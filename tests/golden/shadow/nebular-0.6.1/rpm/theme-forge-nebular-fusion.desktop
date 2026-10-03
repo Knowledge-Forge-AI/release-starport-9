@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Theme Forge Nebular Fusion
+Comment=Evidence-bound Theme Forge integration workbench
+Exec=tfnf
+Icon=theme-forge-nebular-fusion
+Terminal=false
+Categories=Development;

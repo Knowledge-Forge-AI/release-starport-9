@@ -1,0 +1,121 @@
+{
+  "harness_sha256": "8ae602b0a81313530b30609e4bdd78adde08b7c158fbcb63ae77aabc5ae8be4d",
+  "integrated_render_manifest_sha256": "4176a6872443422ad537936315dc7d0d17a35e991cede20a71da4ddd35f2e116",
+  "limits": [
+    "Installed full payload manifests unexecuted; installed launcher/integration readback only",
+    "AUR package installed-tree parity unexecuted",
+    "Nix Linux build/install unavailable",
+    "Ambient Nix channel hash was hardcoded in harness; not independent content verification",
+    "Immutable base container image provenance not retained in second harness",
+    "Reference packages not built",
+    "GUI/sidecar readiness not proven",
+    "Full icon/desktop removal after uninstall not read back"
+  ],
+  "manifest_bridge": "Input record metadata/normalization hashes evolved; all nine executed recipe/desktop bytes are identical to final goldens",
+  "payload_parity": {
+    "nix-aarch64-darwin": {
+      "entries": 1316,
+      "file_content_and_symlink_identity": true,
+      "manifest_sha256": "b4ec52133ef237ef551fc4a52968d6338388adff128c0cd6b7d0e4bcfe16634e",
+      "mode_changes": 1316,
+      "mode_rule": "Nix store removes write bits",
+      "scope": "built package payload, not complete installed-tree readback"
+    },
+    "pacman-x86_64": {
+      "entries": 1371,
+      "file_content_and_symlink_identity": true,
+      "manifest_sha256": "3957611ab375243327b247960094bde3a07df1d0ee2f56786812bf143e1e7249",
+      "mode_changes": 0,
+      "mode_rule": "identical",
+      "scope": "built package payload, not complete installed-tree readback"
+    },
+    "rpm-aarch64": {
+      "entries": 1371,
+      "file_content_and_symlink_identity": true,
+      "manifest_sha256": "a95c7a6285ac1e7c1cf1c184ca902573ab1ccc6b8cc01fae177e2f90a7b6f88f",
+      "mode_changes": 0,
+      "mode_rule": "identical",
+      "scope": "built package payload, not complete installed-tree readback"
+    },
+    "rpm-x86_64": {
+      "entries": 1371,
+      "file_content_and_symlink_identity": true,
+      "manifest_sha256": "3957611ab375243327b247960094bde3a07df1d0ee2f56786812bf143e1e7249",
+      "mode_changes": 0,
+      "mode_rule": "identical",
+      "scope": "built package payload, not complete installed-tree readback"
+    }
+  },
+  "provider_query_coverage": {
+    "arch-x86_64": "all observed system SONAMEs returned providers",
+    "fedora-aarch64": "no providers returned; invalid capability glob; unresolved",
+    "fedora-x86_64": "all observed system SONAMEs returned providers",
+    "nix": "derivation evaluation only; SONAME file-provider proof unexecuted"
+  },
+  "qualification_render_manifest_sha256": "07979ee14043d4f52d15b8b9e149464ebee981d39de612a2d1bf1c6fdd0ec756",
+  "qualified_recipe_hashes": {
+    "aur/theme-forge-nebular-fusion-bin/.SRCINFO": {
+      "sha256": "dccb25b8e0da1987e586bd4254dae8b154013d6bb26ae62b45346da301bb285a",
+      "size": 1641
+    },
+    "aur/theme-forge-nebular-fusion-bin/PKGBUILD": {
+      "sha256": "7da74c25d92687d7095e894489e6c7f4380f0d69a1b02768c36fa27d90944bab",
+      "size": 2159
+    },
+    "aur/theme-forge-nebular-fusion-bin/theme-forge-nebular-fusion.desktop": {
+      "sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401",
+      "size": 203
+    },
+    "nix/theme-forge-nebular-fusion.desktop": {
+      "sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401",
+      "size": 203
+    },
+    "nix/theme-forge-nebular-fusion.nix": {
+      "sha256": "fd374c98801fd2f94ba5732f1fc05b00c1347d0b671375afaafcd27b756db2e0",
+      "size": 3530
+    },
+    "pacman/theme-forge-nebular-fusion/PKGBUILD": {
+      "sha256": "1cc750f4fbb618c6b9ad827cfbe84999c3dc51b805b735fa43464e5435dce485",
+      "size": 1772
+    },
+    "pacman/theme-forge-nebular-fusion/theme-forge-nebular-fusion.desktop": {
+      "sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401",
+      "size": 203
+    },
+    "rpm/theme-forge-nebular-fusion.desktop": {
+      "sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401",
+      "size": 203
+    },
+    "rpm/theme-forge-nebular-fusion.spec": {
+      "sha256": "3c87e63c43a9bae6d7ceca595786e2bb44650d5035a97a06b720719a2b474c78",
+      "size": 3000
+    }
+  },
+  "schema": "rs9.qualification-parent-readback.v1alpha1",
+  "scratch_receipt_sha256": {
+    "arch-build.log": "95c60e1dcc8967f96429634fab5280592df018667f87628ef1b7e98105970829",
+    "arch-install-smoke.log": "a1475878af749424cccf8388dce63851a04403fbf3fe10e7c466351f1c0c31f8",
+    "arch-provider-query.log": "3349e4593c16ba9e9cd6970838b3bfb785b0010ba81df6577ecb2c66bf01019e",
+    "aur-pacman-qualification.json": "b5f026602051b60101ccccea340d22ede588ecb56dae29c23ccdf2e1c5714edc",
+    "cleanup-receipt.json": "8cd138607346fadd1f4b1d174f0a719d0e4af54238ec0e8b566122f62fb5d16f",
+    "darwin-store-payload-manifest.json": "b4ec52133ef237ef551fc4a52968d6338388adff128c0cd6b7d0e4bcfe16634e",
+    "fedora-arm64-provider-query.log": "89951b214387a19b5812b5f0ecdaf02e5d7cd50ae59fc75b51ec0b77e7247636",
+    "fedora-install-smoke-arm64.log": "e8f9287fb9c8f52c895792600855fe65e4a6fef565bd03414eebeed6f3fc3e6e",
+    "fedora-install-smoke-x64.log": "0b461cd9ee829fbcfed16e22befaeaeb1bf3f32807bb9b379536ccf359255b0d",
+    "fedora-provider-query.log": "62f2e10784d4a2e33bc83049916a962812d6965215f081b3778f262e4b63dffe",
+    "harness-receipt.json": "2118b7a42b3a781b11263fee63af5ecf42d0db037c211c2f4998eaf3a2b14772",
+    "install-smoke-receipt.json": "b29aad4c9441241f9a173bc71117c5bd9cb4854db63b3ab6540a31653a0d4548",
+    "nix-darwin-qualification.json": "32e968441e41bfbe84d9680fa2df69020f56cd11555274e5024d123ef3e6d9b6",
+    "nix-darwin.log": "2aa8cb16d2e6064e7c33c29f33bf14015ff69c8214478e6f68eafa9e6a6f7445",
+    "pacman-payload-manifest.json": "3957611ab375243327b247960094bde3a07df1d0ee2f56786812bf143e1e7249",
+    "payload-parity-matrix.json": "c9e941afad1e0bad6c9fe0da1207116a02951742f2e628e527f508ad126eb093",
+    "provider-mapping-proof.json": "9bb933bd09cd4f29d2ec9ba215a914c93f149ff0f24d1906536197b9744d7412",
+    "qualify.py": "8ae602b0a81313530b30609e4bdd78adde08b7c158fbcb63ae77aabc5ae8be4d",
+    "recipe-hashes.json": "1935b5d3c9d8ea45440edf745d6455a08e72ebd6d33246067f634e7ae57814aa",
+    "rpm-payload-manifest-arm64.json": "a95c7a6285ac1e7c1cf1c184ca902573ab1ccc6b8cc01fae177e2f90a7b6f88f",
+    "rpm-payload-manifest-x64.json": "3957611ab375243327b247960094bde3a07df1d0ee2f56786812bf143e1e7249",
+    "rpm-prep-negative.log": "93ebc67e8640c526005b49647b7ad310adb6269b6758b675dbced7b3d6e9ab32",
+    "rpm-qualification.json": "1a75b1d8903de0f88a4461f319fe248b0c9e440182f90e4ade3edb9285a8474e"
+  },
+  "worker_disposition": "partial"
+}

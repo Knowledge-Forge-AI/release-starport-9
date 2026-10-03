@@ -2,6 +2,13 @@
 
 Status: implemented provisionally; no compatibility promise or production use.
 
+Foundation 2 adds optional summary/desktop/tagged icon facts and per-asset
+release-owned launcher selections, plus explicit operator AUR profile selection.
+The validator still performs no network or execution. Separate modules now
+authenticate captured bytes and render deferred shadow candidates. See
+[ADR 0003](0003-authenticated-ingestion-and-shadow-adapters.md) for the amendment;
+the original Foundation 1 boundary described below remains historical context.
+
 ## Context
 
 Theme Forge distribution joins four independently versioned products in one

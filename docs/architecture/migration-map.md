@@ -25,22 +25,32 @@ none of that authority.
 1. Authenticate release/tag lineage and downloaded asset bytes for all four
    current versions. Public API presence/digests were observed; registry cache
    filenames cannot stand in for attached GitHub asset names.
+   Foundation 2 now binds Nebular's three raw assets and tagged source from fresh
+   captured bytes; the other tenant versions remain outside this shadow.
 2. Nebular's npm `AGPL-3.0-or-later OR Commercial` versus distro metadata.
    Tenant decides; syntax-only acceptance does not settle it.
+   Fresh published wrapper bytes confirm the conflict with tagged source and
+   byte-equal project licenses in the raw archives; this gate remains open.
 3. Current signing authority branding, UID domain and rotation before expiry.
    Preserve established trust until an independently qualified operator change.
 4. Hosted GUI/FHS checks, `tfsl-batch` stdin behavior and any other red validation.
    Qualify display-dependent launch in a suitable harness without changing payloads.
 5. Native Burst platform coverage versus narrower pacman serving, and target
    dependency/desktop/icon authority missing from this executable subset.
+   Nebular now has both-architecture released-byte dependency records,
+   deterministic desktop facts and a tagged 256px PNG selection. Runtime/resource,
+   provider and install qualification remain bounded by the Foundation 2 report.
 6. npm/PyPI publisher identity and provenance compatibility. No registry fallback
    or byte transformation is implicitly authorized.
 7. APT candidate's native hosted obligations and authenticated generation retention.
 
-## Next bounded phase
+## Current shadow and adoption gate
 
 `RS9-FOUNDATION2-NEBULAR-PROJECTION-SHADOW1`: use authenticated Nebular 0.6.1
 inputs to render a pacman/RPM/Nix/AUR recipe candidate in RS9 scratch only,
 compare actual recipe bytes/semantics, and close dependency/desktop/license gaps.
 No signing, production publication, external repository mutation or cutover.
 Broader Theme Forge shadow work requires its GitHub asset-authority gaps to close.
+The [Foundation 2 candidate](../foundation2-candidate.md) records the implemented
+shadow and dispatcher review boundary. Resolve tenant license/runtime gates and
+adopt only independently reviewed RS9 source before assigning any next phase.

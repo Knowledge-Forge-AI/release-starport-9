@@ -1,0 +1,38 @@
+pkgbase = theme-forge-nebular-fusion-bin
+	pkgdesc = Evidence-bound Theme Forge integration workbench
+	pkgver = 0.6.1
+	pkgrel = 1
+	url = https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion
+	arch = aarch64
+	arch = x86_64
+	license = AGPL-3.0-or-later
+	depends = bash
+	depends = cairo
+	depends = dbus
+	depends = gdk-pixbuf2
+	depends = glib2
+	depends = glibc>=2.34
+	depends = gtk3
+	depends = hicolor-icon-theme
+	depends = libgcc
+	depends = libsoup3
+	depends = libstdc++
+	depends = nodejs>=22
+	depends = webkit2gtk-4.1
+	provides = theme-forge-nebular-fusion=0.6.1
+	conflicts = theme-forge-nebular-fusion
+	options = !strip
+	options = !debug
+	options = !purge
+	options = !zipman
+	source = theme-forge-nebular-fusion.desktop
+	source = icon.png::https://raw.githubusercontent.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e/src-tauri/icons/icon.png
+	sha256sums = f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401
+	sha256sums = 2d65e8c69a675b6c939ac11757c6a47a123f63b3f83b6d58305aaf7231aca160
+	source_aarch64 = https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz
+	depends_aarch64 = pango
+	sha256sums_aarch64 = 5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f
+	source_x86_64 = https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz
+	sha256sums_x86_64 = d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d
+
+pkgname = theme-forge-nebular-fusion-bin

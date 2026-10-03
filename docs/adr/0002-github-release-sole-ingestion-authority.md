@@ -1,6 +1,9 @@
 # ADR 0002: GitHub Release ingestion authority
 
-Status: architecture decision; authentication and publication not implemented.
+Status: architecture decision; captured-byte authentication implemented in the
+Foundation 2 candidate, publication unimplemented. See
+[ADR 0003](0003-authenticated-ingestion-and-shadow-adapters.md). The original
+Foundation 1 investigation below remains historical evidence.
 
 ## Context
 

@@ -43,7 +43,7 @@ def resolve_target(adapter, package, destination, assets):
               "ecosystem-architectures": ecosystem_architectures(adapter, effective, independent),
               "effective-platforms": effective, "mode": destination["mode"],
               "name": package["name"], "package": package["id"]}
-    for key in ("base-url", "repository"):
+    for key in ("base-url", "repository", "profile"):
         if key in destination:
             target[key] = destination[key]
     return target

@@ -12,5 +12,11 @@ Release Starport 9 is organized around a small number of stable contracts:
   [migration map](architecture/migration-map.md).
 - [Project/ecosystem install index](install/README.md) — routes to current authorities.
 - [Foundation disposition and qualification](foundation1-candidate.md) — bounded phase record.
+- [Foundation 2 candidate](foundation2-candidate.md),
+  [Nebular shadow design](architecture/nebular-shadow-projection.md),
+  [qualification](foundation2-qualification.md), and
+  [ingestion decision](adr/0003-authenticated-ingestion-and-shadow-adapters.md).
+- [Input record](specs/rs9-ingestion-record-v1alpha1.md) and
+  [Linux dependency evidence](specs/rs9-dependency-evidence-v1alpha1.md).
 
 Ecosystem-specific operator and adapter documentation will be added as the corresponding adapters are adopted.

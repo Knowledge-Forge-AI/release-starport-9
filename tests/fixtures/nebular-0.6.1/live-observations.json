@@ -1,0 +1,754 @@
+{
+  "schema": "rs9.live-observations.nebular.v1alpha1",
+  "captured_at": "2026-10-03T12:53:36.763757+00:00",
+  "repository": {
+    "owner": "Knowledge-Forge-AI",
+    "name": "theme-forge-nebular-fusion",
+    "default_branch": "main",
+    "target_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+    "target_tree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b",
+    "tree_truncated": false,
+    "tag": "v0.6.1",
+    "tag_object_type": "commit",
+    "is_draft": false,
+    "is_prerelease": false,
+    "release_id": 400494635,
+    "release_name": "Theme Forge Nebular Fusion 0.6.1"
+  },
+  "source_files": {
+    "LICENSE": {
+      "path": "LICENSE",
+      "git_blob_sha": "7ce823c377a19ad5082605452c4503176cd793e6",
+      "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+      "size": 34460,
+      "mode": "100644"
+    },
+    "NOTICE": {
+      "path": "NOTICE",
+      "git_blob_sha": "2ca3294a5e4c2dbf65cfdb5a74df8dcc157baf05",
+      "sha256": "9b7be934e0a179a7c48446139334470964057c198d49ec8e149c3101f78778f2",
+      "size": 604,
+      "mode": "100644"
+    },
+    "COMMERCIAL-LICENSE.md": {
+      "path": "COMMERCIAL-LICENSE.md",
+      "git_blob_sha": "d321f238af983fdb2d2339ad9a38319a5690ba3c",
+      "sha256": "3f5ea7c51359c8d4310e061686980c674151b20924f6cd2bb59d657566e6c30f",
+      "size": 933,
+      "mode": "100644"
+    },
+    "package.json": {
+      "path": "package.json",
+      "git_blob_sha": "4251796133a8c4a9780cf2a496e265c6fc395bba",
+      "sha256": "8555670c2648985e1193eaef4fd4756793672afcde6a20cc3a862ecc447f33d0",
+      "size": 1833,
+      "mode": "100644",
+      "parsed_json": {
+        "name": "@knowledge-forge-ai/theme-forge-nebular-fusion",
+        "version": "0.6.1",
+        "private": true,
+        "description": "Theme Forge Nebular Fusion application",
+        "license": "AGPL-3.0-or-later",
+        "type": "module",
+        "engines": {
+          "node": ">=22.23.2"
+        },
+        "scripts": {
+          "dev": "vite",
+          "typecheck": "tsc --noEmit",
+          "test": "vitest run",
+          "build": "node tools/solar-sail-prepare.mjs && node tools/app-preview-prepare.mjs && node tools/generate-self-theme.mjs && vite build",
+          "solar-sail:prepare": "node tools/solar-sail-prepare.mjs",
+          "app-preview:prepare": "node tools/app-preview-prepare.mjs",
+          "self-theme:generate": "node tools/generate-self-theme.mjs",
+          "loom:prepare": "node tools/loom-prepare.mjs",
+          "loom:clean": "node tools/loom-clean.mjs",
+          "sidecar:prepare": "node tools/sidecar-prepare.mjs",
+          "sidecar:verify": "node tools/sidecar-verify.mjs",
+          "sidecar:clean": "node tools/sidecar-clean.mjs",
+          "sidecar:test": "node --test tools/sidecar-builder-tests.mjs tools/sidecar-transcript-tests.mjs",
+          "sidecar:transcript": "node tools/sidecar-transcript.mjs",
+          "tauri": "tauri",
+          "tauri:build": "node tools/build-app.mjs",
+          "tauri:build:sidecar": "npm run sidecar:prepare && npm run tauri:build",
+          "tauri:build:loom": "npm run sidecar:prepare && npm run loom:prepare && npm run tauri:build",
+          "notices:generate": "node tools/release-notices.mjs"
+        },
+        "dependencies": {
+          "@tauri-apps/api": "2.11.1",
+          "react": "19.2.8",
+          "react-dom": "19.2.8"
+        },
+        "devDependencies": {
+          "@tauri-apps/cli": "2.11.4",
+          "@testing-library/react": "16.3.3",
+          "@testing-library/user-event": "14.6.6",
+          "@types/react": "19.2.18",
+          "@types/react-dom": "19.2.5",
+          "jsdom": "30.0.1",
+          "typescript": "7.0.2",
+          "vite": "8.2.2",
+          "vitest": "4.1.11"
+        }
+      }
+    },
+    "src-tauri/Cargo.toml": {
+      "path": "src-tauri/Cargo.toml",
+      "git_blob_sha": "39005325fb71fc9b535bcdee6e79537e688fb761",
+      "sha256": "92cdd31067282e3c2c9ef1bce89fd706b0f975750282a8552a5705a129bb0f4c",
+      "size": 1177,
+      "mode": "100644"
+    },
+    "src-tauri/tauri.conf.json": {
+      "path": "src-tauri/tauri.conf.json",
+      "git_blob_sha": "9bfcaee943475b36d04bffa1a1d22bf92da4222c",
+      "sha256": "8421ddc3414c95258dc7a1d131121b141b0cf965805062f62429e7847ad1951d",
+      "size": 1530,
+      "mode": "100644",
+      "parsed_json": {
+        "productName": "Theme Forge Nebular Fusion",
+        "version": "0.6.1",
+        "identifier": "ai.knowledgeforge.themeforge.nebularfusion",
+        "build": {
+          "beforeBuildCommand": "npm run build",
+          "frontendDist": "../dist"
+        },
+        "app": {
+          "withGlobalTauri": false,
+          "windows": [
+            {
+              "label": "main",
+              "title": "Theme Forge Nebular Fusion",
+              "create": false,
+              "width": 1180,
+              "height": 820,
+              "minWidth": 760,
+              "minHeight": 620,
+              "resizable": true,
+              "fullscreen": false
+            }
+          ],
+          "security": {
+            "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' blob:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+            "capabilities": [
+              "main"
+            ]
+          }
+        },
+        "bundle": {
+          "active": true,
+          "externalBin": [
+            "binaries/tfsb-studio-service"
+          ],
+          "resources": [
+            "sidecar-payload/**/*",
+            "loom-payload/**/*",
+            "loom-adapter/**/*",
+            "solar-sail-payload/**/*",
+            "solar-sail-adapter/**/*",
+            "scene-payload/**/*",
+            "release-notices/**/*"
+          ],
+          "targets": [
+            "app"
+          ],
+          "category": "DeveloperTool",
+          "shortDescription": "Evidence-bound Theme Forge integration workbench",
+          "longDescription": "Theme Forge Nebular Fusion is a local human-first workbench for reviewing deterministic Theme Forge candidate evidence.",
+          "macOS": {
+            "minimumSystemVersion": "13.0"
+          }
+        }
+      }
+    },
+    "src-tauri/icons/icon.png": {
+      "path": "src-tauri/icons/icon.png",
+      "git_blob_sha": "ae7ebf4396e0d7aed6e15e5a5f0e123787cd9a35",
+      "sha256": "2d65e8c69a675b6c939ac11757c6a47a123f63b3f83b6d58305aaf7231aca160",
+      "size": 8814,
+      "mode": "100644",
+      "png_info": {
+        "width": 256,
+        "height": 256
+      }
+    }
+  },
+  "release_assets": {
+    "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz": {
+      "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+      "id": 601953438,
+      "size": 47079690,
+      "sha256": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be",
+      "browser_download_url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+      "github_digest": "sha256:e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be",
+      "sha256sums_match": true,
+      "sha256sums_hash": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be"
+    },
+    "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz": {
+      "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+      "id": 601953522,
+      "size": 54248930,
+      "sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+      "browser_download_url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+      "github_digest": "sha256:5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+      "sha256sums_match": true,
+      "sha256sums_hash": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f"
+    },
+    "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz": {
+      "name": "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+      "id": 601953596,
+      "size": 54105413,
+      "sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+      "browser_download_url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+      "github_digest": "sha256:d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+      "sha256sums_match": true,
+      "sha256sums_hash": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d"
+    },
+    "SHA256SUMS": {
+      "name": "SHA256SUMS",
+      "id": 601953797,
+      "size": 1378,
+      "sha256": "0c811162316eb7fb99aac460db3cbeee6a6147d32ace29fa21b57856144f2ea0",
+      "browser_download_url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/SHA256SUMS",
+      "github_digest": "sha256:0c811162316eb7fb99aac460db3cbeee6a6147d32ace29fa21b57856144f2ea0",
+      "sha256sums_match": null
+    },
+    "PROVENANCE.json": {
+      "name": "PROVENANCE.json",
+      "id": 601953752,
+      "size": 14720,
+      "sha256": "3645984085dc434b1678eec16440d79a8c87dd704836eb8731085425dc976d1c",
+      "browser_download_url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/PROVENANCE.json",
+      "github_digest": "sha256:3645984085dc434b1678eec16440d79a8c87dd704836eb8731085425dc976d1c",
+      "sha256sums_match": true,
+      "sha256sums_hash": "3645984085dc434b1678eec16440d79a8c87dd704836eb8731085425dc976d1c"
+    },
+    "nebular.spdx.json": {
+      "name": "nebular.spdx.json",
+      "id": 601953680,
+      "size": 63796,
+      "sha256": "d7b5ae755abc7a3807ff8425341e8028496b3c929d89915b4e5a7f88898909c1",
+      "browser_download_url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/nebular.spdx.json",
+      "github_digest": "sha256:d7b5ae755abc7a3807ff8425341e8028496b3c929d89915b4e5a7f88898909c1",
+      "sha256sums_match": true,
+      "sha256sums_hash": "d7b5ae755abc7a3807ff8425341e8028496b3c929d89915b4e5a7f88898909c1"
+    },
+    "THIRD_PARTY_NOTICES.md": {
+      "name": "THIRD_PARTY_NOTICES.md",
+      "id": 601953710,
+      "size": 131900,
+      "sha256": "d7547284b40ff84372ca4061004307b8513cc39d6839c346f0c4b52832cd5e04",
+      "browser_download_url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/THIRD_PARTY_NOTICES.md",
+      "github_digest": "sha256:d7547284b40ff84372ca4061004307b8513cc39d6839c346f0c4b52832cd5e04",
+      "sha256sums_match": true,
+      "sha256sums_hash": "d7547284b40ff84372ca4061004307b8513cc39d6839c346f0c4b52832cd5e04"
+    },
+    "knowledge-forge-ai-theme-forge-nebular-fusion-0.6.1.tgz": {
+      "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.6.1.tgz",
+      "id": 601953356,
+      "size": 18124,
+      "sha256": "17f7563d6a6fa0bf250579a92ceca065fb4ca115a4fe4aae610850f1cfe29a7f",
+      "browser_download_url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/knowledge-forge-ai-theme-forge-nebular-fusion-0.6.1.tgz",
+      "github_digest": "sha256:17f7563d6a6fa0bf250579a92ceca065fb4ca115a4fe4aae610850f1cfe29a7f",
+      "sha256sums_match": true,
+      "sha256sums_hash": "17f7563d6a6fa0bf250579a92ceca065fb4ca115a4fe4aae610850f1cfe29a7f"
+    }
+  },
+  "archive_inspection": {
+    "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz": {
+      "root": "Theme Forge Nebular Fusion.app",
+      "member_count": 1656,
+      "regular_file_count": 1316,
+      "total_uncompressed_bytes": 145794540,
+      "command_found": true,
+      "command_path": "Theme Forge Nebular Fusion.app/Contents/MacOS/theme-forge-nebular-fusion",
+      "command_size": 19957072,
+      "command_sha256": "663c60a675165287e3157a279988bcd4bce556cf3c2a69d4bfd5ab937f60d867",
+      "command_mode": "0o755",
+      "is_executable": true,
+      "elf_summary": null
+    },
+    "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz": {
+      "root": "theme-forge-nebular-fusion",
+      "member_count": 1752,
+      "regular_file_count": 1371,
+      "total_uncompressed_bytes": 156118902,
+      "command_found": true,
+      "command_path": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+      "command_size": 21168720,
+      "command_sha256": "5c182d28c02f2d6ea09ed130625ef899a8d0fe4ca080df775d72cdd6cd43b743",
+      "command_mode": "0o755",
+      "is_executable": true,
+      "elf_summary": {
+        "machine": "aarch64",
+        "interp": "/lib/ld-linux-aarch64.so.1",
+        "needed_libraries": [
+          "libc.so.6",
+          "libcairo-gobject.so.2",
+          "libcairo.so.2",
+          "libdbus-1.so.3",
+          "libgcc_s.so.1",
+          "libgdk-3.so.0",
+          "libgdk_pixbuf-2.0.so.0",
+          "libgio-2.0.so.0",
+          "libglib-2.0.so.0",
+          "libgobject-2.0.so.0",
+          "libgtk-3.so.0",
+          "libjavascriptcoregtk-4.1.so.0",
+          "libm.so.6",
+          "libpango-1.0.so.0",
+          "libsoup-3.0.so.0",
+          "libwebkit2gtk-4.1.so.0"
+        ],
+        "rpath": null,
+        "runpath": null,
+        "glibc_version_count": 14
+      }
+    },
+    "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz": {
+      "root": "theme-forge-nebular-fusion",
+      "member_count": 1752,
+      "regular_file_count": 1371,
+      "total_uncompressed_bytes": 159796681,
+      "command_found": true,
+      "command_path": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+      "command_size": 22243984,
+      "command_sha256": "6efc9c12ff9148f9e20763c620b7abb1712c614fc796b1577e01913488c658e0",
+      "command_mode": "0o755",
+      "is_executable": true,
+      "elf_summary": {
+        "machine": "x86_64",
+        "interp": "/lib64/ld-linux-x86-64.so.2",
+        "needed_libraries": [
+          "ld-linux-x86-64.so.2",
+          "libc.so.6",
+          "libcairo.so.2",
+          "libdbus-1.so.3",
+          "libgcc_s.so.1",
+          "libgdk-3.so.0",
+          "libgdk_pixbuf-2.0.so.0",
+          "libgio-2.0.so.0",
+          "libglib-2.0.so.0",
+          "libgobject-2.0.so.0",
+          "libgtk-3.so.0",
+          "libjavascriptcoregtk-4.1.so.0",
+          "libm.so.6",
+          "libsoup-3.0.so.0",
+          "libwebkit2gtk-4.1.so.0"
+        ],
+        "rpath": null,
+        "runpath": null,
+        "glibc_version_count": 23
+      }
+    }
+  },
+  "elf_runtime_requirements": {
+    "linux_x86_64": {
+      "machine": "x86_64",
+      "interp": "/lib64/ld-linux-x86-64.so.2",
+      "dt_needed": [
+        "ld-linux-x86-64.so.2",
+        "libc.so.6",
+        "libcairo.so.2",
+        "libdbus-1.so.3",
+        "libgcc_s.so.1",
+        "libgdk-3.so.0",
+        "libgdk_pixbuf-2.0.so.0",
+        "libgio-2.0.so.0",
+        "libglib-2.0.so.0",
+        "libgobject-2.0.so.0",
+        "libgtk-3.so.0",
+        "libjavascriptcoregtk-4.1.so.0",
+        "libm.so.6",
+        "libsoup-3.0.so.0",
+        "libwebkit2gtk-4.1.so.0"
+      ],
+      "glibc_needs": [
+        {
+          "library": "ld-linux-x86-64.so.2",
+          "version": "GLIBC_2.3"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.14"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.15"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.16"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.17"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.18"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.2.5"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.25"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.28"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.29"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.3"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.3.4"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.30"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.32"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.33"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.34"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.4"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.9"
+        },
+        {
+          "library": "libdbus-1.so.3",
+          "version": "LIBDBUS_1_3"
+        },
+        {
+          "library": "libgcc_s.so.1",
+          "version": "GCC_3.0"
+        },
+        {
+          "library": "libgcc_s.so.1",
+          "version": "GCC_3.3"
+        },
+        {
+          "library": "libgcc_s.so.1",
+          "version": "GCC_4.2.0"
+        },
+        {
+          "library": "libm.so.6",
+          "version": "GLIBC_2.29"
+        }
+      ]
+    },
+    "linux_aarch64": {
+      "machine": "aarch64",
+      "interp": "/lib/ld-linux-aarch64.so.1",
+      "dt_needed": [
+        "libc.so.6",
+        "libcairo-gobject.so.2",
+        "libcairo.so.2",
+        "libdbus-1.so.3",
+        "libgcc_s.so.1",
+        "libgdk-3.so.0",
+        "libgdk_pixbuf-2.0.so.0",
+        "libgio-2.0.so.0",
+        "libglib-2.0.so.0",
+        "libgobject-2.0.so.0",
+        "libgtk-3.so.0",
+        "libjavascriptcoregtk-4.1.so.0",
+        "libm.so.6",
+        "libpango-1.0.so.0",
+        "libsoup-3.0.so.0",
+        "libwebkit2gtk-4.1.so.0"
+      ],
+      "glibc_needs": [
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.17"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.18"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.25"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.28"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.29"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.30"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.32"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.33"
+        },
+        {
+          "library": "libc.so.6",
+          "version": "GLIBC_2.34"
+        },
+        {
+          "library": "libdbus-1.so.3",
+          "version": "LIBDBUS_1_3"
+        },
+        {
+          "library": "libgcc_s.so.1",
+          "version": "GCC_3.0"
+        },
+        {
+          "library": "libgcc_s.so.1",
+          "version": "GCC_3.3"
+        },
+        {
+          "library": "libgcc_s.so.1",
+          "version": "GCC_4.2.0"
+        },
+        {
+          "library": "libm.so.6",
+          "version": "GLIBC_2.29"
+        }
+      ]
+    }
+  },
+  "npm_package": {
+    "package_name": "@knowledge-forge-ai/theme-forge-nebular-fusion",
+    "version": "0.6.1",
+    "registry_declared_license": "AGPL-3.0-or-later OR Commercial",
+    "dist": {
+      "shasum": "1ac45767d0701810954468b5638553cb7036e449",
+      "tarball": "https://registry.npmjs.org/@knowledge-forge-ai/theme-forge-nebular-fusion/-/theme-forge-nebular-fusion-0.6.1.tgz",
+      "fileCount": 7,
+      "integrity": "sha512-hlVsZ1YhIl+t75/zEnhh8LMC2ZYa4Bku9QXDu0q/un6ZQ5Paehk373MJX49RODVQj1aXGTdd697J+4EkAC+1+A==",
+      "signatures": [
+        {
+          "sig": "MEQCIAjrrmiKqWHylDZqajfoNBbiCyWEF2RIJbx6XtphsoZrAiA3iRBk1NCdtru1R0SMcwz6y+qbqwK5bu/mU+zFfQnXUQ==",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+          "sig": "MEQCIHghh2705abkgNZnGT/UZx8sRpR+uBkUp0cE3QIMmUovAiAYwkagk/EzqRCgByBxqUqHs+G4/Biyh2wQIIuhO2rA2w=="
+        }
+      ],
+      "unpackedSize": 53923
+    },
+    "tarball_url": "https://registry.npmjs.org/@knowledge-forge-ai/theme-forge-nebular-fusion/-/theme-forge-nebular-fusion-0.6.1.tgz",
+    "tarball_size": 18124,
+    "tarball_sha256": "17f7563d6a6fa0bf250579a92ceca065fb4ca115a4fe4aae610850f1cfe29a7f",
+    "computed_sha1": "1ac45767d0701810954468b5638553cb7036e449",
+    "registry_shasum_match": true,
+    "computed_integrity": "sha512-hlVsZ1YhIl+t75/zEnhh8LMC2ZYa4Bku9QXDu0q/un6ZQ5Paehk373MJX49RODVQj1aXGTdd697J+4EkAC+1+A==",
+    "registry_integrity_match": true,
+    "identical_to_release_asset": true,
+    "package_json_declaration": {
+      "name": "@knowledge-forge-ai/theme-forge-nebular-fusion",
+      "version": "0.6.1",
+      "license": "AGPL-3.0-or-later OR Commercial",
+      "bin": {
+        "tfnf": "./bin/tfnf.js"
+      },
+      "optionalDependencies": {
+        "@knowledge-forge-ai/theme-forge-nebular-fusion-darwin-arm64": "0.6.1",
+        "@knowledge-forge-ai/theme-forge-nebular-fusion-linux-arm64": "0.6.1",
+        "@knowledge-forge-ai/theme-forge-nebular-fusion-linux-x64": "0.6.1"
+      },
+      "dependencies": null,
+      "engines": {
+        "node": ">=22"
+      }
+    }
+  },
+  "license_authority_analysis": {
+    "root_license_file": "GNU AFFERO GENERAL PUBLIC LICENSE Version 3, 19 November 2007 (AGPL-3.0-only / AGPL-3.0-or-later)",
+    "root_notice_declaration": "Unless explicitly stated otherwise in a specific file, all software in this repository is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).",
+    "root_commercial_license_declaration": "Community edition is provided under AGPL-3.0-or-later. Commercial licenses available upon inquiry.",
+    "source_package_json_license": "AGPL-3.0-or-later",
+    "published_npm_package_json_license": "AGPL-3.0-or-later OR Commercial",
+    "published_npm_registry_license": "AGPL-3.0-or-later OR Commercial",
+    "discrepancy": {
+      "source_tag_spdx": "AGPL-3.0-or-later",
+      "npm_published_spdx": "AGPL-3.0-or-later OR Commercial",
+      "finding": "The published npm package declared 'AGPL-3.0-or-later OR Commercial' whereas source-tag package.json and repository LICENSE/NOTICE declare 'AGPL-3.0-or-later' with commercial license offered separately. This constitutes a dual-expression gap between npm publication metadata and source repository root licensing."
+    }
+  },
+  "public_reference": {
+    "repository": "Knowledge-Forge-AI/theme-forge-packages",
+    "observed_commit": "062a931f4b5e44ad43c88363efd81ab8d92602df",
+    "observed_tree": "dc40d20e0e428122d5bc5d5721634bec0511ff26",
+    "captured_files": {
+      "packages/nebular-fusion.nix": {
+        "path": "packages/nebular-fusion.nix",
+        "git_blob_sha": "1201646279b8b1ca3136dbcc05ab26233119cbaf",
+        "sha256": "0c217de505993e7f1c5089651016c273d8f027d6a7a2971e8e4b7750bc0dccb3",
+        "size": 4865
+      },
+      "templates/pacman/theme-forge-nebular-fusion/PKGBUILD": {
+        "path": "templates/pacman/theme-forge-nebular-fusion/PKGBUILD",
+        "git_blob_sha": "33ebe4fabe9672bbbc37211a59c8cb25df006817",
+        "sha256": "9cbbe0c1d04d900fdd1a0207c733d575f3104ad6b7f473e5658ccb688d16422e",
+        "size": 2476
+      },
+      "templates/rpm/theme-forge-nebular-fusion.spec": {
+        "path": "templates/rpm/theme-forge-nebular-fusion.spec",
+        "git_blob_sha": "10dc551ac0d04ed9e0ef5982a35df4da11a49a33",
+        "sha256": "47249b94cc91d8bdb445aa692d5f6b2d036ed7ac515d5c93dddd392d20bfbdbb",
+        "size": 3267
+      },
+      "aur/theme-forge-nebular-fusion-bin/PKGBUILD": {
+        "path": "aur/theme-forge-nebular-fusion-bin/PKGBUILD",
+        "git_blob_sha": "e6d49fc4caf5f078eb99488ca0d00185253f9c2d",
+        "sha256": "1912edfa8e783ed558a728899205f31197c417b53fc5485c62803b6054456019",
+        "size": 2916
+      },
+      "aur/theme-forge-nebular-fusion-bin/.SRCINFO": {
+        "path": "aur/theme-forge-nebular-fusion-bin/.SRCINFO",
+        "git_blob_sha": "8e774a89b95d566e11521056969d929c815702d4",
+        "sha256": "6ee2f94de19ae89a27fa592026cc09b6eb3413c3af1a1c2aa177af6dcb08ff97",
+        "size": 1856
+      },
+      "templates/desktop/theme-forge-nebular-fusion.desktop": {
+        "path": "templates/desktop/theme-forge-nebular-fusion.desktop",
+        "git_blob_sha": "e66612357af2daab79f800a0b69b74e6c5b8610b",
+        "sha256": "24b28e715e74ce594c75c13fb865a84399ca5aac168490e1773cbad1f3de0283",
+        "size": 333
+      },
+      "templates/pacman/theme-forge-nebular-fusion/icon-16x16.png": {
+        "path": "templates/pacman/theme-forge-nebular-fusion/icon-16x16.png",
+        "git_blob_sha": "28538c80562a704bafc06895ce2bf762e93269bd",
+        "sha256": "bd1717587999d2c81baeb583022be718b7ac0a9affbdbad16b8d3d53717850ee",
+        "size": 624,
+        "png_info": {
+          "width": 16,
+          "height": 16
+        }
+      },
+      "templates/pacman/theme-forge-nebular-fusion/icon-32x32.png": {
+        "path": "templates/pacman/theme-forge-nebular-fusion/icon-32x32.png",
+        "git_blob_sha": "001356a689be3caa61251b56081a6c7993b9aef0",
+        "sha256": "a6b2a188179558e26b24a52c8efeda5ce6d2ca73f33f22b8717844cfd00f98d0",
+        "size": 1298,
+        "png_info": {
+          "width": 32,
+          "height": 32
+        }
+      },
+      "templates/pacman/theme-forge-nebular-fusion/icon-48x48.png": {
+        "path": "templates/pacman/theme-forge-nebular-fusion/icon-48x48.png",
+        "git_blob_sha": "5a0af8533ae0198653fbb0cc7f4ec309252c2796",
+        "sha256": "7268eb032e7e41cb6d48a0b086e1a883b64bf5497845980d87f987984884cfad",
+        "size": 1964,
+        "png_info": {
+          "width": 48,
+          "height": 48
+        }
+      },
+      "templates/pacman/theme-forge-nebular-fusion/icon-64x64.png": {
+        "path": "templates/pacman/theme-forge-nebular-fusion/icon-64x64.png",
+        "git_blob_sha": "fe4e70a5d9f37f71d38a433db785c5fd7942116b",
+        "sha256": "fd68f2da45e40bccf6c8fd447b479c92e041fa5675adb88ce6751cc96d4f2d1f",
+        "size": 2702,
+        "png_info": {
+          "width": 64,
+          "height": 64
+        }
+      },
+      "templates/pacman/theme-forge-nebular-fusion/icon-128x128.png": {
+        "path": "templates/pacman/theme-forge-nebular-fusion/icon-128x128.png",
+        "git_blob_sha": "9fb8ba9ea1df99a5c60735136814f617acfa36d1",
+        "sha256": "8aeb5d5d88b2c3cd5525b8de87359c1b8c248948bd9de7bb83a4f61160cdd5ca",
+        "size": 5740,
+        "png_info": {
+          "width": 128,
+          "height": 128
+        }
+      },
+      "templates/pacman/theme-forge-nebular-fusion/icon-256x256.png": {
+        "path": "templates/pacman/theme-forge-nebular-fusion/icon-256x256.png",
+        "git_blob_sha": "ae7ebf4396e0d7aed6e15e5a5f0e123787cd9a35",
+        "sha256": "2d65e8c69a675b6c939ac11757c6a47a123f63b3f83b6d58305aaf7231aca160",
+        "size": 8814,
+        "png_info": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    }
+  },
+  "icon_findings": {
+    "source_icon": {
+      "path": "src-tauri/icons/icon.png",
+      "sha256": "2d65e8c69a675b6c939ac11757c6a47a123f63b3f83b6d58305aaf7231aca160",
+      "size": 8814,
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      }
+    },
+    "reference_pacman_256": {
+      "path": "templates/pacman/theme-forge-nebular-fusion/icon-256x256.png",
+      "sha256": "2d65e8c69a675b6c939ac11757c6a47a123f63b3f83b6d58305aaf7231aca160",
+      "size": 8814,
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "matches_source_icon": true
+    },
+    "reference_icon_sizes_available": [
+      16,
+      32,
+      48,
+      64,
+      128,
+      256
+    ]
+  },
+  "command_findings": {
+    "darwin": {
+      "raw_archive_member": "Theme Forge Nebular Fusion.app/Contents/MacOS/theme-forge-nebular-fusion",
+      "binary_name": "theme-forge-nebular-fusion",
+      "size": 19957072,
+      "sha256": "663c60a675165287e3157a279988bcd4bce556cf3c2a69d4bfd5ab937f60d867"
+    },
+    "linux_aarch64": {
+      "raw_archive_member": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+      "binary_name": "theme-forge-nebular-fusion",
+      "size": 21168720,
+      "sha256": "5c182d28c02f2d6ea09ed130625ef899a8d0fe4ca080df775d72cdd6cd43b743"
+    },
+    "linux_x86_64": {
+      "raw_archive_member": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+      "binary_name": "theme-forge-nebular-fusion",
+      "size": 22243984,
+      "sha256": "6efc9c12ff9148f9e20763c620b7abb1712c614fc796b1577e01913488c658e0"
+    }
+  }
+}

@@ -5,6 +5,10 @@ an ecosystem/package manager; the current source remains authoritative for
 install, upgrade, uninstall and trust guidance. These links do not migrate URLs
 or assert that hosted validation has passed.
 
+[Nebular shadow qualification](../foundation2-qualification.md) is development
+evidence and supplies no new public installation endpoint. Current distribution
+links below remain authoritative; tenant license/migration gates remain open.
+
 | Project | Linux/macOS: Nix | Arch: pacman | Fedora: DNF/RPM | macOS: Homebrew | npm | APT / PyPI / AUR |
 |---|---|---|---|---|---|---|
 | Theme Forge Stellar Burst | [Current distro docs](https://github.com/Knowledge-Forge-AI/theme-forge-packages/blob/main/INSTALL.md) | Same distro docs | Same distro docs | [Current tap](https://github.com/Knowledge-Forge-AI/homebrew-tap) | [Authoritative project](https://github.com/Knowledge-Forge-AI/theme-forge-stellar-burst) | APT staged; PyPI planned; AUR recipes staged |

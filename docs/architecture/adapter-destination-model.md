@@ -1,7 +1,10 @@
 # Adapter and destination boundary
 
-Status: contract design with executable intent validation only. Package builders,
-publishers, signers, projection writers and contribution clients are deferred.
+Status: contract design with executable intent validation and a Nebular shadow
+renderer candidate. RS9 package builders, publishers, signers, projection writers
+and contribution clients remain deferred. The
+[shadow design](nebular-shadow-projection.md) emits recipes into caller-owned
+scratch without performing destination writes.
 
 ## Inputs and ownership
 
@@ -34,7 +37,9 @@ package. Registry is a direct destination, not a fourth mode.
 Future adapter output must report upstream input hashes, artifact hashes,
 transformations, recipe identity, effective architecture coverage, package
 license, qualification receipts and destination readback. Stable schemas for
-those reports are deferred until a real shadow adapter supplies evidence.
+those reports beyond the ingestion/dependency/shadow manifest subset remain
+deferred. An explicit operator AUR profile selects its projection layout; generic
+projection mode does not imply AUR. Rendered shadow status never grants acceptance.
 
 ## Retry and publication state
 

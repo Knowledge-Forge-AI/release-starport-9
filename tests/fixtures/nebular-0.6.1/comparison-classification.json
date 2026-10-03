@@ -1,0 +1,226 @@
+[
+  {
+    "adapter": "aur",
+    "class": "RS9 correction backed by release evidence",
+    "evidence": "dependency-evidence.json: objects/scripts/system_sonames; foundation2-qualification.md",
+    "field": "dependencies",
+    "rationale": "Full ELF and executable-script scan adds system runtime closure candidates. Arch and Fedora x86_64 provider queries agree; Fedora arm64 and Nix provider qualification remain incomplete. OpenSSL/zlib have no direct object requirement; transitive runtime necessity is not disproved."
+  },
+  {
+    "adapter": "aur",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: icon/payload_license_copies",
+    "field": "icon_sizes",
+    "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE."
+  },
+  {
+    "adapter": "aur",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: icon/payload_license_copies",
+    "field": "installed_paths",
+    "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE."
+  },
+  {
+    "adapter": "aur",
+    "class": "unresolved blocker",
+    "evidence": "foundation2-qualification.md; rendered recipes",
+    "field": "payload_policy",
+    "rationale": "Shadow package payload parity is demonstrated for pacman/RPM and Darwin Nix, with Nix store mode normalization. Full installed-tree readback and reference package builds remain unexecuted; this is not evidence that the reference changed executable bytes."
+  },
+  {
+    "adapter": "aur",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: source_files; normalized tenant",
+    "field": "provides",
+    "rationale": "Versioned provides retains the same conflicting package name and installed layout."
+  },
+  {
+    "adapter": "aur",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: source_files; normalized tenant",
+    "field": "summary",
+    "rationale": "Declarative tenant metadata replaces reference-only values."
+  },
+  {
+    "adapter": "aur",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: source_files; normalized tenant",
+    "field": "url",
+    "rationale": "Declarative tenant metadata replaces reference-only values."
+  },
+  {
+    "adapter": "desktop",
+    "class": "reference-only behavior retained pending evidence",
+    "evidence": "tagged src-tauri/tauri.conf.json; declarative desktop facts; foundation2-qualification.md",
+    "field": "Categories",
+    "rationale": "Reference file/URL argument, MIME, window-class and category behavior lacks selected tagged/declarative authority. Its omission is a material parity gap; application argument support and launcher/window matching were not tested. Acceptance remains deferred."
+  },
+  {
+    "adapter": "desktop",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: source_files; normalized tenant",
+    "field": "Comment",
+    "rationale": "Only declarative facts are rendered; reference URL arguments, MIME association, WM class and generic name have no selected tenant authority."
+  },
+  {
+    "adapter": "desktop",
+    "class": "reference-only behavior retained pending evidence",
+    "evidence": "tagged src-tauri/tauri.conf.json; declarative desktop facts; foundation2-qualification.md",
+    "field": "Exec",
+    "rationale": "Reference file/URL argument, MIME, window-class and category behavior lacks selected tagged/declarative authority. Its omission is a material parity gap; application argument support and launcher/window matching were not tested. Acceptance remains deferred."
+  },
+  {
+    "adapter": "desktop",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: source_files; normalized tenant",
+    "field": "GenericName",
+    "rationale": "Only declarative facts are rendered; reference URL arguments, MIME association, WM class and generic name have no selected tenant authority."
+  },
+  {
+    "adapter": "desktop",
+    "class": "reference-only behavior retained pending evidence",
+    "evidence": "tagged src-tauri/tauri.conf.json; declarative desktop facts; foundation2-qualification.md",
+    "field": "MimeType",
+    "rationale": "Reference file/URL argument, MIME, window-class and category behavior lacks selected tagged/declarative authority. Its omission is a material parity gap; application argument support and launcher/window matching were not tested. Acceptance remains deferred."
+  },
+  {
+    "adapter": "desktop",
+    "class": "reference-only behavior retained pending evidence",
+    "evidence": "tagged src-tauri/tauri.conf.json; declarative desktop facts; foundation2-qualification.md",
+    "field": "StartupWMClass",
+    "rationale": "Reference file/URL argument, MIME, window-class and category behavior lacks selected tagged/declarative authority. Its omission is a material parity gap; application argument support and launcher/window matching were not tested. Acceptance remains deferred."
+  },
+  {
+    "adapter": "nix",
+    "class": "RS9 correction backed by release evidence",
+    "evidence": "dependency-evidence.json: objects/scripts/system_sonames; foundation2-qualification.md",
+    "field": "dependencies",
+    "rationale": "Full ELF and executable-script scan adds system runtime closure candidates. Arch and Fedora x86_64 provider queries agree; Fedora arm64 and Nix provider qualification remain incomplete. OpenSSL/zlib have no direct object requirement; transitive runtime necessity is not disproved."
+  },
+  {
+    "adapter": "nix",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: icon/payload_license_copies",
+    "field": "icon_sizes",
+    "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE."
+  },
+  {
+    "adapter": "nix",
+    "class": "RS9 correction backed by release evidence",
+    "evidence": "ingestion.json: assets.launchers; archive payload manifests",
+    "field": "launcher",
+    "rationale": "Darwin selects the authenticated upstream shell shim for headless version/path behavior; Linux launcher matches the reference. GUI/sidecar resource resolution still needs an install smoke test."
+  },
+  {
+    "adapter": "nix",
+    "class": "unresolved blocker",
+    "evidence": "actual reference and shadow Nix recipe bytes; foundation2-qualification.md",
+    "field": "name",
+    "rationale": "Actual Darwin shadow output pname adds the payload suffix relative to the reference; both Linux FHS outputs are named tfnf. The configured family name does not prove concrete derivation identity. Recipes are unchanged and no naming-policy or migration acceptance is granted."
+  },
+  {
+    "adapter": "nix",
+    "class": "unresolved blocker",
+    "evidence": "foundation2-qualification.md; rendered recipes",
+    "field": "payload_policy",
+    "rationale": "Shadow package payload parity is demonstrated for pacman/RPM and Darwin Nix, with Nix store mode normalization. Full installed-tree readback and reference package builds remain unexecuted; this is not evidence that the reference changed executable bytes."
+  },
+  {
+    "adapter": "nix",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: source_files; normalized tenant",
+    "field": "summary",
+    "rationale": "Declarative tenant metadata replaces reference-only values."
+  },
+  {
+    "adapter": "nix",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: source_files; normalized tenant",
+    "field": "url",
+    "rationale": "Declarative tenant metadata replaces reference-only values."
+  },
+  {
+    "adapter": "pacman",
+    "class": "RS9 correction backed by release evidence",
+    "evidence": "dependency-evidence.json: objects/scripts/system_sonames; foundation2-qualification.md",
+    "field": "dependencies",
+    "rationale": "Full ELF and executable-script scan adds system runtime closure candidates. Arch and Fedora x86_64 provider queries agree; Fedora arm64 and Nix provider qualification remain incomplete. OpenSSL/zlib have no direct object requirement; transitive runtime necessity is not disproved."
+  },
+  {
+    "adapter": "pacman",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: icon/payload_license_copies",
+    "field": "icon_sizes",
+    "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE."
+  },
+  {
+    "adapter": "pacman",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: icon/payload_license_copies",
+    "field": "installed_paths",
+    "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE."
+  },
+  {
+    "adapter": "pacman",
+    "class": "unresolved blocker",
+    "evidence": "foundation2-qualification.md; rendered recipes",
+    "field": "payload_policy",
+    "rationale": "Shadow package payload parity is demonstrated for pacman/RPM and Darwin Nix, with Nix store mode normalization. Full installed-tree readback and reference package builds remain unexecuted; this is not evidence that the reference changed executable bytes."
+  },
+  {
+    "adapter": "pacman",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: source_files; normalized tenant",
+    "field": "summary",
+    "rationale": "Declarative tenant metadata replaces reference-only values."
+  },
+  {
+    "adapter": "pacman",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: source_files; normalized tenant",
+    "field": "url",
+    "rationale": "Declarative tenant metadata replaces reference-only values."
+  },
+  {
+    "adapter": "rpm",
+    "class": "RS9 correction backed by release evidence",
+    "evidence": "dependency-evidence.json: objects/scripts/system_sonames; foundation2-qualification.md",
+    "field": "dependencies",
+    "rationale": "Full ELF and executable-script scan adds system runtime closure candidates. Arch and Fedora x86_64 provider queries agree; Fedora arm64 and Nix provider qualification remain incomplete. OpenSSL/zlib have no direct object requirement; transitive runtime necessity is not disproved."
+  },
+  {
+    "adapter": "rpm",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: icon/payload_license_copies",
+    "field": "icon_sizes",
+    "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE."
+  },
+  {
+    "adapter": "rpm",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: icon/payload_license_copies",
+    "field": "installed_paths",
+    "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE."
+  },
+  {
+    "adapter": "rpm",
+    "class": "unresolved blocker",
+    "evidence": "foundation2-qualification.md; rendered recipes",
+    "field": "payload_policy",
+    "rationale": "Shadow package payload parity is demonstrated for pacman/RPM and Darwin Nix, with Nix store mode normalization. Full installed-tree readback and reference package builds remain unexecuted; this is not evidence that the reference changed executable bytes."
+  },
+  {
+    "adapter": "rpm",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: source_files; normalized tenant",
+    "field": "summary",
+    "rationale": "Declarative tenant metadata replaces reference-only values."
+  },
+  {
+    "adapter": "rpm",
+    "class": "intentional RS9 normalization",
+    "evidence": "ingestion.json: source_files; normalized tenant",
+    "field": "url",
+    "rationale": "Declarative tenant metadata replaces reference-only values."
+  }
+]

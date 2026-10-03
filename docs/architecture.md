@@ -1,7 +1,9 @@
 # Release Starport 9 architecture
 
-Status: intended architecture. The foundation currently validates and normalizes
-configuration only; publication and release authentication remain unimplemented.
+Status: intended architecture with provisional validation/normalization,
+captured-byte authentication and Nebular shadow rendering. Publication remains
+unimplemented; shadow acceptance is deferred. See the
+[Foundation 2 candidate](foundation2-candidate.md).
 
 ## Role
 
@@ -79,8 +81,8 @@ its declared repository remains the release authority. Shared keys, hosted
 repositories, flake and tap are operator/RS9 destinations, not a single tenant's
 configuration.
 
-The foundation validates [v1alpha1 configuration](specs/rs9-config-v1alpha1.md)
-and normalizes intent only. See the [inventory](architecture/theme-forge-extraction-inventory.md),
+The foundation validates [v1alpha1 configuration](specs/rs9-config-v1alpha1.md),
+normalizes intent and renders authenticated shadow inputs. See the [inventory](architecture/theme-forge-extraction-inventory.md),
 [adapter/destination model](architecture/adapter-destination-model.md) and
 [migration map](architecture/migration-map.md) for evidence and unimplemented gates.
 

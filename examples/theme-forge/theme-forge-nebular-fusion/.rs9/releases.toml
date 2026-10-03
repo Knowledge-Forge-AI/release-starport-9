@@ -10,6 +10,7 @@ name = "theme-forge-nebular-fusion-v{version}-aarch64-apple-darwin.app.tar.gz"
 format = "tar.gz"
 platforms = ["aarch64-darwin"]
 commands = { tfnf = "Theme Forge Nebular Fusion.app/Contents/MacOS/theme-forge-nebular-fusion" }
+launchers = { tfnf = "Theme Forge Nebular Fusion.app/Contents/Resources/bin/tfnf" }
 
 [[assets]]
 id = "linux-arm64"
@@ -17,6 +18,7 @@ name = "theme-forge-nebular-fusion-v{version}-aarch64-unknown-linux-gnu.tar.gz"
 format = "tar.gz"
 platforms = ["aarch64-linux"]
 commands = { tfnf = "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion" }
+launchers = { tfnf = "theme-forge-nebular-fusion/bin/tfnf" }
 
 [[assets]]
 id = "linux-x64"
@@ -24,3 +26,4 @@ name = "theme-forge-nebular-fusion-v{version}-x86_64-unknown-linux-gnu.tar.gz"
 format = "tar.gz"
 platforms = ["x86_64-linux"]
 commands = { tfnf = "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion" }
+launchers = { tfnf = "theme-forge-nebular-fusion/bin/tfnf" }

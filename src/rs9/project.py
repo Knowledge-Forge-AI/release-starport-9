@@ -7,7 +7,7 @@ from rs9.fields import choice, read_toml, schema, strings, table, typed, unique_
 from rs9.releases import validate_releases
 from rs9.security import (validate_nfc_string, validate_repository, validate_safe_basename,
                           validate_safe_relative_posix_path, validate_slug,
-                          validate_template)
+                          validate_summary, validate_template)
 from rs9.spdx import validate_spdx_expression
 
 
@@ -49,12 +49,14 @@ def load_project(project_dir, *, input_hashes=None):
 
 
 def validate_license(value):
-    license = table(value, {"expression", "files", "source"}, "license",
+    license = table(value, {"expression", "files", "source", "status"}, "license",
                     required={"expression", "files", "source"})
     validate_spdx_expression(license.get("expression", ""))
     for path in strings(license.get("files"), "license.files"):
         validate_safe_relative_posix_path(path, "license.files")
     choice(license.get("source"), {"tagged-repository"}, "license.source")
+    if "status" in license:
+        choice(license["status"], {"unresolved"}, "license.status")
 
 
 def validate_command(value):
@@ -83,11 +85,60 @@ def validate_check(value, commands):
         validate_template(check["expect-stdout-contains"], False, "check output")
 
 
+FREEDESKTOP_MAIN_CATEGORIES = {
+    "Audio",
+    "AudioVideo",
+    "Development",
+    "Education",
+    "Game",
+    "Graphics",
+    "Network",
+    "Office",
+    "Science",
+    "Settings",
+    "System",
+    "Utility",
+    "Video",
+}
+FREEDESKTOP_ADDITIONAL_CATEGORIES = {
+    "IDE",
+}
+ALL_FREEDESKTOP_CATEGORIES = FREEDESKTOP_MAIN_CATEGORIES | FREEDESKTOP_ADDITIONAL_CATEGORIES
+
+
+def validate_desktop(value, commands):
+    desktop = table(value, {"command", "categories", "icon"}, "desktop",
+                    required={"command", "categories", "icon"})
+    command_name = typed(desktop.get("command"), str, "desktop.command")
+    cmd_map = {c["name"]: c for c in commands}
+    if command_name not in cmd_map:
+        raise ContractError("UNKNOWN_REFERENCE", "Desktop command must name a declared command")
+    if cmd_map[command_name].get("interface") != "gui":
+        raise ContractError("INVALID_CONFIG", "Desktop command must have gui interface")
+
+    categories = strings(desktop.get("categories"), "desktop.categories")
+    for category in categories:
+        if category not in ALL_FREEDESKTOP_CATEGORIES:
+            raise ContractError("INVALID_CONFIG", "Desktop categories must be from the allowed category set")
+    if not any(category in FREEDESKTOP_MAIN_CATEGORIES for category in categories):
+        raise ContractError("INVALID_CONFIG", "Desktop categories must include at least one main category")
+    if (({"Audio", "Video"} & set(categories) and "AudioVideo" not in categories)
+            or ("IDE" in categories and "Development" not in categories)):
+        raise ContractError("INVALID_CONFIG", "Desktop category prerequisite is missing")
+
+    icon = table(desktop.get("icon"), {"source", "path"}, "desktop.icon",
+                 required={"source", "path"})
+    choice(icon.get("source"), {"tagged-repository"}, "desktop.icon.source")
+    validate_safe_relative_posix_path(icon.get("path"), "desktop.icon.path")
+    if not icon["path"].endswith(".png"):
+        raise ContractError("INVALID_CONFIG", "Desktop icon path must end with .png")
+
+
 def validate_project(doc):
-    table(doc, {"schema", "project", "license", "runtime", "commands", "checks"}, "project.toml",
+    table(doc, {"schema", "project", "license", "runtime", "commands", "checks", "desktop"}, "project.toml",
           required={"schema", "project", "license"})
     schema(doc, SCHEMA_PROJECT)
-    project = table(doc.get("project"), {"id", "name", "repository", "family"}, "project",
+    project = table(doc.get("project"), {"id", "name", "repository", "family", "summary"}, "project",
                     required={"id", "name", "repository"})
     validate_slug(project.get("id"), "project.id")
     if not typed(project.get("name"), str, "project.name").strip():
@@ -95,6 +146,8 @@ def validate_project(doc):
     validate_repository(project.get("repository"))
     if "family" in project:
         validate_slug(project["family"], "project.family")
+    if "summary" in project:
+        validate_summary(project["summary"])
     validate_license(doc.get("license"))
     commands = typed(doc.get("commands", []), list, "commands")
     for command in commands:
@@ -104,6 +157,8 @@ def validate_project(doc):
     for check in checks:
         validate_check(check, {c["name"] for c in commands})
     unique_rows(checks, "id")
+    if "desktop" in doc:
+        validate_desktop(doc["desktop"], commands)
     if "runtime" in doc:
         runtime = table(doc["runtime"], {"kind", "constraint"}, "runtime", required={"kind"})
         choice(runtime.get("kind"), {"native", "node", "python"}, "runtime.kind")

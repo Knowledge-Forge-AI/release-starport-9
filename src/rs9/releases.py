@@ -19,7 +19,7 @@ def safe_tag(tag):
 
 
 def validate_asset(value, declared_commands):
-    asset = table(value, {"id", "name", "format", "platforms", "commands"}, "asset",
+    asset = table(value, {"id", "name", "format", "platforms", "commands", "launchers"}, "asset",
                   required={"id", "name", "format", "platforms", "commands"})
     validate_slug(asset.get("id"), "asset.id")
     validate_template(asset.get("name"), True, "asset.name")
@@ -31,6 +31,14 @@ def validate_asset(value, declared_commands):
         if command not in declared_commands:
             raise ContractError("UNKNOWN_REFERENCE", "Undeclared asset command")
         validate_safe_relative_posix_path(path, "asset command path")
+    if "launchers" in asset:
+        launchers = typed(asset["launchers"], dict, "asset.launchers")
+        if not launchers:
+            raise ContractError("INVALID_CONFIG", "Launcher selection cannot be empty")
+        for command, path in launchers.items():
+            if command not in commands:
+                raise ContractError("UNKNOWN_REFERENCE", "Launcher must accompany an asset command")
+            validate_safe_relative_posix_path(path, "asset launcher path")
 
 
 def validate_coverage(assets):

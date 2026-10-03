@@ -13,16 +13,20 @@ authored tenant `.rs9` files remain tenant-repository material.
 - `../tests/fixtures/synthetic-mit-tool`: invented MIT payload metadata to test
   license preservation and npm/PyPI shapes; no real package or release exists.
 
-The validator neither downloads nor authenticates releases. These examples are
-not migration-ready: license authority, release authentication, desktop assets,
-dependencies, trust binding and qualification remain gates in the migration map.
+The validator neither downloads nor authenticates releases. Separate Foundation 2
+modules authenticate captured bytes and render shadow recipes from this example.
+It remains an RS9-authored stand-in, with explicit summary, tagged icon selection
+and upstream launcher paths. License reconciliation, runtime/provider closure,
+trust binding and qualification remain migration gates.
 
 The Nebular example and golden manifest provisionally match distro packaging's
 `AGPL-3.0-or-later` expression. That agreement is not tenant license authority and
-does not resolve npm's `OR Commercial` declaration. FOUNDATION2 must reconcile
-tagged repository and payload terms before adopting generated metadata; the
-golden may change with that evidence. The proposed `--version` stdout check has
-not been executed against an authenticated release binary in this phase.
+does not resolve npm's `OR Commercial` declaration. Foundation 2 authenticated
+tagged/payload license parity and confirmed that the published wrapper bytes
+contain the conflicting expression. See the
+[candidate](../docs/foundation2-candidate.md) and
+[qualification](../docs/foundation2-qualification.md). Public shim checks do not
+replace GUI/sidecar readiness qualification.
 
 Use Python 3.11 or newer, without installing anything:
 

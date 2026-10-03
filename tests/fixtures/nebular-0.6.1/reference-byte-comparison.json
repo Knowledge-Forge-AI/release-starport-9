@@ -1,0 +1,80 @@
+{
+  "files": [
+    {
+      "byte_equal": false,
+      "reference_path": "packages/nebular-fusion.nix",
+      "reference_sha256": "0c217de505993e7f1c5089651016c273d8f027d6a7a2971e8e4b7750bc0dccb3",
+      "shadow_path": "nix/theme-forge-nebular-fusion.nix",
+      "shadow_sha256": "fd374c98801fd2f94ba5732f1fc05b00c1347d0b671375afaafcd27b756db2e0"
+    },
+    {
+      "byte_equal": false,
+      "reference_path": "templates/pacman/theme-forge-nebular-fusion/PKGBUILD",
+      "reference_sha256": "9cbbe0c1d04d900fdd1a0207c733d575f3104ad6b7f473e5658ccb688d16422e",
+      "shadow_path": "pacman/theme-forge-nebular-fusion/PKGBUILD",
+      "shadow_sha256": "1cc750f4fbb618c6b9ad827cfbe84999c3dc51b805b735fa43464e5435dce485"
+    },
+    {
+      "byte_equal": false,
+      "reference_path": "templates/rpm/theme-forge-nebular-fusion.spec",
+      "reference_sha256": "47249b94cc91d8bdb445aa692d5f6b2d036ed7ac515d5c93dddd392d20bfbdbb",
+      "shadow_path": "rpm/theme-forge-nebular-fusion.spec",
+      "shadow_sha256": "3c87e63c43a9bae6d7ceca595786e2bb44650d5035a97a06b720719a2b474c78"
+    },
+    {
+      "byte_equal": false,
+      "reference_path": "aur/theme-forge-nebular-fusion-bin/PKGBUILD",
+      "reference_sha256": "1912edfa8e783ed558a728899205f31197c417b53fc5485c62803b6054456019",
+      "shadow_path": "aur/theme-forge-nebular-fusion-bin/PKGBUILD",
+      "shadow_sha256": "7da74c25d92687d7095e894489e6c7f4380f0d69a1b02768c36fa27d90944bab"
+    },
+    {
+      "byte_equal": false,
+      "reference_path": "aur/theme-forge-nebular-fusion-bin/.SRCINFO",
+      "reference_sha256": "6ee2f94de19ae89a27fa592026cc09b6eb3413c3af1a1c2aa177af6dcb08ff97",
+      "shadow_path": "aur/theme-forge-nebular-fusion-bin/.SRCINFO",
+      "shadow_sha256": "dccb25b8e0da1987e586bd4254dae8b154013d6bb26ae62b45346da301bb285a"
+    },
+    {
+      "byte_equal": false,
+      "reference_path": "templates/desktop/theme-forge-nebular-fusion.desktop",
+      "reference_sha256": "24b28e715e74ce594c75c13fb865a84399ca5aac168490e1773cbad1f3de0283",
+      "shadow_path": "nix/theme-forge-nebular-fusion.desktop",
+      "shadow_sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401"
+    },
+    {
+      "byte_equal": false,
+      "reference_path": "templates/desktop/theme-forge-nebular-fusion.desktop",
+      "reference_sha256": "24b28e715e74ce594c75c13fb865a84399ca5aac168490e1773cbad1f3de0283",
+      "shadow_path": "pacman/theme-forge-nebular-fusion/theme-forge-nebular-fusion.desktop",
+      "shadow_sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401"
+    },
+    {
+      "byte_equal": false,
+      "reference_path": "templates/desktop/theme-forge-nebular-fusion.desktop",
+      "reference_sha256": "24b28e715e74ce594c75c13fb865a84399ca5aac168490e1773cbad1f3de0283",
+      "shadow_path": "rpm/theme-forge-nebular-fusion.desktop",
+      "shadow_sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401"
+    },
+    {
+      "byte_equal": false,
+      "reference_path": "templates/desktop/theme-forge-nebular-fusion.desktop",
+      "reference_sha256": "24b28e715e74ce594c75c13fb865a84399ca5aac168490e1773cbad1f3de0283",
+      "shadow_path": "aur/theme-forge-nebular-fusion-bin/theme-forge-nebular-fusion.desktop",
+      "shadow_sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401"
+    },
+    {
+      "byte_equal": true,
+      "reference_path": "templates/pacman/theme-forge-nebular-fusion/icon-256x256.png",
+      "reference_sha256": "2d65e8c69a675b6c939ac11757c6a47a123f63b3f83b6d58305aaf7231aca160",
+      "shadow_authority": "tagged-repository:src-tauri/icons/icon.png",
+      "shadow_sha256": "2d65e8c69a675b6c939ac11757c6a47a123f63b3f83b6d58305aaf7231aca160"
+    }
+  ],
+  "limits": [
+    "Recipe byte differences do not imply semantic inequivalence",
+    "Reference packages were not built"
+  ],
+  "reference_commit": "062a931f4b5e44ad43c88363efd81ab8d92602df",
+  "schema": "rs9.reference-byte-comparison.v1alpha1"
+}

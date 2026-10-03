@@ -21,6 +21,16 @@ def product_files():
 
 
 class HygieneTests(unittest.TestCase):
+    def test_product_contains_only_bounded_text(self):
+        for path in product_files():
+            if "__pycache__" in path.parts:
+                continue
+            self.assertFalse(path.is_symlink())
+            data = path.read_bytes()
+            self.assertLessEqual(len(data), 512 * 1024)
+            self.assertFalse(data.startswith((b"\x7fELF", b"\x1f\x8b", b"\x89PNG", b"\xcf\xfa\xed\xfe")))
+            self.assertNotIn(b"\x00", data)
+            data.decode("utf-8")
     def test_no_private_keys_tokens_or_private_paths_in_product(self):
         private_path = re.compile(r"/Users/|/home/[^/\s]+/|[A-Z]:\\Users\\")
         for path in product_files():

@@ -22,7 +22,7 @@ def validate_url(value):
 
 
 def validate_destination(value):
-    dest = table(value, {"id", "adapter", "mode", "platforms", "status", "base-url", "repository"}, "destination",
+    dest = table(value, {"id", "adapter", "mode", "platforms", "status", "base-url", "repository", "profile"}, "destination",
                  required={"id", "adapter", "mode", "platforms", "status"})
     validate_slug(dest.get("id"), "destination.id")
     choice(dest.get("adapter"), ADAPTER_NAMES, "destination.adapter")
@@ -33,6 +33,11 @@ def validate_destination(value):
         validate_url(dest["base-url"])
     if "repository" in dest:
         validate_repository(dest["repository"])
+    if "profile" in dest:
+        choice(dest["profile"], {"aur"}, "destination.profile")
+        if dest["adapter"] != "pacman" or dest["mode"] != "projection":
+            raise ContractError("INVALID_CONFIG", "Destination profile 'aur' is only permitted for pacman projection destinations")
+
 
 
 def load_destinations(path, *, input_hashes=None):
