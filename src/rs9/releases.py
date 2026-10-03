@@ -53,7 +53,7 @@ def validate_coverage(assets):
 
 
 def validate_releases(doc, commands):
-    table(doc, {"schema", "release", "assets"}, "releases.toml", required={"schema", "release", "assets"})
+    table(doc, {"schema", "release", "assets", "evidence"}, "releases.toml", required={"schema", "release", "assets"})
     schema(doc, SCHEMA_RELEASES)
     release = table(doc.get("release"), {"tag", "prerelease"}, "release", required={"tag", "prerelease"})
     validate_tag(release.get("tag"))
@@ -67,3 +67,23 @@ def validate_releases(doc, commands):
     if len({a["name"] for a in assets}) != len(assets):
         raise ContractError("AMBIGUOUS_COVERAGE", "Duplicate asset name")
     validate_coverage(assets)
+    if "evidence" in doc:
+        evidence = table(doc["evidence"], {"profile", "checksums", "assets"}, "evidence",
+                         required={"profile", "checksums", "assets"})
+        from rs9.profiles import PROFILE_ROLES
+        choice(evidence["profile"], set(PROFILE_ROLES), "evidence.profile")
+        validate_safe_basename(evidence["checksums"])
+        rows = typed(evidence["assets"], list, "evidence.assets")
+        for row in rows:
+            table(row, {"role", "name", "checksum_covered"}, "evidence.asset", required={"role", "name"})
+            validate_slug(row["role"])
+            validate_template(row["name"], False, "evidence.asset.name")
+            validate_safe_basename(row["name"].replace("{version}", "1.0.0"))
+            if "checksum_covered" in row:
+                typed(row["checksum_covered"], bool, "evidence.asset.checksum_covered")
+        unique_rows(rows, "role")
+        if {r["role"] for r in rows} != PROFILE_ROLES[evidence["profile"]]:
+            raise ContractError("EVIDENCE_ROLES", "Selected profile requires exact evidence roles")
+        names = [evidence["checksums"], *[r["name"] for r in rows], *[a["name"] for a in assets]]
+        if len(set(names)) != len(names):
+            raise ContractError("EVIDENCE_ROLES", "Evidence and payload names must be disjoint")

@@ -13,6 +13,9 @@ from rs9.ingestion import authenticate
 from rs9.ingestion import read_evidence, digest
 from rs9.render import render
 from rs9.scratch import canonical
+from rs9.gates import derive_gates
+from rs9.planner import adapter_outputs_from_shadow, destination_policy, plan
+from tests.publication_fixtures import observation, T0
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -31,6 +34,14 @@ class LiveNebularTests(unittest.TestCase):
             self.assertEqual(canonical(manifest), (golden / "render-manifest.json").read_bytes())
             for row in manifest["files"]:
                 self.assertEqual((Path(tmp) / row["path"]).read_bytes(), (golden / row["path"]).read_bytes())
+            output = next(row for row in adapter_outputs_from_shadow(auth, manifest) if row["destination"]["mode"] == "direct")
+            gates = derive_gates(normalized, auth.release_capture, auth.profile_result, output)
+            license_gate = next(row for row in gates if row["id"] == "license.authority")
+            self.assertEqual(license_gate["status"], "fail")
+            candidate = plan(normalized, auth.release_capture, auth.profile_result, output, gates,
+                             destination_policy(), observation(output), evaluated_at=T0, ingestion_record=auth.record)
+            self.assertEqual(candidate["outcome"], "block-gate")
+            self.assertIn("tenant-license-conflict", candidate["reasons"])
 
     def test_captured_reference_tree_and_byte_comparison(self):
         evidence = Path(os.environ["RS9_NEBULAR_EVIDENCE_DIR"])

@@ -1,0 +1,33 @@
+{
+  "checksums": "SHA256SUMS",
+  "evidence_assets": [
+    {
+      "name": "NOTICE",
+      "role": "notice"
+    },
+    {
+      "name": "PROVENANCE.json",
+      "role": "provenance"
+    }
+  ],
+  "payload_assets": [
+    {
+      "commands": {},
+      "format": "tar.gz",
+      "id": "package",
+      "name": "knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+      "platforms": [
+        "any"
+      ]
+    }
+  ],
+  "prerelease": "reject",
+  "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+  "schema": "rs9.release-selection.v1alpha1",
+  "source_paths": [
+    "LICENSE",
+    "NOTICE",
+    "package.json"
+  ],
+  "tag": "v0.6.1"
+}

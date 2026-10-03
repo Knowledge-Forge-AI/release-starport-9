@@ -4,6 +4,16 @@ schema = "rs9.releases.v1alpha1"
 tag = "v{version}"
 prerelease = "reject"
 
+[evidence]
+profile = "tauri-desktop-archive.v1alpha1"
+checksums = "SHA256SUMS"
+assets = [
+  { role = "provenance", name = "PROVENANCE.json" },
+  { role = "sbom-spdx", name = "nebular.spdx.json" },
+  { role = "third-party-notices", name = "THIRD_PARTY_NOTICES.md" },
+  { role = "npm-wrapper", name = "knowledge-forge-ai-theme-forge-nebular-fusion-{version}.tgz" },
+]
+
 [[assets]]
 id = "darwin-arm64"
 name = "theme-forge-nebular-fusion-v{version}-aarch64-apple-darwin.app.tar.gz"

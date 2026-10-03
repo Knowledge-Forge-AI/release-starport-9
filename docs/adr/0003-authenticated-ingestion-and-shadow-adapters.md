@@ -70,3 +70,5 @@ See the [candidate disposition](../foundation2-candidate.md),
 [record specification](../specs/rs9-ingestion-record-v1alpha1.md),
 [dependency model](../specs/rs9-dependency-evidence-v1alpha1.md) and
 [Nebular design](../architecture/nebular-shadow-projection.md).
+
+Foundation 3 evolves the ingestion boundary in [ADR 0004](0004-ingestion-core-and-evidence-profiles.md) and adds pure state/provenance contracts in [ADR 0005](0005-publication-state-planner-and-receipts.md). Foundation 2 remains a source/shadow foundation.

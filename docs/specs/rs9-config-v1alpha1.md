@@ -88,6 +88,16 @@ Resolved version, tag and asset names must remain safe. Version resolution
 accepts a numeric dotted version with an optional semver-style suffix; version
 validation does not implement ecosystem version ordering.
 
+### Evidence table amendment `[evidence]`
+
+Foundation 3 introduces an optional schema amendment table `[evidence]` to `releases.toml`:
+- `checksums`: Safe basename template containing `{version}` or an exact basename identifying the authoritative SHA256SUMS file (e.g. `"SHA256SUMS-{version}.txt"`).
+- `profile`: Closed profile identifier, restricted to `"tauri-desktop-archive.v1alpha1"` or `"npm-package-archive.v1alpha1"`. No filename guessing or arbitrary tenant code is supported. No Stellar renderers exist or are supported.
+- `assets`: Nonempty list of tables specifying exact `{role, name}` bindings where `role` is a sanitized slug (e.g. `"checksums"`, `"wrapper"`) and `name` is a safe basename template with `{version}`.
+
+**Explicit behavioral rule**:
+The `[evidence]` table is **optional** in the configuration schema for `rs9.contract validate` and `normalize`, allowing pure planning manifests to be generated without evidence declarations. However, it is **required** for release authentication (`rs9.release_core.authenticate_release`). Attempting to authenticate a release whose configuration omits `[evidence]` fails closed.
+
 ## Adapter intent files
 
 All seven adapters use the same deliberately limited shape:
@@ -182,3 +192,24 @@ rules. These are not invented fields in v1alpha1.
 Changing release authority, multiple coupled version streams or license terms
 per payload may require a successor schema. See the
 [migration gates](../architecture/migration-map.md).
+
+## What would make this wrong
+
+1. **Trust boundary**: Trusting tenant configuration declarations or planning manifests as authorization to publish without independent byte authentication via `ReleaseCapture`.
+2. **Timestamps limitation**: Relying on configuration or file modification timestamps to infer release sequence or freshness; timestamps cannot secure untrusted transport.
+3. **Persisted audit limit**: Treating persisted normalized configuration JSON as an active capability rather than a static planning intent record.
+4. **Guessing filenames or interpreting arbitrary tenant scripts**: Attempting to dynamically infer release assets or executing arbitrary tenant code instead of enforcing declarative `[evidence]` bindings.
+5. **Inventing unsupported profiles or renderers**: Adding unverified profiles or Stellar renderers without specification and qualification.
+6. **Ignoring credential patterns in field values or keys**: Permitting API keys, private keys, or credentials to be committed to tenant configuration.
+7. **Silently ignoring non-NFC Unicode strings**: Allowing non-NFC strings to alter archive lookup semantics or bypass path safety checks.
+
+## Local Links
+
+- [ADR 0001: Tenant contract v1alpha1](../adr/0001-tenant-contract-v1alpha1.md)
+- [ADR 0002: GitHub Release as sole ingestion authority](../adr/0002-github-release-sole-ingestion-authority.md)
+- [ADR 0003: Authenticated ingestion and shadow adapters](../adr/0003-authenticated-ingestion-and-shadow-adapters.md)
+- [ADR 0004: Ingestion core and evidence profiles](../adr/0004-ingestion-core-and-evidence-profiles.md)
+- [Specification: Release record v1alpha1](rs9-release-record-v1alpha1.md)
+- [Specification: Ingestion record v1alpha1](rs9-ingestion-record-v1alpha1.md)
+- [Project contract](../project-contract.md)
+- [Architecture overview](../architecture.md)

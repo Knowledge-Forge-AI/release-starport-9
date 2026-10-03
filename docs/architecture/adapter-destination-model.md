@@ -1,73 +1,86 @@
 # Adapter and destination boundary
 
-Status: contract design with executable intent validation and a Nebular shadow
-renderer candidate. RS9 package builders, publishers, signers, projection writers
-and contribution clients remain deferred. The
-[shadow design](nebular-shadow-projection.md) emits recipes into caller-owned
-scratch without performing destination writes.
+Status: contract design with executable intent validation, Nebular shadow renderer candidate, and Foundation 3 publication control plane (observation derivation, pure planner, revision allocator, receipts, and retry engine). Live package builders, publishers, signers, projection writers, and contribution clients remain deferred; no live mutations are authorized. No actual destination readback adapter or publisher exists.
 
 ## Inputs and ownership
 
-The intended adapter consumes normalized tenant facts, an authenticated ingestion
-record (repo/tag/commit/assets/hashes/license evidence), qualified operator
-destination/trust policy and publication state (versions/revisions/readback).
-Adapters must not discover alternate upstreams or silently rebuild release bytes.
-The foundation normalizer emits only tenant intent and raw configuration hashes;
-it supplies none of the authentication, trust or qualification records.
+The publication adapter consumes normalized tenant facts, an authenticated in-process `ReleaseCapture` (repository, tag, commit, assets, SHA256SUMS, archive manifests, license evidence), qualified operator destination policy, and destination observation state (readback hashes, remote IDs, semantic content identity).
 
-Core owns release authentication, canonical records, native payload identity,
-qualification state and publication receipts. Adapters own construction and
-ecosystem-specific readback/signature/install verification. Destinations own
-repository topology, shared indexes, origin, retention and trust binding.
-Credentials live in operator facilities, with references in a future separate
-operator contract. They are absent from this foundation's interpreted schema.
+Adapters must not discover alternate upstreams or silently rebuild release bytes.
+
+- **Core owns**: Release authentication (`rs9.release_core`), canonical records (`rs9.records`), native payload identity, observation state derivation (`rs9.observation`), safety gates (`rs9.gates`), pure publication planning (`rs9.planner`), revision allocation, and confirmed receipts (`rs9.publication`). Records hash raw bytes, not signatures or ambient authority.
+- **Adapters own**: Packaging artifact construction, rendering manifests, ecosystem-specific readback parsing, and install/verification logic.
+- **Destinations own**: Repository topology, shared indexes, origin, retention, trust binding, and remote revision tracking. Credentials live in operator facilities and are absent from interpreted tenant schemas.
 
 ## Modes and results
 
-| Mode | Intended effect | Required future readback |
+| Mode | Intended effect | Required readback verification |
 |---|---|---|
-| direct | Registry publication or atomic hosted-repository generation | Exact package content/identity and registry metadata, or authenticated signed index and installed payload. |
-| projection | Controlled updates to required repos, including tap and one AUR repo per package | Generated tree, upstream base, allowed paths, commit/PR identity, projection binding and merged/current tree. |
-| contribution | Reviewed packaging proposal in external repos | Source/build policy, branch/PR identity, upstream review/merge outcome and contribution-specific qualification. |
+| `direct` | Registry publication or atomic hosted-repository generation | Exact package payload hashes and registry metadata, or authenticated signed index and installed payload. |
+| `projection` | Controlled updates to downstream repos (e.g. Homebrew tap, AUR) | Generated file tree, upstream base commit, allowed relative paths, commit/PR identity, and merged/current tree readback. |
+| `contribution` | Reviewed packaging proposal in external repositories (e.g. nixpkgs) | Source/build policy, branch/PR identity, upstream review outcome, and verified repository availability. **Contribution PR state is separate from destination exact state.** |
 
-A projection can travel by PR without becoming contribution mode: the distinction
-is whether RS9 owns the generated projection or proposes an ecosystem-maintained
-package. Registry is a direct destination, not a fourth mode.
+A projection can travel by pull request without becoming contribution mode: the distinction is whether RS9 governs the generated projection repository or proposes changes to an external ecosystem-maintained package.
 
-Future adapter output must report upstream input hashes, artifact hashes,
-transformations, recipe identity, effective architecture coverage, package
-license, qualification receipts and destination readback. Stable schemas for
-those reports beyond the ingestion/dependency/shadow manifest subset remain
-deferred. An explicit operator AUR profile selects its projection layout; generic
-projection mode does not imply AUR. Rendered shadow status never grants acceptance.
+## Destination observation and subject binding
 
-## Retry and publication state
+Destination state is observed and validated via `rs9.observation.observe` and `validate_observation` (`rs9.destination-observation.v1alpha1`):
+1. `unreachable`: Endpoint unreachable (DNS, timeout, connection failure).
+2. `unknown`: Ambiguous or unparseable destination response.
+3. `absent`: Authenticated check confirms the package version definitely does not exist. Unknown errors are never inferred as absent.
+4. `exact`: Authenticated readback confirms all expected files, hashes, and aggregate desired semantic content identity match completely.
+5. `incomplete`: Destination contains a partial or broken release.
+6. `conflict`: Destination version exists with differing payload hashes or configuration.
 
-Read authenticated destination state before any mutation. An absent package may
-be published after qualification. An exact already-published result is a no-op.
-The same version/revision with different bytes or identity fails. Partial or
-unverifiable state fails pending operator disposition. A timeout after a mutation
-requires readback, not blind retry. Projection updates require a current base and
-an allowed-path diff; contribution completion is never inferred from opening a PR.
+**Subject mismatch input error**: If the observed destination ID, target ID, adapter, or version disagrees with the expected subject, `ContractError("SUBJECT_MISMATCH", ...)` is raised immediately.
 
-Multi-package npm ordering (platform packages before launcher), registry-specific
-immutability and failed partial fanout require adapter qualification. An index
-rebuild must retain the previously authenticated objects clients may still name.
-APT's current guard permits first/unchanged generations but blocks changed indexes
-until retention is implemented. Repeated equivalent static-tree generation must
-not accidentally advance tenant versions or packaging revisions.
+**Independent verification**: Caller-asserted verdicts are never accepted alone; readback payload hashes are independently checked against expected component hashes.
 
-## Trust and qualification
+## Semantic content identity and revision allocation
 
-Private keys/passphrases/tokens never enter tenant files, fixtures, source or
-public evidence. Public trust binding must identify key fingerprint, signing
-subkey, validity/rotation and key URL independently from payload licenses.
-Fixture keys are confined to qualification; they must fail production binding.
-OIDC is registry-specific, and publisher identity must be proven rather than
-derived from the location of reusable code.
+To prevent packaging revision bumps (e.g. Arch `pkgrel` or RPM `Release`) from breaking byte equivalence, RS9 uses `rs9.semantic-content-identity.v1alpha1`:
+- Contains artifact payload hashes and explicit configuration input hash mapping;
+- Strictly excludes ecosystem packaging revision numbers;
+- Evaluates identically on both desired output manifests and destination observations.
 
-Package qualification eventually includes tamper/signature failure, clean install
-and uninstall, architecture/runtime closure and native byte readback. A GUI launch
-needs a display-capable harness. Contribution channels requiring source builds
-have separate provenance and byte rules; they cannot reuse a binary-preservation
-receipt as proof of source-build compliance.
+Actual rendered recipe files (`PKGBUILD`, `.spec`, `.nix`) are separately bound in `rs9.adapter-output.v1alpha1`. `adapter_outputs_from_shadow` wires the actual shadow renderer and normalized semantic target inputs excluding the allocated revision.
+
+**Revision allocation (`allocate_revision`)**:
+- Desired revision unoccupied: returns desired revision.
+- Desired revision occupied with identical semantic identity: returns desired revision (`reuse-exact`).
+- Desired revision occupied with differing content on immutable registry: returns `None` with basis `immutable-conflict`.
+- Mutable ecosystems: allocates next positive integer (`next-after-observed` or `first`).
+- If allocated revision != output revision on mutating plans, the planner blocks on `allocated-revision-requires-render`.
+
+## Repair and publication state
+
+- **Planner precedence**:
+  1. Stale/future readback before exact noop (`defer-readback`);
+  2. Conflict before gates (`block-conflict`);
+  3. Exact no-op before gates (`noop`): performs zero writes and does not imply acceptance;
+  4. All unresolved gates `block-gate`;
+  5. Absent yields `publish-intent`;
+  6. Safe repair yields `repair-intent`; otherwise `block`.
+- **Named versioned safe-repair contract**: An `incomplete` destination can be repaired only when matching `rs9.safe-repair.v1alpha1` (`restore-missing-components`). Policy must select the same ID (`repair["id"] == policy["repair_contract"]`), and only missing components may be restored when aggregate semantic identity matches. Overwriting existing components is prohibited.
+- **Publication attempts and receipts**:
+  - `mutation_attempt` records `transport_outcome` (`not_attempted`, `confirmed`, `ambiguous`, `failed`) with sanitized roles, request tracking, and separate bounded log hashes.
+  - `publication_receipt` confirms final states (`already-exact`, `published`, `conflict`, `incomplete`, `not-attempted`, `unconfirmed`).
+  - A `published` receipt strictly requires an actual confirmed or ambiguous attempt AND an exact post-readback observation ordered after the attempt via response remote sequence/ID or documented timestamp fallback.
+- **The nine retry MUST rules**:
+  - Retries require a fresh re-read strictly after attempt completion (`observed_at > max(finished_at)`);
+  - Preconditions are verified against the fresh observation;
+  - Confirmed exact destinations trigger `noop` without duplicate action;
+  - Shifted remote revisions trigger `replan-required`;
+  - Conflicting destinations are blocked permanently (`block-conflict`);
+  - Blind retries and automatic timeout repetitions are prohibited;
+  - Receipt replay validates the full receipt graph.
+
+## Local Links
+
+- [ADR 0004: Ingestion core and evidence profiles](../adr/0004-ingestion-core-and-evidence-profiles.md)
+- [ADR 0005: Publication state, planner, and receipts](../adr/0005-publication-state-planner-and-receipts.md)
+- [Specification: Destination observation v1alpha1](../specs/rs9-destination-observation-v1alpha1.md)
+- [Specification: Publication plan v1alpha1](../specs/rs9-publication-plan-v1alpha1.md)
+- [Specification: Publication receipt v1alpha1](../specs/rs9-publication-receipt-v1alpha1.md)
+- [Specification: Retry and idempotence v1alpha1](../specs/rs9-retry-idempotence-v1alpha1.md)
+- [Architecture overview](../architecture.md)

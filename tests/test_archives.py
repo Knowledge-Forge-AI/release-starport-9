@@ -19,9 +19,9 @@ class ArchiveTests(unittest.TestCase):
     def base(self):
         return [("app/bin/app", b"upstream executable", 0o755, tarfile.REGTYPE, "")]
 
-    def test_valid_safe_links_and_visitor(self):
+    def test_valid_safe_symlink_and_visitor(self):
         seen = []
-        entries = self.base() + [("app/current", b"", 0o777, tarfile.SYMTYPE, "bin/app"), ("app/copy", b"", 0o644, tarfile.LNKTYPE, "app/bin/app")]
+        entries = self.base() + [("app/current", b"", 0o777, tarfile.SYMTYPE, "bin/app")]
         result = self.inspect(entries, on_file=lambda p, b, m: seen.append(p))
         self.assertEqual(result["root"], "app")
         self.assertEqual(seen, ["app/bin/app"])

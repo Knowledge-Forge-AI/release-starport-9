@@ -105,6 +105,28 @@ class ContractTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.tmp_path = Path(self.temp.name)
 
+    def test_explicit_evidence_amendment_and_version_template(self):
+        _create_minimal_project(self.tmp_path)
+        path = self.tmp_path / ".rs9/releases.toml"
+        original = path.read_text()
+        policy = '''
+[evidence]
+profile = "npm-package-archive.v1alpha1"
+checksums = "SHA256SUMS"
+assets = [{role="notice", name="NOTICE"}, {role="provenance", name="PROVENANCE-{version}.json"}]
+'''
+        path.write_text(original + policy)
+        destination = _create_destinations(self.tmp_path)
+        result = json.loads(normalize(self.tmp_path, destination, "1.2.3"))
+        self.assertEqual(result["release"]["evidence"]["assets"][1]["name"], "PROVENANCE-1.2.3.json")
+        for before, after in (("npm-package-archive.v1alpha1", "arbitrary-hook"),
+                              ('role="notice"', 'role="unknown"'),
+                              ('name="NOTICE"', 'name="../NOTICE"'),
+                              ("{version}", "{commit}")):
+            path.write_text(original + policy.replace(before, after))
+            with self.assertRaises(ContractError):
+                load_project(self.tmp_path)
+
     def test_valid_minimal_project_and_destinations(self) -> None:
         tmp_path = self.tmp_path
         pacman_toml = """schema = "rs9.pacman.v1alpha1"
