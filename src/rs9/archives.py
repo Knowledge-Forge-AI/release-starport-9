@@ -60,6 +60,8 @@ def inspect_archive(path, commands, *, on_file=None, max_members=20000,
                         raise ContractError("DUPLICATE_MEMBER", "Duplicate archive path")
                     if member.mode & 0o6000:
                         raise ContractError("UNSAFE_MODE", "Privileged archive mode forbidden")
+                    if member.islnk() or member.type in (tarfile.LNKTYPE, "1", b"1"):
+                        raise ContractError("UNSAFE_LINK", "Archive hard links forbidden")
                     if member.size < 0 or member.size > max_member_bytes:
                         raise ContractError("ARCHIVE_LIMIT", "Archive member size exceeds limit")
                     total += member.size
@@ -81,8 +83,8 @@ def inspect_archive(path, commands, *, on_file=None, max_members=20000,
                         entry["sha256"] = hasher.hexdigest()
                     elif member.isdir():
                         entry["type"] = "directory"
-                    elif member.issym() or member.islnk():
-                        entry["type"] = "symlink" if member.issym() else "hardlink"
+                    elif member.issym():
+                        entry["type"] = "symlink"
                         target = member.linkname
                         if (not target or target.startswith("/") or "\\" in target
                                 or unicodedata.normalize("NFC", target) != target
@@ -111,12 +113,10 @@ def inspect_archive(path, commands, *, on_file=None, max_members=20000,
                         raise ContractError("UNSAFE_LINK", "Link leaves archive root")
                     current = "/".join(resolved)
                     entry = entries.get(current, {})
-                    if entry.get("type") in ("symlink", "hardlink"):
+                    if entry.get("type") == "symlink":
                         if current in seen or len(seen) > 64:
                             raise ContractError("UNSAFE_LINK", "Archive link cycle or excessive chain")
-                        target = entry["target"]
-                        if entry["type"] == "symlink":
-                            target = posixpath.dirname(current) + "/" + target
+                        target = posixpath.dirname(current) + "/" + entry["target"]
                         suffix = "/".join(parts)
                         return resolve(target + ("/" + suffix if suffix else ""), (*seen, current))
                 return "/".join(resolved)
@@ -127,10 +127,8 @@ def inspect_archive(path, commands, *, on_file=None, max_members=20000,
                     if entries.get(parent, {}).get("type", "directory") != "directory":
                         raise ContractError("UNSAFE_LINK", "Archive member has a non-directory ancestor")
                     parent = posixpath.dirname(parent)
-                if entry["type"] in ("symlink", "hardlink"):
+                if entry["type"] == "symlink":
                     target = resolve(name)
-                    if entry["type"] == "hardlink" and entries.get(target, {}).get("type") != "file":
-                        raise ContractError("UNSAFE_LINK", "Hardlink must resolve to a regular member")
             command_records = {}
             for command, name in commands.items():
                 entry = entries.get(name, {})

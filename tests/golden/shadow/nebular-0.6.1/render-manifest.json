@@ -63,7 +63,7 @@
   "inputs": {
     "dependencies_sha256": "e6ff0d85dd09d855cfbbca4618a8571200b9c58759153295f40c91ac61e7343a",
     "ingestion_sha256": "f5057782b8494ae74e19991db0232a03241c0f686753187505b1a4766cd7b367",
-    "normalized_sha256": "5c498032adccfc1febc6c2bc0afd0a31ad4f627639f5bae8562e270532092a78"
+    "normalized_sha256": "e4c47b802c04a50d6c2e44c4c2870afd3c19b87b4fab4b667d1b96cb057821d0"
   },
   "license_authority": "conflict",
   "license_intent_status": "unresolved",

@@ -1,0 +1,104 @@
+{
+  "assets": [
+    {
+      "checksum_covered": true,
+      "github_asset_id": 599265906,
+      "name": "NOTICE",
+      "role": "notice",
+      "sha256": "d31e49346c1d4b9ea98ed49b817d48e68c4b9000e1763522da5ffe7f791e3657",
+      "size": 601
+    },
+    {
+      "checksum_covered": true,
+      "github_asset_id": 599265968,
+      "name": "PROVENANCE.json",
+      "role": "provenance",
+      "sha256": "8a3d209168b6d3cd701fec648051e44b18e02fe6c9f1beb69230bc366d9f88b3",
+      "size": 3909
+    },
+    {
+      "checksum_covered": false,
+      "github_asset_id": 599266011,
+      "name": "SHA256SUMS",
+      "role": "checksums",
+      "sha256": "a56000c63c5b85a12c378fc7d216e86b03037a24c8681533f2d6bcd7d9feeae6",
+      "size": 383
+    },
+    {
+      "checksum_covered": true,
+      "github_asset_id": 599265851,
+      "name": "knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+      "role": "payload",
+      "sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+      "size": 644313
+    }
+  ],
+  "limits": {
+    "archive_bytes": 1073741824,
+    "asset_bytes": 1073741824,
+    "capture_bytes": 2147483648,
+    "member_bytes": 268435456,
+    "members": 20000,
+    "ratio": 1000,
+    "source_bytes": 16777216
+  },
+  "payloads": [
+    {
+      "commands": {},
+      "github_asset_id": 599265851,
+      "id": "package",
+      "launchers": {},
+      "member_count": 356,
+      "name": "knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+      "payload_manifest_sha256": "b47cf89dd8610d2167bf10c486a51f1889ffb52dc428cecc32a7a1cb7ddafe38",
+      "platforms": [
+        "any"
+      ],
+      "root": "package",
+      "sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+      "size": 644313
+    }
+  ],
+  "release": {
+    "draft": false,
+    "id": 399542205,
+    "prerelease": false,
+    "tag": "v0.6.1"
+  },
+  "repository": {
+    "full_name": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+    "id": 1342490027
+  },
+  "schema": "rs9.release-record.v1alpha1",
+  "selection_sha256": "e16fe9f3f833fa1e181b179f4338864e1ac298e86c4daf92e4cc29197e191a0a",
+  "source_files": [
+    {
+      "blob": "7ce823c377a19ad5082605452c4503176cd793e6",
+      "path": "LICENSE",
+      "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+      "size": 34460
+    },
+    {
+      "blob": "b19225efa28526b8864470d78d1eb9c9b6ddb202",
+      "path": "NOTICE",
+      "sha256": "d31e49346c1d4b9ea98ed49b817d48e68c4b9000e1763522da5ffe7f791e3657",
+      "size": 601
+    },
+    {
+      "blob": "4e8d9965e6d31f36a0cd1a2712dfa81922165f5d",
+      "path": "package.json",
+      "sha256": "744940d2c9523adf6e3766d4ac6f2467ce4e0b57401633a8595164d3f2b19120",
+      "size": 3072
+    }
+  ],
+  "source_times": {
+    "created_at": "2026-09-29T21:28:47Z",
+    "published_at": "2026-09-29T21:28:52Z"
+  },
+  "tag": {
+    "commit": "a3e89683f92b8240c800ed303c866e7b12aa3277",
+    "tag_objects": [],
+    "target_basis": "tag-ref",
+    "tree": "158bd6d03b21d747385fb25f49e6e148d62043c8"
+  }
+}

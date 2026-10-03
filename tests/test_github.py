@@ -22,6 +22,20 @@ class Opener:
 
 
 class GithubTests(unittest.TestCase):
+    def test_receipts_do_not_retain_redirect_query_values(self):
+        class RedirectResponse(Response):
+            def geturl(self):
+                return "https://release-assets.githubusercontent.com/example?signature=synthetic-value"
+
+        class RedirectOpener:
+            def open(self, request, timeout):
+                return RedirectResponse(b"data")
+
+        client = PublicClient(RedirectOpener())
+        client.get("https://github.com/example?temporary=synthetic-value")
+        self.assertEqual(client.receipts[0]["url"], "https://github.com/example")
+        self.assertEqual(client.receipts[0]["final_url"], "https://release-assets.githubusercontent.com/example")
+
     def test_bounded_download_and_size(self):
         client = PublicClient(Opener(b"12345"))
         self.assertEqual(client.get("https://api.github.com/example", limit=5, expected_size=5), b"12345")

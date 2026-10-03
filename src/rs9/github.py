@@ -3,7 +3,7 @@ import json
 import time
 from datetime import datetime, timezone
 from urllib.error import URLError
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from rs9.errors import ContractError
@@ -67,7 +67,10 @@ class PublicClient:
                     raise ContractError("SIZE_MISMATCH", "Downloaded size differs from release metadata")
                 data = b"".join(chunks)
                 import hashlib
-                self.receipts.append({"url": url, "final_url": response.geturl(), "status": 200,
+                def receipt_url(value):
+                    parsed = urlsplit(value)
+                    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
+                self.receipts.append({"url": receipt_url(url), "final_url": receipt_url(response.geturl()), "status": 200,
                                       "size": length, "sha256": hashlib.sha256(data).hexdigest(),
                                       "collected_at": datetime.now(timezone.utc).isoformat()})
                 return data

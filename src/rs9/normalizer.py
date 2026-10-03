@@ -78,6 +78,13 @@ def normalize(project_dir, destinations_path, version):
     safe_tag(tag)
     result.update(schema=SCHEMA_NORMALIZED, tag=tag, version=version)
     result["release"] = {"tag": tag, "version": version, "prerelease": release["release"]["prerelease"]}
+    if "evidence" in release:
+        policy = release["evidence"]
+        rows = [{**row, "name": row["name"].replace("{version}", version)} for row in policy["assets"]]
+        for row in rows:
+            validate_safe_basename(row["name"])
+        result["release"]["evidence"] = {"profile": policy["profile"], "checksums": policy["checksums"],
+                                           "assets": sorted(rows, key=lambda row: row["role"])}
     result["assets"] = sorted([normalized_asset(a, version) for a in release["assets"]], key=lambda a: a["id"])
     result["targets"] = resolve_targets(project, destinations)
     result["evidence"] = {"inputs": [{"filename": filename, "sha256": digest}

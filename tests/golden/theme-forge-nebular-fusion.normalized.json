@@ -103,7 +103,7 @@
       },
       {
         "filename": "releases.toml",
-        "sha256": "24f74fec2dffe3f7d7b5594e18d6af783ed576e7bc545265fffd7a8a97836fff"
+        "sha256": "faa057cda672496dfd358b00b8a0f5b98d2de950fd9d2a176f17cace5c4d0b02"
       }
     ]
   },
@@ -124,6 +124,28 @@
     "summary": "Evidence-bound Theme Forge integration workbench"
   },
   "release": {
+    "evidence": {
+      "assets": [
+        {
+          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.6.1.tgz",
+          "role": "npm-wrapper"
+        },
+        {
+          "name": "PROVENANCE.json",
+          "role": "provenance"
+        },
+        {
+          "name": "nebular.spdx.json",
+          "role": "sbom-spdx"
+        },
+        {
+          "name": "THIRD_PARTY_NOTICES.md",
+          "role": "third-party-notices"
+        }
+      ],
+      "checksums": "SHA256SUMS",
+      "profile": "tauri-desktop-archive.v1alpha1"
+    },
     "prerelease": "reject",
     "tag": "v0.6.1",
     "version": "0.6.1"
