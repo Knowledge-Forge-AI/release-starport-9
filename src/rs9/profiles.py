@@ -14,11 +14,13 @@ from rs9.security import validate_ecosystem_name, scan_for_credentials, validate
 from rs9.spdx import validate_spdx_expression
 
 TAURI_PROFILE = "tauri-desktop-archive.v1alpha1"
+TAURI_AUTHORITY_PROFILE = "tauri-desktop-archive.v1alpha2"
 PACKAGE_PROFILE = "npm-package-archive.v1alpha1"
 TAURI_SOURCES = ("LICENSE", "NOTICE", "COMMERCIAL-LICENSE.md", "package.json",
                  "src-tauri/Cargo.toml", "src-tauri/tauri.conf.json")
 PROFILE_ROLES = {TAURI_PROFILE: {"provenance", "sbom-spdx", "third-party-notices", "npm-wrapper"},
                  PACKAGE_PROFILE: {"provenance", "notice"}}
+PROFILE_ROLES[TAURI_AUTHORITY_PROFILE] = PROFILE_ROLES[TAURI_PROFILE]
 
 
 def png_size(data):
@@ -43,12 +45,18 @@ def evidence_policy(normalized):
     return profile, evidence, roles
 
 
-def selection_for_intent(normalized):
+def selection_for_intent(normalized, *, include_configuration=False):
     profile, evidence, roles = evidence_policy(normalized)
-    sources = set(TAURI_SOURCES if profile == TAURI_PROFILE else ("package.json",))
+    sources = set(TAURI_SOURCES if profile in {TAURI_PROFILE, TAURI_AUTHORITY_PROFILE} else ("package.json",))
     sources.update(normalized.get("license", {}).get("files", []))
+    from rs9.constants import ALLOWED_PROJECT_FILES
+    for row in normalized.get("evidence", {}).get("inputs", []) if include_configuration else ():
+        if row.get("filename") in ALLOWED_PROJECT_FILES:
+            sources.add(".rs9/" + row["filename"])
+    if normalized.get("project", {}).get("id") == "theme-forge-stellar-burst":
+        sources.add("package-lock.json")
     if "desktop" in normalized:
-        if profile != TAURI_PROFILE:
+        if profile not in {TAURI_PROFILE, TAURI_AUTHORITY_PROFILE}:
             raise ContractError("EVIDENCE_PROFILE", "Desktop evidence requires desktop profile")
         sources.add(normalized["desktop"]["icon"]["path"])
     return {"schema": "rs9.release-selection.v1alpha1", "repository": normalized["project"]["repository"],
@@ -59,7 +67,7 @@ def selection_for_intent(normalized):
 
 def capture_supplemental(normalized, output, client):
     profile, evidence, roles = evidence_policy(normalized)
-    if profile != TAURI_PROFILE:
+    if profile not in {TAURI_PROFILE, TAURI_AUTHORITY_PROFILE}:
         return
     # This corroboration belongs solely to the desktop evidence profile.
     package = json_evidence(output, "source/package.json")["name"]
@@ -94,7 +102,8 @@ def evaluate_profile(capture, profile, intent, *, roles=None):
         if not any(row["role"] == role and row["name"] == name for row in capture.record["assets"]):
             raise ContractError("EVIDENCE_ROLES", "Profile roles must bind selected authenticated assets")
     try:
-        sections = _evaluate_tauri(capture, intent, roles) if profile == TAURI_PROFILE else _evaluate_package(capture, intent, roles)
+        sections = (_evaluate_tauri(capture, intent, roles, repository_authority=profile == TAURI_AUTHORITY_PROFILE)
+                    if profile in {TAURI_PROFILE, TAURI_AUTHORITY_PROFILE} else _evaluate_package(capture, intent, roles))
     except (KeyError, TypeError, ValueError, UnicodeError, AttributeError):
         raise ContractError("INVALID_EVIDENCE", "Profile evidence does not satisfy its schema") from None
     result = {"schema": "rs9.evidence-profile-result.v1alpha1", "profile": profile,
@@ -103,7 +112,7 @@ def evaluate_profile(capture, profile, intent, *, roles=None):
     return result
 
 
-def _evaluate_tauri(capture, normalized, roles):
+def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False):
     root, source, metadata, payloads = capture.root, capture.source, capture.asset_metadata, capture.evidence_bytes
     repository = capture.record["repository"]
     release = capture.record["release"]
@@ -218,7 +227,10 @@ def _evaluate_tauri(capture, normalized, roles):
     for declaration in declarations:
         scan_for_credentials(declaration["expression"])
         validate_spdx_expression(declaration["expression"])
-    license_status = "consistent" if all(d["expression"] == normalized["license"]["expression"] for d in declarations) else "conflict"
+    authority = [d for d in declarations if d["source"].startswith("tagged:")]
+    conflicts = [d for d in declarations if not d["source"].startswith("tagged:")
+                 and d["expression"] != normalized["license"]["expression"]]
+    license_status = "consistent" if all(d["expression"] == normalized["license"]["expression"] for d in (authority if repository_authority else declarations)) else "conflict"
     icon = None
     if "desktop" in normalized:
         selected = normalized["desktop"]["icon"]["path"]
@@ -230,7 +242,10 @@ def _evaluate_tauri(capture, normalized, roles):
                       "target_basis": capture.record["tag"]["target_basis"]},
               "assets": inputs, "evidence_assets": [metadata[n] for n in sorted((*EVIDENCE_NAMES, *wrappers))],
               "source_files": source_records, "payload_license_copies": license_copies,
-              "license": {"status": license_status, "declarations": declarations, "comparison": "exact-string; SPDX list membership unvalidated"},
+              "license": {"status": license_status, "declarations": declarations,
+                          **({"authority": "tagged-repository", "downstream_metadata_conflicts": conflicts,
+                              "comparison": "tagged-authority; downstream conflicts retained"} if repository_authority
+                             else {"comparison": "exact-string; SPDX list membership unvalidated"})},
               "npm_support": {"name": npm["name"], "version": npm["version"], "sha256": digest(npm_bytes),
                               "release_asset": wrappers[0], "integrity_agrees": True,
                               "payload_manifest_sha256": npm_manifest["manifest_sha256"],
@@ -251,7 +266,8 @@ def _evaluate_package(capture, intent, roles):
         if path in ("package/package.json", "package/NOTICE", "package/LICENSE"):
             packaged[path] = data
 
-    manifest = inspect_archive(capture.archives[identity], {}, on_file=visitor,
+    selected = next(a for a in intent["assets"] if a["id"] == identity)
+    manifest = inspect_archive(capture.archives[identity], selected.get("commands", {}), on_file=visitor,
                                max_members=20000, max_member_bytes=4 * 1024 ** 2,
                                max_total_bytes=64 * 1024 ** 2)
     if manifest != capture.manifests[identity]:

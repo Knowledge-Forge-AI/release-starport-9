@@ -8,7 +8,7 @@ from rs9.contract import normalize
 from rs9.dependencies import derive_dependencies
 from rs9.errors import ContractError
 from rs9.fetch import fetch
-from rs9.ingestion import authenticate
+from rs9.ingestion import authenticate_shadow as authenticate
 from rs9.render import render
 from rs9.scratch import ConfinedWriter, canonical
 

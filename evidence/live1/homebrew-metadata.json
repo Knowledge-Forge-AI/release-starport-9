@@ -1,0 +1,73 @@
+{
+  "authenticated_payload_bytes": false,
+  "mutable_reference": "main",
+  "observations": [
+    {
+      "dependencies": [
+        "node"
+      ],
+      "formula_sha256": "af8b1ee1784553745d93e8f9cbc6f15194b6dbeb8c0ad98a4de01669640db8fa",
+      "license": "AGPL-3.0-or-later",
+      "observation_level": "metadata-only",
+      "payload_url": "https://registry.npmjs.org/@knowledge-forge-ai/theme-forge-stellar-burst/-/theme-forge-stellar-burst-0.6.1.tgz",
+      "project": "theme-forge-stellar-burst",
+      "publication_state": "not-classified-exact",
+      "referenced_commands": [
+        "tfsb",
+        "tfsb-studio-service"
+      ],
+      "reported_payload_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+      "source": "https://github.com/Knowledge-Forge-AI/homebrew-tap/blob/main/Formula/theme-forge-stellar-burst.rb"
+    },
+    {
+      "dependencies": [
+        "node"
+      ],
+      "formula_sha256": "5d9e848a9023e46f3d4a8d9f0d6e70f7919ea7bfca5b10bf68105d8663070ce9",
+      "license": "AGPL-3.0-or-later",
+      "observation_level": "metadata-only",
+      "payload_url": "https://registry.npmjs.org/@knowledge-forge-ai/theme-forge-stellar-loom/-/theme-forge-stellar-loom-0.4.0.tgz",
+      "project": "theme-forge-stellar-loom",
+      "publication_state": "not-classified-exact",
+      "referenced_commands": [
+        "tfsl",
+        "tfsl-batch"
+      ],
+      "reported_payload_sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+      "source": "https://github.com/Knowledge-Forge-AI/homebrew-tap/blob/main/Formula/theme-forge-stellar-loom.rb"
+    },
+    {
+      "dependencies": [
+        "node"
+      ],
+      "formula_sha256": "2470e65d56830f5a167f9120b56f627bcd96b0797258d7a44df9ca7b32909666",
+      "license": "AGPL-3.0-or-later",
+      "observation_level": "metadata-only",
+      "payload_url": "https://registry.npmjs.org/@knowledge-forge-ai/theme-forge-solar-sail/-/theme-forge-solar-sail-0.2.1.tgz",
+      "project": "theme-forge-solar-sail",
+      "publication_state": "not-classified-exact",
+      "referenced_commands": [
+        "tfss"
+      ],
+      "reported_payload_sha256": "ebc4f21d1e61dbc0ac4e87ce81f7ecec4f97d7c15562356e429d4c1a4e9aa5a0",
+      "source": "https://github.com/Knowledge-Forge-AI/homebrew-tap/blob/main/Formula/theme-forge-solar-sail.rb"
+    },
+    {
+      "dependencies": [],
+      "formula_sha256": "3ceab48cc7ea8d64d178b45ae3475ac61d25a60f090b0396148110a691914e61",
+      "license": "AGPL-3.0-or-later",
+      "observation_level": "metadata-only",
+      "payload_url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+      "project": "theme-forge-nebular-fusion",
+      "publication_state": "not-classified-exact",
+      "referenced_commands": [
+        "tfnf"
+      ],
+      "reported_payload_sha256": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be",
+      "source": "https://github.com/Knowledge-Forge-AI/homebrew-tap/blob/main/Formula/theme-forge-nebular-fusion.rb"
+    }
+  ],
+  "observed_date": "2026-10-03",
+  "schema": "rs9.live1-reference-metadata.v1alpha1",
+  "source": "fresh-github-connector-read"
+}

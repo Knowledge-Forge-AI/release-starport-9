@@ -2,11 +2,22 @@
 
 Status: implemented specification in `src/rs9/planner.py` and `src/rs9/records.py`. Defines revision-independent semantic content identity, adapter outputs, pure publication planning, and deterministic revision allocation. Record hashes bind canonical JSON bytes; they do not establish signatures or authority.
 
+LIVE1 retains plan/adapter-output v1alpha1 shapes but requires an explicitly
+migrated [destination policy v1alpha2](rs9-live1-policy-receipt-v1alpha2.md).
+The v1alpha1 policy description below is historical. Current adapter-owned gates
+cannot be waived; serialized plans are audit evidence and require fresh planning
+before real transport.
+
 ## Overview
 
 The RS9 publication planner (`rs9.planner`) is a pure functional control plane component. Given normalized tenant intent, an authenticated in-process `ReleaseCapture`, profile results, an adapter output manifest, qualification gates, destination policy, and a destination observation, it deterministically computes a plan with an immutable hash identity (`rs9.publication-plan.v1alpha1`).
 
-The planner executes zero network I/O, does not access ambient clocks (evaluating strictly against an explicit RFC3339 UTC `evaluated_at`), and produces pure canonical records.
+The planner executes zero network I/O and does not access ambient clocks (evaluating
+strictly against an explicit RFC3339 UTC `evaluated_at`). It rechecks local captured
+bytes and configuration authority before producing canonical records. A pre-RS9
+exception requires an approved exact bootstrap capability; normal future releases
+require captured tagged `.rs9/` inputs. Serialized configuration claims cannot
+replace those checks.
 
 ## Semantic content identity (`rs9.semantic-content-identity.v1alpha1`)
 

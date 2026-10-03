@@ -37,9 +37,9 @@ class GateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             intent, capture, profile, output, gates, policy = fixture(Path(tmp).resolve())
             trust = gate("trust.signature", "pass", "registry", [{"kind": "signature-receipt", "sha256": "c" * 64}], reason="operator-bound")
-            for external, outcome in (({}, "block-gate"), ({"trust.signature": ["c" * 64]}, "publish-intent")):
+            for external, outcome in (({}, "block-gate"), ({"trust.signature": ["c" * 64]}, "block-gate")):
                 authority = policy["external_evidence"]["license.authority"]
-                policy = destination_policy(required_gates=["trust.signature"], external_evidence={"license.authority": authority, **external})
+                policy = destination_policy(required_gates=["trust.signature"], external_evidence={**policy["external_evidence"], **external})
                 result = plan(intent, capture, profile, output, [*gates, trust], policy, observation(output), evaluated_at=T0)
                 self.assertEqual(result["outcome"], outcome)
 

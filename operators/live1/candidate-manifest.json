@@ -1,0 +1,991 @@
+{
+  "authenticated_release_records": [],
+  "bootstrap_manifest_sha256": "dd99580fbcacd5f3c87b99d2e0cb0f28f835a44c46505a197295fdb3951a951f",
+  "configuration_hashes": [
+    {
+      "config_sha256": "db39ddce5ddc2448d6b0693cafe02489ddad4639f7eee6223d0506a37a841c1c",
+      "project": "theme-forge-stellar-burst"
+    },
+    {
+      "config_sha256": "c926fa9455f7f23ad06fd791e4ea417c0f6edf4e8b15fa6e4c026d777a8735aa",
+      "project": "theme-forge-stellar-loom"
+    },
+    {
+      "config_sha256": "afb77d5eb80e2728dce5b09f0ed30f734bd3daf39e486efc555b6b226d50621d",
+      "project": "theme-forge-solar-sail"
+    },
+    {
+      "config_sha256": "d009ea0a968ff4fcdacaedbb3ae75b0292ef40bb0899368dac4f71db27d63a41",
+      "project": "theme-forge-nebular-fusion"
+    }
+  ],
+  "downstream_artifacts": [],
+  "files": [
+    {
+      "path": ".github/pull_request_template.md",
+      "sha256": "ca90d7728025d29b8e166e00b6f90e6c4a6279c9c6507c8c9cd37b340c5a9aed",
+      "size": 452
+    },
+    {
+      "path": ".github/workflows/rs9-candidate-tests.yml",
+      "sha256": "06f53c39bea82a3dab5963bc35a4d1f9a2c86abde183fb513b041502f5aabf41",
+      "size": 797
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793",
+      "size": 19
+    },
+    {
+      "path": "CLA.md",
+      "sha256": "0a777947100c39fcce985be2fc481a715156135c13294624cc543d7dc0b954af",
+      "size": 2533
+    },
+    {
+      "path": "COMMERCIAL-LICENSE.md",
+      "sha256": "b0d078e2344ce6822827cffb81ad94a9704dd783bcb6c262ccbd33f62a3d6840",
+      "size": 1284
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "sha256": "0bbd127792f93d124f445d663cefc33ff24949e6928385d6e83ad73fefd88081",
+      "size": 1259
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+      "size": 34460
+    },
+    {
+      "path": "NOTICE",
+      "sha256": "5b6a3d40779e779b3e70da6789b6d1706f84a0c92e2ba59460c25c43388cc625",
+      "size": 1528
+    },
+    {
+      "path": "README.md",
+      "sha256": "324baca10165990a62199a08c278b020011e65cc6a39270962f28334f19a61a9",
+      "size": 4888
+    },
+    {
+      "path": "bootstrap/pre-rs9/theme-forge-live1/README.md",
+      "sha256": "a616bb9b53d97989ab39a88ea4e3c568ccff56c8b471b39f9e8914764eee7a39",
+      "size": 1138
+    },
+    {
+      "path": "bootstrap/pre-rs9/theme-forge-live1/manifest.json",
+      "sha256": "dd99580fbcacd5f3c87b99d2e0cb0f28f835a44c46505a197295fdb3951a951f",
+      "size": 3194
+    },
+    {
+      "path": "bootstrap/pre-rs9/theme-forge-live1/theme-forge-nebular-fusion/channels.json",
+      "sha256": "663aa3adbc965eca3748886e88aa2505d399af59463daa988dd36a69026f1034",
+      "size": 1053
+    },
+    {
+      "path": "bootstrap/pre-rs9/theme-forge-live1/theme-forge-nebular-fusion/intent.json",
+      "sha256": "480d3b0f363cfada9320f4ff1e443709b97d6d057457ec58d68197435e06aa8f",
+      "size": 2523
+    },
+    {
+      "path": "bootstrap/pre-rs9/theme-forge-live1/theme-forge-solar-sail/channels.json",
+      "sha256": "323347289a9e33127b99ab844ce58b1fcc582ea5f1bca4c28c0ca603072bf80c",
+      "size": 1029
+    },
+    {
+      "path": "bootstrap/pre-rs9/theme-forge-live1/theme-forge-solar-sail/intent.json",
+      "sha256": "e94b3f917d2644cd8b064e7e8b0eae7463445f82d136f6f52360d24ca3861a90",
+      "size": 1126
+    },
+    {
+      "path": "bootstrap/pre-rs9/theme-forge-live1/theme-forge-stellar-burst/channels.json",
+      "sha256": "9989d6926e5242aba96d99be7114834f69b20e7f63651b2717a89613245d1ace",
+      "size": 1047
+    },
+    {
+      "path": "bootstrap/pre-rs9/theme-forge-live1/theme-forge-stellar-burst/intent.json",
+      "sha256": "006e3021e4c8ef4dc5dab0d4813c1cc6c3d6dbac4f5776a0b24df85f8e1b2416",
+      "size": 1291
+    },
+    {
+      "path": "bootstrap/pre-rs9/theme-forge-live1/theme-forge-stellar-loom/channels.json",
+      "sha256": "f7ed39bdbda15a348f5f346309194e4930c69eb01ed57a8e42004ec6edc2a4ca",
+      "size": 1041
+    },
+    {
+      "path": "bootstrap/pre-rs9/theme-forge-live1/theme-forge-stellar-loom/intent.json",
+      "sha256": "ad9fd8045122de15daf10c1115c801ebd6f3e947e65cc5303d9dde994221d11d",
+      "size": 1251
+    },
+    {
+      "path": "docs/README.md",
+      "sha256": "b693b972c61fbde677efaf6a98c7d210407f9969a1f89edb0302489c4fc79a80",
+      "size": 4538
+    },
+    {
+      "path": "docs/adr/0001-tenant-contract-v1alpha1.md",
+      "sha256": "3ee754f34ad24be06bfb6a7f2a2602394a061efbd74d56d32d1cb73c720915fa",
+      "size": 4487
+    },
+    {
+      "path": "docs/adr/0002-github-release-sole-ingestion-authority.md",
+      "sha256": "81697436a8c6f1bd1283d251c18d1c2170c876c8285591b9d12279576d1041a2",
+      "size": 3960
+    },
+    {
+      "path": "docs/adr/0003-authenticated-ingestion-and-shadow-adapters.md",
+      "sha256": "33b4a5003329547291fe73bbd0c4ddbfa02195bd9a9090831699bc86bcedc479",
+      "size": 4501
+    },
+    {
+      "path": "docs/adr/0004-ingestion-core-and-evidence-profiles.md",
+      "sha256": "8c4718d24235ad1c30428fbe5e2b9a441d566ada1d78c1ebd558f4be7a40ea65",
+      "size": 8091
+    },
+    {
+      "path": "docs/adr/0005-publication-state-planner-and-receipts.md",
+      "sha256": "e11259a1a4cb442d3c8214b220a1c654cfe183a6bf4e1b23d609b0066af91638",
+      "size": 12687
+    },
+    {
+      "path": "docs/adr/0006-live-publisher-gates-and-bootstrap-tenants.md",
+      "sha256": "133f334ecff1bdcc4c92a94f4d7afda716ba6cd780adabf77680f05d0723295c",
+      "size": 3233
+    },
+    {
+      "path": "docs/apgr-v0.13.0-readiness.md",
+      "sha256": "1fc23035335795fb81a0af1b312d9e789b84cbb9ec04b0ccf87c5981c9f982a0",
+      "size": 1292
+    },
+    {
+      "path": "docs/architecture.md",
+      "sha256": "561c3d9baead3804df65ddba5c804bd8a9de318ae3c35a6778bacc93bcdd9fd5",
+      "size": 10376
+    },
+    {
+      "path": "docs/architecture/adapter-destination-model.md",
+      "sha256": "0598a789596e093187b1684f8b2da0b8d89e566ec3b52c87c78199aefbb1be63",
+      "size": 7465
+    },
+    {
+      "path": "docs/architecture/migration-map.md",
+      "sha256": "60f4e7eceb6b47fc2d33a8d808b983887ca455b66533610ae520a41e2e68e6e2",
+      "size": 7115
+    },
+    {
+      "path": "docs/architecture/nebular-runtime-materialization.md",
+      "sha256": "7a83641a2dd58534cb2caab0b8c823e9f45e11d242aad9887569ffbb31e73b41",
+      "size": 2204
+    },
+    {
+      "path": "docs/architecture/nebular-shadow-projection.md",
+      "sha256": "192b3d92791809d941bee32781edce6f64e764277c0bb448f5e295ac94221b8b",
+      "size": 9351
+    },
+    {
+      "path": "docs/architecture/theme-forge-extraction-inventory.md",
+      "sha256": "02f7d5bef6246481c629c96fafc5893ddc15ced00e57b7aeac003bb66d8b53c1",
+      "size": 11617
+    },
+    {
+      "path": "docs/foundation1-candidate.md",
+      "sha256": "aff9803bb334a73b424c38ecfa8de3dc316c362065cf970f75bcffa8fd85fe27",
+      "size": 16982
+    },
+    {
+      "path": "docs/foundation2-candidate.md",
+      "sha256": "7eea7e3d56f59be4ea7fa908b0261bd08492802381537951ef44a5ece90796ec",
+      "size": 12405
+    },
+    {
+      "path": "docs/foundation2-inventory.md",
+      "sha256": "d5955c68079b5bf4682f36df8ab667deeee23647b4f63b21195ad277d19c15d8",
+      "size": 3365
+    },
+    {
+      "path": "docs/foundation2-qualification.md",
+      "sha256": "19f5aea667bbd2ffe1c3431e033393efcc93d7faa7a0a6760633d725ac7a6786",
+      "size": 8623
+    },
+    {
+      "path": "docs/foundation3-candidate.md",
+      "sha256": "f50a07fc5693dc5397753308932bf82a733ed8a5ebdf64927f6ed4c84f9dd4bb",
+      "size": 14996
+    },
+    {
+      "path": "docs/foundation3-inventory.md",
+      "sha256": "702370d241fb5dc8571ecd445ee94e5e4664deb2141dec5f1343416a92993688",
+      "size": 3206
+    },
+    {
+      "path": "docs/install/README.md",
+      "sha256": "a00e0273fe87fd8120bbde66041def65e8a87d0f701d9a9bf15889d5b3885e07",
+      "size": 2241
+    },
+    {
+      "path": "docs/live1-candidate.md",
+      "sha256": "ca8c2b2cdfa598e51689798fd874a2f5bc1125910add47b343b323705a2286cf",
+      "size": 13328
+    },
+    {
+      "path": "docs/live1-closeout.md",
+      "sha256": "3e0915512fba665a652ed3dadff7784c2ec815a7ae7d03f8e72271e9c3121060",
+      "size": 7621
+    },
+    {
+      "path": "docs/live1-inventory.md",
+      "sha256": "9f20db253dd25d0114409765a910fde8bfcc322370464d6ab68cb89d1774f2c3",
+      "size": 2008
+    },
+    {
+      "path": "docs/project-contract.md",
+      "sha256": "570509fb197fafc190f7b4d9c6ba5c5bd31aea38bf03fcbbff5d3b5976e30d5a",
+      "size": 4493
+    },
+    {
+      "path": "docs/specs/rs9-bootstrap-tenant-v1alpha1.md",
+      "sha256": "1606b6b2042b6350873a962f78919e845c4876b57d902eb32e8d61223868de02",
+      "size": 2522
+    },
+    {
+      "path": "docs/specs/rs9-config-v1alpha1.md",
+      "sha256": "b5c299f560b50a3739b298e186f2a052909c08aaa9cd1325a1017671b804b424",
+      "size": 13838
+    },
+    {
+      "path": "docs/specs/rs9-dependency-evidence-v1alpha1.md",
+      "sha256": "8b94ab9bf9f90bfbf9bae8e849fc322412110d4974f064577e872d04ee6064f4",
+      "size": 2680
+    },
+    {
+      "path": "docs/specs/rs9-destination-observation-v1alpha1.md",
+      "sha256": "2e424cddc830b005723c224dc18875a7662fdb578a8a500f75bb5b2bed38ea5b",
+      "size": 7153
+    },
+    {
+      "path": "docs/specs/rs9-ingestion-record-v1alpha1.md",
+      "sha256": "b01ec12e43616a7673daa1d705cd4cbf6ad75ef0708da1aeb5beb14b6b59eba7",
+      "size": 6317
+    },
+    {
+      "path": "docs/specs/rs9-live1-policy-receipt-v1alpha2.md",
+      "sha256": "c71b79b833229404c57af598804ee7493bfd9af997f23f1b9451fd47a0581022",
+      "size": 2512
+    },
+    {
+      "path": "docs/specs/rs9-publication-plan-v1alpha1.md",
+      "sha256": "1b68f3963b089ccbc89f9d0171740f5a73d7b1252f65b720e8032271dd5a4b63",
+      "size": 10043
+    },
+    {
+      "path": "docs/specs/rs9-publication-receipt-v1alpha1.md",
+      "sha256": "fe74839f406f1d6b4a3d61bc4ed9ef4fd9a97d0235d46a5abe1ecd6416c0d181",
+      "size": 6816
+    },
+    {
+      "path": "docs/specs/rs9-qualification-record-v1alpha1.md",
+      "sha256": "49dd6a85a48c8274780289ed11e72f1cd624239744c00cebb8e1fd2326461872",
+      "size": 2383
+    },
+    {
+      "path": "docs/specs/rs9-release-record-v1alpha1.md",
+      "sha256": "eededd732e0ac9ea826376b59ba7f18e7d9443f1e5355bb626a6a457eee5e687",
+      "size": 7120
+    },
+    {
+      "path": "docs/specs/rs9-retry-idempotence-v1alpha1.md",
+      "sha256": "09402c356314c08eb66401cff98bf5884342805720909235454c5958f8c06ea9",
+      "size": 5754
+    },
+    {
+      "path": "evidence/live1/closeout-verification.json",
+      "sha256": "ca50341f79bee6d99ac87393a77d35710d1c9c9ae309617dba1ac0dd020a0a51",
+      "size": 1499
+    },
+    {
+      "path": "evidence/live1/environment.json",
+      "sha256": "ef94a3a7a95829a32b567ce0f7f4c43c8aeef5508f93454f52919c49f4fb27ae",
+      "size": 659
+    },
+    {
+      "path": "evidence/live1/gate-matrix.json",
+      "sha256": "d39ad1624ef0380ac2149459d2ee98ba5d01ec51a7a0c74391a0c04f9e29c643",
+      "size": 16915
+    },
+    {
+      "path": "evidence/live1/homebrew-metadata.json",
+      "sha256": "9ddca28e18da3be2fbc0c4632fbcba8ca8965e54a032a660e4a84116e66a3eda",
+      "size": 3245
+    },
+    {
+      "path": "evidence/live1/proposal-disposition.json",
+      "sha256": "a2c8db5064bc0ccc68a7c17517d3d307e9f078e69ba4e68bf63edd28d4cca32e",
+      "size": 1146
+    },
+    {
+      "path": "evidence/live1/publication-preparation.json",
+      "sha256": "1476d06d557bf118501e81f392001ba28c3db425e62dc67f5b26d2e10747825a",
+      "size": 13249
+    },
+    {
+      "path": "evidence/live1/release-metadata.json",
+      "sha256": "b57591e8efb0814e7566eae2a39f18b919f561a09b630e7bed800215230ad231",
+      "size": 10304
+    },
+    {
+      "path": "evidence/live1/unit-verification.json",
+      "sha256": "c277578cb4d61aedf4a17f9ffc8f5566f71ff6b1ab6f6b5b7fa055bd32be52af",
+      "size": 600
+    },
+    {
+      "path": "examples/README.md",
+      "sha256": "1df11c411be269d903dbb460044059070682607b0b3e1a8779c383e8a3505301",
+      "size": 2278
+    },
+    {
+      "path": "examples/destinations.example.toml",
+      "sha256": "19221e5e59e5dcf0fadec81c9f407615d64ad01521989202065b058c52879c32",
+      "size": 1721
+    },
+    {
+      "path": "examples/theme-forge/theme-forge-nebular-fusion/.rs9/apt.toml",
+      "sha256": "f77a3fbbebba1873e67378670e563ecf9b28477782eaff60f50d00ead6cd9719",
+      "size": 182
+    },
+    {
+      "path": "examples/theme-forge/theme-forge-nebular-fusion/.rs9/dnf.toml",
+      "sha256": "0a13048275014e92c106844ebe2e1eb39173f07289f7a37deeddbbc2246b37da",
+      "size": 182
+    },
+    {
+      "path": "examples/theme-forge/theme-forge-nebular-fusion/.rs9/homebrew.toml",
+      "sha256": "741ebe622358546a328886df8728d212de7dc21559c1a10bdb5804395a0232a9",
+      "size": 215
+    },
+    {
+      "path": "examples/theme-forge/theme-forge-nebular-fusion/.rs9/nix.toml",
+      "sha256": "303da468e0b7e8a2359416254f01a0d0278370bbef6008bd3fa8ecce7dfb1d4c",
+      "size": 198
+    },
+    {
+      "path": "examples/theme-forge/theme-forge-nebular-fusion/.rs9/pacman.toml",
+      "sha256": "d99d362af1662710f37dba84af300676daf513ab7574386736455f90829d8473",
+      "size": 329
+    },
+    {
+      "path": "examples/theme-forge/theme-forge-nebular-fusion/.rs9/project.toml",
+      "sha256": "63541af88c8ba9965ae68f7413c955eccdff2e2239a58912a559f9866b3fc9f3",
+      "size": 882
+    },
+    {
+      "path": "examples/theme-forge/theme-forge-nebular-fusion/.rs9/releases.toml",
+      "sha256": "faa057cda672496dfd358b00b8a0f5b98d2de950fd9d2a176f17cace5c4d0b02",
+      "size": 1393
+    },
+    {
+      "path": "flake.nix",
+      "sha256": "81f00ca3a1d528f9acde88846ba7485cf1b660ec84c0a61734711e45fe0cd7dc",
+      "size": 843
+    },
+    {
+      "path": "nix/candidate-products.json",
+      "sha256": "46bf6db5c6cd318a40f9b7e5a6f42b740dc190c90e0d3f7aeaeafef690daa088",
+      "size": 6655
+    },
+    {
+      "path": "nix/default.nix",
+      "sha256": "14efb5f6d206d7b2236ba226362dbbe3e78a460e9c727f62d1ff664cb9e8b9b1",
+      "size": 2863
+    },
+    {
+      "path": "nix/nebular.nix",
+      "sha256": "b780acbce568599207801ec650e8ad68d21a20ead08eb152725a61e26fc78888",
+      "size": 382
+    },
+    {
+      "path": "nix/node-cli.nix",
+      "sha256": "6303a657cd63aa5b626761430f0c145706e2f7c54a795b6b44f9fd66ab55ed88",
+      "size": 1338
+    },
+    {
+      "path": "nix/theme-forge-nebular-fusion.desktop",
+      "sha256": "90767c87996767a3455c7673e598cfae18caaa165ae19e6c40b39ef8314d89d7",
+      "size": 206
+    },
+    {
+      "path": "operators/live1/RUNBOOK.md",
+      "sha256": "25b41263102bafb0e781803f4e3046ea40b0864df0be016d57c9b8983d7bb82d",
+      "size": 9347
+    },
+    {
+      "path": "operators/live1/expectations.json",
+      "sha256": "324852491060c3f051814368b28073840a0ce4635e12be3e5f25d85c44749268",
+      "size": 3426
+    },
+    {
+      "path": "operators/live1/readiness.json",
+      "sha256": "e8e6dfc9d4a8bf035ffa14f04908dfe0b9dd59441279715e69652e543e017e1c",
+      "size": 1073
+    },
+    {
+      "path": "src/rs9/__init__.py",
+      "sha256": "c3c63fc5509f2c940e2b974b1fd2771608cb4e816507efa3c1c40f9aa686cdfe",
+      "size": 371
+    },
+    {
+      "path": "src/rs9/adapter_gates.py",
+      "sha256": "992d583db60c72960120d4d8b6b841b966e05c3f921b81f1d097213f41b33245",
+      "size": 1727
+    },
+    {
+      "path": "src/rs9/adapters.py",
+      "sha256": "5f94a5bc0d8c5f287c67ebb15db9068f2d2630b530bb81e66b27fd30aac80b16",
+      "size": 3294
+    },
+    {
+      "path": "src/rs9/archives.py",
+      "sha256": "f9f7cdb9064395f1037e05cc544760978e9610bf3337b22c9c04bf0f8cc1e344",
+      "size": 8565
+    },
+    {
+      "path": "src/rs9/bootstrap.py",
+      "sha256": "8984fdc36ab659dbb842bf3a854c7ec1d8d065758b9a0affd09c1c5dfb7bc6f2",
+      "size": 6936
+    },
+    {
+      "path": "src/rs9/compare.py",
+      "sha256": "e718de0901110169b9fe874d8a163dc06d6b016d1d0206514633e9f0cb660d14",
+      "size": 14227
+    },
+    {
+      "path": "src/rs9/constants.py",
+      "sha256": "b077992eb71c5b795d0205e0ec60532cf406447315b5e94e79c5ccab389456a9",
+      "size": 1742
+    },
+    {
+      "path": "src/rs9/contract.py",
+      "sha256": "840d0e4de49aa1e953060a90adbca8d6973f1f300b62e98de3c0a50e6bf6ee29",
+      "size": 2836
+    },
+    {
+      "path": "src/rs9/cross_validator.py",
+      "sha256": "596462d54038097f1eba5ced61c2bfd80b370bfafb126116cb15f2ae298f68dd",
+      "size": 3839
+    },
+    {
+      "path": "src/rs9/dependencies.py",
+      "sha256": "5995e455f31bf16cfa6a842164c1c4b4dcd87b114d7e42dd70f2c10b8af7664c",
+      "size": 10440
+    },
+    {
+      "path": "src/rs9/destinations.py",
+      "sha256": "c88c89fcde6b2b31de7be33ddc1b3ebfdac6f67a3b47bf1515488d856a18a234",
+      "size": 2676
+    },
+    {
+      "path": "src/rs9/elf.py",
+      "sha256": "774dcbde5d9873bd80961238de6eea7fe22b1bd662bc939911ab7f820220b847",
+      "size": 19568
+    },
+    {
+      "path": "src/rs9/errors.py",
+      "sha256": "b9dbf2370253c320f361072c467955d3bad8401bccb2941f0840d5342b069c9a",
+      "size": 714
+    },
+    {
+      "path": "src/rs9/fetch.py",
+      "sha256": "1a78ba7003728393eff1a5b88c0a73d4c5cac1779e50665aa2e50a688dcc6f9b",
+      "size": 469
+    },
+    {
+      "path": "src/rs9/fields.py",
+      "sha256": "7c1ac47383b64c09806d1172480ad1c7655942cfc3c6ded2ee03454940bc185a",
+      "size": 2958
+    },
+    {
+      "path": "src/rs9/gates.py",
+      "sha256": "5f40c671c4006f41d9ba867733d45a112559c5f7e25d69ce7f78135d4ca1b6bf",
+      "size": 6357
+    },
+    {
+      "path": "src/rs9/github.py",
+      "sha256": "99cf908435483b05b478b2f3819b530ebaa9bb767fa738703f780c83f1655d70",
+      "size": 4193
+    },
+    {
+      "path": "src/rs9/ingestion.py",
+      "sha256": "bff49ca7d5fbba9747379d8d5afa8c8acd70d725a4d4da620890e0c073cf6ebf",
+      "size": 2695
+    },
+    {
+      "path": "src/rs9/materialize.py",
+      "sha256": "35d22477c8bc643f9ef227c18ad43b92724b2df1a5843bc8c921b5156a789064",
+      "size": 26985
+    },
+    {
+      "path": "src/rs9/normalizer.py",
+      "sha256": "8d97c2464dd208ded0c0daa7e8d36cac7fef3d908e8caf8d5ac6c6cb5cb9c245",
+      "size": 4192
+    },
+    {
+      "path": "src/rs9/npm_deps.py",
+      "sha256": "c44c8eda213e3143f74a38acec32f7a246f5f0d0e340423aa67cdb31d89cdae9",
+      "size": 5827
+    },
+    {
+      "path": "src/rs9/observation.py",
+      "sha256": "b81eacabd1299a7216a1712288f395b4e02f2a77c0486ff8b8cdbee8d8e9e007",
+      "size": 7416
+    },
+    {
+      "path": "src/rs9/operator.py",
+      "sha256": "88bd709342eae9de95184ecfbf993834e091751002bc8c9ca593629f183c7a2f",
+      "size": 7907
+    },
+    {
+      "path": "src/rs9/pages.py",
+      "sha256": "242710bc96a5d7d73509819548dfc8c7ca5f5a68ea7bebcff22ca96b3446ff54",
+      "size": 20860
+    },
+    {
+      "path": "src/rs9/planner.py",
+      "sha256": "298d687a043ee0b14d926c381dcece340ea6bc7e2ecc4dee644e616a19d82e08",
+      "size": 20436
+    },
+    {
+      "path": "src/rs9/profiles.py",
+      "sha256": "5bb640fbd6bebe8eb05820ef43e9d98be8e9b533e497118ba2dfce1d49df4bcb",
+      "size": 21762
+    },
+    {
+      "path": "src/rs9/project.py",
+      "sha256": "734170742e0fd7e37d88d410ce47d110d31e36e2a7a45bc2eda991e36d11bf19",
+      "size": 7848
+    },
+    {
+      "path": "src/rs9/publication.py",
+      "sha256": "17d47a561bd34d431b51a8e54d3ad5032051bc8936e97657404b28a84aa83a20",
+      "size": 11046
+    },
+    {
+      "path": "src/rs9/qualification.py",
+      "sha256": "f4a2b2adba5f2f660e06b35e41c404ab87d1ffd47de530555c529eb78d00b8d9",
+      "size": 5921
+    },
+    {
+      "path": "src/rs9/readers.py",
+      "sha256": "fa21edeaff9f6787620e3992bced7715572f83945e10687fb0c18a40cfad4651",
+      "size": 5992
+    },
+    {
+      "path": "src/rs9/records.py",
+      "sha256": "096f8835a8e2bb6152f010a34809befb59726971b65e9628637c34e6edee7f41",
+      "size": 5729
+    },
+    {
+      "path": "src/rs9/release_core.py",
+      "sha256": "80f01d73ebb38743f5c77ec16f7b5bc8d790225fea9e03c8be042556e73bd117",
+      "size": 21371
+    },
+    {
+      "path": "src/rs9/releases.py",
+      "sha256": "8dbdd7041dc67616248a76b193409d685605abba70f75c5528f9d9ee2f509455",
+      "size": 4775
+    },
+    {
+      "path": "src/rs9/render.py",
+      "sha256": "67ac9c4ee41a56e62d7935a0ceaf15b984a5806d84ca878b62326da48cdd604a",
+      "size": 21127
+    },
+    {
+      "path": "src/rs9/render_live.py",
+      "sha256": "8cfd6e53766dc2949ef7b8ec3074f7c6936d68749842814df4f3fd05457046de",
+      "size": 18146
+    },
+    {
+      "path": "src/rs9/repo_apt.py",
+      "sha256": "6e028a2301282bc4eafa23ab4ab46b6a59390aa83549747acd268d8e3caef1af",
+      "size": 22689
+    },
+    {
+      "path": "src/rs9/scratch.py",
+      "sha256": "9319dbe9a6ed98e2e3196f348b3788684eaee2bf3ebeaf0c8eaf6fbd8efd6791",
+      "size": 2374
+    },
+    {
+      "path": "src/rs9/security.py",
+      "sha256": "42f5a4e293a65dedcec54ac5e0cfa3e90f80f8c27b6b9208ef70c375ff44b15a",
+      "size": 10730
+    },
+    {
+      "path": "src/rs9/shadow.py",
+      "sha256": "cdaeb05460a3d0a3fedb2fc1b8583aa09f8f30816aa1e3d63af279023c141bb4",
+      "size": 2231
+    },
+    {
+      "path": "src/rs9/signed_store.py",
+      "sha256": "233665555a18f315d1ae1a0c5e9e6e0c7d2a1e8319caafd8996ba12969dcf973",
+      "size": 32450
+    },
+    {
+      "path": "src/rs9/spdx.py",
+      "sha256": "7c02de64807fdc57c7828f081430ce745da55d5444581c9fc1333ae6e6d3f054",
+      "size": 5116
+    },
+    {
+      "path": "src/rs9/validator.py",
+      "sha256": "6f0320607b7ab33e380f2779b1825bbc2537675f24c8b3b3925d8aa3cbb40d7c",
+      "size": 365
+    },
+    {
+      "path": "src/rs9/wheel.py",
+      "sha256": "585ba58004aa9333847abf835d4199b30e6ad123c1770614ca6f66eea0591511",
+      "size": 23537
+    },
+    {
+      "path": "tests/__init__.py",
+      "sha256": "17591131d23e2a8b680c1c2576f2451b8449ca6a273b27aca0e4974fe19e33bf",
+      "size": 26
+    },
+    {
+      "path": "tests/elf_builder.py",
+      "sha256": "26c865f721d5fc1fcd78ceecdb01921d7dee500acb1783bb4eec3a23b4fe703f",
+      "size": 16314
+    },
+    {
+      "path": "tests/fixtures/nebular-0.6.1/comparison-classification.json",
+      "sha256": "d9692569b258c85785806d465a5ab6b67634bc0d1f16148126c7d3035da64c1e",
+      "size": 11987
+    },
+    {
+      "path": "tests/fixtures/nebular-0.6.1/comparison.json",
+      "sha256": "2240a7d64e7253489f61f53c472bdd2ec01990ca354585ff429f86753ae591e0",
+      "size": 24329
+    },
+    {
+      "path": "tests/fixtures/nebular-0.6.1/dependency-evidence.json",
+      "sha256": "e6ff0d85dd09d855cfbbca4618a8571200b9c58759153295f40c91ac61e7343a",
+      "size": 24497
+    },
+    {
+      "path": "tests/fixtures/nebular-0.6.1/ingestion.json",
+      "sha256": "f5057782b8494ae74e19991db0232a03241c0f686753187505b1a4766cd7b367",
+      "size": 9169
+    },
+    {
+      "path": "tests/fixtures/nebular-0.6.1/live-observations.json",
+      "sha256": "42214c89ba87e26793033926a917f33b17ccacade57a4b82ccabb09e53d60161",
+      "size": 28587
+    },
+    {
+      "path": "tests/fixtures/nebular-0.6.1/qualification-readback.json",
+      "sha256": "98b8566ae522ba9cbc32d8cd0dd910542632afaf30b197fc832c344137378e11",
+      "size": 6634
+    },
+    {
+      "path": "tests/fixtures/nebular-0.6.1/reference-byte-comparison.json",
+      "sha256": "d974b0a5ff9b75c575638580f1b656405f9f9a1e054cd738fdb042f38465fa5a",
+      "size": 3970
+    },
+    {
+      "path": "tests/fixtures/nebular-0.6.1/reference-facts.json",
+      "sha256": "4f23c59e611adde0d093766a23744662278deea442a623fc01e50ff562363e27",
+      "size": 11461
+    },
+    {
+      "path": "tests/fixtures/stellar-burst-0.6.1/live-observations.json",
+      "sha256": "3fce098b667c1aa2e40953ccb722406fac293a4a861f72c0bc93898839467cb3",
+      "size": 1506
+    },
+    {
+      "path": "tests/fixtures/stellar-burst-0.6.1/profile-result.json",
+      "sha256": "f183263b45c2278c75d81fde7ac6d1b64a5641039833b908ebb89ab0850a57a0",
+      "size": 1782
+    },
+    {
+      "path": "tests/fixtures/stellar-burst-0.6.1/release-record.json",
+      "sha256": "59c89bd48c554f4296206cdb93a4f24c7cc4969653d2277fe27fd45459c5607c",
+      "size": 3013
+    },
+    {
+      "path": "tests/fixtures/stellar-burst-0.6.1/selection.json",
+      "sha256": "e16fe9f3f833fa1e181b179f4338864e1ac298e86c4daf92e4cc29197e191a0a",
+      "size": 645
+    },
+    {
+      "path": "tests/fixtures/synthetic-mit-tool/.rs9/npm.toml",
+      "sha256": "0f1a700a7724286e168bf014aabd2763933b51d7cbb96a0e442ac3de57a9dcd5",
+      "size": 150
+    },
+    {
+      "path": "tests/fixtures/synthetic-mit-tool/.rs9/project.toml",
+      "sha256": "146b8e3b052888f317ab9cfe7b3c31e8cdd6d66eacf90f3c8244a185461cc55c",
+      "size": 407
+    },
+    {
+      "path": "tests/fixtures/synthetic-mit-tool/.rs9/pypi.toml",
+      "sha256": "d61b5696002e3ae37ab6ddce50af309bdf81ed78028f7701626aa0af053180ef",
+      "size": 152
+    },
+    {
+      "path": "tests/fixtures/synthetic-mit-tool/.rs9/releases.toml",
+      "sha256": "d594ca8eeb45499b59792458f1dd05eace3c876ecc50b7216e1bc1be2e68f282",
+      "size": 468
+    },
+    {
+      "path": "tests/fixtures/theme-forge-observed-facts.json",
+      "sha256": "0339558d5d949dda0f81bdce308c99ee0244e0a9aace15248e1747134d26483d",
+      "size": 22459
+    },
+    {
+      "path": "tests/golden/shadow/nebular-0.6.1/README.md",
+      "sha256": "b1386d33695d22be64b591077c6feb07b00afddd896eb881cc1c2803d9a94e55",
+      "size": 318
+    },
+    {
+      "path": "tests/golden/shadow/nebular-0.6.1/aur/theme-forge-nebular-fusion-bin/.SRCINFO",
+      "sha256": "dccb25b8e0da1987e586bd4254dae8b154013d6bb26ae62b45346da301bb285a",
+      "size": 1641
+    },
+    {
+      "path": "tests/golden/shadow/nebular-0.6.1/aur/theme-forge-nebular-fusion-bin/PKGBUILD",
+      "sha256": "7da74c25d92687d7095e894489e6c7f4380f0d69a1b02768c36fa27d90944bab",
+      "size": 2159
+    },
+    {
+      "path": "tests/golden/shadow/nebular-0.6.1/aur/theme-forge-nebular-fusion-bin/theme-forge-nebular-fusion.desktop",
+      "sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401",
+      "size": 203
+    },
+    {
+      "path": "tests/golden/shadow/nebular-0.6.1/nix/theme-forge-nebular-fusion.desktop",
+      "sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401",
+      "size": 203
+    },
+    {
+      "path": "tests/golden/shadow/nebular-0.6.1/nix/theme-forge-nebular-fusion.nix",
+      "sha256": "fd374c98801fd2f94ba5732f1fc05b00c1347d0b671375afaafcd27b756db2e0",
+      "size": 3530
+    },
+    {
+      "path": "tests/golden/shadow/nebular-0.6.1/pacman/theme-forge-nebular-fusion/PKGBUILD",
+      "sha256": "1cc750f4fbb618c6b9ad827cfbe84999c3dc51b805b735fa43464e5435dce485",
+      "size": 1772
+    },
+    {
+      "path": "tests/golden/shadow/nebular-0.6.1/pacman/theme-forge-nebular-fusion/theme-forge-nebular-fusion.desktop",
+      "sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401",
+      "size": 203
+    },
+    {
+      "path": "tests/golden/shadow/nebular-0.6.1/render-manifest.json",
+      "sha256": "5e6b8c097260582222368971cf40a7a240558cb4ba96720ad0401582e2cf65d5",
+      "size": 2620
+    },
+    {
+      "path": "tests/golden/shadow/nebular-0.6.1/rpm/theme-forge-nebular-fusion.desktop",
+      "sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401",
+      "size": 203
+    },
+    {
+      "path": "tests/golden/shadow/nebular-0.6.1/rpm/theme-forge-nebular-fusion.spec",
+      "sha256": "3c87e63c43a9bae6d7ceca595786e2bb44650d5035a97a06b720719a2b474c78",
+      "size": 3000
+    },
+    {
+      "path": "tests/golden/theme-forge-nebular-fusion.normalized.json",
+      "sha256": "e4c47b802c04a50d6c2e44c4c2870afd3c19b87b4fab4b667d1b96cb057821d0",
+      "size": 7139
+    },
+    {
+      "path": "tests/publication_fixtures.py",
+      "sha256": "8a9a0851baa2d8a0cd7c98ca5b2363e97786d8ed3bb42aec19a67b68a304ea53",
+      "size": 6592
+    },
+    {
+      "path": "tests/release_fixtures.py",
+      "sha256": "e877db22763b946f7247f0b66e5a4cdf83158663a33c73a8d7c4071f6bac0678",
+      "size": 2750
+    },
+    {
+      "path": "tests/shadow_fixtures.py",
+      "sha256": "e8ad146d368d7ac262a6836ece12b105533a46c59f02946bb843744350ec66e2",
+      "size": 5041
+    },
+    {
+      "path": "tests/test_archive_hardlinks.py",
+      "sha256": "a4262895e88a23810a36311e6c1bad6103caa90720f97f5a6c81ffa325e84557",
+      "size": 13857
+    },
+    {
+      "path": "tests/test_archives.py",
+      "sha256": "7a985bd54d60b4f97c91a5726e98d3a752a669972d43db138426ca9fe1276445",
+      "size": 3201
+    },
+    {
+      "path": "tests/test_closeout_regressions.py",
+      "sha256": "8db8335e06e61154e4bb3858df0554deeeeb7e69b44372a88ea5972d6918f41e",
+      "size": 8271
+    },
+    {
+      "path": "tests/test_contract.py",
+      "sha256": "be13ca88208eb51e99aed1dd3dbd257415965cd43be7e1ae8531ec007889d7e2",
+      "size": 25212
+    },
+    {
+      "path": "tests/test_dependencies.py",
+      "sha256": "68a2d9e12cb387e0494e215c1ba9958d69092d2b890c35edf3907a5e3c9bc1c7",
+      "size": 3098
+    },
+    {
+      "path": "tests/test_elf.py",
+      "sha256": "2b020a26ec74528eb44564a925ec0d0e8c5fdfe047afc5964aaa72efa7e414c3",
+      "size": 19097
+    },
+    {
+      "path": "tests/test_fail_closed.py",
+      "sha256": "9acfd6ed28278b4b666bbd72fce073ef65d946b145064a62b77c0e887be231c0",
+      "size": 6891
+    },
+    {
+      "path": "tests/test_fetch.py",
+      "sha256": "5c17f8976a0ea31f47c20d59ed458662a6172c5b7efbf89859181fb2bc59a410",
+      "size": 3612
+    },
+    {
+      "path": "tests/test_gates.py",
+      "sha256": "aa2043c25ed3090e35790381c0b50690f8fcbca33ae8b80db9b6460599bcad78",
+      "size": 3460
+    },
+    {
+      "path": "tests/test_github.py",
+      "sha256": "8ff54f381695b8fb36c6d8605095d34a6ad3a7dbbf84721b39b97a785d1b427e",
+      "size": 2617
+    },
+    {
+      "path": "tests/test_hygiene.py",
+      "sha256": "285c90343625d0697692edf4c314f7394be279b8812daaf394804a4c5dbd2096",
+      "size": 2775
+    },
+    {
+      "path": "tests/test_ingestion.py",
+      "sha256": "d7c2639d775226c16673ef4be8c7b8d7f4930b2cb4da0ff6b4d7e7dd2466d936",
+      "size": 8942
+    },
+    {
+      "path": "tests/test_live1_closeout.py",
+      "sha256": "c08e3d5c71c7d88a38541e5bd31400224e2a0bbe909dbf438784e3c6a617da3d",
+      "size": 7978
+    },
+    {
+      "path": "tests/test_live1_contracts.py",
+      "sha256": "b1800edf5f4bc311c7f5028264fcf2c501aed6257d51ab37beece0dbca4b8801",
+      "size": 8954
+    },
+    {
+      "path": "tests/test_live1_readers_operator.py",
+      "sha256": "71047c0f34312dba36da43ae503779eef707170cf281d84096a5140609523a8c",
+      "size": 11159
+    },
+    {
+      "path": "tests/test_live_nebular.py",
+      "sha256": "54cedc3cbf9da5656f15ed1739ca3d3f30b296de9f5248d073db2d3f55f192aa",
+      "size": 6958
+    },
+    {
+      "path": "tests/test_live_stellar_burst.py",
+      "sha256": "5f0719eb1d4e6f2e7189735826cfcb83c5b70bd2702cc2589d393756074c8577",
+      "size": 4061
+    },
+    {
+      "path": "tests/test_materialize.py",
+      "sha256": "4cc085a74db3e1dde35a3a263c702d53bc6bfc575eb8433b820bcd3f81d9d342",
+      "size": 40002
+    },
+    {
+      "path": "tests/test_observation.py",
+      "sha256": "2a84f6a052fe4f455dd8ffe095ffce31c4e6b48ff3943fdf5b715513f5cc58be",
+      "size": 3203
+    },
+    {
+      "path": "tests/test_pages.py",
+      "sha256": "f4981bc86084a2e959b0a0271c654c8cfb8b8002e1ca6ac0e1196e44bd9b132c",
+      "size": 17440
+    },
+    {
+      "path": "tests/test_planner.py",
+      "sha256": "69731d6e2d3f4c5d6733d101978d382e9a871a08cb0a4eff0e2a42637a16b125",
+      "size": 8794
+    },
+    {
+      "path": "tests/test_profiles.py",
+      "sha256": "30811b7790e32fa4a56330e2038878e683bf45d4a5bf747d3948ee40390db8c4",
+      "size": 2955
+    },
+    {
+      "path": "tests/test_publication.py",
+      "sha256": "679559b439e59dd228320c15d1ff7121e8de396f03a29fae0427b587ee12263a",
+      "size": 10557
+    },
+    {
+      "path": "tests/test_reference_comparison.py",
+      "sha256": "0d95aa413544648cf8bd1bca878c33a0b6a8f3a0b669eb9a6ddab9c675521908",
+      "size": 5604
+    },
+    {
+      "path": "tests/test_release_core.py",
+      "sha256": "7453a3d9475a2772d91e470057125b4e13800b0ba01a259759c6dcc6d0fbe26b",
+      "size": 4205
+    },
+    {
+      "path": "tests/test_render.py",
+      "sha256": "5ccf81990e684b52b4763394673aa4c8afa05205fd2c089db81cfeca2bccf1a6",
+      "size": 5846
+    },
+    {
+      "path": "tests/test_render_live.py",
+      "sha256": "45020cf7841a6e0eeb747b051c41087d4cd0c037cd432ee886e6800c88bd63e4",
+      "size": 7491
+    },
+    {
+      "path": "tests/test_repo_apt.py",
+      "sha256": "8c6db6194b20c8e686eb6f050d8c75ba728d4a13ba32c7c7ffa678793575adec",
+      "size": 19580
+    },
+    {
+      "path": "tests/test_shadow_cli.py",
+      "sha256": "1ac15a65154ec19943f835366ef771e81853ba91236c6da9f1175b63d88cca29",
+      "size": 1846
+    },
+    {
+      "path": "tests/test_shadow_contract.py",
+      "sha256": "01ad23a83577220e9919aa7b8eed438a9a64125f59ee34f631fb323396381a2e",
+      "size": 15951
+    },
+    {
+      "path": "tests/test_signed_store.py",
+      "sha256": "c60adab18efda5afa6502c76a37934922ad57cb0d7a0d836fcd152876260abaf",
+      "size": 28743
+    },
+    {
+      "path": "tests/test_theme_forge_parity.py",
+      "sha256": "317ea8e8a65429bab2906997686b57c1b567dad382a44aa8da625d834acd1abc",
+      "size": 4659
+    },
+    {
+      "path": "tests/test_wheel.py",
+      "sha256": "fa74802c28eaa3e3b4578c18abdbf5ccca870ca7e993f2f124f2ab11634fa2df",
+      "size": 7466
+    }
+  ],
+  "inventory_scope": "bounded-product-files-excluding-this-manifest-and-unrelated-local-state",
+  "kind": "source-candidate-only",
+  "phase_outcome": "blocked",
+  "production_ready": false,
+  "publication_authority": false,
+  "publication_plans": [],
+  "publication_receipts": [],
+  "qualification_records": [],
+  "review_status": "dispatcher-pre-final-reviewed-with-findings-terminal-amended",
+  "schema": "rs9.live1-source-candidate-inventory.v1alpha1",
+  "terminal_disposition": "amend"
+}

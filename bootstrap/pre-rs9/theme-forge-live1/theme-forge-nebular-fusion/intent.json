@@ -1,0 +1,106 @@
+{
+  "project": {
+    "id": "theme-forge-nebular-fusion",
+    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+    "name": "Theme Forge Nebular Fusion"
+  },
+  "version": "0.6.1",
+  "tag": "v0.6.1",
+  "license": {
+    "expression": "AGPL-3.0-or-later",
+    "source": "tagged-repository",
+    "files": [
+      "LICENSE",
+      "NOTICE",
+      "COMMERCIAL-LICENSE.md"
+    ]
+  },
+  "runtime": {
+    "kind": "native"
+  },
+  "commands": [
+    {
+      "name": "tfnf",
+      "interface": "gui"
+    }
+  ],
+  "release": {
+    "prerelease": "reject",
+    "evidence": {
+      "profile": "tauri-desktop-archive.v1alpha2",
+      "checksums": "SHA256SUMS",
+      "assets": [
+        {
+          "role": "provenance",
+          "name": "PROVENANCE.json"
+        },
+        {
+          "role": "sbom-spdx",
+          "name": "nebular.spdx.json"
+        },
+        {
+          "role": "third-party-notices",
+          "name": "THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "role": "npm-wrapper",
+          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.6.1.tgz"
+        }
+      ]
+    }
+  },
+  "assets": [
+    {
+      "id": "darwin-arm64",
+      "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+      "format": "tar.gz",
+      "platforms": [
+        "aarch64-darwin"
+      ],
+      "commands": {
+        "tfnf": "Theme Forge Nebular Fusion.app/Contents/MacOS/theme-forge-nebular-fusion"
+      },
+      "launchers": {
+        "tfnf": "Theme Forge Nebular Fusion.app/Contents/Resources/bin/tfnf"
+      }
+    },
+    {
+      "id": "linux-arm64",
+      "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+      "format": "tar.gz",
+      "platforms": [
+        "aarch64-linux"
+      ],
+      "commands": {
+        "tfnf": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion"
+      },
+      "launchers": {
+        "tfnf": "theme-forge-nebular-fusion/bin/tfnf"
+      }
+    },
+    {
+      "id": "linux-x64",
+      "name": "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+      "format": "tar.gz",
+      "platforms": [
+        "x86_64-linux"
+      ],
+      "commands": {
+        "tfnf": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion"
+      },
+      "launchers": {
+        "tfnf": "theme-forge-nebular-fusion/bin/tfnf"
+      }
+    }
+  ],
+  "desktop": {
+    "command": "tfnf",
+    "categories": [
+      "Development"
+    ],
+    "icon": {
+      "source": "tagged-repository",
+      "path": "src-tauri/icons/icon.png"
+    }
+  }
+}

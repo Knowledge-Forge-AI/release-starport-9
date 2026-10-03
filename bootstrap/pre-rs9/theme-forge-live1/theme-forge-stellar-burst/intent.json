@@ -1,0 +1,63 @@
+{
+  "project": {
+    "id": "theme-forge-stellar-burst",
+    "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+    "name": "Theme Forge Stellar Burst"
+  },
+  "version": "0.6.1",
+  "tag": "v0.6.1",
+  "license": {
+    "expression": "AGPL-3.0-or-later",
+    "source": "tagged-repository",
+    "files": [
+      "LICENSE",
+      "NOTICE",
+      "COMMERCIAL-LICENSE.md"
+    ]
+  },
+  "runtime": {
+    "kind": "node",
+    "constraint": ">=22"
+  },
+  "commands": [
+    {
+      "name": "tfsb",
+      "interface": "cli"
+    },
+    {
+      "name": "tfsb-studio-service",
+      "interface": "cli"
+    }
+  ],
+  "release": {
+    "prerelease": "reject",
+    "evidence": {
+      "profile": "npm-package-archive.v1alpha1",
+      "checksums": "SHA256SUMS",
+      "assets": [
+        {
+          "role": "provenance",
+          "name": "PROVENANCE.json"
+        },
+        {
+          "role": "notice",
+          "name": "NOTICE"
+        }
+      ]
+    }
+  },
+  "assets": [
+    {
+      "id": "package",
+      "name": "knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+      "format": "tar.gz",
+      "platforms": [
+        "any"
+      ],
+      "commands": {
+        "tfsb": "package/dist/cli.js",
+        "tfsb-studio-service": "package/dist/service-protocol/server-cli.js"
+      }
+    }
+  ]
+}

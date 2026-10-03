@@ -14,9 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 def product_files():
     names = ("README.md", "LICENSE", "COMMERCIAL-LICENSE.md", "CLA.md", "NOTICE", "CONTRIBUTING.md", ".gitignore")
     files = {ROOT / name for name in names}
-    for directory in (".github", "docs", "examples", "src", "tests"):
+    for directory in (".github", "docs", "examples", "src", "tests", "bootstrap", "nix", "operators", "evidence"):
         files.update(path for path in (ROOT / directory).rglob("*") if path.is_file())
     files.add(ROOT / ".gitignore")
+    files.update(p for p in (ROOT/"flake.nix", ROOT/"flake.lock") if p.is_file())
     return sorted(files)
 
 

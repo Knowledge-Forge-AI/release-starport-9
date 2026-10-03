@@ -4,7 +4,7 @@ import tempfile
 import unittest
 
 from rs9.errors import ContractError
-from rs9.ingestion import authenticate
+from rs9.ingestion import authenticate_shadow as authenticate
 from rs9.render import desktop_entry, nix_string, rpm_string, render
 from rs9.scratch import ConfinedWriter
 from tests.shadow_fixtures import fixture_evidence

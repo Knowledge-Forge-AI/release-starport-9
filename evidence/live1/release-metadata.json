@@ -1,0 +1,303 @@
+{
+  "schema": "rs9.live1-metadata-observation.v1alpha1",
+  "source": "github-connector-read-only",
+  "observed_date": "2026-10-03",
+  "status": "metadata-matches-payload-bytes-not-authenticated",
+  "projects": [
+    {
+      "project": "stellar-burst",
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+      "repository_id": 1342490027,
+      "tag": "v0.6.1",
+      "release_id": 399542205,
+      "immutable": false,
+      "commit": "a3e89683f92b8240c800ed303c866e7b12aa3277",
+      "tree": "158bd6d03b21d747385fb25f49e6e148d62043c8",
+      "contains_rs9": false,
+      "truncated": false,
+      "assets": [
+        {
+          "name": "knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+          "size": 644313,
+          "sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+          "id": 599265851
+        },
+        {
+          "name": "NOTICE",
+          "size": 601,
+          "sha256": "d31e49346c1d4b9ea98ed49b817d48e68c4b9000e1763522da5ffe7f791e3657",
+          "id": 599265906
+        },
+        {
+          "name": "PROVENANCE.json",
+          "size": 3909,
+          "sha256": "8a3d209168b6d3cd701fec648051e44b18e02fe6c9f1beb69230bc366d9f88b3",
+          "id": 599265968
+        },
+        {
+          "name": "SHA256SUMS",
+          "size": 383,
+          "sha256": "a56000c63c5b85a12c378fc7d216e86b03037a24c8681533f2d6bcd7d9feeae6",
+          "id": 599266011
+        },
+        {
+          "name": "theme-forge-stellar-burst-staging.tar.gz",
+          "size": 1504643,
+          "sha256": "25782f49b694f5b10709337dc5decd2c4172de35409bc43e53a6ce89e00d6b3c",
+          "id": 599265803
+        }
+      ],
+      "published_at": "2026-09-29T21:28:52Z",
+      "license": "AGPL-3.0-or-later",
+      "license_authority": "tagged-repository",
+      "tagged_files": {
+        "package.json": {
+          "blob": "4e8d9965e6d31f36a0cd1a2712dfa81922165f5d"
+        },
+        "LICENSE": {
+          "blob": "7ce823c377a19ad5082605452c4503176cd793e6"
+        },
+        "NOTICE": {
+          "blob": "b19225efa28526b8864470d78d1eb9c9b6ddb202"
+        },
+        "COMMERCIAL-LICENSE.md": {
+          "blob": "c42374f457a2dfcd8822b566958303e7c1f6c6bd"
+        },
+        "package-lock.json": {
+          "blob": "fa4d1927484d94620a641bf2589ab47586f73524"
+        }
+      }
+    },
+    {
+      "project": "stellar-loom",
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-loom",
+      "repository_id": 1361513719,
+      "tag": "v0.4.0",
+      "release_id": 399542451,
+      "immutable": false,
+      "commit": "d6f3cc457ee68224cef06e9599c9d2401057c618",
+      "tree": "9388e305fd516755f01fdd01e66c72f09cc8e1d8",
+      "contains_rs9": false,
+      "truncated": false,
+      "assets": [
+        {
+          "name": "knowledge-forge-ai-theme-forge-stellar-loom-0.4.0.tgz",
+          "size": 273462,
+          "sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+          "id": 599266537
+        },
+        {
+          "name": "NOTICE",
+          "size": 598,
+          "sha256": "e711709e69f5f8fc65c55ff3b3e47c390ed8f60890eb38cf999d95c2494b5d17",
+          "id": 599266582
+        },
+        {
+          "name": "PROVENANCE.json",
+          "size": 3048,
+          "sha256": "e45dee5163a93eff1183e238c194005a3ce184ee96aab0576e72b5ab0ae252f5",
+          "id": 599266628
+        },
+        {
+          "name": "SHA256SUMS",
+          "size": 381,
+          "sha256": "fecc32d60fe05947b916489b93421c3be51025bd6c6e032e4d07cdfd9a6506d5",
+          "id": 599266675
+        },
+        {
+          "name": "theme-forge-stellar-loom-staging.tar.gz",
+          "size": 1226314,
+          "sha256": "23b62934b9c683615b26b8b08bb6a3033d637aebd7b414c0d5e8db171ef713ee",
+          "id": 599266479
+        }
+      ],
+      "published_at": "2026-09-29T21:29:14Z",
+      "license": "AGPL-3.0-or-later",
+      "license_authority": "tagged-repository",
+      "tagged_files": {
+        "package.json": {
+          "blob": "4474651fc577f5dce6a65515a09ce82c55434a61"
+        },
+        "LICENSE": {
+          "blob": "7ce823c377a19ad5082605452c4503176cd793e6"
+        },
+        "NOTICE": {
+          "blob": "941e3ac6d8274e3a031b153dc4212c8dcce113a8"
+        },
+        "COMMERCIAL-LICENSE.md": {
+          "blob": "fc2d6bbe23aa9b042aa69075b79f7e58aec113cb"
+        }
+      }
+    },
+    {
+      "project": "solar-sail",
+      "repository": "Knowledge-Forge-AI/theme-forge-solar-sail",
+      "repository_id": 1374611333,
+      "tag": "v0.2.1",
+      "release_id": 399542664,
+      "immutable": false,
+      "commit": "68e3f95a27cf1681aabb1fccb55e8b78d23b5fa0",
+      "tree": "35a865bdea29dac6e39feb6afcba39485b23b3a6",
+      "contains_rs9": false,
+      "truncated": false,
+      "assets": [
+        {
+          "name": "knowledge-forge-ai-theme-forge-solar-sail-0.2.1.tgz",
+          "size": 110658,
+          "sha256": "ebc4f21d1e61dbc0ac4e87ce81f7ecec4f97d7c15562356e429d4c1a4e9aa5a0",
+          "id": 599267369
+        },
+        {
+          "name": "NOTICE",
+          "size": 592,
+          "sha256": "f42f316dab658fda0feb16da73d8a772254aca290ceabd0f3bd1bb21cbebad55",
+          "id": 599267475
+        },
+        {
+          "name": "PROVENANCE.json",
+          "size": 3338,
+          "sha256": "387ff3b27470d926de91abb56527e170007cbbb4d895b4767dad626f36d741af",
+          "id": 599267547
+        },
+        {
+          "name": "SHA256SUMS",
+          "size": 377,
+          "sha256": "433677f5408627398e156d1bf77c511003f51ccfb08dc44c3116b8a6b62131e2",
+          "id": 599267598
+        },
+        {
+          "name": "theme-forge-solar-sail-staging.tar.gz",
+          "size": 219206,
+          "sha256": "a9748fa5ea334b39f018c18a2ef239d4043142e8356618589fa3655be71b135a",
+          "id": 599267250
+        }
+      ],
+      "published_at": "2026-09-29T21:29:39Z",
+      "license": "AGPL-3.0-or-later",
+      "license_authority": "tagged-repository",
+      "tagged_files": {
+        "package.json": {
+          "blob": "cd93dfdd380cdacace4f626979d5d40c29a4015c"
+        },
+        "LICENSE": {
+          "blob": "7ce823c377a19ad5082605452c4503176cd793e6"
+        },
+        "NOTICE": {
+          "blob": "cc4be991b261ed35e5d2c63a4325d0ed9f76ac74"
+        },
+        "COMMERCIAL-LICENSE.md": {
+          "blob": "0dd9aeecd38106ad815a406d35f3a5dc2040e5c5"
+        }
+      }
+    },
+    {
+      "project": "nebular-fusion",
+      "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+      "repository_id": 1358643872,
+      "tag": "v0.6.1",
+      "release_id": 400494635,
+      "immutable": false,
+      "commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+      "tree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b",
+      "contains_rs9": false,
+      "truncated": false,
+      "assets": [
+        {
+          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.6.1.tgz",
+          "size": 18124,
+          "sha256": "17f7563d6a6fa0bf250579a92ceca065fb4ca115a4fe4aae610850f1cfe29a7f",
+          "id": 601953356
+        },
+        {
+          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-darwin-arm64-0.6.1.tgz",
+          "size": 47082735,
+          "sha256": "089ab0ba9d2a2c6e36de58d23a988047d41d9e593f6bfc15d8d90debf08d2c24",
+          "id": 601953156
+        },
+        {
+          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-linux-arm64-0.6.1.tgz",
+          "size": 54205397,
+          "sha256": "bb23429473211cca057a4b634d089eee938d360e7ee0e7ad415f516155cb99fd",
+          "id": 601953215
+        },
+        {
+          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-linux-x64-0.6.1.tgz",
+          "size": 54053877,
+          "sha256": "a9f8084217104c3c23db39a5c9af01646e319793e2c70eda438bc576b776c4d2",
+          "id": 601953275
+        },
+        {
+          "name": "nebular-public-source.tar.gz",
+          "size": 7471875,
+          "sha256": "f9e0436ea4794e5dc8eb9e4c1585079fc65329e37ac502b30a9d075ea057b0aa",
+          "id": 601953397
+        },
+        {
+          "name": "nebular.spdx.json",
+          "size": 63796,
+          "sha256": "d7b5ae755abc7a3807ff8425341e8028496b3c929d89915b4e5a7f88898909c1",
+          "id": 601953680
+        },
+        {
+          "name": "PROVENANCE.json",
+          "size": 14720,
+          "sha256": "3645984085dc434b1678eec16440d79a8c87dd704836eb8731085425dc976d1c",
+          "id": 601953752
+        },
+        {
+          "name": "SHA256SUMS",
+          "size": 1378,
+          "sha256": "0c811162316eb7fb99aac460db3cbeee6a6147d32ace29fa21b57856144f2ea0",
+          "id": 601953797
+        },
+        {
+          "name": "theme-forge-nebular-fusion-staging.tar.gz",
+          "size": 7466665,
+          "sha256": "27ff6a60d5c139d7efcdb997cbc7daa04bd2f9d76391f1fccfcf7fac3a437bb1",
+          "id": 601953101
+        },
+        {
+          "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+          "size": 47079690,
+          "sha256": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be",
+          "id": 601953438
+        },
+        {
+          "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+          "size": 54248930,
+          "sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+          "id": 601953522
+        },
+        {
+          "name": "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+          "size": 54105413,
+          "sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+          "id": 601953596
+        },
+        {
+          "name": "THIRD_PARTY_NOTICES.md",
+          "size": 131900,
+          "sha256": "d7547284b40ff84372ca4061004307b8513cc39d6839c346f0c4b52832cd5e04",
+          "id": 601953710
+        }
+      ],
+      "published_at": "2026-09-30T22:54:44Z",
+      "license": "AGPL-3.0-or-later",
+      "license_authority": "tagged-repository",
+      "tagged_files": {
+        "package.json": {
+          "blob": "4251796133a8c4a9780cf2a496e265c6fc395bba"
+        },
+        "LICENSE": {
+          "blob": "7ce823c377a19ad5082605452c4503176cd793e6"
+        },
+        "NOTICE": {
+          "blob": "2ca3294a5e4c2dbf65cfdb5a74df8dcc157baf05"
+        },
+        "COMMERCIAL-LICENSE.md": {
+          "blob": "d321f238af983fdb2d2339ad9a38319a5690ba3c"
+        }
+      }
+    }
+  ]
+}

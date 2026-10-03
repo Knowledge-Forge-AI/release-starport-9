@@ -1,22 +1,34 @@
-# Find current installation documentation
+# Theme Forge installation channels
 
-Status: navigation skeleton. RS9 serves no packages yet. Select a project, then
-an ecosystem/package manager; the current source remains authoritative for
-install, upgrade, uninstall and trust guidance. These links do not migrate URLs
-or assert that hosted validation has passed.
+Status: **RS9 LIVE1 pending / not live.** None of the new RS9 channels below is
+ready for installation. The four products keep their already-released versions:
+Stellar Burst 0.6.1, Stellar Loom 0.4.0, Solar Sail 0.2.1 and Nebular Fusion 0.6.1.
 
-[Nebular shadow qualification](../foundation2-qualification.md) is development
-evidence and supplies no new public installation endpoint. Current distribution
-links below remain authoritative; tenant license/migration gates remain open.
+| Channel | Intended LIVE1 coverage | Current status |
+|---|---|---|
+| PyPI | Four project names; pure CLI wheels where truthful, native wheels only for qualified platforms | Pending availability, ownership, artifact and install qualification |
+| Nix | RS9 flake; Linux x86_64/aarch64 and macOS arm64 as qualified | Package/app outputs withheld |
+| pacman | Signed RS9 repository, x86_64 | Pending native packages, clients, signatures and hosting |
+| DNF/RPM | Signed RS9 repositories, x86_64/aarch64, separately qualified Fedora families | Pending; no Fedora family claimed supported |
+| APT | Signed RS9 repository, Ubuntu 26.04 amd64/arm64 | Pending; no Debian 13 claim |
 
-| Project | Linux/macOS: Nix | Arch: pacman | Fedora: DNF/RPM | macOS: Homebrew | npm | APT / PyPI / AUR |
-|---|---|---|---|---|---|---|
-| Theme Forge Stellar Burst | [Current distro docs](https://github.com/Knowledge-Forge-AI/theme-forge-packages/blob/main/INSTALL.md) | Same distro docs | Same distro docs | [Current tap](https://github.com/Knowledge-Forge-AI/homebrew-tap) | [Authoritative project](https://github.com/Knowledge-Forge-AI/theme-forge-stellar-burst) | APT staged; PyPI planned; AUR recipes staged |
-| Theme Forge Stellar Loom | Current distro docs above | Same distro docs | Same distro docs | Current tap above | [Authoritative project](https://github.com/Knowledge-Forge-AI/theme-forge-stellar-loom) | Same status |
-| Theme Forge Solar Sail | Current distro docs above | Same distro docs | Same distro docs | Current tap above | [Authoritative project](https://github.com/Knowledge-Forge-AI/theme-forge-solar-sail) | Same status |
-| Theme Forge Nebular Fusion | Current distro docs above | Same distro docs | Same distro docs | Current tap above (Apple Silicon developer app) | [Authoritative project](https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion) | Same status |
+[Publication readiness and remaining checks](../live1-candidate.md) lists the
+qualification needed before install commands can be advertised. Canonical new
+repository URLs will use `https://rs9.knowledge-forge.ai/` after verified hosting
+and TLS. The convenience alias must preserve path and query. This candidate does
+not assert current DNS, TLS or Pages readiness.
 
-Future routes should provide separate install, upgrade, uninstall and trust pages
-per project/platform/package manager. Cross-project repository trust belongs to a
-shared trust guide. Do not copy install commands until the serving surface and
-supported target matrix independently qualify.
+Existing npm and [Homebrew tap](https://github.com/Knowledge-Forge-AI/homebrew-tap)
+channels remain managed by their existing authorities. Use each upstream project's
+current instructions:
+
+- [Stellar Burst](https://github.com/Knowledge-Forge-AI/theme-forge-stellar-burst)
+- [Stellar Loom](https://github.com/Knowledge-Forge-AI/theme-forge-stellar-loom)
+- [Solar Sail](https://github.com/Knowledge-Forge-AI/theme-forge-solar-sail)
+- [Nebular Fusion](https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion)
+
+The [legacy distribution repository](https://github.com/Knowledge-Forge-AI/theme-forge-packages)
+is retained as reference and rollback evidence. LIVE1 does not repair its generator
+or establish a new permanent client URL there. After exact production readback,
+install, upgrade, uninstall and trust instructions require a separately reviewed
+documentation update bound to the published generation.

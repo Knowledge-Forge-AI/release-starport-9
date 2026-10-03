@@ -8,13 +8,16 @@ The short name and prospective CLI name are **`rs9`**.
 
 ## Current status and navigation
 
-Foundation 2 adds captured-byte release authentication and deterministic Nebular
-0.6.1 shadow recipes for Nix, pacman, RPM and AUR to the provisional `.rs9`
-validator/normalizer. Shadow acceptance remains deferred for tenant license and
-qualification gates. Signing, registry publication, projection updates and hosting
-remain unimplemented. Existing Theme Forge publication surfaces remain authoritative.
+Foundation 3 supplies the publication-state planner. The first Theme Forge LIVE1
+candidate adds an exact-generation bootstrap, mandatory adapter gates, downstream
+package builders and retained signed-object storage. **PyPI, RS9 Nix, pacman,
+DNF/RPM and APT are pending / not live.** Real release downloads, native
+qualification and attended production transports remain incomplete. Existing
+Theme Forge publication surfaces remain authoritative.
 
 - [Documentation index](docs/README.md)
+- [LIVE1 candidate, scope and remaining gates](docs/live1-candidate.md)
+- [Attended preparation and publication readiness](operators/live1/RUNBOOK.md)
 - [Choose project, ecosystem and package manager](docs/install/README.md)
 - [Configuration v1alpha1](docs/specs/rs9-config-v1alpha1.md) and
   [examples](examples/README.md)

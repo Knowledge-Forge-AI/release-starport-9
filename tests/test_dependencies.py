@@ -4,7 +4,7 @@ import tempfile
 import unittest
 
 from rs9.dependencies import derive_dependencies, shebang
-from rs9.ingestion import authenticate
+from rs9.ingestion import authenticate_shadow as authenticate
 from rs9.scratch import canonical
 from tests.elf_builder import build_elf
 from tests.shadow_fixtures import fixture_evidence

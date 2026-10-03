@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 from rs9.errors import ContractError
-from rs9.ingestion import authenticate, digest, png_size
+from rs9.ingestion import authenticate_shadow as authenticate, digest, png_size
 from rs9.scratch import canonical
 from tests.shadow_fixtures import fixture_evidence
 from tests.shadow_fixtures import tar_bytes

@@ -9,7 +9,7 @@ import unittest
 from rs9.contract import normalize
 from rs9.compare import parse_srcinfo, reference_facts
 from rs9.dependencies import derive_dependencies
-from rs9.ingestion import authenticate
+from rs9.ingestion import authenticate_shadow as authenticate
 from rs9.ingestion import read_evidence, digest
 from rs9.render import render
 from rs9.scratch import canonical

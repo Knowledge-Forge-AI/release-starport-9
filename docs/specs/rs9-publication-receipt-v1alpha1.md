@@ -1,6 +1,9 @@
 # Publication receipt and mutation attempt v1alpha1
 
-Status: implemented specification in `src/rs9/publication.py` and `src/rs9/records.py`. Defines execution attempt auditing, verifiable receipt generation, and cryptographic readback confirmation. Record hashes bind canonical JSON bytes; they do not establish signatures or authority. No actual destination readback adapter or publisher exists.
+Status: historical Foundation 3 specification. The LIVE1 candidate implements
+[receipt v1alpha2](rs9-live1-policy-receipt-v1alpha2.md), adding live-reader and
+fresh-plan authority and simulated fixture receipts. Record hashes alone grant
+no authority. Production publishers remain disabled.
 
 ## Overview
 

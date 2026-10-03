@@ -209,7 +209,31 @@ def authenticated_record_hash(capture):
         raise ContractError("RELEASE_CAPTURE", "Fresh in-process byte authentication required")
     if digest(canonical(capture.record)) != capture._record_hash:
         raise ContractError("INPUT_CHANGED", "Release record changed after authentication")
+    source_records = {row["path"]: row for row in capture.record["source_files"]}
+    if set(capture.source) != set(source_records) or any(
+        not isinstance(data, bytes) or len(data) != source_records[path]["size"]
+        or digest(data) != source_records[path]["sha256"] for path, data in capture.source.items()
+    ):
+        raise ContractError("INPUT_CHANGED", "Authenticated tagged source bytes changed")
     return capture._record_hash
+
+
+def authenticated_tree(capture):
+    """Configuration authority requires the tree authenticated with the capture."""
+    authenticated_record_hash(capture)
+    tree = json_evidence(capture.root, "api/tree.json")
+    if digest(canonical(tree)) != capture.__dict__.get("_tree_hash"):
+        raise ContractError("INPUT_CHANGED", "Captured tagged tree changed after authentication")
+    return tree
+
+
+def authenticated_release_metadata(capture):
+    """Return the unchanged release metadata used to authenticate asset bytes."""
+    authenticated_record_hash(capture)
+    release = json_evidence(capture.root, "api/release.json")
+    if digest(canonical(release)) != capture.__dict__.get("_release_metadata_hash"):
+        raise ContractError("INPUT_CHANGED", "Captured release metadata changed after authentication")
+    return release
 
 
 def authenticate_release(selection, evidence):
@@ -334,4 +358,7 @@ def _authenticate_release(selection, evidence):
             if parsed.utcoffset() is None or parsed.utcoffset().total_seconds() != 0:
                 raise ContractError("INVALID_EVIDENCE", "Release timestamp must be UTC")
             record.setdefault("source_times", {})[key] = value
-    return ReleaseCapture(record, archives, source, manifests, metadata, payloads, root, _proof=_CAPTURE_PROOF)
+    capture = ReleaseCapture(record, archives, source, manifests, metadata, payloads, root, _proof=_CAPTURE_PROOF)
+    capture._tree_hash = digest(canonical(tree))
+    capture._release_metadata_hash = digest(canonical(release))
+    return capture

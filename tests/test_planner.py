@@ -5,13 +5,13 @@ import unittest
 
 from rs9.errors import ContractError
 from rs9.gates import derive_gates
-from rs9.ingestion import authenticate
+from rs9.ingestion import authenticate_shadow as authenticate
 from rs9.planner import plan, destination_policy, allocate_revision, adapter_outputs_from_shadow, safe_repair_contract
 from rs9.records import record_sha256
 from rs9.records import semantic_identity_sha256
 from rs9.render import render
 from rs9.scratch import canonical
-from tests.publication_fixtures import fixture, observation, make_plan, T0, T1
+from tests.publication_fixtures import fixture, observation, make_plan, T0, T1, authorize_fixture_configuration
 from tests.shadow_fixtures import fixture_evidence
 
 
@@ -111,6 +111,7 @@ class PlannerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp).resolve();evidence=root/"evidence";evidence.mkdir()
             intent=fixture_evidence(evidence);auth=authenticate(intent,evidence)
+            authorize_fixture_configuration(evidence, intent, auth.release_capture)
             first=root/"first";second=root/"second";first.mkdir();second.mkdir()
             one=adapter_outputs_from_shadow(auth,render(auth,first,revision=1))
             two=adapter_outputs_from_shadow(auth,render(auth,second,revision=2))

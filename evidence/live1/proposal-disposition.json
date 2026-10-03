@@ -1,0 +1,19 @@
+{
+  "disposition": "amend",
+  "implemented": "Fail-closed control-plane contracts, exact-generation bootstrap, package and retention candidate primitives, preparation operator and pending handoff.",
+  "original_scope": "Current four Theme Forge releases to PyPI, RS9 Nix, pacman, DNF/RPM and APT; observed npm/Homebrew; attended operators only.",
+  "original_scope_replaced": false,
+  "pre_work_stage_deltas": [],
+  "production_enabled": false,
+  "proposal": {
+    "bytes": 39144,
+    "relative_path": "plan-material.md",
+    "sha256": "00d91c4285a04d6510110cd37e0c0da7937917e901483c1360bbcd2148387473"
+  },
+  "required_remaining_work": "Authenticated payload bytes, real native candidates and verifier suites, destination identities/readers, production transports and qualification.",
+  "review_disposition_reference": "docs/live1-candidate.md",
+  "schema": "rs9.live1-proposal-disposition.v1alpha1",
+  "terminal_disposition_reference": "docs/live1-closeout.md",
+  "terminal_phase_outcome": "blocked",
+  "terminal_prior_stage_delta_disposition": "Retain prior producer scope; supersede unqualified APT recipe rendering with explicit refusal."
+}

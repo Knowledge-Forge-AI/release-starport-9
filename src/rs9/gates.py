@@ -54,18 +54,24 @@ def derive_gates(intent, capture, profile, output):
     release_hash = authenticated_record_hash(capture)
     status, blocker = license_status(intent, profile)
     manifest = output["source_manifest"]
-    package_status = "pass" if manifest.get("verdict") == "qualified" and not manifest.get("blockers") else "deferred"
+    # A renderer's own verdict is diagnostic, never publication authority.
+    package_status = "not-run"
     return [gate("release.authenticated", "pass", "release", [{"kind": "release-record", "sha256": release_hash}], reason="captured-byte-authentication"),
             gate("license.authority", status, "tenant", [{"kind": "profile-result", "sha256": record_sha256(profile)}], reason=blocker or "tenant-authority-resolved", blocker=blocker),
             gate("package.render", package_status, output["destination"]["adapter"], [{"kind": "source-manifest", "sha256": output["source_manifest_sha256"]}], reason="package-qualified" if package_status == "pass" else "shadow-qualification-deferred")]
 
 
-def check_gates(intent, release_hash, profile, output, values, policy):
+def check_gates(intent, capture, profile, output, values, policy):
+    from rs9.adapter_gates import mandatory_gates
+    from rs9.qualification import bound_qualifications
+    from rs9.release_core import authenticated_record_hash
+    release_hash = authenticated_record_hash(capture)
     rows = sorted([validate_gate(value) for value in values], key=lambda value: value["id"])
     by_id = {row["id"]: row for row in rows}
     if len(by_id) != len(rows):
         raise ContractError("GATE_ID", "Gate IDs must be unique")
-    required = sorted(set(policy["required_gates"]) | {"release.authenticated", "license.authority", "package.render"})
+    mandatory = mandatory_gates(intent, output["destination"]["adapter"])
+    required = sorted(set(policy["required_gates"]) | mandatory)
     known = {"release.authenticated": ("release-record", release_hash),
              "license.authority": ("profile-result", record_sha256(profile)),
              "package.render": ("source-manifest", output["source_manifest_sha256"])}
@@ -75,7 +81,7 @@ def check_gates(intent, release_hash, profile, output, values, policy):
         if row is None:
             reasons.append("missing:" + gate_id)
             continue
-        if row["status"] == "not-applicable" and gate_id not in known and gate_id in policy["allow_not_applicable"]:
+        if row["status"] == "not-applicable" and gate_id not in mandatory and gate_id in policy["allow_not_applicable"]:
             continue
         if row["status"] != "pass":
             reasons.append("status:" + gate_id + ":" + row["status"])
@@ -87,11 +93,15 @@ def check_gates(intent, release_hash, profile, output, values, policy):
             expected_scope = {"release.authenticated": "release", "license.authority": "tenant", "package.render": output["destination"]["adapter"]}[gate_id]
             if row["scope"] != expected_scope:
                 reasons.append("scope:" + gate_id)
-        elif not row["evidence"] or any(e["sha256"] not in policy["external_evidence"].get(gate_id, []) for e in row["evidence"]):
-            reasons.append("operator-evidence-unbound:" + gate_id)
+        if gate_id != "release.authenticated":
+            allowed = set(policy["external_evidence"].get(gate_id, []))
+            executed = set(bound_qualifications(capture, output, gate_id))
+            evidence = {e["sha256"] for e in row["evidence"] if e["kind"] == "qualification-record"}
+            if not evidence or not evidence <= (allowed & executed):
+                reasons.append("execution-evidence-unbound:" + gate_id)
     status, blocker = license_status(intent, profile)
     authority = by_id.get("license.authority", {})
-    bound_authority = any(row["kind"] == "tenant-license-authority" and row["sha256"] in policy["external_evidence"].get("license.authority", []) for row in authority.get("evidence", []))
+    bound_authority = bool(set(bound_qualifications(capture, output, "license.authority")) & set(policy["external_evidence"].get("license.authority", [])))
     if status == "not-run" and authority.get("status") == "pass" and bound_authority:
         sections = profile["sections"]
         record = sections.get("license", sections.get("legacy_ingestion", {}).get("license", {}))
@@ -99,7 +109,4 @@ def check_gates(intent, release_hash, profile, output, values, policy):
             reasons.append("license-declaration-inconsistent")
     else:
         reasons.append(blocker)
-    source = output["source_manifest"]
-    if source.get("verdict") != "qualified" or source.get("blockers"):
-        reasons.append("package-qualification-deferred")
     return rows, sorted(set(reasons))

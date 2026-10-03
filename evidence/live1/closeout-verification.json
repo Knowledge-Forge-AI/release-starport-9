@@ -1,0 +1,30 @@
+{
+  "cases": 203,
+  "command": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_live1_closeout tests.test_live1_contracts tests.test_live1_readers_operator tests.test_pages tests.test_wheel tests.test_render_live tests.test_repo_apt tests.test_signed_store tests.test_materialize tests.test_ingestion tests.test_profiles tests.test_release_core tests.test_planner tests.test_publication tests.test_gates tests.test_fetch tests.test_render tests.test_shadow_cli tests.test_dependencies tests.test_live_nebular -q",
+  "destination_live_readback": "not-run",
+  "disposition": "amend",
+  "failed": 0,
+  "git_diff_check": "passed",
+  "hosted_ci": "pending-externally",
+  "limits": "Synthetic fixture artifacts and local contract checks do not qualify Theme Forge releases or authorize publication.",
+  "native_platform_qualification": "not-run",
+  "operator_status": {
+    "production_enabled": false,
+    "publication": "blocked"
+  },
+  "passed": 200,
+  "phase_outcome": "blocked",
+  "publication_receipts": 0,
+  "real_release_byte_authentication": "not-run",
+  "repository_wide_verification": "not-run-outside-terminal-scope",
+  "schema": "rs9.live1-closeout-verification.v1alpha1",
+  "scope": "terminal-corrections-and-changed-boundary-compatibility",
+  "skip_reason": "Authenticated live Nebular capture directory unavailable",
+  "skipped": 3,
+  "workers": {
+    "cleanup_proven": true,
+    "independent_review": false,
+    "kind": "gemini",
+    "used": 4
+  }
+}

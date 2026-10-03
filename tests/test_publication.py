@@ -25,7 +25,23 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(publication_receipt(self.plan,[self.attempt()],observation(self.output,"exact",at=T1))["final_state"],"unconfirmed")
         for state,final in (("absent","unconfirmed"),("incomplete","incomplete"),("conflict","conflict"),("unknown","unconfirmed")):
             self.assertEqual(publication_receipt(self.plan,[self.attempt()],observation(self.output,state,at=T3))["final_state"],final)
-        self.assertEqual(publication_receipt(self.plan,[self.attempt()],exact)["final_state"],"published")
+        self.assertEqual(publication_receipt(self.plan,[self.attempt()],exact)["final_state"],"simulated")
+
+    def test_persisted_operator_attempt_audits_but_cannot_authorize_transport(self):
+        import json
+        attempt=mutation_attempt(self.plan,executor_role="operator",started_at=T1,finished_at=T2,transport_outcome="confirmed")
+        saved_plan=json.loads(canonical(self.plan))
+        saved_attempt=json.loads(canonical(attempt))
+        post=observation(self.output,"exact",at=T3)
+        receipt=publication_receipt(saved_plan,[saved_attempt],post)
+        self.assertEqual(receipt["final_state"],"simulated")
+        # Imported published claims are structurally audited only. Exact retry
+        # state still comes from the latest observation, never the saved claim.
+        receipt["final_state"]="published"
+        self.assertEqual(next_action(saved_plan,[],post,evaluated_at=T3,receipt=receipt),"noop")
+        self.assertEqual(next_action(saved_plan,[],observation(self.output),evaluated_at=T0),"replan-required")
+        with self.assertRaises(ContractError):
+            mutation_attempt(saved_plan,executor_role="operator",started_at=T1,finished_at=T2,transport_outcome="confirmed")
 
     def test_forged_attempt_and_readback_rejected(self):
         attempt=self.attempt();attempt["plan_sha256"]="c"*64
@@ -90,7 +106,7 @@ class PublicationTests(unittest.TestCase):
         attempt=self.attempt(response_remote={"sequence":2})
         early=observation(self.output,"exact",at=T1,remote={"sequence":2})
         receipt=publication_receipt(self.plan,[attempt],early)
-        self.assertEqual(receipt["final_state"],"published")
+        self.assertEqual(receipt["final_state"],"simulated")
         self.assertEqual(receipt["readback_proof"]["basis"],"remote-sequence")
         stale=observation(self.output,"exact",at=T3,remote={"sequence":1})
         self.assertEqual(publication_receipt(self.plan,[attempt],stale)["final_state"],"unconfirmed")
@@ -123,4 +139,4 @@ class PublicationTests(unittest.TestCase):
                 post=observation(self.output,"exact",at=T3,remote=remote)
                 self.assertEqual(publication_receipt(self.plan,[attempt],post)["final_state"],"unconfirmed")
         post=observation(self.output,"exact",at=T1,remote={"sequence":3,"etag":"new-etag","commit":"b"*40})
-        self.assertEqual(publication_receipt(self.plan,[attempt],post)["final_state"],"published")
+        self.assertEqual(publication_receipt(self.plan,[attempt],post)["final_state"],"simulated")
