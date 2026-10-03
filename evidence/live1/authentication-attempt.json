@@ -1,0 +1,10 @@
+{
+  "artifact_count": 0,
+  "error_code": "FETCH_FAILED",
+  "fresh_release_bytes_authenticated": false,
+  "observed_at": "2026-10-03T20:06:22.275357+00:00",
+  "production_enabled": false,
+  "schema": "rs9.candidate-authentication-attempt.v1alpha1",
+  "stale_input_reused": false,
+  "status": "blocked"
+}

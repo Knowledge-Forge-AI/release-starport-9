@@ -1,5 +1,9 @@
 # Theme Forge LIVE1 implementation candidate
 
+This document describes the preceding accepted partial source checkpoint. The current
+[real-candidate continuation](live1-real-candidate-continuation.md) records the latest
+source changes, fresh failed authentication, current observations and remaining blockers.
+
 Status: **partial implementation; pending / not live; production operator not ready**.
 No production signing, publication, secret change, Git publication or upstream
 release/tag mutation was performed by the provider. The dispatcher pre-final review

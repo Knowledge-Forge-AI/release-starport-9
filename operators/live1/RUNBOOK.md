@@ -5,6 +5,25 @@ and fresh release authentication only. `publish-pages` and `publish-pypi` stop w
 PUBLICATION_NOT_READY. Manual environment setup cannot complete the missing package,
 qualification, reader and transport implementations.
 
+The latest [real-candidate continuation](../../docs/live1-real-candidate-continuation.md)
+is also **not ready for source adoption**. The candidate manifest refuses adoption
+while real artifacts/platform qualification are missing. The separate attended
+adopt-and-qualify.py operator accepts a reviewed parent/tree/manifest digest and an
+empty external output directory; it has no production publication path. Do not run
+it against this blocked candidate. Complete qualification and obtain manager review
+before changing candidate_adoption_ready. Future hosted receipt hashes must be matched
+by an attended rebuild or exact bytes held in reviewed durable custody before production.
+
+The signing-preflight.py operator takes an independently reviewed public-export
+SHA-256. It inspects existing local-key availability and public bytes only; it never
+exports secrets, signs or handles a passphrase. It was not run by this provider.
+The pinned digest is specifically the SHA-256 of the binary stdout from
+`gpg --batch --export 7D03EE84F8C7025FD2F3D772BF89DF6643C2F1AF` with no export
+options. Local UID/certification changes may change these public export bytes
+without changing the fingerprints. Capture and review the digest using the same
+public keyring/export command; a mismatch must stop preflight. Do not silently
+refresh the approved digest or reinterpret it as an export-minimal digest.
+
 ## Review-bound preparation
 
 The dispatcher owns candidate adoption and Git publication. After independent

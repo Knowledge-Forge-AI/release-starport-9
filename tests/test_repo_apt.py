@@ -334,15 +334,17 @@ class RepoAptTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "INVALID_METADATA")
 
     def test_architecture_restrictions_ubuntu_2604(self):
-        # Only amd64 and arm64 supported
+        # amd64 and arm64 clients support architecture-independent packages.
         valid_amd64 = DebPackage("test-pkg", "1.0", "amd64", "pool/main/t/test/test_1.0_amd64.deb", 100, "0" * 64, "desc")
         self.assertEqual(valid_amd64.architecture, "amd64")
 
         valid_arm64 = DebPackage("test-pkg", "1.0", "arm64", "pool/main/t/test/test_1.0_arm64.deb", 100, "0" * 64, "desc")
         self.assertEqual(valid_arm64.architecture, "arm64")
 
-        # "all", "i386", "riscv64" rejected
-        for bad_arch in ("all", "i386", "riscv64", "armhf", "ppc64le"):
+        # Architecture-independent packages are supported on both target clients.
+        valid_all = DebPackage("test-pkg", "1.0", "all", "pool/main/t/test/test_1.0_all.deb", 100, "0" * 64, "desc")
+        self.assertEqual(valid_all.architecture, "all")
+        for bad_arch in ("i386", "riscv64", "armhf", "ppc64le"):
             with self.subTest(arch=bad_arch):
                 with self.assertRaises(ContractError) as ctx:
                     DebPackage("test-pkg", "1.0", bad_arch, f"pool/main/t/test/test_1.0_{bad_arch}.deb", 100, "0" * 64, "desc")
@@ -368,7 +370,8 @@ class RepoAptTests(unittest.TestCase):
         store_root = self.root / "signed_store"
         store = SignedStore(store_root, trust_config={"allowed_keys": {"synthetic-primary"}})
 
-        repo_root = self.root / "pages_repo"
+        pages_root = self.root / "pages_repo"
+        repo_root = pages_root / "apt"
         repo = build_apt_repository(
             repo_root,
             packages_bytes=[self.deb_amd64, self.deb_arm64],
@@ -384,7 +387,7 @@ class RepoAptTests(unittest.TestCase):
             validator=lambda u, s, e: {"verified_issuer":"attended-signer-1","primary_key_id":"synthetic-primary"},
         )
 
-        (repo_root / "CNAME").write_text("apt.example.com\n")
+        (pages_root / "CNAME").write_text("rs9.knowledge-forge.ai\n")
         pubkey = (
             "-----BEGIN PGP PUBLIC KEY BLOCK-----\n"
             "Version: RS9\n\n"
@@ -396,17 +399,18 @@ class RepoAptTests(unittest.TestCase):
             "=g8c1\n"
             "-----END PGP PUBLIC KEY BLOCK-----\n"
         )
-        (repo_root / "pubkey.gpg").write_text(pubkey)
-        (repo_root / "index.html").write_text("<html><body>APT Repository</body></html>\n")
+        (pages_root / "keys").mkdir()
+        (pages_root / "keys/rs9.asc").write_text(pubkey)
+        (pages_root / "index.html").write_text("<html><body>APT Repository</body></html>\n")
 
-        manifest = scan_pages_tree(repo_root)
+        manifest = scan_pages_tree(pages_root)
         self.assertEqual(manifest["schema"], "rs9.pages-manifest.v1alpha1")
         self.assertGreater(manifest["file_count"], 0)
 
         leak = repo_root / "dists/resolute/leak_id_rsa"
         leak.write_text("-----" + "BEGIN OPENSSH PRIVATE KEY-----\nsecret\n-----END OPENSSH PRIVATE KEY-----\n")
         with self.assertRaises(ContractError) as ctx:
-            scan_pages_tree(repo_root)
+            scan_pages_tree(pages_root)
         self.assertIn(ctx.exception.code, ("CREDENTIAL_DETECTED", "PRIVATE_PAYLOAD_DETECTED", "DISALLOWED_FILE"))
 
     def test_installed_size_uses_actual_control_field_not_compressed_size(self):

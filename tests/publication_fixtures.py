@@ -66,7 +66,7 @@ def fixture(root, *, mode="direct", destination_id="synthetic", scheme="none", r
     for gate_id in ("license.authority", "package.render"):
         row = execute_qualification(capture, output, gate_id, root, verifier,
               verifier_id="synthetic-independent-verifier", verifier_source_sha256=digest(__import__("pathlib").Path(__file__).read_bytes()),
-              environment={"purpose": "synthetic-fixture"})
+              environment={"purpose": "synthetic-fixture"}, trust_root="attended-local-rerun")
         executed[gate_id] = [record_sha256(row)]
     policy = destination_policy(repair_contract=repair_contract["id"] if repair_contract else None,
                                 external_evidence=executed)

@@ -24,6 +24,7 @@ from rs9.security import validate_ecosystem_name, validate_safe_relative_posix_p
 from rs9.signed_store import SignedStore, _check_no_symlinks, _safe_read_file, _safe_write_file
 
 ARCHITECTURES = ("amd64", "arm64")
+PACKAGE_ARCHITECTURES = (*ARCHITECTURES, "all")
 COMPONENTS = ("main",)
 DEFAULT_DISTRIBUTION = "resolute"
 SUPPORTED_DISTRIBUTIONS = ("resolute",)
@@ -52,8 +53,8 @@ class DebPackage:
             raise ContractError("INVALID_METADATA", "Description injection rejected")
         validate_ecosystem_name("apt", package)
         validate_version_string(version)
-        if architecture not in ARCHITECTURES:
-            raise ContractError("INVALID_ARCHITECTURE", "Architecture must be amd64 or arm64 for Ubuntu 26.04")
+        if architecture not in PACKAGE_ARCHITECTURES:
+            raise ContractError("INVALID_ARCHITECTURE", "Package architecture must be amd64, arm64 or all for Ubuntu 26.04")
         validate_safe_relative_posix_path(filename)
         validate_bounded_int(size, min_val=1, max_val=MAX_DEB_SIZE)
         validate_sha256(sha256)
@@ -173,8 +174,8 @@ def parse_deb_control(deb_bytes: bytes) -> dict[str, str]:
     for req in ("Package", "Version", "Architecture"):
         if req not in fields:
             raise ContractError("INVALID_DEB", "Missing required control fields")
-    if fields["Architecture"] not in ARCHITECTURES:
-        raise ContractError("INVALID_ARCHITECTURE", "Architecture must be amd64 or arm64 for Ubuntu 26.04")
+    if fields["Architecture"] not in PACKAGE_ARCHITECTURES:
+        raise ContractError("INVALID_ARCHITECTURE", "Package architecture must be amd64, arm64 or all for Ubuntu 26.04")
     return fields
 
 
@@ -248,7 +249,7 @@ class AptRepositoryCandidate:
 
         index_entries: dict[str, tuple[str, int, bytes]] = {}
         for arch in ARCHITECTURES:
-            arch_packages = [p for p in self.packages if p.architecture == arch]
+            arch_packages = [p for p in self.packages if p.architecture in (arch, "all")]
             arch_packages.sort(key=lambda p: (p.package, p.version, p.filename))
 
             txt = ("\n\n".join(p.to_stanza() for p in arch_packages) + "\n") if arch_packages else ""

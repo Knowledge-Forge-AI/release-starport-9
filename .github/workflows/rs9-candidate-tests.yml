@@ -1,9 +1,14 @@
-name: RS9 candidate unit checks
+name: RS9 non-production candidate checks
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: rs9-candidate-${{ github.sha }}
+  cancel-in-progress: false
 jobs:
   unit:
     runs-on: ubuntu-24.04
@@ -11,16 +16,142 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-      - name: Select required Node runtime
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
-      - name: Verify available runtime and run unit checks
+      - name: Test source contracts
         env:
           PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest discover -s tests -q
+  authenticate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Reauthenticate immutable releases
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
         run: |
-          python3 --version
-          node --version
-          node -e 'if (Number(process.versions.node.split(".")[0]) < 22) process.exit(1)'
-          python3 -m unittest discover -s tests -q
+          mkdir -p "$RUNNER_TEMP/rs9-auth" "$RUNNER_TEMP/rs9-receipts"
+          python3 -m rs9.hosted_candidate authenticate --scratch "$RUNNER_TEMP/rs9-auth" --receipts "$RUNNER_TEMP/rs9-receipts"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: candidate-receipts-authenticate
+          path: ${{ runner.temp }}/rs9-receipts/*.json
+          retention-days: 1
+          if-no-files-found: error
+  wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            system: aarch64-darwin
+          - runner: ubuntu-24.04
+            system: x86_64-linux
+          - runner: ubuntu-24.04-arm
+            system: aarch64-linux
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Reauthenticate and exercise CLI wheel lifecycle
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-wheels" "$RUNNER_TEMP/rs9-receipts"
+          python3 -m rs9.hosted_candidate wheels --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-wheels" --receipts "$RUNNER_TEMP/rs9-receipts"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: candidate-receipts-wheels-${{ matrix.system }}
+          path: ${{ runner.temp }}/rs9-receipts/*.json
+          retention-days: 1
+          if-no-files-found: error
+  prerequisites:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: nix
+            system: aarch64-darwin
+            runner: macos-15
+          - lane: nix
+            system: x86_64-linux
+            runner: ubuntu-24.04
+          - lane: nix
+            system: aarch64-linux
+            runner: ubuntu-24.04-arm
+          - lane: pacman
+            system: x86_64-linux
+            runner: ubuntu-24.04
+          - lane: rpm
+            system: x86_64-linux
+            runner: ubuntu-24.04
+          - lane: rpm
+            system: aarch64-linux
+            runner: ubuntu-24.04-arm
+          - lane: deb
+            system: amd64
+            runner: ubuntu-24.04
+          - lane: deb
+            system: arm64
+            runner: ubuntu-24.04-arm
+          - lane: pages
+            system: generation
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Require qualified native inputs and pinned builders
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-prerequisites" "$RUNNER_TEMP/rs9-receipts"
+          python3 -m rs9.hosted_candidate '${{ matrix.lane }}' --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-prerequisites" --receipts "$RUNNER_TEMP/rs9-receipts"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: candidate-receipts-${{ matrix.lane }}-${{ matrix.system }}
+          path: ${{ runner.temp }}/rs9-receipts/*.json
+          retention-days: 1
+          if-no-files-found: error
+  summary:
+    if: always()
+    needs: [unit, authenticate, wheels, prerequisites]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: candidate-receipts-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/rs9-receipts
+      - name: Bind bounded receipts and reject incomplete generation
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m rs9.hosted_candidate summary --receipts "$RUNNER_TEMP/rs9-receipts"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: hosted-candidate-receipts
+          path: ${{ runner.temp }}/rs9-receipts/*.json
+          retention-days: 1
+          if-no-files-found: error

@@ -16,6 +16,7 @@ from rs9.scratch import physical_directory
 from rs9.security import validate_safe_relative_posix_path
 
 _PROOF = object()
+VALID_TRUST_ROOTS = frozenset({"attended-local-rerun", "provider-local-unattested", "hosted-candidate-unattested"})
 
 
 class Qualification:
@@ -43,7 +44,8 @@ def artifact_inventory(root, artifacts):
 
 
 def execute_qualification(capture, output, gate_id, root, verifier, *, verifier_id,
-                          verifier_source_sha256, environment):
+                          verifier_source_sha256, environment,
+                          trust_root="provider-local-unattested"):
     """Rehash before/after a reviewed verifier; store only hashes, never logs.
 
     verifier returns observations, not a pass flag: a nonempty list of command
@@ -52,6 +54,8 @@ def execute_qualification(capture, output, gate_id, root, verifier, *, verifier_
     It raises on any failure. Caller must separately allowlist this record hash.
     This is a local code trust boundary, not a sandbox for untrusted callables.
     """
+    if trust_root not in VALID_TRUST_ROOTS:
+        raise ContractError("QUALIFICATION_TRUST_ROOT", "Unknown qualification trust root")
     release_hash = authenticated_record_hash(capture)
     validate_sanitized_string(gate_id)
     validate_sanitized_string(verifier_id)
@@ -81,7 +85,7 @@ def execute_qualification(capture, output, gate_id, root, verifier, *, verifier_
     if artifact_inventory(root, output["artifacts"]) != inventory:
         raise ContractError("QUALIFICATION_ARTIFACT", "Verifier modified candidate bytes")
     record = {"schema": "rs9.qualification-record.v1alpha1", "gate": gate_id,
-              "trust_root": "attended-local-rerun", "release_record_sha256": release_hash,
+              "trust_root": trust_root, "release_record_sha256": release_hash,
               "adapter": output["destination"]["adapter"],
               "content_identity_sha256": output["content_identity_sha256"],
               "source_manifest_sha256": output["source_manifest_sha256"],
@@ -103,6 +107,8 @@ def bound_qualifications(capture, output, gate_id):
         record = proof.record
         if record_sha256(record) != proof._hash:
             raise ContractError("QUALIFICATION_CHANGED", "Execution evidence changed after verification")
+        if record.get("trust_root") != "attended-local-rerun":
+            continue
         bindings = {"release_record_sha256": release_hash, "gate": gate_id,
                     "adapter": output["destination"]["adapter"],
                     "content_identity_sha256": output["content_identity_sha256"],
