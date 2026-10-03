@@ -2,7 +2,11 @@
 
 Status: research inventory for a provisional RS9 foundation. No tooling is moved
 from a tenant repository, no production publication is changed, and no adapter
-implementation is imported. Facts are observations, not release authentication.
+implementation is imported. Foundation 1 observations below remain historical
+research evidence. The [Foundation 2 supplement](nebular-shadow-projection.md)
+now authenticates Nebular captured bytes and supplies newly authored RS9 shadow
+renderers, dependency/license evidence and explicit desktop/icon authority.
+Other families and publication machinery remain outside this candidate.
 
 ## Sources and observations
 
@@ -80,7 +84,7 @@ explicitly; a source's current location does not determine future ownership.
 | `verify-hosted-validation-gate.mjs` | RS9 shared core | Qualify the candidate inputs before unsealing production signing authority. Configuration validation alone is insufficient. |
 | `scan-distribution-privacy.mjs`, receipt-output rules | RS9 shared core | Sanitize durable evidence, exclude private operational paths/data, keep private material out of source and receipts. |
 | DIST1 freeze manifest, pending-key bootstrap marker, projection tarball/schema names | Historical evidence / not migrated | Preserve as rollback/evidence; do not make DIST1 identifiers the RS9 public contract. |
-| Nebular desktop entry/icons under distribution templates | Tenant/project fact | Tenant must own/authorize desktop artifacts before packaging. Generic icon-source fields would conceal missing authority; deferred. |
+| Nebular desktop entry/icons under distribution templates | Tenant/project fact; RS9 adapter | Foundation 2 renders desktop metadata from explicit facts and selects a tagged PNG bound to the release commit. Other reference resolutions lack selected authority and remain excluded. |
 | Node >=22; dependency lock and Nix dependency authority | Tenant/project fact; RS9 adapter | Runtime floor is tenant fact; adapter derives vendored closure and ecosystem hashes from authenticated release inputs, recording state. |
 | APT Ubuntu 26.04, Debian 13 exclusion, target-specific shlibdeps | RS9 destination/projection; RS9 adapter; ecosystem-owned policy | Suite support/qualification belongs to destination; dependencies derive per architecture, not by translating RPM lists. |
 | Nix GUI check in headless sandbox; container CLI checks | Tenant/project fact; RS9 adapter | Display requirement belongs to check intent. Byte identity may qualify payload preservation but does not replace display-capable launch evidence. |

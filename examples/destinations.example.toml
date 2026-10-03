@@ -40,6 +40,7 @@ adapter = "pacman"
 mode = "projection"
 platforms = ["x86_64-linux", "aarch64-linux"]
 status = "candidate"
+profile = "aur"
 
 [[destinations]]
 id = "kfa-homebrew-tap"

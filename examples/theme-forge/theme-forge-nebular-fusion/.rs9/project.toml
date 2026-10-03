@@ -1,19 +1,30 @@
 schema = "rs9.project.v1alpha1"
+# RS9 stand-in illustration; no tenant adoption claim.
 
 [project]
 id = "theme-forge-nebular-fusion"
 name = "Theme Forge Nebular Fusion"
 repository = "Knowledge-Forge-AI/theme-forge-nebular-fusion"
 family = "theme-forge"
+summary = "Evidence-bound Theme Forge integration workbench"
 
 [license]
-# Matches distro metadata. npm's OR Commercial declaration remains unresolved.
+# Tagged community expression; published npm artifact authority conflicts.
 expression = "AGPL-3.0-or-later"
+status = "unresolved"
 source = "tagged-repository"
 files = ["LICENSE", "NOTICE"]
 
 [runtime]
 kind = "native"
+
+[desktop]
+command = "tfnf"
+categories = ["Development"]
+
+[desktop.icon]
+source = "tagged-repository"
+path = "src-tauri/icons/icon.png"
 
 [[commands]]
 name = "tfnf"

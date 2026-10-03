@@ -47,6 +47,7 @@ Only applicable files need to exist.
 - release/version conventions;
 - authoritative GitHub Release assets and platform mappings;
 - expected executable names;
+- explicitly selected release-owned launchers, summary and desktop/icon facts;
 - project license identity and authoritative license location;
 - package names for individual ecosystems;
 - supported operating systems and architectures;
@@ -72,8 +73,10 @@ Only applicable files need to exist.
 Every RS9 configuration file carries an explicit schema version. RS9 rejects unsupported or ambiguous configuration rather than guessing.
 
 The [v1alpha1 specification](specs/rs9-config-v1alpha1.md) implements a narrow
-validator/normalizer boundary derived from Theme Forge. It promises no stable
+validator/normalizer and optional shadow-fact boundary derived from Theme Forge. It promises no stable
 compatibility or production publication. Only selected adapter files are needed;
 the caller can explicitly select a project root below a monorepo root. License
 paths are relative to the declared release repository at the resolved tag commit.
 See [ADR 0001](adr/0001-tenant-contract-v1alpha1.md) for tenancy and ownership.
+The [Foundation 2 amendment](adr/0003-authenticated-ingestion-and-shadow-adapters.md)
+keeps authenticated digests and distro dependencies outside tenant configuration.

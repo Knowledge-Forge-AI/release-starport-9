@@ -1,0 +1,328 @@
+{
+  "commit": "062a931f4b5e44ad43c88363efd81ab8d92602df",
+  "facts": {
+    "aur": {
+      "architectures": [
+        "aarch64",
+        "x86_64"
+      ],
+      "conflicts": [
+        "theme-forge-nebular-fusion"
+      ],
+      "dependencies": {
+        "aarch64": [
+          "cairo",
+          "dbus",
+          "glib2",
+          "gtk3",
+          "openssl",
+          "pango",
+          "webkit2gtk-4.1",
+          "zlib"
+        ],
+        "x86_64": [
+          "cairo",
+          "dbus",
+          "glib2",
+          "gtk3",
+          "openssl",
+          "pango",
+          "webkit2gtk-4.1",
+          "zlib"
+        ]
+      },
+      "icon_sizes": [
+        16,
+        32,
+        48,
+        64,
+        128,
+        256
+      ],
+      "installed_paths": [
+        "/usr/bin/tfnf",
+        "/usr/lib/theme-forge-nebular-fusion",
+        "/usr/share/applications/theme-forge-nebular-fusion.desktop",
+        "/usr/share/icons/hicolor/128x128/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/16x16/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/256x256/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/32x32/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/48x48/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/64x64/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/licenses/theme-forge-nebular-fusion-bin/LICENSE"
+      ],
+      "launcher": "/usr/lib/theme-forge-nebular-fusion/bin/tfnf",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-nebular-fusion-bin",
+      "payload_policy": "cp -r nonhidden entries; strip disabled",
+      "provides": [
+        "theme-forge-nebular-fusion"
+      ],
+      "summary": "Theme Forge Nebular Fusion design system studio and theme compiler workbench (binary release)",
+      "url": "https://github.com/Knowledge-Forge-AI/theme-forge-packages",
+      "version": "0.6.1"
+    },
+    "desktop": {
+      "Categories": "Development;Graphics;IDE;",
+      "Comment": "Desktop design system studio and theme compiler workbench",
+      "Exec": "tfnf %U",
+      "GenericName": "Design System Workbench",
+      "Icon": "theme-forge-nebular-fusion",
+      "MimeType": "application/json;",
+      "Name": "Theme Forge Nebular Fusion",
+      "StartupWMClass": "theme-forge-nebular-fusion",
+      "Terminal": "false",
+      "Type": "Application"
+    },
+    "nix": {
+      "architectures": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "dependencies": {
+        "aarch64-linux": [
+          "cairo",
+          "dbus",
+          "glib",
+          "gtk3",
+          "libsoup_3",
+          "openssl",
+          "pango",
+          "webkitgtk_4_1",
+          "zlib"
+        ],
+        "x86_64-linux": [
+          "cairo",
+          "dbus",
+          "glib",
+          "gtk3",
+          "libsoup_3",
+          "openssl",
+          "pango",
+          "webkitgtk_4_1",
+          "zlib"
+        ]
+      },
+      "icon_sizes": [],
+      "launcher": {
+        "aarch64-darwin": "Contents/MacOS/theme-forge-nebular-fusion",
+        "aarch64-linux": "bin/tfnf",
+        "x86_64-linux": "bin/tfnf"
+      },
+      "license": "AGPL-3.0-or-later",
+      "name": {
+        "aarch64-darwin": "theme-forge-nebular-fusion",
+        "aarch64-linux": "tfnf",
+        "x86_64-linux": "tfnf"
+      },
+      "payload_policy": "cp -r nonhidden Linux entries; dontStrip/dontPatchELF; optional FHS fallback",
+      "summary": "Theme Forge Nebular Fusion design system studio and theme compiler workbench",
+      "url": "https://github.com/Knowledge-Forge-AI/theme-forge-packages",
+      "version": "0.6.1"
+    },
+    "pacman": {
+      "architectures": [
+        "x86_64"
+      ],
+      "dependencies": {
+        "x86_64": [
+          "cairo",
+          "dbus",
+          "glib2",
+          "gtk3",
+          "openssl",
+          "pango",
+          "webkit2gtk-4.1",
+          "zlib"
+        ]
+      },
+      "icon_sizes": [
+        16,
+        32,
+        48,
+        64,
+        128,
+        256
+      ],
+      "installed_paths": [
+        "/usr/bin/tfnf",
+        "/usr/lib/theme-forge-nebular-fusion",
+        "/usr/share/applications/theme-forge-nebular-fusion.desktop",
+        "/usr/share/icons/hicolor/128x128/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/16x16/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/256x256/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/32x32/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/48x48/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/64x64/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/licenses/theme-forge-nebular-fusion/LICENSE"
+      ],
+      "launcher": "/usr/lib/theme-forge-nebular-fusion/bin/tfnf",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-nebular-fusion",
+      "payload_policy": "cp -r nonhidden entries; strip disabled",
+      "summary": "Theme Forge Nebular Fusion design system studio and theme compiler workbench",
+      "url": "https://github.com/Knowledge-Forge-AI/theme-forge-packages",
+      "version": "0.6.1"
+    },
+    "rpm": {
+      "architectures": [
+        "aarch64",
+        "x86_64"
+      ],
+      "dependencies": {
+        "aarch64": [
+          "cairo",
+          "dbus",
+          "glib2",
+          "gtk3",
+          "openssl-libs",
+          "pango",
+          "webkit2gtk4.1",
+          "zlib"
+        ],
+        "x86_64": [
+          "cairo",
+          "dbus",
+          "glib2",
+          "gtk3",
+          "openssl-libs",
+          "pango",
+          "webkit2gtk4.1",
+          "zlib"
+        ]
+      },
+      "icon_sizes": [
+        16,
+        32,
+        48,
+        64,
+        128,
+        256
+      ],
+      "installed_paths": [
+        "/usr/bin/tfnf",
+        "/usr/lib/theme-forge-nebular-fusion",
+        "/usr/share/applications/theme-forge-nebular-fusion.desktop",
+        "/usr/share/icons/hicolor/128x128/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/16x16/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/256x256/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/32x32/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/48x48/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/64x64/apps/theme-forge-nebular-fusion.png",
+        "RPM-managed LICENSE copy",
+        "RPM-managed NOTICE copy"
+      ],
+      "launcher": "/usr/lib/theme-forge-nebular-fusion/bin/tfnf",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-nebular-fusion",
+      "payload_policy": "cp -r nonhidden entries; strip disabled; default brp",
+      "summary": "Theme Forge Nebular Fusion design system studio and theme compiler workbench",
+      "url": "https://github.com/Knowledge-Forge-AI/theme-forge-packages",
+      "version": "0.6.1"
+    }
+  },
+  "facts_method": "Static constrained first-tenant recipe grammar; no external recipe execution",
+  "files": {
+    "aur/theme-forge-nebular-fusion-bin/.SRCINFO": {
+      "git_blob_sha": "8e774a89b95d566e11521056969d929c815702d4",
+      "path": "aur/theme-forge-nebular-fusion-bin/.SRCINFO",
+      "sha256": "6ee2f94de19ae89a27fa592026cc09b6eb3413c3af1a1c2aa177af6dcb08ff97",
+      "size": 1856
+    },
+    "aur/theme-forge-nebular-fusion-bin/PKGBUILD": {
+      "git_blob_sha": "e6d49fc4caf5f078eb99488ca0d00185253f9c2d",
+      "path": "aur/theme-forge-nebular-fusion-bin/PKGBUILD",
+      "sha256": "1912edfa8e783ed558a728899205f31197c417b53fc5485c62803b6054456019",
+      "size": 2916
+    },
+    "packages/nebular-fusion.nix": {
+      "git_blob_sha": "1201646279b8b1ca3136dbcc05ab26233119cbaf",
+      "path": "packages/nebular-fusion.nix",
+      "sha256": "0c217de505993e7f1c5089651016c273d8f027d6a7a2971e8e4b7750bc0dccb3",
+      "size": 4865
+    },
+    "templates/desktop/theme-forge-nebular-fusion.desktop": {
+      "git_blob_sha": "e66612357af2daab79f800a0b69b74e6c5b8610b",
+      "path": "templates/desktop/theme-forge-nebular-fusion.desktop",
+      "sha256": "24b28e715e74ce594c75c13fb865a84399ca5aac168490e1773cbad1f3de0283",
+      "size": 333
+    },
+    "templates/pacman/theme-forge-nebular-fusion/PKGBUILD": {
+      "git_blob_sha": "33ebe4fabe9672bbbc37211a59c8cb25df006817",
+      "path": "templates/pacman/theme-forge-nebular-fusion/PKGBUILD",
+      "sha256": "9cbbe0c1d04d900fdd1a0207c733d575f3104ad6b7f473e5658ccb688d16422e",
+      "size": 2476
+    },
+    "templates/pacman/theme-forge-nebular-fusion/icon-128x128.png": {
+      "git_blob_sha": "9fb8ba9ea1df99a5c60735136814f617acfa36d1",
+      "path": "templates/pacman/theme-forge-nebular-fusion/icon-128x128.png",
+      "png_info": {
+        "height": 128,
+        "width": 128
+      },
+      "sha256": "8aeb5d5d88b2c3cd5525b8de87359c1b8c248948bd9de7bb83a4f61160cdd5ca",
+      "size": 5740
+    },
+    "templates/pacman/theme-forge-nebular-fusion/icon-16x16.png": {
+      "git_blob_sha": "28538c80562a704bafc06895ce2bf762e93269bd",
+      "path": "templates/pacman/theme-forge-nebular-fusion/icon-16x16.png",
+      "png_info": {
+        "height": 16,
+        "width": 16
+      },
+      "sha256": "bd1717587999d2c81baeb583022be718b7ac0a9affbdbad16b8d3d53717850ee",
+      "size": 624
+    },
+    "templates/pacman/theme-forge-nebular-fusion/icon-256x256.png": {
+      "git_blob_sha": "ae7ebf4396e0d7aed6e15e5a5f0e123787cd9a35",
+      "path": "templates/pacman/theme-forge-nebular-fusion/icon-256x256.png",
+      "png_info": {
+        "height": 256,
+        "width": 256
+      },
+      "sha256": "2d65e8c69a675b6c939ac11757c6a47a123f63b3f83b6d58305aaf7231aca160",
+      "size": 8814
+    },
+    "templates/pacman/theme-forge-nebular-fusion/icon-32x32.png": {
+      "git_blob_sha": "001356a689be3caa61251b56081a6c7993b9aef0",
+      "path": "templates/pacman/theme-forge-nebular-fusion/icon-32x32.png",
+      "png_info": {
+        "height": 32,
+        "width": 32
+      },
+      "sha256": "a6b2a188179558e26b24a52c8efeda5ce6d2ca73f33f22b8717844cfd00f98d0",
+      "size": 1298
+    },
+    "templates/pacman/theme-forge-nebular-fusion/icon-48x48.png": {
+      "git_blob_sha": "5a0af8533ae0198653fbb0cc7f4ec309252c2796",
+      "path": "templates/pacman/theme-forge-nebular-fusion/icon-48x48.png",
+      "png_info": {
+        "height": 48,
+        "width": 48
+      },
+      "sha256": "7268eb032e7e41cb6d48a0b086e1a883b64bf5497845980d87f987984884cfad",
+      "size": 1964
+    },
+    "templates/pacman/theme-forge-nebular-fusion/icon-64x64.png": {
+      "git_blob_sha": "fe4e70a5d9f37f71d38a433db785c5fd7942116b",
+      "path": "templates/pacman/theme-forge-nebular-fusion/icon-64x64.png",
+      "png_info": {
+        "height": 64,
+        "width": 64
+      },
+      "sha256": "fd68f2da45e40bccf6c8fd447b479c92e041fa5675adb88ce6751cc96d4f2d1f",
+      "size": 2702
+    },
+    "templates/rpm/theme-forge-nebular-fusion.spec": {
+      "git_blob_sha": "10dc551ac0d04ed9e0ef5982a35df4da11a49a33",
+      "path": "templates/rpm/theme-forge-nebular-fusion.spec",
+      "sha256": "47249b94cc91d8bdb445aa692d5f6b2d036ed7ac515d5c93dddd392d20bfbdbb",
+      "size": 3267
+    }
+  },
+  "method": "bounded static inspection of captured bytes; no external Nix/Bash code executed",
+  "repository": "Knowledge-Forge-AI/theme-forge-packages",
+  "schema": "rs9.reference-facts.v1alpha1",
+  "tree": "dc40d20e0e428122d5bc5d5721634bec0511ff26"
+}

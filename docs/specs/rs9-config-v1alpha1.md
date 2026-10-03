@@ -28,11 +28,16 @@ and their path values.
 
 | Table | Required fields | Optional fields |
 |---|---|---|
-| `project` | `id`, `name`, `repository` (`Owner/Repo`) | `family` |
-| `license` | `expression`, `source = "tagged-repository"`, nonempty `files` | none |
+| `project` | `id`, `name`, `repository` (`Owner/Repo`) | `family`, `summary` |
+| `license` | `expression`, `source = "tagged-repository"`, nonempty `files` | `status = "unresolved"` |
+| `desktop` (optional table) | `command`, `categories`, `icon` | none |
 | `runtime` (optional table) | `kind` (`native`, `node`, `python`) | `constraint` |
 | `commands` (array of tables) | unique `name`, `interface` (`cli`, `gui`) | none |
 | `checks` (array of tables) | unique `id`, `argv`, `requires-display` | `expect-exit` (default 0), `expect-stdout-contains` |
+
+`project.summary` is an optional single NFC line (1..160 characters) with no control characters or credential patterns.
+
+`desktop` is an optional table with `command` (must name a declared GUI command), `categories` (nonempty unique list of allowlisted freedesktop categories containing at least one main category: `Development`, `Graphics`, `Utility`, `Office`, `Network`, `AudioVideo`, `Audio`, `Video`, `Game`, `Education`, `Science`, `Settings`, `System`, plus additional `IDE` allowed with `Development`; `Audio`/`Video` require `AudioVideo`), and `icon` table (`source = "tagged-repository"`, safe relative POSIX `path` ending in `.png`). There is no `icon.size` field; dimensions are derived from authenticated IHDR bytes. Normalized desktop sorts categories and emits a deep stable dictionary.
 
 License files are relative to the declared release repository root at the tag's
 resolved commit. No files are fetched by the validator. Expression grammar is
@@ -40,17 +45,29 @@ syntax-only: identifiers, `AND`, `OR`, `WITH`, parentheses. It does not validate
 the SPDX license list; `Commercial` is syntactically accepted. Expression
 presence is mandatory and exact text is preserved (non-NFC text fails).
 
+Optional `license.status = "unresolved"` preserves a known authority conflict in
+normalized intent. The expression then records a provisional source declaration,
+not a reconciled payload license. Nebular needs this because its tagged community
+declaration conflicts with the authenticated npm artifact. Tenant intent owns
+this unresolved marker; ingestion separately records observed declarations.
+Only `"unresolved"` is accepted: the field cannot assert legal resolution or
+grant acceptance. Omission means declaration only, not proven consistency.
+Normalization preserves the marker deterministically. Render manifests expose
+`license_intent_status` and retain a `tenant-license-unresolved` blocker even if
+the currently inspected declarations agree. Recipe license strings remain
+provisional shadow metadata until tenant authority resolves the conflict.
+
 Checks are nonempty argv arrays starting with a declared command. They are never
 executed here. Arguments and output expectations must already be NFC so
 normalization preserves their operational meaning. Output expectations can use
 `{version}`; no other placeholders. `expect-exit` accepts integers without an
 execution-domain range check; runner-specific exit/signal semantics are deferred.
-There are no shell, hook, script, credential, digest, revision or desktop fields.
+There are no shell, hook, script, credential, digest or revision fields.
 
 ## releases.toml
 
 `[release]`: `tag` with exactly one `{version}` and `prerelease = "reject"` or
-`"allow"`. Drafts are always rejected by future ingestion. Tags may have prefixes.
+`"allow"`. Drafts are always rejected by ingestion. Tags may have prefixes.
 
 `[[assets]]`: unique `id`, unique `name` template (exactly one `{version}`),
 `format` (`tar.gz`, `npm-tarball`, `wheel`, `sdist`), `platforms`, and `commands`
@@ -58,6 +75,14 @@ There are no shell, hook, script, credential, digest, revision or desktop fields
 Asset names are basenames, not URLs or paths. The only platform vocabulary is
 `x86_64-linux`, `aarch64-linux`, `x86_64-darwin`, `aarch64-darwin`, or exactly
 `["any"]`. Ambiguous overlapping assets for the same command fail.
+
+Optional `launchers` maps an asset command to an upstream archive-owned shim.
+It must be nonempty when present, name only this asset's mapped commands and use
+the same safe relative-path rules. It is a selection of authenticated payload
+bytes, not an executable hook. Normalization preserves the map deterministically.
+Ingestion requires executable regular nonlink files for both native command and
+selected launcher. Nebular's released `tfnf` shim supplies headless version/path
+behavior while `commands.tfnf` continues to identify the native GUI bytes.
 
 Resolved version, tag and asset names must remain safe. Version resolution
 accepts a numeric dotted version with an optional semver-style suffix; version
@@ -100,7 +125,8 @@ An operator-supplied file outside `.rs9/` has
 - nonempty concrete canonical `platforms` (never `any`);
 - `status` (`illustrative`, `candidate`, `live`), descriptive only;
 - optional HTTPS `base-url` without credentials, query or fragment;
-- optional `repository` (`Owner/Repo`).
+- optional `repository` (`Owner/Repo`);
+- optional `profile = "aur"` only for pacman projection destinations (propagated to normalized targets).
 
 This is routing validation, not a production destination registry. No trust,
 secrets, credential references, suites or authentication are interpreted yet.
@@ -147,8 +173,8 @@ wrong type use `INVALID_TYPE`. A present unsupported schema uses
 
 ## Deferred contract questions
 
-Authenticating checksum/signature assets; license reconciliation; desktop/icon
-ownership; dependencies derived per target architecture; Nix wrappers/aliases;
+Authenticating checksum/signature assets; license reconciliation;
+dependencies derived per target architecture; Nix wrappers/aliases;
 complex stdin/fixture smoke checks; signing rotation; receipt schemas; npm/PyPI
 OIDC claims; complete ecosystem naming/version policy; contribution source-build
 rules. These are not invented fields in v1alpha1.

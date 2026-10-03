@@ -22,8 +22,11 @@ def nfc_data(value):
 def normalized_asset(asset, version):
     name = asset["name"].replace("{version}", version)
     validate_safe_basename(name, "resolved asset name")
-    return {"id": asset["id"], "name": name, "format": asset["format"],
-            "platforms": sorted(asset["platforms"]), "commands": dict(asset["commands"])}
+    result = {"id": asset["id"], "name": name, "format": asset["format"],
+              "platforms": sorted(asset["platforms"]), "commands": dict(asset["commands"])}
+    if "launchers" in asset:
+        result["launchers"] = dict(asset["launchers"])
+    return result
 
 
 def normalized_check(check, version):
@@ -35,6 +38,17 @@ def normalized_check(check, version):
     return result
 
 
+def normalized_desktop(desktop):
+    return {
+        "categories": sorted(desktop["categories"]),
+        "command": desktop["command"],
+        "icon": {
+            "path": desktop["icon"]["path"],
+            "source": desktop["icon"]["source"],
+        },
+    }
+
+
 def project_semantics(project, version):
     license = project["license"]
     result = {"project": dict(project["project"]),
@@ -43,9 +57,14 @@ def project_semantics(project, version):
               "commands": sorted(project.get("commands", []), key=lambda c: c["name"]),
               "checks": sorted([normalized_check(c, version) for c in project.get("checks", [])],
                                key=lambda c: c["id"])}
+    if "status" in license:
+        result["license"]["status"] = license["status"]
+    if "desktop" in project:
+        result["desktop"] = normalized_desktop(project["desktop"])
     if "runtime" in project:
         result["runtime"] = dict(project["runtime"])
     return result
+
 
 
 def normalize(project_dir, destinations_path, version):

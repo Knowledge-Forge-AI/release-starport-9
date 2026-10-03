@@ -1,0 +1,73 @@
+{
+  "blockers": [
+    "shadow-only; package build/install and provider mapping qualification required",
+    "tenant-license-conflict",
+    "tenant-license-unresolved",
+    "aarch64-linux: unresolved runtime evidence",
+    "x86_64-linux: unresolved runtime evidence"
+  ],
+  "files": [
+    {
+      "path": "aur/theme-forge-nebular-fusion-bin/.SRCINFO",
+      "sha256": "dccb25b8e0da1987e586bd4254dae8b154013d6bb26ae62b45346da301bb285a",
+      "size": 1641
+    },
+    {
+      "path": "aur/theme-forge-nebular-fusion-bin/PKGBUILD",
+      "sha256": "7da74c25d92687d7095e894489e6c7f4380f0d69a1b02768c36fa27d90944bab",
+      "size": 2159
+    },
+    {
+      "path": "aur/theme-forge-nebular-fusion-bin/theme-forge-nebular-fusion.desktop",
+      "sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401",
+      "size": 203
+    },
+    {
+      "path": "nix/theme-forge-nebular-fusion.desktop",
+      "sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401",
+      "size": 203
+    },
+    {
+      "path": "nix/theme-forge-nebular-fusion.nix",
+      "sha256": "fd374c98801fd2f94ba5732f1fc05b00c1347d0b671375afaafcd27b756db2e0",
+      "size": 3530
+    },
+    {
+      "path": "pacman/theme-forge-nebular-fusion/PKGBUILD",
+      "sha256": "1cc750f4fbb618c6b9ad827cfbe84999c3dc51b805b735fa43464e5435dce485",
+      "size": 1772
+    },
+    {
+      "path": "pacman/theme-forge-nebular-fusion/theme-forge-nebular-fusion.desktop",
+      "sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401",
+      "size": 203
+    },
+    {
+      "path": "rpm/theme-forge-nebular-fusion.desktop",
+      "sha256": "f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401",
+      "size": 203
+    },
+    {
+      "path": "rpm/theme-forge-nebular-fusion.spec",
+      "sha256": "3c87e63c43a9bae6d7ceca595786e2bb44650d5035a97a06b720719a2b474c78",
+      "size": 3000
+    }
+  ],
+  "icon_authority": {
+    "authority": "tagged-repository",
+    "commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+    "path": "src-tauri/icons/icon.png",
+    "sha256": "2d65e8c69a675b6c939ac11757c6a47a123f63b3f83b6d58305aaf7231aca160",
+    "size": 256
+  },
+  "inputs": {
+    "dependencies_sha256": "e6ff0d85dd09d855cfbbca4618a8571200b9c58759153295f40c91ac61e7343a",
+    "ingestion_sha256": "f5057782b8494ae74e19991db0232a03241c0f686753187505b1a4766cd7b367",
+    "normalized_sha256": "5c498032adccfc1febc6c2bc0afd0a31ad4f627639f5bae8562e270532092a78"
+  },
+  "license_authority": "conflict",
+  "license_intent_status": "unresolved",
+  "revision": 1,
+  "schema": "rs9.shadow-render.v1alpha1",
+  "verdict": "deferred"
+}

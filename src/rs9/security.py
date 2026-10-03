@@ -70,7 +70,7 @@ def scan_keys_for_credentials(data: Any, path: tuple[str, ...] = ()) -> None:
             if not isinstance(key, str):
                 continue
             scan_for_credentials(key)
-            if path != ("assets", "commands") and CREDENTIAL_KEY_RE.search(key):
+            if path not in (("assets", "commands"), ("assets", "launchers")) and CREDENTIAL_KEY_RE.search(key):
                 raise ContractError(
                     "CREDENTIAL_DETECTED",
                     "Credential-like key name detected in configuration",
@@ -83,10 +83,23 @@ def scan_keys_for_credentials(data: Any, path: tuple[str, ...] = ()) -> None:
         scan_for_credentials(data)
 
 
-def validate_nfc_string(value: str) -> None:
+def validate_nfc_string(value: str, context: str = "Check text") -> None:
     """Reject operational strings that normalization would silently change."""
     if unicodedata.normalize("NFC", value) != value:
-        raise ContractError("NON_NFC_STRING", "Check text must use NFC normalization")
+        raise ContractError("NON_NFC_STRING", f"{context} must use NFC normalization")
+
+
+def validate_summary(value: Any) -> None:
+    """Validate project summary: single NFC line, 1..160 chars, no controls or credentials."""
+    if type(value) is not str:
+        raise ContractError("INVALID_TYPE", "Field 'project.summary' must be a string")
+    if not (1 <= len(value) <= 160):
+        raise ContractError("INVALID_CONFIG", "Field 'project.summary' length must be 1..160 characters")
+    if any(ord(c) < 32 or ord(c) == 127 for c in value):
+        raise ContractError("INVALID_CONFIG", "Field 'project.summary' contains control characters or newlines")
+    validate_nfc_string(value, "Project summary")
+    scan_for_credentials(value)
+
 
 
 def validate_slug(value: Any, context: str = "identifier") -> None:

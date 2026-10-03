@@ -1,0 +1,25 @@
+# RS9 shadow candidate; publication and license acceptance deferred.
+pkgname=theme-forge-nebular-fusion
+pkgver=0.6.1
+pkgrel=1
+pkgdesc='Evidence-bound Theme Forge integration workbench'
+arch=(x86_64)
+url=https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion
+license=(AGPL-3.0-or-later)
+depends=(bash cairo dbus gdk-pixbuf2 glib2 'glibc>=2.34' gtk3 hicolor-icon-theme libgcc libsoup3 libstdc++ 'nodejs>=22' webkit2gtk-4.1)
+options=('!strip' '!debug' '!purge' '!zipman')
+source=(theme-forge-nebular-fusion.desktop icon.png::https://raw.githubusercontent.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e/src-tauri/icons/icon.png)
+sha256sums=(f859eb821441c21873220eb03af148229f9c456a0a1a33537d6d30a0f6b33401 2d65e8c69a675b6c939ac11757c6a47a123f63b3f83b6d58305aaf7231aca160)
+source_x86_64=(https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz)
+sha256sums_x86_64=(d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d)
+
+package() {
+  local payload="$pkgdir/usr/lib/theme-forge-nebular-fusion"
+  mkdir -p "$payload" "$pkgdir/usr/bin"
+  cp -a "$srcdir/"theme-forge-nebular-fusion/. "$payload/"
+  ln -s /usr/lib/theme-forge-nebular-fusion/bin/tfnf "$pkgdir/usr/bin/tfnf"
+  install -Dm644 "$srcdir/theme-forge-nebular-fusion.desktop" "$pkgdir/usr/share/applications/theme-forge-nebular-fusion.desktop"
+  install -Dm644 "$srcdir/icon.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/theme-forge-nebular-fusion.png"
+  install -Dm644 "$payload/"LICENSE "$pkgdir/usr/share/licenses/theme-forge-nebular-fusion/"LICENSE
+  install -Dm644 "$payload/"NOTICE "$pkgdir/usr/share/licenses/theme-forge-nebular-fusion/"NOTICE
+}

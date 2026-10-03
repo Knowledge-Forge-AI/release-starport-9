@@ -8,11 +8,11 @@ The short name and prospective CLI name are **`rs9`**.
 
 ## Current status and navigation
 
-The first foundation implements a provisional `.rs9` configuration validator
-and deterministic normalizer, derived from Theme Forge publication research.
-Release authentication, package construction, signing, registry publication,
-projection updates and hosting are not implemented. Existing Theme Forge
-publication surfaces remain authoritative.
+Foundation 2 adds captured-byte release authentication and deterministic Nebular
+0.6.1 shadow recipes for Nix, pacman, RPM and AUR to the provisional `.rs9`
+validator/normalizer. Shadow acceptance remains deferred for tenant license and
+qualification gates. Signing, registry publication, projection updates and hosting
+remain unimplemented. Existing Theme Forge publication surfaces remain authoritative.
 
 - [Documentation index](docs/README.md)
 - [Choose project, ecosystem and package manager](docs/install/README.md)
@@ -20,6 +20,7 @@ publication surfaces remain authoritative.
   [examples](examples/README.md)
 - [Extraction inventory](docs/architecture/theme-forge-extraction-inventory.md)
   and [staged migration map](docs/architecture/migration-map.md)
+- [Nebular shadow candidate and evidence](docs/foundation2-candidate.md)
 
 ## Mission
 

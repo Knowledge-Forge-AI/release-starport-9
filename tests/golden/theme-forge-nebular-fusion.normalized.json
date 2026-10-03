@@ -6,6 +6,9 @@
       },
       "format": "tar.gz",
       "id": "darwin-arm64",
+      "launchers": {
+        "tfnf": "Theme Forge Nebular Fusion.app/Contents/Resources/bin/tfnf"
+      },
       "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
       "platforms": [
         "aarch64-darwin"
@@ -17,6 +20,9 @@
       },
       "format": "tar.gz",
       "id": "linux-arm64",
+      "launchers": {
+        "tfnf": "theme-forge-nebular-fusion/bin/tfnf"
+      },
       "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
       "platforms": [
         "aarch64-linux"
@@ -28,6 +34,9 @@
       },
       "format": "tar.gz",
       "id": "linux-x64",
+      "launchers": {
+        "tfnf": "theme-forge-nebular-fusion/bin/tfnf"
+      },
       "name": "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
       "platforms": [
         "x86_64-linux"
@@ -52,6 +61,16 @@
       "name": "tfnf"
     }
   ],
+  "desktop": {
+    "categories": [
+      "Development"
+    ],
+    "command": "tfnf",
+    "icon": {
+      "path": "src-tauri/icons/icon.png",
+      "source": "tagged-repository"
+    }
+  },
   "evidence": {
     "inputs": [
       {
@@ -60,7 +79,7 @@
       },
       {
         "filename": "destinations.toml",
-        "sha256": "0c49d3dde3587a02ca6967ed0e0f4545d49b0119b8ff7f0a7e4a1208b8f09e8c"
+        "sha256": "19221e5e59e5dcf0fadec81c9f407615d64ad01521989202065b058c52879c32"
       },
       {
         "filename": "dnf.toml",
@@ -80,11 +99,11 @@
       },
       {
         "filename": "project.toml",
-        "sha256": "0b6b6e121e4bacfa43b19b58ba39c9855e80a3adc2504463470001c2b5d39ece"
+        "sha256": "63541af88c8ba9965ae68f7413c955eccdff2e2239a58912a559f9866b3fc9f3"
       },
       {
         "filename": "releases.toml",
-        "sha256": "b79c4740d3aa0b69f71b9d02bd19804bbcd1c0380c367d55d62c58194f55dbc7"
+        "sha256": "24f74fec2dffe3f7d7b5594e18d6af783ed576e7bc545265fffd7a8a97836fff"
       }
     ]
   },
@@ -94,13 +113,15 @@
       "LICENSE",
       "NOTICE"
     ],
-    "source": "tagged-repository"
+    "source": "tagged-repository",
+    "status": "unresolved"
   },
   "project": {
     "family": "theme-forge",
     "id": "theme-forge-nebular-fusion",
     "name": "Theme Forge Nebular Fusion",
-    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion"
+    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+    "summary": "Evidence-bound Theme Forge integration workbench"
   },
   "release": {
     "prerelease": "reject",
@@ -131,7 +152,8 @@
       ],
       "mode": "projection",
       "name": "theme-forge-nebular-fusion-bin",
-      "package": "aur"
+      "package": "aur",
+      "profile": "aur"
     },
     {
       "adapter": "apt",

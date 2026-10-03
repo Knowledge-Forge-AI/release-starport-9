@@ -1,0 +1,618 @@
+{
+  "differences": [
+    {
+      "adapter": "aur",
+      "class": "RS9 correction backed by release evidence",
+      "evidence": "dependency-evidence.json: objects/scripts/system_sonames; foundation2-qualification.md",
+      "field": "dependencies",
+      "material": true,
+      "rationale": "Full ELF and executable-script scan adds system runtime closure candidates. Arch and Fedora x86_64 provider queries agree; Fedora arm64 and Nix provider qualification remain incomplete. OpenSSL/zlib have no direct object requirement; transitive runtime necessity is not disproved.",
+      "reference": {
+        "aarch64": [
+          "cairo",
+          "dbus",
+          "glib2",
+          "gtk3",
+          "openssl",
+          "pango",
+          "webkit2gtk-4.1",
+          "zlib"
+        ],
+        "x86_64": [
+          "cairo",
+          "dbus",
+          "glib2",
+          "gtk3",
+          "openssl",
+          "pango",
+          "webkit2gtk-4.1",
+          "zlib"
+        ]
+      },
+      "shadow": {
+        "aarch64": [
+          "bash",
+          "cairo",
+          "dbus",
+          "gdk-pixbuf2",
+          "glib2",
+          "glibc>=2.34",
+          "gtk3",
+          "hicolor-icon-theme",
+          "libgcc",
+          "libsoup3",
+          "libstdc++",
+          "nodejs>=22",
+          "pango",
+          "webkit2gtk-4.1"
+        ],
+        "x86_64": [
+          "bash",
+          "cairo",
+          "dbus",
+          "gdk-pixbuf2",
+          "glib2",
+          "glibc>=2.34",
+          "gtk3",
+          "hicolor-icon-theme",
+          "libgcc",
+          "libsoup3",
+          "libstdc++",
+          "nodejs>=22",
+          "webkit2gtk-4.1"
+        ]
+      }
+    },
+    {
+      "adapter": "aur",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: icon/payload_license_copies",
+      "field": "icon_sizes",
+      "material": true,
+      "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE.",
+      "reference": [
+        16,
+        32,
+        48,
+        64,
+        128,
+        256
+      ],
+      "shadow": [
+        256
+      ]
+    },
+    {
+      "adapter": "aur",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: icon/payload_license_copies",
+      "field": "installed_paths",
+      "material": true,
+      "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE.",
+      "reference": [
+        "/usr/bin/tfnf",
+        "/usr/lib/theme-forge-nebular-fusion",
+        "/usr/share/applications/theme-forge-nebular-fusion.desktop",
+        "/usr/share/icons/hicolor/128x128/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/16x16/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/256x256/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/32x32/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/48x48/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/64x64/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/licenses/theme-forge-nebular-fusion-bin/LICENSE"
+      ],
+      "shadow": [
+        "/usr/bin/tfnf",
+        "/usr/lib/theme-forge-nebular-fusion",
+        "/usr/share/applications/theme-forge-nebular-fusion.desktop",
+        "/usr/share/icons/hicolor/256x256/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/licenses/theme-forge-nebular-fusion-bin/LICENSE",
+        "/usr/share/licenses/theme-forge-nebular-fusion-bin/NOTICE"
+      ]
+    },
+    {
+      "adapter": "aur",
+      "class": "unresolved blocker",
+      "evidence": "foundation2-qualification.md; rendered recipes",
+      "field": "payload_policy",
+      "material": true,
+      "rationale": "Shadow package payload parity is demonstrated for pacman/RPM and Darwin Nix, with Nix store mode normalization. Full installed-tree readback and reference package builds remain unexecuted; this is not evidence that the reference changed executable bytes.",
+      "reference": "cp -r nonhidden entries; strip disabled",
+      "shadow": "cp -a all entries; strip/debug/purge/zipman disabled"
+    },
+    {
+      "adapter": "aur",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: source_files; normalized tenant",
+      "field": "provides",
+      "material": true,
+      "rationale": "Versioned provides retains the same conflicting package name and installed layout.",
+      "reference": [
+        "theme-forge-nebular-fusion"
+      ],
+      "shadow": [
+        "theme-forge-nebular-fusion=0.6.1"
+      ]
+    },
+    {
+      "adapter": "aur",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: source_files; normalized tenant",
+      "field": "summary",
+      "material": false,
+      "rationale": "Declarative tenant metadata replaces reference-only values.",
+      "reference": "Theme Forge Nebular Fusion design system studio and theme compiler workbench (binary release)",
+      "shadow": "Evidence-bound Theme Forge integration workbench"
+    },
+    {
+      "adapter": "aur",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: source_files; normalized tenant",
+      "field": "url",
+      "material": false,
+      "rationale": "Declarative tenant metadata replaces reference-only values.",
+      "reference": "https://github.com/Knowledge-Forge-AI/theme-forge-packages",
+      "shadow": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion"
+    },
+    {
+      "adapter": "desktop",
+      "class": "reference-only behavior retained pending evidence",
+      "evidence": "tagged src-tauri/tauri.conf.json; declarative desktop facts; foundation2-qualification.md",
+      "field": "Categories",
+      "material": true,
+      "rationale": "Reference file/URL argument, MIME, window-class and category behavior lacks selected tagged/declarative authority. Its omission is a material parity gap; application argument support and launcher/window matching were not tested. Acceptance remains deferred.",
+      "reference": "Development;Graphics;IDE;",
+      "shadow": "Development;"
+    },
+    {
+      "adapter": "desktop",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: source_files; normalized tenant",
+      "field": "Comment",
+      "material": false,
+      "rationale": "Only declarative facts are rendered; reference URL arguments, MIME association, WM class and generic name have no selected tenant authority.",
+      "reference": "Desktop design system studio and theme compiler workbench",
+      "shadow": "Evidence-bound Theme Forge integration workbench"
+    },
+    {
+      "adapter": "desktop",
+      "class": "reference-only behavior retained pending evidence",
+      "evidence": "tagged src-tauri/tauri.conf.json; declarative desktop facts; foundation2-qualification.md",
+      "field": "Exec",
+      "material": true,
+      "rationale": "Reference file/URL argument, MIME, window-class and category behavior lacks selected tagged/declarative authority. Its omission is a material parity gap; application argument support and launcher/window matching were not tested. Acceptance remains deferred.",
+      "reference": "tfnf %U",
+      "shadow": "tfnf"
+    },
+    {
+      "adapter": "desktop",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: source_files; normalized tenant",
+      "field": "GenericName",
+      "material": false,
+      "rationale": "Only declarative facts are rendered; reference URL arguments, MIME association, WM class and generic name have no selected tenant authority.",
+      "reference": "Design System Workbench",
+      "shadow": null
+    },
+    {
+      "adapter": "desktop",
+      "class": "reference-only behavior retained pending evidence",
+      "evidence": "tagged src-tauri/tauri.conf.json; declarative desktop facts; foundation2-qualification.md",
+      "field": "MimeType",
+      "material": true,
+      "rationale": "Reference file/URL argument, MIME, window-class and category behavior lacks selected tagged/declarative authority. Its omission is a material parity gap; application argument support and launcher/window matching were not tested. Acceptance remains deferred.",
+      "reference": "application/json;",
+      "shadow": null
+    },
+    {
+      "adapter": "desktop",
+      "class": "reference-only behavior retained pending evidence",
+      "evidence": "tagged src-tauri/tauri.conf.json; declarative desktop facts; foundation2-qualification.md",
+      "field": "StartupWMClass",
+      "material": true,
+      "rationale": "Reference file/URL argument, MIME, window-class and category behavior lacks selected tagged/declarative authority. Its omission is a material parity gap; application argument support and launcher/window matching were not tested. Acceptance remains deferred.",
+      "reference": "theme-forge-nebular-fusion",
+      "shadow": null
+    },
+    {
+      "adapter": "nix",
+      "class": "RS9 correction backed by release evidence",
+      "evidence": "dependency-evidence.json: objects/scripts/system_sonames; foundation2-qualification.md",
+      "field": "dependencies",
+      "material": true,
+      "rationale": "Full ELF and executable-script scan adds system runtime closure candidates. Arch and Fedora x86_64 provider queries agree; Fedora arm64 and Nix provider qualification remain incomplete. OpenSSL/zlib have no direct object requirement; transitive runtime necessity is not disproved.",
+      "reference": {
+        "aarch64-linux": [
+          "cairo",
+          "dbus",
+          "glib",
+          "gtk3",
+          "libsoup_3",
+          "openssl",
+          "pango",
+          "webkitgtk_4_1",
+          "zlib"
+        ],
+        "x86_64-linux": [
+          "cairo",
+          "dbus",
+          "glib",
+          "gtk3",
+          "libsoup_3",
+          "openssl",
+          "pango",
+          "webkitgtk_4_1",
+          "zlib"
+        ]
+      },
+      "shadow": {
+        "aarch64-linux": [
+          "bash",
+          "cairo",
+          "dbus",
+          "gdk-pixbuf",
+          "glib",
+          "glibc",
+          "gtk3",
+          "libsoup_3",
+          "nodejs_22",
+          "pango",
+          "stdenv.cc.cc.lib",
+          "webkitgtk_4_1"
+        ],
+        "x86_64-linux": [
+          "bash",
+          "cairo",
+          "dbus",
+          "gdk-pixbuf",
+          "glib",
+          "glibc",
+          "gtk3",
+          "libsoup_3",
+          "nodejs_22",
+          "stdenv.cc.cc.lib",
+          "webkitgtk_4_1"
+        ]
+      }
+    },
+    {
+      "adapter": "nix",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: icon/payload_license_copies",
+      "field": "icon_sizes",
+      "material": true,
+      "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE.",
+      "reference": [],
+      "shadow": [
+        256
+      ]
+    },
+    {
+      "adapter": "nix",
+      "class": "RS9 correction backed by release evidence",
+      "evidence": "ingestion.json: assets.launchers; archive payload manifests",
+      "field": "launcher",
+      "material": true,
+      "rationale": "Darwin selects the authenticated upstream shell shim for headless version/path behavior; Linux launcher matches the reference. GUI/sidecar resource resolution still needs an install smoke test.",
+      "reference": {
+        "aarch64-darwin": "Contents/MacOS/theme-forge-nebular-fusion",
+        "aarch64-linux": "bin/tfnf",
+        "x86_64-linux": "bin/tfnf"
+      },
+      "shadow": {
+        "aarch64-darwin": "Contents/Resources/bin/tfnf",
+        "aarch64-linux": "bin/tfnf",
+        "x86_64-linux": "bin/tfnf"
+      }
+    },
+    {
+      "adapter": "nix",
+      "class": "unresolved blocker",
+      "evidence": "actual reference and shadow Nix recipe bytes; foundation2-qualification.md",
+      "field": "name",
+      "material": true,
+      "rationale": "Actual Darwin shadow output pname adds the payload suffix relative to the reference; both Linux FHS outputs are named tfnf. The configured family name does not prove concrete derivation identity. Recipes are unchanged and no naming-policy or migration acceptance is granted.",
+      "reference": {
+        "aarch64-darwin": "theme-forge-nebular-fusion",
+        "aarch64-linux": "tfnf",
+        "x86_64-linux": "tfnf"
+      },
+      "shadow": {
+        "aarch64-darwin": "theme-forge-nebular-fusion-payload",
+        "aarch64-linux": "tfnf",
+        "x86_64-linux": "tfnf"
+      }
+    },
+    {
+      "adapter": "nix",
+      "class": "unresolved blocker",
+      "evidence": "foundation2-qualification.md; rendered recipes",
+      "field": "payload_policy",
+      "material": true,
+      "rationale": "Shadow package payload parity is demonstrated for pacman/RPM and Darwin Nix, with Nix store mode normalization. Full installed-tree readback and reference package builds remain unexecuted; this is not evidence that the reference changed executable bytes.",
+      "reference": "cp -r nonhidden Linux entries; dontStrip/dontPatchELF; optional FHS fallback",
+      "shadow": "cp -a all entries; dontFixup; mandatory Linux FHS; no GUI installCheck"
+    },
+    {
+      "adapter": "nix",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: source_files; normalized tenant",
+      "field": "summary",
+      "material": false,
+      "rationale": "Declarative tenant metadata replaces reference-only values.",
+      "reference": "Theme Forge Nebular Fusion design system studio and theme compiler workbench",
+      "shadow": "Evidence-bound Theme Forge integration workbench"
+    },
+    {
+      "adapter": "nix",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: source_files; normalized tenant",
+      "field": "url",
+      "material": false,
+      "rationale": "Declarative tenant metadata replaces reference-only values.",
+      "reference": "https://github.com/Knowledge-Forge-AI/theme-forge-packages",
+      "shadow": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion"
+    },
+    {
+      "adapter": "pacman",
+      "class": "RS9 correction backed by release evidence",
+      "evidence": "dependency-evidence.json: objects/scripts/system_sonames; foundation2-qualification.md",
+      "field": "dependencies",
+      "material": true,
+      "rationale": "Full ELF and executable-script scan adds system runtime closure candidates. Arch and Fedora x86_64 provider queries agree; Fedora arm64 and Nix provider qualification remain incomplete. OpenSSL/zlib have no direct object requirement; transitive runtime necessity is not disproved.",
+      "reference": {
+        "x86_64": [
+          "cairo",
+          "dbus",
+          "glib2",
+          "gtk3",
+          "openssl",
+          "pango",
+          "webkit2gtk-4.1",
+          "zlib"
+        ]
+      },
+      "shadow": {
+        "x86_64": [
+          "bash",
+          "cairo",
+          "dbus",
+          "gdk-pixbuf2",
+          "glib2",
+          "glibc>=2.34",
+          "gtk3",
+          "hicolor-icon-theme",
+          "libgcc",
+          "libsoup3",
+          "libstdc++",
+          "nodejs>=22",
+          "webkit2gtk-4.1"
+        ]
+      }
+    },
+    {
+      "adapter": "pacman",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: icon/payload_license_copies",
+      "field": "icon_sizes",
+      "material": true,
+      "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE.",
+      "reference": [
+        16,
+        32,
+        48,
+        64,
+        128,
+        256
+      ],
+      "shadow": [
+        256
+      ]
+    },
+    {
+      "adapter": "pacman",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: icon/payload_license_copies",
+      "field": "installed_paths",
+      "material": true,
+      "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE.",
+      "reference": [
+        "/usr/bin/tfnf",
+        "/usr/lib/theme-forge-nebular-fusion",
+        "/usr/share/applications/theme-forge-nebular-fusion.desktop",
+        "/usr/share/icons/hicolor/128x128/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/16x16/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/256x256/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/32x32/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/48x48/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/64x64/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/licenses/theme-forge-nebular-fusion/LICENSE"
+      ],
+      "shadow": [
+        "/usr/bin/tfnf",
+        "/usr/lib/theme-forge-nebular-fusion",
+        "/usr/share/applications/theme-forge-nebular-fusion.desktop",
+        "/usr/share/icons/hicolor/256x256/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/licenses/theme-forge-nebular-fusion/LICENSE",
+        "/usr/share/licenses/theme-forge-nebular-fusion/NOTICE"
+      ]
+    },
+    {
+      "adapter": "pacman",
+      "class": "unresolved blocker",
+      "evidence": "foundation2-qualification.md; rendered recipes",
+      "field": "payload_policy",
+      "material": true,
+      "rationale": "Shadow package payload parity is demonstrated for pacman/RPM and Darwin Nix, with Nix store mode normalization. Full installed-tree readback and reference package builds remain unexecuted; this is not evidence that the reference changed executable bytes.",
+      "reference": "cp -r nonhidden entries; strip disabled",
+      "shadow": "cp -a all entries; strip/debug/purge/zipman disabled"
+    },
+    {
+      "adapter": "pacman",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: source_files; normalized tenant",
+      "field": "summary",
+      "material": false,
+      "rationale": "Declarative tenant metadata replaces reference-only values.",
+      "reference": "Theme Forge Nebular Fusion design system studio and theme compiler workbench",
+      "shadow": "Evidence-bound Theme Forge integration workbench"
+    },
+    {
+      "adapter": "pacman",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: source_files; normalized tenant",
+      "field": "url",
+      "material": false,
+      "rationale": "Declarative tenant metadata replaces reference-only values.",
+      "reference": "https://github.com/Knowledge-Forge-AI/theme-forge-packages",
+      "shadow": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion"
+    },
+    {
+      "adapter": "rpm",
+      "class": "RS9 correction backed by release evidence",
+      "evidence": "dependency-evidence.json: objects/scripts/system_sonames; foundation2-qualification.md",
+      "field": "dependencies",
+      "material": true,
+      "rationale": "Full ELF and executable-script scan adds system runtime closure candidates. Arch and Fedora x86_64 provider queries agree; Fedora arm64 and Nix provider qualification remain incomplete. OpenSSL/zlib have no direct object requirement; transitive runtime necessity is not disproved.",
+      "reference": {
+        "aarch64": [
+          "cairo",
+          "dbus",
+          "glib2",
+          "gtk3",
+          "openssl-libs",
+          "pango",
+          "webkit2gtk4.1",
+          "zlib"
+        ],
+        "x86_64": [
+          "cairo",
+          "dbus",
+          "glib2",
+          "gtk3",
+          "openssl-libs",
+          "pango",
+          "webkit2gtk4.1",
+          "zlib"
+        ]
+      },
+      "shadow": {
+        "aarch64": [
+          "bash",
+          "cairo",
+          "cairo-gobject",
+          "dbus-libs",
+          "gdk-pixbuf2",
+          "glib2",
+          "glibc >= 2.34",
+          "gtk3",
+          "hicolor-icon-theme",
+          "javascriptcoregtk4.1",
+          "libgcc",
+          "libsoup3",
+          "libstdc++",
+          "nodejs >= 22",
+          "pango",
+          "webkit2gtk4.1"
+        ],
+        "x86_64": [
+          "bash",
+          "cairo",
+          "dbus-libs",
+          "gdk-pixbuf2",
+          "glib2",
+          "glibc >= 2.34",
+          "gtk3",
+          "hicolor-icon-theme",
+          "javascriptcoregtk4.1",
+          "libgcc",
+          "libsoup3",
+          "libstdc++",
+          "nodejs >= 22",
+          "webkit2gtk4.1"
+        ]
+      }
+    },
+    {
+      "adapter": "rpm",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: icon/payload_license_copies",
+      "field": "icon_sizes",
+      "material": true,
+      "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE.",
+      "reference": [
+        16,
+        32,
+        48,
+        64,
+        128,
+        256
+      ],
+      "shadow": [
+        256
+      ]
+    },
+    {
+      "adapter": "rpm",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: icon/payload_license_copies",
+      "field": "installed_paths",
+      "material": true,
+      "rationale": "Only the authenticated tagged 256px icon is selected; other reference sizes lack authority. Pacman/AUR also install the reconciled NOTICE.",
+      "reference": [
+        "/usr/bin/tfnf",
+        "/usr/lib/theme-forge-nebular-fusion",
+        "/usr/share/applications/theme-forge-nebular-fusion.desktop",
+        "/usr/share/icons/hicolor/128x128/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/16x16/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/256x256/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/32x32/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/48x48/apps/theme-forge-nebular-fusion.png",
+        "/usr/share/icons/hicolor/64x64/apps/theme-forge-nebular-fusion.png",
+        "RPM-managed LICENSE copy",
+        "RPM-managed NOTICE copy"
+      ],
+      "shadow": [
+        "/usr/bin/tfnf",
+        "/usr/lib/theme-forge-nebular-fusion",
+        "/usr/share/applications/theme-forge-nebular-fusion.desktop",
+        "/usr/share/icons/hicolor/256x256/apps/theme-forge-nebular-fusion.png",
+        "RPM-managed LICENSE copy",
+        "RPM-managed NOTICE copy"
+      ]
+    },
+    {
+      "adapter": "rpm",
+      "class": "unresolved blocker",
+      "evidence": "foundation2-qualification.md; rendered recipes",
+      "field": "payload_policy",
+      "material": true,
+      "rationale": "Shadow package payload parity is demonstrated for pacman/RPM and Darwin Nix, with Nix store mode normalization. Full installed-tree readback and reference package builds remain unexecuted; this is not evidence that the reference changed executable bytes.",
+      "reference": "cp -r nonhidden entries; strip disabled; default brp",
+      "shadow": "cp -a all entries; brp transformations disabled; source checksums in prep"
+    },
+    {
+      "adapter": "rpm",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: source_files; normalized tenant",
+      "field": "summary",
+      "material": false,
+      "rationale": "Declarative tenant metadata replaces reference-only values.",
+      "reference": "Theme Forge Nebular Fusion design system studio and theme compiler workbench",
+      "shadow": "Evidence-bound Theme Forge integration workbench"
+    },
+    {
+      "adapter": "rpm",
+      "class": "intentional RS9 normalization",
+      "evidence": "ingestion.json: source_files; normalized tenant",
+      "field": "url",
+      "material": false,
+      "rationale": "Declarative tenant metadata replaces reference-only values.",
+      "reference": "https://github.com/Knowledge-Forge-AI/theme-forge-packages",
+      "shadow": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion"
+    }
+  ],
+  "reference_sha256": "0a23f4c495fbf1fa0ff7e17742ecb1be122a87e3965fcf691fd0ac4a31053223",
+  "schema": "rs9.shadow-comparison.v1alpha1",
+  "shadow_sha256": "0458dec858b58839663a73c6514bb1c56d6bcfce172e41ad6096e0dce4b55cd0"
+}
