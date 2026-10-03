@@ -1,0 +1,44 @@
+{
+  "closeout_disposition": "amend; blocked partial source candidate",
+  "git_diff_check": "pass",
+  "git_tree_calculation": "verified against current HEAD objects; no index/object writes",
+  "hosted_workflow": "not-run",
+  "hygiene_after_evidence": "pass",
+  "independent_review": "dispatcher-supplied-reviewed-with-findings; terminal amendment has no automatic independent review",
+  "post_suite_delta": "report/evidence/inventory only; terminal hygiene, diff and inventory checks required",
+  "production_enabled": false,
+  "real_artifact_or_platform_qualification": "not-run",
+  "schema": "rs9.provider-verification.v1alpha1",
+  "scope": "source contracts and synthetic fixtures only",
+  "terminal_delta": {
+    "source": "withhold presence-only Nebular verification; move synthetic Pages construction into test fixtures; portable missing-tool tests",
+    "targeted_tests": {
+      "command": "python3 -m unittest tests.test_build_native tests.test_build_deb tests.test_pages_candidate -q",
+      "failures": 0,
+      "passed": 25,
+      "run": 26,
+      "skipped": 1
+    }
+  },
+  "unit_tests": {
+    "command": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -q",
+    "errors": 0,
+    "failures": 0,
+    "passed": 463,
+    "run": 470,
+    "scope": "final runtime/test source after closeout corrections; synthetic fixtures only",
+    "skipped": 7,
+    "skips": "five authenticated-live captures; two fixture GPG agents"
+  },
+  "work_stage_unit_tests": {
+    "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -q",
+    "errors": 0,
+    "failures": 0,
+    "passed": 428,
+    "run": 435,
+    "skipped": 7,
+    "skips": "five authenticated-live-capture prerequisites; two fixture-GPG-agent prerequisites",
+    "stderr_sha256": "cc4402c165a6e55da39e7b4e1a0a511ce802a8fa69d56d7a1d84e2c92eddcff5",
+    "stdout_sha256": "c5329bcb3a839ef1ac94793e0aefdc257c78ad33a3bb8e3573fd83e45aba1bc4"
+  }
+}

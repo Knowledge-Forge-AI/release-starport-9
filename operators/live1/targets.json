@@ -1,0 +1,11 @@
+{
+  "schema": "rs9.live1-candidate-targets.v1alpha1",
+  "production_enabled": false,
+  "maintainer": null,
+  "pacman": {"architectures": ["x86_64"], "container_digest": null, "snapshot": null},
+  "rpm": {"distribution": "fedora-43", "architectures": ["x86_64", "aarch64"], "container_digests": {}},
+  "deb": {"distribution": "ubuntu-26.04", "suite": "resolute", "architectures": ["amd64", "arm64"], "container_digests": {}},
+  "nix": {"nixpkgs_revision": null, "nixpkgs_nar_hash": null, "outputs_exposed": false},
+  "dependency_free_cli_architectures": {"pacman": "any", "rpm": "noarch", "deb": "all"},
+  "pin_status": "blocked-fresh-network-authentication-unavailable"
+}

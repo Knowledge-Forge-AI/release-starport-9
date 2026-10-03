@@ -11,7 +11,8 @@ import zipfile
 
 from rs9.errors import ContractError
 from rs9.scratch import canonical
-from rs9.wheel import build_wheel, inspect_wheel, resolve_wheel_tag
+from rs9.wheel import build_wheel, inspect_wheel, resolve_wheel_tag, verify_wheel_record
+from rs9.verify_wheel import verify_offline_venv_lifecycle
 from rs9.release_core import digest
 
 LICENSES = {"LICENSE": b"Synthetic AGPL fixture licence.\n", "NOTICE": b"Synthetic notice.\n"}
@@ -80,6 +81,7 @@ class WheelTests(unittest.TestCase):
 
     def test_content_identity_and_tampered_record(self):
         result=self.build(self.root,content_identity_sha256="b"*64)
+        self.assertTrue(verify_wheel_record(result.wheel_path))
         with zipfile.ZipFile(result.wheel_path) as wheel:
             prov=json.loads(wheel.read("theme_forge_stellar_loom/_rs9/provenance.json"))
             self.assertEqual(prov["content_identity_sha256"],"b"*64)
@@ -89,6 +91,9 @@ class WheelTests(unittest.TestCase):
         with zipfile.ZipFile(target,"w") as wheel:
             for n,b in entries.items(): wheel.writestr(n,b)
         self.assertFalse(inspect_wheel(target)["record_valid"])
+        with self.assertRaises(ContractError) as caught:
+            verify_wheel_record(target)
+        self.assertEqual(caught.exception.code, "RECORD_MISMATCH")
 
         with zipfile.ZipFile(result.wheel_path) as wheel:
             entries={n:wheel.read(n) for n in wheel.namelist()}
@@ -99,6 +104,46 @@ class WheelTests(unittest.TestCase):
         with zipfile.ZipFile(target_phantom, "w") as wheel:
             for n, b in entries.items(): wheel.writestr(n, b)
         self.assertFalse(inspect_wheel(target_phantom)["record_valid"])
+        with self.assertRaises(ContractError) as caught_ph:
+            verify_wheel_record(target_phantom)
+        self.assertEqual(caught_ph.exception.code, "RECORD_MISMATCH")
+
+    def test_wheel_verifiers_reject_duplicate_zip_members_and_record_rows(self):
+        result = self.build(self.root / "orig_wheel")
+        with zipfile.ZipFile(result.wheel_path) as wheel:
+            entries = {n: wheel.read(n) for n in wheel.namelist()}
+
+        # 1. Duplicate ZIP member
+        target_dup_member = self.root / "dup_member.whl"
+        with zipfile.ZipFile(target_dup_member, "w") as wheel:
+            for n, b in entries.items():
+                wheel.writestr(n, b)
+            # Add duplicate of an existing member
+            dup_name = "theme_forge_stellar_loom/payload/package/bin/tfsl.js"
+            wheel.writestr(dup_name, entries[dup_name])
+
+        self.assertFalse(inspect_wheel(target_dup_member)["record_valid"])
+        with self.assertRaises(ContractError) as ctx_m:
+            verify_wheel_record(target_dup_member)
+        self.assertEqual(ctx_m.exception.code, "RECORD_MISMATCH")
+
+        # 2. Duplicate RECORD row
+        target_dup_row = self.root / "dup_row.whl"
+        rec_path = "theme_forge_stellar_loom-0.4.0.dist-info/RECORD"
+        rec_text = entries[rec_path].decode("utf-8")
+        first_row = rec_text.splitlines()[0]
+        rec_text_dup = rec_text + first_row + "\n"
+        with zipfile.ZipFile(target_dup_row, "w") as wheel:
+            for n, b in entries.items():
+                if n == rec_path:
+                    wheel.writestr(n, rec_text_dup.encode("utf-8"))
+                else:
+                    wheel.writestr(n, b)
+
+        self.assertFalse(inspect_wheel(target_dup_row)["record_valid"])
+        with self.assertRaises(ContractError) as ctx_r:
+            verify_wheel_record(target_dup_row)
+        self.assertEqual(ctx_r.exception.code, "RECORD_MISMATCH")
 
     @unittest.skipUnless(shutil.which("node"),"Node required for actual fixture entrypoint execution")
     def test_actual_offline_install_run_uninstall(self):
@@ -118,3 +163,56 @@ class WheelTests(unittest.TestCase):
         self.assertFalse((venv/"bin/tfsl").exists())
         self.assertFalse((venv/"bin/tfsl-batch").exists())
         self.assertFalse(any(venv.glob("lib/python*/site-packages/theme_forge_stellar_loom*")))
+
+        # Full lifecycle baseline inventory test via verify_offline_venv_lifecycle
+        report = verify_offline_venv_lifecycle(
+            result.wheel_path,
+            distribution_name="theme-forge-stellar-loom",
+            commands_to_test={
+                "tfsl": {"argv": [], "expect_exit": 0, "expect_stdout_contains": "synthetic-loom 0.4.0"},
+                "tfsl-batch": {"argv": [], "input": "", "expect_exit": 1, "expect_json_error": "EMPTY_INPUT"},
+            },
+            venv_dir=self.root / "lifecycle_venv",
+        )
+        self.assertTrue(report["clean_uninstall_verified"])
+        self.assertEqual(report["venv_residuals"], [])
+
+    @unittest.skipUnless(shutil.which("node"), "Node required for actual fixture entrypoint execution")
+    def test_offline_venv_lifecycle_rejects_residual_files(self):
+        result = self.build(self.root / "residual_test_wheel")
+        # Run a command that drops a rogue residual file in the venv
+        with self.assertRaises(ContractError) as ctx:
+            verify_offline_venv_lifecycle(
+                result.wheel_path,
+                distribution_name="theme-forge-stellar-loom",
+                commands_to_test={
+                    "tfsl": {
+                        "argv": [],
+                        "expect_exit": 0,
+                    },
+                },
+                venv_dir=self.root / "residual_venv",
+                # Wrap command prefix with a command that leaves a residual file in the venv
+                command_prefix=[
+                    "bash", "-c",
+                    'touch "$(dirname "$1")/rogue_venv_artifact.txt" && exec "$@"',
+                    "inline_wrapper",
+                ],
+            )
+        self.assertEqual(ctx.exception.code, "DIRTY_UNINSTALL")
+        self.assertIn("rogue_venv_artifact.txt", str(ctx.exception))
+
+    @unittest.skipUnless(shutil.which("node"), "Node required for fixture execution")
+    def test_uninstall_rejects_empty_directories_and_baseline_mutation(self):
+        result = self.build(self.root / "inventory_wheel")
+        scripts = {
+            "empty-directory": 'mkdir -p "$(dirname "$1")/unrelated-cache" && exec "$@"',
+            "pip-leftover": 'mkdir -p "$(dirname "$1")/../lib/rogue/pip" && touch "$(dirname "$1")/../lib/rogue/pip/residual" && exec "$@"',
+            "baseline-mutation": 'printf "\\n# mutation\\n" >> "$(dirname "$1")/../pyvenv.cfg" && exec "$@"',
+        }
+        for name, script in scripts.items():
+            with self.subTest(name=name), self.assertRaises(ContractError) as raised:
+                verify_offline_venv_lifecycle(result.wheel_path, distribution_name="theme-forge-stellar-loom",
+                    commands_to_test={"tfsl": {"argv": [], "expect_exit": 0}},
+                    venv_dir=self.root / name, command_prefix=["bash", "-c", script, "wrapper"])
+            self.assertEqual(raised.exception.code, "DIRTY_UNINSTALL")

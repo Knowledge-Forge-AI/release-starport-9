@@ -1,0 +1,330 @@
+"""Comprehensive tests for native Nebular Darwin compressed-archive wheel builder."""
+from __future__ import annotations
+
+import gzip
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import plistlib
+import shutil
+import stat
+import subprocess
+import sys
+import tarfile
+import tempfile
+import unittest
+import zipfile
+
+from rs9.errors import ContractError
+from rs9.release_core import digest
+from rs9.scratch import canonical
+from rs9.verify_wheel import (
+    verify_double_build,
+    verify_offline_venv_lifecycle,
+    verify_wheel_record_bidirectional,
+)
+from rs9.wheel import WheelWithheldError
+from rs9.wheel_native import (
+    REVIEWED_HELPERS,
+    build_native_wheel as _build_native_wheel,
+    extract_darwin_minimum_version,
+    resolve_native_darwin_tag,
+)
+
+
+def build_native_wheel(*args, **kwargs):
+    return _build_native_wheel(*args, fixture_only=True, **kwargs)
+
+
+def make_darwin_archive(
+    entries: list[tuple[str, bytes, int, int, str]],
+) -> bytes:
+    """Build a synthetic tar.gz archive with specified members (path, data, mode, type, linkname)."""
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+        for path, data, mode, kind, linkname in entries:
+            ti = tarfile.TarInfo(path)
+            ti.mode = mode
+            ti.type = kind
+            ti.linkname = linkname
+            ti.size = len(data) if kind == tarfile.REGTYPE else 0
+            tf.addfile(ti, io.BytesIO(data) if kind == tarfile.REGTYPE else None)
+    return buf.getvalue()
+
+
+def make_standard_darwin_entries(
+    *,
+    min_os: str = "11.0.0",
+    launcher_script: bytes = b"#!/bin/sh\necho 'nebular 0.6.1 native'\nexit 0\n",
+    extra_entries: list[tuple[str, bytes, int, int, str]] | None = None,
+) -> list[tuple[str, bytes, int, int, str]]:
+    plist = plistlib.dumps({"LSMinimumSystemVersion": min_os, "CFBundleIdentifier": "ai.knowledgeforge.nebular"})
+    root = "Theme Forge Nebular Fusion.app"
+    entries = [
+        (root, b"", 0o755, tarfile.DIRTYPE, ""),
+        (f"{root}/Contents", b"", 0o755, tarfile.DIRTYPE, ""),
+        (f"{root}/Contents/Info.plist", plist, 0o644, tarfile.REGTYPE, ""),
+        (f"{root}/Contents/MacOS", b"", 0o755, tarfile.DIRTYPE, ""),
+        (f"{root}/Contents/MacOS/theme-forge-nebular-fusion", b"#!/bin/sh\nexit 0\n", 0o755, tarfile.REGTYPE, ""),
+        (f"{root}/Contents/Resources", b"", 0o755, tarfile.DIRTYPE, ""),
+        (f"{root}/Contents/Resources/bin", b"", 0o755, tarfile.DIRTYPE, ""),
+        (f"{root}/Contents/Resources/bin/tfnf", launcher_script, 0o755, tarfile.REGTYPE, ""),
+        (f"{root}/Contents/Resources/LICENSE", b"Synthetic AGPL-3.0-or-later license text.\n", 0o644, tarfile.REGTYPE, ""),
+        (f"{root}/Contents/Resources/NOTICE", b"Synthetic notice.\n", 0o644, tarfile.REGTYPE, ""),
+    ]
+    if extra_entries:
+        entries.extend(extra_entries)
+    return entries
+
+
+class WheelNativeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name).resolve()
+
+    def test_darwin_minimum_arm64_from_plist(self) -> None:
+        # Valid macOS 11.0, 11.3, 12.0
+        for ver_str, exp_major, exp_minor in (("11.0", 11, 0), ("11.3.1", 11, 3), ("12.0", 12, 0), ("14.5", 14, 5)):
+            plist = plistlib.dumps({"LSMinimumSystemVersion": ver_str})
+            major, minor = extract_darwin_minimum_version(plist)
+            self.assertEqual((major, minor), (exp_major, exp_minor))
+            tag = resolve_native_darwin_tag(plist)
+            self.assertEqual(tag, f"py3-none-macosx_{exp_major}_{exp_minor}_arm64")
+
+        # Refusal for Darwin arm64 < 11.0 (e.g. 10.15)
+        plist_old = plistlib.dumps({"LSMinimumSystemVersion": "10.15.7"})
+        self.assertEqual(extract_darwin_minimum_version(plist_old), (11, 0))
+
+        # Refusal for missing or malformed plist
+        with self.assertRaises(ContractError) as ctx:
+            extract_darwin_minimum_version(b"not a valid plist")
+        self.assertIn("INVALID_PLIST", str(ctx.exception))
+
+        with self.assertRaises(ContractError) as ctx:
+            extract_darwin_minimum_version(plistlib.dumps({}))
+        self.assertIn("INVALID_PLIST", str(ctx.exception))
+
+    def test_linux_manylinux_and_fake_universal_withholding(self) -> None:
+        plist = plistlib.dumps({"LSMinimumSystemVersion": "11.0"})
+        # 1. Linux wheel tags must NOT claim manylinux compliance with external GTK/WebKit dependencies
+        for linux_tag in ("manylinux_2_34_x86_64", "manylinux2014_x86_64", "linux_x86_64", "musllinux_1_2_x86_64"):
+            with self.assertRaises(WheelWithheldError) as ctx:
+                resolve_native_darwin_tag(plist, platform_tag=linux_tag)
+            self.assertEqual(ctx.exception.code, "MANYLINUX_UNPROVEN")
+            self.assertEqual(ctx.exception.reason, "manylinux_unproven")
+
+        # 2. Fake universal 'any' tag must be rejected
+        with self.assertRaises(ContractError) as ctx:
+            resolve_native_darwin_tag(plist, platform_tag="any")
+        self.assertIn("UNSUPPORTED_PLATFORM", str(ctx.exception))
+
+        # 3. Builder also withholds when target_platform is linux
+        arc = make_darwin_archive(make_standard_darwin_entries())
+        with self.assertRaises(WheelWithheldError) as ctx:
+            build_native_wheel(
+                "theme-forge-nebular-fusion",
+                "0.6.1",
+                archive_bytes=arc,
+                target_platform="x86_64-unknown-linux-gnu",
+                output_dir=self.root / "out",
+            )
+        self.assertEqual(ctx.exception.code, "MANYLINUX_UNPROVEN")
+
+    def test_raw_archive_cannot_claim_authenticated_release(self):
+        archive = make_darwin_archive(make_standard_darwin_entries())
+        with self.assertRaises(ContractError) as raised:
+            _build_native_wheel("theme-forge-nebular-fusion", "0.6.1", archive_bytes=archive, output_dir=self.root / "out")
+        self.assertEqual(raised.exception.code, "PROVENANCE_REQUIRED")
+
+    def test_embedded_unchanged_helpers_and_exact_payload(self) -> None:
+        arc_bytes = make_darwin_archive(make_standard_darwin_entries())
+        res = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc_bytes,
+            output_dir=self.root / "out",
+        )
+        self.assertEqual(res.filename, "theme_forge_nebular_fusion-0.6.1-py3-none-macosx_11_0_arm64.whl")
+
+        with zipfile.ZipFile(res.wheel_path) as zf:
+            names = set(zf.namelist())
+            # Check embedded helpers under isolated package namespace
+            rs9_src = Path("src/rs9")
+            for helper in REVIEWED_HELPERS:
+                member_name = f"theme_forge_nebular_fusion/_isolated/rs9/{helper}"
+                self.assertIn(member_name, names)
+                actual_bytes = zf.read(member_name)
+                expected_bytes = (rs9_src / helper).read_bytes()
+                self.assertEqual(actual_bytes, expected_bytes, f"Helper {helper} bytes must be unchanged")
+
+            # Check exact compressed released payload bytes
+            payload_name = "theme_forge_nebular_fusion/payload/theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz"
+            self.assertIn(payload_name, names)
+            self.assertEqual(zf.read(payload_name), arc_bytes)
+
+            # Check manifest and provenance
+            self.assertIn("theme_forge_nebular_fusion/payload/manifest.json", names)
+            prov = json.loads(zf.read("theme_forge_nebular_fusion/_rs9/provenance.json").decode("utf-8"))
+            self.assertFalse(prov["can_publish"])
+            self.assertEqual(prov["payload_archive_sha256"], digest(arc_bytes))
+
+    def test_fail_closed_on_unsafe_archive_modes_and_symlinks(self) -> None:
+        root = "Theme Forge Nebular Fusion.app"
+        # 1. Privileged mode (setuid 0o4755)
+        bad_mode_entries = make_standard_darwin_entries(
+            extra_entries=[(f"{root}/Contents/MacOS/evil", b"evil", 0o4755, tarfile.REGTYPE, "")]
+        )
+        bad_arc = make_darwin_archive(bad_mode_entries)
+        with self.assertRaises(ContractError) as ctx:
+            build_native_wheel("theme-forge-nebular-fusion", "0.6.1", archive_bytes=bad_arc, output_dir=self.root / "out")
+        self.assertIn("UNSAFE_MODE", str(ctx.exception))
+
+        # 2. Escaping symlink
+        bad_link_entries = make_standard_darwin_entries(
+            extra_entries=[(f"{root}/Contents/Resources/escape", b"", 0o755, tarfile.SYMTYPE, "../../../etc/passwd")]
+        )
+        bad_link_arc = make_darwin_archive(bad_link_entries)
+        with self.assertRaises(ContractError) as ctx:
+            build_native_wheel("theme-forge-nebular-fusion", "0.6.1", archive_bytes=bad_link_arc, output_dir=self.root / "out")
+        self.assertIn("UNSAFE_LINK", str(ctx.exception))
+
+        # 3. Hard link
+        bad_hardlink_entries = make_standard_darwin_entries(
+            extra_entries=[(f"{root}/Contents/MacOS/hardlink", b"", 0o755, tarfile.LNKTYPE, f"{root}/Contents/MacOS/theme-forge-nebular-fusion")]
+        )
+        bad_hardlink_arc = make_darwin_archive(bad_hardlink_entries)
+        with self.assertRaises(ContractError) as ctx:
+            build_native_wheel("theme-forge-nebular-fusion", "0.6.1", archive_bytes=bad_hardlink_arc, output_dir=self.root / "out")
+        self.assertIn("UNSAFE_LINK", str(ctx.exception))
+
+    def test_double_build_determinism_and_record(self) -> None:
+        arc_bytes = make_darwin_archive(make_standard_darwin_entries())
+
+        res_a, res_b = verify_double_build(
+            build_native_wheel,
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc_bytes,
+            output_dir_a=self.root / "build_a",
+            output_dir_b=self.root / "build_b",
+        )
+        self.assertEqual(res_a.wheel_bytes, res_b.wheel_bytes)
+        self.assertEqual(res_a.sha256, res_b.sha256)
+        self.assertEqual(res_a.filename, "theme_forge_nebular_fusion-0.6.1-py3-none-macosx_11_0_arm64.whl")
+
+        inv = verify_wheel_record_bidirectional(res_a.wheel_path)
+        self.assertTrue(inv["record_valid"])
+        self.assertGreater(inv["member_count"], 10)
+
+    @unittest.skipUnless(sys.platform == "darwin", "Darwin native wheel launcher execution requires macOS")
+    def test_offline_venv_materialize_and_uninstall_lifecycle(self) -> None:
+        arc_bytes = make_darwin_archive(
+            make_standard_darwin_entries(launcher_script=b"#!/bin/sh\necho 'nebular live venv'\nexit 0\n")
+        )
+        res = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc_bytes,
+            output_dir=self.root / "wheel_out",
+        )
+
+        venv_dir = self.root / "native_venv"
+        cache_dir = self.root / "runtime-cache"
+        report = verify_offline_venv_lifecycle(
+            res.wheel_path,
+            distribution_name="theme-forge-nebular-fusion",
+            commands_to_test={
+                "tfnf": {"argv": [], "expect_exit": 0, "expect_stdout_contains": "nebular live venv",
+                         "env": {"THEME_FORGE_CACHE_DIR": str(cache_dir)}}
+            },
+            venv_dir=venv_dir,
+            cache_dir=cache_dir,
+        )
+        self.assertTrue(report["clean_uninstall_verified"])
+        self.assertEqual(report["venv_residuals"], [])
+
+        # Truthfully verify materialization cache persistence across uninstall without claiming pip removed it
+        cache_info = report["materialization_cache"]
+        self.assertTrue(cache_info["materialized"])
+        self.assertTrue(cache_info["persisted_after_uninstall"])
+        self.assertFalse(cache_info["pip_removed"])
+        self.assertTrue(cache_info["persistent_cache_documented"])
+        self.assertTrue((cache_dir / "entries").exists())
+
+    @unittest.skipUnless(sys.platform == "darwin", "Darwin native wheel launcher execution requires macOS")
+    def test_offline_venv_residual_files_rejected(self) -> None:
+        arc_bytes = make_darwin_archive(
+            make_standard_darwin_entries(launcher_script=b"#!/bin/sh\necho 'nebular live'\nexit 0\n")
+        )
+        res = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc_bytes,
+            output_dir=self.root / "wheel_res_out",
+        )
+        venv_dir = self.root / "dirty_venv"
+        cache_dir = self.root / "dirty_cache"
+
+        with self.assertRaises(ContractError) as ctx:
+            verify_offline_venv_lifecycle(
+                res.wheel_path,
+                distribution_name="theme-forge-nebular-fusion",
+                commands_to_test={
+                    "tfnf": {"argv": [], "expect_exit": 0,
+                             "env": {"THEME_FORGE_CACHE_DIR": str(cache_dir)}}
+                },
+                venv_dir=venv_dir,
+                cache_dir=cache_dir,
+                command_prefix=[
+                    "bash", "-c",
+                    'touch "$(dirname "$1")/rogue_native_leftover.txt" && exec "$@"',
+                    "inline_wrapper",
+                ],
+            )
+        self.assertEqual(ctx.exception.code, "DIRTY_UNINSTALL")
+        self.assertIn("rogue_native_leftover.txt", str(ctx.exception))
+
+    @unittest.skipUnless(sys.platform == "darwin", "Darwin native wheel launcher execution requires macOS")
+    def test_offline_venv_isolated_cache_lifecycle(self) -> None:
+        arc_bytes = make_darwin_archive(
+            make_standard_darwin_entries(launcher_script=b"#!/bin/sh\necho 'nebular isolated'\nexit 0\n")
+        )
+        res = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc_bytes,
+            output_dir=self.root / "wheel_isolated_out",
+        )
+        venv_dir = self.root / "isolated_venv"
+        report = verify_offline_venv_lifecycle(
+            res.wheel_path,
+            distribution_name="theme-forge-nebular-fusion",
+            commands_to_test={
+                "tfnf": {"argv": [], "expect_exit": 0, "expect_stdout_contains": "nebular isolated"}
+            },
+            venv_dir=venv_dir,
+        )
+        self.assertTrue(report["clean_uninstall_verified"])
+        self.assertEqual(report["venv_residuals"], [])
+        self.assertTrue(report["materialization_cache"]["materialized"])
+        self.assertTrue(report["materialization_cache"]["persisted_after_uninstall"])
+        self.assertFalse(report["materialization_cache"]["pip_removed"])
+
+    def test_refusal_on_invalid_version_and_symlink_destination(self) -> None:
+        arc_bytes = make_darwin_archive(make_standard_darwin_entries())
+        # Invalid product version
+        with self.assertRaises(ContractError) as ctx:
+            build_native_wheel("theme-forge-nebular-fusion", "0.6.2", archive_bytes=arc_bytes, output_dir=self.root / "out")
+        self.assertIn("INVALID_VERSION", str(ctx.exception))
+
+        # Destination ancestry symlink
+        link = self.root / "link_dir"
+        real = self.root / "real_dir"
+        real.mkdir()
+        link.symlink_to(real, target_is_directory=True)
+        with self.assertRaises(ContractError) as ctx:
+            build_native_wheel("theme-forge-nebular-fusion", "0.6.1", archive_bytes=arc_bytes, output_dir=link)
+        self.assertIn("UNSAFE_DESTINATION", str(ctx.exception))

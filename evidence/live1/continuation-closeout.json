@@ -1,0 +1,629 @@
+{
+  "additional_substantive_review": false,
+  "candidate_adoption_ready": false,
+  "disposition": "amend",
+  "outcome": "blocked",
+  "prior_stage_delta_disposition": "retain in-scope source/evidence and amend as recorded; unrelated local state preserved",
+  "producer_binding": {
+    "authority": "dispatcher-supplied",
+    "head": "bb228a097e2ba3c79921df1489ec508d16aac053",
+    "tree": "7db6dd895f0e95a0901fe2fa35c8796597126b6d"
+  },
+  "production_enabled": false,
+  "rationale": "Accept source-only corrections and prior in-scope deltas as a blocked partial checkpoint; the complete real qualified generation is absent. Source adoption and production remain disabled.",
+  "real_evidence_counts": {
+    "authenticated_releases": 0,
+    "downstream_artifacts": 0,
+    "foundation3_publication_plans": 0,
+    "hosted_runs": 0,
+    "production_receipts": 0,
+    "qualification_records": 0
+  },
+  "review_findings": [
+    {
+      "disposition": "amend",
+      "number": 1,
+      "result": "Populate makepkg srcdir with digest-checked release extraction and exact staged offline npm closure before --noextract; source preparation fixture checks pass. Actual Arch build remains not-run."
+    },
+    {
+      "disposition": "amend",
+      "number": 2,
+      "result": "Integrate every buildable CLI DEB into the existing APT engine; accept package Architecture: all and index it under both binary-amd64 and binary-arm64. Remove worker global parser patch and duplicated repository classes. Repository fixture validation passes; real dpkg/client qualification remains not-run."
+    },
+    {
+      "disposition": "amend",
+      "number": 3,
+      "result": "Classify CLI Node requirements as reviewed-policy, with separate builder execution provenance; no executed packaging tool can make policy dependencies tool-derived or authorize publication."
+    },
+    {
+      "disposition": "amend",
+      "number": 4,
+      "result": "Probe tfsl-batch only with truthful empty input, withhold studio-service pending supported scenario, and retain product/command diagnostic failures. Supported real release behavior remains not-run."
+    },
+    {
+      "disposition": "amend",
+      "number": 5,
+      "result": "Linux namespace execution requires setpriv and drops to non-root runner uid/gid; Darwin runtime offline gate is not-run without actual isolation. Source command construction tested; real Linux clean-client qualification pending externally."
+    },
+    {
+      "disposition": "amend",
+      "number": 6,
+      "result": "Compare complete venv file/directory inventory, including bytes, types and modes, before install versus after uninstall. Disable incidental bytecode; detect unrelated leftovers, empty directories and baseline mutation. Isolate and truthfully report Nebular cache retention versus temporary harness cleanup."
+    },
+    {
+      "disposition": "amend",
+      "number": 7,
+      "result": "All public wheel RECORD checks share strict bidirectional implementation and reject duplicate ZIP members/RECORD rows, missing/unlisted members and invalid hashes/sizes."
+    },
+    {
+      "disposition": "amend",
+      "number": 8,
+      "result": "Require supplied exact Pages inventory before writes; explicit discovery mode remains non-authoritative. Reject source collisions and require canonical RS9 CNAME when present."
+    },
+    {
+      "deferred": "Real RPM/XZ scan compatibility",
+      "disposition": "amend",
+      "number": 9,
+      "result": "Reject legacy public namespaces, generic root Markdown, root keys and release assets. Preserve conservative secret-packet scanning without suffix/magic exemptions. Real RPM/XZ packet-scan false-positive investigation deferred; no real package qualification claimed."
+    },
+    {
+      "disposition": "amend",
+      "number": 10,
+      "result": "Architecture-independent package payload/dependency validation rejects ELF, PE/DOS, 32/64-bit and fat Mach-O, native-library suffixes and npm OS/CPU restrictions."
+    },
+    {
+      "disposition": "amend",
+      "number": 11,
+      "result": "Require exact 13 workflow lane/system receipt set and consistent per-receipt summary outcomes; reject missing, duplicate, unexpected, malformed or publication-enabled records. Derive missing configuration pins/maintainer from targets; unimplemented harness blockers remain explicit even when configuration is populated."
+    },
+    {
+      "disposition": "amend",
+      "number": 12,
+      "result": "Parent reran complete unittest suite after all runtime/test source amendments: 470 run, 463 passed, 7 prerequisite skips, no failures/errors. Subsequent changes are report/evidence/inventory only; terminal hygiene/diff/inventory checks apply to those bytes."
+    },
+    {
+      "disposition": "amend",
+      "number": 13,
+      "reference": "https://github.com/npm/npm-normalize-package-bin/blob/v3.0.1/lib/index.js",
+      "result": "Normalize packaged, registry and reviewed npm command metadata with bounded local logic; compare actual authenticated tarball identity. Signed-index HTTP error URL lookup is defensive. PyPI project conflicts carry real metadata/file hashes with no invented semantic identities; duplicate rows remain unknown."
+    },
+    {
+      "disposition": "amend",
+      "number": 14,
+      "result": "Document exact binary public export command with no export options behind pinned SHA-256; local UID/certification changes require attended digest review. Do not run production custody/signing preflight in provider closeout."
+    }
+  ],
+  "schema": "rs9.closeout-disposition.v1alpha1",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT1-REAL-CANDIDATES1",
+  "terminal_changed_paths": [
+    "docs/live1-real-candidate-continuation.md",
+    "evidence/live1/continuation-closeout.json",
+    "evidence/live1/continuation-proposal-disposition.json",
+    "evidence/live1/continuation-verification.json",
+    "operators/live1/RUNBOOK.md",
+    "operators/live1/candidate-manifest.json",
+    "src/rs9/adopt_candidate.py",
+    "src/rs9/build_deb.py",
+    "src/rs9/build_native.py",
+    "src/rs9/build_pacman.py",
+    "src/rs9/hosted_candidate.py",
+    "src/rs9/pages.py",
+    "src/rs9/pages_candidate.py",
+    "src/rs9/readers.py",
+    "src/rs9/repo_apt.py",
+    "src/rs9/signing_preflight.py",
+    "src/rs9/verify_wheel.py",
+    "src/rs9/wheel.py",
+    "tests/pages_candidate_fixtures.py",
+    "tests/test_build_deb.py",
+    "tests/test_build_native.py",
+    "tests/test_candidate_adoption.py",
+    "tests/test_candidate_readers.py",
+    "tests/test_candidate_wheel_record.py",
+    "tests/test_exact_candidate_readback.py",
+    "tests/test_hosted_candidate.py",
+    "tests/test_pages.py",
+    "tests/test_pages_candidate.py",
+    "tests/test_repo_apt.py",
+    "tests/test_wheel.py",
+    "tests/test_wheel_native.py"
+  ],
+  "terminal_removed_product_paths": [],
+  "terminal_revision_independently_reviewed": false,
+  "unresolved_concerns": [
+    "Fresh GitHub release-byte authentication remains blocked by prior provider transport failure; no stale authority substituted.",
+    "All real downstream builds, native closure/sidecar/scenario-A, client install/run/uninstall and fixture trust/tamper qualification remain not-run.",
+    "Real RPM/XZ compatibility with conservative Pages secret-packet discovery remains unqualified.",
+    "Linux Nebular wheel compatibility policy, nixpkgs/container pins, maintainer and supported studio-service scenario remain unresolved.",
+    "Foundation 3 records/plans, complete candidate workflow implementation and manager-triggered hosted results remain absent or pending externally.",
+    "Name/owner/Trusted Publisher attestations, Pages/DNS/TLS administration, durable artifact custody and attended production signing/readback remain required."
+  ],
+  "verification": {
+    "command": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -q",
+    "errors": 0,
+    "failures": 0,
+    "hosted": "pending externally; not executed in closeout",
+    "live_release_authentication": "Prior work-stage FETCH_FAILED evidence carried forward; not retried in closeout.",
+    "passed": 463,
+    "production_signing_preflight": "not-run",
+    "qualification_limit": "Passing source tests cannot satisfy release, platform, clean-client or trust qualification gates.",
+    "run": 470,
+    "scope": "Current runtime/test source; synthetic fixtures only. Report/evidence/inventory updated afterward and subject to terminal hygiene/diff/inventory checks.",
+    "skipped": 7,
+    "skips": "Five authenticated live capture prerequisites; two fixture GPG agent prerequisites."
+  },
+  "verified_runtime_and_test_inventory": [
+    {
+      "path": "src/rs9/__init__.py",
+      "sha256": "c3c63fc5509f2c940e2b974b1fd2771608cb4e816507efa3c1c40f9aa686cdfe"
+    },
+    {
+      "path": "src/rs9/adapter_gates.py",
+      "sha256": "992d583db60c72960120d4d8b6b841b966e05c3f921b81f1d097213f41b33245"
+    },
+    {
+      "path": "src/rs9/adapters.py",
+      "sha256": "5f94a5bc0d8c5f287c67ebb15db9068f2d2630b530bb81e66b27fd30aac80b16"
+    },
+    {
+      "path": "src/rs9/adopt_candidate.py",
+      "sha256": "5aded0fba3d56de31cac68830891421f76212e136d07bd688bce3e128be9d0bc"
+    },
+    {
+      "path": "src/rs9/archives.py",
+      "sha256": "f9f7cdb9064395f1037e05cc544760978e9610bf3337b22c9c04bf0f8cc1e344"
+    },
+    {
+      "path": "src/rs9/bootstrap.py",
+      "sha256": "8984fdc36ab659dbb842bf3a854c7ec1d8d065758b9a0affd09c1c5dfb7bc6f2"
+    },
+    {
+      "path": "src/rs9/build_deb.py",
+      "sha256": "59ff567dc758869725751326eb27b1cff371c945f1de203acd56b98c1bb6f89f"
+    },
+    {
+      "path": "src/rs9/build_native.py",
+      "sha256": "23cd9b64ec3b4b16a080a2af59eb7119bb2f7a9cc7192e1ee9470115b3f4dc96"
+    },
+    {
+      "path": "src/rs9/build_pacman.py",
+      "sha256": "7d78ddd7456378aeb835f8ee0cce930c128939c9b40165733d5663cf1578d54a"
+    },
+    {
+      "path": "src/rs9/build_rpm.py",
+      "sha256": "3db4ce7b22b69e591e3f16e13e12b3815c8814ab70758229847d561cde4297d1"
+    },
+    {
+      "path": "src/rs9/candidate.py",
+      "sha256": "df317ffdc394d84eeb063612e8a0e8ac2068cc5039e4597516f2854a119eb4d4"
+    },
+    {
+      "path": "src/rs9/candidate_inventory.py",
+      "sha256": "11e8946b3b26835600147a73c34db945a813a7f879a48c5dc2221e7f52c2813a"
+    },
+    {
+      "path": "src/rs9/compare.py",
+      "sha256": "e718de0901110169b9fe874d8a163dc06d6b016d1d0206514633e9f0cb660d14"
+    },
+    {
+      "path": "src/rs9/constants.py",
+      "sha256": "b077992eb71c5b795d0205e0ec60532cf406447315b5e94e79c5ccab389456a9"
+    },
+    {
+      "path": "src/rs9/contract.py",
+      "sha256": "840d0e4de49aa1e953060a90adbca8d6973f1f300b62e98de3c0a50e6bf6ee29"
+    },
+    {
+      "path": "src/rs9/cross_validator.py",
+      "sha256": "596462d54038097f1eba5ced61c2bfd80b370bfafb126116cb15f2ae298f68dd"
+    },
+    {
+      "path": "src/rs9/dependencies.py",
+      "sha256": "5995e455f31bf16cfa6a842164c1c4b4dcd87b114d7e42dd70f2c10b8af7664c"
+    },
+    {
+      "path": "src/rs9/destinations.py",
+      "sha256": "c88c89fcde6b2b31de7be33ddc1b3ebfdac6f67a3b47bf1515488d856a18a234"
+    },
+    {
+      "path": "src/rs9/elf.py",
+      "sha256": "774dcbde5d9873bd80961238de6eea7fe22b1bd662bc939911ab7f820220b847"
+    },
+    {
+      "path": "src/rs9/errors.py",
+      "sha256": "b9dbf2370253c320f361072c467955d3bad8401bccb2941f0840d5342b069c9a"
+    },
+    {
+      "path": "src/rs9/fetch.py",
+      "sha256": "1a78ba7003728393eff1a5b88c0a73d4c5cac1779e50665aa2e50a688dcc6f9b"
+    },
+    {
+      "path": "src/rs9/fields.py",
+      "sha256": "7c1ac47383b64c09806d1172480ad1c7655942cfc3c6ded2ee03454940bc185a"
+    },
+    {
+      "path": "src/rs9/gates.py",
+      "sha256": "5f40c671c4006f41d9ba867733d45a112559c5f7e25d69ce7f78135d4ca1b6bf"
+    },
+    {
+      "path": "src/rs9/github.py",
+      "sha256": "2f4e78ebcd0352796faa7d53f655c6e807418d57b9c7b55ceeaa3e440cbc03ff"
+    },
+    {
+      "path": "src/rs9/hosted_candidate.py",
+      "sha256": "1c6fb267eec91a76cbf004d2ac723e637c86b95826d9e92c7118ee99ab2b7b83"
+    },
+    {
+      "path": "src/rs9/ingestion.py",
+      "sha256": "bff49ca7d5fbba9747379d8d5afa8c8acd70d725a4d4da620890e0c073cf6ebf"
+    },
+    {
+      "path": "src/rs9/materialize.py",
+      "sha256": "35d22477c8bc643f9ef227c18ad43b92724b2df1a5843bc8c921b5156a789064"
+    },
+    {
+      "path": "src/rs9/normalizer.py",
+      "sha256": "8d97c2464dd208ded0c0daa7e8d36cac7fef3d908e8caf8d5ac6c6cb5cb9c245"
+    },
+    {
+      "path": "src/rs9/npm_deps.py",
+      "sha256": "c44c8eda213e3143f74a38acec32f7a246f5f0d0e340423aa67cdb31d89cdae9"
+    },
+    {
+      "path": "src/rs9/observation.py",
+      "sha256": "b81eacabd1299a7216a1712288f395b4e02f2a77c0486ff8b8cdbee8d8e9e007"
+    },
+    {
+      "path": "src/rs9/operator.py",
+      "sha256": "88bd709342eae9de95184ecfbf993834e091751002bc8c9ca593629f183c7a2f"
+    },
+    {
+      "path": "src/rs9/pages.py",
+      "sha256": "a3b59662ec5fc075ae84f94d8174e20a81e0fe819530ed377ef55b43dc6bd902"
+    },
+    {
+      "path": "src/rs9/pages_candidate.py",
+      "sha256": "bc5ab63f2234e4192a41f3212f12aa4cfc0f555813061ab3d30e44756be73e48"
+    },
+    {
+      "path": "src/rs9/planner.py",
+      "sha256": "298d687a043ee0b14d926c381dcece340ea6bc7e2ecc4dee644e616a19d82e08"
+    },
+    {
+      "path": "src/rs9/profiles.py",
+      "sha256": "5bb640fbd6bebe8eb05820ef43e9d98be8e9b533e497118ba2dfce1d49df4bcb"
+    },
+    {
+      "path": "src/rs9/project.py",
+      "sha256": "734170742e0fd7e37d88d410ce47d110d31e36e2a7a45bc2eda991e36d11bf19"
+    },
+    {
+      "path": "src/rs9/publication.py",
+      "sha256": "17d47a561bd34d431b51a8e54d3ad5032051bc8936e97657404b28a84aa83a20"
+    },
+    {
+      "path": "src/rs9/qualification.py",
+      "sha256": "952e020255f884e6ca4b4c82de2ab8e4faac9f2e035165cd47fa018d1f9190a7"
+    },
+    {
+      "path": "src/rs9/readers.py",
+      "sha256": "fd8a2b6ac0fe340ca097c3a51ed820da4707fa3501a99e686554ba845363f75a"
+    },
+    {
+      "path": "src/rs9/records.py",
+      "sha256": "096f8835a8e2bb6152f010a34809befb59726971b65e9628637c34e6edee7f41"
+    },
+    {
+      "path": "src/rs9/release_core.py",
+      "sha256": "80f01d73ebb38743f5c77ec16f7b5bc8d790225fea9e03c8be042556e73bd117"
+    },
+    {
+      "path": "src/rs9/releases.py",
+      "sha256": "8dbdd7041dc67616248a76b193409d685605abba70f75c5528f9d9ee2f509455"
+    },
+    {
+      "path": "src/rs9/render.py",
+      "sha256": "67ac9c4ee41a56e62d7935a0ceaf15b984a5806d84ca878b62326da48cdd604a"
+    },
+    {
+      "path": "src/rs9/render_live.py",
+      "sha256": "8cfd6e53766dc2949ef7b8ec3074f7c6936d68749842814df4f3fd05457046de"
+    },
+    {
+      "path": "src/rs9/repo_apt.py",
+      "sha256": "8631474f359b4e03b824b6557efb2a16a20c7f096ab14a8bdc721db100fd89f0"
+    },
+    {
+      "path": "src/rs9/scratch.py",
+      "sha256": "9319dbe9a6ed98e2e3196f348b3788684eaee2bf3ebeaf0c8eaf6fbd8efd6791"
+    },
+    {
+      "path": "src/rs9/security.py",
+      "sha256": "42f5a4e293a65dedcec54ac5e0cfa3e90f80f8c27b6b9208ef70c375ff44b15a"
+    },
+    {
+      "path": "src/rs9/shadow.py",
+      "sha256": "cdaeb05460a3d0a3fedb2fc1b8583aa09f8f30816aa1e3d63af279023c141bb4"
+    },
+    {
+      "path": "src/rs9/signed_store.py",
+      "sha256": "233665555a18f315d1ae1a0c5e9e6e0c7d2a1e8319caafd8996ba12969dcf973"
+    },
+    {
+      "path": "src/rs9/signing_fixture.py",
+      "sha256": "172820e72c2075141d7ce8b70d5bc5ab7b3a092c463a2119c2cc20b5aa6b75e2"
+    },
+    {
+      "path": "src/rs9/signing_preflight.py",
+      "sha256": "9271de29ef76977ffc24f66b9b4a7df7a9ab91e27170d52af72e5edbc5edb060"
+    },
+    {
+      "path": "src/rs9/spdx.py",
+      "sha256": "7c02de64807fdc57c7828f081430ce745da55d5444581c9fc1333ae6e6d3f054"
+    },
+    {
+      "path": "src/rs9/validator.py",
+      "sha256": "6f0320607b7ab33e380f2779b1825bbc2537675f24c8b3b3925d8aa3cbb40d7c"
+    },
+    {
+      "path": "src/rs9/verify_wheel.py",
+      "sha256": "ccfc41c6c4a4fb4ec1e66619dcc7abc4b61eda3783ac5de449b57ea024178edc"
+    },
+    {
+      "path": "src/rs9/wheel.py",
+      "sha256": "f6b9f75617dfe15714119bb5b6393d85f2b69b0fa69f5cdb05ff28b94df1765e"
+    },
+    {
+      "path": "src/rs9/wheel_capture.py",
+      "sha256": "3c1f1bc93692b46ece8a6f7b1954a5baec966a99f19d9478556793a8c572caa6"
+    },
+    {
+      "path": "src/rs9/wheel_native.py",
+      "sha256": "709f596a13d57980e28aa00c448ec5201f4570dcb9a2c13d108c4e635e7c47a8"
+    },
+    {
+      "path": "tests/__init__.py",
+      "sha256": "17591131d23e2a8b680c1c2576f2451b8449ca6a273b27aca0e4974fe19e33bf"
+    },
+    {
+      "path": "tests/elf_builder.py",
+      "sha256": "26c865f721d5fc1fcd78ceecdb01921d7dee500acb1783bb4eec3a23b4fe703f"
+    },
+    {
+      "path": "tests/pages_candidate_fixtures.py",
+      "sha256": "454009b11a597bb5d083cb467e904d6de33b4a550b6c9b7464521d19b97b0198"
+    },
+    {
+      "path": "tests/publication_fixtures.py",
+      "sha256": "1858e430df401e080126028575662997ae198909f5f5584a39fa990058c9fa9d"
+    },
+    {
+      "path": "tests/release_fixtures.py",
+      "sha256": "e877db22763b946f7247f0b66e5a4cdf83158663a33c73a8d7c4071f6bac0678"
+    },
+    {
+      "path": "tests/shadow_fixtures.py",
+      "sha256": "e8ad146d368d7ac262a6836ece12b105533a46c59f02946bb843744350ec66e2"
+    },
+    {
+      "path": "tests/test_archive_hardlinks.py",
+      "sha256": "a4262895e88a23810a36311e6c1bad6103caa90720f97f5a6c81ffa325e84557"
+    },
+    {
+      "path": "tests/test_archives.py",
+      "sha256": "7a985bd54d60b4f97c91a5726e98d3a752a669972d43db138426ca9fe1276445"
+    },
+    {
+      "path": "tests/test_build_deb.py",
+      "sha256": "fee84c08515fb28927734476da674c8505bfe858569672be1a2f8303ed677332"
+    },
+    {
+      "path": "tests/test_build_native.py",
+      "sha256": "de17305054a5b3c8ac88ee3cb62b498c38e746c2da10700454f9699dd941e270"
+    },
+    {
+      "path": "tests/test_candidate_adoption.py",
+      "sha256": "c59f2ef20d230c8228293efd70f8e1c67821fd9ee7fa92bee8cccb7e9b6e4f2c"
+    },
+    {
+      "path": "tests/test_candidate_capture.py",
+      "sha256": "325367a641863d9fef283cd3f8b0b5cf95028e60fd82187cd21296282eed0ee6"
+    },
+    {
+      "path": "tests/test_candidate_readers.py",
+      "sha256": "f8d0d7e8079a905b927413a0850ab956a0c0a3f7f20afb2f21984d1ab8ebf93c"
+    },
+    {
+      "path": "tests/test_candidate_wheel_record.py",
+      "sha256": "b27b8b330209be5738d3249e0b7981f96e12b112b33f61cf36c3d182882ba0b9"
+    },
+    {
+      "path": "tests/test_closeout_regressions.py",
+      "sha256": "8db8335e06e61154e4bb3858df0554deeeeb7e69b44372a88ea5972d6918f41e"
+    },
+    {
+      "path": "tests/test_contract.py",
+      "sha256": "be13ca88208eb51e99aed1dd3dbd257415965cd43be7e1ae8531ec007889d7e2"
+    },
+    {
+      "path": "tests/test_dependencies.py",
+      "sha256": "68a2d9e12cb387e0494e215c1ba9958d69092d2b890c35edf3907a5e3c9bc1c7"
+    },
+    {
+      "path": "tests/test_elf.py",
+      "sha256": "2b020a26ec74528eb44564a925ec0d0e8c5fdfe047afc5964aaa72efa7e414c3"
+    },
+    {
+      "path": "tests/test_exact_candidate_readback.py",
+      "sha256": "e4ebacc39d2a6ab5cef84f7679f242353ed6327c566f345467b031ca61d52fc3"
+    },
+    {
+      "path": "tests/test_fail_closed.py",
+      "sha256": "9acfd6ed28278b4b666bbd72fce073ef65d946b145064a62b77c0e887be231c0"
+    },
+    {
+      "path": "tests/test_fetch.py",
+      "sha256": "5c17f8976a0ea31f47c20d59ed458662a6172c5b7efbf89859181fb2bc59a410"
+    },
+    {
+      "path": "tests/test_gates.py",
+      "sha256": "aa2043c25ed3090e35790381c0b50690f8fcbca33ae8b80db9b6460599bcad78"
+    },
+    {
+      "path": "tests/test_github.py",
+      "sha256": "8ff54f381695b8fb36c6d8605095d34a6ad3a7dbbf84721b39b97a785d1b427e"
+    },
+    {
+      "path": "tests/test_hosted_candidate.py",
+      "sha256": "69473e5541033265f61cb426d95b984ca2de6bbbdf69efc12e6e1a0d2ed29e73"
+    },
+    {
+      "path": "tests/test_hygiene.py",
+      "sha256": "285c90343625d0697692edf4c314f7394be279b8812daaf394804a4c5dbd2096"
+    },
+    {
+      "path": "tests/test_ingestion.py",
+      "sha256": "d7c2639d775226c16673ef4be8c7b8d7f4930b2cb4da0ff6b4d7e7dd2466d936"
+    },
+    {
+      "path": "tests/test_live1_closeout.py",
+      "sha256": "c08e3d5c71c7d88a38541e5bd31400224e2a0bbe909dbf438784e3c6a617da3d"
+    },
+    {
+      "path": "tests/test_live1_contracts.py",
+      "sha256": "b1800edf5f4bc311c7f5028264fcf2c501aed6257d51ab37beece0dbca4b8801"
+    },
+    {
+      "path": "tests/test_live1_readers_operator.py",
+      "sha256": "71047c0f34312dba36da43ae503779eef707170cf281d84096a5140609523a8c"
+    },
+    {
+      "path": "tests/test_live_nebular.py",
+      "sha256": "54cedc3cbf9da5656f15ed1739ca3d3f30b296de9f5248d073db2d3f55f192aa"
+    },
+    {
+      "path": "tests/test_live_stellar_burst.py",
+      "sha256": "5f0719eb1d4e6f2e7189735826cfcb83c5b70bd2702cc2589d393756074c8577"
+    },
+    {
+      "path": "tests/test_materialize.py",
+      "sha256": "4cc085a74db3e1dde35a3a263c702d53bc6bfc575eb8433b820bcd3f81d9d342"
+    },
+    {
+      "path": "tests/test_observation.py",
+      "sha256": "2a84f6a052fe4f455dd8ffe095ffce31c4e6b48ff3943fdf5b715513f5cc58be"
+    },
+    {
+      "path": "tests/test_pages.py",
+      "sha256": "abe015f082673066945fa5971ee4041e0316d19ae68b6524dac65f7434011beb"
+    },
+    {
+      "path": "tests/test_pages_candidate.py",
+      "sha256": "ab127ba1d362e64343417808428521b438dabe1e9fd910350d5471eaf79e9f33"
+    },
+    {
+      "path": "tests/test_planner.py",
+      "sha256": "69731d6e2d3f4c5d6733d101978d382e9a871a08cb0a4eff0e2a42637a16b125"
+    },
+    {
+      "path": "tests/test_profiles.py",
+      "sha256": "30811b7790e32fa4a56330e2038878e683bf45d4a5bf747d3948ee40390db8c4"
+    },
+    {
+      "path": "tests/test_publication.py",
+      "sha256": "679559b439e59dd228320c15d1ff7121e8de396f03a29fae0427b587ee12263a"
+    },
+    {
+      "path": "tests/test_qualification_trust.py",
+      "sha256": "7b6b6f06689919e5322a3f27c6506b2ec13ff8eb03eea5271613a58071a3404c"
+    },
+    {
+      "path": "tests/test_reference_comparison.py",
+      "sha256": "0d95aa413544648cf8bd1bca878c33a0b6a8f3a0b669eb9a6ddab9c675521908"
+    },
+    {
+      "path": "tests/test_release_core.py",
+      "sha256": "7453a3d9475a2772d91e470057125b4e13800b0ba01a259759c6dcc6d0fbe26b"
+    },
+    {
+      "path": "tests/test_render.py",
+      "sha256": "5ccf81990e684b52b4763394673aa4c8afa05205fd2c089db81cfeca2bccf1a6"
+    },
+    {
+      "path": "tests/test_render_live.py",
+      "sha256": "45020cf7841a6e0eeb747b051c41087d4cd0c037cd432ee886e6800c88bd63e4"
+    },
+    {
+      "path": "tests/test_repo_apt.py",
+      "sha256": "fa1441bb5ee60d75e430c0fd339657b36b1e14fa80ee0b80be4c5264cf983a20"
+    },
+    {
+      "path": "tests/test_shadow_cli.py",
+      "sha256": "1ac15a65154ec19943f835366ef771e81853ba91236c6da9f1175b63d88cca29"
+    },
+    {
+      "path": "tests/test_shadow_contract.py",
+      "sha256": "01ad23a83577220e9919aa7b8eed438a9a64125f59ee34f631fb323396381a2e"
+    },
+    {
+      "path": "tests/test_signed_store.py",
+      "sha256": "c60adab18efda5afa6502c76a37934922ad57cb0d7a0d836fcd152876260abaf"
+    },
+    {
+      "path": "tests/test_signing_fixture.py",
+      "sha256": "024522bc96b63249d65211ebb7b94aad66306743284bfa91d9e0a3c568a3e6cc"
+    },
+    {
+      "path": "tests/test_theme_forge_parity.py",
+      "sha256": "317ea8e8a65429bab2906997686b57c1b567dad382a44aa8da625d834acd1abc"
+    },
+    {
+      "path": "tests/test_wheel.py",
+      "sha256": "467afeb06e54a766174c4e408fd8dadf5422ba5a6f2e77e02dd979a5251151c8"
+    },
+    {
+      "path": "tests/test_wheel_capture.py",
+      "sha256": "ab095d3f7d9e69a2eb4a7670cf4ff92e42f5fcfdfb9195c07e64e04e519c2a94"
+    },
+    {
+      "path": "tests/test_wheel_native.py",
+      "sha256": "046869bdb533907450239018b898aa7b00020f8247246c360a03352ad5760294"
+    }
+  ],
+  "work_review": "reviewed_with_findings; supplied by dispatcher",
+  "workers": [
+    {
+      "cleanup_proven": true,
+      "effective_model_observed": null,
+      "integration": "parent-amended-source; real qualification not-run",
+      "job_id": "worker-rs9-closeout-native-corrections-v1",
+      "parent_disposition": "partial",
+      "replacement_writer": false,
+      "requested_profile": "gemini-3.8-flash-high",
+      "status": "completed",
+      "worker_kind": "gemini"
+    },
+    {
+      "cleanup_proven": true,
+      "effective_model_observed": null,
+      "integration": "parent-amended-source; real qualification not-run",
+      "job_id": "worker-rs9-closeout-wheel-corrections-v1",
+      "parent_disposition": "partial",
+      "replacement_writer": false,
+      "requested_profile": "gemini-3.8-flash-high",
+      "status": "completed",
+      "worker_kind": "gemini"
+    },
+    {
+      "cleanup_proven": true,
+      "effective_model_observed": null,
+      "integration": "parent-amended-source; real qualification not-run",
+      "job_id": "worker-rs9-closeout-hosted-corrections-v1",
+      "parent_disposition": "partial",
+      "replacement_writer": false,
+      "requested_profile": "gemini-3.8-flash-high",
+      "status": "completed",
+      "worker_kind": "gemini"
+    }
+  ]
+}

@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timezone
 from urllib.error import URLError
 from urllib.parse import urlsplit, urlunsplit
-from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
+from urllib.request import BaseHandler, HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from rs9.errors import ContractError
 
@@ -35,9 +35,30 @@ class Redirects(HTTPRedirectHandler):
         return result
 
 
+class ScopedGitHubAuthorization(BaseHandler):
+    """Read-only workflow identity, confined to the GitHub API origin.
+
+    Unredirected headers are not copied into redirects. Asset/CDN and raw source
+    requests never receive the workflow credential, including on redirect hops.
+    """
+    def __init__(self, value):
+        if not isinstance(value, str) or not value or any(ord(c) <= 32 or ord(c) >= 127 for c in value):
+            raise ContractError("GITHUB_IDENTITY", "Invalid read-only workflow identity")
+        self._value = value
+
+    def https_request(self, request):
+        if (urlsplit(request.full_url).hostname == "api.github.com"
+                and request.get_method() == "GET"):
+            request.add_unredirected_header("Authorization", "Bearer " + self._value)
+        return request
+
+
 class PublicClient:
-    def __init__(self, opener=None):
-        self.opener = opener or build_opener(ProxyHandler({}), Redirects())
+    def __init__(self, opener=None, *, api_token=None):
+        handlers = [ProxyHandler({}), Redirects()]
+        if api_token is not None:
+            handlers.append(ScopedGitHubAuthorization(api_token))
+        self.opener = opener or build_opener(*handlers)
         self.receipts = []
 
     def get(self, url, *, limit=16 * 1024 * 1024, expected_size=None, no_redirect=False):

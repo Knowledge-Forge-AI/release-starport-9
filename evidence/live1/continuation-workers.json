@@ -1,0 +1,42 @@
+{
+  "configured_model_is_not_invocation_evidence": true,
+  "dispatcher_checkpoint_satisfied": false,
+  "provider_invocations": "observed",
+  "requested_profile": "gemini-3.8-flash-high",
+  "schema": "rs9.worker-disposition.v1alpha1",
+  "worker_kind": "gemini",
+  "workers": [
+    {
+      "cleanup_proven": true,
+      "integration": "parent-amended-source; fixture-only findings",
+      "parent_disposition": "partial",
+      "replacement_writer": false,
+      "status": "completed",
+      "task": "worker-rs9-real1-wheel-v1"
+    },
+    {
+      "cleanup_proven": true,
+      "integration": "parent-amended-source; fixture-only findings",
+      "parent_disposition": "partial",
+      "replacement_writer": false,
+      "status": "completed",
+      "task": "worker-rs9-real1-native-v1"
+    },
+    {
+      "cleanup_proven": true,
+      "integration": "parent-amended-source; fixture-only findings",
+      "parent_disposition": "partial",
+      "replacement_writer": false,
+      "status": "completed",
+      "task": "worker-rs9-real1-pages-v1"
+    },
+    {
+      "cleanup_proven": true,
+      "integration": "parent-amended-source; fixture-only findings",
+      "parent_disposition": "partial",
+      "replacement_writer": false,
+      "status": "completed",
+      "task": "worker-rs9-real1-readers-v1"
+    }
+  ]
+}

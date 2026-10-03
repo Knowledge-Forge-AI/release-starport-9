@@ -1,0 +1,97 @@
+{
+  "current_delta": "source-only implementation and closeout corrections; zero real artifacts/qualifications/plans; complete generation blocked",
+  "independent_pre_final_review": "dispatcher-supplied-reviewed-with-findings",
+  "observed_prior_stage_deltas": [],
+  "original_scope": "complete real qualified downstream candidate generation and hosted evidence; no production mutation",
+  "original_scope_complete": false,
+  "production_enabled": false,
+  "proposal": {
+    "bytes": 27235,
+    "disposition": "amend",
+    "sha256": "3efb00e8cebf4778588c0170eeedaf9dbea28df57e8d36413499db3f7a407df7"
+  },
+  "proposal_decisions": {
+    "D1": "withhold Linux wheels rather than inaccurate manylinux tags",
+    "D2": "accept RS9-owned targets; immutable bootstrap unchanged",
+    "D3": "accept exact retained repository objects if determinism qualification proves necessity; not-run",
+    "D4": "defer maintainer identity; not invented",
+    "D5": "amend three trust roots; default provider unattested",
+    "D6": "accept unexposed Nix outputs pending qualification"
+  },
+  "review_findings": [
+    {
+      "disposition": "amend",
+      "number": 1,
+      "result": "Closed provider-local-unattested and hosted-candidate-unattested roots; binding rejects both for attended gates."
+    },
+    {
+      "disposition": "amend",
+      "number": 2,
+      "result": "RPM driver uses createrepo_c gzip and no-database; real output qualification remains not-run."
+    },
+    {
+      "disposition": "defer",
+      "number": 3,
+      "result": "No synthetic binary-magic exemptions accepted. Existing packet scan remains strict; actual RPM/XZ false-positive investigation blocked."
+    },
+    {
+      "disposition": "amend",
+      "number": 4,
+      "result": "Attended rebuild must reproduce hosted receipt hashes or exact bytes require durable reviewed custody before publication."
+    },
+    {
+      "disposition": "amend",
+      "number": 5,
+      "result": "Contents-read github.token confined to GET at api.github.com with unredirected authorization; rate errors fail closed."
+    },
+    {
+      "disposition": "amend",
+      "number": 6,
+      "result": "Embed unchanged materializer and helper module source bytes; original security modules were not modified."
+    },
+    {
+      "disposition": "defer",
+      "number": 7,
+      "result": "CLI version/help and Loom empty input compare exact raw command output. Nebular sidecar and native scenario-A are mandatory not-run gates."
+    },
+    {
+      "disposition": "amend",
+      "number": 8,
+      "result": "Pure CLI closure uses any/noarch/all; platform/native npm closure remains withheld."
+    },
+    {
+      "disposition": "defer",
+      "number": 9,
+      "result": "RPM 6 signature/header identity and real rpmsign tamper proof not-run; no synthetic signed-identity claim."
+    },
+    {
+      "disposition": "amend",
+      "number": 10,
+      "result": "Debian native path withholds launcher-only and caller inventory derivation; full ELF/installed-shlibs proof still incomplete."
+    },
+    {
+      "disposition": "amend",
+      "number": 11,
+      "result": "Darwin arm64 wheel tag floor is macOS 11.0."
+    },
+    {
+      "disposition": "accept",
+      "number": 12,
+      "result": "Tracked environment restricted to public host names, booleans and output hashes; hygiene scans forbid private paths and credentials."
+    },
+    {
+      "disposition": "accept",
+      "number": 13,
+      "result": "All four worker test paths explicitly owned, shared fixtures and live1 contracts parent-owned; all cleanup proven."
+    },
+    {
+      "disposition": "accept",
+      "number": 14,
+      "result": "Current official PyPI pending publisher/OIDC/storage documentation read; requirements document links direct supporting pages."
+    }
+  ],
+  "schema": "rs9.proposal-disposition.v1alpha1",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT1-REAL-CANDIDATES1",
+  "terminal_revision_independently_reviewed": false,
+  "terminal_work_review_disposition": "evidence/live1/continuation-closeout.json"
+}

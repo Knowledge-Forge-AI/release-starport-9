@@ -19,3 +19,14 @@ those assets/configuration, qualifies downstream artifacts and owns publication.
 The Theme Forge bootstrap exception does not apply. Existing APGR Homebrew
 projection requires a separate adoption decision. Do not start APGR publication
 until Theme Forge LIVE1 is accepted.
+
+The native RS9 downstream path must qualify exact PyPI artifacts, pinned Nix
+outputs, pacman x86_64 packages, Fedora 43 RPM packages for x86_64/aarch64 and
+Ubuntu 26.04 resolute APT packages for amd64/arm64, then construct public Pages
+repository objects under apt/, rpm/, pacman/ and keys/. Qualification binds release
+ingestion, builder source, artifact hashes, platform, clean install/run/uninstall
+and repository trust/tamper evidence. Hosted diagnostics alone do not authorize
+publication. APGR's future release-bound .rs9/ configuration must provide each
+requested adapter's exact assets and evidence requirements before release creation.
+The current Theme Forge continuation remains blocked; it supplies no APGR
+qualification or publication authority.

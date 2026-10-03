@@ -1,636 +1,2638 @@
 {
-  "matrix": [
+  "additional_platforms": {
+    "nebular-pypi": [
+      "aarch64-darwin",
+      "aarch64-linux",
+      "x86_64-linux"
+    ],
+    "nix": [
+      "aarch64-darwin",
+      "aarch64-linux",
+      "x86_64-linux"
+    ],
+    "status": "not-run"
+  },
+  "diagnostic_results_authorize_publication": false,
+  "pages": {
+    "reason": "qualified-repository-objects-unavailable",
+    "status": "not-run"
+  },
+  "pairs": [
     {
-      "adapter": "pypi",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-stellar-burst",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "install.clean",
-        "license.authority",
-        "package.render",
-        "payload.identity",
-        "provenance.binding",
-        "pypi.metadata-tags",
-        "pypi.name-state",
-        "pypi.trusted-publisher",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "pypi",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pypi.metadata-tags": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pypi.name-state": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pypi.trusted-publisher": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "product-platform-set",
+      "product": "theme-forge-stellar-burst",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "nix",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-stellar-burst",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "install.clean",
-        "license.authority",
-        "nix.offline",
-        "package.render",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "nix",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nix.offline": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "product-platform-set",
+      "product": "theme-forge-stellar-burst",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "pacman",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-stellar-burst",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "domain.tls",
-        "index.deterministic",
-        "install.clean",
-        "license.authority",
-        "package.render",
-        "pages.public-only",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "signature.metadata",
-        "signature.packages",
-        "tamper.metadata",
-        "tamper.package",
-        "trust.bootstrap",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "pacman",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "x86_64",
+      "product": "theme-forge-stellar-burst",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "dnf",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-stellar-burst",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "domain.tls",
-        "index.deterministic",
-        "install.clean",
-        "license.authority",
-        "package.render",
-        "pages.public-only",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "signature.metadata",
-        "signature.packages",
-        "tamper.metadata",
-        "tamper.package",
-        "trust.bootstrap",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "dnf",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "fedora-43-x86_64",
+      "product": "theme-forge-stellar-burst",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "apt",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-stellar-burst",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "domain.tls",
-        "index.deterministic",
-        "install.clean",
-        "license.authority",
-        "package.render",
-        "pages.public-only",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "signature.metadata",
-        "signature.packages",
-        "tamper.metadata",
-        "tamper.package",
-        "trust.bootstrap",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "dnf",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "fedora-43-aarch64",
+      "product": "theme-forge-stellar-burst",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "npm",
-      "eligible": false,
-      "mode": "observe-only",
-      "project": "theme-forge-stellar-burst",
-      "real_evidence_status": "not-run",
-      "required_gates": [],
+      "artifact_sha256": null,
+      "channel": "apt",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "ubuntu-26.04-amd64",
+      "product": "theme-forge-stellar-burst",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "homebrew",
-      "eligible": false,
-      "mode": "observe-only",
-      "project": "theme-forge-stellar-burst",
-      "real_evidence_status": "not-run",
-      "required_gates": [],
+      "artifact_sha256": null,
+      "channel": "apt",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "ubuntu-26.04-arm64",
+      "product": "theme-forge-stellar-burst",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "pypi",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-stellar-loom",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "install.clean",
-        "license.authority",
-        "package.render",
-        "payload.identity",
-        "provenance.binding",
-        "pypi.metadata-tags",
-        "pypi.name-state",
-        "pypi.trusted-publisher",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "npm",
+      "mandatory_gates": {},
+      "plan_status": "not-generated",
+      "platform": "observe-only",
+      "product": "theme-forge-stellar-burst",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
+      "version": "0.6.1"
+    },
+    {
+      "artifact_sha256": null,
+      "channel": "homebrew",
+      "mandatory_gates": {},
+      "plan_status": "not-generated",
+      "platform": "observe-only",
+      "product": "theme-forge-stellar-burst",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
+      "version": "0.6.1"
+    },
+    {
+      "artifact_sha256": null,
+      "channel": "pypi",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pypi.metadata-tags": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pypi.name-state": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pypi.trusted-publisher": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "product-platform-set",
+      "product": "theme-forge-stellar-loom",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.4.0"
     },
     {
-      "adapter": "nix",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-stellar-loom",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "install.clean",
-        "license.authority",
-        "nix.offline",
-        "package.render",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "nix",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nix.offline": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "product-platform-set",
+      "product": "theme-forge-stellar-loom",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.4.0"
     },
     {
-      "adapter": "pacman",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-stellar-loom",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "domain.tls",
-        "index.deterministic",
-        "install.clean",
-        "license.authority",
-        "package.render",
-        "pages.public-only",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "signature.metadata",
-        "signature.packages",
-        "tamper.metadata",
-        "tamper.package",
-        "trust.bootstrap",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "pacman",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "x86_64",
+      "product": "theme-forge-stellar-loom",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.4.0"
     },
     {
-      "adapter": "dnf",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-stellar-loom",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "domain.tls",
-        "index.deterministic",
-        "install.clean",
-        "license.authority",
-        "package.render",
-        "pages.public-only",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "signature.metadata",
-        "signature.packages",
-        "tamper.metadata",
-        "tamper.package",
-        "trust.bootstrap",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "dnf",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "fedora-43-x86_64",
+      "product": "theme-forge-stellar-loom",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.4.0"
     },
     {
-      "adapter": "apt",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-stellar-loom",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "domain.tls",
-        "index.deterministic",
-        "install.clean",
-        "license.authority",
-        "package.render",
-        "pages.public-only",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "signature.metadata",
-        "signature.packages",
-        "tamper.metadata",
-        "tamper.package",
-        "trust.bootstrap",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "dnf",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "fedora-43-aarch64",
+      "product": "theme-forge-stellar-loom",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.4.0"
     },
     {
-      "adapter": "npm",
-      "eligible": false,
-      "mode": "observe-only",
-      "project": "theme-forge-stellar-loom",
-      "real_evidence_status": "not-run",
-      "required_gates": [],
+      "artifact_sha256": null,
+      "channel": "apt",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "ubuntu-26.04-amd64",
+      "product": "theme-forge-stellar-loom",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.4.0"
     },
     {
-      "adapter": "homebrew",
-      "eligible": false,
-      "mode": "observe-only",
-      "project": "theme-forge-stellar-loom",
-      "real_evidence_status": "not-run",
-      "required_gates": [],
+      "artifact_sha256": null,
+      "channel": "apt",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "ubuntu-26.04-arm64",
+      "product": "theme-forge-stellar-loom",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.4.0"
     },
     {
-      "adapter": "pypi",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-solar-sail",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "install.clean",
-        "license.authority",
-        "package.render",
-        "payload.identity",
-        "provenance.binding",
-        "pypi.metadata-tags",
-        "pypi.name-state",
-        "pypi.trusted-publisher",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "npm",
+      "mandatory_gates": {},
+      "plan_status": "not-generated",
+      "platform": "observe-only",
+      "product": "theme-forge-stellar-loom",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
+      "version": "0.4.0"
+    },
+    {
+      "artifact_sha256": null,
+      "channel": "homebrew",
+      "mandatory_gates": {},
+      "plan_status": "not-generated",
+      "platform": "observe-only",
+      "product": "theme-forge-stellar-loom",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
+      "version": "0.4.0"
+    },
+    {
+      "artifact_sha256": null,
+      "channel": "pypi",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pypi.metadata-tags": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pypi.name-state": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pypi.trusted-publisher": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "product-platform-set",
+      "product": "theme-forge-solar-sail",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.2.1"
     },
     {
-      "adapter": "nix",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-solar-sail",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "install.clean",
-        "license.authority",
-        "nix.offline",
-        "package.render",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "nix",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nix.offline": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "product-platform-set",
+      "product": "theme-forge-solar-sail",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.2.1"
     },
     {
-      "adapter": "pacman",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-solar-sail",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "domain.tls",
-        "index.deterministic",
-        "install.clean",
-        "license.authority",
-        "package.render",
-        "pages.public-only",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "signature.metadata",
-        "signature.packages",
-        "tamper.metadata",
-        "tamper.package",
-        "trust.bootstrap",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "pacman",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "x86_64",
+      "product": "theme-forge-solar-sail",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.2.1"
     },
     {
-      "adapter": "dnf",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-solar-sail",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "domain.tls",
-        "index.deterministic",
-        "install.clean",
-        "license.authority",
-        "package.render",
-        "pages.public-only",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "signature.metadata",
-        "signature.packages",
-        "tamper.metadata",
-        "tamper.package",
-        "trust.bootstrap",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "dnf",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "fedora-43-x86_64",
+      "product": "theme-forge-solar-sail",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.2.1"
     },
     {
-      "adapter": "apt",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-solar-sail",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "domain.tls",
-        "index.deterministic",
-        "install.clean",
-        "license.authority",
-        "package.render",
-        "pages.public-only",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.cli-truth",
-        "runtime.commands",
-        "signature.metadata",
-        "signature.packages",
-        "tamper.metadata",
-        "tamper.package",
-        "trust.bootstrap",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "dnf",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "fedora-43-aarch64",
+      "product": "theme-forge-solar-sail",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.2.1"
     },
     {
-      "adapter": "npm",
-      "eligible": false,
-      "mode": "observe-only",
-      "project": "theme-forge-solar-sail",
-      "real_evidence_status": "not-run",
-      "required_gates": [],
+      "artifact_sha256": null,
+      "channel": "apt",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "ubuntu-26.04-amd64",
+      "product": "theme-forge-solar-sail",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.2.1"
     },
     {
-      "adapter": "homebrew",
-      "eligible": false,
-      "mode": "observe-only",
-      "project": "theme-forge-solar-sail",
-      "real_evidence_status": "not-run",
-      "required_gates": [],
+      "artifact_sha256": null,
+      "channel": "apt",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.cli-truth": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "ubuntu-26.04-arm64",
+      "product": "theme-forge-solar-sail",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.2.1"
     },
     {
-      "adapter": "pypi",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-nebular-fusion",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "install.clean",
-        "license.authority",
-        "nebular.release-smoke",
-        "nebular.sidecar-verifier",
-        "package.render",
-        "payload.identity",
-        "provenance.binding",
-        "pypi.metadata-tags",
-        "pypi.name-state",
-        "pypi.trusted-publisher",
-        "release.authenticated",
-        "runtime.commands",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "npm",
+      "mandatory_gates": {},
+      "plan_status": "not-generated",
+      "platform": "observe-only",
+      "product": "theme-forge-solar-sail",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
+      "version": "0.2.1"
+    },
+    {
+      "artifact_sha256": null,
+      "channel": "homebrew",
+      "mandatory_gates": {},
+      "plan_status": "not-generated",
+      "platform": "observe-only",
+      "product": "theme-forge-solar-sail",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
+      "version": "0.2.1"
+    },
+    {
+      "artifact_sha256": null,
+      "channel": "pypi",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.release-smoke": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.sidecar-verifier": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pypi.metadata-tags": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pypi.name-state": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pypi.trusted-publisher": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "product-platform-set",
+      "product": "theme-forge-nebular-fusion",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "nix",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-nebular-fusion",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "desktop.integration",
-        "install.clean",
-        "license.authority",
-        "linux.fhs-closure",
-        "nebular.release-smoke",
-        "nebular.sidecar-verifier",
-        "nix.offline",
-        "package.render",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.commands",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "nix",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "desktop.integration": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "linux.fhs-closure": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.release-smoke": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.sidecar-verifier": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nix.offline": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "product-platform-set",
+      "product": "theme-forge-nebular-fusion",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "pacman",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-nebular-fusion",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "desktop.integration",
-        "domain.tls",
-        "index.deterministic",
-        "install.clean",
-        "license.authority",
-        "nebular.release-smoke",
-        "nebular.sidecar-verifier",
-        "package.render",
-        "pages.public-only",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.commands",
-        "signature.metadata",
-        "signature.packages",
-        "tamper.metadata",
-        "tamper.package",
-        "trust.bootstrap",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "pacman",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "desktop.integration": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.release-smoke": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.sidecar-verifier": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "x86_64",
+      "product": "theme-forge-nebular-fusion",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "dnf",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-nebular-fusion",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "desktop.integration",
-        "domain.tls",
-        "index.deterministic",
-        "install.clean",
-        "license.authority",
-        "nebular.release-smoke",
-        "nebular.sidecar-verifier",
-        "package.render",
-        "pages.public-only",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.commands",
-        "signature.metadata",
-        "signature.packages",
-        "tamper.metadata",
-        "tamper.package",
-        "trust.bootstrap",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "dnf",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "desktop.integration": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.release-smoke": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.sidecar-verifier": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "fedora-43-x86_64",
+      "product": "theme-forge-nebular-fusion",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "apt",
-      "eligible": false,
-      "mode": "publish",
-      "project": "theme-forge-nebular-fusion",
-      "real_evidence_status": "not-run",
-      "required_gates": [
-        "build.platform",
-        "build.reproducible",
-        "deps.per-arch-derivation",
-        "desktop.integration",
-        "domain.tls",
-        "index.deterministic",
-        "install.clean",
-        "license.authority",
-        "nebular.release-smoke",
-        "nebular.sidecar-verifier",
-        "package.render",
-        "pages.public-only",
-        "payload.identity",
-        "provenance.binding",
-        "release.authenticated",
-        "runtime.commands",
-        "signature.metadata",
-        "signature.packages",
-        "tamper.metadata",
-        "tamper.package",
-        "trust.bootstrap",
-        "uninstall.clean"
-      ],
+      "artifact_sha256": null,
+      "channel": "dnf",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "desktop.integration": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.release-smoke": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.sidecar-verifier": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "fedora-43-aarch64",
+      "product": "theme-forge-nebular-fusion",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "npm",
-      "eligible": false,
-      "mode": "observe-only",
-      "project": "theme-forge-nebular-fusion",
-      "real_evidence_status": "not-run",
-      "required_gates": [],
+      "artifact_sha256": null,
+      "channel": "apt",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "desktop.integration": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.release-smoke": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.sidecar-verifier": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "ubuntu-26.04-amd64",
+      "product": "theme-forge-nebular-fusion",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     },
     {
-      "adapter": "homebrew",
-      "eligible": false,
-      "mode": "observe-only",
-      "project": "theme-forge-nebular-fusion",
-      "real_evidence_status": "not-run",
-      "required_gates": [],
+      "artifact_sha256": null,
+      "channel": "apt",
+      "mandatory_gates": {
+        "build.platform": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "build.reproducible": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "deps.per-arch-derivation": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "desktop.integration": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "domain.tls": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "index.deterministic": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "install.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "license.authority": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.release-smoke": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "nebular.sidecar-verifier": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "package.render": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "pages.public-only": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "payload.identity": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "provenance.binding": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "release.authenticated": {
+          "qualification_record_sha256": null,
+          "reason": "blocked-FETCH_FAILED",
+          "status": "not-run"
+        },
+        "runtime.commands": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "signature.packages": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.metadata": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "tamper.package": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "trust.bootstrap": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        },
+        "uninstall.clean": {
+          "qualification_record_sha256": null,
+          "status": "not-run"
+        }
+      },
+      "plan_status": "not-generated",
+      "platform": "ubuntu-26.04-arm64",
+      "product": "theme-forge-nebular-fusion",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
+      "version": "0.6.1"
+    },
+    {
+      "artifact_sha256": null,
+      "channel": "npm",
+      "mandatory_gates": {},
+      "plan_status": "not-generated",
+      "platform": "observe-only",
+      "product": "theme-forge-nebular-fusion",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
+      "version": "0.6.1"
+    },
+    {
+      "artifact_sha256": null,
+      "channel": "homebrew",
+      "mandatory_gates": {},
+      "plan_status": "not-generated",
+      "platform": "observe-only",
+      "product": "theme-forge-nebular-fusion",
+      "production_ready": false,
+      "publication_authority": false,
+      "qualification_record_sha256": null,
+      "reason": "fresh-ingestion-and-real-artifacts-unavailable",
       "version": "0.6.1"
     }
   ],
-  "publication_authority": false,
-  "schema": "rs9.live1-required-gate-preparation.v1alpha1"
+  "production_enabled": false,
+  "real_qualification_records": [],
+  "schema": "rs9.candidate-gate-matrix.v1alpha1",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT1-REAL-CANDIDATES1"
 }

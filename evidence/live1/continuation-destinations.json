@@ -1,0 +1,207 @@
+{
+  "dns_failure_is_absence": false,
+  "foundation3_plans_generated": 0,
+  "observations": [
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "pypi",
+      "diagnostics": [],
+      "observed_at": "2026-10-03T20:42:46.141471Z",
+      "presence": "unknown",
+      "product": "theme-forge-stellar-burst",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "npm-observe-only",
+      "diagnostics": [],
+      "observed_at": "2026-10-03T20:42:46.142282Z",
+      "presence": "unknown",
+      "product": "theme-forge-stellar-burst",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "pypi",
+      "diagnostics": [],
+      "observed_at": "2026-10-03T20:42:46.141949Z",
+      "presence": "unknown",
+      "product": "theme-forge-stellar-loom",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "npm-observe-only",
+      "diagnostics": [],
+      "observed_at": "2026-10-03T20:42:46.142606Z",
+      "presence": "unknown",
+      "product": "theme-forge-stellar-loom",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "pypi",
+      "diagnostics": [],
+      "observed_at": "2026-10-03T20:42:46.150845Z",
+      "presence": "unknown",
+      "product": "theme-forge-solar-sail",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "npm-observe-only",
+      "diagnostics": [],
+      "observed_at": "2026-10-03T20:42:46.152163Z",
+      "presence": "unknown",
+      "product": "theme-forge-solar-sail",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "pypi",
+      "diagnostics": [],
+      "observed_at": "2026-10-03T20:42:46.151153Z",
+      "presence": "unknown",
+      "product": "theme-forge-nebular-fusion",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "npm-observe-only",
+      "diagnostics": [],
+      "observed_at": "2026-10-03T20:42:46.151456Z",
+      "presence": "unknown",
+      "product": "theme-forge-nebular-fusion",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "apt",
+      "diagnostics": [
+        {
+          "code": "pages-dns-unknown",
+          "message": "DNS resolution unavailable"
+        }
+      ],
+      "observed_at": "2026-10-03T20:42:46.159284Z",
+      "presence": "unknown",
+      "product": "generation",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "rpm",
+      "diagnostics": [
+        {
+          "code": "pages-dns-unknown",
+          "message": "DNS resolution unavailable"
+        }
+      ],
+      "observed_at": "2026-10-03T20:42:46.159629Z",
+      "presence": "unknown",
+      "product": "generation",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "pacman",
+      "diagnostics": [
+        {
+          "code": "pages-dns-unknown",
+          "message": "DNS resolution unavailable"
+        }
+      ],
+      "observed_at": "2026-10-03T20:42:46.163542Z",
+      "presence": "unknown",
+      "product": "generation",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "pages",
+      "diagnostics": [
+        {
+          "code": "pages-dns-unknown",
+          "message": "DNS resolution unavailable"
+        }
+      ],
+      "observed_at": "2026-10-03T20:42:46.164068Z",
+      "presence": "unknown",
+      "product": "generation",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "git-main",
+      "diagnostics": [],
+      "observed_at": "2026-10-03T20:42:46.170261Z",
+      "presence": "unknown",
+      "product": "generation",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "authenticated": false,
+      "candidate_artifact_identity": "unavailable",
+      "channel": "pages-admin",
+      "diagnostics": [],
+      "observed_at": "2026-10-03T20:42:46.170461Z",
+      "presence": "unknown",
+      "product": "generation",
+      "state": "unknown",
+      "transport": "unknown"
+    },
+    {
+      "channel": "homebrew-observe-only",
+      "product": "theme-forge-stellar-burst",
+      "reason": "fresh-immutable-tap-ref-and-artifact-authority-unavailable",
+      "state": "not-run"
+    },
+    {
+      "channel": "homebrew-observe-only",
+      "product": "theme-forge-stellar-loom",
+      "reason": "fresh-immutable-tap-ref-and-artifact-authority-unavailable",
+      "state": "not-run"
+    },
+    {
+      "channel": "homebrew-observe-only",
+      "product": "theme-forge-solar-sail",
+      "reason": "fresh-immutable-tap-ref-and-artifact-authority-unavailable",
+      "state": "not-run"
+    },
+    {
+      "channel": "homebrew-observe-only",
+      "product": "theme-forge-nebular-fusion",
+      "reason": "fresh-immutable-tap-ref-and-artifact-authority-unavailable",
+      "state": "not-run"
+    }
+  ],
+  "observed_at": "2026-10-03T20:42:46.170739+00:00",
+  "production_enabled": false,
+  "schema": "rs9.candidate-destination-matrix.v1alpha1"
+}

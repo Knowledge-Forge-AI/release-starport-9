@@ -305,77 +305,94 @@ def classify_pages_path(rel_path: str) -> tuple[bool, str]:
 
     # 2. Index files
     if filename in INDEX_FILENAMES:
+        if parts[0] in {"apt", "rpm", "pacman", "keys"}:
+            valid_parent = parts[:-1] in (["apt"], ["rpm"], ["pacman"], ["pacman", "x86_64"])
+            if len(parts) == 5 and parts[:3] == ["rpm", "fedora", "43"] and parts[3] in {"x86_64", "aarch64"}:
+                valid_parent = True
+            return (True, CATEGORY_INDEX) if valid_parent else (False, "")
         if (
             len(parts) == 1
-            or parts[0] in ("docs", "assets", "dists", "pool", "repodata", "rpm", "pacman", "arch", "archlinux")
-            or (len(parts) == 4 and parts[1] == "os")
+            or parts[0] == "docs"
         ):
             return True, CATEGORY_INDEX
         return False, ""
 
-    # 3. Public keys (documented root only)
+    # 3. Public keys: keys/{rs9.asc,rs9-archive-keyring.gpg} or documented root keys
     ext = Path(filename).suffix.lower()
-    if len(parts) == 1 and (filename in PUBLIC_KEY_NAMES or ext in PUBLIC_KEY_EXTENSIONS):
-        return True, CATEGORY_PUBLIC_KEY
+    if parts[0] == "keys":
+        if len(parts) == 2 and filename in ("rs9.asc", "rs9-archive-keyring.gpg"):
+            return True, CATEGORY_PUBLIC_KEY
+        return False, ""
 
-    # 4. Docs
-    if parts[0] == "docs" and ext in DOC_EXTENSIONS:
-        return True, CATEGORY_DOCS
-    if len(parts) == 1 and (filename in ROOT_DOC_FILES or (filename.endswith(".md") and not SENSITIVE_FILENAME_RE.search(filename))):
+    # 4. Docs: docs/, docs/install, root doc files
+    if parts[0] == "docs":
+        if ext in DOC_EXTENSIONS or filename in ROOT_DOC_FILES or (len(parts) == 2 and parts[1] == "install"):
+            return True, CATEGORY_DOCS
+        return False, ""
+    if len(parts) == 1 and filename in ROOT_DOC_FILES:
         return True, CATEGORY_DOCS
 
     # 5. Candidate public assets in documented directory structures only:
     # No broad suffix allowlist bypassing directory rules.
 
-    # 5a. APT repository: dists/, pool/, by-hash/
-    if parts[0] == "dists":
-        if filename in APT_METADATA_FILES:
-            return True, CATEGORY_CANDIDATE_ASSET
-        if len(parts) >= 3 and parts[-3] == "by-hash" and parts[-2] == "SHA256":
-            if re.fullmatch(r"[0-9a-f]{64}", filename):
+    # 5a. APT repository within the reviewed apt/ namespace only.
+    apt_parts = parts[1:] if (parts[0] == "apt" and len(parts) > 1) else None
+    if apt_parts is not None:
+        if apt_parts[0] == "dists":
+            if filename in APT_METADATA_FILES:
                 return True, CATEGORY_CANDIDATE_ASSET
-        return False, ""
+            if len(apt_parts) >= 3 and apt_parts[-3] == "by-hash" and apt_parts[-2] == "SHA256":
+                if re.fullmatch(r"[0-9a-f]{64}", filename):
+                    return True, CATEGORY_CANDIDATE_ASSET
+            return False, ""
 
-    if parts[0] == "pool":
-        if filename.endswith(".deb"):
-            return True, CATEGORY_CANDIDATE_ASSET
-        return False, ""
+        if apt_parts[0] == "pool":
+            if filename.endswith(".deb"):
+                return True, CATEGORY_CANDIDATE_ASSET
+            return False, ""
 
-    if parts[0] == "by-hash":
-        if len(parts) == 3 and parts[1] == "SHA256" and re.fullmatch(r"[0-9a-f]{64}", filename):
-            return True, CATEGORY_CANDIDATE_ASSET
-        return False, ""
+        if apt_parts[0] == "by-hash":
+            if len(apt_parts) == 3 and apt_parts[1] == "SHA256" and re.fullmatch(r"[0-9a-f]{64}", filename):
+                return True, CATEGORY_CANDIDATE_ASSET
+            return False, ""
 
-    # 5b. RPM repository: repodata/, rpm/, packages/
-    if parts[0] == "repodata" or (len(parts) >= 2 and parts[-2] == "repodata"):
-        if filename == "repomd.xml" or filename.startswith("repomd.") or filename.endswith((".xml", ".xml.gz", ".xml.asc")):
-            return True, CATEGORY_CANDIDATE_ASSET
-        return False, ""
-
-    if parts[0] in ("rpm", "packages"):
-        if filename.endswith(".rpm"):
-            return True, CATEGORY_CANDIDATE_ASSET
-        return False, ""
-
-    # 5c. Pacman / Arch repository: arch/, pacman/, archlinux/, or <repo>/os/<arch>/
-    if parts[0] in ("arch", "pacman", "archlinux"):
-        if filename.endswith((".pkg.tar.zst", ".pkg.tar.zst.sig", ".db", ".db.tar.gz", ".files", ".files.tar.gz")):
-            return True, CATEGORY_CANDIDATE_ASSET
-        return False, ""
-
-    if len(parts) == 4 and parts[1] == "os" and parts[2] in ("x86_64", "aarch64", "any", "i686", "armv7h"):
-        if filename.endswith((".pkg.tar.zst", ".pkg.tar.zst.sig", ".db", ".db.tar.gz", ".files", ".files.tar.gz")):
-            return True, CATEGORY_CANDIDATE_ASSET
-        return False, ""
-
-    # 5d. General release assets and root checksums
-    if parts[0] == "assets":
-        if filename.endswith((".tar.gz", ".tar.xz", ".tgz", ".zip")) or filename in ("SHA256SUMS", "hashes.txt"):
-            return True, CATEGORY_CANDIDATE_ASSET
-        return False, ""
-
-    if len(parts) == 1 and filename in ("SHA256SUMS", "hashes.txt"):
+    # 5b. RPM repository:
+    # Required prefix: rpm/fedora/43/{x86_64,aarch64}/{Packages,repodata} plus rpm/rs9.repo
+    if rel_path == "rpm/rs9.repo":
         return True, CATEGORY_CANDIDATE_ASSET
+
+    if parts[0] == "rpm" and len(parts) >= 5 and parts[1] == "fedora" and parts[2] == "43" and parts[3] in ("x86_64", "aarch64"):
+        if len(parts) != 6:
+            return False, ""
+        sub_dir = parts[4]
+        if sub_dir == "Packages":
+            if filename.endswith(".rpm"):
+                return True, CATEGORY_CANDIDATE_ASSET
+            return False, ""
+        if sub_dir == "repodata":
+            if filename in {"repomd.xml", "repomd.xml.asc"} or filename.endswith((".xml", ".xml.gz")):
+                return True, CATEGORY_CANDIDATE_ASSET
+            return False, ""
+        return False, ""
+
+    # 5c. Pacman / Arch repository:
+    # Required prefix: pacman/x86_64 packages/db/files and exact signatures
+    PACMAN_EXTENSIONS = (
+        ".pkg.tar.zst",
+        ".pkg.tar.zst.sig",
+        ".db",
+        ".db.tar.gz",
+        ".db.sig",
+        ".db.tar.gz.sig",
+        ".files",
+        ".files.tar.gz",
+        ".files.sig",
+        ".files.tar.gz.sig",
+    )
+    if parts[0] == "pacman":
+        if len(parts) == 3 and parts[1] == "x86_64" and filename.endswith(PACMAN_EXTENSIONS):
+            return True, CATEGORY_CANDIDATE_ASSET
+        return False, ""
 
     return False, ""
 
@@ -401,6 +418,7 @@ def _scan_file_content(path: Path, rel_path: str, category: str, max_size: int =
 
     file_size = len(data)
     sha256 = _digest(data)
+    filename = Path(rel_path).name
 
     # Check for private or secret key blocks across all files
     if b"PRIVATE KEY" in data or b"SECRET KEY" in data:
@@ -408,16 +426,15 @@ def _scan_file_content(path: Path, rel_path: str, category: str, max_size: int =
         if PRIVATE_BLOCK_RE.search(text_preview) or "BEGIN PGP SECRET KEY BLOCK" in text_preview:
             raise ContractError("CREDENTIAL_DETECTED", "Private or secret key block detected")
 
-    # Reject binary OpenPGP secret key packets across all files
+    # Keep the reviewed packet scan for every artifact. Real RPM/XZ false
+    # positives remain blockers until a complete real format validator is proven.
     check_no_secret_key_packets(data)
-
-    # Validate public key material if categorized as public key
     if category == CATEGORY_PUBLIC_KEY:
         validate_openpgp_public_key(data)
 
     # Scan for credentials in text files
     if category in (CATEGORY_CNAME, CATEGORY_DOCS, CATEGORY_INDEX, CATEGORY_PUBLIC_KEY) or rel_path.endswith(
-        (".txt", ".md", ".json", ".xml", ".html", ".css", ".js")
+        (".txt", ".md", ".json", ".xml", ".html", ".css", ".js", ".repo")
     ):
         text = data.decode("utf-8", errors="replace")
         try:

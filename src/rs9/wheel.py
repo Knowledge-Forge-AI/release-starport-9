@@ -71,6 +71,8 @@ def resolve_wheel_tag(product_id: str, *, platform_tag: str | None = None, js_fa
         raise WheelWithheldError("NATIVE_WHEEL_WITHHELD", "Native Theme Forge Nebular Fusion wheel withheld entirely",
                                  product_id=canonical_id, reason="native_withheld")
     if canonical_id == "theme-forge-stellar-burst":
+        if evidence is _OFFLINE_JS_PROOF and platform_tag in (None, "any"):
+            return "py3-none-any"
         if platform_tag and platform_tag != "any":
             if not BURST_TAG_RE.fullmatch(platform_tag):
                 raise ContractError("UNSUPPORTED_PLATFORM", 'Invalid candidate input or unavailable candidate operation')
@@ -81,6 +83,10 @@ def resolve_wheel_tag(product_id: str, *, platform_tag: str | None = None, js_fa
     if platform_tag and platform_tag != "any":
         raise ContractError("UNSUPPORTED_PLATFORM", "Pure JavaScript wrappers require the any tag")
     return "py3-none-any"
+
+
+# Only the authenticated closure builder issues this in-process representation.
+_OFFLINE_JS_PROOF = object()
 
 
 def _record_digest(data: bytes) -> str:
@@ -200,6 +206,7 @@ def build_wheel(
     console_scripts: dict[str, str] | None = None, command_map: dict[str, str] | None = None,
     license_files: Mapping[str, bytes] | None = None, summary: str | None = None,
     deterministic_timestamp: tuple[int, int, int, int, int, int] | None = None,
+    extra_provenance: dict[str, Any] | None = None,
 ) -> WheelBuildResult:
     """Build a deterministic standard Python wheel for Theme Forge release payloads."""
     if output_path is None and output_dir is None:
@@ -277,6 +284,10 @@ def build_wheel(
         provenance_data["release_record"] = release_record
     if content_identity_sha256 is not None:
         provenance_data["content_identity_sha256"] = content_identity_sha256
+    if extra_provenance is not None:
+        if set(extra_provenance) - {"npm_dependencies", "fixture_only"}:
+            raise ContractError("PROVENANCE_REQUIRED", "Additional provenance cannot replace release bindings")
+        provenance_data.update(extra_provenance)
 
     summary_text = summary or f"Theme Forge authenticated release payload for {dist_name}"
     if any(ord(c) < 32 or ord(c) == 127 for c in summary_text):
@@ -347,58 +358,176 @@ def build_wheel(
     )
 
 
-def inspect_wheel(wheel_path: str | Path) -> dict[str, Any]:
-    """Inspect and verify wheel structure, RECORD digests, and metadata."""
+def verify_wheel_record_bidirectional(wheel_path: str | Path) -> dict[str, Any]:
+    """Verify that every member in the wheel is in PEP 376 RECORD, and every RECORD entry matches.
+
+    Performs strict bidirectional validation:
+    1. Dist-info directory and RECORD must exist.
+    2. Every file in the zip (except RECORD itself) must be present in RECORD.
+    3. Every file listed in RECORD (except RECORD itself) must exist in the zip.
+    4. Each member's size and SHA-256 base64 digest must match RECORD exactly.
+    5. RECORD row syntax must follow standard PEP 376 CSV.
+    6. Duplicate ZIP members and duplicate RECORD rows are strictly rejected.
+    """
     path = Path(wheel_path).resolve()
+    if not path.is_file():
+        raise ContractError("INVALID_WHEEL", f"Wheel file does not exist: {path}")
     data = path.read_bytes()
     entries_info: dict[str, dict[str, Any]] = {}
     with zipfile.ZipFile(io.BytesIO(data), "r") as zf:
-        names = sorted(zf.namelist())
-        dist_info = next((p.split("/")[0] for p in names if p.endswith(".dist-info/METADATA")), None)
-        if not dist_info or f"{dist_info}/RECORD" not in names:
-            raise ContractError("INVALID_WHEEL", "Missing dist-info/METADATA or RECORD")
-        rec_rows = csv.reader(zf.read(f"{dist_info}/RECORD").decode("utf-8").splitlines())
-        rec_map = {r[0]: (r[1], int(r[2]) if r[2] else 0) for r in rec_rows if r}
-        valid = True
-        for z in zf.infolist():
-            mb = zf.read(z.filename)
-            entries_info[z.filename] = {"size": len(mb), "mode": (z.external_attr >> 16) & 0o7777, "sha256": digest(mb)}
-            if z.filename != f"{dist_info}/RECORD":
-                rec = rec_map.get(z.filename)
-                if not rec or rec[1] != len(mb) or rec[0] != _record_digest(mb):
-                    valid = False
-        if f"{dist_info}/RECORD" not in rec_map:
-            valid = False
-        for rec_path, (rec_digest, rec_size) in rec_map.items():
-            if rec_path == f"{dist_info}/RECORD":
+        raw_namelist = zf.namelist()
+        if len(raw_namelist) != len(set(raw_namelist)):
+            raise ContractError("RECORD_MISMATCH", "Duplicate wheel members")
+        dist_info = next((p.split("/")[0] for p in sorted(set(raw_namelist)) if p.endswith(".dist-info/METADATA")), None)
+        if not dist_info:
+            raise ContractError("INVALID_WHEEL", "Missing .dist-info/METADATA in wheel")
+        record_path = f"{dist_info}/RECORD"
+        if record_path not in raw_namelist:
+            raise ContractError("INVALID_WHEEL", "Missing .dist-info/RECORD in wheel")
+
+        record_bytes = zf.read(record_path)
+        try:
+            record_text = record_bytes.decode("utf-8")
+        except UnicodeError:
+            raise ContractError("RECORD_MISMATCH", "RECORD file is not valid UTF-8")
+
+        rec_rows = list(csv.reader(record_text.splitlines()))
+        rec_map: dict[str, tuple[str, int]] = {}
+        for row in rec_rows:
+            if not row:
                 continue
-            if rec_path not in entries_info:
+            if len(row) != 3:
+                raise ContractError("RECORD_MISMATCH", f"Invalid RECORD row: {row}")
+            fn, h, sz = row[0], row[1], row[2]
+            if fn in rec_map:
+                raise ContractError("RECORD_MISMATCH", "Duplicate RECORD entry")
+            if fn == record_path:
+                if h != "" or sz != "":
+                    raise ContractError("RECORD_MISMATCH", "RECORD row for RECORD itself must have empty hash and size")
+                rec_map[fn] = ("", 0)
+            else:
+                try:
+                    size_int = int(sz)
+                except ValueError:
+                    raise ContractError("RECORD_MISMATCH", f"Non-integer size in RECORD for {fn}: {sz}")
+                rec_map[fn] = (h, size_int)
+
+        if record_path not in rec_map:
+            raise ContractError("RECORD_MISMATCH", "RECORD must contain an entry for itself")
+
+        # Check every file in the zip against RECORD
+        for z in zf.infolist():
+            member_bytes = zf.read(z.filename)
+            entries_info[z.filename] = {
+                "size": len(member_bytes),
+                "mode": (z.external_attr >> 16) & 0o7777,
+                "sha256_record": _record_digest(member_bytes),
+            }
+            if z.filename == record_path:
+                continue
+            rec_entry = rec_map.get(z.filename)
+            if rec_entry is None:
+                raise ContractError("RECORD_MISMATCH", f"File in wheel not listed in RECORD: {z.filename}")
+            expected_digest, expected_size = rec_entry
+            if len(member_bytes) != expected_size:
+                raise ContractError(
+                    "RECORD_MISMATCH",
+                    f"Size mismatch for {z.filename}: zip={len(member_bytes)}, RECORD={expected_size}",
+                )
+            actual_digest = _record_digest(member_bytes)
+            if actual_digest != expected_digest:
+                raise ContractError(
+                    "RECORD_MISMATCH",
+                    f"Digest mismatch for {z.filename}: zip={actual_digest}, RECORD={expected_digest}",
+                )
+
+        # Check every non-RECORD entry in RECORD exists in the zip
+        for rec_file in rec_map:
+            if rec_file == record_path:
+                continue
+            if rec_file not in entries_info:
+                raise ContractError("RECORD_MISMATCH", f"File in RECORD not found in wheel: {rec_file}")
+
+    return {
+        "wheel_path": str(path),
+        "filename": path.name,
+        "dist_info": dist_info,
+        "member_count": len(entries_info),
+        "record_entries_count": len(rec_map),
+        "record_valid": True,
+        "entries": entries_info,
+    }
+
+
+def inspect_wheel(wheel_path: str | Path) -> dict[str, Any]:
+    """Inspect and verify wheel structure, RECORD digests, and metadata."""
+    path = Path(wheel_path).resolve()
+    if not path.is_file():
+        raise ContractError("INVALID_WHEEL", f"Wheel file does not exist: {path}")
+    data = path.read_bytes()
+    entries_info: dict[str, dict[str, Any]] = {}
+    with zipfile.ZipFile(io.BytesIO(data), "r") as zf:
+        raw_names = zf.namelist()
+        names = sorted(set(raw_names))
+        dist_info = next((p.split("/")[0] for p in names if p.endswith(".dist-info/METADATA")), None)
+        if not dist_info or f"{dist_info}/RECORD" not in raw_names:
+            raise ContractError("INVALID_WHEEL", "Missing dist-info/METADATA or RECORD")
+
+        # Consolidate with strict bidirectional RECORD logic
+        valid = True
+        try:
+            verify_wheel_record_bidirectional(path)
+        except ContractError as exc:
+            if exc.code == "RECORD_MISMATCH":
                 valid = False
-            elif entries_info[rec_path]["size"] != rec_size or _record_digest(zf.read(rec_path)) != rec_digest:
+            else:
+                raise
+
+        for z in zf.infolist():
+            try:
+                mb = zf.read(z.filename)
+                entries_info[z.filename] = {"size": len(mb), "mode": (z.external_attr >> 16) & 0o7777, "sha256": digest(mb)}
+            except Exception:
                 valid = False
+
         meta_dict: dict[str, Any] = {}
-        meta_raw = zf.read(f"{dist_info}/METADATA").decode("utf-8")
-        headers_section = meta_raw.split("\n\n", 1)[0]
-        for line in headers_section.splitlines():
-            if not line.strip():
-                break
-            if ":" in line and not line.startswith(" "):
-                k, v = [x.strip() for x in line.split(":", 1)]
-                if k in meta_dict:
-                    meta_dict[k] = (meta_dict[k] if isinstance(meta_dict[k], list) else [meta_dict[k]]) + [v]
-                else:
-                    meta_dict[k] = v
+        try:
+            meta_raw = zf.read(f"{dist_info}/METADATA").decode("utf-8")
+            headers_section = meta_raw.split("\n\n", 1)[0]
+            for line in headers_section.splitlines():
+                if not line.strip():
+                    break
+                if ":" in line and not line.startswith(" "):
+                    k, v = [x.strip() for x in line.split(":", 1)]
+                    if k in meta_dict:
+                        meta_dict[k] = (meta_dict[k] if isinstance(meta_dict[k], list) else [meta_dict[k]]) + [v]
+                    else:
+                        meta_dict[k] = v
+        except Exception:
+            valid = False
+
         prov_entry = next((p for p in names if p.endswith("/_rs9/provenance.json") or p.endswith("/provenance.json")), None)
-        prov = json.loads(zf.read(prov_entry).decode("utf-8")) if prov_entry else None
-        return {"path": str(path), "filename": path.name, "size": len(data), "sha256": digest(data),
-                "dist_info": dist_info, "metadata": meta_dict, "record_valid": valid,
-                "entries": entries_info, "provenance": prov}
+        prov = None
+        if prov_entry:
+            try:
+                prov = json.loads(zf.read(prov_entry).decode("utf-8"))
+            except Exception:
+                pass
 
-
+        return {
+            "path": str(path),
+            "filename": path.name,
+            "size": len(data),
+            "sha256": digest(data),
+            "dist_info": dist_info,
+            "metadata": meta_dict,
+            "record_valid": valid,
+            "entries": entries_info,
+            "provenance": prov,
+        }
 
 
 def verify_wheel_record(wheel_path: str | Path) -> bool:
     """Verify that every file in the wheel matches the PEP 376 RECORD checksum and size."""
-    if not inspect_wheel(wheel_path)["record_valid"]:
-        raise ContractError("RECORD_MISMATCH", "Wheel member hashes do not agree with RECORD")
+    verify_wheel_record_bidirectional(wheel_path)
     return True

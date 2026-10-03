@@ -1,23 +1,142 @@
 {
-  "container_engine": "unavailable",
-  "github_connector": "metadata-and-UTF8-only",
-  "host": {
-    "architecture": "arm64",
-    "os": "Darwin"
+  "architecture": "arm64",
+  "checkout": {
+    "branch": "main",
+    "head_matches_origin_main": true,
+    "input_head": "bb228a097e2ba3c79921df1489ec508d16aac053",
+    "input_tree": "104c655a3c73062e5f046519b5a122fc19a38e6f",
+    "tracked_clean": true
   },
-  "linux_package_tools": "unavailable",
-  "native_qualification": "not-run",
-  "nix_daemon": "permission-denied",
-  "nix_pure_evaluator": "available",
-  "observed_tools": {
-    "gpg": "2.4.9",
-    "nix": "2.31.5",
-    "node": "22.22.2",
-    "python": "3.13.12",
-    "rtk": "0.43.0"
-  },
-  "private_material_read": false,
-  "production_signing_custody": "unknown-metadata-only-list-failed",
-  "public_shell_transport": "unavailable-dns-resolution",
-  "schema": "rs9.live1-environment-observation.v1alpha1"
+  "network": [
+    {
+      "dns": false,
+      "host": "api.github.com",
+      "status": "unknown",
+      "tls": false
+    },
+    {
+      "dns": false,
+      "host": "github.com",
+      "status": "unknown",
+      "tls": false
+    },
+    {
+      "dns": false,
+      "host": "objects.githubusercontent.com",
+      "status": "unknown",
+      "tls": false
+    },
+    {
+      "dns": false,
+      "host": "pypi.org",
+      "status": "unknown",
+      "tls": false
+    },
+    {
+      "dns": false,
+      "host": "files.pythonhosted.org",
+      "status": "unknown",
+      "tls": false
+    },
+    {
+      "dns": false,
+      "host": "registry.npmjs.org",
+      "status": "unknown",
+      "tls": false
+    },
+    {
+      "dns": false,
+      "host": "rs9.knowledge-forge.ai",
+      "status": "unknown",
+      "tls": false
+    }
+  ],
+  "observed_at": "2026-10-03T20:06:03.539027+00:00",
+  "os": "Darwin",
+  "production_enabled": false,
+  "schema": "rs9.candidate-environment.v1alpha1",
+  "scratch_exception": "temporary directory required by managed sandbox",
+  "tools": {
+    "colima": {
+      "available": false
+    },
+    "docker": {
+      "available": true,
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "052e12d05ede7aae32852d293abc360e85a93259b5ef3bff41216413ad5074af"
+    },
+    "docker_engine": {
+      "available": true,
+      "exit_code": 1,
+      "stderr_sha256": "bf5ef112da407b2d0c7686fe3c3958c10689053509b5fa6b6bcad1e4a535f617",
+      "stdout_sha256": "ca0331cbf1dcc53ddb8a4f573275b287ef2924d7b5be4d5540d440d2a93eb412"
+    },
+    "dpkg-deb": {
+      "available": false
+    },
+    "dpkg-shlibdeps": {
+      "available": false
+    },
+    "gh": {
+      "available": true,
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "546cd3a9964ab2020771588d6d4d5afd0f81a50e35ff4a3a2fb38b0ca32c821d"
+    },
+    "gpg": {
+      "available": true,
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "3d1d6aa5de63eddb4e56bbd69467d5a8b22ead5a17e8e3e06db8a52c48d8c5b4"
+    },
+    "limactl": {
+      "available": false
+    },
+    "makepkg": {
+      "available": false
+    },
+    "nix": {
+      "available": true,
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "c87c5354049b87ceaeed9ffa3d35f4006a154f4c0f69d700e93f0d178fc2dea7"
+    },
+    "nix_daemon": {
+      "available": true,
+      "exit_code": 1,
+      "stderr_sha256": "c4ba6e944437d952c3d74b373b2f875dffdab89a1d27fe7f375137ad23a2d04b",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "node": {
+      "available": true,
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "5a64071862e0a30c10895711c2317a83576c2999e2d255bf9d95756c466bd4ce"
+    },
+    "orb": {
+      "available": true,
+      "exit_code": 1,
+      "stderr_sha256": "28c40fd13e26ff7f3f838cf5a245b6a4be541b83c8b689330bd1acc5f5a5f48d",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pip3": {
+      "available": true,
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "60687e529be6d407c6ebf38fd26d6556e54187535437c10985a68f020a3808b6"
+    },
+    "podman": {
+      "available": false
+    },
+    "python3": {
+      "available": true,
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "9acda2babae175a076c5eec85844a8033b0b454b9930d80523d355f5ed17c29f"
+    },
+    "rpmbuild": {
+      "available": false
+    }
+  }
 }

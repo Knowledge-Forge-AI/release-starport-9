@@ -44,14 +44,14 @@ class PagesScannerTests(unittest.TestCase):
             "CNAME": "pkg.example.com\n",
             "index.html": "<!DOCTYPE html><html><body>Welcome</body></html>\n",
             "README.md": "# Public Repository\nDocumentation.\n",
-            "pubkey.gpg": TRUTHFUL_PGP_PUBLIC_KEY,
+            "keys/rs9.asc": TRUTHFUL_PGP_PUBLIC_KEY,
             "docs/guide.md": "# Documentation Guide\n",
             "docs/style.css": "body { font-family: sans-serif; }\n",
-            "assets/my-app_1.0.0.tar.gz": "FAKE-TARBALL-BYTES-12345",
-            "assets/SHA256SUMS": "abcdef123456  my-app_1.0.0.tar.gz\n",
-            "dists/stable/Release": "Origin: RS9\nLabel: RS9\nSuite: stable\n",
-            "dists/stable/Release.gpg": "FAKE-DETACHED-GPG-SIG",
-            "pool/main/m/my-app/my-app_1.0.0_amd64.deb": "FAKE-DEB-BYTES",
+            "docs/install/index.html": "Installation",
+            "docs/install/guide.txt": "Instructions",
+            "apt/dists/stable/Release": "Origin: RS9\nLabel: RS9\nSuite: stable\n",
+            "apt/dists/stable/Release.gpg": "FAKE-DETACHED-GPG-SIG",
+            "apt/pool/main/m/my-app/my-app_1.0.0_amd64.deb": "FAKE-DEB-BYTES",
         }
         for rel_path, content in files.items():
             file_path = self.root / rel_path
@@ -70,10 +70,10 @@ class PagesScannerTests(unittest.TestCase):
         self.assertIn("CNAME", manifest["files"])
         self.assertEqual(manifest["files"]["CNAME"]["category"], CATEGORY_CNAME)
         self.assertEqual(manifest["files"]["index.html"]["category"], CATEGORY_INDEX)
-        self.assertEqual(manifest["files"]["pubkey.gpg"]["category"], CATEGORY_PUBLIC_KEY)
+        self.assertEqual(manifest["files"]["keys/rs9.asc"]["category"], CATEGORY_PUBLIC_KEY)
         self.assertEqual(manifest["files"]["docs/guide.md"]["category"], CATEGORY_DOCS)
         self.assertEqual(
-            manifest["files"]["pool/main/m/my-app/my-app_1.0.0_amd64.deb"]["category"],
+            manifest["files"]["apt/pool/main/m/my-app/my-app_1.0.0_amd64.deb"]["category"],
             CATEGORY_CANDIDATE_ASSET,
         )
 
@@ -81,13 +81,13 @@ class PagesScannerTests(unittest.TestCase):
         self.assertEqual(classify_pages_path("CNAME"), (True, CATEGORY_CNAME))
         self.assertEqual(classify_pages_path("index.html"), (True, CATEGORY_INDEX))
         self.assertEqual(classify_pages_path("docs/index.html"), (True, CATEGORY_INDEX))
-        self.assertEqual(classify_pages_path("Release.gpg"), (True, CATEGORY_PUBLIC_KEY))
-        self.assertEqual(classify_pages_path("key.asc"), (True, CATEGORY_PUBLIC_KEY))
+        self.assertEqual(classify_pages_path("keys/rs9-archive-keyring.gpg"), (True, CATEGORY_PUBLIC_KEY))
+        self.assertEqual(classify_pages_path("keys/rs9.asc"), (True, CATEGORY_PUBLIC_KEY))
         self.assertEqual(classify_pages_path("docs/style.css"), (True, CATEGORY_DOCS))
-        self.assertEqual(classify_pages_path("dists/stable/Release"), (True, CATEGORY_CANDIDATE_ASSET))
-        self.assertEqual(classify_pages_path("pool/main/pkg_1.0_amd64.deb"), (True, CATEGORY_CANDIDATE_ASSET))
+        self.assertEqual(classify_pages_path("apt/dists/stable/Release"), (True, CATEGORY_CANDIDATE_ASSET))
+        self.assertEqual(classify_pages_path("apt/pool/main/pkg_1.0_amd64.deb"), (True, CATEGORY_CANDIDATE_ASSET))
         self.assertEqual(
-            classify_pages_path("dists/stable/by-hash/SHA256/" + "a" * 64),
+            classify_pages_path("apt/dists/stable/by-hash/SHA256/" + "a" * 64),
             (True, CATEGORY_CANDIDATE_ASSET),
         )
 
@@ -197,14 +197,14 @@ class PagesScannerTests(unittest.TestCase):
 
     def test_pacman_and_rpm_artifacts_classified_and_scanned(self):
         test_paths = [
-            ("core/os/x86_64/core.db", True, CATEGORY_CANDIDATE_ASSET),
-            ("core/os/x86_64/core.files", True, CATEGORY_CANDIDATE_ASSET),
-            ("core/os/x86_64/mypkg-1.0.0-1-x86_64.pkg.tar.zst", True, CATEGORY_CANDIDATE_ASSET),
-            ("core/os/x86_64/mypkg-1.0.0-1-x86_64.pkg.tar.zst.sig", True, CATEGORY_CANDIDATE_ASSET),
-            ("rpm/packages/app-1.0.0.rpm", True, CATEGORY_CANDIDATE_ASSET),
-            ("repodata/repomd.xml", True, CATEGORY_CANDIDATE_ASSET),
-            ("repodata/repomd.xml.asc", True, CATEGORY_CANDIDATE_ASSET),
-            ("repodata/filelists.xml.gz", True, CATEGORY_CANDIDATE_ASSET),
+            ("pacman/x86_64/core.db", True, CATEGORY_CANDIDATE_ASSET),
+            ("pacman/x86_64/core.files", True, CATEGORY_CANDIDATE_ASSET),
+            ("pacman/x86_64/mypkg-1.0.0-1-x86_64.pkg.tar.zst", True, CATEGORY_CANDIDATE_ASSET),
+            ("pacman/x86_64/mypkg-1.0.0-1-x86_64.pkg.tar.zst.sig", True, CATEGORY_CANDIDATE_ASSET),
+            ("rpm/fedora/43/x86_64/Packages/app-1.0.0.rpm", True, CATEGORY_CANDIDATE_ASSET),
+            ("rpm/fedora/43/x86_64/repodata/repomd.xml", True, CATEGORY_CANDIDATE_ASSET),
+            ("rpm/fedora/43/x86_64/repodata/repomd.xml.asc", True, CATEGORY_CANDIDATE_ASSET),
+            ("rpm/fedora/43/x86_64/repodata/filelists.xml.gz", True, CATEGORY_CANDIDATE_ASSET),
         ]
         for path, expected_allowed, expected_cat in test_paths:
             with self.subTest(path=path):
@@ -213,15 +213,15 @@ class PagesScannerTests(unittest.TestCase):
                 self.assertEqual(cat, expected_cat)
 
         # Create tree with pacman and rpm artifacts
-        (self.root / "repodata").mkdir(parents=True, exist_ok=True)
-        (self.root / "repodata/repomd.xml").write_text("<repomd></repomd>\n")
-        (self.root / "repodata/repomd.xml.asc").write_text("-----BEGIN PGP SIGNATURE-----\nsig\n-----END PGP SIGNATURE-----\n")
-        (self.root / "rpm").mkdir(parents=True, exist_ok=True)
-        (self.root / "rpm/sample.rpm").write_bytes(b"\xed\xab\xee\xdbFAKE-RPM")
-        (self.root / "arch").mkdir(parents=True, exist_ok=True)
-        (self.root / "arch/repo.db").write_bytes(b"FAKE-ARCH-DB")
-        (self.root / "arch/sample.pkg.tar.zst").write_bytes(b"FAKE-ZST-PKG")
-        (self.root / "arch/sample.pkg.tar.zst.sig").write_bytes(b"FAKE-SIG")
+        (self.root / "rpm/fedora/43/x86_64/repodata").mkdir(parents=True, exist_ok=True)
+        (self.root / "rpm/fedora/43/x86_64/repodata/repomd.xml").write_text("<repomd></repomd>\n")
+        (self.root / "rpm/fedora/43/x86_64/repodata/repomd.xml.asc").write_text("-----BEGIN PGP SIGNATURE-----\nsig\n-----END PGP SIGNATURE-----\n")
+        (self.root / "rpm/fedora/43/x86_64/Packages").mkdir(parents=True, exist_ok=True)
+        (self.root / "rpm/fedora/43/x86_64/Packages/sample.rpm").write_bytes(b"\xed\xab\xee\xdbFAKE-RPM")
+        (self.root / "pacman/x86_64").mkdir(parents=True, exist_ok=True)
+        (self.root / "pacman/x86_64/repo.db").write_bytes(b"FAKE-ARCH-DB")
+        (self.root / "pacman/x86_64/sample.pkg.tar.zst").write_bytes(b"FAKE-ZST-PKG")
+        (self.root / "pacman/x86_64/sample.pkg.tar.zst.sig").write_bytes(b"FAKE-SIG")
         (self.root / "CNAME").write_text("mirror.example.com\n")
 
         scan = scan_pages_tree(self.root)
@@ -242,7 +242,7 @@ class PagesScannerTests(unittest.TestCase):
 
     def test_binary_manifest_required_for_package_files(self):
         # Create an isolated package file in pool without any index
-        pkg = self.root / "pool/main/pkg.deb"
+        pkg = self.root / "apt/pool/main/pkg.deb"
         pkg.parent.mkdir(parents=True, exist_ok=True)
         pkg.write_bytes(b"FAKE-DEB")
         with self.assertRaises(ContractError) as ctx:
@@ -260,7 +260,7 @@ class PagesScannerTests(unittest.TestCase):
             "token.asc",
             "docs/secret.gpg",
             "assets/private.asc",
-            "repodata/secret.gpg",
+            "rpm/fedora/43/x86_64/repodata/secret.gpg",
         ]
         for bad_rel in sensitive_cases:
             with self.subTest(path=bad_rel):
@@ -283,18 +283,18 @@ class PagesScannerTests(unittest.TestCase):
         for payload in (tag5_new, tag5_old, tag7_new, mixed_keyring):
             with self.subTest(payload=payload.hex()):
                 # Test in pubkey.gpg
-                (self.root / "pubkey.gpg").write_bytes(payload)
+                (self.root / "keys/rs9.asc").write_bytes(payload)
                 with self.assertRaises(ContractError) as ctx:
                     scan_pages_tree(self.root)
                 self.assertEqual(ctx.exception.code, "CREDENTIAL_DETECTED")
-                (self.root / "pubkey.gpg").write_text(TRUTHFUL_PGP_PUBLIC_KEY)
+                (self.root / "keys/rs9.asc").write_text(TRUTHFUL_PGP_PUBLIC_KEY)
 
                 # Test in candidate asset signature file
-                (self.root / "dists/stable/Release.gpg").write_bytes(payload)
+                (self.root / "apt/dists/stable/Release.gpg").write_bytes(payload)
                 with self.assertRaises(ContractError) as ctx:
                     scan_pages_tree(self.root)
                 self.assertEqual(ctx.exception.code, "CREDENTIAL_DETECTED")
-                (self.root / "dists/stable/Release.gpg").write_text("FAKE-DETACHED-GPG-SIG")
+                (self.root / "apt/dists/stable/Release.gpg").write_text("FAKE-DETACHED-GPG-SIG")
 
     def test_ascii_armor_secret_key_and_smuggled_packets_rejected(self):
         self._create_clean_pages_tree()
@@ -305,7 +305,7 @@ class PagesScannerTests(unittest.TestCase):
             "fake-secret-key-material\n"
             "-----END PGP SECRET KEY BLOCK-----\n"
         )
-        (self.root / "pubkey.gpg").write_text(secret_armor)
+        (self.root / "keys/rs9.asc").write_text(secret_armor)
         with self.assertRaises(ContractError) as ctx:
             scan_pages_tree(self.root)
         self.assertEqual(ctx.exception.code, "CREDENTIAL_DETECTED")
@@ -318,14 +318,14 @@ class PagesScannerTests(unittest.TestCase):
             f"{smuggled_b64}\n"
             "-----END PGP PUBLIC KEY BLOCK-----\n"
         )
-        (self.root / "pubkey.gpg").write_text(smuggled_armor)
+        (self.root / "keys/rs9.asc").write_text(smuggled_armor)
         with self.assertRaises(ContractError) as ctx:
             scan_pages_tree(self.root)
         self.assertEqual(ctx.exception.code, "CREDENTIAL_DETECTED")
 
     def test_invalid_public_key_material_rejected(self):
         self._create_clean_pages_tree()
-        (self.root / "pubkey.gpg").write_text("NOT-AN-OPENPGP-KEY")
+        (self.root / "keys/rs9.asc").write_text("NOT-AN-OPENPGP-KEY")
         with self.assertRaises(ContractError) as ctx:
             scan_pages_tree(self.root)
         self.assertEqual(ctx.exception.code, "INVALID_PUBLIC_KEY")
@@ -336,7 +336,7 @@ class PagesScannerTests(unittest.TestCase):
         secret_packet = bytes([0xC5, 2, 30, 40])
         for payload in (public_packet + b"invalid" + secret_packet,
                         public_packet + bytes([0xC6, 10, 1])):
-            (self.root / "pubkey.gpg").write_bytes(payload)
+            (self.root / "keys/rs9.asc").write_bytes(payload)
             with self.assertRaises(ContractError) as caught:
                 scan_pages_tree(self.root)
             self.assertEqual(caught.exception.code, "INVALID_PUBLIC_KEY")
@@ -349,7 +349,7 @@ class PagesScannerTests(unittest.TestCase):
             f"{base64.b64encode(tag13_only).decode('ascii')}\n"
             "-----END PGP PUBLIC KEY BLOCK-----\n"
         )
-        (self.root / "pubkey.gpg").write_text(tag13_armor)
+        (self.root / "keys/rs9.asc").write_text(tag13_armor)
         with self.assertRaises(ContractError) as ctx:
             scan_pages_tree(self.root)
         self.assertEqual(ctx.exception.code, "INVALID_PUBLIC_KEY")
