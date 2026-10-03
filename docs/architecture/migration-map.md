@@ -2,11 +2,17 @@
 
 Status: future migration design; no live cutover authorized or performed. Incorporates Foundation 3 pure publication control plane (observation derivation, safety gates, pure planner, revision allocator, receipts, and retry evaluation).
 
+LIVE1 disposition supersedes earlier legacy repair directions in this document:
+Foundation 3 is accepted; `theme-forge-packages` and private DIST1/APT evidence are
+read-only reference/rollback surfaces. RS9 owns new Nix, pacman, RPM and APT
+implementation. npm and Homebrew are observe-only. See the
+[current candidate and gate status](../live1-candidate.md).
+
 Keep current authoritative publication surfaces operational until an RS9 equivalent independently qualifies in shadow against one actual release. Retain current generators and known-good signed generations as rollback inputs. A signing, publisher, or domain change is a separate operator action with client compatibility and verified rollback; a passing configuration validator or pure plan grants none of that authority.
 
 | Surface | Preconditions and staged adoption | Compatibility and rollback |
 |---|---|---|
-| `theme-forge-packages` | Canonicalize unpublished generator/workflow changes and repair hosted qualification. Foundation 2 rendered Nebular shadow recipes; Foundation 3 models destination observation, evidence-bound gates, pure planning, receipts, and retry logic. Only after independent qualification replace the generator and later publication orchestration. | Keep repo, URLs and current trust unchanged during machinery replacement. Preserve frozen DIST1 generator, receipts and previous signed tree; restore through current publication machinery. |
+| `theme-forge-packages` | LIVE1 legacy repair lane closed/deferred. Carry diagnostics into RS9 adapters without editing this generator. | Retain repository, URLs, trust and previous signed generations as read-only reference/rollback evidence. No archival, deletion or redirect in LIVE1. |
 | APT overlay | Remains staged, not live. Operator decides whether to fold into DIST1 before RS9 or adopt its qualified behavior directly. Preserve Ubuntu 26.04 amd64/arm64 support, target-derived Depends, SHA256 indexes/by-hash, dual metadata signatures and destination keyring. Changed indexes require authenticated previous-generation retention and corresponding provenance/verifier semantics first. | Never advertise Debian 13 Node support. Keep candidate isolated until qualification. Roll back to prior served signed generation and retain pool/by-hash objects needed by clients. Initial trust and keyring upgrade trust are distinct. |
 | `homebrew-tap` | Render formulas in shadow, qualify install/test/payload and compare observed formulas. Later controlled PRs update only adopted families' formulas/docs. APGR stays separately managed until adopted. | Keep Homebrew-shaped tap and formula names; preserve other families. Manual formula maintenance remains rollback. |
 | npm | Fresh API reads found current Burst/Loom/Sail release tarballs with lock-matching reported digests. Authenticate downloaded assets and resolve source/build/release-repository identity. Read-only registry/GitHub byte parity first. Qualify npm provenance repository compatibility and OIDC route. Then separately authorize publication and exact-match/partial-fanout behavior. | Never silently rewrite `package.json.repository`, repack an asset or assume central `--provenance` works. Retain current TF helper/token policy until a qualified replacement is approved. Existing immutable versions remain untouched. |
@@ -19,8 +25,12 @@ Keep current authoritative publication surfaces operational until an RS9 equival
 
 1. **Release authentication across release streams**:
    Authenticate release/tag lineage and downloaded asset bytes. Read-only genericity and byte-compatibility evidence is recorded in the [Foundation 3 candidate](../foundation3-candidate.md).
-2. **Nebular's genuine license conflict**:
-   Nebular's npm wrapper declares `AGPL-3.0-or-later OR Commercial` while tagged Git source and release archives declare `AGPL-3.0-or-later`. This conflict remains **unresolved**; tenant authority must decide. Syntax-only acceptance does not settle it, and RS9 cannot invent a resolution.
+2. **Nebular's historical npm metadata conflict**:
+   Manager direction resolves new downstream metadata to repository-authoritative
+   `AGPL-3.0-or-later`; commercial negotiation remains separate. The npm wrapper's
+   differing declaration remains a recorded historical conflict. New downstream
+   packages do not propagate that expression. The npm observe-only contract must
+   include licensing and let that pair block-conflict without blocking other lanes.
 3. **Current signing authority branding, UID domain, and rotation**:
    Preserve established trust until an independently qualified operator change.
 4. **Hosted GUI/FHS checks and display smoke qualification**:
@@ -34,7 +44,9 @@ Keep current authoritative publication surfaces operational until an RS9 equival
 
 ## Current control plane adoption gate
 
-`RS9-FOUNDATION3-PUBLICATION-CONTROL-PLANE`: Verify observation derivation, evidence-bound gates, pure planner actions, revision allocation, execution attempt auditing, confirmed receipts, and deterministic retry evaluation in pure offline test harnesses. No live signing, production publication, external repository mutation, or cutover is authorized.
+`RS9-FOUNDATION3-PUBLICATION-CONTROL-PLANE` is accepted as a foundation. LIVE1 still
+requires authoritative real-publisher qualification and exact destination readers.
+Passing synthetic planner tests supplies no live publication authority.
 
 ## Local Links
 

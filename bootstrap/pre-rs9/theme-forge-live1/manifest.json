@@ -1,0 +1,93 @@
+{
+  "schema": "rs9.bootstrap-tenant-manifest.v1alpha1",
+  "bootstrap-pre-rs9": true,
+  "release-contains-rs9": false,
+  "scope": "exact-generation",
+  "future-releases": "forbidden",
+  "projects": [
+    {
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+      "repository_id": 1342490027,
+      "tag": "v0.6.1",
+      "version": "0.6.1",
+      "release_id": 399542205,
+      "tag_commit": "a3e89683f92b8240c800ed303c866e7b12aa3277",
+      "tag_tree": "158bd6d03b21d747385fb25f49e6e148d62043c8",
+      "configuration": "theme-forge-stellar-burst",
+      "config_sha256": "db39ddce5ddc2448d6b0693cafe02489ddad4639f7eee6223d0506a37a841c1c",
+      "license_authority": {
+        "expression": "AGPL-3.0-or-later",
+        "basis": "manager-direction-and-authenticated-tagged-repository",
+        "files": [
+          "LICENSE",
+          "NOTICE",
+          "COMMERCIAL-LICENSE.md",
+          "package.json"
+        ]
+      }
+    },
+    {
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-loom",
+      "repository_id": 1361513719,
+      "tag": "v0.4.0",
+      "version": "0.4.0",
+      "release_id": 399542451,
+      "tag_commit": "d6f3cc457ee68224cef06e9599c9d2401057c618",
+      "tag_tree": "9388e305fd516755f01fdd01e66c72f09cc8e1d8",
+      "configuration": "theme-forge-stellar-loom",
+      "config_sha256": "c926fa9455f7f23ad06fd791e4ea417c0f6edf4e8b15fa6e4c026d777a8735aa",
+      "license_authority": {
+        "expression": "AGPL-3.0-or-later",
+        "basis": "manager-direction-and-authenticated-tagged-repository",
+        "files": [
+          "LICENSE",
+          "NOTICE",
+          "COMMERCIAL-LICENSE.md",
+          "package.json"
+        ]
+      }
+    },
+    {
+      "repository": "Knowledge-Forge-AI/theme-forge-solar-sail",
+      "repository_id": 1374611333,
+      "tag": "v0.2.1",
+      "version": "0.2.1",
+      "release_id": 399542664,
+      "tag_commit": "68e3f95a27cf1681aabb1fccb55e8b78d23b5fa0",
+      "tag_tree": "35a865bdea29dac6e39feb6afcba39485b23b3a6",
+      "configuration": "theme-forge-solar-sail",
+      "config_sha256": "afb77d5eb80e2728dce5b09f0ed30f734bd3daf39e486efc555b6b226d50621d",
+      "license_authority": {
+        "expression": "AGPL-3.0-or-later",
+        "basis": "manager-direction-and-authenticated-tagged-repository",
+        "files": [
+          "LICENSE",
+          "NOTICE",
+          "COMMERCIAL-LICENSE.md",
+          "package.json"
+        ]
+      }
+    },
+    {
+      "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+      "repository_id": 1358643872,
+      "tag": "v0.6.1",
+      "version": "0.6.1",
+      "release_id": 400494635,
+      "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+      "tag_tree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b",
+      "configuration": "theme-forge-nebular-fusion",
+      "config_sha256": "d009ea0a968ff4fcdacaedbb3ae75b0292ef40bb0899368dac4f71db27d63a41",
+      "license_authority": {
+        "expression": "AGPL-3.0-or-later",
+        "basis": "manager-direction-and-authenticated-tagged-repository",
+        "files": [
+          "LICENSE",
+          "NOTICE",
+          "COMMERCIAL-LICENSE.md",
+          "package.json"
+        ]
+      }
+    }
+  ]
+}

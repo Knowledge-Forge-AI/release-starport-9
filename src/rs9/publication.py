@@ -1,7 +1,7 @@
 """Future publisher contracts: attempts, readback receipts, and mandatory rereads."""
 from rs9.errors import ContractError
 from rs9.observation import validate_observation
-from rs9.planner import expected_components, validate_output, validate_policy
+from rs9.planner import expected_components, validate_output, validate_policy, has_plan_proof
 from rs9.records import Record, closed, parse_rfc3339_utc, record_sha256, snapshot, validate_bounded_int, validate_sha256
 
 ATTEMPT_OUTCOMES = {"not_attempted", "confirmed", "ambiguous", "failed"}
@@ -24,6 +24,17 @@ def validate_plan(plan):
 
 def mutation_attempt(plan, *, executor_role, started_at, finished_at, transport_outcome,
                      request_identity=None, response_remote=None, log_reference=None):
+    if transport_outcome != "not_attempted" and executor_role != "synthetic-test" and not has_plan_proof(plan):
+        raise ContractError("ATTEMPT_AUTHORITY", "Fresh in-process planning is required before attended transport")
+    return _attempt_record(plan, executor_role=executor_role, started_at=started_at,
+                           finished_at=finished_at, transport_outcome=transport_outcome,
+                           request_identity=request_identity, response_remote=response_remote,
+                           log_reference=log_reference)
+
+
+def _attempt_record(plan, *, executor_role, started_at, finished_at, transport_outcome,
+                    request_identity=None, response_remote=None, log_reference=None):
+    """Structural audit of persisted attempts grants no transport authority."""
     validate_plan(plan)
     if transport_outcome not in ATTEMPT_OUTCOMES or executor_role not in {"operator", "ci-publisher", "synthetic-test"}:
         raise ContractError("ATTEMPT_STATUS", "Explicit executor role and transport outcome required")
@@ -50,7 +61,7 @@ def validate_attempt(plan, attempt):
     closed(attempt, {"schema", "plan_sha256", "executor_role", "request_identity", "started_at", "finished_at", "transport_outcome", "response_remote", "log_reference"})
     if attempt["schema"] != "rs9.mutation-attempt.v1alpha1" or attempt["plan_sha256"] != record_sha256(plan):
         raise ContractError("ATTEMPT_BINDING", "Attempt does not bind immutable plan")
-    rebuilt = mutation_attempt(plan, **{key: value for key, value in attempt.items() if key not in {"schema", "plan_sha256"}})
+    rebuilt = _attempt_record(plan, **{key: value for key, value in attempt.items() if key not in {"schema", "plan_sha256"}})
     if rebuilt != attempt:
         raise ContractError("ATTEMPT_BINDING", "Attempt must be canonical")
     return rebuilt
@@ -86,6 +97,8 @@ def _ordered_after(observation, attempts, before):
 
 
 def publication_receipt(plan, attempts, post_observation):
+    from rs9.readers import has_live_proof
+    live_read = has_live_proof(post_observation)
     validate_plan(plan)
     rows = [validate_attempt(plan, row) for row in attempts]
     if len({record_sha256(row) for row in rows}) != len(rows):
@@ -98,7 +111,8 @@ def publication_receipt(plan, attempts, post_observation):
     if state == "exact" and plan["outcome"] == "noop" and not actual:
         final, proof = "already-exact", {"basis": "exact-noop", "observation_sha256": record_sha256(post)}
     elif state == "exact" and actual and any(row["transport_outcome"] in {"confirmed", "ambiguous"} for row in actual) and _ordered_after(post, actual, plan["observation"]["remote"]):
-        final, proof = "published", _ordered_after(post, actual, plan["observation"]["remote"])
+        proof = _ordered_after(post, actual, plan["observation"]["remote"])
+        final = "published" if live_read and has_plan_proof(plan) and all(a["executor_role"] != "synthetic-test" for a in actual) else "simulated"
     elif state == "conflict":
         final = "conflict"
     elif state == "incomplete":
@@ -107,7 +121,7 @@ def publication_receipt(plan, attempts, post_observation):
         final = "not-attempted"
     else:
         final = "unconfirmed"
-    return Record(snapshot({"schema": "rs9.publication-receipt.v1alpha1", "plan_sha256": record_sha256(plan),
+    return Record(snapshot({"schema": "rs9.publication-receipt.v1alpha2", "plan_sha256": record_sha256(plan),
          "attempts": rows, "attempt_sha256s": [record_sha256(row) for row in rows],
          "post_observation": post, "post_observation_sha256": record_sha256(post),
          "readback_proof": proof, "final_state": final}))
@@ -130,7 +144,14 @@ def next_action(plan, attempts, latest_observation, *, evaluated_at, receipt=Non
     rows = [validate_attempt(plan, row) for row in attempts]
     if receipt is not None:
         expected = publication_receipt(plan, receipt["attempts"], receipt["post_observation"])
-        if expected != receipt:
+        audit = snapshot(receipt)
+        # Persisted published claims retain their audit graph, but cannot mint a
+        # new published receipt. Authority always comes from fresh live readback.
+        if audit.get("final_state") == "published" and expected["final_state"] == "simulated" and all(
+            row["executor_role"] != "synthetic-test" for row in expected["attempts"]
+        ):
+            audit["final_state"] = "simulated"
+        if expected != audit:
             raise ContractError("RECEIPT_BINDING", "Receipt does not bind its exact readback graph")
         # A caller cannot erase recorded transport by omitting its attempts.
         rows = list({record_sha256(row): row for row in rows + expected["attempts"]}.values())
@@ -155,4 +176,6 @@ def next_action(plan, attempts, latest_observation, *, evaluated_at, receipt=Non
         return "replan-required"
     if state == "incomplete" and plan["outcome"] != "repair-intent":
         return "block"
+    if plan["outcome"] in MUTATING_INTENTS and not has_plan_proof(plan):
+        return "replan-required"
     return plan["outcome"]

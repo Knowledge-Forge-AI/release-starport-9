@@ -1,0 +1,58 @@
+{
+  "project": {
+    "id": "theme-forge-solar-sail",
+    "repository": "Knowledge-Forge-AI/theme-forge-solar-sail",
+    "name": "Theme Forge Solar Sail"
+  },
+  "version": "0.2.1",
+  "tag": "v0.2.1",
+  "license": {
+    "expression": "AGPL-3.0-or-later",
+    "source": "tagged-repository",
+    "files": [
+      "LICENSE",
+      "NOTICE",
+      "COMMERCIAL-LICENSE.md"
+    ]
+  },
+  "runtime": {
+    "kind": "node",
+    "constraint": ">=22"
+  },
+  "commands": [
+    {
+      "name": "tfss",
+      "interface": "cli"
+    }
+  ],
+  "release": {
+    "prerelease": "reject",
+    "evidence": {
+      "profile": "npm-package-archive.v1alpha1",
+      "checksums": "SHA256SUMS",
+      "assets": [
+        {
+          "role": "provenance",
+          "name": "PROVENANCE.json"
+        },
+        {
+          "role": "notice",
+          "name": "NOTICE"
+        }
+      ]
+    }
+  },
+  "assets": [
+    {
+      "id": "package",
+      "name": "knowledge-forge-ai-theme-forge-solar-sail-0.2.1.tgz",
+      "format": "tar.gz",
+      "platforms": [
+        "any"
+      ],
+      "commands": {
+        "tfss": "package/bin/tfss.js"
+      }
+    }
+  ]
+}

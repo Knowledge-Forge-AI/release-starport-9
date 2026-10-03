@@ -1,0 +1,23 @@
+{
+  "schema": "rs9.live1-readiness.v1alpha1",
+  "stage": "implementation-candidate",
+  "production_enabled": false,
+  "release_metadata": "fresh-match",
+  "release_byte_authentication": "not-run-network-unavailable",
+  "pypi_names": "unknown-current-observation-unavailable",
+  "pypi_ownership": "not-attested",
+  "pypi_trusted_publishers": "not-attested",
+  "nix_native_qualification": "not-run",
+  "nebular_raw_store_materialized_smoke": "not-run",
+  "linux_fhs_closure_both_architectures": "not-run",
+  "native_package_builds": "not-run-linux-tools-unavailable",
+  "clean_clients_and_tamper_checks": "not-run",
+  "pages_administration": "unknown-connector-endpoint-unavailable",
+  "dns_and_tls": "unknown-current-observation-unavailable",
+  "signing_custody": "unknown-local-metadata-listing-failed",
+  "production_primary_fingerprint": "7D03EE84F8C7025FD2F3D772BF89DF6643C2F1AF",
+  "production_signing_subkey": "C021E00EE3D37C459B0E1CB3199F8028126E8A8C",
+  "private_material_read": false,
+  "live_transports": "unimplemented-closed",
+  "publication_receipts": "none"
+}

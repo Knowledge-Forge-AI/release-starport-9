@@ -1,0 +1,164 @@
+{
+  "schema": "rs9.nix-candidates.v1alpha1",
+  "status": "pending",
+  "authenticated": false,
+  "generated_at": "2026-10-03T13:46:31-04:00",
+  "products": {
+    "theme-forge-stellar-burst": {
+      "id": "theme-forge-stellar-burst",
+      "pname": "theme-forge-stellar-burst",
+      "version": "0.6.1",
+      "summary": "Evidence-bound Theme Forge Stellar Burst CLI and Studio Service",
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+      "tag": "v0.6.1",
+      "kind": "node-cli",
+      "license": "AGPL-3.0-or-later",
+      "node_engine": ">=22",
+      "authenticated": false,
+      "commands": [
+        "tfsb",
+        "tfsb-studio-service"
+      ],
+      "asset": {
+        "name": "knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-stellar-burst/releases/download/v0.6.1/knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+        "sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+        "size": 644313,
+        "root": "package"
+      },
+      "platforms": [
+        "aarch64-darwin",
+        "x86_64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "command_paths": {
+        "tfsb": "dist/cli.js",
+        "tfsb-studio-service": "dist/service-protocol/server-cli.js"
+      }
+    },
+    "theme-forge-stellar-loom": {
+      "id": "theme-forge-stellar-loom",
+      "pname": "theme-forge-stellar-loom",
+      "version": "0.4.0",
+      "summary": "Evidence-bound Theme Forge Stellar Loom CLI and batch compiler",
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-loom",
+      "tag": "v0.4.0",
+      "kind": "node-cli",
+      "license": "AGPL-3.0-or-later",
+      "node_engine": ">=22",
+      "authenticated": false,
+      "commands": [
+        "tfsl",
+        "tfsl-batch"
+      ],
+      "asset": {
+        "name": "knowledge-forge-ai-theme-forge-stellar-loom-0.4.0.tgz",
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-stellar-loom/releases/download/v0.4.0/knowledge-forge-ai-theme-forge-stellar-loom-0.4.0.tgz",
+        "sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+        "root": "package"
+      },
+      "platforms": [
+        "aarch64-darwin",
+        "x86_64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "command_paths": {
+        "tfsl": "bin/tfsl.js",
+        "tfsl-batch": "bin/tfsl-batch.js"
+      }
+    },
+    "theme-forge-solar-sail": {
+      "id": "theme-forge-solar-sail",
+      "pname": "theme-forge-solar-sail",
+      "version": "0.2.1",
+      "summary": "Evidence-bound Theme Forge Solar Sail lightweight deployment and sync tool",
+      "repository": "Knowledge-Forge-AI/theme-forge-solar-sail",
+      "tag": "v0.2.1",
+      "kind": "node-cli",
+      "license": "AGPL-3.0-or-later",
+      "node_engine": ">=22",
+      "authenticated": false,
+      "commands": [
+        "tfss"
+      ],
+      "asset": {
+        "name": "knowledge-forge-ai-theme-forge-solar-sail-0.2.1.tgz",
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-solar-sail/releases/download/v0.2.1/knowledge-forge-ai-theme-forge-solar-sail-0.2.1.tgz",
+        "sha256": "ebc4f21d1e61dbc0ac4e87ce81f7ecec4f97d7c15562356e429d4c1a4e9aa5a0",
+        "root": "package"
+      },
+      "platforms": [
+        "aarch64-darwin",
+        "x86_64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "command_paths": {
+        "tfss": "bin/tfss.js"
+      }
+    },
+    "theme-forge-nebular-fusion": {
+      "id": "theme-forge-nebular-fusion",
+      "pname": "theme-forge-nebular-fusion",
+      "version": "0.6.1",
+      "summary": "Evidence-bound Theme Forge integration workbench",
+      "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+      "tag": "v0.6.1",
+      "commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+      "kind": "materialized-desktop",
+      "license": "AGPL-3.0-or-later",
+      "authenticated": false,
+      "commands": [
+        "tfnf"
+      ],
+      "icon": {
+        "url": "https://raw.githubusercontent.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e/src-tauri/icons/icon.png",
+        "sha256": "pending",
+        "size": 256
+      },
+      "assets": {
+        "aarch64-darwin": {
+          "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+          "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+          "sha256": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be",
+          "size": 47079690,
+          "root": "Theme Forge Nebular Fusion.app",
+          "launcher": "Contents/Resources/bin/tfnf",
+          "executable_path": "Theme Forge Nebular Fusion.app/Contents/MacOS/theme-forge-nebular-fusion",
+          "executable_sha256": "pending",
+          "payload_manifest_sha256": "pending"
+        },
+        "aarch64-linux": {
+          "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+          "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+          "sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+          "size": 54248930,
+          "root": "theme-forge-nebular-fusion",
+          "launcher": "bin/tfnf",
+          "executable_path": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+          "executable_sha256": "pending",
+          "payload_manifest_sha256": "pending"
+        },
+        "x86_64-linux": {
+          "name": "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+          "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+          "sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+          "size": 54105413,
+          "root": "theme-forge-nebular-fusion",
+          "launcher": "bin/tfnf",
+          "executable_path": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+          "executable_sha256": "pending",
+          "payload_manifest_sha256": "pending"
+        }
+      },
+      "closure_qualification": {
+        "status": "not-run",
+        "authenticated": false,
+        "native_proof_status": "pending",
+        "rationale": "Complete per-system ELF/FHS closure and raw/store/materialized smoke must be derived and executed in RS9."
+      }
+    }
+  }
+}

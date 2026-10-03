@@ -1,0 +1,23 @@
+{
+  "container_engine": "unavailable",
+  "github_connector": "metadata-and-UTF8-only",
+  "host": {
+    "architecture": "arm64",
+    "os": "Darwin"
+  },
+  "linux_package_tools": "unavailable",
+  "native_qualification": "not-run",
+  "nix_daemon": "permission-denied",
+  "nix_pure_evaluator": "available",
+  "observed_tools": {
+    "gpg": "2.4.9",
+    "nix": "2.31.5",
+    "node": "22.22.2",
+    "python": "3.13.12",
+    "rtk": "0.43.0"
+  },
+  "private_material_read": false,
+  "production_signing_custody": "unknown-metadata-only-list-failed",
+  "public_shell_transport": "unavailable-dns-resolution",
+  "schema": "rs9.live1-environment-observation.v1alpha1"
+}

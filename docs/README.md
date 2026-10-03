@@ -2,6 +2,9 @@
 
 Release Starport 9 is organized around stable, evidence-bound contracts across its ingestion, rendering, and publication control planes.
 
+Theme Forge LIVE1 is pending / not live. See the [candidate disposition](live1-candidate.md),
+[source inventory](live1-inventory.md) and [attended preparation runbook](../operators/live1/RUNBOOK.md).
+
 ## Architecture and governance
 
 - [Architecture](architecture.md) — Control-plane responsibilities, publication modes, and trust boundaries.
@@ -19,6 +22,7 @@ Release Starport 9 is organized around stable, evidence-bound contracts across i
 - [ADR 0003: Authenticated ingestion and shadow adapters](adr/0003-authenticated-ingestion-and-shadow-adapters.md) — Bounded byte capture and deferred shadow adapters.
 - [ADR 0004: Ingestion core and evidence profiles](adr/0004-ingestion-core-and-evidence-profiles.md) — Generic release capture, closed profiles, hardlink rejection, and in-process `ReleaseCapture`.
 - [ADR 0005: Publication state, planner, and receipts](adr/0005-publication-state-planner-and-receipts.md) — Pure planner, observation derivation, evidence gates, revision allocation, receipts, and nine retry MUST rules.
+- [ADR 0006: LIVE1 gates and bootstrap](adr/0006-live-publisher-gates-and-bootstrap-tenants.md) — Mandatory adapter gates, reviewed local verifier authority and exact-generation configuration.
 
 ## Implemented specifications
 
@@ -30,6 +34,9 @@ Release Starport 9 is organized around stable, evidence-bound contracts across i
 - [Publication plan v1alpha1](specs/rs9-publication-plan-v1alpha1.md) — Pure planner actions, revision allocation, and semantic content identity.
 - [Publication receipt v1alpha1](specs/rs9-publication-receipt-v1alpha1.md) — Execution attempt records and confirmed post-readback receipts.
 - [Retry and idempotence v1alpha1](specs/rs9-retry-idempotence-v1alpha1.md) — Deterministic retry evaluation and the nine retry MUST rules.
+- [LIVE1 policy and receipt v1alpha2](specs/rs9-live1-policy-receipt-v1alpha2.md) — Explicit migration and live-read authority.
+- [Qualification record v1alpha1](specs/rs9-qualification-record-v1alpha1.md) — Executed local verifier boundary; imported verdicts grant no authority.
+- [Bootstrap tenant v1alpha1](specs/rs9-bootstrap-tenant-v1alpha1.md) — Reviewed exception for these four releases only.
 
 ## Foundation qualification records
 

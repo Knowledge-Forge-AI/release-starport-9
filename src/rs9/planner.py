@@ -5,6 +5,17 @@ from rs9.observation import validate_destination, validate_subject, validate_obs
 from rs9.records import Record, closed, parse_rfc3339_utc, record_sha256, semantic_identity_sha256, snapshot, validate_bounded_int, validate_sha256, validate_sanitized_string
 from rs9.security import validate_safe_relative_posix_path
 
+_PLAN_PROOF = object()
+
+
+class PublicationPlan(Record):
+    """A persisted plan is evidence; fresh in-process planning owns authority."""
+
+
+def has_plan_proof(value):
+    return (isinstance(value, PublicationPlan) and value.__dict__.get("_proof") is _PLAN_PROOF
+            and value.__dict__.get("_hash") == record_sha256(value))
+
 
 def safe_repair_contract(contract_id, adapter, allowed_components):
     for name in allowed_components:
@@ -67,7 +78,9 @@ def validate_output(output):
 def destination_policy(*, enabled=True, max_observation_age_seconds=300, required_gates=(),
                        allow_not_applicable=(), external_evidence=None, repair_contract=None,
                        immutable_versions=True, revision_floor=1, pinned_revision=None,
-                       base_commit=None, allowed_paths=()):
+                       base_commit=None, allowed_paths=(), mode="publish"):
+    if mode not in {"publish", "observe-only"}:
+        raise ContractError("POLICY_MODE", "Unknown publication policy mode")
     if type(enabled) is not bool or type(immutable_versions) is not bool:
         raise ContractError("POLICY_TYPE", "Explicit policy booleans required")
     validate_bounded_int(max_observation_age_seconds, min_val=1, max_val=86400)
@@ -84,7 +97,7 @@ def destination_policy(*, enabled=True, max_observation_age_seconds=300, require
     for rows in external_evidence.values():
         for sha in rows:
             validate_sha256(sha)
-    return Record(snapshot({"schema": "rs9.destination-policy.v1alpha1", "enabled": enabled,
+    return Record(snapshot({"schema": "rs9.destination-policy.v1alpha2", "mode": mode, "enabled": enabled,
          "max_observation_age_seconds": max_observation_age_seconds, "required_gates": sorted(set(required_gates)),
          "allow_not_applicable": sorted(set(allow_not_applicable)),
          "external_evidence": {key: sorted(set(rows)) for key, rows in sorted(external_evidence.items())},
@@ -93,7 +106,7 @@ def destination_policy(*, enabled=True, max_observation_age_seconds=300, require
 
 
 def validate_policy(policy):
-    fields = {"schema", "enabled", "max_observation_age_seconds", "required_gates", "allow_not_applicable", "external_evidence", "repair_contract", "immutable_versions", "revision_floor", "pinned_revision", "base_commit", "allowed_paths"}
+    fields = {"schema", "mode", "enabled", "max_observation_age_seconds", "required_gates", "allow_not_applicable", "external_evidence", "repair_contract", "immutable_versions", "revision_floor", "pinned_revision", "base_commit", "allowed_paths"}
     closed(policy, fields)
     rebuilt = destination_policy(**{key: value for key, value in policy.items() if key != "schema"})
     if rebuilt != policy:
@@ -175,6 +188,8 @@ def adapter_outputs_from_shadow(authenticated, manifest):
 def plan(intent, capture, profile_result, output, gates, policy, observation, *, evaluated_at, ingestion_record=None):
     from rs9.release_core import authenticated_record_hash
     release_hash = authenticated_record_hash(capture)
+    from rs9.bootstrap import require_configuration_authority
+    require_configuration_authority(capture, intent)
     output, policy = validate_output(output), validate_policy(policy)
     if intent["project"]["repository"] != capture.record["repository"]["full_name"] or intent["tag"] != capture.record["release"]["tag"]:
         raise ContractError("INTENT_BINDING", "Intent does not bind the captured release")
@@ -188,7 +203,7 @@ def plan(intent, capture, profile_result, output, gates, policy, observation, *,
     if profile_result["intent_sha256"] != record_sha256(intent) or profile_result["profile"] != intent["release"]["evidence"]["profile"]:
         raise ContractError("PROFILE_BINDING", "Profile result does not bind selected intent and profile")
     from rs9.profiles import selection_for_intent
-    if record_sha256(selection_for_intent(intent)) != capture.record["selection_sha256"]:
+    if record_sha256(selection_for_intent(intent, include_configuration=any(p.startswith(".rs9/") for p in capture.source))) != capture.record["selection_sha256"]:
         raise ContractError("INTENT_BINDING", "Release selection differs from authenticated capture")
     for name, sha in output["semantic_identity"]["artifact_payload_hashes"].items():
         if not any(row["name"] == name and row["sha256"] == sha for row in capture.record["payloads"]):
@@ -213,7 +228,9 @@ def plan(intent, capture, profile_result, output, gates, policy, observation, *,
     evaluation = parse_rfc3339_utc(evaluated_at)
     observed = parse_rfc3339_utc(observation["observed_at"])
     stale = observed > evaluation or (evaluation - observed).total_seconds() > policy["max_observation_age_seconds"]
-    gate_rows, gate_reasons = check_gates(intent, release_hash, profile_result, output, gates, policy)
+    if output["destination"]["adapter"] in {"npm", "homebrew"} and policy["mode"] != "observe-only":
+        raise ContractError("OBSERVE_ONLY", "Reference targets cannot acquire publication authority")
+    gate_rows, gate_reasons = check_gates(intent, capture, profile_result, output, gates, policy)
     state, reasons = observation["state"], []
     allocation = allocate_revision(output["revision_scheme"], observation["revisions"], output["content_identity_sha256"],
                                    floor=policy["revision_floor"], pinned=policy["pinned_revision"], immutable=policy["immutable_versions"])
@@ -231,6 +248,8 @@ def plan(intent, capture, profile_result, output, gates, policy, observation, *,
     elif state == "exact":
         outcome = "noop"
         allocation["output"] = {"revision": output["subject"]["revision"], "basis": "reuse-exact-readback"}
+    elif policy["mode"] == "observe-only":
+        outcome, reasons = "block", ["observe-only-destination"]
     elif gate_reasons:
         outcome, reasons = "block-gate", gate_reasons
     elif state == "absent":
@@ -260,4 +279,6 @@ def plan(intent, capture, profile_result, output, gates, policy, observation, *,
               "desired": output, "policy": policy, "gates": gate_rows, "observation": observation,
               "evaluated_at": evaluated_at, "outcome": outcome, "reasons": sorted(reasons),
               "revision_allocation": allocation, "projection": projection, "contribution": contribution}
-    return Record(snapshot(result))
+    authorized = PublicationPlan(snapshot(result))
+    authorized._proof, authorized._hash = _PLAN_PROOF, record_sha256(authorized)
+    return authorized

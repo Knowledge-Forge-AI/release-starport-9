@@ -12,10 +12,26 @@ class AuthenticatedInputs:
         self.release_capture, self.profile_result = release_capture, profile_result
 
 
-def authenticate(normalized, evidence):
+def authenticate(normalized, evidence, *, bootstrap_manifest=None, approved_manifests=()):
+    return _authenticate(normalized, evidence, bootstrap_manifest=bootstrap_manifest,
+                         approved_manifests=approved_manifests, require_configuration=True)
+
+
+def authenticate_shadow(normalized, evidence):
+    """Legacy diagnostic input only; cannot bypass the planner configuration gate."""
+    return _authenticate(normalized, evidence, require_configuration=False)
+
+
+def _authenticate(normalized, evidence, *, bootstrap_manifest=None, approved_manifests=(), require_configuration):
     try:
-        selection = selection_for_intent(normalized)
+        selection = selection_for_intent(normalized, include_configuration=require_configuration and bootstrap_manifest is None)
         capture = authenticate_release(selection, evidence)
+        if require_configuration:
+            from rs9.bootstrap import load_bootstrap, require_configuration_authority
+            if bootstrap_manifest is not None:
+                if load_bootstrap(bootstrap_manifest, capture, approved_manifests=approved_manifests) != normalized:
+                    raise ContractError("BOOTSTRAP_BINDING", "Intent differs from approved bootstrap")
+            require_configuration_authority(capture, normalized)
         profile, policy, roles = evidence_policy(normalized)
         result = evaluate_profile(capture, profile, normalized, roles=roles)
         legacy = result["sections"].get("legacy_ingestion")

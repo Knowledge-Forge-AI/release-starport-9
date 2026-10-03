@@ -1,0 +1,49 @@
+{
+  "schema": "rs9.live1-channel-intent.v1alpha1",
+  "project_id": "theme-forge-stellar-burst",
+  "version": "0.6.1",
+  "publication": {
+    "pypi": {
+      "name": "theme-forge-stellar-burst",
+      "status": "pending",
+      "source": "wrapper-from-authenticated-release",
+      "sdist": false
+    },
+    "nix": {
+      "name": "theme-forge-stellar-burst",
+      "status": "unexposed"
+    },
+    "pacman": {
+      "name": "theme-forge-stellar-burst",
+      "architectures": [
+        "x86_64"
+      ],
+      "status": "pending"
+    },
+    "dnf": {
+      "name": "theme-forge-stellar-burst",
+      "architectures": [
+        "x86_64",
+        "aarch64"
+      ],
+      "fedora_families": [],
+      "status": "pending"
+    },
+    "apt": {
+      "name": "theme-forge-stellar-burst",
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "distribution": "Ubuntu",
+      "version": "26.04",
+      "status": "pending"
+    },
+    "npm": {
+      "mode": "observe-only"
+    },
+    "homebrew": {
+      "mode": "observe-only"
+    }
+  }
+}

@@ -6,7 +6,7 @@ from urllib.parse import unquote
 
 from rs9.errors import ContractError
 from rs9.fetch import fetch
-from rs9.ingestion import authenticate
+from rs9.ingestion import authenticate_shadow as authenticate
 
 from tests.shadow_fixtures import fixture_evidence
 

@@ -1,0 +1,15 @@
+{
+  "cases": 295,
+  "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -q",
+  "expected_negative_diagnostic": "AMBIGUOUS_COVERAGE",
+  "failed": 0,
+  "git_diff_check": "passed",
+  "limits": "Fixture wheels and package inputs; no real publication or readback evidence.",
+  "native_linux_clean_clients": "not-run",
+  "native_nebular_smoke": "not-run",
+  "passed": 290,
+  "real_release_qualification": false,
+  "schema": "rs9.live1-unit-verification.v1alpha1",
+  "skip_reason": "Authenticated live Nebular/Burst capture directories unavailable.",
+  "skipped": 5
+}
