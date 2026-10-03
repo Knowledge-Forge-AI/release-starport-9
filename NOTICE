@@ -1,0 +1,21 @@
+# Release Starport 9 Notice
+
+Release Starport 9 is stewarded by Samuel Leighton Lair.
+
+Copyright (c) 2026 Samuel Leighton Lair and Release Starport 9 contributors.
+
+Unless a file states otherwise, RS9's own source code, publication infrastructure, generators, adapters, templates, verification tooling, documentation, and other RS9-authored material are licensed under the GNU Affero General Public License v3.0 or later. See LICENSE.
+
+Commercial licenses for RS9 itself are available for proprietary terms. Commercial licensing contact: lair001@gmail.com.
+
+## Distributed-project licensing boundary
+
+RS9 is publication infrastructure. Software that RS9 packages, mirrors, verifies, republishes, or submits to downstream ecosystems is not relicensed merely because RS9 processes or distributes it.
+
+Each distributed project, release artifact, dependency, package payload, and other third-party or separately maintained material remains subject to the copyright, license, notice, trademark, and other terms established by its authoritative source repository, release, or upstream rights holder.
+
+Generated package metadata must describe the distributed project's applicable license rather than treating RS9's AGPL-3.0-or-later license as the payload license.
+
+A project's `.rs9/` configuration lives in that project's repository and is governed by that project's own repository terms unless the file states otherwise.
+
+Third-party material incorporated into RS9 itself remains subject to its own license and notice requirements.
