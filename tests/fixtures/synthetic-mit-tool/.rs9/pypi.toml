@@ -1,0 +1,10 @@
+schema = "rs9.pypi.v1alpha1"
+
+[[packages]]
+id = "main"
+name = "mit-tool"
+assets = ["wheel", "sdist"]
+
+[[publish]]
+package = "main"
+destination = "pypi"

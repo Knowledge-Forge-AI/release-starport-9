@@ -1,0 +1,21 @@
+schema = "rs9.project.v1alpha1"
+
+[project]
+id = "synthetic-mit-tool"
+name = "Invented MIT tool (no real release)"
+repository = "Example/synthetic-mit-tool"
+
+[license]
+expression = "MIT"
+source = "tagged-repository"
+files = ["LICENSE"]
+
+[[commands]]
+name = "mit-tool"
+interface = "cli"
+
+[[checks]]
+id = "version"
+argv = ["mit-tool", "--version"]
+expect-stdout-contains = "{version}"
+requires-display = false

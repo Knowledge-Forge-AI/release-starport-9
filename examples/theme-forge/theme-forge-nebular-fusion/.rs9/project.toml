@@ -1,0 +1,27 @@
+schema = "rs9.project.v1alpha1"
+
+[project]
+id = "theme-forge-nebular-fusion"
+name = "Theme Forge Nebular Fusion"
+repository = "Knowledge-Forge-AI/theme-forge-nebular-fusion"
+family = "theme-forge"
+
+[license]
+# Matches distro metadata. npm's OR Commercial declaration remains unresolved.
+expression = "AGPL-3.0-or-later"
+source = "tagged-repository"
+files = ["LICENSE", "NOTICE"]
+
+[runtime]
+kind = "native"
+
+[[commands]]
+name = "tfnf"
+interface = "gui"
+
+[[checks]]
+id = "version"
+argv = ["tfnf", "--version"]
+expect-exit = 0
+expect-stdout-contains = "theme-forge-nebular-fusion {version}"
+requires-display = true

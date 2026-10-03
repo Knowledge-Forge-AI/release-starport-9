@@ -1,0 +1,240 @@
+{
+  "assets": [
+    {
+      "commands": {
+        "tfnf": "Theme Forge Nebular Fusion.app/Contents/MacOS/theme-forge-nebular-fusion"
+      },
+      "format": "tar.gz",
+      "id": "darwin-arm64",
+      "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+      "platforms": [
+        "aarch64-darwin"
+      ]
+    },
+    {
+      "commands": {
+        "tfnf": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion"
+      },
+      "format": "tar.gz",
+      "id": "linux-arm64",
+      "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+      "platforms": [
+        "aarch64-linux"
+      ]
+    },
+    {
+      "commands": {
+        "tfnf": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion"
+      },
+      "format": "tar.gz",
+      "id": "linux-x64",
+      "name": "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+      "platforms": [
+        "x86_64-linux"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "argv": [
+        "tfnf",
+        "--version"
+      ],
+      "expect-exit": 0,
+      "expect-stdout-contains": "theme-forge-nebular-fusion 0.6.1",
+      "id": "version",
+      "requires-display": true
+    }
+  ],
+  "commands": [
+    {
+      "interface": "gui",
+      "name": "tfnf"
+    }
+  ],
+  "evidence": {
+    "inputs": [
+      {
+        "filename": "apt.toml",
+        "sha256": "f77a3fbbebba1873e67378670e563ecf9b28477782eaff60f50d00ead6cd9719"
+      },
+      {
+        "filename": "destinations.toml",
+        "sha256": "0c49d3dde3587a02ca6967ed0e0f4545d49b0119b8ff7f0a7e4a1208b8f09e8c"
+      },
+      {
+        "filename": "dnf.toml",
+        "sha256": "0a13048275014e92c106844ebe2e1eb39173f07289f7a37deeddbbc2246b37da"
+      },
+      {
+        "filename": "homebrew.toml",
+        "sha256": "741ebe622358546a328886df8728d212de7dc21559c1a10bdb5804395a0232a9"
+      },
+      {
+        "filename": "nix.toml",
+        "sha256": "303da468e0b7e8a2359416254f01a0d0278370bbef6008bd3fa8ecce7dfb1d4c"
+      },
+      {
+        "filename": "pacman.toml",
+        "sha256": "d99d362af1662710f37dba84af300676daf513ab7574386736455f90829d8473"
+      },
+      {
+        "filename": "project.toml",
+        "sha256": "0b6b6e121e4bacfa43b19b58ba39c9855e80a3adc2504463470001c2b5d39ece"
+      },
+      {
+        "filename": "releases.toml",
+        "sha256": "b79c4740d3aa0b69f71b9d02bd19804bbcd1c0380c367d55d62c58194f55dbc7"
+      }
+    ]
+  },
+  "license": {
+    "expression": "AGPL-3.0-or-later",
+    "files": [
+      "LICENSE",
+      "NOTICE"
+    ],
+    "source": "tagged-repository"
+  },
+  "project": {
+    "family": "theme-forge",
+    "id": "theme-forge-nebular-fusion",
+    "name": "Theme Forge Nebular Fusion",
+    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion"
+  },
+  "release": {
+    "prerelease": "reject",
+    "tag": "v0.6.1",
+    "version": "0.6.1"
+  },
+  "runtime": {
+    "kind": "native"
+  },
+  "schema": "rs9.normalized-tenant.v1alpha1",
+  "tag": "v0.6.1",
+  "targets": [
+    {
+      "adapter": "pacman",
+      "assets": [
+        "linux-arm64",
+        "linux-x64"
+      ],
+      "destination": "aur",
+      "destination-status": "candidate",
+      "ecosystem-architectures": [
+        "aarch64",
+        "x86_64"
+      ],
+      "effective-platforms": [
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "mode": "projection",
+      "name": "theme-forge-nebular-fusion-bin",
+      "package": "aur"
+    },
+    {
+      "adapter": "apt",
+      "assets": [
+        "linux-arm64",
+        "linux-x64"
+      ],
+      "base-url": "https://knowledge-forge-ai.github.io/theme-forge-packages/apt",
+      "destination": "kfa-apt",
+      "destination-status": "candidate",
+      "ecosystem-architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "effective-platforms": [
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "mode": "direct",
+      "name": "theme-forge-nebular-fusion",
+      "package": "main"
+    },
+    {
+      "adapter": "homebrew",
+      "assets": [
+        "darwin-arm64"
+      ],
+      "destination": "kfa-homebrew-tap",
+      "destination-status": "illustrative",
+      "ecosystem-architectures": [
+        "arm64"
+      ],
+      "effective-platforms": [
+        "aarch64-darwin"
+      ],
+      "mode": "projection",
+      "name": "theme-forge-nebular-fusion",
+      "package": "main",
+      "repository": "Knowledge-Forge-AI/homebrew-tap"
+    },
+    {
+      "adapter": "nix",
+      "assets": [
+        "darwin-arm64",
+        "linux-arm64",
+        "linux-x64"
+      ],
+      "destination": "kfa-nix",
+      "destination-status": "illustrative",
+      "ecosystem-architectures": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "effective-platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "mode": "projection",
+      "name": "theme-forge-nebular-fusion",
+      "package": "main",
+      "repository": "Knowledge-Forge-AI/theme-forge-packages"
+    },
+    {
+      "adapter": "pacman",
+      "assets": [
+        "linux-x64"
+      ],
+      "base-url": "https://knowledge-forge-ai.github.io/theme-forge-packages/arch",
+      "destination": "kfa-pacman",
+      "destination-status": "illustrative",
+      "ecosystem-architectures": [
+        "x86_64"
+      ],
+      "effective-platforms": [
+        "x86_64-linux"
+      ],
+      "mode": "direct",
+      "name": "theme-forge-nebular-fusion",
+      "package": "hosted"
+    },
+    {
+      "adapter": "dnf",
+      "assets": [
+        "linux-arm64",
+        "linux-x64"
+      ],
+      "base-url": "https://knowledge-forge-ai.github.io/theme-forge-packages/rpm",
+      "destination": "kfa-rpm",
+      "destination-status": "illustrative",
+      "ecosystem-architectures": [
+        "aarch64",
+        "x86_64"
+      ],
+      "effective-platforms": [
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "mode": "direct",
+      "name": "theme-forge-nebular-fusion",
+      "package": "main"
+    }
+  ],
+  "version": "0.6.1"
+}

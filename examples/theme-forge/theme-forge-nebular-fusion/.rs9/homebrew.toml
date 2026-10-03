@@ -1,0 +1,11 @@
+schema = "rs9.homebrew.v1alpha1"
+
+[[packages]]
+id = "main"
+name = "theme-forge-nebular-fusion"
+assets = ["darwin-arm64"]
+platforms = ["aarch64-darwin"]
+
+[[publish]]
+package = "main"
+destination = "kfa-homebrew-tap"
