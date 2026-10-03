@@ -1,0 +1,10 @@
+schema = "rs9.npm.v1alpha1"
+
+[[packages]]
+id = "main"
+name = "@example/mit-tool"
+assets = ["npm"]
+
+[[publish]]
+package = "main"
+destination = "npmjs"

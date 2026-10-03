@@ -1,0 +1,111 @@
+"""Tenant facts and bounded configuration-directory loading."""
+from pathlib import Path
+from rs9.adapters import validate_adapter
+from rs9.constants import ALLOWED_PROJECT_FILES, SCHEMA_PROJECT
+from rs9.errors import ContractError
+from rs9.fields import choice, read_toml, schema, strings, table, typed, unique_rows
+from rs9.releases import validate_releases
+from rs9.security import (validate_nfc_string, validate_repository, validate_safe_basename,
+                          validate_safe_relative_posix_path, validate_slug,
+                          validate_template)
+from rs9.spdx import validate_spdx_expression
+
+
+def find_rs9_dir(project_dir):
+    root = Path(project_dir)
+    directory = root / ".rs9"
+    if root.is_symlink() or directory.is_symlink():
+        raise ContractError("SYMLINK_REJECTED", "Project/configuration root cannot be a symlink")
+    if not directory.exists():
+        raise ContractError("MISSING_REQUIRED_FILE", "Could not locate .rs9 directory")
+    if not directory.is_dir():
+        raise ContractError("INVALID_DIRECTORY", ".rs9 must be a directory")
+    return directory
+
+
+def load_project(project_dir, *, input_hashes=None):
+    directory = find_rs9_dir(project_dir)
+    for entry in directory.iterdir():
+        if entry.is_symlink():
+            raise ContractError("SYMLINK_REJECTED", "Symlinks are forbidden in .rs9")
+        if entry.name not in ALLOWED_PROJECT_FILES or not entry.is_file():
+            raise ContractError("UNKNOWN_FILE", "Unknown or non-regular configuration entry")
+    for required in ("project.toml", "releases.toml"):
+        if not (directory / required).is_file():
+            raise ContractError("MISSING_REQUIRED_FILE", "Required tenant configuration is missing")
+    documents = {}
+    for entry in sorted(directory.iterdir()):
+        documents[entry.name], digest = read_toml(entry)
+        if input_hashes is not None:
+            input_hashes[entry.name] = digest
+    validate_project(documents["project.toml"])
+    commands = {c["name"] for c in documents["project.toml"].get("commands", [])}
+    validate_releases(documents["releases.toml"], commands)
+    assets = {a["id"]: a for a in documents["releases.toml"]["assets"]}
+    for filename, doc in documents.items():
+        if filename not in ("project.toml", "releases.toml"):
+            validate_adapter(filename[:-5], doc, assets)
+    return documents
+
+
+def validate_license(value):
+    license = table(value, {"expression", "files", "source"}, "license",
+                    required={"expression", "files", "source"})
+    validate_spdx_expression(license.get("expression", ""))
+    for path in strings(license.get("files"), "license.files"):
+        validate_safe_relative_posix_path(path, "license.files")
+    choice(license.get("source"), {"tagged-repository"}, "license.source")
+
+
+def validate_command(value):
+    command = table(value, {"name", "interface"}, "command", required={"name", "interface"})
+    validate_safe_basename(command.get("name"), "command.name")
+    choice(command.get("interface"), {"cli", "gui"}, "command.interface")
+
+
+def validate_check(value, commands):
+    check = table(value, {"id", "argv", "expect-exit", "expect-stdout-contains", "requires-display"}, "check",
+                  required={"id", "argv", "requires-display"})
+    validate_slug(check.get("id"), "check.id")
+    argv = typed(check.get("argv"), list, "check.argv")
+    if not argv:
+        raise ContractError("INVALID_CONFIG", "Check argv cannot be empty")
+    for argument in argv:
+        typed(argument, str, "check.argv item")
+        validate_nfc_string(argument)
+    if argv[0] not in commands:
+        raise ContractError("UNKNOWN_REFERENCE", "Check must name a declared command")
+    typed(check.get("expect-exit", 0), int, "check.expect-exit")
+    typed(check["requires-display"], bool, "check.requires-display")
+    if "expect-stdout-contains" in check:
+        typed(check["expect-stdout-contains"], str, "check output")
+        validate_nfc_string(check["expect-stdout-contains"])
+        validate_template(check["expect-stdout-contains"], False, "check output")
+
+
+def validate_project(doc):
+    table(doc, {"schema", "project", "license", "runtime", "commands", "checks"}, "project.toml",
+          required={"schema", "project", "license"})
+    schema(doc, SCHEMA_PROJECT)
+    project = table(doc.get("project"), {"id", "name", "repository", "family"}, "project",
+                    required={"id", "name", "repository"})
+    validate_slug(project.get("id"), "project.id")
+    if not typed(project.get("name"), str, "project.name").strip():
+        raise ContractError("INVALID_CONFIG", "Project name cannot be empty")
+    validate_repository(project.get("repository"))
+    if "family" in project:
+        validate_slug(project["family"], "project.family")
+    validate_license(doc.get("license"))
+    commands = typed(doc.get("commands", []), list, "commands")
+    for command in commands:
+        validate_command(command)
+    unique_rows(commands, "name")
+    checks = typed(doc.get("checks", []), list, "checks")
+    for check in checks:
+        validate_check(check, {c["name"] for c in commands})
+    unique_rows(checks, "id")
+    if "runtime" in doc:
+        runtime = table(doc["runtime"], {"kind", "constraint"}, "runtime", required={"kind"})
+        choice(runtime.get("kind"), {"native", "node", "python"}, "runtime.kind")
+        if "constraint" in runtime:
+            typed(runtime["constraint"], str, "runtime.constraint")

@@ -1,0 +1,26 @@
+schema = "rs9.releases.v1alpha1"
+
+[release]
+tag = "tool-v{version}"
+prerelease = "reject"
+
+[[assets]]
+id = "npm"
+name = "mit-tool-{version}.tgz"
+format = "npm-tarball"
+platforms = ["any"]
+commands = { mit-tool = "package/bin/tool.js" }
+
+[[assets]]
+id = "wheel"
+name = "mit_tool-{version}-py3-none-any.whl"
+format = "wheel"
+platforms = ["any"]
+commands = {}
+
+[[assets]]
+id = "sdist"
+name = "mit_tool-{version}.tar.gz"
+format = "sdist"
+platforms = ["any"]
+commands = {}

@@ -1,0 +1,10 @@
+schema = "rs9.apt.v1alpha1"
+
+[[packages]]
+id = "main"
+name = "theme-forge-nebular-fusion"
+assets = ["linux-x64", "linux-arm64"]
+
+[[publish]]
+package = "main"
+destination = "kfa-apt"

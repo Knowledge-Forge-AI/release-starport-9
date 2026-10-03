@@ -2,9 +2,24 @@
 
 **Release Starport 9 (RS9)** is Knowledge Forge AI's publication-infrastructure hub for software releases.
 
-Projects remain responsible for producing authoritative public GitHub releases. RS9 consumes those releases, verifies their identity and provenance, and handles downstream packaging and publication across supported ecosystems.
+Projects remain responsible for producing authoritative public GitHub releases. RS9 is intended to consume those releases, verify their identity and provenance, and handle downstream packaging and publication across supported ecosystems.
 
 The short name and prospective CLI name are **`rs9`**.
+
+## Current status and navigation
+
+The first foundation implements a provisional `.rs9` configuration validator
+and deterministic normalizer, derived from Theme Forge publication research.
+Release authentication, package construction, signing, registry publication,
+projection updates and hosting are not implemented. Existing Theme Forge
+publication surfaces remain authoritative.
+
+- [Documentation index](docs/README.md)
+- [Choose project, ecosystem and package manager](docs/install/README.md)
+- [Configuration v1alpha1](docs/specs/rs9-config-v1alpha1.md) and
+  [examples](examples/README.md)
+- [Extraction inventory](docs/architecture/theme-forge-extraction-inventory.md)
+  and [staged migration map](docs/architecture/migration-map.md)
 
 ## Mission
 
@@ -73,7 +88,7 @@ Only relevant adapters need configuration. Project configuration should describe
 
 ## Publication modes
 
-RS9 supports three broad publication modes:
+RS9's intended architecture has three broad publication modes:
 
 1. **Direct publication** — publish to a registry or RS9-hosted repository.
 2. **Projection publication** — generate and update ecosystem-specific repositories such as a Homebrew tap or AUR package repository.
@@ -89,7 +104,9 @@ The canonical package-serving hostname is intended to be:
 rs9.knowledge-forge.ai
 ```
 
-`packages.knowledge-forge.ai` is a convenience redirect to the corresponding RS9 path.
+`packages.knowledge-forge.ai` is intended to redirect to the corresponding RS9
+path, preserving path and query. No DNS, Pages or redirect configuration is
+changed by this foundation.
 
 ## Licensing boundary
 

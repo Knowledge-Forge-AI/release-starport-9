@@ -1,0 +1,66 @@
+schema = "rs9.destinations.v1alpha1"
+# Illustrative routing only; trust, suite and credentials are not interpreted.
+
+[[destinations]]
+id = "kfa-pacman"
+adapter = "pacman"
+mode = "direct"
+platforms = ["x86_64-linux"]
+status = "illustrative"
+base-url = "https://knowledge-forge-ai.github.io/theme-forge-packages/arch"
+
+[[destinations]]
+id = "kfa-rpm"
+adapter = "dnf"
+mode = "direct"
+platforms = ["x86_64-linux", "aarch64-linux"]
+status = "illustrative"
+base-url = "https://knowledge-forge-ai.github.io/theme-forge-packages/rpm"
+
+[[destinations]]
+id = "kfa-apt"
+adapter = "apt"
+mode = "direct"
+platforms = ["x86_64-linux", "aarch64-linux"]
+status = "candidate"
+# APT overlay is not live; this URL expresses its intended layout only.
+base-url = "https://knowledge-forge-ai.github.io/theme-forge-packages/apt"
+
+[[destinations]]
+id = "kfa-nix"
+adapter = "nix"
+mode = "projection"
+platforms = ["x86_64-linux", "aarch64-linux", "aarch64-darwin"]
+status = "illustrative"
+repository = "Knowledge-Forge-AI/theme-forge-packages"
+
+[[destinations]]
+id = "aur"
+adapter = "pacman"
+mode = "projection"
+platforms = ["x86_64-linux", "aarch64-linux"]
+status = "candidate"
+
+[[destinations]]
+id = "kfa-homebrew-tap"
+adapter = "homebrew"
+mode = "projection"
+platforms = ["aarch64-darwin"]
+status = "illustrative"
+repository = "Knowledge-Forge-AI/homebrew-tap"
+
+[[destinations]]
+id = "npmjs"
+adapter = "npm"
+mode = "direct"
+platforms = ["x86_64-linux", "aarch64-linux", "x86_64-darwin", "aarch64-darwin"]
+status = "illustrative"
+base-url = "https://registry.npmjs.org"
+
+[[destinations]]
+id = "pypi"
+adapter = "pypi"
+mode = "direct"
+platforms = ["x86_64-linux", "aarch64-linux"]
+status = "candidate"
+base-url = "https://pypi.org"

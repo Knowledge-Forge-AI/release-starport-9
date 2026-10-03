@@ -1,0 +1,605 @@
+{
+  "apt": {
+    "depends": {
+      "theme-forge-nebular-fusion": {
+        "amd64": "libc6 (>= 2.34), libcairo2 (>= 1.10.0), libdbus-1-3 (>= 1.10), libgcc-s1 (>= 4.2), libgdk-pixbuf-2.0-0 (>= 2.36.9), libglib2.0-0t64 (>= 2.66.0), libgtk-3-0t64 (>= 3.21.5), libjavascriptcoregtk-4.1-0, libsoup-3.0-0 (>= 3.0.3), libstdc++6 (>= 5.2), libwebkit2gtk-4.1-0 (>= 2.41.90)",
+        "arm64": "libc6 (>= 2.34), libcairo-gobject2 (>= 1.10.0), libcairo2 (>= 1.10.0), libdbus-1-3 (>= 1.10), libgcc-s1 (>= 4.2), libgdk-pixbuf-2.0-0 (>= 2.36.9), libglib2.0-0t64 (>= 2.66.0), libgtk-3-0t64 (>= 3.21.5), libjavascriptcoregtk-4.1-0, libpango-1.0-0 (>= 1.14.0), libsoup-3.0-0 (>= 3.0.3), libstdc++6 (>= 5.2), libwebkit2gtk-4.1-0 (>= 2.41.90)"
+      },
+      "theme-forge-solar-sail": {
+        "all": "nodejs (>= 22)"
+      },
+      "theme-forge-stellar-burst": {
+        "amd64": "nodejs (>= 22), libc6 (>= 2.33)",
+        "arm64": "nodejs (>= 22), libc6 (>= 2.33)"
+      },
+      "theme-forge-stellar-loom": {
+        "all": "nodejs (>= 22)"
+      }
+    },
+    "keyringOwner": "destination",
+    "live": false,
+    "retention": "changed indexes blocked pending authenticated generation retention",
+    "source": {
+      "path": "tools/distribution-apt/apt-matrix.json",
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+      "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+      "sha256": "b239018d67711059dd3cb6fcf54fcc79c4c47905db2b225f6720036aa36e998f",
+      "state": "observed-working-copy"
+    },
+    "suite": "stable",
+    "support": [
+      "Ubuntu 26.04 amd64",
+      "Ubuntu 26.04 arm64"
+    ]
+  },
+  "description": "RS9-authored extraction of observed facts, not a verbatim imported lock, license authority or authenticated ingestion record. Source SHA256 binds working-copy bytes; revision is context, not an exact-head prerequisite.",
+  "desktop": {
+    "exec": "tfnf %U",
+    "icons": [
+      16,
+      32,
+      48,
+      64,
+      128,
+      256
+    ],
+    "ownership": "distribution templates; migration needs tenant-owned authority",
+    "source": {
+      "path": "tools/distribution/templates/desktop/theme-forge-nebular-fusion.desktop",
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+      "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+      "sha256": "24b28e715e74ce594c75c13fb865a84399ca5aac168490e1773cbad1f3de0283",
+      "state": "observed-working-copy"
+    }
+  },
+  "products": [
+    {
+      "bins": [
+        "tfsb",
+        "tfsb-studio-service"
+      ],
+      "cacheAsset": "theme-forge-stellar-burst-0.6.1.tgz",
+      "canonicalRepo": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+      "id": "theme-forge-stellar-burst",
+      "inputKind": "npm-registry",
+      "nodeEngine": ">=22",
+      "sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+      "source": {
+        "path": "tools/distribution/release-lock.json",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "567b91e43e9e3d871d19f96abbaa4c593de0f0c99029d56f3fd903b5635b29cc",
+        "state": "observed-working-copy"
+      },
+      "version": "0.6.1"
+    },
+    {
+      "bins": [
+        "tfsl",
+        "tfsl-batch"
+      ],
+      "cacheAsset": "theme-forge-stellar-loom-0.4.0.tgz",
+      "canonicalRepo": "Knowledge-Forge-AI/theme-forge-stellar-loom",
+      "id": "theme-forge-stellar-loom",
+      "inputKind": "npm-registry",
+      "nodeEngine": ">=22",
+      "sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+      "source": {
+        "path": "tools/distribution/release-lock.json",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "567b91e43e9e3d871d19f96abbaa4c593de0f0c99029d56f3fd903b5635b29cc",
+        "state": "observed-working-copy"
+      },
+      "version": "0.4.0"
+    },
+    {
+      "bins": [
+        "tfss"
+      ],
+      "cacheAsset": "theme-forge-solar-sail-0.2.1.tgz",
+      "canonicalRepo": "Knowledge-Forge-AI/theme-forge-solar-sail",
+      "id": "theme-forge-solar-sail",
+      "inputKind": "npm-registry",
+      "nodeEngine": ">=22",
+      "sha256": "ebc4f21d1e61dbc0ac4e87ce81f7ecec4f97d7c15562356e429d4c1a4e9aa5a0",
+      "source": {
+        "path": "tools/distribution/release-lock.json",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "567b91e43e9e3d871d19f96abbaa4c593de0f0c99029d56f3fd903b5635b29cc",
+        "state": "observed-working-copy"
+      },
+      "version": "0.2.1"
+    },
+    {
+      "bins": [
+        "tfnf"
+      ],
+      "canonicalRepo": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+      "id": "theme-forge-nebular-fusion",
+      "inputKind": "github-release",
+      "rawArchives": {
+        "aarch64-darwin": {
+          "asset": "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+          "executablePath": "Theme Forge Nebular Fusion.app/Contents/MacOS/theme-forge-nebular-fusion",
+          "executableSha256": "663c60a675165287e3157a279988bcd4bce556cf3c2a69d4bfd5ab937f60d867",
+          "sha256": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be"
+        },
+        "aarch64-linux": {
+          "asset": "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+          "executablePath": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+          "executableSha256": "5c182d28c02f2d6ea09ed130625ef899a8d0fe4ca080df775d72cdd6cd43b743",
+          "sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f"
+        },
+        "x86_64-linux": {
+          "asset": "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+          "executablePath": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+          "executableSha256": "6efc9c12ff9148f9e20763c620b7abb1712c614fc796b1577e01913488c658e0",
+          "sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d"
+        }
+      },
+      "releaseCommit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+      "source": {
+        "path": "tools/distribution/release-lock.json",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "567b91e43e9e3d871d19f96abbaa4c593de0f0c99029d56f3fd903b5635b29cc",
+        "state": "observed-working-copy"
+      },
+      "version": "0.6.1"
+    }
+  ],
+  "publicLock": {
+    "path": "release-lock.json",
+    "repository": "Knowledge-Forge-AI/theme-forge-packages",
+    "revision": "062a931f4b5e44ad43c88363efd81ab8d92602df",
+    "sha256": "567b91e43e9e3d871d19f96abbaa4c593de0f0c99029d56f3fd903b5635b29cc"
+  },
+  "publicReleases": [
+    {
+      "assets": [
+        {
+          "name": "knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+          "sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+          "size": 644313
+        }
+      ],
+      "draft": false,
+      "evidence": "GitHub REST metadata; bytes not downloaded",
+      "prerelease": false,
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+      "tag": "v0.6.1"
+    },
+    {
+      "assets": [
+        {
+          "name": "knowledge-forge-ai-theme-forge-stellar-loom-0.4.0.tgz",
+          "sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+          "size": 273462
+        }
+      ],
+      "draft": false,
+      "evidence": "GitHub REST metadata; bytes not downloaded",
+      "prerelease": false,
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-loom",
+      "tag": "v0.4.0"
+    },
+    {
+      "assets": [
+        {
+          "name": "knowledge-forge-ai-theme-forge-solar-sail-0.2.1.tgz",
+          "sha256": "ebc4f21d1e61dbc0ac4e87ce81f7ecec4f97d7c15562356e429d4c1a4e9aa5a0",
+          "size": 110658
+        }
+      ],
+      "draft": false,
+      "evidence": "GitHub REST metadata; bytes not downloaded",
+      "prerelease": false,
+      "repository": "Knowledge-Forge-AI/theme-forge-solar-sail",
+      "tag": "v0.2.1"
+    },
+    {
+      "assets": [
+        {
+          "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+          "sha256": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be",
+          "size": 47079690
+        },
+        {
+          "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+          "sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+          "size": 54248930
+        },
+        {
+          "name": "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+          "sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+          "size": 54105413
+        }
+      ],
+      "draft": false,
+      "evidence": "GitHub REST metadata; bytes not downloaded",
+      "prerelease": false,
+      "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+      "tag": "v0.6.1"
+    }
+  ],
+  "schema": "rs9.research.theme-forge.v1",
+  "surfaces": [
+    {
+      "adapter": "pacman",
+      "architectures": [
+        "x86_64"
+      ],
+      "destination": "kfa-pacman",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-nebular-fusion",
+      "project": "theme-forge-nebular-fusion",
+      "source": {
+        "path": "tools/distribution/templates/pacman/theme-forge-nebular-fusion/PKGBUILD",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "9cbbe0c1d04d900fdd1a0207c733d575f3104ad6b7f473e5658ccb688d16422e",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "pacman",
+      "architectures": [
+        "any"
+      ],
+      "destination": "kfa-pacman",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-solar-sail",
+      "project": "theme-forge-solar-sail",
+      "source": {
+        "path": "tools/distribution/templates/pacman/theme-forge-solar-sail/PKGBUILD",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "5827815f77844b19086993a518a91aeb996ffa1714ffebc6a01b622c208e900a",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "pacman",
+      "architectures": [
+        "x86_64"
+      ],
+      "destination": "kfa-pacman",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-stellar-burst",
+      "project": "theme-forge-stellar-burst",
+      "source": {
+        "path": "tools/distribution/templates/pacman/theme-forge-stellar-burst/PKGBUILD",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "2d3ef7b13229919bf1d97deccb0f352181c71409ea1ff83bcaae658828fc6789",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "pacman",
+      "architectures": [
+        "any"
+      ],
+      "destination": "kfa-pacman",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-stellar-loom",
+      "project": "theme-forge-stellar-loom",
+      "source": {
+        "path": "tools/distribution/templates/pacman/theme-forge-stellar-loom/PKGBUILD",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "6d2cddbb05c0ac98fbae6e5eb95ca5f3b187399335abc1b55d897a91635b0dc5",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "dnf",
+      "architectures": [
+        "x86_64",
+        "aarch64"
+      ],
+      "destination": "kfa-rpm",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-nebular-fusion",
+      "project": "theme-forge-nebular-fusion",
+      "source": {
+        "path": "tools/distribution/templates/rpm/theme-forge-nebular-fusion.spec",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "47249b94cc91d8bdb445aa692d5f6b2d036ed7ac515d5c93dddd392d20bfbdbb",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "dnf",
+      "architectures": [
+        "noarch"
+      ],
+      "destination": "kfa-rpm",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-solar-sail",
+      "project": "theme-forge-solar-sail",
+      "source": {
+        "path": "tools/distribution/templates/rpm/theme-forge-solar-sail.spec",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "c1345d7e3327d9930a9266a078c145188ee38ca49e56fdc30104727a0a230cb0",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "dnf",
+      "architectures": [
+        "x86_64",
+        "aarch64"
+      ],
+      "destination": "kfa-rpm",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-stellar-burst",
+      "project": "theme-forge-stellar-burst",
+      "source": {
+        "path": "tools/distribution/templates/rpm/theme-forge-stellar-burst.spec",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "4bbf2b2d4f91ccb81312972c70f8df2ab0939e1f8b94bb70c2eed363b532cb5c",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "dnf",
+      "architectures": [
+        "noarch"
+      ],
+      "destination": "kfa-rpm",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-stellar-loom",
+      "project": "theme-forge-stellar-loom",
+      "source": {
+        "path": "tools/distribution/templates/rpm/theme-forge-stellar-loom.spec",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "98375c2ce2cd9e29e0e2308d07cd3c658ee8de03cbca9036e83947f4890d123d",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "pacman",
+      "architectures": [
+        "x86_64",
+        "aarch64"
+      ],
+      "destination": "aur",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-nebular-fusion-bin",
+      "project": "theme-forge-nebular-fusion",
+      "source": {
+        "path": "tools/distribution/templates/aur/theme-forge-nebular-fusion-bin/PKGBUILD",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "1912edfa8e783ed558a728899205f31197c417b53fc5485c62803b6054456019",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "pacman",
+      "architectures": [
+        "any"
+      ],
+      "destination": "aur",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-solar-sail",
+      "project": "theme-forge-solar-sail",
+      "source": {
+        "path": "tools/distribution/templates/aur/theme-forge-solar-sail/PKGBUILD",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "2da6339db6e5efb65e3318f7158c359f1a2f9678e4a9516af2e740f335ba1679",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "pacman",
+      "architectures": [
+        "x86_64",
+        "aarch64"
+      ],
+      "destination": "aur",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-stellar-burst",
+      "project": "theme-forge-stellar-burst",
+      "source": {
+        "path": "tools/distribution/templates/aur/theme-forge-stellar-burst/PKGBUILD",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "1dc9001ca66318de7555891311c409c831906373c08979e6db06dc3e005a80bc",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "pacman",
+      "architectures": [
+        "any"
+      ],
+      "destination": "aur",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-stellar-loom",
+      "project": "theme-forge-stellar-loom",
+      "source": {
+        "path": "tools/distribution/templates/aur/theme-forge-stellar-loom/PKGBUILD",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "2b69d33543ba889547a71ce712944126155a556b4a034ed0ca0cc195a8cf14e5",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "apt",
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "destination": "kfa-apt",
+      "license": null,
+      "name": "theme-forge-stellar-burst",
+      "project": "theme-forge-stellar-burst",
+      "source": {
+        "path": "tools/distribution-apt/apt-matrix.json",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "b239018d67711059dd3cb6fcf54fcc79c4c47905db2b225f6720036aa36e998f",
+        "state": "observed-working-copy"
+      },
+      "status": "candidate-not-live"
+    },
+    {
+      "adapter": "apt",
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "destination": "kfa-apt",
+      "license": null,
+      "name": "theme-forge-nebular-fusion",
+      "project": "theme-forge-nebular-fusion",
+      "source": {
+        "path": "tools/distribution-apt/apt-matrix.json",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "b239018d67711059dd3cb6fcf54fcc79c4c47905db2b225f6720036aa36e998f",
+        "state": "observed-working-copy"
+      },
+      "status": "candidate-not-live"
+    },
+    {
+      "adapter": "apt",
+      "architectures": [
+        "all"
+      ],
+      "destination": "kfa-apt",
+      "license": null,
+      "name": "theme-forge-stellar-loom",
+      "project": "theme-forge-stellar-loom",
+      "source": {
+        "path": "tools/distribution-apt/apt-matrix.json",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "b239018d67711059dd3cb6fcf54fcc79c4c47905db2b225f6720036aa36e998f",
+        "state": "observed-working-copy"
+      },
+      "status": "candidate-not-live"
+    },
+    {
+      "adapter": "apt",
+      "architectures": [
+        "all"
+      ],
+      "destination": "kfa-apt",
+      "license": null,
+      "name": "theme-forge-solar-sail",
+      "project": "theme-forge-solar-sail",
+      "source": {
+        "path": "tools/distribution-apt/apt-matrix.json",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "b239018d67711059dd3cb6fcf54fcc79c4c47905db2b225f6720036aa36e998f",
+        "state": "observed-working-copy"
+      },
+      "status": "candidate-not-live"
+    },
+    {
+      "adapter": "nix",
+      "architectures": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "destination": "kfa-nix",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-stellar-burst",
+      "project": "theme-forge-stellar-burst",
+      "source": {
+        "path": "tools/distribution/templates/nix/packages/stellar-burst.nix",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "af9e61d2c81c268428157793c2d6c3f68843983e97bfb9f68a9feadba17fd1db",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "nix",
+      "architectures": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "destination": "kfa-nix",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-stellar-loom",
+      "project": "theme-forge-stellar-loom",
+      "source": {
+        "path": "tools/distribution/templates/nix/packages/stellar-loom.nix",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "e2fce9c7364ab914aa953d471b36cec01da3045c31225aa5c1ba76248944bcf0",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "nix",
+      "architectures": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "destination": "kfa-nix",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-solar-sail",
+      "project": "theme-forge-solar-sail",
+      "source": {
+        "path": "tools/distribution/templates/nix/packages/solar-sail.nix",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "8e175f41f226485dd738e79f9fe2c875cd8df01e4b96db7142928997e494badc",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "nix",
+      "architectures": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "destination": "kfa-nix",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-nebular-fusion",
+      "project": "theme-forge-nebular-fusion",
+      "source": {
+        "path": "tools/distribution/templates/nix/packages/nebular-fusion.nix",
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "revision": "8580d1f3e57b6011e58665548638bc7f9b129a94",
+        "sha256": "83519b07071d7fa90140a41d55a4e3ba1efdc9ab78f7054ed768d3f7d4bd6df3",
+        "state": "observed-working-copy"
+      }
+    },
+    {
+      "adapter": "homebrew",
+      "architectures": [
+        "arm64"
+      ],
+      "destination": "kfa-homebrew-tap",
+      "license": "AGPL-3.0-or-later",
+      "name": "theme-forge-nebular-fusion",
+      "project": "theme-forge-nebular-fusion",
+      "source": {
+        "path": "Formula/theme-forge-nebular-fusion.rb",
+        "repository": "Knowledge-Forge-AI/homebrew-tap",
+        "revision": "b8b695bbb27e607a181e8ddedc506a1235831484",
+        "sha256": "3ceab48cc7ea8d64d178b45ae3475ac61d25a60f090b0396148110a691914e61",
+        "state": "public-commit"
+      }
+    }
+  ]
+}

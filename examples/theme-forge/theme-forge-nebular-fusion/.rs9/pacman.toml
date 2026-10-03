@@ -1,0 +1,19 @@
+schema = "rs9.pacman.v1alpha1"
+
+[[packages]]
+id = "hosted"
+name = "theme-forge-nebular-fusion"
+assets = ["linux-x64"]
+
+[[packages]]
+id = "aur"
+name = "theme-forge-nebular-fusion-bin"
+assets = ["linux-x64", "linux-arm64"]
+
+[[publish]]
+package = "hosted"
+destination = "kfa-pacman"
+
+[[publish]]
+package = "aur"
+destination = "aur"

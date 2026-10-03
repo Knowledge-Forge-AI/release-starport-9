@@ -1,5 +1,8 @@
 # Release Starport 9 architecture
 
+Status: intended architecture. The foundation currently validates and normalizes
+configuration only; publication and release authentication remain unimplemented.
+
 ## Role
 
 Release Starport 9 (RS9) is a publication control plane. It begins from an authoritative public project release and carries that release into downstream registries, package repositories, projection repositories, and upstream packaging contribution workflows.
@@ -45,7 +48,7 @@ Go modules and other ecosystems can be supported project-by-project without beco
 
 ### Direct
 
-RS9 directly publishes to a registry or repository under RS9 control.
+In the intended direct mode, RS9 publishes to a registry or repository under RS9 control.
 
 Examples include hosted APT/DNF/pacman repositories and, where authentication models permit, package registries.
 
@@ -68,6 +71,18 @@ Projects are tenants of RS9, not owners of RS9's shared machinery.
 Project-specific facts and publication intent live under `<project-root>/.rs9/`. RS9 owns the parsers, schemas, adapters, policy, verification logic, and destination mechanics.
 
 Theme Forge is the first migration tenant. Its current Nix, pacman, DNF/RPM, AUR-readiness, APT, and Homebrew work will be used to extract reusable RS9 infrastructure without changing the authority of existing Theme Forge releases.
+
+The provisional extraction treats each independent release stream as a project.
+Theme Forge groups four such projects; a family label has no publication
+authority. A selected project root can lie below a build monorepo root, while
+its declared repository remains the release authority. Shared keys, hosted
+repositories, flake and tap are operator/RS9 destinations, not a single tenant's
+configuration.
+
+The foundation validates [v1alpha1 configuration](specs/rs9-config-v1alpha1.md)
+and normalizes intent only. See the [inventory](architecture/theme-forge-extraction-inventory.md),
+[adapter/destination model](architecture/adapter-destination-model.md) and
+[migration map](architecture/migration-map.md) for evidence and unimplemented gates.
 
 ## Hosted publication domain
 

@@ -69,6 +69,11 @@ Only applicable files need to exist.
 
 ## Schema versioning
 
-Every RS9 configuration file should eventually carry or inherit an explicit schema version. RS9 must reject unsupported or ambiguous configuration rather than guessing.
+Every RS9 configuration file carries an explicit schema version. RS9 rejects unsupported or ambiguous configuration rather than guessing.
 
-The concrete TOML schemas are intentionally deferred until the first Theme Forge migration slice can derive them from real publication requirements.
+The [v1alpha1 specification](specs/rs9-config-v1alpha1.md) implements a narrow
+validator/normalizer boundary derived from Theme Forge. It promises no stable
+compatibility or production publication. Only selected adapter files are needed;
+the caller can explicitly select a project root below a monorepo root. License
+paths are relative to the declared release repository at the resolved tag commit.
+See [ADR 0001](adr/0001-tenant-contract-v1alpha1.md) for tenancy and ownership.
