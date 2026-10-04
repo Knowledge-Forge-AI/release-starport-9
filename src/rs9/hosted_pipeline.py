@@ -9,7 +9,8 @@ import subprocess
 import sys
 
 from rs9.candidate import capture_generation
-from rs9.errors import ContractError
+from rs9.command_report import report_generation
+from rs9.errors import ContractError, safe_details
 from rs9.github import PublicClient
 from rs9.hosted_commands import bind_commands
 from rs9.hosted_contract import canonical_release_auth_projection, compute_auth_sha256, generate_matrix_outputs
@@ -58,6 +59,7 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
               "policy_blockers": [], "runner": runner_facts(),
               "fixture": {"used": False, "production": False}}
     files, ingestion = [], None
+    bytes_authenticated = False
     try:
         validate_host(system)
         upstream = _inputs(inputs, repository, commit)
@@ -65,6 +67,7 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
         capture_root.mkdir()
         client = client or PublicClient(api_token=os.environ.get("RS9_GITHUB_READ_TOKEN"))
         captures = capture_generation(repository, capture_root, client=client, checkout_binding="hosted:" + commit)
+        bytes_authenticated = True
         projection = canonical_release_auth_projection(json.loads((capture_root / "summary/authentication.json").read_bytes()))
         ingestion = compute_auth_sha256(projection)
         expected_auth = upstream.get(("authenticate", "generation"))
@@ -113,8 +116,20 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
         # Retain diagnostic custody even for an unexpected builder exception.
         # Interrupts and process termination remain outside this boundary.
         record["execution_error"] = error.code if isinstance(error, ContractError) else "hosted-execution-failed"
+        record["execution_error_detail"] = safe_details({"stage": lane,
+            **(error.details if isinstance(error, ContractError) else {})})
         if not record["gates"]:
             record["gates"] = [{"name": n, "status": "fail", "reason": record["execution_error"]} for n in row["required_gates"]]
+    # A capture can be complete before core authentication fails. Preserve the
+    # bounded per-command metadata on both paths without retaining release bytes.
+    if (scratch / "capture").is_dir():
+        try:
+            command_report = scratch / "command-report.json"
+            command_report.write_bytes(canonical(report_generation(repository, scratch / "capture",
+                                                                    bytes_authenticated=bytes_authenticated)))
+            files.append(command_report)
+        except Exception:
+            record["command_report_error"] = "report-unavailable"
     record["provenance"] = provenance(repository, ingestion)
     runtime_lane = lane in {"wheels", "nix", "pacman", "rpm", "deb", "pages"}
     darwin = system.endswith("darwin")

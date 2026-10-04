@@ -1,23 +1,51 @@
 # Attended Theme Forge LIVE1 preparation and future publication contract
 
-Status: **not ready for production publication**. `rs9.operator` supports status
-and fresh release authentication only. `publish-pages` and `publish-pypi` stop with
-PUBLICATION_NOT_READY. Manual environment setup cannot complete the missing package,
-qualification, reader and transport implementations.
+Status: **REPAIR1 attended source candidate; not ready for production publication**.
+`rs9.operator` supports status and fresh release authentication only. `publish-pages`
+and `publish-pypi` stop with PUBLICATION_NOT_READY. Manual environment setup cannot
+complete the missing package, qualification, reader and transport implementations.
 
-The accepted CONT1 checkpoint is historical partial source. Current [CONT2 hosted source](../../docs/live1-hosted-candidate.md) prepares a non-production runner workflow. Source adoption does not require local Docker, Nix, GPG or live capture. The dispatcher advisory pre-final review has completed; closeout amendments are recorded in the source evidence and receive no automatic independent review. Manager disposition of the exact terminal source bindings is required before executing the operator below. Real hosted qualification remains pending.
+The accepted CONT1 checkpoint is historical partial source. Current [REPAIR1 hosted candidate source](../../docs/live1-hosted-candidate.md)
+prepares a non-production runner workflow. Source adoption does not require local Docker,
+Nix, GPG or live capture. First hosted run 37166638590 failed due to primary source defects;
+a second hosted run has not been performed, downstream cascades are untouched, and no hosted
+green qualification is claimed. Plan disposition amends for exact proposal SHA
+`e55cb8ab059b22ed799c3504cb67185d318317b9fc7e35706324971bd55e301d`. Manager disposition of
+the exact terminal source bindings is required before executing the operator below. Real
+hosted package lanes remain mandatory integration.
+
+## Environment and qualification realities
+
+- **Local environment**: The local execution environment is Darwin with Python 3.13; no
+  Python 3.12 or GnuPG usable was observed locally. Minimal scratch symlink PATH reruns serve
+  strictly as tool-isolation checks, not Ubuntu equivalence.
+- **Stock Ubuntu 24.04 environment**: A stock ubuntu-24.04 source unit assumes Python 3.12,
+  Node 22, and GnuPG are present, and the unit suite must work without Docker, Nix, Arch/RPM builders, or zstd.
+  Real hosted package lanes remain mandatory integration.
+- **Verification**: Source checks and scoped skips are recorded in the repair verification evidence.
 
 ## Source adoption and hosted collection
 
-After review, set RS9_REVIEWED_PARENT, RS9_REVIEWED_TREE and RS9_MANIFEST_SHA256 to the exact reviewed candidate. Create an empty physical directory below ~/Documents/agent/outbox/release-starport-9_dev/ and set RS9_PACKET_DIR to that path. From the reviewed repository:
+After review, set `RS9_REVIEWED_PARENT` to the reviewed parent commit `2095e9d84295e09e4f1d4fc517fe0d5006478803`.
+Manager supplies `RS9_REVIEWED_TREE` and `RS9_MANIFEST_SHA256` for the exact candidate. Create
+an empty physical directory below `~/Documents/agent/outbox/release-starport-9_dev/` and set `RS9_PACKET_DIR`
+to that path. From the reviewed repository:
 
 ~~~sh
 rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 operators/live1/adopt-and-qualify.py adopt \
-  --reviewed-parent "$RS9_REVIEWED_PARENT" --reviewed-tree "$RS9_REVIEWED_TREE" \
-  --manifest-sha256 "$RS9_MANIFEST_SHA256" --output "$RS9_PACKET_DIR"
+  --reviewed-parent "2095e9d84295e09e4f1d4fc517fe0d5006478803" \
+  --reviewed-tree "$RS9_REVIEWED_TREE" \
+  --manifest-sha256 "$RS9_MANIFEST_SHA256" \
+  --commit-message "Repair hosted command authentication and hermetic source contracts" \
+  --output "$RS9_PACKET_DIR"
 ~~~
 
-This authenticates the inventory, checks main/remote parent twice, stages explicit reviewed paths and deletions, commits normally, fast-forward pushes and collects the new push run bound to that commit. Unrelated .serena state and ordinary interpreter/test caches are tolerated and never staged. Collection is bounded to two hours by default, six hours maximum.
+This authenticates the inventory, checks main/remote parent twice, stages explicit reviewed
+paths and deletions, commits normally with `--commit-message` (defaulting to the repair message
+shown above), fast-forward pushes and collects the new push run bound to that
+commit. No rerun and no production publication is performed. Unrelated .serena state and
+ordinary interpreter/test caches are tolerated and never staged. Collection is bounded to two
+hours by default, six hours maximum.
 
 If collection times out, create a different empty outbox directory and explicitly resume read-only collection:
 
@@ -26,7 +54,12 @@ rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 operators/live1/a
   --commit "$RS9_ADOPTED_COMMIT" --run-id "$RS9_RUN_ID" --output "$RS9_PACKET_DIR"
 ~~~
 
-The packet is written before validation and includes all job/step conclusions, artifact IDs/digests/expiry, bounded summary bytes and reason codes. A failed run is not rerun automatically. Neither subcommand publishes, deploys, signs production bytes, mutates npm/Homebrew or emits a production receipt. A not-qualified first run is expected while preparation pins and Linux wheel promotion policy are unresolved.
+The collection step uses the v2 collector (`rs9.collect_candidate`); historical CONT1 v1
+`validate_receipts` is not used. The packet is written before validation and includes all
+job/step conclusions, artifact IDs/digests/expiry, bounded summary bytes and reason codes.
+A failed run is not rerun automatically. Neither subcommand publishes, deploys, signs
+production bytes, mutates npm/Homebrew or emits a production receipt. A not-qualified first
+run is expected while preparation pins and Linux wheel promotion policy are unresolved.
 
 The signing-preflight.py operator takes an independently reviewed public-export
 SHA-256. It inspects existing local-key availability and public bytes only; it never

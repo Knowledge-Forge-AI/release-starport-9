@@ -34,6 +34,6 @@ def package_evidence(root):
               "assets": [{"role": "notice", "name": "NOTICE"}, {"role": "provenance", "name": "PROVENANCE.json"}]}
     intent = {"project": {"repository": repository, "id": "second-project"}, "tag": tag, "version": "0.6.1",
               "release": {"prerelease": "reject", "evidence": policy},
-              "assets": [{"id": "package", "name": "second-0.6.1.tgz", "format": "tar.gz", "commands": {}, "platforms": ["any"]}],
+              "assets": [{"id": "package", "name": "second-0.6.1.tgz", "format": "tar.gz", "commands": {"second": "package/bin/run.js"}, "platforms": ["any"]}],
               "license": {"files": [], "expression": "MIT"}}
     return intent

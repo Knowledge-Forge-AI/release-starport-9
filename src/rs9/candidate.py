@@ -40,17 +40,26 @@ def capture_generation(repository, output, *, project=None, client=None, checkou
         target = output / intent["project"]["id"]
         target.mkdir()
         selection = selection_for_intent(intent)
-        capture_release(selection, target, client=client)
-        capture = authenticate_release(selection, target)
-        expected = [r for r in expectations if r["repository"] == row["repository"]]
-        if len(expected) != 1:
-            raise ContractError("LIVE1_RELEASE_MISMATCH", "Exactly one release expectation required")
-        assert_release_expectations(capture, expected[0])
-        manifest = root / BOOTSTRAP
-        intent = load_bootstrap(manifest, capture, approved_manifests=[digest(manifest.read_bytes())])
-        require_configuration_authority(capture, intent)
-        capture_supplemental(intent, target, client)
-        profile = evaluate_profile(capture, intent["release"]["evidence"]["profile"], intent)
+        stage = "capture"
+        try:
+            capture_release(selection, target, client=client)
+            stage = "core-authenticate"
+            capture = authenticate_release(selection, target)
+            stage = "expectations"
+            expected = [r for r in expectations if r["repository"] == row["repository"]]
+            if len(expected) != 1:
+                raise ContractError("LIVE1_RELEASE_MISMATCH", "Exactly one release expectation required")
+            assert_release_expectations(capture, expected[0])
+            stage = "bootstrap"
+            manifest = root / BOOTSTRAP
+            intent = load_bootstrap(manifest, capture, approved_manifests=[digest(manifest.read_bytes())])
+            require_configuration_authority(capture, intent)
+            stage = "supplemental"
+            capture_supplemental(intent, target, client)
+            stage = "profile"
+            profile = evaluate_profile(capture, intent["release"]["evidence"]["profile"], intent)
+        except ContractError as error:
+            raise error.with_details(project=intent["project"]["id"], stage=stage) from None
         summary = {"project": intent["project"]["id"], "release_record_sha256": record_sha256(capture.record),
                    "profile_result_sha256": record_sha256(profile), "repository": capture.record["repository"],
                    "release": capture.record["release"], "tag": capture.record["tag"],

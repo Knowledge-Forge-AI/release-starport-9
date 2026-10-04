@@ -27,10 +27,12 @@ class _DecompressionLimit:
         return data
 
 
-def inspect_archive(path, commands, *, on_file=None, max_members=20000,
+def inspect_archive(path, commands, *, command_policy="native-executable", on_file=None, max_members=20000,
                     max_member_bytes=256 * 1024 ** 2, max_total_bytes=1024 ** 3,
                     max_ratio=1000):
     """Check the complete structure before handing any bytes to a visitor."""
+    if command_policy not in {"native-executable", "npm-package-bin"}:
+        raise ContractError("INVALID_SELECTION", "Unknown command execution policy")
     path = Path(path)
     if any(p.is_symlink() for p in (path, *path.parents)):
         raise ContractError("SYMLINK_REJECTED", "Archive input cannot traverse symlinks")
@@ -132,9 +134,15 @@ def inspect_archive(path, commands, *, on_file=None, max_members=20000,
             command_records = {}
             for command, name in commands.items():
                 entry = entries.get(name, {})
-                if entry.get("type") != "file" or not entry.get("mode", 0) & 0o111:
-                    raise ContractError("COMMAND_PATH", "Command must be an executable regular archive file")
-                command_records[command] = {"path": name, "sha256": entry["sha256"]}
+                reason = ("missing" if not entry else "not-regular" if entry.get("type") != "file"
+                          else "not-executable" if command_policy == "native-executable" and not entry["mode"] & 0o111 else None)
+                if reason:
+                    launcher = command.startswith("launcher:")
+                    raise ContractError("COMMAND_PATH", "Command member violates its execution policy", details={
+                        "command": command[9:] if launcher else command, "archive_path": name,
+                        "command_kind": "launcher" if launcher else "command",
+                        "member_type": entry.get("type", "missing"), "mode": entry.get("mode", 0), "reason": reason})
+                command_records[command] = {k: entry[k] for k in ("path", "sha256", "size", "mode")}
             if on_file is not None:
                 raw.seek(0)
                 with gzip.GzipFile(fileobj=raw) as decoded, tarfile.open(fileobj=_DecompressionLimit(decoded, decompressed_limit), mode="r|") as archive:

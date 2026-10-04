@@ -33,6 +33,7 @@ class ProfileTests(unittest.TestCase):
             capture = authenticate_release(selection_for_intent(intent), root)
             result = evaluate_profile(capture, PACKAGE_PROFILE, intent)
             self.assertEqual(result["sections"]["package"]["commands"][0]["path"], "package/bin/run.js")
+            self.assertFalse(any(row["path"].endswith(".js") for row in result["sections"]["legal_files"]))
             self.assertEqual(result["sections"]["license"]["status"], "consistent")
             self.assertNotIn("legacy_ingestion", result["sections"])
             self.assertEqual(canonical(result), canonical(evaluate_profile(capture, PACKAGE_PROFILE, intent)))

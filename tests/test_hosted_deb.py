@@ -23,12 +23,15 @@ from rs9.errors import ContractError
 from rs9.hosted_contract import REQUIRED_GATES, validate_execution_result
 from rs9.pages import merkle_inventory, scan_pages_tree
 from rs9.pages_candidate import CLIENT_KEYRING_PATH, load_custody_bundle, write_custody_bundle
+from rs9.release_core import digest
 from rs9.repo_apt import build_apt_repository, verify_apt_signatures
 from rs9.signing_fixture import SigningFixture, find_gpg_binary
 from tests.test_build_native import create_cli_fixture
 from tests.test_pages import make_rpm, zstd_raw_frame
+from tests.test_pages_candidate import TRUTHFUL_ARMOR_PUBLIC_KEY
 from tests.test_repo_apt import FixtureSigner, build_minimal_deb
 
+TRUTHFUL_BINARY_PUBLIC_KEY = bytes([0xC0 | 6, 2, 10, 20])
 DIGEST = "ab" * 32
 AUTH = "d" * 64
 MAINTAINER = "Theme Forge Lead <maintainer@example.com>"
@@ -189,6 +192,58 @@ def usable_gpg():
             return None
         raise
     return binary
+
+
+class HermeticFixtureSigner(FixtureSigner):
+    """Key-bound fixture-signer double with truthful OpenPGP public key packets for candidate tests."""
+
+    def __init__(self, fingerprint: str = "A" * 40, homedir: Path | None = None) -> None:
+        super().__init__(fingerprint)
+        self.homedir = homedir
+        self.gpg = "gpg"
+        self.public_key_armor = TRUTHFUL_ARMOR_PUBLIC_KEY
+        self.public_key_bytes = TRUTHFUL_ARMOR_PUBLIC_KEY.encode("utf-8")
+        self.public_key_binary = TRUTHFUL_BINARY_PUBLIC_KEY
+
+    def close(self) -> None:
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+
+def fake_sign_rpm(runner, path, fixture):
+    before = digest(path.read_bytes())
+    homedir = getattr(fixture, "homedir", None) or ""
+    gpg_bin = getattr(fixture, "gpg", "gpg")
+    runner.run(["rpmsign", "--define", "_gpg_name " + fixture.primary_fingerprint,
+                "--define", "_gpg_path " + str(homedir),
+                "--define", "__gpg " + gpg_bin, "--addsign", str(path)])
+    after = digest(path.read_bytes())
+    if before == after:
+        data = path.read_bytes()
+        if data[128:132] == b"sig\0":
+            path.write_bytes(data[:128] + b"fix\0" + data[132:])
+            after = digest(path.read_bytes())
+    if homedir:
+        db = Path(homedir) / "fixture-rpmdb"
+        db.mkdir(parents=True, exist_ok=True)
+        public = Path(homedir) / "rs9-candidate-fixture-NONPRODUCTION.asc"
+        armor = getattr(fixture, "public_key_bytes", None)
+        if armor is None:
+            armor = getattr(fixture, "public_key_armor", "").encode("utf-8")
+        public.write_bytes(armor)
+        runner.run(["rpmkeys", "--dbpath", str(db), "--import", str(public)])
+        runner.run(["rpmkeys", "--dbpath", str(db), "--checksig", str(path)])
+    return {
+        "unsigned_sha256": before,
+        "fixture_signed_sha256": after,
+        "fixture_fingerprint": fixture.primary_fingerprint,
+        "production": False,
+    }
 
 
 class StatusTests(unittest.TestCase):
@@ -861,6 +916,16 @@ class PagesLaneTests(unittest.TestCase):
         self.assertEqual({g["status"] for g in result["gates"]}, {"not-run"})
         self.assertTrue((self.scratch / result["details"]["manifest_path"]).is_file())
 
+    def test_pages_with_custody_and_unavailable_package_tools_is_not_run(self):
+        self.all_bundles()
+        home = self.root / "fixture-home"
+        home.mkdir()
+        fixture = HermeticFixtureSigner(homedir=home)
+        result = hd.execute(self.context(None, signing_fixture=fixture))
+        self.assertEqual({g["status"] for g in result["gates"]}, {"not-run"})
+        self.assertTrue(all("docker" in g["reason"] for g in result["gates"]))
+        self.assertTrue((self.scratch / result["details"]["manifest_path"]).is_file())
+
     def test_custody_that_is_not_exact_or_not_from_this_run_is_rejected_fail_closed(self):
         target = self.bundle("deb-amd64", "deb", "amd64", self.deb_packages("amd64"))
         next(iter((target / "files").iterdir())).write_bytes(b"tampered")
@@ -904,13 +969,35 @@ class PagesLaneTests(unittest.TestCase):
         self.all_bundles()
         docker = ScriptedDocker()
         with SigningFixture(gpg_binary=binary) as fixture, patch("rs9.hosted_deb.execute_probes", side_effect=stub_probes), patch(
-                "rs9.hosted_smoke.prepare_smoke", return_value=None):
+                "rs9.hosted_smoke.prepare_smoke", return_value=None), patch(
+                "rs9.hosted_packaging.sign_rpm", side_effect=fake_sign_rpm):
             result = hd.execute(self.context(docker, signing_fixture=fixture))
+            self.assertTrue((self.scratch / "pages-tree").is_dir(), str(result["gates"]))
             # Apt metadata in the assembled tree is signed by this lane's real fixture key.
             verified = verify_apt_signatures(self.scratch / "pages-tree/apt", fixture)
             self.assertTrue(verified["signature_authenticated"])
             self.assertEqual(verified["verified_issuer"], fixture.primary_fingerprint)
         validate_execution_result(result)
+        self._assert_assembled_tree_coverage(result, fixture, docker)
+
+    def test_assembled_tree_is_exact_scanned_signed_and_client_tested_hermetic(self):
+        self.all_bundles()
+        docker = ScriptedDocker()
+        home = self.root / "fixture-home"
+        home.mkdir(parents=True, exist_ok=True)
+        fixture = HermeticFixtureSigner(homedir=home)
+        with patch("rs9.hosted_deb.execute_probes", side_effect=stub_probes), patch(
+                "rs9.hosted_smoke.prepare_smoke", return_value=None), patch(
+                "rs9.hosted_packaging.sign_rpm", side_effect=fake_sign_rpm):
+            result = hd.execute(self.context(docker, signing_fixture=fixture))
+            self.assertTrue((self.scratch / "pages-tree").is_dir(), str(result["gates"]))
+            verified = verify_apt_signatures(self.scratch / "pages-tree/apt", fixture)
+            self.assertTrue(verified["signature_authenticated"])
+            self.assertEqual(verified["verified_issuer"], fixture.primary_fingerprint)
+        validate_execution_result(result)
+        self._assert_assembled_tree_coverage(result, fixture, docker)
+
+    def _assert_assembled_tree_coverage(self, result, fixture, docker):
         gates = self.by_name(result)
         self.assertEqual([g for g in result["gates"] if g["status"] == "fail"], [])
         self.assertNotIn("pass", {g["status"] for n, g in gates.items() if n.startswith("pages-client.")})

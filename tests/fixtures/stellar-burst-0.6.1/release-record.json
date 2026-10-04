@@ -44,7 +44,21 @@
   },
   "payloads": [
     {
-      "commands": {},
+      "command_policy": "npm-package-bin",
+      "commands": {
+        "tfsb": {
+          "mode": 420,
+          "path": "package/dist/cli.js",
+          "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+          "size": 74258
+        },
+        "tfsb-studio-service": {
+          "mode": 420,
+          "path": "package/dist/service-protocol/server-cli.js",
+          "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+          "size": 298
+        }
+      },
       "github_asset_id": 599265851,
       "id": "package",
       "launchers": {},
@@ -70,7 +84,7 @@
     "id": 1342490027
   },
   "schema": "rs9.release-record.v1alpha1",
-  "selection_sha256": "e16fe9f3f833fa1e181b179f4338864e1ac298e86c4daf92e4cc29197e191a0a",
+  "selection_sha256": "97102753e89d1b83be155a5399d0fe29b38e0685ddec4d1b6f8ee17097b945be",
   "source_files": [
     {
       "blob": "7ce823c377a19ad5082605452c4503176cd793e6",

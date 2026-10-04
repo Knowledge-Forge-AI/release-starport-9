@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 from types import SimpleNamespace
 
 from rs9.errors import ContractError
@@ -39,6 +40,7 @@ from rs9.pages_candidate import (
 from rs9.scratch import canonical
 from rs9.signing_fixture import SigningFixture, find_gpg_binary
 from tests.pages_candidate_fixtures import construct_candidate_signed_tree
+from tests.test_repo_apt import FixtureSigner
 
 
 TRUTHFUL_ARMOR_PUBLIC_KEY = (
@@ -57,6 +59,24 @@ TRUTHFUL_ARMOR_PUBLIC_KEY = (
 def inventory(files):
     return {p: hashlib.sha256(v.encode() if isinstance(v, str) else v).hexdigest()
             for p, v in files.items()}
+
+
+class HermeticSigningDouble(FixtureSigner):
+    """Key-bound fixture-signer double with truthful OpenPGP public key packets."""
+
+    def __init__(self, fingerprint: str = "A" * 40, homedir: Path | None = None) -> None:
+        super().__init__(fingerprint)
+        self.public_key_armor = TRUTHFUL_ARMOR_PUBLIC_KEY
+        self.public_key_bytes = TRUTHFUL_ARMOR_PUBLIC_KEY.encode("utf-8")
+        self.public_key_binary = bytes([0xC0 | 6, 2, 10, 20])
+        self.homedir = homedir
+        self.gpg = "gpg"
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
 
 
 class PagesCandidateTests(unittest.TestCase):
@@ -391,6 +411,104 @@ class PagesCandidateTests(unittest.TestCase):
             self.assertEqual(ver["verified_issuer"], fixture.primary_fingerprint)
             # The bound inventory is exactly committed by the Merkle root.
             self.assertEqual(status["merkle_root"], merkle_inventory(cand.exact_inventory)["root"])
+
+    def test_construct_candidate_signed_tree_hermetic(self):
+        scratch = self.root / "hermetic_fixture_signed_scratch"
+        scratch.mkdir()
+
+        fixture = HermeticSigningDouble(homedir=self.root / "fixture-home")
+        cand = construct_candidate_signed_tree(scratch, signing_fixture=fixture)
+        status = cand.status()
+        self.assertTrue(status["is_candidate"])
+        self.assertFalse(status["is_live"])
+        self.assertEqual(status["qualification"], "pending")
+        self.assertIn("keys/rs9-candidate-fixture-NONPRODUCTION.asc", cand.exact_inventory)
+        self.assertIn("keys/rs9-candidate-fixture-NONPRODUCTION.gpg", cand.exact_inventory)
+        self.assertIn("keys/KEY-METADATA.json", cand.exact_inventory)
+        self.assertIn("rpm/rs9.repo", cand.exact_inventory)
+        self.assertIn("rpm/fedora/43/x86_64/repodata/repomd.xml.asc", cand.exact_inventory)
+        self.assertIn("pacman/x86_64/rs9.db.sig", cand.exact_inventory)
+
+        # Verify repo sample config uses nonproduction candidate name and key path
+        repo_text = (scratch / "rpm/rs9.repo").read_text()
+        self.assertIn("[rs9-fedora-nonproduction]", repo_text)
+        self.assertIn("repo_gpgcheck=1", repo_text)
+        self.assertIn("keys/rs9-candidate-fixture-NONPRODUCTION.asc", repo_text)
+
+        # Verify repomd.xml detached signature using fixture
+        repomd_xml = (scratch / "rpm/fedora/43/x86_64/repodata/repomd.xml").read_bytes()
+        repomd_asc = (scratch / "rpm/fedora/43/x86_64/repodata/repomd.xml.asc").read_bytes()
+        ver = fixture.verify(repomd_xml, repomd_asc)
+        self.assertEqual(ver["status"], "valid")
+        self.assertEqual(ver["verified_issuer"], fixture.primary_fingerprint)
+        # The bound inventory is exactly committed by the Merkle root.
+        self.assertEqual(status["merkle_root"], merkle_inventory(cand.exact_inventory)["root"])
+
+    def test_fixture_inventory_detects_assembler_public_armor_drift(self):
+        fixture = HermeticSigningDouble()
+        scratch = self.root / "armor_drift"; scratch.mkdir()
+        with patch("rs9.pages_candidate._fixture_public_armor",
+                   return_value=fixture.public_key_bytes + b"\n"), self.assertRaises(ContractError) as caught:
+            construct_candidate_signed_tree(scratch, signing_fixture=fixture)
+        self.assertEqual(caught.exception.code, "TAMPER_DETECTED")
+
+    def test_candidate_fixture_inventory_regressions(self):
+        fixture = HermeticSigningDouble()
+
+        # 1. Custom files supplying production key paths are strictly rejected
+        for bad_key in ("keys/rs9.asc", "keys/rs9-archive-keyring.gpg"):
+            with self.subTest(bad_key=bad_key):
+                sub_scratch = self.root / f"bad_key_{bad_key.replace('/', '_')}"
+                sub_scratch.mkdir()
+                with self.assertRaises(ContractError) as caught:
+                    construct_candidate_signed_tree(
+                        sub_scratch,
+                        signing_fixture=fixture,
+                        custom_files={bad_key: b"unallowed"},
+                    )
+                self.assertEqual(caught.exception.code, "FIXTURE_KEY_PATH")
+
+        # 2. Tampered file fails exact inventory check
+        sub_scratch2 = self.root / "tampered_candidate"
+        sub_scratch2.mkdir()
+        with self.assertRaises(ContractError) as caught:
+            assemble_pages_candidate(
+                sub_scratch2,
+                files={"index.html": "<!DOCTYPE html><html><body>Original</body></html>\n"},
+                signing_fixture=fixture,
+                exact_inventory={
+                    "index.html": "0" * 64,  # wrong hash
+                    "CNAME": hashlib.sha256(b"rs9.knowledge-forge.ai\n").hexdigest(),
+                    "keys/rs9-candidate-fixture-NONPRODUCTION.asc": hashlib.sha256(fixture.public_key_bytes).hexdigest(),
+                    "keys/rs9-candidate-fixture-NONPRODUCTION.gpg": hashlib.sha256(fixture.public_key_binary).hexdigest(),
+                    "keys/KEY-METADATA.json": hashlib.sha256(canonical({
+                        "production": False, "fixture": True, "fingerprint": fixture.primary_fingerprint,
+                        "purpose": "NON-PRODUCTION CANDIDATE TEST ONLY",
+                    })).hexdigest(),
+                },
+                cname="rs9.knowledge-forge.ai",
+            )
+        self.assertEqual(caught.exception.code, "TAMPER_DETECTED")
+
+    def test_fixture_metadata_omission_and_extra_declaration_fail_exact_inventory(self):
+        fixture = HermeticSigningDouble()
+        original = self.root / "original"
+        original.mkdir()
+        candidate = construct_candidate_signed_tree(original, signing_fixture=fixture)
+        files = {p: (original / p).read_bytes() for p in candidate.exact_inventory if not p.startswith("keys/") and p != "CNAME"}
+        for case, code in (("omitted", "UNMANIFESTED_FILE"), ("extra", "MISSING_MANIFESTED_FILE")):
+            with self.subTest(case=case):
+                target = self.root / case
+                target.mkdir()
+                declared = dict(candidate.exact_inventory)
+                if case == "omitted":
+                    del declared["keys/KEY-METADATA.json"]
+                else:
+                    declared["keys/extra-NONPRODUCTION.asc"] = "a" * 64
+                with self.assertRaises(ContractError) as caught:
+                    assemble_pages_candidate(target, files=files, signing_fixture=fixture, exact_inventory=declared,
+                                             cname="rs9.knowledge-forge.ai")
+                self.assertEqual(caught.exception.code, code)
 
 
 class CustodyAndCompletenessTests(unittest.TestCase):

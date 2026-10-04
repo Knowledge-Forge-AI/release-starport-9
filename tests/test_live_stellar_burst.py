@@ -19,7 +19,7 @@ class LiveStellarTests(unittest.TestCase):
         fixture = ROOT / "tests/fixtures/stellar-burst-0.6.1"
         selection = json.loads((fixture / "selection.json").read_bytes())
         capture = authenticate_release(selection, os.environ["RS9_STELLAR_BURST_EVIDENCE_DIR"])
-        profile = evaluate_profile(capture, PACKAGE_PROFILE, {"version": "0.6.1", "tag": "v0.6.1"},
+        profile = evaluate_profile(capture, PACKAGE_PROFILE, {"version": "0.6.1", "tag": "v0.6.1", "assets": selection["payload_assets"]},
                                    roles={row["role"]: row["name"] for row in selection["evidence_assets"]})
         self.assertEqual(canonical(capture.record), (fixture / "release-record.json").read_bytes())
         self.assertEqual(canonical(profile), (fixture / "profile-result.json").read_bytes())

@@ -1,0 +1,452 @@
+{
+  "attended_handoff": {
+    "automatic_rerun": false,
+    "commit_message": "Repair hosted command authentication and hermetic source contracts",
+    "new_push_run_only": true,
+    "operator": "operators/live1/adopt-and-qualify.py adopt",
+    "production_publish": false,
+    "reviewed_parent": "2095e9d84295e09e4f1d4fc517fe0d5006478803",
+    "reviewed_tree_and_manifest": "manager binds exact final source candidate",
+    "stop": "new manager packet preserving downstream failures"
+  },
+  "closeout": {
+    "disposition": "amend",
+    "entry_binding_verified": {
+      "files": 278,
+      "inventory_verified": true,
+      "manifest_sha256": "1dd80c29d28d1707d025aee1f74936e922b17a20b89c275488f6b970ecf2bac5",
+      "tree": "81996f10848aa21b3cd86906456456a11dd53a70"
+    },
+    "independent_terminal_review": false,
+    "omissions": [
+      "No further substantive reviewer invoked",
+      "No staging, commit, push, hosted rerun, production publication, credential provisioning or dependency changes"
+    ],
+    "rationale": "Accept the bounded source repair with four advisory corrections; preserve fail-closed hosted qualification and report unavailable integration evidence explicitly",
+    "terminal_binding": "Computed after evidence and manifest refresh; exact tree and manifest digest reported in terminal dispatcher handoff",
+    "terminal_changed_paths": [
+      "docs/live1-hosted-candidate.md",
+      "evidence/live1/hosted-repair-command-report.json",
+      "evidence/live1/hosted-repair-verification.json",
+      "operators/live1/RUNBOOK.md",
+      "operators/live1/candidate-manifest.json",
+      "src/rs9/adopt_candidate.py",
+      "src/rs9/command_report.py",
+      "src/rs9/hosted_pipeline.py",
+      "src/rs9/pages.py",
+      "tests/pages_candidate_fixtures.py",
+      "tests/test_command_contracts.py",
+      "tests/test_pages.py",
+      "tests/test_pages_candidate.py"
+    ],
+    "work_review_dispositions": [
+      {
+        "disposition": "defer",
+        "finding": 1,
+        "result": "Real-GnuPG versions of both original failures and Ubuntu24.04/Python3.12 execution remain pending externally. Hermetic siblings pass; no stock-runner green claim."
+      },
+      {
+        "disposition": "defer",
+        "finding": 2,
+        "result": "Complete live API/source captures unavailable. No full release reauthentication or Burst golden replay claimed; exact retained payload report remains narrower command evidence."
+      },
+      {
+        "disposition": "amend",
+        "finding": 3,
+        "result": "Report and per-command basis plus bytes_authenticated distinguish completed generation authentication from inspected capture hashes, including actual DIGEST_MISMATCH failure custody."
+      },
+      {
+        "disposition": "accept",
+        "finding": 4,
+        "result": "Retain the existing tighter package-profile bounds and reinspection change check for this bounded generation. Both passes share the same npm validator, so execution semantics agree. Limits unification is deferred; no larger package qualification claimed."
+      },
+      {
+        "disposition": "amend",
+        "finding": 5,
+        "result": "Both adopt API and argparse defaults now use the repair commit message; mocked API/CLI checks pass and runbook wording agrees."
+      },
+      {
+        "disposition": "amend",
+        "finding": 6,
+        "result": "Independent inventory binds fixture-owned armor instead of calling the product helper. Deliberate assembler armor drift fails TAMPER_DETECTED."
+      },
+      {
+        "disposition": "amend",
+        "finding": 7,
+        "result": "Exit-wait timeout kills and reaps the zstd child before context-manager exit. Real child closing stdout then hanging is reaped without ResourceWarning."
+      },
+      {
+        "disposition": "accept",
+        "finding": 8,
+        "result": "Verified the exact entry candidate tree, manifest digest, complete file hashes and modes. Terminal inventory is refreshed and independently recomputed without Git metadata mutation."
+      }
+    ],
+    "workers": "declined for closeout: small coupled corrections performed directly; producer worker evidence retained"
+  },
+  "command_evidence": {
+    "assets_exact_size_hash": 6,
+    "commands_and_launchers": 11,
+    "decision": "D1-B; Burst bins regular 0644 with exact bin targets and Node shebangs; npm uses node-explicit; Nebular remains regular executable",
+    "fresh_full_generation_authentication": "not-run: public transport unavailable; full API/source captures not retained",
+    "release_bytes_in_product": false,
+    "report": "evidence/live1/hosted-repair-command-report.json"
+  },
+  "deferred": [
+    "Actual stock Ubuntu24.04/Python3.12 execution and real GnuPG signing",
+    "Fresh complete generation authentication and second hosted push run",
+    "Downstream package-lane failures and qualification policy blockers",
+    "Historical CONT1 v1-only receipt reader discrepancy"
+  ],
+  "entry_observation": {
+    "branch": "main",
+    "head": "2095e9d84295e09e4f1d4fc517fe0d5006478803",
+    "local_equals_origin_main": true,
+    "preserved_unrelated_state": ".serena/**",
+    "remote_refresh": "not performed; network capture unavailable",
+    "tree": "60e13556a9dbda2e6e40d1a240d89f0f198a5c56"
+  },
+  "external_reviewer_invoked": false,
+  "focused_verification": {
+    "closeout_contracts": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_command_contracts tests.test_pages tests.test_pages_candidate tests.test_hosted_candidate tests.test_collect_candidate tests.test_candidate_adoption -q",
+      "errors": 0,
+      "failures": 0,
+      "note": "Two initial new-test harness errors corrected (patch import and patch ordering); rerun passed",
+      "skipped": 1,
+      "tests_run": 86
+    },
+    "operator_default_smoke": {
+      "adoption": "mocked; no Git action performed",
+      "api": "pass",
+      "cli": "pass"
+    }
+  },
+  "full_unittest": {
+    "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -q",
+    "errors": 0,
+    "failures": 0,
+    "production_enabled": false,
+    "python": "3.13.12",
+    "schema": "rs9.source-test-result.v1alpha1",
+    "seconds": 28.083,
+    "skipped": 9,
+    "suite": "full unittest discover -s tests",
+    "system": "Darwin",
+    "tests_run": 651
+  },
+  "git_publication_performed": false,
+  "goldens": {
+    "burst": "Updated selection, command fields and hashes from exact payload inspection plus existing audit; opt-in test now supplies assets",
+    "burst_full_capture_replay": "not-run: complete API/source capture unavailable",
+    "nebular": "Legacy shadow command projection preserved; generic captured command fields enriched"
+  },
+  "gpg": {
+    "hermetic_original_failure_siblings": "pass; no skip",
+    "hosted_integration": "mandatory",
+    "real_sign_verify": "not-run",
+    "reason": "GPG_NOT_AVAILABLE",
+    "usable_binary_found": false
+  },
+  "hygiene": {
+    "credential_scan": "pass",
+    "diff_check": "pass",
+    "inventory": "complete product source; .serena excluded",
+    "python_ast": "pass",
+    "relative_links": "pass",
+    "relative_links_checked": 245
+  },
+  "independent_terminal_review_claimed": false,
+  "original_scope": "Bounded source repair of run 37166638590 COMMAND_PATH and hermetic unit defects; second hosted run requires manager disposition",
+  "plan_review_dispositions": [
+    {
+      "disposition": "amend",
+      "finding": 1,
+      "result": "Both real-GnuPG and always-running hermetic Pages tests patch synthetic RPM signing; production checked() remains strict."
+    },
+    {
+      "disposition": "amend",
+      "finding": 2,
+      "result": "Retain command report on failure as well as success; safe diagnostics preserve app paths containing spaces."
+    },
+    {
+      "disposition": "amend",
+      "finding": 3,
+      "result": "Inventoried direct inspect_archive/authenticate_release callers; closed command policy dispatcher invokes shared npm bin validator during capture and profile evaluation. Native dependency inspection stays strict."
+    },
+    {
+      "disposition": "amend",
+      "finding": 4,
+      "result": "Repair commit message parameterized and mocked attended adoption tested; manifest declares candidate_adoption_ready; collect uses v2 collector and does not reach legacy validate_receipts."
+    },
+    {
+      "disposition": "amend",
+      "finding": 5,
+      "result": "Feeder owns stdin close and is joined before Popen context exit; child killed on limit, read failure or unjoined feeder."
+    },
+    {
+      "disposition": "accept",
+      "finding": 6,
+      "result": "Reuse pages_candidate._fixture_public_armor in sign_rpm/write_keys."
+    },
+    {
+      "disposition": "accept",
+      "finding": 7,
+      "result": "Symlink-only additions and isolated HOME/PATH are a Darwin tool-isolation check, explicitly not Ubuntu/Python3.12 equivalence."
+    },
+    {
+      "disposition": "accept",
+      "finding": 8,
+      "result": "Unavailable package tools modeled through runner availability; no global tool patch in Pages logic test. Arch builder diagnostics printed by suite are expected prerequisite-report tests."
+    },
+    {
+      "disposition": "accept",
+      "finding": 9,
+      "result": "Unauthenticated capture attempted once per project; exact retained payload bytes then matched size/hash against reviewed expectations. No rate-limit polling or credential fallback."
+    }
+  ],
+  "prior_stage_verification": {
+    "focused_verification": {
+      "integrated_contract_tests": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 2,
+        "tests_run": 96
+      },
+      "workflow_token_hygiene_contracts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests_run": 27
+      }
+    },
+    "full_unittest": {
+      "errors": 0,
+      "failures": 0,
+      "production_enabled": false,
+      "python": "3.13.12",
+      "schema": "rs9.source-test-result.v1alpha1",
+      "seconds": 29.623,
+      "skipped_tests": [
+        {
+          "reason": "GnuPG binary not available",
+          "test": "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift"
+        },
+        {
+          "reason": "both live capture directories required",
+          "test": "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records"
+        },
+        {
+          "reason": "GnuPG binary not available",
+          "test": "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture"
+        },
+        {
+          "reason": "GnuPG binary not available",
+          "test": "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper"
+        },
+        {
+          "reason": "GnuPG binary not available in environment",
+          "test": "setUpClass (test_signing_fixture.SigningFixtureTests)"
+        }
+      ],
+      "suite": "full unittest discover -s tests",
+      "system": "Darwin",
+      "tests_run": 648
+    },
+    "unit_tool_isolation": {
+      "errors": 0,
+      "failures": 0,
+      "python": "3.13.12",
+      "seconds": 31.024,
+      "skipped_tests": [
+        {
+          "reason": "GnuPG binary not available",
+          "test": "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift"
+        },
+        {
+          "reason": "both live capture directories required",
+          "test": "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records"
+        },
+        {
+          "reason": "Nix pure evaluator unavailable",
+          "test": "test_materialize.NixCandidateContractTests.test_candidate_definitions_under_nix_fail_closed_without_pinned_nixpkgs"
+        },
+        {
+          "reason": "Nix pure evaluator unavailable",
+          "test": "test_materialize.NixCandidateContractTests.test_pure_flake_evaluation_has_no_publication_outputs"
+        },
+        {
+          "reason": "Nix pure evaluator unavailable",
+          "test": "test_materialize.NixCandidateContractTests.test_qualification_proof_pending_status"
+        },
+        {
+          "reason": "GnuPG binary not available",
+          "test": "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture"
+        },
+        {
+          "reason": "GnuPG binary not available",
+          "test": "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper"
+        },
+        {
+          "reason": "GnuPG binary not available in environment",
+          "test": "setUpClass (test_signing_fixture.SigningFixtureTests)"
+        }
+      ],
+      "suite": "full unittest with isolated HOME and symlink-only tool additions",
+      "system": "Darwin",
+      "tests_run": 648,
+      "tools_visible": {
+        "createrepo_c": false,
+        "docker": false,
+        "gpg": false,
+        "makepkg": false,
+        "nix": false,
+        "node": true,
+        "python3": true,
+        "repo-add": false,
+        "rpmbuild": false,
+        "zstd": false
+      },
+      "ubuntu_equivalence": false
+    }
+  },
+  "production_enabled": false,
+  "proposal": {
+    "bytes": 20814,
+    "disposition": "amend",
+    "sha256": "e55cb8ab059b22ed799c3504cb67185d318317b9fc7e35706324971bd55e301d"
+  },
+  "publication_authority": false,
+  "schema": "rs9.live1-hosted-repair-verification.v1alpha1",
+  "stage_deltas_at_entry": [],
+  "status": "closeout-source-candidate-amended; manager disposition and second hosted run pending",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT3-HOSTED1-REPAIR1",
+  "unit_harness_correction": {
+    "disposition": "harness corrected to match python -m cwd import path; complete suite rerun passed; no product change",
+    "first_attempt": "Imported scratch runner omitted repository top-level from sys.path; 29 test-module import errors"
+  },
+  "unit_tool_isolation": {
+    "errors": 0,
+    "failures": 0,
+    "python": "3.13.12",
+    "schema": "rs9.source-test-result.v1alpha1",
+    "seconds": 25.159,
+    "skipped": 12,
+    "skipped_tests": [
+      {
+        "reason": "GnuPG binary not available",
+        "test": "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+      },
+      {
+        "reason": "live capture directory not supplied",
+        "test": "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison"
+      },
+      {
+        "reason": "live capture directory not supplied",
+        "test": "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens"
+      },
+      {
+        "reason": "live capture directory not supplied",
+        "test": "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift"
+      },
+      {
+        "reason": "both live capture directories required",
+        "test": "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core"
+      },
+      {
+        "reason": "live capture directory not supplied",
+        "test": "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records"
+      },
+      {
+        "reason": "Nix pure evaluator unavailable",
+        "test": "test_materialize.NixCandidateContractTests.test_candidate_definitions_under_nix_fail_closed_without_pinned_nixpkgs"
+      },
+      {
+        "reason": "Nix pure evaluator unavailable",
+        "test": "test_materialize.NixCandidateContractTests.test_pure_flake_evaluation_has_no_publication_outputs"
+      },
+      {
+        "reason": "Nix pure evaluator unavailable",
+        "test": "test_materialize.NixCandidateContractTests.test_qualification_proof_pending_status"
+      },
+      {
+        "reason": "GnuPG binary not available",
+        "test": "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture"
+      },
+      {
+        "reason": "GnuPG binary not available",
+        "test": "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper"
+      },
+      {
+        "reason": "GnuPG binary not available in environment",
+        "test": "setUpClass (test_signing_fixture.SigningFixtureTests)"
+      }
+    ],
+    "suite": "full unittest with isolated HOME and symlink-only tool additions",
+    "system": "Darwin",
+    "tests_run": 651,
+    "tools_visible": {
+      "createrepo_c": false,
+      "docker": false,
+      "gpg": false,
+      "makepkg": false,
+      "nix": false,
+      "node": true,
+      "python3": true,
+      "repo-add": false,
+      "rpmbuild": false,
+      "zstd": false
+    },
+    "ubuntu_equivalence": false
+  },
+  "workers": {
+    "dispatcher_checkpoint_authority": false,
+    "effective_model_identity": "not observed in terminal worker evidence",
+    "requested_profile": "gemini-3.8-flash-high",
+    "used": [
+      {
+        "cleanup_proven": true,
+        "job": "pages-hermetic-repair",
+        "kind": "gemini",
+        "outcome": "accepted with parent amendments"
+      },
+      {
+        "cleanup_proven": true,
+        "job": "repair-source-documentation",
+        "kind": "gemini",
+        "outcome": "accepted with parent amendments"
+      }
+    ]
+  }
+}

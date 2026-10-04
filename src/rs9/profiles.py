@@ -61,7 +61,8 @@ def selection_for_intent(normalized, *, include_configuration=False):
         sources.add(normalized["desktop"]["icon"]["path"])
     return {"schema": "rs9.release-selection.v1alpha1", "repository": normalized["project"]["repository"],
             "tag": normalized["tag"], "prerelease": normalized["release"]["prerelease"],
-            "payload_assets": normalized["assets"], "evidence_assets": evidence["assets"],
+            "payload_assets": [{**asset, "command_policy": "npm-package-bin" if profile == PACKAGE_PROFILE else "native-executable"}
+                               for asset in normalized["assets"]], "evidence_assets": evidence["assets"],
             "checksums": evidence["checksums"], "source_paths": sorted(sources)}
 
 
@@ -92,6 +93,9 @@ def evaluate_profile(capture, profile, intent, *, roles=None):
     release_hash = authenticated_record_hash(capture)
     if profile not in PROFILE_ROLES:
         raise ContractError("EVIDENCE_PROFILE", "Unknown RS9-owned evidence profile")
+    expected_policy = "npm-package-bin" if profile == PACKAGE_PROFILE else "native-executable"
+    if any(p.get("command_policy", "native-executable") != expected_policy for p in capture.record["payloads"]):
+        raise ContractError("EVIDENCE_PROFILE", "Profile and captured command execution policy disagree")
     if roles is None:
         selected, evidence, roles = evidence_policy(intent)
         if selected != profile:
@@ -149,8 +153,10 @@ def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False):
         archives[asset["id"]] = path
         manifests[asset["id"]] = manifest
         inputs.append({**metadata[asset["name"]], "id": asset["id"], "platforms": asset["platforms"],
-                       "root": manifest["root"], "commands": {k: v for k, v in manifest["commands"].items() if not k.startswith("launcher:")},
-                       "launchers": {k[9:]: v for k, v in manifest["commands"].items() if k.startswith("launcher:")},
+                       # Preserve the legacy shadow record's path/hash projection;
+                       # complete modes and sizes remain in the generic capture.
+                       "root": manifest["root"], "commands": {k: {f: v[f] for f in ("path", "sha256")} for k, v in manifest["commands"].items() if not k.startswith("launcher:")},
+                       "launchers": {k[9:]: {f: v[f] for f in ("path", "sha256")} for k, v in manifest["commands"].items() if k.startswith("launcher:")},
                        "payload_manifest_sha256": manifest["manifest_sha256"], "member_count": len(manifest["members"])})
     try:
         provenance = json.loads(payloads[roles["provenance"]])
@@ -265,16 +271,22 @@ def _evaluate_package(capture, intent, roles):
     def visitor(path, data, mode):
         if path in ("package/package.json", "package/NOTICE", "package/LICENSE"):
             packaged[path] = data
+        elif path in selected.get("commands", {}).values():
+            packaged[path] = data[:257]
 
     selected = next(a for a in intent["assets"] if a["id"] == identity)
-    manifest = inspect_archive(capture.archives[identity], selected.get("commands", {}), on_file=visitor,
+    manifest = inspect_archive(capture.archives[identity], selected.get("commands", {}), command_policy="npm-package-bin", on_file=visitor,
                                max_members=20000, max_member_bytes=4 * 1024 ** 2,
                                max_total_bytes=64 * 1024 ** 2)
     if manifest != capture.manifests[identity]:
         raise ContractError("INPUT_CHANGED", "Archive changed after core authentication")
     if manifest["root"] != "package" or "package/package.json" not in packaged:
         raise ContractError("PACKAGE_IDENTITY", "Single package root and regular metadata required")
-    package = json.loads(packaged["package/package.json"])
+    from rs9.npm_commands import authenticate_bins
+    try:
+        package, commands, undeclared_bins = authenticate_bins(manifest, packaged, selected.get("commands", {}))
+    except ContractError as error:
+        raise error.with_details(asset=identity) from None
     tagged = json.loads(capture.source["package.json"])
     validate_ecosystem_name("npm", package["name"])
     for key in ("name", "version"):
@@ -287,22 +299,6 @@ def _evaluate_package(capture, intent, roles):
     for declaration in declarations:
         scan_for_credentials(declaration["expression"])
         validate_spdx_expression(declaration["expression"])
-    bins = package.get("bin", {})
-    if isinstance(bins, str):
-        bins = {package["name"].rsplit("/", 1)[-1]: bins}
-    if not isinstance(bins, dict):
-        raise ContractError("PACKAGE_IDENTITY", "Package bin mapping must be declarative")
-    members = {row["path"]: row for row in manifest["members"]}
-    commands = []
-    for name, target in sorted(bins.items()):
-        validate_ecosystem_name("npm", name)
-        if target.startswith("./"):
-            target = target[2:]
-        validate_safe_relative_posix_path(target)
-        row = members.get("package/" + target, {})
-        if row.get("type") != "file":
-            raise ContractError("COMMAND_PATH", "Package bin must be a regular authenticated member")
-        commands.append({"name": name, "path": row["path"], "sha256": row["sha256"]})
     provenance = json.loads(capture.evidence_bytes[roles["provenance"]])
     assertions = provenance.get("release", {})
     for key, expected in {"repository": capture.record["repository"]["full_name"], "tag": intent["tag"],
@@ -320,8 +316,10 @@ def _evaluate_package(capture, intent, roles):
             if row.get("sha256") != asset["sha256"] or ("size" in row and row["size"] != asset["size"]):
                 raise ContractError("PROVENANCE_MISMATCH", "Publisher selected asset assertion disagrees")
     return {"package": {"name": package["name"], "version": package["version"],
-                        "payload_manifest_sha256": manifest["manifest_sha256"], "commands": commands},
+                        "payload_manifest_sha256": manifest["manifest_sha256"], "commands": commands,
+                        "undeclared_bins": undeclared_bins},
             "license": {"status": "consistent" if tagged["license"] == package["license"] else "conflict",
                         "declarations": declarations, "comparison": "exact-string; no legal acceptance"},
             "notice_sha256": digest(notice), "provenance_sha256": digest(capture.evidence_bytes[roles["provenance"]]),
-            "legal_files": [{"path": path, "sha256": digest(data)} for path, data in sorted(packaged.items()) if path != "package/package.json"]}
+            "legal_files": [{"path": path, "sha256": digest(data)} for path, data in sorted(packaged.items())
+                            if path in {"package/LICENSE", "package/NOTICE"}]}

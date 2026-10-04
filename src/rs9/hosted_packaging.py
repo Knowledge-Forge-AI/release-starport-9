@@ -12,6 +12,7 @@ from rs9.errors import ContractError
 from rs9.hosted_native import provision, container_tool_facts
 from rs9.hosted_wheels import _resolve_offline_npm_archives
 from rs9.release_core import digest
+from rs9.pages_candidate import _fixture_public_armor
 from rs9.scratch import canonical
 from rs9.signing_fixture import SigningFixture
 
@@ -39,7 +40,7 @@ def sign_rpm(runner, path, fixture):
     db = fixture.homedir / "fixture-rpmdb"
     db.mkdir(exist_ok=True)
     public = fixture.homedir / FIXTURE_ARMOR
-    public.write_bytes(fixture.public_key_armor)
+    public.write_bytes(_fixture_public_armor(fixture))
     checked(runner, ["rpmkeys", "--dbpath", str(db), "--import", str(public)])
     result = checked(runner, ["rpmkeys", "--dbpath", str(db), "--checksig", str(path)])
     if "OK" not in result.stdout_text or "NOT OK" in result.stdout_text:
@@ -50,7 +51,7 @@ def sign_rpm(runner, path, fixture):
 
 def write_keys(directory, fixture):
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / FIXTURE_ARMOR).write_bytes(fixture.public_key_armor)
+    (directory / FIXTURE_ARMOR).write_bytes(_fixture_public_armor(fixture))
     (directory / FIXTURE_KEYRING).write_bytes(fixture.public_key_binary)
     (directory / "KEY-METADATA.json").write_bytes(canonical({"production": False, "fixture": True,
         "fingerprint": fixture.primary_fingerprint, "purpose": "NON-PRODUCTION CANDIDATE TEST ONLY"}))

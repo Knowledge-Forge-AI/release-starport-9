@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib
 from typing import Any
 from rs9.pages_candidate import PagesCandidate, assemble_pages_candidate
+from rs9.scratch import canonical
 
 
 def construct_candidate_signed_tree(
@@ -20,12 +21,13 @@ def construct_candidate_signed_tree(
     pacman_db_sig = signing_fixture.detach_sign(pacman_db, armor=False)
 
     sample_repo_config = (
-        "[rs9-fedora]\n"
-        "name=RS9 Fedora 43 Repository\n"
-        "baseurl=https://rs9.knowledge-forge.ai/rpm/fedora/43/$basearch\n"
+        "[rs9-fedora-nonproduction]\n"
+        "name=RS9 Fedora 43 NONPRODUCTION candidate\n"
+        f"baseurl=https://{cname}/rpm/fedora/43/$basearch\n"
         "enabled=1\n"
         "gpgcheck=1\n"
-        "gpgkey=https://rs9.knowledge-forge.ai/keys/rs9.asc\n"
+        "repo_gpgcheck=1\n"
+        f"gpgkey=https://{cname}/keys/rs9-candidate-fixture-NONPRODUCTION.asc\n"
     )
 
     base_files: dict[str, bytes | str] = {
@@ -47,11 +49,28 @@ def construct_candidate_signed_tree(
     if custom_files:
         base_files.update(custom_files)
 
-    bound_files = {**base_files, "CNAME": (cname + "\n").encode(),
-                   "keys/rs9.asc": signing_fixture.public_key_bytes,
-                   "keys/rs9-archive-keyring.gpg": signing_fixture.public_key_binary}
-    exact_inventory = {p: hashlib.sha256(v.encode() if isinstance(v, str) else v).hexdigest()
-                       for p, v in bound_files.items()}
+    key_metadata = canonical({
+        "production": False,
+        "fixture": True,
+        "fingerprint": signing_fixture.primary_fingerprint,
+        "purpose": "NON-PRODUCTION CANDIDATE TEST ONLY",
+    })
+
+    # Bind fixture-owned bytes independently of the assembler's armor helper.
+    public_armor = getattr(signing_fixture, "public_key_bytes", None)
+    if public_armor is None:
+        public_armor = signing_fixture.public_key_armor.encode("utf-8")
+    bound_files = {
+        **base_files,
+        "CNAME": (cname + "\n").encode(),
+        "keys/rs9-candidate-fixture-NONPRODUCTION.asc": public_armor,
+        "keys/rs9-candidate-fixture-NONPRODUCTION.gpg": signing_fixture.public_key_binary,
+        "keys/KEY-METADATA.json": key_metadata,
+    }
+    exact_inventory = {
+        p: hashlib.sha256(v.encode() if isinstance(v, str) else v).hexdigest()
+        for p, v in bound_files.items()
+    }
 
     return assemble_pages_candidate(
         scratch_dir,

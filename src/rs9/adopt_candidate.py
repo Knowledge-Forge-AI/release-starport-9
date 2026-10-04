@@ -158,13 +158,18 @@ def staging_paths(root, manifest, git):
     return sorted(allowed | deleted)
 
 
-def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256, timeout=7200):
+def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256, timeout=7200,
+          commit_message="Repair hosted command authentication and hermetic source contracts"):
     from rs9.collect_candidate import collect, output_directory
     root = physical_directory(repository)
     if any(not re.fullmatch(r"[0-9a-f]{40}", x) for x in (reviewed_parent, reviewed_tree)) or not re.fullmatch(r"[0-9a-f]{64}", manifest_sha256):
         raise ContractError("ADOPTION_REVIEW", "Exact manager review bindings required")
     if type(timeout) is not int or not 30 <= timeout <= 21600:
         raise ContractError("ADOPTION_TIMEOUT", "Wait must be bounded")
+    if (not isinstance(commit_message, str) or not 1 <= len(commit_message) <= 160
+            or any(ord(c) < 32 or ord(c) == 127 for c in commit_message)):
+        raise ContractError("ADOPTION_REVIEW", "Bounded single-line commit message required")
+    scan_for_credentials(commit_message)
     manifest_path = root / MANIFEST
     if any(p.is_symlink() for p in (manifest_path, *manifest_path.parents)) or manifest_path.stat().st_size > 512 * 1024:
         raise ContractError("ADOPTION_REVIEW", "Bounded physical manifest required")
@@ -197,7 +202,7 @@ def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256
     git("add", "-A", "--", *paths)
     if git("write-tree") != reviewed_tree:
         raise ContractError("ADOPTION_REVIEW", "Staged tree differs; index retained for inspection")
-    git("commit", "-m", "Complete non-production hosted Theme Forge candidate pipeline")
+    git("commit", "-m", commit_message)
     commit = git("rev-parse", "HEAD")
     if git("rev-parse", "HEAD^{tree}") != reviewed_tree or git("rev-parse", "HEAD^") != reviewed_parent:
         raise ContractError("ADOPTION_REVIEW", "Commit hook changed candidate; stop before push")
@@ -221,13 +226,15 @@ def main(argv=None):
         command.add_argument("--timeout", type=int, default=7200)
     for flag in ("reviewed-parent", "reviewed-tree", "manifest-sha256"):
         adoption.add_argument("--" + flag, required=True)
+    adoption.add_argument("--commit-message", default="Repair hosted command authentication and hermetic source contracts")
     collection.add_argument("--commit", required=True)
     collection.add_argument("--run-id", type=int, required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == "adopt":
             result = adopt(args.repository, args.output, reviewed_parent=args.reviewed_parent,
-                           reviewed_tree=args.reviewed_tree, manifest_sha256=args.manifest_sha256, timeout=args.timeout)
+                           reviewed_tree=args.reviewed_tree, manifest_sha256=args.manifest_sha256, timeout=args.timeout,
+                           commit_message=args.commit_message)
         else:
             from rs9.collect_candidate import collect
             result = collect(args.repository, args.output, commit=args.commit, run_id=args.run_id,
