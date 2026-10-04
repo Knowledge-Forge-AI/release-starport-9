@@ -41,11 +41,11 @@ def install(repository, scratch, *, client=None):
     client = client or PublicClient()
     expected = targets.get("installer_sha256")
     if not expected:
-        expected = client.get(url + ".sha256", limit=1024).decode().split()[0]
+        expected = client.get(url + ".sha256", request_class="nix-installer", limit=1024).decode().split()[0]
     import re
     if not re.fullmatch("[0-9a-f]{64}", expected):
         raise ContractError("NIX_INSTALLER", "Canonical installer checksum required")
-    data = client.get(url, limit=256 * 1024 ** 2)
+    data = client.get(url, request_class="nix-installer", limit=256 * 1024 ** 2)
     if digest(data) != expected:
         raise ContractError("NIX_INSTALLER", "Official installer checksum mismatch")
     archive = scratch / filename

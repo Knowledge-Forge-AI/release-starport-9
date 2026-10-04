@@ -749,7 +749,7 @@ def _offline_npm_archives(capture: Any, product: str, inputs: Path | None, clien
         elif client is not None:
             target = scratch / "npm_downloads" / f"dep-{product}-{index}.tgz"
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(client.get(row["url"], limit=32 * 1024 ** 2))
+            target.write_bytes(client.get(row["url"], request_class="npm-tarball", limit=32 * 1024 ** 2))
             archives[row["path"]] = target
     return archives
 

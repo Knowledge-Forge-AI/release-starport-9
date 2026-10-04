@@ -9,7 +9,8 @@ from rs9.bootstrap import checked_bootstrap_configurations, load_bootstrap, requ
 from rs9.errors import ContractError
 from rs9.github import PublicClient
 from rs9.operator import BOOTSTRAP, EXPECTATIONS, assert_release_expectations
-from rs9.profiles import capture_supplemental, evaluate_profile, selection_for_intent
+from rs9.profiles import (TAURI_PROFILE, TAURI_AUTHORITY_PROFILE, capture_supplemental,
+                          evaluate_profile, record_corroboration_failure, selection_for_intent)
 from rs9.records import record_sha256
 from rs9.release_core import authenticate_release, capture_release, digest
 from rs9.scratch import ConfinedWriter, canonical, physical_directory
@@ -24,7 +25,8 @@ def configuration_rows(repository):
     return checked_bootstrap_configurations(manifest, approved_manifests=[digest(manifest.read_bytes())])
 
 
-def capture_generation(repository, output, *, project=None, client=None, checkout_binding="provider-uncommitted"):
+def capture_generation(repository, output, *, project=None, client=None, checkout_binding="provider-uncommitted",
+                       supplemental_receipts=None):
     root, output = physical_directory(repository), physical_directory(output)
     if any(output.iterdir()):
         raise ContractError("OUTPUT_NOT_EMPTY", "Fresh candidate scratch must be empty")
@@ -41,6 +43,7 @@ def capture_generation(repository, output, *, project=None, client=None, checkou
         target.mkdir()
         selection = selection_for_intent(intent)
         stage = "capture"
+        corroboration = None
         try:
             capture_release(selection, target, client=client)
             stage = "core-authenticate"
@@ -55,10 +58,18 @@ def capture_generation(repository, output, *, project=None, client=None, checkou
             intent = load_bootstrap(manifest, capture, approved_manifests=[digest(manifest.read_bytes())])
             require_configuration_authority(capture, intent)
             stage = "supplemental"
-            capture_supplemental(intent, target, client)
+            desktop_profile = intent["release"]["evidence"]["profile"] in {TAURI_PROFILE, TAURI_AUTHORITY_PROFILE}
+            corroboration = ({"project": intent["project"]["id"], "release_authentication": "core-authenticated",
+                              "npm_corroboration": "pending", "wrapper_bytes": "pending", "integrity": "pending"}
+                             if desktop_profile else None)
+            if desktop_profile and supplemental_receipts is not None:
+                supplemental_receipts.append(corroboration)
+            capture_supplemental(intent, target, client, corroboration=corroboration, core_authenticated=True)
             stage = "profile"
-            profile = evaluate_profile(capture, intent["release"]["evidence"]["profile"], intent)
+            profile = evaluate_profile(capture, intent["release"]["evidence"]["profile"], intent,
+                                       corroboration=corroboration if desktop_profile else None)
         except ContractError as error:
+            record_corroboration_failure(corroboration, error)
             raise error.with_details(project=intent["project"]["id"], stage=stage) from None
         summary = {"project": intent["project"]["id"], "release_record_sha256": record_sha256(capture.record),
                    "profile_result_sha256": record_sha256(profile), "repository": capture.record["repository"],

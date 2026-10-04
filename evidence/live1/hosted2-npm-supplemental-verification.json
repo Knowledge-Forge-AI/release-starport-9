@@ -1,0 +1,407 @@
+{
+  "attended_handoff": {
+    "automatic_rerun": false,
+    "collect_every_job_step_artifact_summary": true,
+    "commit_message": "Repair npm supplemental transport identity and diagnostics",
+    "exact_reviewed_inventory_required": true,
+    "new_push_run_only": true,
+    "normal_commit_and_fast_forward_push": true,
+    "operator": "operators/live1/adopt-and-qualify.py adopt",
+    "production_publish": false,
+    "remote_main_parent_check": true,
+    "reviewed_parent": "00bfaeae4268810d5231ec570c63920af2304593",
+    "reviewed_paths_only": true,
+    "reviewed_tree_and_manifest": "manager supplies exact accepted candidate bindings",
+    "stop_with_manager_packet": true
+  },
+  "attended_operator_static_tests": {
+    "errors": 0,
+    "evidence_owner": "prior producer; recorded before terminal amendment; not rerun or claimed as terminal evidence",
+    "failures": 0,
+    "skipped": 0,
+    "suite": "test_candidate_adoption, test_collect_candidate, test_workflow_static",
+    "tests_run": 24
+  },
+  "closeout": {
+    "additional_terminal_paths": [
+      "evidence/live1/hosted2-npm-supplemental-verification.json",
+      "operators/live1/candidate-manifest.json"
+    ],
+    "attended_operator_tests": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_candidate_adoption tests.test_collect_candidate -q",
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "tests_run": 11
+    },
+    "bound_producer_manifest_sha256": "733f19224d428cc56ce361860efb824d279224d49398d9b16b6c39d6335213a2",
+    "bound_producer_tree": "a4334ff9c3ab5cbfc57ca60ce9fcb363cfd8584e",
+    "checks_not_repeated": [
+      "Full unittest and stock-runner tool-isolation gates were run by the producer before the dispatcher work review. Closeout ran only verification affected by the bounded terminal correction.",
+      "No fresh provider npm canary; prior DNS failure remains an optional network limitation.",
+      "Hosted run 3 and all downstream integration remain pending externally.",
+      "No second substantive review or independent terminal rereview."
+    ],
+    "disposition": "amend",
+    "focused_verification": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_github tests.test_npm_transport tests.test_npm_supplemental tests.test_fetch tests.test_candidate_capture tests.test_profiles tests.test_ingestion tests.test_live1_contracts tests.test_command_contracts tests.test_hosted_candidate tests.test_hosted_nix tests.test_hosted_wheels tests.test_hosted_deb tests.test_hosted_smoke tests.test_hosted_observe tests.test_workflow_static -q",
+      "errors": 0,
+      "failures": 0,
+      "seconds": 4.071,
+      "skipped": 1,
+      "tests_run": 161
+    },
+    "git_diff_check": "pass before final evidence/inventory refresh; final command result reported in terminal result",
+    "hygiene": {
+      "credential_scanned_files": 280,
+      "diff_command": "git diff --check",
+      "git_index_unstaged": true,
+      "inventory_command": "candidate_paths/file_inventory/verify_inventory; complete maintained product with unchanged Git index",
+      "inventory_files": 280,
+      "links_command": "Repository-relative Markdown target existence check; external URLs and fragment-only targets excluded",
+      "local_branch": "main",
+      "local_head_equals_origin_main": true,
+      "preserved_source_contracts": {
+        ".github/workflows/rs9-candidate-tests.yml": true,
+        "operators/live1/hosted-lanes.json": true,
+        "src/rs9/adopt_candidate.py": true
+      },
+      "preserved_unrelated_state": ".serena/** unchanged; aggregate digest compared to closeout entry",
+      "production_permissions_or_secrets_added": false,
+      "python_ast_files": 146,
+      "relative_links_checked": 246,
+      "remote_refresh": "not performed; attended adoption checks live remote",
+      "tests": {
+        "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_hygiene -q",
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests_run": 4
+      },
+      "tracked_deletions": 0
+    },
+    "npm_verification": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_npm_supplemental tests.test_npm_transport -q",
+      "errors": 0,
+      "failures": 0,
+      "scope": "Real urllib policies, HTTP/host-escape/malformed metadata, wrapper/SRI, sanitized diagnostics, token-leak negatives and hosted corroboration states.",
+      "skipped": 0,
+      "tests_run": 27
+    },
+    "provider_actions": {
+      "dispatcher_finalization": "not observed; dispatcher owns staging, commit, configured upstream publication and archives",
+      "git_metadata_mutations": false,
+      "hosted_execution": false,
+      "production_publish": false
+    },
+    "rationale": "Accept the bounded reviewed repair; correct npm outcome attribution for unrelated profile failures and qualify fail-closed build-metadata identity without expanding release or transport authority.",
+    "regression_reproduction": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_npm_supplemental.NpmSupplementalTests.test_hosted_provenance_failure_blocks_unreached_npm_comparison tests.test_npm_supplemental.NpmSupplementalTests.test_hosted_later_profile_failure_preserves_completed_npm_comparison -q",
+      "failure_reason": "Receipt recorded fail instead of blocked before npm comparison and instead of pass after completed npm comparison.",
+      "failures_before_fix": 2,
+      "tests_run": 2
+    },
+    "terminal_binding": "Final manifest digest and complete source tree are returned in the terminal result; this evidence file and inventory are not self-hashed here.",
+    "terminal_delta": [
+      {
+        "after_sha256": "1163dd9a109ad222ddaeff2002816b93e0ad576ea8f7a4e9bcfd015ae7636bf2",
+        "before_sha256": "6c974dd98df93c192e638ccabd2e59534dbb7e5adebf3835d1c65ddf8c66f70f",
+        "path": "docs/live1-hosted-candidate.md"
+      },
+      {
+        "after_sha256": "f06e197d27cfb0fe0a055c3e3d398448ffc3b6f10191de27d3d42aff7c55b4ea",
+        "before_sha256": "dbe0a3b55647966cf69fa6a3f24b6b13173f020c153dbb13fc45f8c1225ef46a",
+        "path": "operators/live1/RUNBOOK.md"
+      },
+      {
+        "after_sha256": "07f01fb6771ab1dd95780b87399b7c101b2d50cacbe67cf087395e0a53b5720e",
+        "before_sha256": "b7a396dc7e7cc071d4453c12723de84423f47cbca244f826d149ed6a066971bf",
+        "path": "src/rs9/candidate.py"
+      },
+      {
+        "after_sha256": "dc5b9cb9d4d038c6135a0d9d3b32831d7322db58e98cd6e59919b57f9c55e684",
+        "before_sha256": "cda0ae3400197329804317660d7c2d978b0bdbcda26cca72a599341f2f4f0bb3",
+        "path": "src/rs9/profiles.py"
+      },
+      {
+        "after_sha256": "1a362fd4126324191ceab2dfbc27dd69eca92e4eb2cbd4faedc4e6b63a8af7ce",
+        "before_sha256": "5a72ef7169f20c5dc4d6bce8d70db8cc6d6d4c7449a55ee78d7c53c9c0633f51",
+        "path": "tests/test_npm_supplemental.py"
+      }
+    ],
+    "unresolved_concerns": [
+      "Hosted run 2 transport subcause is not recoverable from its old receipt.",
+      "Exact published registry identity and downstream lane outcomes await attended hosted run 3.",
+      "Terminal source amendment requires manager disposition; no independent terminal review follows."
+    ],
+    "work_review_dispositions": [
+      {
+        "disposition": "amend",
+        "finding": 1,
+        "resolution": "Unreached npm comparison is blocked; completed npm checks retain pass on a later independent profile failure. Required profile errors remain fatal and withhold global authentication. Offline hosted custody/token-negative regressions reproduced both prior failures then passed."
+      },
+      {
+        "disposition": "defer",
+        "finding": 2,
+        "resolution": "Original FETCH_FAILED cause and live exact version availability remain unresolved; optional provider canary was unavailable. Attended hosted run 3 must establish availability and retain exact metadata/tarball diagnostics. No provider network or hosted execution repeated at closeout."
+      },
+      {
+        "disposition": "accept",
+        "finding": 3,
+        "resolution": "Preserve literal @ and task-required uppercase %2F. Candidate already discloses npm-package-arg lowercase output; no accidental normalization dependency introduced."
+      },
+      {
+        "disposition": "amend",
+        "finding": 4,
+        "resolution": "Same-host packument redirect rejection was already documented and covered by test_api_cross_origin_and_packument_redirects_fail_closed. Add explicit documentation and a test that +build cannot silently select a normalized tarball URL; exact 0.6.1 contract stays unchanged."
+      }
+    ],
+    "worker_usage": {
+      "reason": "Closeout disposition and tightly coupled receipt correction stayed with the parent; no additional substantive review permitted.",
+      "state": "declined"
+    }
+  },
+  "diagnosis": {
+    "established": [
+      "Baseline Accept header was GitHub-specific on every destination.",
+      "Baseline supplemental lookup percent-encoded @ and used version-specific metadata rather than exact packument selection.",
+      "HTTPError was collapsed with URLError/OSError; receipt could not distinguish HTTP status or metadata vs tarball.",
+      "URL/redirect/transfer-limit failures have distinct stable error codes."
+    ],
+    "unresolved": "Old receipt cannot establish metadata vs tarball or HTTP vs socket cause. New diagnostics make the next hosted failure actionable; no claim of observed registry rejection."
+  },
+  "entry_observation": {
+    "branch": "main",
+    "hash_prerequisite": "none; dispatcher semantic entry checks applied",
+    "local_equals_origin_main": true,
+    "preserved_unrelated_state": ".serena/**",
+    "remote_refresh": "not performed; attended adoption rechecks remote main",
+    "tracked_changes": false
+  },
+  "focused_verification": {
+    "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_github tests.test_npm_transport tests.test_npm_supplemental tests.test_fetch tests.test_candidate_capture tests.test_profiles tests.test_ingestion tests.test_live1_contracts tests.test_command_contracts tests.test_hosted_candidate tests.test_hosted_nix tests.test_hosted_wheels tests.test_hosted_deb tests.test_hosted_smoke tests.test_hosted_observe tests.test_workflow_static -q",
+    "errors": 0,
+    "evidence_owner": "prior producer; recorded before terminal amendment; not rerun or claimed as terminal evidence",
+    "failures": 0,
+    "seconds": 4.678,
+    "skipped": 1,
+    "tests_run": 158
+  },
+  "full_unittest": {
+    "errors": 0,
+    "evidence_owner": "prior producer; recorded before terminal amendment; not rerun or claimed as terminal evidence",
+    "failures": 0,
+    "python": "3.13.12",
+    "seconds": 30.353,
+    "skip_categories": {
+      "GnuPG_unavailable": 4,
+      "live_capture_not_supplied": 5
+    },
+    "skipped": 9,
+    "suite": "full unittest discover -s tests",
+    "system": "Darwin",
+    "tests_run": 675
+  },
+  "git_publication_performed": false,
+  "hosted_run_2": {
+    "authenticate_job_id": 111342811909,
+    "command_path_architecture": "preserved",
+    "primary_failure": "FETCH_FAILED",
+    "project": "theme-forge-nebular-fusion",
+    "qualification": "not-qualified",
+    "run_id": 37170664747,
+    "stage": "supplemental",
+    "top_level_reason": "HOSTED_COMPLETENESS",
+    "unit_job_id": 111342797439,
+    "unit_status": "passed per manager evidence"
+  },
+  "hygiene": {
+    "candidate_changed_paths": 20,
+    "credential_scanned_files": 281,
+    "dependencies_added": false,
+    "evidence_owner": "prior producer; recorded before terminal amendment; not rerun or claimed as terminal evidence",
+    "git_diff_check": "pass",
+    "git_index": "unchanged",
+    "inventory": "pass; complete source inventory freshly recomputed",
+    "inventory_files": 280,
+    "preserved_source_contracts": {
+      ".github/workflows/rs9-candidate-tests.yml": true,
+      "operators/live1/hosted-lanes.json": true,
+      "src/rs9/adopt_candidate.py": true
+    },
+    "preserved_unrelated_state": ".serena/**",
+    "production_permissions_or_secrets_added": false,
+    "python_ast_files": 146,
+    "relative_links": "pass",
+    "relative_links_checked": 246,
+    "workflow_sha256": "5935aa95bfdc252e4e9ea2ef6110299e269a5c90c24db92127d98aeb6c7ddd5b"
+  },
+  "observed_stage_deltas_before_work": [],
+  "official_documentation": {
+    "findings": [
+      "Both package and version endpoints are documented.",
+      "Packument JSON supports exact versions selection; full JSON preserves license evidence.",
+      "npm-package-arg preserves @ and emits %2f; candidate uses requested uppercase %2F."
+    ],
+    "sources": [
+      "https://github.com/npm/registry/blob/main/docs/REGISTRY-API.md",
+      "https://github.com/npm/registry/blob/main/docs/responses/package-metadata.md",
+      "https://github.com/npm/npm-package-arg/blob/main/lib/npa.js"
+    ],
+    "state": "read"
+  },
+  "original_scope": {
+    "downstream_repair": "deferred until a new hosted run reveals independent evidence",
+    "npm_role": "required profile corroboration only",
+    "objective": "Repair hosted run 2 Nebular npm supplemental authentication; retain command/native/archive and workflow completeness contracts.",
+    "release_ingestion_authority": "GitHub Release"
+  },
+  "plan_review_findings": [
+    {
+      "disposition": "accept",
+      "finding": 1,
+      "resolution": "Final pending/pass/fail plus wrapper and integrity outcomes retained in hosted npm_corroboration; token negatives inspect retained JSON, and authentication summary is absent on required profile failure."
+    },
+    {
+      "disposition": "accept",
+      "finding": 2,
+      "resolution": "Initial/redirect/final request-class host validation; explicit class/trace propagation; same-host API redirect test preserves scoped identity."
+    },
+    {
+      "disposition": "accept",
+      "finding": 3,
+      "resolution": "Validate exact safe semver before tarball construction, including rejection of numeric prerelease leading zeros and URL/control injection."
+    },
+    {
+      "disposition": "amend",
+      "finding": 4,
+      "resolution": "Retry omitted. Existing single-request socket/transfer bounds retained and documented; HTTPError and failed responses are closed; tarball tests are retry-independent."
+    },
+    {
+      "disposition": "accept",
+      "finding": 5,
+      "resolution": "Hosted metadata 404/406 tests assert exact sanitized execution_error_detail keys and project/stage values end to end."
+    }
+  ],
+  "production_qualification_claimed": false,
+  "proposal": {
+    "amendments": [
+      "No automatic retries; deterministic HTTP failures remain immediately actionable.",
+      "Retain final npm corroboration state and wrapper/SRI outcomes in hosted lane diagnostic receipt on failure and success. Immutable capture receipt remains a capture-time snapshot.",
+      "Use selected version metadata only; do not persist an arbitrary complete packument response.",
+      "Include candidate.py, hosted_pipeline.py, test_candidate_capture.py and separate real-handler transport tests for state propagation and class-bound API changes.",
+      "Official docs confirm both package and version routes; packument is chosen for deterministic exact-version selection. npm-package-arg currently emits lowercase %2f; task-required uppercase %2F is deliberate."
+    ],
+    "bytes": 19929,
+    "disposition": "amend",
+    "sha256": "c7bd62a9a3be1b8a1d213abf6b01ca30353decc7b02e659402314200909ed329"
+  },
+  "provider_canary": {
+    "diagnostic": {
+      "host": "registry.npmjs.org",
+      "operation": "npm-packument",
+      "reason": "transport",
+      "redirect_hops": 0,
+      "transport_error": "dns"
+    },
+    "github_wrapper_comparison": "not-run",
+    "read_only": true,
+    "source_acceptance_impact": "none; optional provider network",
+    "state": "unavailable",
+    "unprivileged": true
+  },
+  "python_profile": {
+    "follow_up_boundary": "Legacy profile/candidate decomposition is outside this source repair.",
+    "level": "Orange",
+    "local_decision": "Task-authorized closed request-class API migration and bounded receipt propagation. Preserve existing legacy profile responsibility; no broad decomposition in this repair. All internal consumers migrated and adverse/integration tests pass.",
+    "measurement": "APG fallback physical lines and owned callable statement nodes; no configured analyzer added",
+    "rollback": "Revert this bounded candidate as a unit before adoption; no release, dependency, workflow or production state mutated.",
+    "signals": {
+      "PublicClient_get_statements": 24,
+      "capture_generation_statements": 49,
+      "capture_supplemental_statements": 37,
+      "github_module_lines": 198,
+      "legacy_evaluate_tauri_statements_after": 109,
+      "legacy_evaluate_tauri_statements_before": 104,
+      "profiles_module_lines": 403
+    },
+    "terminal_amendment": {
+      "follow_up": "Legacy profile decomposition remains outside this bounded repair.",
+      "level": "Orange",
+      "local_decision": "Small receipt-state correction within the task-authorized legacy profile boundary. No independent responsibility added; preserve architecture and stable ContractError codes. Roll back the terminal correction as a unit before attended adoption if manager rejects it.",
+      "measurement": "APG fallback physical lines and owned callable statement nodes; no analyzer or dependency added",
+      "signals": {
+        "capture_generation_statements": 48,
+        "evaluate_profile_statements": 27,
+        "legacy_evaluate_tauri_statements": 113,
+        "profiles_module_lines": 416,
+        "rebind_evidence_statements": 12,
+        "record_corroboration_failure_statements": 9,
+        "test_module_lines": 289
+      }
+    }
+  },
+  "review_boundary": {
+    "closeout_verification": "task-scoped terminal checks recorded below; no additional substantive review",
+    "external_reviewer_invoked": false,
+    "independent_terminal_review": false,
+    "pre_final": "dispatcher independent work review received; advisory findings dispositioned at closeout"
+  },
+  "schema": "rs9.hosted2-npm-supplemental-source-verification.v1alpha1",
+  "security_verification": {
+    "ambient_npm_credentials": false,
+    "arbitrary_header_injection": "forbidden; CR/LF/control policy and token validation tested",
+    "malformed_identity_host_escape_http_failure_tests": "pass",
+    "production_enabled": false,
+    "publication_authority": false,
+    "token_leak_negative_tests": "pass; synthetic GitHub token absent from errors, transport receipts, profile-fetch receipts, and every retained hosted JSON on HTTP/profile failures and success"
+  },
+  "status": "terminal-source-amendment-manager-disposition-required",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT4-HOSTED2-NPM-SUPPLEMENTAL1",
+  "unit_tool_isolation": {
+    "errors": 0,
+    "evidence_owner": "prior producer; recorded before terminal amendment; not rerun or claimed as terminal evidence",
+    "failures": 0,
+    "python": "3.13.12",
+    "seconds": 28.166,
+    "skip_categories": {
+      "GnuPG_unavailable": 4,
+      "Nix_evaluator_unavailable": 3,
+      "live_capture_not_supplied": 5
+    },
+    "skipped": 12,
+    "stock_runner_contract": "Source unit must work with Python and Node and without Docker/Nix/native package builders/zstd. Hosted run 2 independently passed stock Ubuntu unit; this Darwin isolation run tests absence of ambient developer tools.",
+    "suite": "full unittest with isolated HOME and symlink-only Python/Node additions",
+    "system": "Darwin",
+    "tests_run": 675,
+    "tools_visible": {
+      "createrepo_c": false,
+      "docker": false,
+      "gpg": false,
+      "makepkg": false,
+      "nix": false,
+      "node": true,
+      "python3": true,
+      "rpmbuild": false,
+      "zstd": false
+    },
+    "ubuntu_equivalence_claimed": false
+  },
+  "verification_notes": [
+    "Initial new integration fixture test supplied nonempty capture output; fixture corrected and all subsequent focused/full runs passed.",
+    "Hygiene check initially referenced absent project metadata; corrected to existing tracked contracts and complete candidate inventory.",
+    "RTK gain telemetry unavailable under sandbox; RTK command proxy active, no settings changed."
+  ],
+  "worker_usage": {
+    "adopted": "HTTPError collapsing and hosted receipt/summary propagation facts",
+    "cleanup_proven": true,
+    "effective_model": "not observed by worker facility",
+    "independent_checkpoint": false,
+    "kind": "gemini",
+    "not_adopted": "Broad unobserved hosted-cause speculation or unexecuted test-success claims",
+    "outcome": "partial",
+    "requested_profile": "gemini-3.8-flash-high",
+    "state": "used",
+    "task": "read-only baseline transport and receipt analysis"
+  }
+}

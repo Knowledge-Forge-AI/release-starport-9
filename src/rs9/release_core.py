@@ -144,25 +144,25 @@ def capture_release(selection, output, *, client=None):
     client = client or PublicClient()
     repository, tag = selection["repository"], selection["tag"]
     base = "https://api.github.com/repos/" + repository
-    repo = client.json(base, no_redirect=True)
+    repo = client.json(base, request_class="github-api", no_redirect=True)
     if repo.get("full_name") != repository:
         raise ContractError("REPOSITORY_MISMATCH", "Selected repository identity disagrees")
-    ref = client.json(base + "/git/ref/tags/" + quote(tag, safe=""))
+    ref = client.json(base + "/git/ref/tags/" + quote(tag, safe=""), request_class="github-api")
     obj, tags, seen = ref["object"], [], set()
     while obj["type"] == "tag":
         if len(tags) == 8 or obj["sha"] in seen:
             raise ContractError("TAG_LIMIT", "Annotated tag depth or cycle exceeded")
         seen.add(obj["sha"])
-        item = client.json(base + "/git/tags/" + obj["sha"])
+        item = client.json(base + "/git/tags/" + obj["sha"], request_class="github-api")
         tags.append(item)
         obj = item["object"]
     if obj["type"] != "commit" or not HEX.fullmatch(obj["sha"]):
         raise ContractError("TAG_TARGET", "Release tag does not resolve to a commit")
-    commit = client.json(base + "/git/commits/" + obj["sha"])
-    tree = client.json(base + "/git/trees/" + commit["tree"]["sha"] + "?recursive=1")
+    commit = client.json(base + "/git/commits/" + obj["sha"], request_class="github-api")
+    tree = client.json(base + "/git/trees/" + commit["tree"]["sha"] + "?recursive=1", request_class="github-api")
     if tree.get("truncated") is not False:
         raise ContractError("TRUNCATED_TREE", "Full tagged tree evidence is required")
-    release = client.json(base + "/releases/tags/" + quote(tag, safe=""))
+    release = client.json(base + "/releases/tags/" + quote(tag, safe=""), request_class="github-api")
     total = 0
     with ConfinedWriter(output) as writer:
         for name, value in {"repository": repo, "ref": ref, "tags": tags, "commit": commit,
@@ -182,9 +182,9 @@ def capture_release(selection, output, *, client=None):
             total += asset["size"]
             if total > limits["capture_bytes"]:
                 raise ContractError("FETCH_LIMIT", "Aggregate capture bound exceeded")
-            writer.write("assets/" + name, client.get(expected, limit=limits["asset_bytes"], expected_size=asset["size"]))
+            writer.write("assets/" + name, client.get(expected, request_class="github-asset", limit=limits["asset_bytes"], expected_size=asset["size"]))
         for path in sorted(selection["source_paths"]):
-            data = client.get("https://raw.githubusercontent.com/" + repository + "/" + obj["sha"] + "/" + quote(path, safe="/"), limit=limits["source_bytes"])
+            data = client.get("https://raw.githubusercontent.com/" + repository + "/" + obj["sha"] + "/" + quote(path, safe="/"), request_class="github-source", limit=limits["source_bytes"])
             total += len(data)
             if total > limits["capture_bytes"]:
                 raise ContractError("FETCH_LIMIT", "Aggregate capture bound exceeded")

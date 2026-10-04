@@ -32,33 +32,35 @@ class GithubTests(unittest.TestCase):
                 return RedirectResponse(b"data")
 
         client = PublicClient(RedirectOpener())
-        client.get("https://github.com/example?temporary=synthetic-value")
+        client.get("https://github.com/example?temporary=synthetic-value", request_class="github-asset")
         self.assertEqual(client.receipts[0]["url"], "https://github.com/example")
         self.assertEqual(client.receipts[0]["final_url"], "https://release-assets.githubusercontent.com/example")
 
     def test_bounded_download_and_size(self):
         client = PublicClient(Opener(b"12345"))
-        self.assertEqual(client.get("https://api.github.com/example", limit=5, expected_size=5), b"12345")
+        self.assertEqual(client.get("https://api.github.com/example", request_class="github-api", limit=5, expected_size=5), b"12345")
         for kwargs in ({"limit": 4}, {"expected_size": 6}):
             with self.assertRaises(ContractError):
-                client.get("https://api.github.com/example", **kwargs)
+                client.get("https://api.github.com/example", request_class="github-api", **kwargs)
 
     def test_hosts_credentials_ports_and_redirect_limits(self):
         for url in ("http://api.github.com/x", "https://evil.example/x", "https://user:pass@github.com/x", "https://github.com:80/x", "https://github.com/a\nb"):
             with self.assertRaises(ContractError):
                 validate_https(url)
         req = Request("https://api.github.com/example")
+        req.rs9_operation = "github-api"
+        req.rs9_trace = {"operation": "github-api", "host": "api.github.com", "redirect_hops": 0}
         req.rs9_no_redirect = True
         with self.assertRaises(ContractError):
             Redirects().redirect_request(req, None, 302, "", {}, "https://github.com/new")
         req.rs9_no_redirect = False
-        req.rs9_hops = 5
+        req.rs9_trace["redirect_hops"] = 5
         with self.assertRaises(ContractError):
             Redirects().redirect_request(req, None, 302, "", {}, "https://github.com/new")
 
     def test_repository_final_url_and_invalid_json(self):
         client = PublicClient(Opener(b"not JSON"))
         with self.assertRaises(ContractError):
-            client.get("https://api.github.com/different", no_redirect=True)
+            client.get("https://api.github.com/different", request_class="github-api", no_redirect=True)
         with self.assertRaises(ContractError):
-            client.json("https://api.github.com/example")
+            client.json("https://api.github.com/example", request_class="github-api")

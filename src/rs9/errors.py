@@ -9,7 +9,8 @@ def safe_details(details):
     """Closed, bounded public identifiers only; reject credentials and host paths."""
     from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
     allowed = {"stage", "project", "asset", "command", "command_kind", "archive_path",
-               "member_type", "mode", "size", "sha256", "reason"}
+               "member_type", "mode", "size", "sha256", "reason",
+               "operation", "host", "http_status", "transport_error", "redirect_hops"}
     result, dropped = {}, False
     if not isinstance(details, dict):
         return {}
@@ -19,6 +20,18 @@ def safe_details(details):
             continue
         if key not in allowed:
             dropped = True
+            continue
+        if key in {"operation", "host", "transport_error", "http_status", "redirect_hops"}:
+            from rs9.github import HOSTS, REQUEST_CLASSES
+            valid = ((key == "operation" and isinstance(value, str) and value in REQUEST_CLASSES)
+                     or (key == "host" and isinstance(value, str) and value in HOSTS)
+                     or (key == "transport_error" and value in ("timeout", "tls", "dns", "connection", "protocol", "transport"))
+                     or (key == "http_status" and type(value) is int and 100 <= value <= 599)
+                     or (key == "redirect_hops" and type(value) is int and 0 <= value <= 5))
+            if valid:
+                result[key] = value
+            else:
+                dropped = True
             continue
         if type(value) is int and key in {"mode", "size"} and 0 <= value <= 1024 ** 3:
             result[key] = value

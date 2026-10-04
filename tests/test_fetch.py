@@ -7,6 +7,7 @@ from urllib.parse import unquote
 from rs9.errors import ContractError
 from rs9.fetch import fetch
 from rs9.ingestion import authenticate_shadow as authenticate
+from rs9.profiles import _npm_tarball_url
 
 from tests.shadow_fixtures import fixture_evidence
 
@@ -39,12 +40,13 @@ class FixtureClient:
             return (self.root / "source" / unquote(url[len(prefix):])).read_bytes()
         if "/releases/download/v0.6.1/" in url:
             return (self.root / "assets" / unquote(url.rsplit("/", 1)[1])).read_bytes()
-        if url == "https://registry.npmjs.org/fixture.tgz":
+        metadata = json.loads((self.root / "npm/metadata.json").read_bytes())
+        if url == _npm_tarball_url(metadata["name"], self.n["version"]):
             return (self.root / "npm/package.tgz").read_bytes()
         if url.startswith("https://registry.npmjs.org/"):
             data = json.loads((self.root / "npm/metadata.json").read_bytes())
-            data["dist"]["tarball"] = "https://registry.npmjs.org/fixture.tgz"
-            return json.dumps(data).encode()
+            data["dist"]["tarball"] = _npm_tarball_url(data["name"], self.n["version"])
+            return json.dumps({"name": data["name"], "versions": {self.n["version"]: data}}).encode()
         raise ContractError("FETCH_FAILED", "Unexpected fixture transport request")
 
 
