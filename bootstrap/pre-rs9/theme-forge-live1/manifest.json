@@ -77,7 +77,7 @@
       "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
       "tag_tree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b",
       "configuration": "theme-forge-nebular-fusion",
-      "config_sha256": "d009ea0a968ff4fcdacaedbb3ae75b0292ef40bb0899368dac4f71db27d63a41",
+      "config_sha256": "b985546482cfff16436d166ff3ba175b54b4afc03b35c48e4310cf070690c27f",
       "license_authority": {
         "expression": "AGPL-3.0-or-later",
         "basis": "manager-direction-and-authenticated-tagged-repository",

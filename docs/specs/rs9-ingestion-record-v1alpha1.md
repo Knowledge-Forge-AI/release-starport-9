@@ -33,6 +33,21 @@ Asset presence is exact and unambiguous. Each uploaded required asset needs a Gi
 
 Tagged source files must be regular Git blobs, with locally recomputed blob identities matching the captured tree. Current project license copies at the archive root (or app Resources directory) must match their tagged source bytes. Publisher provenance assertions are cross-checked where present, without claiming independent signer authentication.
 
+Desktop `license.files` names the required payload copies, not all tagged
+licensing authority evidence. Nebular 0.6.1 requires exactly `LICENSE` and
+`NOTICE`; `payload_license_copies` records each asset, exact path, tagged source
+and agreeing SHA-256. Tagged `COMMERCIAL-LICENSE.md` remains independently
+selected and authenticated, even when absent from native archives. An extra
+payload copy cannot supply or override its tagged declaration.
+
+Missing copies fail with `PAYLOAD_LICENSE_MISSING`. Retained details contain only
+project, asset id, profile, sorted expected/observed safe basenames (space-joined,
+or `none` when no required basename was observed), stage and stable error code.
+Only exact declared paths count as observed. Byte differences fail with
+`PAYLOAD_LICENSE_MISMATCH`; empty or duplicate desktop lists fail with
+`PAYLOAD_LICENSE_POLICY`. Diagnostics never include archive member lists or
+legal-file contents.
+
 ### Archive inspection and hardlink rejection
 
 Tar hard links (`member.islnk()` or `member.type in (tarfile.LNKTYPE, "1", b"1")`) are unconditionally rejected with `ContractError("UNSAFE_LINK", "Archive hard links forbidden")` before any member visitor runs. Disallowing hard links prevents silent inspection gaps where linked members could bypass validation, eliminates memory retention overhead from inode graphs, and ensures strict byte accounting.
@@ -41,7 +56,15 @@ Tar hard links (`member.islnk()` or `member.type in (tarfile.LNKTYPE, "1", b"1")
 
 The supporting npm wrapper is hash-equal to its GitHub attachment, agrees with registry SHA-512 integrity, and is safety-inspected through the same archive code. It is legal evidence, not a package input for packaging adapters.
 
-The Nebular 0.6.1 npm package contains a genuine license conflict: the published `package.json` declares `AGPL-3.0-or-later OR Commercial`, while tagged repository source files and tarball license copies declare `AGPL-3.0-or-later`. This conflict remains **unresolved**; RS9 records both observed declarations without inventing an artificial legal resolution. Live compatibility cannot be claimed without captured bytes.
+The Nebular 0.6.1 npm package's historical `package.json` declares
+`AGPL-3.0-or-later OR Commercial`, while tagged repository authority establishes
+the community expression `AGPL-3.0-or-later`. The v1alpha1 profile retains its
+historical exact-declaration conflict behavior. The v1alpha2 profile uses tagged
+authority and records the npm string in `downstream_metadata_conflicts`.
+`COMMERCIAL-LICENSE.md` describes a separate commercial offer and stays part of
+the tagged authority evidence. New RS9 downstream metadata uses
+`AGPL-3.0-or-later`; RS9 does not relicense payloads or infer rights from npm
+metadata. Live compatibility still requires captured bytes.
 
 ### Sealed in-process `ReleaseCapture` requirement
 

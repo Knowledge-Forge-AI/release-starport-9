@@ -1,0 +1,273 @@
+{
+  "attended_handoff": {
+    "automatic_rerun": false,
+    "collect_every_job_step_artifact_summary": true,
+    "commit_message": "Separate Nebular payload legal copies from tagged license authority",
+    "exact_reviewed_inventory_required": true,
+    "manifest_sha256": "SHA-256 of accepted raw candidate-manifest bytes",
+    "new_push_run_only": true,
+    "normal_commit_and_fast_forward_push": true,
+    "operator": "operators/live1/adopt-and-qualify.py adopt",
+    "packet_and_log": "external physical directory and sibling log; bounded terminal tail",
+    "production_publish": false,
+    "remote_main_parent_check": true,
+    "reviewed_parent": "6f5227586e944bf2016f4cf44000f49c16947351",
+    "reviewed_paths_only": true,
+    "reviewed_tree": "verify_inventory on accepted final bytes",
+    "stop_with_manager_packet": true,
+    "workflow": "rs9-candidate-tests.yml"
+  },
+  "bootstrap_bindings": {
+    "manifest_sha256": "93081d30cb2eedb88eb6248653177ab03570dbd51f7047293e25670d860b8e64",
+    "nebular_config_sha256": "b985546482cfff16436d166ff3ba175b54b4afc03b35c48e4310cf070690c27f",
+    "other_configuration_hashes": "unchanged"
+  },
+  "boundary": {
+    "downstream_expression": "AGPL-3.0-or-later",
+    "historical_npm_expression": "AGPL-3.0-or-later OR Commercial",
+    "license_authority_manifest": "unchanged",
+    "npm_expression_role": "recorded downstream metadata conflict, never authority",
+    "payload_copies": [
+      "LICENSE",
+      "NOTICE"
+    ],
+    "payload_equality": "exact tagged bytes; missing or mismatch fails closed",
+    "source_selection_unchanged": true,
+    "tagged_commercial_authenticated": true,
+    "unexpected_payload_commercial": "cannot supply or override tagged authority"
+  },
+  "checks_not_run": [
+    "Provider network release/npm capture: not required for source acceptance; real packaging facts supplied by manager.",
+    "Hosted run 4: requires manager acceptance and attended source adoption.",
+    "Native package/build matrix execution: deferred to preserved hosted lanes after authentication.",
+    "Dispatcher pre-final review and closeout final verification: dispatcher-owned and pending."
+  ],
+  "diagnosis": {
+    "architecture": "license.files already names desktop payload paths in profile and renderers; profile-owned source selection independently binds broader authority. No new schema field needed.",
+    "construction_evidence": {
+      "darwin": "tools/finalize-darwin-bundle.mjs installs LICENSE and NOTICE in Contents/Resources",
+      "independent_provider_fetch": "not required or performed",
+      "native": "tools/native-rc-package.mjs captures, packages and verifies LICENSE and NOTICE only",
+      "owner": "manager-supplied tagged release source facts",
+      "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+    },
+    "pre_fix_reproduction": {
+      "code": "PAYLOAD_LICENSE_MISSING",
+      "fixture": "synthetic native archives with exact LICENSE/NOTICE and no commercial file",
+      "intent": "pre-edit checked-in Nebular v1alpha2 intent"
+    }
+  },
+  "entry_observation": {
+    "branch": "main",
+    "hash_prerequisite": "none; dispatcher semantic entry checks applied",
+    "local_equals_origin_main": true,
+    "preserved_unrelated_state": ".serena/**",
+    "remote_refresh": "not performed; attended adoption rechecks live remote main",
+    "tracked_changes": false
+  },
+  "focused_verification": {
+    "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_nebular_legal_boundary tests.test_profiles tests.test_ingestion tests.test_live1_contracts tests.test_npm_supplemental tests.test_npm_transport tests.test_github tests.test_fetch tests.test_candidate_capture tests.test_command_contracts tests.test_render tests.test_workflow_static tests.test_hygiene tests.test_candidate_adoption tests.test_collect_candidate -q",
+    "errors": 0,
+    "evidence_owner": "parent; integrated implementation-stage state",
+    "failures": 0,
+    "python": "3.13.12",
+    "seconds": 3.749,
+    "skip_reasons": {},
+    "skipped": 0,
+    "system": "Darwin",
+    "tests_run": 131
+  },
+  "full_unittest": {
+    "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest discover -s tests -q",
+    "errors": 0,
+    "evidence_owner": "parent; integrated implementation-stage state",
+    "failures": 0,
+    "python": "3.13.12",
+    "seconds": 30.298,
+    "skip_reasons": {
+      "GnuPG binary not available": 3,
+      "GnuPG binary not available in environment": 1,
+      "both live capture directories required": 1,
+      "live capture directory not supplied": 4
+    },
+    "skipped": 9,
+    "system": "Darwin",
+    "tests_run": 693
+  },
+  "git_publication_performed": false,
+  "hosted_run_3": {
+    "config": "pass",
+    "evidence_owner": "manager packet; no provider network rerun",
+    "npm_packument": {
+      "http_status": 200,
+      "name": "@knowledge-forge-ai/theme-forge-nebular-fusion",
+      "selected_version": "0.6.1",
+      "status": "pass"
+    },
+    "npm_tarball": {
+      "http_status": 200,
+      "sha256": "17f7563d6a6fa0bf250579a92ceca065fb4ca115a4fe4aae610850f1cfe29a7f",
+      "status": "pass"
+    },
+    "primary_failure": "PAYLOAD_LICENSE_MISSING",
+    "project": "theme-forge-nebular-fusion",
+    "qualification": "not-qualified",
+    "release_authentication": "core-authenticated",
+    "run_id": 37173827457,
+    "stage": "profile",
+    "top_level_reason": "HOSTED_COMPLETENESS",
+    "unit": "pass"
+  },
+  "hygiene": {
+    "credential_scanned_files": 283,
+    "dependencies_added": false,
+    "git_diff_check": "pass; final repetition after inventory refresh",
+    "git_index_unstaged": true,
+    "inventory": "complete candidate inventory refreshed after final evidence bytes",
+    "inventory_files": 282,
+    "preserved_source_contracts": {
+      ".github/workflows/rs9-candidate-tests.yml": true,
+      "operators/live1/expectations.json": true,
+      "operators/live1/hosted-lanes.json": true,
+      "src/rs9/adopt_candidate.py": true,
+      "src/rs9/candidate.py": true,
+      "src/rs9/github.py": true,
+      "src/rs9/hosted_pipeline.py": true,
+      "tests/test_npm_supplemental.py": true,
+      "tests/test_npm_transport.py": true
+    },
+    "preserved_unrelated_state": ".serena/** unchanged; aggregate digest matches entry",
+    "production_permissions_or_secrets_added": false,
+    "python_ast_files": 147,
+    "relative_links": "pass",
+    "relative_links_checked": 247,
+    "tracked_deletions": 0,
+    "workflow_sha256": "5935aa95bfdc252e4e9ea2ef6110299e269a5c90c24db92127d98aeb6c7ddd5b"
+  },
+  "observed_stage_deltas_before_work": [],
+  "original_scope": {
+    "downstream_repair": "deferred until authentication passes and independent hosted evidence exists",
+    "objective": "Bounded hosted-run-3 source repair: separate native legal copies from tagged licensing authority and prepare hosted run 4.",
+    "release_changes": "forbidden"
+  },
+  "plan_review_findings": [
+    {
+      "disposition": "accept",
+      "finding": 1,
+      "resolution": "Desktop profile validates a nonempty duplicate-free list; tests cover empty and duplicate lists."
+    },
+    {
+      "disposition": "accept",
+      "finding": 2,
+      "resolution": "Bootstrap loader requires listed authority files to be selected; no schema change."
+    },
+    {
+      "disposition": "accept",
+      "finding": 3,
+      "resolution": "Hosted legal-boundary tests use checked-in v1alpha2 intent for both configuration_rows and load_bootstrap, guarded against fixture selection drift."
+    },
+    {
+      "disposition": "accept",
+      "finding": 4,
+      "resolution": "Runbook derives tree through verify_inventory and digest from final raw candidate-manifest bytes; packet/log are external and new files are inventoried."
+    }
+  ],
+  "production_enabled": false,
+  "production_qualification_claimed": false,
+  "proposal": {
+    "amendments": [
+      "Reject empty, duplicate or non-list desktop legal-copy lists before set comparison.",
+      "Enforce optional manifest license_authority.files selection at bootstrap runtime.",
+      "Use the checked-in v1alpha2 intent in both hosted configuration seams.",
+      "Explain review-binding derivation, external packet/log paths and inventory coverage of new files.",
+      "Include src/rs9/bootstrap.py in the reviewed candidate for the authority-selection guard."
+    ],
+    "bytes": 15625,
+    "disposition": "amend",
+    "sha256": "fcc2846a48bfa5b1dc91e68cd3bd681993d32a13381095d66a4f64083d84826c"
+  },
+  "provider_actions": {
+    "external_reviewer_invoked": false,
+    "git_metadata_mutations": false,
+    "hosted_execution": false,
+    "production_publish": false,
+    "release_or_metadata_rewrites": false
+  },
+  "publication_authority": false,
+  "python_profile": {
+    "follow_up_boundary": "Legacy profile decomposition is outside this repair.",
+    "largest_test_callable_statements": 38,
+    "level": "Red legacy boundary; bounded repair exception",
+    "local_decision": "The explicit source-repair scope authorizes the smallest safe change to existing legal-copy validation and diagnostics. No new independent responsibility or broad legacy decomposition.",
+    "measurement": "APG fallback physical lines and callable-owned recursive statement nodes, excluding nested callable bodies",
+    "rollback": "Revert this bounded source candidate before adoption; no release, dependency, workflow or production state mutated.",
+    "signals": {
+      "bootstrap_lines_after": 126,
+      "bootstrap_lines_before": 118,
+      "checked_bootstrap_statements_after": 42,
+      "checked_bootstrap_statements_before": 36,
+      "evaluate_tauri_statements_after": 117,
+      "evaluate_tauri_statements_before": 111,
+      "profiles_lines_after": 430,
+      "profiles_lines_before": 416
+    },
+    "test_module_lines": 508,
+    "validation": "Required legal-boundary adverse tests and retained profile/npm suites."
+  },
+  "required_test_coverage": {
+    "1": "test_01_exact_list",
+    "10": "test_07_each_missing_and_mismatched_legal_file_fails_per_asset",
+    "11": "test_09_unexpected_payload_commercial_cannot_override_tagged_declaration",
+    "12": "test_10_actual_inventory_paths_and_hashes",
+    "13": "test_01_exact_list and test_11_npm_metadata_and_wrapper_or_commercial_yields_consistent_authority",
+    "14": "test_11_npm_metadata_and_wrapper_or_commercial_yields_consistent_authority",
+    "15": "test_12_profile_authentication_does_not_modify_evidence_bytes and test_13_pinned_manifest_identities_and_license_authority_remain",
+    "2": "test_02_config_manifest_hash_bindings_and_tamper_rejection",
+    "3": "test_03_selection_still_commercial_and_same_as_pre_fix",
+    "4": "test_04_missing_commercial_source_and_corrupted_blob",
+    "5": "test_06_darwin_and_both_linux_exact_legal_copies_pass_without_commercial",
+    "6": "test_06_darwin_and_both_linux_exact_legal_copies_pass_without_commercial",
+    "7": "test_07_each_missing_and_mismatched_legal_file_fails_per_asset",
+    "8": "test_07_each_missing_and_mismatched_legal_file_fails_per_asset",
+    "9": "test_07_each_missing_and_mismatched_legal_file_fails_per_asset"
+  },
+  "review_boundary": {
+    "closeout": "final verification belongs to closeout",
+    "external_reviewer_invoked": false,
+    "independent_terminal_rereview_claimed": false,
+    "post_planning": "dispatcher findings dispositioned above",
+    "pre_final": "pending dispatcher checkpoint"
+  },
+  "schema": "rs9.hosted3-payload-license-source-verification.v1alpha1",
+  "security_verification": {
+    "no_secret_scan": "pass; complete bounded candidate text screened with file_inventory plus hygiene tests",
+    "production_enabled": false,
+    "publication_authority": false,
+    "safe_payload_diagnostics": "exact project/asset/profile and expected/observed required basenames; no archive member lists or contents",
+    "token_leak_negative_tests": "pass; synthetic token absent from all retained hosted JSON in successful, missing-copy and old-intent cases"
+  },
+  "status": "pre-final-source-candidate-dispatcher-checkpoint-pending",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT5-HOSTED3-PAYLOAD-LICENSE1",
+  "verification_notes": [
+    "RTK command proxy active; telemetry database unavailable under sandbox; no settings changed.",
+    "No provider network needed for source acceptance. Hosted run 4 is future attended work after manager acceptance."
+  ],
+  "worker_usage": {
+    "cleanup_proven": true,
+    "effective_model": "not observed by worker facility",
+    "independent_checkpoint": false,
+    "kind": "gemini",
+    "outcome": "partial adopted and amended by parent",
+    "parent_amendments": [
+      "Candidate-manifest raw hash and all configuration bindings; reject historical approval and restored commercial payload requirement.",
+      "Assert actual payload legal-copy inventory against tagged source hashes.",
+      "Successful conflicting extra-commercial payload ignored; malformed or missing tagged source still fails.",
+      "Full asset fixture guard and wrong-path legal copy cannot satisfy a missing declared path.",
+      "Data-driven adverse cases; parent independently executed unittest."
+    ],
+    "requested_profile": "gemini-3.8-flash-high",
+    "state": "used",
+    "task": "bounded legal-boundary regression tests and fixture extension",
+    "worker_test_claims": "not used as source acceptance evidence"
+  }
+}

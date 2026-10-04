@@ -45,6 +45,17 @@ syntax-only: identifiers, `AND`, `OR`, `WITH`, parentheses. It does not validate
 the SPDX license list; `Commercial` is syntactically accepted. Expression
 presence is mandatory and exact text is preserved (non-NFC text fails).
 
+For `tauri-desktop-archive.v1alpha1` and `tauri-desktop-archive.v1alpha2`,
+`license.files` is the nonempty, duplicate-free list of legal copies required in
+every native payload and installed by downstream renderers. Each copy must match
+the corresponding tagged source bytes exactly. Nebular 0.6.1 requires `LICENSE`
+and `NOTICE`, at the Linux archive root or Darwin `Contents/Resources/`.
+Tagged `COMMERCIAL-LICENSE.md` is broader licensing authority evidence selected
+independently by `TAURI_SOURCES`; it is not required inside the native payload.
+Do not add authority-only files to this payload list. For
+`npm-package-archive.v1alpha1`, `license.files` selects tagged source evidence;
+the desktop payload-copy rule does not apply to that profile.
+
 Optional `license.status = "unresolved"` preserves a known authority conflict in
 normalized intent. The expression then records a provisional source declaration,
 not a reconciled payload license. Nebular needs this because its tagged community
@@ -92,7 +103,7 @@ validation does not implement ecosystem version ordering.
 
 Foundation 3 introduces an optional schema amendment table `[evidence]` to `releases.toml`:
 - `checksums`: Safe basename template containing `{version}` or an exact basename identifying the authoritative SHA256SUMS file (e.g. `"SHA256SUMS-{version}.txt"`).
-- `profile`: Closed profile identifier, restricted to `"tauri-desktop-archive.v1alpha1"` or `"npm-package-archive.v1alpha1"`. No filename guessing or arbitrary tenant code is supported. No Stellar renderers exist or are supported.
+- `profile`: Closed profile identifier, restricted to `"tauri-desktop-archive.v1alpha1"`, `"tauri-desktop-archive.v1alpha2"` or `"npm-package-archive.v1alpha1"`. No filename guessing or arbitrary tenant code is supported. No Stellar renderers exist or are supported.
 - `assets`: Nonempty list of tables specifying exact `{role, name}` bindings where `role` is a sanitized slug (e.g. `"checksums"`, `"wrapper"`) and `name` is a safe basename template with `{version}`.
 
 **Explicit behavioral rule**:

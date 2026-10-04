@@ -29,7 +29,7 @@ def tar_bytes(entries):
     return output.getvalue()
 
 
-def fixture_evidence(directory, *, extra_linux=()):
+def fixture_evidence(directory, *, extra_linux=(), payload_legal=None):
     n = json.loads((ROOT / "tests/golden/theme-forge-nebular-fusion.normalized.json").read_bytes())
     sources = {"LICENSE": b"Synthetic license text for offline fixture only.\n", "NOTICE": b"Synthetic AGPL-3.0-or-later declaration.\n",
                "COMMERCIAL-LICENSE.md": b"Synthetic AGPL-3.0-or-later community and separate offer.\n",
@@ -50,7 +50,13 @@ def fixture_evidence(directory, *, extra_linux=()):
         license_root = root + ("/Contents/Resources" if root.endswith(".app") else "")
         native = b"synthetic Mach-O stand-in\n" if root.endswith(".app") else build_elf(machine=asset["platforms"][0].split("-")[0], needed=["libc.so.6"], interpreter="/lib/ld-linux-aarch64.so.1" if asset["platforms"] == ["aarch64-linux"] else "/lib64/ld-linux-x86-64.so.2", version_needs={"libc.so.6": ["GLIBC_2.34"]})
         entries = [(root, b"", 0o755, tarfile.DIRTYPE, ""), (command, native, 0o755, tarfile.REGTYPE, "")]
-        entries += [(license_root + "/" + p, sources[p], 0o644, tarfile.REGTYPE, "") for p in ("LICENSE", "NOTICE")]
+        legal = {"LICENSE": sources["LICENSE"], "NOTICE": sources["NOTICE"]}
+        for name, data in (payload_legal or {}).get(asset["id"], {}).items():
+            if data is None:
+                legal.pop(name, None)
+            else:
+                legal[name] = data
+        entries += [(license_root + "/" + p, legal[p], 0o644, tarfile.REGTYPE, "") for p in sorted(legal)]
         entries += [(p, b"#!/bin/sh\nexit 0\n", 0o755, tarfile.REGTYPE, "") for p in asset["launchers"].values()]
         if not root.endswith(".app"):
             entries += list(extra_linux)
