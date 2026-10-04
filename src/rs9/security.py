@@ -63,6 +63,56 @@ def scan_for_credentials(text: str) -> None:
             )
 
 
+# Marker pieces are joined so this source never contains a literal private key marker.
+PRIVATE_BLOCK_BYTES_RE = re.compile(
+    rb"-----" rb"BEGIN (?:[A-Z0-9_-]+ )?PRIVATE KEY(?: BLOCK)?-----|"
+    rb"-----" rb"BEGIN OPENSSH PRIVATE KEY-----|"
+    rb"-----" rb"BEGIN PGP (?:PRIVATE|SECRET) KEY BLOCK-----"
+)
+
+
+# Distinctive vendor-prefixed tokens only. The generic "Bearer <opaque>" shape is excluded for
+# packaged content, where documentation strings routinely contain it.
+STRONG_TOKEN_PATTERNS = [p for p in TOKEN_PATTERNS if not p.pattern.startswith("Bearer")]
+
+
+def scan_bytes_for_credentials(data: bytes, *, token_scan: bool | None = None) -> None:
+    """Scan bytes for private key blocks; token patterns only for text-like data.
+
+    Private key armor is searched in every byte stream. Vendor-prefixed token patterns are
+    applied when ``token_scan`` is true, or by default when the first 4 KiB has no NUL byte,
+    so compiled binaries do not trigger on incidental string constants.
+    """
+    if PRIVATE_BLOCK_BYTES_RE.search(data):
+        raise ContractError("CREDENTIAL_DETECTED", "Private key block detected in binary stream")
+    if token_scan is None:
+        token_scan = b"\x00" not in data[:4096]
+    if token_scan:
+        text = data.decode("utf-8", errors="replace")
+        for pattern in STRONG_TOKEN_PATTERNS:
+            if pattern.search(text):
+                raise ContractError("CREDENTIAL_DETECTED", "Credential token pattern detected in package content")
+
+
+NONPRODUCTION_KEY_MARKER = "nonproduction"
+_PRODUCTION_KEY_NAME_RE = re.compile(r"(?i)(^|[/_.-])(prod|production|release-signing|live)([/_.-]|$)")
+
+
+def validate_nonproduction_key_path(path: Any) -> None:
+    """Fixture key material must live under an explicit NONPRODUCTION path segment.
+
+    The reviewed production key locations are never accepted for hosted candidate
+    clients; the marker keeps fixture trust distinct from any production trust path.
+    """
+    validate_safe_relative_posix_path(path.lstrip("/") if isinstance(path, str) else path, "key path")
+    lowered = path.lower()
+    if NONPRODUCTION_KEY_MARKER not in lowered.replace("-", "").replace("_", ""):
+        raise ContractError("KEY_PATH_NOT_NONPRODUCTION", "Fixture key path must be explicitly NONPRODUCTION")
+    stripped = lowered.replace("nonproduction", "").replace("non-production", "").replace("non_production", "")
+    if _PRODUCTION_KEY_NAME_RE.search(stripped):
+        raise ContractError("KEY_PATH_NOT_NONPRODUCTION", "Fixture key path resembles a production key location")
+
+
 def scan_keys_for_credentials(data: Any, path: tuple[str, ...] = ()) -> None:
     """Screen decoded values and keys, allowing declared command identifiers."""
     if isinstance(data, dict):

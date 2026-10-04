@@ -31,6 +31,7 @@ def run(root, args):
 
 
 def validate_receipts(root, commit, workflow_sha256):
+    """Historical CONT1 v1 diagnostic reader; adoption uses the v2 collector."""
     root = physical_directory(root)
     manifest = root / "receipts-manifest.json"
     if manifest.is_symlink() or not manifest.is_file() or manifest.stat().st_size > 512 * 1024:
@@ -135,13 +136,34 @@ def validate_receipts(root, commit, workflow_sha256):
     return record
 
 
-def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256, timeout=1800):
-    root, output = physical_directory(repository), physical_directory(output)
-    if any(output.iterdir()) or output == root or root in output.parents:
-        raise ContractError("ADOPTION_OUTPUT", "Empty external physical result directory required")
+def _cache_path(relative):
+    parts = Path(relative).parts
+    return (relative.startswith(".serena/") or "__pycache__" in parts
+            or ".pytest_cache" in parts or relative.endswith(".pyc"))
+
+
+def staging_paths(root, manifest, git):
+    """Reviewed inventory plus explicitly reviewed tracked deletions."""
+    allowed = {r["path"] for r in manifest["files"]} | {MANIFEST}
+    tracked = set(git("ls-files", "-z").split(chr(0))) - {""}
+    deleted = {p for p in tracked if not (root / p).exists()}
+    if deleted != set(manifest.get("deleted_paths", [])):
+        raise ContractError("ADOPTION_DELETIONS", "Tracked deletions differ from the reviewed manifest")
+    for path in deleted:
+        validate_safe_relative_posix_path(path)
+    unknown = git("ls-files", "--others", "--exclude-standard").splitlines()
+    unknown += git("ls-files", "--others", "--ignored", "--exclude-standard").splitlines()
+    if any(p not in allowed and not _cache_path(p) for p in unknown):
+        raise ContractError("ADOPTION_INVENTORY", "Unreviewed checkout state present")
+    return sorted(allowed | deleted)
+
+
+def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256, timeout=7200):
+    from rs9.collect_candidate import collect, output_directory
+    root = physical_directory(repository)
     if any(not re.fullmatch(r"[0-9a-f]{40}", x) for x in (reviewed_parent, reviewed_tree)) or not re.fullmatch(r"[0-9a-f]{64}", manifest_sha256):
         raise ContractError("ADOPTION_REVIEW", "Exact manager review bindings required")
-    if type(timeout) is not int or not 30 <= timeout <= 3600:
+    if type(timeout) is not int or not 30 <= timeout <= 21600:
         raise ContractError("ADOPTION_TIMEOUT", "Wait must be bounded")
     manifest_path = root / MANIFEST
     if any(p.is_symlink() for p in (manifest_path, *manifest_path.parents)) or manifest_path.stat().st_size > 512 * 1024:
@@ -150,84 +172,69 @@ def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256
     if hashlib.sha256(raw).hexdigest() != manifest_sha256:
         raise ContractError("ADOPTION_REVIEW", "Manifest differs from reviewed bytes")
     manifest = json.loads(raw)
-    # A blocked source checkpoint does not become an authorized completed
-    # candidate just because this script exists.
-    if manifest.get("candidate_adoption_ready") is not True:
-        raise ContractError("ADOPTION_NOT_READY", "Local candidate qualification is incomplete")
+    if (manifest.get("candidate_adoption_ready") is not True
+            or manifest.get("adoption_scope") != "hosted-candidate-qualification-only"
+            or manifest.get("production_enabled") is not False):
+        raise ContractError("ADOPTION_NOT_READY", "Source adoption contract is incomplete")
+    output = output_directory(output)
+    if output == root or root in output.parents:
+        raise ContractError("ADOPTION_OUTPUT", "External result directory required")
     if verify_inventory(root, manifest) != reviewed_tree:
-        raise ContractError("ADOPTION_REVIEW", "Source tree differs from exact manager review")
+        raise ContractError("ADOPTION_REVIEW", "Source tree differs from manager review")
     git = lambda *args: run(root, ["git", *args])
     if git("branch", "--show-current") != "main" or git("rev-parse", "HEAD") != reviewed_parent or git("diff", "--cached", "--name-only"):
         raise ContractError("ADOPTION_PARENT", "Reviewed main parent and clean index required")
-    remote = git("remote", "get-url", "origin")
-    if remote not in {"https://github.com/" + REPOSITORY + ".git", "git@github.com:" + REPOSITORY + ".git"}:
-        raise ContractError("ADOPTION_REMOTE", "RS9 origin required")
-    unknown = git("ls-files", "--others", "--exclude-standard").splitlines() + git("ls-files", "--others", "--ignored", "--exclude-standard").splitlines()
-    allowed = {r["path"] for r in manifest["files"]} | {MANIFEST}
-    if any(p not in allowed and not p.startswith(".serena/") for p in unknown):
-        raise ContractError("ADOPTION_INVENTORY", "Unreviewed checkout state present")
+    if git("remote", "get-url", "origin") not in {"https://github.com/" + REPOSITORY + ".git", "git@github.com:" + REPOSITORY + ".git"}:
+        raise ContractError("ADOPTION_REMOTE", "Exact RS9 origin required")
+    paths = staging_paths(root, manifest, git)
     git("fetch", "origin", "main")
     if git("rev-parse", "origin/main") != reviewed_parent:
-        raise ContractError("ADOPTION_PARENT", "Origin advanced; fresh manager review required")
-    # Recheck after fetch and immediately before index mutation.
-    if verify_inventory(root, manifest) != reviewed_tree:
-        raise ContractError("ADOPTION_REVIEW", "Candidate changed during preflight")
-    if (git("branch", "--show-current") != "main" or git("rev-parse", "HEAD") != reviewed_parent
-            or git("diff", "--cached", "--name-only")):
-        raise ContractError("ADOPTION_PARENT", "Checkout or index changed during preflight")
-    git("add", "--", *sorted(allowed))
+        raise ContractError("ADOPTION_PARENT", "Remote main advanced; fresh review required")
+    if (verify_inventory(root, manifest) != reviewed_tree or git("branch", "--show-current") != "main"
+            or git("rev-parse", "HEAD") != reviewed_parent or git("diff", "--cached", "--name-only")
+            or paths != staging_paths(root, manifest, git)):
+        raise ContractError("ADOPTION_REVIEW", "Source or index changed during preflight")
+    git("add", "-A", "--", *paths)
     if git("write-tree") != reviewed_tree:
-        raise ContractError("ADOPTION_REVIEW", "Staged tree differs; stop with index retained for inspection")
-    git("commit", "-m", "Prepare Theme Forge candidate qualification")
+        raise ContractError("ADOPTION_REVIEW", "Staged tree differs; index retained for inspection")
+    git("commit", "-m", "Complete non-production hosted Theme Forge candidate pipeline")
     commit = git("rev-parse", "HEAD")
     if git("rev-parse", "HEAD^{tree}") != reviewed_tree or git("rev-parse", "HEAD^") != reviewed_parent:
         raise ContractError("ADOPTION_REVIEW", "Commit hook changed candidate; stop before push")
     started = datetime.now(timezone.utc).replace(microsecond=0)
     git("push", "origin", "HEAD:main")
-    deadline = time.monotonic() + timeout
-    gh = lambda *args: run(root, ["gh", *args, "--repo", REPOSITORY])
-    run_id = None
-    while time.monotonic() < deadline:
-        rows = json.loads(gh("run", "list", "--workflow", WORKFLOW, "--event", "push", "--branch", "main", "--commit", commit,
-                             "--limit", "100", "--json", "databaseId,headSha,event,status,conclusion,createdAt"))
-        matching = [r for r in rows if r["headSha"] == commit and r["event"] == "push"
-                    and datetime.fromisoformat(r["createdAt"].replace("Z", "+00:00")) >= started]
-        if len(matching) > 1:
-            raise ContractError("HOSTED_RUN", "Multiple new push runs; manager disposition required")
-        if matching:
-            run_id = matching[0]["databaseId"]
-            if matching[0]["status"] == "completed":
-                break
-        time.sleep(min(15, max(0, deadline - time.monotonic())))
-    else:
-        (output / "hosted-timeout.json").write_bytes(canonical({"commit": commit, "run_id": run_id, "status": "pending", "production_enabled": False}))
-        raise ContractError("HOSTED_TIMEOUT", "Candidate pushed; hosted results still pending")
-    detail = json.loads(gh("run", "view", str(run_id), "--json", "headSha,event,status,conclusion,jobs,url"))
-    if detail["headSha"] != commit or detail["event"] != "push" or not detail["jobs"]:
-        raise ContractError("HOSTED_BINDING", "Hosted run binding is incomplete")
-    # Keep all job and step outcomes; do not turn a partial successful job into
-    # an accepted generation. Candidate evidence stays unattested.
-    (output / "job-conclusions.json").write_bytes(canonical(detail))
-    receipts = output / "receipts"
-    receipts.mkdir()
-    gh("run", "download", str(run_id), "--name", "hosted-candidate-receipts", "--dir", str(receipts))
-    validate_receipts(receipts, commit, hashlib.sha256((root / ".github/workflows" / WORKFLOW).read_bytes()).hexdigest())
-    return {"commit": commit, "tree": reviewed_tree, "run_id": run_id, "conclusion": detail["conclusion"],
-            "manager_disposition_required": True, "production_enabled": False}
+    packet = collect(root, output, commit=commit, started_at=started, timeout=timeout, runner=run)
+    packet["reviewed_tree"] = reviewed_tree
+    from rs9.collect_candidate import write_packet
+    write_packet(output, packet)
+    return packet
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Attended RS9 source adoption and hosted qualification only")
-    parser.add_argument("--repository", default=".")
-    for flag in ("output", "reviewed-parent", "reviewed-tree", "manifest-sha256"):
-        parser.add_argument("--" + flag, required=True)
-    parser.add_argument("--timeout", type=int, default=1800)
+    parser = argparse.ArgumentParser(description="Attended source adoption and hosted collection only")
+    sub = parser.add_subparsers(dest="command", required=True)
+    adoption = sub.add_parser("adopt")
+    collection = sub.add_parser("collect")
+    for command in (adoption, collection):
+        command.add_argument("--repository", default=".")
+        command.add_argument("--output", required=True)
+        command.add_argument("--timeout", type=int, default=7200)
+    for flag in ("reviewed-parent", "reviewed-tree", "manifest-sha256"):
+        adoption.add_argument("--" + flag, required=True)
+    collection.add_argument("--commit", required=True)
+    collection.add_argument("--run-id", type=int, required=True)
     args = parser.parse_args(argv)
     try:
-        result = adopt(args.repository, args.output, reviewed_parent=args.reviewed_parent, reviewed_tree=args.reviewed_tree,
-                       manifest_sha256=args.manifest_sha256, timeout=args.timeout)
-        print(canonical(result).decode(), end="")
-        return 0 if result["conclusion"] == "success" else 2
+        if args.command == "adopt":
+            result = adopt(args.repository, args.output, reviewed_parent=args.reviewed_parent,
+                           reviewed_tree=args.reviewed_tree, manifest_sha256=args.manifest_sha256, timeout=args.timeout)
+        else:
+            from rs9.collect_candidate import collect
+            result = collect(args.repository, args.output, commit=args.commit, run_id=args.run_id,
+                             timeout=args.timeout, runner=run)
+        print(canonical({"status": result["status"], "run_id": result["run_id"],
+                         "validation": result["validation"], "production_enabled": False}).decode(), end="")
+        return 0 if result["validation"]["status"] == "pass" else 2
     except (ContractError, OSError, ValueError, subprocess.SubprocessError) as error:
         print("Attended adoption stopped: " + (error.code if isinstance(error, ContractError) else "ADOPTION_FAILED"))
         return 2

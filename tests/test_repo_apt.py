@@ -1,9 +1,13 @@
 """Tests for deterministic APT repository index and candidate generator (rs9.repo_apt)."""
 
 import gzip
+import hashlib
 import io
+import lzma
 import os
 from pathlib import Path
+import re
+import shutil
 import tarfile
 import tempfile
 import unittest
@@ -13,11 +17,55 @@ from rs9.pages import scan_pages_tree
 from rs9.repo_apt import (
     AptRepositoryCandidate,
     DebPackage,
+    TAMPER_KINDS,
+    apt_source_line,
     build_apt_repository,
+    clearsigned_body,
     parse_deb_control,
+    tamper_apt_repository,
     validate_apt_repository,
+    verify_apt_signatures,
 )
 from rs9.signed_store import SignedStore
+from rs9.signing_fixture import SigningFixture, find_gpg_binary
+
+
+class FixtureSigner:
+    """Key-bound signer double for SOURCE tests only; it is never a hosted-lane signing result.
+
+    Signatures bind both the exact signed bytes and the key; verification is pinned to this
+    key, mirroring how the real fixture's VALIDSIG pin behaves for the checks under test.
+    """
+
+    def __init__(self, fingerprint: str = "A" * 40) -> None:
+        self.primary_fingerprint = fingerprint
+        self.public_key_binary = bytes.fromhex(fingerprint[:8])
+        self.public_key_armor = "fixture-public-key-" + fingerprint
+
+    def _signature(self, data: bytes) -> str:
+        return hashlib.sha256(self.primary_fingerprint.encode() + b"\0" + data).hexdigest()
+
+    def detach_sign(self, data: bytes, *, armor: bool = True) -> bytes:
+        return (f"-----BEGIN PGP SIGNATURE-----\n\nKEY:{self.primary_fingerprint}\n"
+                f"SIG:{self._signature(data)}\n-----END PGP SIGNATURE-----\n").encode()
+
+    def clearsign(self, data: bytes) -> bytes:
+        body = data.rstrip(b"\n")
+        return b"-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\n\n" + body + b"\n" + self.detach_sign(body)
+
+    def verify(self, signed: bytes, signature: bytes | None = None) -> dict:
+        if signature is None:
+            data = clearsigned_body(signed)
+            signature = b"-----BEGIN PGP SIGNATURE-----" + signed.partition(b"\n-----BEGIN PGP SIGNATURE-----")[2]
+        else:
+            data = signed
+        text = signature.decode("utf-8", errors="replace")
+        key, sig = re.search(r"KEY:([0-9A-F]+)", text), re.search(r"SIG:([0-9a-f]+)", text)
+        if key is None or key.group(1) != self.primary_fingerprint:
+            raise ContractError("UNPINNED_TRUST", "Signature key is not the pinned fixture signer")
+        if sig is None or sig.group(1) != self._signature(data):
+            raise ContractError("VERIFICATION_FAILED", "Signature does not match the signed bytes")
+        return {"verified_issuer": self.primary_fingerprint, "status": "valid"}
 
 
 def build_minimal_deb(
@@ -450,6 +498,230 @@ class RepoAptTests(unittest.TestCase):
                 with self.assertRaises(ContractError) as ctx2:
                     validate_apt_repository(self.root / "repo_u26", distribution=debian_dist)
                 self.assertEqual(ctx2.exception.code, "UNSUPPORTED_PLATFORM")
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def rewrite_index(root: Path, arch: str, *, plain: bytes | None = None, gz: bytes | None = None) -> None:
+    """Replace an arch index consistently (Release hashes, by-hash objects) to test deeper invariants."""
+    dist = root / "dists/resolute"
+    directory = dist / f"main/binary-{arch}"
+    names = ("Packages", "Packages.gz", "Packages.xz")
+    current = {name: (directory / name).read_bytes() for name in names}
+    plain_bytes = plain if plain is not None else current["Packages"]
+    replacement = {
+        "Packages": plain_bytes,
+        "Packages.gz": gz if gz is not None else gzip.compress(plain_bytes, mtime=0),
+        "Packages.xz": lzma.compress(plain_bytes, preset=6, check=lzma.CHECK_CRC64),
+    }
+    release = (dist / "Release").read_text("utf-8")
+    for name, data in replacement.items():
+        (directory / name).write_bytes(data)
+        (directory / "by-hash/SHA256" / _sha(data)).write_bytes(data)
+        release = release.replace(
+            f" {_sha(current[name])} {len(current[name])} main/binary-{arch}/{name}",
+            f" {_sha(data)} {len(data)} main/binary-{arch}/{name}",
+        )
+    release_bytes = release.encode("utf-8")
+    (dist / "Release").write_bytes(release_bytes)
+    (dist / "by-hash/SHA256" / _sha(release_bytes)).write_bytes(release_bytes)
+
+
+class FixtureSigningAndClientTests(unittest.TestCase):
+    """Signed-repository, tamper and architecture-all invariants (signer double; see FixtureSigner)."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp_dir.name).resolve()
+        self.debs = [
+            build_minimal_deb("hello-world", "1.0.0", "amd64", payload_content=b"amd64-bytes"),
+            build_minimal_deb("hello-world", "1.0.0", "arm64", payload_content=b"arm64-bytes"),
+            build_minimal_deb("tf-cli", "1.0.0", "all", depends="nodejs (>= 22)", payload_content=b"cli-bytes"),
+        ]
+        self.signer = FixtureSigner()
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def signed_repo(self, name: str = "signed") -> Path:
+        root = self.root / name
+        repo = build_apt_repository(root, packages_bytes=self.debs)
+        repo.sign_with_fixture(self.signer)
+        return root
+
+    def test_sign_with_fixture_writes_signed_objects_and_by_hash(self):
+        root = self.root / "signed"
+        repo = build_apt_repository(root, packages_bytes=self.debs)
+        self.assertFalse(repo.is_signed)
+        evidence = repo.sign_with_fixture(self.signer)
+        self.assertTrue(repo.is_signed)
+        dist = root / "dists/resolute"
+        release = (dist / "Release").read_bytes()
+        inrelease, release_gpg = (dist / "InRelease").read_bytes(), (dist / "Release.gpg").read_bytes()
+        self.assertEqual(clearsigned_body(inrelease).rstrip(b"\n"), release.rstrip(b"\n"))
+        self.assertEqual(evidence["inrelease_sha256"], _sha(inrelease))
+        self.assertEqual(evidence["release_gpg_sha256"], _sha(release_gpg))
+        for blob in (inrelease, release_gpg, release):
+            self.assertEqual((dist / "by-hash/SHA256" / _sha(blob)).read_bytes(), blob)
+        verified = verify_apt_signatures(root, self.signer)
+        self.assertTrue(verified["signature_authenticated"])
+        self.assertEqual(verified["verified_issuer"], self.signer.primary_fingerprint)
+        self.assertEqual(verified["verified_packages"], 3)
+        # Structural validation alone still never claims signature authentication.
+        self.assertFalse(validate_apt_repository(root)["signature_authenticated"])
+
+    def test_unsigned_repository_has_no_authenticated_signature(self):
+        root = self.root / "unsigned"
+        build_apt_repository(root, packages_bytes=self.debs)
+        with self.assertRaises(ContractError) as caught:
+            verify_apt_signatures(root, self.signer)
+        self.assertEqual(caught.exception.code, "MISSING_SIGNATURE")
+
+    def test_every_tamper_kind_is_rejected_fail_closed(self):
+        expected = {"package": {"TAMPER_DETECTED"}, "index": {"TAMPER_DETECTED"},
+                    "signature": {"MISSING_BY_HASH", "VERIFICATION_FAILED"}, "wrongkey": {"UNPINNED_TRUST"}}
+        self.assertEqual(set(TAMPER_KINDS), set(expected))
+        original = self.signed_repo()
+        for arch in ("amd64", "arm64"):
+            for kind, codes in expected.items():
+                with self.subTest(kind=kind, arch=arch):
+                    copy = self.root / f"tampered-{kind}-{arch}"
+                    shutil.copytree(original, copy)
+                    changed = tamper_apt_repository(copy, kind, arch=arch, wrong_signer=FixtureSigner("B" * 40),
+                                                    package="hello-world")
+                    self.assertTrue(changed)
+                    with self.assertRaises(ContractError) as caught:
+                        verify_apt_signatures(copy, self.signer)
+                    self.assertIn(caught.exception.code, codes)
+        verify_apt_signatures(original, self.signer)  # the untouched original still verifies
+
+    def test_signature_corruption_is_caught_by_cryptographic_verification(self):
+        copy = self.root / "corrupt-signature"
+        shutil.copytree(self.signed_repo(), copy)
+        tamper_apt_repository(copy, "signature")
+        dist = copy / "dists/resolute"
+        with self.assertRaises(ContractError) as inline:
+            self.signer.verify((dist / "InRelease").read_bytes())
+        with self.assertRaises(ContractError) as detached:
+            self.signer.verify((dist / "Release").read_bytes(), (dist / "Release.gpg").read_bytes())
+        self.assertEqual(inline.exception.code, "VERIFICATION_FAILED")
+        self.assertEqual(detached.exception.code, "VERIFICATION_FAILED")
+
+    def test_wrong_key_signature_is_valid_for_its_own_key_but_unpinned(self):
+        copy = self.root / "wrong-key"
+        shutil.copytree(self.signed_repo(), copy)
+        other = FixtureSigner("C" * 40)
+        tamper_apt_repository(copy, "wrongkey", wrong_signer=other)
+        verify_apt_signatures(copy, other)
+        with self.assertRaises(ContractError):
+            verify_apt_signatures(copy, self.signer)
+        with self.assertRaises(ContractError) as missing:
+            tamper_apt_repository(copy, "wrongkey")
+        self.assertEqual(missing.exception.code, "INVALID_ARGUMENT")
+
+    def test_tamper_arguments_are_validated(self):
+        root = self.signed_repo()
+        for kwargs in ({"kind": "other"}, {"kind": "index", "arch": "armhf"}, {"kind": "package", "package": "../x"}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ContractError):
+                tamper_apt_repository(root, **kwargs)
+
+    def test_architecture_all_is_indexed_identically_in_both_architectures(self):
+        root = self.signed_repo()
+        dist = root / "dists/resolute/main"
+        amd64 = (dist / "binary-amd64/Packages").read_text("utf-8")
+        arm64 = (dist / "binary-arm64/Packages").read_text("utf-8")
+        self.assertIn("Package: tf-cli", amd64)
+        self.assertIn("Package: tf-cli", arm64)
+        self.assertEqual(amd64.count("Architecture: all"), 1)
+        self.assertEqual(arm64.count("Architecture: all"), 1)
+        self.assertIn("Architecture: amd64", amd64)
+        self.assertNotIn("Architecture: arm64", amd64)
+        self.assertNotIn("Architecture: amd64", arm64)
+        self.assertEqual(validate_apt_repository(root)["verified_packages"], 3)
+
+    def test_architecture_all_missing_from_one_index_is_rejected(self):
+        root = self.root / "missing-all"
+        build_apt_repository(root, packages_bytes=self.debs)
+        arm64 = (root / "dists/resolute/main/binary-arm64/Packages").read_text("utf-8")
+        stanzas = [s for s in arm64.strip().split("\n\n") if "Architecture: all" not in s]
+        rewrite_index(root, "arm64", plain=("\n\n".join(stanzas) + "\n").encode("utf-8"))
+        with self.assertRaises(ContractError) as caught:
+            validate_apt_repository(root)
+        self.assertEqual(caught.exception.code, "INVALID_REPO")
+
+    def test_foreign_architecture_stanza_is_rejected(self):
+        root = self.root / "foreign"
+        build_apt_repository(root, packages_bytes=self.debs)
+        amd64 = (root / "dists/resolute/main/binary-amd64/Packages").read_text("utf-8")
+        stanzas = amd64.strip().split("\n\n")
+        arm64_stanza = next(s for s in (root / "dists/resolute/main/binary-arm64/Packages").read_text("utf-8")
+                            .strip().split("\n\n") if "Architecture: arm64" in s)
+        rewrite_index(root, "amd64", plain=("\n\n".join([*stanzas, arm64_stanza]) + "\n").encode("utf-8"))
+        with self.assertRaises(ContractError) as caught:
+            validate_apt_repository(root)
+        self.assertEqual(caught.exception.code, "INVALID_ARCHITECTURE")
+
+    def test_compressed_index_must_decode_to_packages(self):
+        root = self.root / "decoy-gz"
+        build_apt_repository(root, packages_bytes=self.debs)
+        rewrite_index(root, "amd64", gz=gzip.compress(b"Package: decoy\n", mtime=0))
+        with self.assertRaises(ContractError) as caught:
+            validate_apt_repository(root)
+        self.assertEqual(caught.exception.code, "TAMPER_DETECTED")
+        root2 = self.root / "bad-gz"
+        build_apt_repository(root2, packages_bytes=self.debs)
+        rewrite_index(root2, "amd64", gz=b"not gzip")
+        with self.assertRaises(ContractError):
+            validate_apt_repository(root2)
+
+    def test_clearsigned_body_unescapes_dashes_and_rejects_non_clearsigned(self):
+        document = (b"-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\n\nline one\n- -dash line\nlast"
+                    b"\n-----BEGIN PGP SIGNATURE-----\n\nSIG\n-----END PGP SIGNATURE-----\n")
+        self.assertEqual(clearsigned_body(document), b"line one\n-dash line\nlast")
+        for bad in (b"plain", b"-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\nno separator",
+                    b"-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\n\nbody without signature"):
+            with self.subTest(bad=bad), self.assertRaises(ContractError):
+                clearsigned_body(bad)
+
+    def test_apt_source_line_requires_nonproduction_keyring_and_safe_values(self):
+        line = apt_source_line("file:/srv/rs9/apt", "/etc/apt/keyrings/rs9-nonproduction.gpg", arch="arm64")
+        self.assertEqual(line, "deb [signed-by=/etc/apt/keyrings/rs9-nonproduction.gpg arch=arm64] "
+                               "file:/srv/rs9/apt resolute main\n")
+        for keyring in ("/etc/apt/keyrings/rs9.gpg", "/usr/share/keyrings/production/rs9-nonproduction.gpg"):
+            with self.subTest(keyring=keyring), self.assertRaises(ContractError) as caught:
+                apt_source_line("file:/srv/rs9/apt", keyring)
+            self.assertEqual(caught.exception.code, "KEY_PATH_NOT_NONPRODUCTION")
+        for kwargs in ({"url": "file:/x y"}, {"url": "file:/x\nbad"}, {"url": "http://h/;rm"},
+                       {"distribution": "trixie"}, {"arch": "armhf"}):
+            args = {"url": "file:/srv/rs9/apt", "keyring": "/etc/apt/keyrings/rs9-nonproduction.gpg", **kwargs}
+            with self.subTest(kwargs=kwargs), self.assertRaises(ContractError):
+                apt_source_line(args["url"], args["keyring"], **{k: v for k, v in kwargs.items() if k != "url"})
+
+    def test_real_gnupg_fixture_signs_and_rejects_every_tamper(self):
+        binary = find_gpg_binary()
+        if not binary:
+            self.skipTest("GnuPG binary not available")
+        try:
+            fixture = SigningFixture(gpg_binary=binary)
+            wrong = SigningFixture(gpg_binary=binary, user_id="RS9 NON-PRODUCTION WRONG KEY <nonproduction@invalid>")
+        except ContractError as error:
+            if error.code == "GPG_AGENT_UNAVAILABLE":
+                self.skipTest("GnuPG agent unavailable")
+            raise
+        with fixture, wrong:
+            root = self.root / "real-gpg"
+            repo = build_apt_repository(root, packages_bytes=self.debs)
+            repo.sign_with_fixture(fixture)
+            self.assertTrue(verify_apt_signatures(root, fixture)["signature_authenticated"])
+            for kind in TAMPER_KINDS:
+                with self.subTest(kind=kind):
+                    copy = self.root / f"real-{kind}"
+                    shutil.copytree(root, copy)
+                    tamper_apt_repository(copy, kind, wrong_signer=wrong, package="hello-world")
+                    with self.assertRaises(ContractError):
+                        verify_apt_signatures(copy, fixture)
 
 
 if __name__ == "__main__":

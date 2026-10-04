@@ -1,0 +1,96 @@
+{
+  "dispatcher_checkpoint": false,
+  "frozen_worker_policy_sha256": "6f20f3a58f31a5b2495423ebd7018634e893de5f4b1a667805330b4ff328bc33",
+  "invocations": {
+    "gemini": 8,
+    "sonnet": 1
+  },
+  "jobs": [
+    {
+      "attempt": 1,
+      "cleanup": "proven",
+      "disposition": "partial",
+      "logical_task": "workflow-and-contract",
+      "provider": "gemini",
+      "reason": "parent stopped after uninformative output; partial edits retained"
+    },
+    {
+      "adoption": "partial source adopted and parent repaired",
+      "attempt": 2,
+      "cleanup": "proven",
+      "disposition": "partial",
+      "logical_task": "workflow-and-contract",
+      "provider": "gemini",
+      "replaces_attempt": 1
+    },
+    {
+      "attempt": 1,
+      "cleanup": "proven",
+      "disposition": "partial",
+      "logical_task": "native-packages",
+      "provider": "gemini",
+      "reason": "parent stopped after uninformative output; partial edits retained"
+    },
+    {
+      "adoption": "partial source adopted; parent replaced placeholder signing and probes",
+      "attempt": 2,
+      "cleanup": "proven",
+      "disposition": "partial",
+      "logical_task": "native-packages",
+      "provider": "gemini",
+      "replaces_attempt": 1
+    },
+    {
+      "attempt": 1,
+      "cleanup": "proven",
+      "disposition": "partial",
+      "logical_task": "wheels-and-nix",
+      "provider": "gemini",
+      "reason": "parent stopped after uninformative output; partial edits retained"
+    },
+    {
+      "adoption": "partial source adopted; parent replaced fabricated Nix output identities and unsupported probes",
+      "attempt": 2,
+      "cleanup": "proven",
+      "disposition": "partial",
+      "logical_task": "wheels-and-nix",
+      "provider": "gemini",
+      "replaces_attempt": 1
+    },
+    {
+      "attempt": 1,
+      "cleanup": "proven",
+      "disposition": "failed",
+      "logical_task": "apt-and-pages",
+      "provider": "gemini",
+      "reason": "worker admission failed on malformed empty result schema enum; no edits"
+    },
+    {
+      "adoption": "partial source adopted and integrated",
+      "attempt": 2,
+      "cleanup": "proven",
+      "disposition": "partial",
+      "logical_task": "apt-and-pages",
+      "provider": "sonnet",
+      "reason": "provider exited successfully but terminal result was missing or conflicting",
+      "replaces_attempt": 1
+    },
+    {
+      "adoption": "Parent adopted bounded partial corrections after cleanup, superseded unsafe fallbacks and repaired tests.",
+      "attempt": 1,
+      "cleanup": "proven",
+      "disposition": "partial",
+      "effective_model_observed": false,
+      "ledger_correction": "Cancellation outcome is immutable. Its initial no-edit evidence was corrected by stable-file inspection; this record documents partial-work adoption.",
+      "logical_task": "closeout-pages-custody",
+      "provider": "gemini",
+      "reason": "No terminal report or meaningful progress signal within 393 seconds; no retry.",
+      "transport_outcome": "cancelled-after-deliberate-bounded-stop"
+    }
+  ],
+  "parent_acceptance": "fresh source verification only; internal worker results are not dispatcher review",
+  "replacement_policy": "cleanup proven before every replacement; no further replacement writers",
+  "schema": "rs9.hosted-worker-disposition.v1alpha1",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT2-HOSTED-CANDIDATE1",
+  "worker_use": "used"
+}

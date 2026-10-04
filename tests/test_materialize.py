@@ -701,7 +701,7 @@ class NixCandidateContractTests(unittest.TestCase):
 
     def test_root_flake_does_not_expose_unqualified_outputs(self):
         flake_text = (ROOT / "flake.nix").read_text()
-        self.assertIn("outputs = { self }:", flake_text)
+        self.assertIn("outputs = { self, nixpkgs", flake_text)
 
         # Must NOT expose root publication outputs
         for forbidden in ["packages = ", "apps = ", "overlay = ", "overlays = "]:

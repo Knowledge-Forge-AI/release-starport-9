@@ -1,7 +1,12 @@
 """Tests for public Pages tree scanner (rs9.pages)."""
 
+import hashlib
+import io
+import lzma
 import os
 from pathlib import Path
+import struct
+import tarfile
 import tempfile
 import unittest
 
@@ -12,10 +17,75 @@ from rs9.pages import (
     CATEGORY_DOCS,
     CATEGORY_INDEX,
     CATEGORY_PUBLIC_KEY,
+    MERKLE_ALGORITHM,
+    _zstd_frames_valid,
+    check_no_secret_key_packets,
     classify_pages_path,
+    clean_openpgp_framing,
+    detect_binary_format,
+    merkle_inventory,
+    scan_binary_artifact,
     scan_pages_tree,
     validate_pages_tree,
+    verify_merkle_inventory,
 )
+from rs9.security import scan_bytes_for_credentials, validate_nonproduction_key_path
+from tests.test_repo_apt import build_minimal_deb
+
+# Spelled in pieces so this source never contains a literal private key block.
+PRIVATE_BLOCK = "-----" + "BEGIN PGP PRIVATE KEY BLOCK-----\nfixture-only-material\n-----END PGP PRIVATE KEY BLOCK-----\n"
+SECRET_PACKET = bytes([0xC0 | 5, 4, 1, 2, 3, 4])
+
+
+def cpio_newc(files: dict[str, bytes]) -> bytes:
+    def entry(name: str, data: bytes, mode: int, ino: int) -> bytes:
+        raw_name = name.encode() + b"\0"
+        fields = (ino, mode, 0, 0, 1, 0, len(data), 0, 0, 0, 0, len(raw_name), 0)
+        header = b"070701" + b"".join(b"%08X" % value for value in fields) + raw_name
+        return header + b"\0" * (-len(header) % 4) + data + b"\0" * (-len(data) % 4)
+
+    out = b"".join(entry(name, data, 0o100644, i) for i, (name, data) in enumerate(files.items(), 1))
+    return out + entry("TRAILER!!!", b"", 0, 0)
+
+
+def rpm_header(store: bytes, magic: bytes = b"\x8e\xad\xe8\x01") -> bytes:
+    entry = struct.pack(">IIII", 1000, 7, 0, len(store))
+    return magic + b"\0\0\0\0" + struct.pack(">II", 1, len(store)) + entry + store
+
+
+def make_rpm(files: dict[str, bytes], *, signature_store: bytes = b"sig\0", compress: bool = True) -> bytes:
+    lead = (b"\xed\xab\xee\xdb" + b"\x03\x00" + struct.pack(">HH", 0, 1) + b"theme-forge".ljust(66, b"\0")
+            + struct.pack(">HH", 1, 5) + b"\0" * 16)
+    signature = rpm_header(signature_store)
+    signature += b"\0" * (-len(signature) % 8)
+    header = rpm_header(b"theme-forge\0")
+    payload = cpio_newc(files)
+    return lead + signature + header + (lzma.compress(payload, check=lzma.CHECK_CRC32) if compress else payload)
+
+
+def make_xz_deb(payload_name: str, payload: bytes) -> bytes:
+    def tar_xz(name: str, data: bytes) -> bytes:
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w:xz") as archive:
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+        return buffer.getvalue()
+
+    control = b"Package: sample\nVersion: 1.0\nArchitecture: amd64\nDescription: sample\n"
+    members = [("debian-binary", b"2.0\n"), ("control.tar.xz", tar_xz("./control", control)),
+               ("data.tar.xz", tar_xz(payload_name, payload))]
+    out = b"!<arch>\n"
+    for name, data in members:
+        out += f"{name:<16}0           0     0     100644  {len(data):<10}`\n".encode() + data
+        out += b"\n" if len(data) % 2 else b""
+    return out
+
+
+def zstd_raw_frame(content: bytes) -> bytes:
+    """Minimal valid frame: single segment, one raw last block (no decoder needed to build it)."""
+    return (b"\x28\xb5\x2f\xfd" + b"\x20" + bytes([len(content)])
+            + ((len(content) << 3) | 1).to_bytes(3, "little") + content)
 
 
 TRUTHFUL_PGP_PUBLIC_KEY = (
@@ -379,6 +449,219 @@ class PagesScannerTests(unittest.TestCase):
                     scan_pages_tree(self.root)
                 self.assertEqual(ctx.exception.code, "DISALLOWED_FILE")
                 f.unlink()
+
+
+class FormatAwareBinaryScanTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp_dir.name).resolve()
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def place(self, rel: str, data: bytes) -> None:
+        path = self.root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+    def test_format_detection_is_by_magic_only(self):
+        self.assertEqual(detect_binary_format(b"\xed\xab\xee\xdb" + b"x" * 8), "rpm")
+        self.assertEqual(detect_binary_format(b"!<arch>\nrest"), "ar")
+        self.assertEqual(detect_binary_format(b"\xfd7zXZ\x00rest"), "xz")
+        self.assertEqual(detect_binary_format(b"\x28\xb5\x2f\xfdrest"), "zstd")
+        self.assertEqual(detect_binary_format(b"\x1f\x8brest"), "gzip")
+        self.assertEqual(detect_binary_format(b"070701" + b"0" * 20), "cpio")
+        self.assertEqual(detect_binary_format(b"x" * 257 + b"ustar" + b"\0" * 10), "tar")
+        self.assertIsNone(detect_binary_format(b"plain text"))
+
+    def test_real_rpm_with_header_bytes_that_parse_as_a_secret_packet_is_not_a_false_positive(self):
+        # Offset 173 holds a tag-5 packet header: the raw prefix scan (0xed lead byte, 171 byte
+        # "packet") reads it as a secret key, though these are plain RPM signature header bytes.
+        rpm = make_rpm({"usr/bin/tool": b"#!/bin/sh\n"}, signature_store=b"\0" * 45 + b"\xc5\x01\x00" + b"\0" * 8)
+        with self.assertRaises(ContractError) as legacy:
+            check_no_secret_key_packets(rpm)
+        self.assertEqual(legacy.exception.code, "CREDENTIAL_DETECTED")
+        evidence = scan_binary_artifact(rpm, "x.rpm")
+        self.assertEqual(evidence["format"], "rpm")
+        self.assertTrue(evidence["complete"])
+        self.assertEqual(evidence["members_scanned"], 1)
+        self.assertIn("xz", evidence["formats_seen"])
+        self.place("rpm/fedora/43/x86_64/Packages/tool.rpm", rpm)
+        self.place("rpm/fedora/43/x86_64/repodata/repomd.xml", b"<repomd/>\n")
+        files = scan_pages_tree(self.root)["files"]
+        self.assertEqual(files["rpm/fedora/43/x86_64/Packages/tool.rpm"]["format_scan"]["format"], "rpm")
+
+    def test_real_xz_stream_that_parses_as_a_secret_packet_is_not_a_false_positive(self):
+        stream = None
+        for i in range(20000):
+            body = b"".join(hashlib.sha256(f"{i}-{j}".encode()).digest() for j in range(3))
+            candidate = lzma.compress(body, check=lzma.CHECK_CRC32)
+            if len(candidate) > 58 and candidate[57] == 0xC5:
+                stream = candidate
+                break
+        self.assertIsNotNone(stream, "no deterministic xz sample found")
+        with self.assertRaises(ContractError):
+            check_no_secret_key_packets(stream)
+        self.place("apt/dists/resolute/main/binary-amd64/Packages.xz", stream)
+        record = scan_pages_tree(self.root)["files"]["apt/dists/resolute/main/binary-amd64/Packages.xz"]
+        self.assertEqual(record["format_scan"]["format"], "xz")
+        self.assertTrue(record["format_scan"]["complete"])
+
+    def test_secret_material_inside_rpm_payload_is_rejected(self):
+        for name, content in (("etc/server.conf", PRIVATE_BLOCK.encode()),
+                              ("usr/share/keyrings/vendor.gpg", SECRET_PACKET),
+                              ("usr/share/data.bin", SECRET_PACKET)):
+            with self.subTest(member=name), self.assertRaises(ContractError) as caught:
+                scan_binary_artifact(make_rpm({name: content}), "x.rpm")
+            self.assertEqual(caught.exception.code, "CREDENTIAL_DETECTED")
+        token = ("ghp_" + "A" * 36).encode()
+        with self.assertRaises(ContractError):
+            scan_binary_artifact(make_rpm({"etc/notes.txt": token}), "x.rpm")
+
+    def test_secret_material_inside_deb_members_is_rejected_for_every_compression(self):
+        for payload_name, content in (("./etc/secret.conf", PRIVATE_BLOCK.encode()), ("./etc/k.pgp", SECRET_PACKET)):
+            for deb in (build_minimal_deb("sample", "1.0", "amd64", payload_content=content),
+                        make_xz_deb(payload_name, content)):
+                with self.subTest(payload=payload_name), self.assertRaises(ContractError) as caught:
+                    scan_binary_artifact(deb, "sample.deb")
+                self.assertEqual(caught.exception.code, "CREDENTIAL_DETECTED")
+        clean = make_xz_deb("./usr/bin/tool", b"#!/bin/sh\n")
+        evidence = scan_binary_artifact(clean, "sample.deb")
+        self.assertEqual((evidence["format"], evidence["complete"]), ("ar", True))
+        self.assertTrue({"ar", "xz", "tar"} <= set(evidence["formats_seen"]))
+
+    def test_secret_material_inside_plain_tar_and_gzip_is_rejected(self):
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+            info = tarfile.TarInfo("pkg/id.asc")
+            info.size = len(PRIVATE_BLOCK)
+            archive.addfile(info, io.BytesIO(PRIVATE_BLOCK.encode()))
+        with self.assertRaises(ContractError) as caught:
+            scan_binary_artifact(buffer.getvalue(), "x.tar.gz")
+        self.assertEqual(caught.exception.code, "CREDENTIAL_DETECTED")
+
+    def test_unproven_or_malformed_containers_fall_back_to_the_raw_scan(self):
+        for blob in (b"\xed\xab\xee\xdbFAKE-RPM", b"!<arch>\nnot an archive", b"\xfd7zXZ\x00corrupt",
+                     b"\x28\xb5\x2f\xfdnot-a-frame", b"\x1f\x8bnot-gzip", b"plain"):
+            with self.subTest(blob=blob):
+                self.assertIsNone(scan_binary_artifact(blob, "x.bin"))
+        # The legacy raw scan keeps catching a secret packet that merely claims a suffix.
+        self.place("rpm/fedora/43/x86_64/Packages/fake.rpm", bytes([0xC5, 1, 0]))
+        with self.assertRaises(ContractError) as caught:
+            scan_pages_tree(self.root)
+        self.assertEqual(caught.exception.code, "CREDENTIAL_DETECTED")
+
+    def test_rpm_with_undecodable_payload_is_structurally_proven_but_incomplete(self):
+        rpm = make_rpm({"usr/bin/tool": b"x"})
+        header_end = len(rpm) - len(lzma.compress(cpio_newc({"usr/bin/tool": b"x"}), check=lzma.CHECK_CRC32))
+        broken = rpm[:header_end] + b"\x28\xb5\x2f\xfd-not-a-valid-frame"
+        evidence = scan_binary_artifact(broken, "x.rpm")
+        self.assertEqual(evidence["format"], "rpm")
+        self.assertFalse(evidence["complete"])
+        self.assertIn("rpm-payload", evidence["unscanned_streams"])
+
+    def test_zstd_frame_walker_and_scan_evidence(self):
+        frame = zstd_raw_frame(b"public bytes only")
+        self.assertTrue(_zstd_frames_valid(frame))
+        self.assertTrue(_zstd_frames_valid(frame + frame))
+        self.assertTrue(_zstd_frames_valid(b"\x50\x2a\x4d\x18" + (3).to_bytes(4, "little") + b"abc" + frame))
+        reserved_block = frame[:6] + (((len(b"public bytes only") << 3) | 1) | (3 << 1)).to_bytes(3, "little") + frame[9:]
+        for bad in (frame[:-1], frame + b"x", b"", b"\x28\xb5\x2f\xfd", reserved_block):
+            with self.subTest(bad=bad):
+                self.assertFalse(_zstd_frames_valid(bad))
+        evidence = scan_binary_artifact(frame, "pkg.pkg.tar.zst")
+        self.assertEqual(evidence["format"], "zstd")
+        # Without a reviewed decoder the stream is flagged instead of silently treated as scanned.
+        self.assertEqual(evidence["complete"], not evidence["unscanned_streams"])
+
+    def test_clean_openpgp_framing_requires_exact_packet_sequence(self):
+        self.assertEqual(clean_openpgp_framing(SECRET_PACKET), [5])
+        self.assertEqual(clean_openpgp_framing(bytes([0xC6, 2, 10, 20]) + SECRET_PACKET), [6, 5])
+        for data in (SECRET_PACKET + b"x", SECRET_PACKET[:-1], b"\x7fELF" + b"\0" * 20, b"", b"\xc5\x01",
+                     bytes([0xC0 | 5, 0xE0, 1, 2])):
+            with self.subTest(data=data):
+                self.assertIsNone(clean_openpgp_framing(data))
+
+    def test_decoded_byte_budget_is_enforced(self):
+        import rs9.pages as pages
+
+        original = pages.MAX_SCAN_DECODED_BYTES
+        pages.MAX_SCAN_DECODED_BYTES = 1024
+        try:
+            with self.assertRaises(ContractError) as caught:
+                scan_binary_artifact(lzma.compress(b"\0" * 100_000), "x.xz")
+        finally:
+            pages.MAX_SCAN_DECODED_BYTES = original
+        self.assertEqual(caught.exception.code, "PAGES_LIMIT")
+
+
+class ByteScanAndKeyPathTests(unittest.TestCase):
+    def test_private_key_armor_is_rejected_in_any_byte_stream(self):
+        for armor in ("-----" + "BEGIN PRIVATE KEY-----", "-----" + "BEGIN RSA PRIVATE KEY-----",
+                      "-----" + "BEGIN OPENSSH PRIVATE KEY-----", "-----" + "BEGIN PGP PRIVATE KEY BLOCK-----",
+                      "-----" + "BEGIN PGP SECRET KEY BLOCK-----"):
+            for data in (armor.encode(), b"\x00\x01" + armor.encode() + b"\x00"):
+                with self.subTest(armor=armor), self.assertRaises(ContractError) as caught:
+                    scan_bytes_for_credentials(data)
+                self.assertEqual(caught.exception.code, "CREDENTIAL_DETECTED")
+        scan_bytes_for_credentials(b"-----BEGIN PGP PUBLIC KEY BLOCK-----\nabc\n-----END PGP PUBLIC KEY BLOCK-----\n")
+
+    def test_vendor_tokens_are_text_gated_and_generic_bearer_strings_are_not_secrets(self):
+        token = ("ghp_" + "A" * 36).encode()
+        with self.assertRaises(ContractError):
+            scan_bytes_for_credentials(b"token=" + token)
+        scan_bytes_for_credentials(b"\x00\x01compiled constant " + token)  # binary: not text-scanned by default
+        with self.assertRaises(ContractError):
+            scan_bytes_for_credentials(b"\x00\x01 header " + token, token_scan=True)
+        scan_bytes_for_credentials(b"Send Authorization: Bearer " + b"a" * 40 + b" in the header")
+
+    def test_fixture_key_paths_must_be_explicitly_nonproduction(self):
+        for good in ("/etc/apt/keyrings/rs9-nonproduction.gpg", "etc/rs9/non-production/key.asc",
+                     "keys/rs9_nonproduction.asc"):
+            validate_nonproduction_key_path(good)
+        for bad in ("/etc/apt/keyrings/rs9.gpg", "/usr/share/keyrings/production/rs9-nonproduction.gpg",
+                    "keys/live/nonproduction.asc", "keys/rs9-archive-keyring.gpg", "../escape-nonproduction.gpg", ""):
+            with self.subTest(path=bad), self.assertRaises(ContractError):
+                validate_nonproduction_key_path(bad)
+        with self.assertRaises(ContractError):
+            validate_nonproduction_key_path(None)
+
+
+class MerkleInventoryTests(unittest.TestCase):
+    INVENTORY = {"CNAME": "a" * 64, "apt/dists/resolute/Release": "b" * 64, "keys/rs9.asc": "c" * 64}
+
+    def test_single_file_root_is_the_domain_separated_leaf(self):
+        doc = merkle_inventory({"CNAME": "a" * 64})
+        leaf = hashlib.sha256(b"\x00" + (5).to_bytes(4, "big") + b"CNAME" + bytes.fromhex("a" * 64)).hexdigest()
+        self.assertEqual((doc["algorithm"], doc["leaf_count"], doc["root"]), (MERKLE_ALGORITHM, 1, leaf))
+
+    def test_root_is_deterministic_order_independent_and_exact(self):
+        doc = merkle_inventory(self.INVENTORY)
+        self.assertEqual(doc, merkle_inventory(dict(reversed(list(self.INVENTORY.items())))))
+        self.assertEqual([row["path"] for row in doc["leaves"]], sorted(self.INVENTORY))
+        leaves = [bytes.fromhex(row["leaf"]) for row in doc["leaves"]]
+        left = hashlib.sha256(b"\x01" + leaves[0] + leaves[1]).digest()
+        # Odd node is promoted, not duplicated.
+        self.assertEqual(doc["root"], hashlib.sha256(b"\x01" + left + leaves[2]).hexdigest())
+        roots = {merkle_inventory({**self.INVENTORY, "CNAME": "d" * 64})["root"],
+                 merkle_inventory({**self.INVENTORY, "CNAME2": self.INVENTORY["CNAME"]})["root"],
+                 merkle_inventory({k: v for k, v in self.INVENTORY.items() if k != "CNAME"})["root"],
+                 doc["root"]}
+        self.assertEqual(len(roots), 4)
+
+    def test_inventory_is_validated_and_verification_fails_closed(self):
+        for bad in ({}, {"/abs": "a" * 64}, {"a/../b": "a" * 64}, {"x": "short"}):
+            with self.subTest(bad=bad), self.assertRaises(ContractError):
+                merkle_inventory(bad)
+        doc = merkle_inventory(self.INVENTORY)
+        verify_merkle_inventory(doc, self.INVENTORY)
+        for wrong in ({**self.INVENTORY, "extra": "e" * 64}, {**self.INVENTORY, "CNAME": "0" * 64}):
+            with self.subTest(wrong=wrong), self.assertRaises(ContractError) as caught:
+                verify_merkle_inventory(doc, wrong)
+            self.assertEqual(caught.exception.code, "MERKLE_MISMATCH")
+        for bad_doc in (None, {}, {**doc, "root": "0" * 64}, {**doc, "algorithm": "other"}):
+            with self.subTest(doc=bad_doc), self.assertRaises(ContractError):
+                verify_merkle_inventory(bad_doc, self.INVENTORY)
 
 
 if __name__ == "__main__":

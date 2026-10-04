@@ -232,7 +232,49 @@ def build_rpm_candidate(
         (rpm_topdir / "SOURCES" / f"{project_id}.desktop").write_bytes(desktop_bytes)
         (rpm_topdir / "SOURCES" / "icon.png").write_bytes(icon_bytes)
 
-        raise ContractError("NATIVE_DEPENDENCY_DERIVATION_UNQUALIFIED", "Native dependency provider queries and clean client closure proof are required")
+        # Derive ELF dependencies from released payload asset
+        from rs9.dependencies import INTERPRETERS, LIBRARIES, shebang
+        from rs9.elf import parse_elf
+        import tarfile
+
+        elf_objects = []
+        scripts = []
+        system_sonames = set()
+        fedora_packages = set()
+
+        with tarfile.open(ctx["asset_file"], "r:*") as tar:
+            for member in tar.getmembers():
+                if member.isfile():
+                    f = tar.extractfile(member)
+                    if f is not None:
+                        data = f.read()
+                        if data.startswith(b"\x7fELF"):
+                            elf_info = parse_elf(data)
+                            elf_objects.append({
+                                "path": member.name,
+                                "needed": elf_info["needed"],
+                                "interpreter": elf_info.get("interpreter"),
+                            })
+                            for soname in elf_info["needed"]:
+                                system_sonames.add(soname)
+                                if soname in LIBRARIES:
+                                    fedora_packages.add(LIBRARIES[soname][1])
+                            interp = elf_info.get("interpreter")
+                            if interp in {"/lib64/ld-linux-x86-64.so.2", "/lib/ld-linux-aarch64.so.1"}:
+                                fedora_packages.add("glibc")
+                        elif data.startswith(b"#!") and (member.mode & 0o111):
+                            sh_info = shebang(data)
+                            if sh_info and sh_info.get("interpreter"):
+                                interp_name = sh_info["interpreter"]
+                                scripts.append({"path": member.name, "interpreter": interp_name})
+                                if interp_name in INTERPRETERS:
+                                    fedora_packages.add(INTERPRETERS[interp_name][1])
+
+        if not elf_objects:
+            raise ContractError("NO_ELF_OBJECTS", "Native package contains no ELF binaries")
+
+        derived_deps = sorted(fedora_packages)
+        dependency_classification = "native-tool-derived"
     else:
         # CLI projects: stage offline authenticated npm closure
         payload_root = ctx["payload_root"]
@@ -247,6 +289,7 @@ def build_rpm_candidate(
         closure_sha = npm_bundle(staged_nm, rpm_topdir / "SOURCES/npm-closure.tar.gz")
 
         derived_deps = ["nodejs >= 22"]
+        dependency_classification = "reviewed-policy"
 
     # Render RPM spec file
     spec_bytes = _render_rpm_spec(
@@ -339,9 +382,25 @@ def build_rpm_candidate(
                 "payload_digest_algo": parts[5],
             }
 
+    rpm_requires_receipt = None
+    if is_native:
+        rpm_requires_cmd = [
+            "rpm",
+            "-qp",
+            "--requires",
+            str(dest_rpm),
+        ]
+        rpm_requires_receipt = r.run(rpm_requires_cmd, cwd=scratch)
+        if rpm_requires_receipt.exit_code or not rpm_requires_receipt.stdout_text.strip():
+            raise ContractError("DEPENDENCY_DERIVATION", "Actual RPM requirement readback required")
+        policy_dependencies = list(derived_deps)
+        derived_deps = sorted(set(rpm_requires_receipt.stdout_text.splitlines()))
+
     # Execute rpmlint
     rpmlint_cmd = ["rpmlint", str(spec_path), str(dest_rpm)]
     rpmlint_receipt = r.run(rpmlint_cmd, cwd=scratch)
+    if rpmlint_receipt.exit_code:
+        raise ContractError("RPMLINT_FAILED", "Candidate RPM did not pass rpmlint")
 
     # Execute createrepo gzip --no-database
     createrepo_cmd = [
@@ -363,6 +422,39 @@ def build_rpm_candidate(
     rel_artifact_path = dest_rpm.relative_to(scratch).as_posix()
     validate_safe_relative_posix_path(rel_artifact_path)
 
+    extra_tools = [rpm_query_receipt]
+    if rpm_requires_receipt is not None:
+        extra_tools.append(rpm_requires_receipt)
+    extra_tools.extend([rpmlint_receipt, createrepo_receipt])
+
+    extra_ev: dict[str, Any] = {
+        "rpm_v6_identity": rpm_v6_identity,
+        "rpmlint_status": "executed",
+        "rpmlint_exit_code": rpmlint_receipt.exit_code,
+        "createrepo_flags": ["--no-database", "gzip"],
+        "native_preservation": {
+            "strip": False,
+            "debug": False,
+            "mangle_shebangs": False,
+            "build_id": False,
+        },
+    }
+    if is_native:
+        extra_ev["policy_dependencies"] = policy_dependencies
+        extra_ev["elf_dependencies"] = {
+            "objects": elf_objects,
+            "system_sonames": sorted(system_sonames),
+            "derived_packages": derived_deps,
+        }
+        if rpm_requires_receipt is not None:
+            extra_ev["rpm_query_evidence"] = {
+                "requires": [
+                    line.strip()
+                    for line in rpm_requires_receipt.stdout_text.splitlines()
+                    if line.strip()
+                ],
+            }
+
     derivation = create_derivation_record(
         artifact_relpath=rel_artifact_path,
         artifact_bytes=rpm_bytes,
@@ -375,19 +467,9 @@ def build_rpm_candidate(
         project_id=project_id,
         version=version,
         derived_dependencies=derived_deps,
-        extra_tools=[rpm_query_receipt, rpmlint_receipt, createrepo_receipt],
-        extra_evidence={
-            "rpm_v6_identity": rpm_v6_identity,
-            "rpmlint_status": "executed",
-            "rpmlint_exit_code": rpmlint_receipt.exit_code,
-            "createrepo_flags": ["--no-database", "gzip"],
-            "native_preservation": {
-                "strip": False,
-                "debug": False,
-                "mangle_shebangs": False,
-                "build_id": False,
-            },
-        },
+        extra_tools=extra_tools,
+        extra_evidence=extra_ev,
+        dependency_classification=dependency_classification,
     )
 
     manifest = {
@@ -405,6 +487,7 @@ def build_rpm_candidate(
         "package_sha256": digest(rpm_bytes),
         "package_size": len(rpm_bytes),
         "dependencies": derived_deps,
+        "dependency_classification": dependency_classification,
         "rpm_v6_identity": rpm_v6_identity,
         "derivation": derivation,
     }

@@ -18,7 +18,7 @@ macosx_11_0_arm64. Uninstall removes the distribution; the verified application 
 is separate user state and must be documented/tested. Released sidecar/native scenario-A
 and honest platform dependencies are mandatory, still not-run.
 
-Linux Nebular wheels remain withheld. A glibc floor alone cannot promise manylinux
+Production Linux Nebular wheels remain withheld. The hosted candidate-only path emits generic linux_x86_64/linux_aarch64 wheels, with custody marked candidate-policy-pending. It cannot claim manylinux or feed a production builder. A glibc floor alone cannot promise manylinux
 compatibility where GUI dependencies are outside the portability contract. A disclosed
 auditwheel deviation does not repair an inaccurate platform tag. The compatibility
 promise must be proved before a wheel is offered.
@@ -52,3 +52,23 @@ that path. Immediately reread project and version state before setup and publica
 An exact metadata URL 404 may mean absent; download errors, rate limits and DNS/TLS
 failures remain unknown. No secret or account credential belongs in evidence.
 [Pending publishers](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/).
+
+
+## CONT2 official documentation refresh and manual setup
+
+Official Trusted Publishing documentation was re-read read-only on 2026-10-03.
+Pending publishers can create projects on their first trusted publish; they do not reserve names. No publisher was created here.
+[Pending publisher creation](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/),
+[GitHub publisher setup](https://docs.pypi.org/trusted-publishers/adding-a-publisher/),
+[Security model](https://docs.pypi.org/trusted-publishers/security-model/).
+
+For each absent project, an authorized PyPI account must use the pending GitHub publisher form with these exact fields:
+
+| PyPI project name | Owner | Repository | Workflow filename | Environment |
+|---|---|---|---|---|
+| theme-forge-stellar-burst | Knowledge-Forge-AI | release-starport-9 | rs9-pypi-publish.yml | pypi |
+| theme-forge-stellar-loom | Knowledge-Forge-AI | release-starport-9 | rs9-pypi-publish.yml | pypi |
+| theme-forge-solar-sail | Knowledge-Forge-AI | release-starport-9 | rs9-pypi-publish.yml | pypi |
+| theme-forge-nebular-fusion | Knowledge-Forge-AI | release-starport-9 | rs9-pypi-publish.yml | pypi |
+
+For an existing project, a project owner configures the same GitHub publisher on its Publishing page. The protected pypi environment and dedicated production workflow are future manual/preflight work. The candidate workflow has no OIDC permission or publisher binding.

@@ -9,7 +9,8 @@ from urllib.request import BaseHandler, HTTPRedirectHandler, ProxyHandler, Reque
 from rs9.errors import ContractError
 
 HOSTS = frozenset({"api.github.com", "github.com", "objects.githubusercontent.com",
-                   "release-assets.githubusercontent.com", "raw.githubusercontent.com", "registry.npmjs.org"})
+                   "release-assets.githubusercontent.com", "raw.githubusercontent.com", "registry.npmjs.org",
+                   "releases.nixos.org"})
 
 
 def validate_https(url):

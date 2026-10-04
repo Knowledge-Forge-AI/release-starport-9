@@ -84,7 +84,7 @@ class SigningFixture:
         self,
         *,
         scratch_dir: str | Path | None = None,
-        user_id: str = "RS9 Fixture Signer <fixture@example.com>",
+        user_id: str = "RS9 NON-PRODUCTION CANDIDATE FIXTURE <nonproduction@invalid>",
         gpg_binary: str | None = None,
     ) -> None:
         if gpg_binary is not None:
