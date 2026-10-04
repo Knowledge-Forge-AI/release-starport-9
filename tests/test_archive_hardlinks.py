@@ -295,5 +295,6 @@ class ArchiveHardlinkTests(unittest.TestCase):
         self.assertIn("manifest_sha256", result)
         self.assertEqual(len(result["manifest_sha256"]), 64)
         self.assertEqual(result["commands"], {
-            "app": {"path": "app/bin/app", "sha256": result["members"][0]["sha256"]}
+            "app": {"path": "app/bin/app", "sha256": result["members"][0]["sha256"],
+                    "mode": result["members"][0]["mode"], "size": result["members"][0]["size"]}
         })

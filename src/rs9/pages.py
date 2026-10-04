@@ -460,24 +460,61 @@ def _zstd_decode(data: bytes, limit: int) -> bytes | None:
     tool = shutil.which("zstd")
     if tool is None:
         return None
+
+    def _feed(stdin):
+        try:
+            stdin.write(data)
+        except (BrokenPipeError, OSError):
+            pass
+        finally:
+            try:
+                stdin.close()
+            except (BrokenPipeError, OSError):
+                pass
+
     try:
-        child = subprocess.Popen([tool, "-dc", "-q"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                 stderr=subprocess.DEVNULL)
-        feeder = threading.Thread(target=lambda: (child.stdin.write(data), child.stdin.close()), daemon=True)
-        feeder.start()
-        out = bytearray()
-        while True:
-            chunk = child.stdout.read(1024 * 1024)
-            if not chunk:
-                break
-            out += chunk
-            if len(out) > limit:
-                child.kill()
-                child.wait()
+        with subprocess.Popen(
+            [tool, "-dc", "-q"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        ) as child:
+            feeder = threading.Thread(target=_feed, args=(child.stdin,), daemon=True)
+            feeder.start()
+            out = bytearray()
+            limit_exceeded = False
+            read_complete = False
+            try:
+                while True:
+                    chunk = child.stdout.read(1024 * 1024)
+                    if not chunk:
+                        read_complete = True
+                        break
+                    out += chunk
+                    if len(out) > limit:
+                        limit_exceeded = True
+                        break
+            finally:
+                if not read_complete:
+                    child.kill()
+                feeder.join(timeout=30)
+                if feeder.is_alive():
+                    child.kill()
+                    feeder.join()
+                try:
+                    child.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    # EOF does not establish process exit. Reap before the
+                    # context manager performs its otherwise unbounded wait.
+                    child.kill()
+                    child.wait()
+                    raise
+
+            if limit_exceeded:
                 raise ContractError("PAGES_LIMIT", "Decoded artifact byte limit exceeded during privacy scan")
-        feeder.join(timeout=30)
-        return bytes(out) if child.wait(timeout=30) == 0 else None
-    except (OSError, subprocess.SubprocessError, BrokenPipeError):
+
+            return bytes(out) if child.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError):
         return None
 
 

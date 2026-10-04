@@ -6,7 +6,7 @@ import re
 import stat
 from urllib.parse import quote
 
-from rs9.archives import inspect_archive
+from rs9.command_policies import inspect_selected_archive, validate_command_policy
 from rs9.errors import ContractError
 from rs9.github import PublicClient
 from rs9.releases import safe_tag
@@ -92,7 +92,7 @@ def validate_selection(selection):
         if not isinstance(rows, list) or len(rows) > 256 or (kind == "payload_assets" and not rows):
             raise ContractError("INVALID_SELECTION", "Explicit asset selections required")
         for row in rows:
-            allowed = {"id", "name", "format", "commands", "launchers", "platforms", "checksum_covered"} if kind == "payload_assets" else {"role", "name", "checksum_covered"}
+            allowed = {"id", "name", "format", "commands", "launchers", "platforms", "checksum_covered", "command_policy"} if kind == "payload_assets" else {"role", "name", "checksum_covered"}
             if not isinstance(row, dict) or set(row) - allowed:
                 raise ContractError("INVALID_SELECTION", "Closed selected asset required")
             validate_safe_basename(row.get("name"))
@@ -105,6 +105,7 @@ def validate_selection(selection):
             if type(row.get("checksum_covered", True)) is not bool:
                 raise ContractError("INVALID_SELECTION", "Checksum coverage must be explicit boolean")
             if kind == "payload_assets":
+                validate_command_policy(row)
                 if row.get("format") != "tar.gz":
                     raise ContractError("UNSUPPORTED_ARCHIVE", "Bounded tar.gz inputs required")
                 for field in ("commands", "launchers"):
@@ -334,12 +335,15 @@ def _authenticate_release(selection, evidence):
             raise ContractError("CHECKSUM_MISMATCH", "Present checksum disagrees even without required coverage")
     archives, manifests, inputs = {}, {}, []
     for asset in sorted(selection["payload_assets"], key=lambda row: row["id"]):
-        commands = {**asset.get("commands", {}), **{"launcher:" + k: v for k, v in asset.get("launchers", {}).items()}}
         path = root / "assets" / asset["name"]
-        manifest = inspect_archive(path, commands, max_members=limits["members"], max_member_bytes=limits["member_bytes"],
-                                   max_total_bytes=limits["archive_bytes"], max_ratio=limits["ratio"])
+        policy = validate_command_policy(asset)
+        try:
+            manifest = inspect_selected_archive(path, asset, limits)
+        except ContractError as error:
+            raise error.with_details(asset=asset["id"]) from None
         archives[asset["id"]], manifests[asset["id"]] = path, manifest
         inputs.append({**metadata[asset["name"]], "id": asset["id"], "platforms": sorted(asset.get("platforms", [])),
+                       "command_policy": policy,
                        "root": manifest["root"], "commands": {k: v for k, v in manifest["commands"].items() if not k.startswith("launcher:")},
                        "launchers": {k[9:]: v for k, v in manifest["commands"].items() if k.startswith("launcher:")},
                        "payload_manifest_sha256": manifest["manifest_sha256"], "member_count": len(manifest["members"])})

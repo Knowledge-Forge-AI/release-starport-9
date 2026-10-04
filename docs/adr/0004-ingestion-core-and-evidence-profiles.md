@@ -1,6 +1,6 @@
 # ADR 0004: Ingestion core and evidence profiles
 
-Status: decided; implemented in `rs9.release_core` and `rs9.records`. Replaces the composite Foundation 2 ingestion approach with generic release capture and closed evidence profiles. No live publication or publisher claims authorized.
+Status: decided; implemented in `rs9.release_core`, `rs9.records`, `rs9.command_policies`, and `rs9.npm_commands`. Replaces the composite Foundation 2 ingestion approach with generic release capture and closed evidence profiles. No live publication or publisher claims authorized.
 
 ## Context
 
@@ -17,8 +17,8 @@ Several critical architectural issues emerged from that prototype:
 ### 1. Canonical generic release core (`rs9.release_core`)
 
 Extract reusable, bounded release capture and byte authentication into `src/rs9/release_core.py`:
-- **Selection contract (`rs9.release-selection.v1alpha1`)**: Explicit repository (`Owner/Repo`), Git tag, prerelease policy (`allow` or `reject`), checksums asset name, payload asset list, evidence asset list, source file paths, and optional bounded limits.
-- **Release record contract (`rs9.release-record.v1alpha1`)**: Cryptographically binds the numeric GitHub repository ID, numeric release ID, tag object chain, resolved commit SHA, tree SHA, regular source file blobs (recomputed `blob <len>\0<data>` SHA-1), release asset sizes and GitHub SHA-256 digests, independent SHA256SUMS verification for every covered asset, archive root names, command paths, launcher paths, and canonical archive payload manifest hashes.
+- **Selection contract (`rs9.release-selection.v1alpha1`)**: Explicit repository (`Owner/Repo`), Git tag, prerelease policy (`allow` or `reject`), checksums asset name, payload asset list with optional additive `command_policy`, evidence asset list, source file paths, and optional bounded limits.
+- **Release record contract (`rs9.release-record.v1alpha1`)**: Cryptographically binds the numeric GitHub repository ID, numeric release ID, tag object chain, resolved commit SHA, tree SHA, regular source file blobs (recomputed `blob <len>\0<data>` SHA-1), release asset sizes and GitHub SHA-256 digests, independent SHA256SUMS verification for every covered asset, archive root names, command records (`path`, `sha256`, `size`, `mode`), launcher paths, and canonical archive payload manifest hashes.
 - **Strict byte limits**: Enforces positive bounded limits (`DEFAULT_LIMITS`: 1 GB asset size, 2 GB total capture, 16 MB source files, 20,000 archive members, 256 MB member size, 1 GB decompressed archive, 1000:1 compression ratio). Tenant configurations may only narrow these bounds.
 
 ### 2. Unconditional archive hardlink rejection
@@ -71,11 +71,22 @@ Read-only genericity and byte-compatibility evidence is recorded in the [Foundat
 
 The genuine license discrepancy in Nebular 0.6.1 between the published npm package (`AGPL-3.0-or-later OR Commercial`) and the repository source/archives (`AGPL-3.0-or-later`) remains open and unresolved. RS9 faithfully records both observations without inventing an artificial resolution. Live publication remains blocked until tenant authorities resolve the discrepancy.
 
+### 8. Profile-owned command execution semantics
+
+Generic archive inspection binds each command's regular member path, hash, size and mode. The closed `rs9.command_policies` dispatcher selects native or npm semantics; no tenant hook is accepted. Native executables and launchers retain `mode & 0o111`. The npm profile authenticates `package/package.json`, exact declared bin targets and Node shebangs at capture and profile evaluation, including direct capture callers. Undeclared bins remain recorded and unexposed.
+
+[Exact asset inspection](../../evidence/live1/hosted-repair-command-report.json) establishes Burst's published `0644` bin modes. The [npm bin contract](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#bin) installs command links or shims, and [npm bin-links](https://github.com/npm/bin-links/blob/main/lib/fix-bin.js) materializes executable permissions. RS9 package and wheel wrappers invoke Node explicitly, so raw executable mode is recorded rather than required for npm. The installed-wheel regression verifies this execution model. Profile/policy disagreement fails closed. New generic audit fields are additive in v1alpha1; the legacy desktop shadow projection retains its path/hash command records.
+
+The hosted pipeline retains a bounded command report on success and failure, together with sanitized command error identifiers. Native paths containing spaces remain visible; credentials and absolute host paths are dropped.
+
 ## Consequences
 
 - Ingestion core is reusable across all tenants without importing tenant-specific heuristics.
 - Security posture is hardened against link-based archive attacks and serialized token replay attacks.
 - Release authentication requires real in-process bytes, preventing synthetic or forged JSON records from bypassing publication gates.
+- Command authentication verifies both native and npm execution models cleanly without compromising security bounds.
+- Diagnostic visibility is retained even when pipeline stages fail, while sanitization prevents secret or local host path leakage.
+- Testing is hermetic and resilient across environments without assuming external GPG infrastructure or leaking process resources.
 - No live compatibility or publisher claims are made without captured and independently authenticated bytes.
 
 ## Local Links

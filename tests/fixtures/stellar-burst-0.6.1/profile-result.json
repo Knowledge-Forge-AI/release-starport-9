@@ -1,7 +1,7 @@
 {
-  "intent_sha256": "1ad83a9baa32e3573b041d60abf54225b9371a29fb9302e47dcadd4d0e406ce7",
+  "intent_sha256": "3feb03b29ef41aa53534a6d967497f50f480be335cbb1d779c6a5d2eaaef79ed",
   "profile": "npm-package-archive.v1alpha1",
-  "release_record_sha256": "59c89bd48c554f4296206cdb93a4f24c7cc4969653d2277fe27fd45459c5607c",
+  "release_record_sha256": "6035650d88f3ce61b1e6eef578bfdabf8deb6a4b33b1912ba010fd6a17bbf36f",
   "schema": "rs9.evidence-profile-result.v1alpha1",
   "sections": {
     "legal_files": [
@@ -32,18 +32,27 @@
     "package": {
       "commands": [
         {
+          "execution": "node-explicit",
+          "mode": 420,
           "name": "tfsb",
           "path": "package/dist/cli.js",
-          "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9"
+          "raw_mode_executable": false,
+          "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+          "size": 74258
         },
         {
+          "execution": "node-explicit",
+          "mode": 420,
           "name": "tfsb-studio-service",
           "path": "package/dist/service-protocol/server-cli.js",
-          "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17"
+          "raw_mode_executable": false,
+          "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+          "size": 298
         }
       ],
       "name": "@knowledge-forge-ai/theme-forge-stellar-burst",
       "payload_manifest_sha256": "b47cf89dd8610d2167bf10c486a51f1889ffb52dc428cecc32a7a1cb7ddafe38",
+      "undeclared_bins": [],
       "version": "0.6.1"
     },
     "provenance_sha256": "8a3d209168b6d3cd701fec648051e44b18e02fe6c9f1beb69230bc366d9f88b3"

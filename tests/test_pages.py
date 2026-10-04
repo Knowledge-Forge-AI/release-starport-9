@@ -6,9 +6,14 @@ import lzma
 import os
 from pathlib import Path
 import struct
+import subprocess
 import tarfile
+import sys
 import tempfile
 import unittest
+import warnings
+import gc
+from unittest.mock import patch
 
 from rs9.errors import ContractError
 from rs9.pages import (
@@ -18,6 +23,7 @@ from rs9.pages import (
     CATEGORY_INDEX,
     CATEGORY_PUBLIC_KEY,
     MERKLE_ALGORITHM,
+    _zstd_decode,
     _zstd_frames_valid,
     check_no_secret_key_packets,
     classify_pages_path,
@@ -573,6 +579,71 @@ class FormatAwareBinaryScanTests(unittest.TestCase):
         self.assertEqual(evidence["format"], "zstd")
         # Without a reviewed decoder the stream is flagged instead of silently treated as scanned.
         self.assertEqual(evidence["complete"], not evidence["unscanned_streams"])
+
+    def test_zstd_decode_resource_management_normal_and_limit(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            script = Path(tmp_dir) / "zstd"
+            script.write_text(
+                f"#!{sys.executable}\n"
+                "import sys\n"
+                "raw = sys.stdin.buffer.read(16)\n"
+                "if b'overflow' in raw:\n"
+                "    sys.stdout.buffer.write(b'X' * 50000)\n"
+                "else:\n"
+                "    sys.stdout.buffer.write(b'decoded-payload')\n"
+            )
+            script.chmod(0o755)
+
+            with patch("shutil.which", return_value=str(script)), \
+                 patch("importlib.import_module", side_effect=ImportError("No native zstd")):
+
+                # Normal decode: within limit, context management closes resources without ResourceWarning
+                with warnings.catch_warnings(record=True) as recorded:
+                    warnings.simplefilter("always", ResourceWarning)
+                    decoded = _zstd_decode(b"normal-data", limit=1000)
+                    self.assertEqual(decoded, b"decoded-payload")
+                    gc.collect()
+                    resource_warnings = [w for w in recorded if issubclass(w.category, ResourceWarning)]
+                    self.assertEqual(resource_warnings, [])
+
+                # Limit exceeded: feeder owns stdin, broken pipe handled, feeder joined before exit, kill on limit
+                with warnings.catch_warnings(record=True) as recorded:
+                    warnings.simplefilter("always", ResourceWarning)
+                    with self.assertRaises(ContractError) as caught:
+                        _zstd_decode(b"overflow-data" + b"X" * (2 * 1024 ** 2), limit=100)
+                    self.assertEqual(caught.exception.code, "PAGES_LIMIT")
+                    gc.collect()
+                    resource_warnings = [w for w in recorded if issubclass(w.category, ResourceWarning)]
+                    self.assertEqual(resource_warnings, [])
+
+    def test_zstd_decoder_that_closes_stdout_then_hangs_is_killed_and_reaped(self):
+        real_popen = subprocess.Popen
+        children = []
+        def spawn(*args, **kwargs):
+            child = real_popen(*args, **kwargs)
+            real_wait = child.wait
+            def bounded_wait(timeout=None):
+                return real_wait(timeout=0.1 if timeout is not None else None)
+            child.wait = bounded_wait
+            children.append(child)
+            return child
+        with tempfile.TemporaryDirectory() as tmp:
+            script = Path(tmp) / "zstd"
+            script.write_text(f"#!{sys.executable}\nimport os, sys, time\n"
+                              "os.close(1)\nsys.stdin.buffer.read()\ntime.sleep(60)\n")
+            script.chmod(0o755)
+            with patch("rs9.pages.shutil.which", return_value=str(script)), \
+                 patch("rs9.pages.subprocess.Popen", side_effect=spawn), \
+                 patch("rs9.pages.importlib.import_module", side_effect=ImportError), \
+                 warnings.catch_warnings(record=True) as recorded:
+                warnings.simplefilter("always", ResourceWarning)
+                self.assertIsNone(_zstd_decode(b"input", limit=1000))
+                self.assertEqual(len(children), 1)
+                self.assertLess(children[0].returncode, 0)
+                self.assertTrue(children[0].stdin.closed)
+                self.assertTrue(children[0].stdout.closed)
+                gc.collect()
+                self.assertEqual([w for w in recorded if issubclass(w.category, ResourceWarning)], [])
 
     def test_clean_openpgp_framing_requires_exact_packet_sequence(self):
         self.assertEqual(clean_openpgp_framing(SECRET_PACKET), [5])
