@@ -6,7 +6,44 @@ from pathlib import Path
 
 from rs9.errors import ContractError
 from rs9.hosted_custody import provenance, verify_set
+from rs9.product_classes import get_product_class, supported_architectures, extract_package_arch
 from rs9.scratch import canonical
+
+LINUX_WHEEL_PROMOTION_BLOCKER = "linux-wheel-production-promotion-compatibility-unproven"
+
+
+def validate_product_architectures(lane, files):
+    """Reject custody filenames contradicting the product's qualified architecture."""
+    family, system = lane["lane"], lane["system"]
+    if family not in {"wheels", "pacman", "rpm", "deb"}:
+        return
+    for product in lane.get("required_products", []):
+        product_class = get_product_class(product)
+        prefix = product.replace("-", "_") + "-" if family == "wheels" else product + ("_" if family == "deb" else "-")
+        names = [Path(r["path"]).name for r in files if r.get("kind") == "custody"
+                 and r.get("promotion") != "fixture-test-only" and Path(r["path"]).name.startswith(prefix)]
+        for name in names:
+            if family == "wheels":
+                tag = name.removesuffix(".whl").rsplit("-", 1)[-1]
+                valid = (tag == "any" if product_class == "pure-js-cli" else
+                         tag.startswith("macosx_") and tag.endswith("_arm64") if system == "aarch64-darwin" else
+                         tag == {"x86_64-linux": "linux_x86_64", "aarch64-linux": "linux_aarch64"}.get(system))
+            else:
+                expected = (next(iter(supported_architectures(product, family))) if product_class == "pure-js-cli" else
+                            system if family == "deb" else {"x86_64-linux": "x86_64", "aarch64-linux": "aarch64"}.get(system))
+                valid = extract_package_arch(name) == expected
+            if not valid:
+                raise ContractError("CUSTODY_ARCHITECTURE", "Product custody has an unqualified package architecture")
+
+
+def promotion_blockers(lane, receipt):
+    values = receipt.get("production_promotion_blockers", [])
+    if not isinstance(values, list) or any(not isinstance(v, str) for v in values):
+        raise ContractError("HOSTED_POLICY", "Production promotion blockers must be a list of tokens")
+    if (lane["lane"] == "wheels" and lane["system"].endswith("linux")
+            and LINUX_WHEEL_PROMOTION_BLOCKER not in values):
+        raise ContractError("HOSTED_POLICY", "Linux candidate wheels must retain the production compatibility blocker")
+    return values
 
 
 def contract(repository):
@@ -38,7 +75,7 @@ def gate_blockers(lane, receipt):
 
 def summarize(repository, inputs, output):
     lanes = required(repository)
-    reasons, receipts, manifests = [], [], []
+    reasons, receipts, manifests, promotion = [], [], [], []
     jobs = json.loads(os.environ.get("RS9_JOB_CONCLUSIONS", "{}"))
     expected_jobs = set(contract(repository)["required_jobs"]) - {"summary"}
     if set(jobs) != expected_jobs or any(row.get("result") != "success" for row in jobs.values()):
@@ -58,6 +95,7 @@ def summarize(repository, inputs, output):
             reasons.extend(lane["artifact_name"] + ":" + r for r in gate_blockers(lane, receipt))
             if lane.get("custody_required") and not any(r["kind"] == "custody" for r in manifest["files"]):
                 reasons.append(lane["artifact_name"] + ":missing-custody-objects")
+            validate_product_architectures(lane, manifest["files"])
             for product in lane.get("required_products", []):
                 needle = product.replace("-", "_") if lane["lane"] == "wheels" else product
                 if not any(Path(r["path"]).name.startswith(needle + "-" if lane["lane"] != "deb" else needle + "_")
@@ -66,6 +104,7 @@ def summarize(repository, inputs, output):
             if receipt.get("execution_error"):
                 reasons.append(lane["artifact_name"] + ":execution-failed")
             reasons.extend(receipt.get("policy_blockers", []))
+            promotion.extend(promotion_blockers(lane, receipt))
         except (ContractError, OSError, ValueError, KeyError) as error:
             reasons.append(lane["artifact_name"] + ":" + (error.code if isinstance(error, ContractError) else "missing-or-invalid-artifact"))
     if len(auth_values) != 1 or None in auth_values:
@@ -85,7 +124,9 @@ def summarize(repository, inputs, output):
               "adoptable": expected["event"] == "push" and expected["ref"] == "refs/heads/main" and expected["attempt"] == 1,
               "qualification_verdict": "qualified" if qualified else "not-qualified",
               "lanes_executed_ok": len(receipts) == len(lanes) and all(not r.get("execution_error") for r in receipts),
-              "blocking_reasons": sorted(set(reasons)), "receipts": receipts, "artifact_manifests": manifests}
+              "blocking_reasons": sorted(set(reasons)), "receipts": receipts, "artifact_manifests": manifests,
+              "production_promotion_blockers": sorted(set(promotion)),
+              "production_promotion_blocked": bool(promotion)}
     record["job_conclusions"] = {key: row.get("result") for key, row in jobs.items()}
     raw = canonical(record)
     if len(raw) > 16 * 1024 ** 2:
@@ -118,13 +159,19 @@ def validate_summary(summary, repository, commit):
             raise ContractError("HOSTED_GATES", "Missing gate or mixed receipt provenance")
         if row.get("execution_error") or row.get("policy_blockers") or row.get("production_enabled") is not False:
             raise ContractError("HOSTED_GATES", "Receipt has unresolved failures or publication authority")
+        promotion_blockers(lane, row)
         manifest = next(m for m in manifests if (m["lane"],m["system"]) == (row["lane"],row["system"]))
+        validate_product_architectures(lane, manifest.get("files", []))
         receipt_name = row["lane"] + "-" + row["system"] + ".json"
         if (any(manifest.get(k) != record[k] for k in expected)
                 or manifest.get("qualification_receipt_hashes") != {receipt_name: hashlib.sha256(canonical(row)).hexdigest()}
                 or manifest.get("production_enabled") is not False or manifest.get("publication_authority") is not False
                 or not manifest.get("files")):
             raise ContractError("HOSTED_CUSTODY", "Manifest and receipt binding differ")
+    promotion = sorted({v for row in receipts for v in promotion_blockers(row, row)})
+    if (record.get("production_promotion_blockers") != promotion
+            or record.get("production_promotion_blocked") is not bool(promotion)):
+        raise ContractError("HOSTED_POLICY", "Summary must preserve production promotion blockers")
     if record.get("job_conclusions") != {key:"success" for key in set(contract(repository)["required_jobs"]) - {"summary"}}:
         raise ContractError("HOSTED_JOBS", "Source-required workflow job conclusions missing")
     if (record.get("production_enabled") is not False or record.get("publication_authority") is not False

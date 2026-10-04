@@ -13,7 +13,7 @@ from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
 VERSION_RE = re.compile(r"^[0-9]+(\.[0-9]+)*([a-zA-Z0-9_.-]*)$")
 NEBULAR_TAG_RE = re.compile(r"^macosx_[0-9]+_[0-9]+_arm64$")
 BURST_TAG_RE = re.compile(
-    r"^(macosx_[0-9]+_[0-9]+_(arm64|x86_64)|manylinux_[0-9]+_[0-9]+_(x86_64|aarch64)|manylinux[0-9]+_(x86_64|aarch64)|musllinux_[0-9]+_[0-9]+_(x86_64|aarch64))$"
+    r"^(macosx_[0-9]+_[0-9]+_arm64|linux_(x86_64|aarch64))$"
 )
 SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -285,7 +285,14 @@ def build_wheel(
     if content_identity_sha256 is not None:
         provenance_data["content_identity_sha256"] = content_identity_sha256
     if extra_provenance is not None:
-        if set(extra_provenance) - {"npm_dependencies", "fixture_only"}:
+        allowed_extra = {
+            "npm_dependencies", "fixture_only", "platform_specific", "target_system",
+            "target_native_addon", "foreign_prebuilds", "downstream_transform", "native_loader",
+            "production_promotion", "linux_compatibility", "candidate_only",
+            "promotability", "manylinux_proven", "musllinux_proven", "linux_compatible",
+            "linux_compatibility_proven", "linux_compatibility_status",
+        }
+        if set(extra_provenance) - allowed_extra:
             raise ContractError("PROVENANCE_REQUIRED", "Additional provenance cannot replace release bindings")
         provenance_data.update(extra_provenance)
 

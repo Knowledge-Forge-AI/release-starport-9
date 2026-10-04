@@ -4,8 +4,8 @@ Executes real host rpmbuild, rpm, rpmlint, and createrepo:
 - Preserves native binaries: no strip, no debug package, no shebang mangling, no build-id links.
 - Collects actual RPM v6 package identities and rpmlint receipts.
 - Generates repository metadata using createrepo gzip --no-database.
-- CLI projects enforce arch 'noarch' and stage offline authenticated npm closure or fail closed.
-- Native project (Nebular) enforces arch 'x86_64' or 'aarch64' for Fedora 43.
+- Pure JS CLI projects enforce arch 'noarch' with authenticated offline npm closure.
+- Native Node CLI and native desktop products enforce arch 'x86_64' or 'aarch64'.
 - Native prerequisites absent -> explicit unavailable, never fabricated files.
 - Subprocess derivation records bound to artifact, tool, container, and source.
 """
@@ -17,6 +17,7 @@ import json
 import os
 from pathlib import Path
 import posixpath
+import re
 import shutil
 from typing import Any, Mapping
 
@@ -63,6 +64,7 @@ def _render_rpm_spec(
     root: str,
     d_sha: str = "",
     i_sha: str = "",
+    is_native_node: bool = False,
 ) -> bytes:
     rpm_sum = summary.replace("%", "%%")
     reqs = "\n".join(f"Requires: {d}" for d in deps)
@@ -95,6 +97,19 @@ def _render_rpm_spec(
 
     cmd_files = "\n".join(f"/usr/bin/{c['name']}" for c in cmds)
     arch_line = f"BuildArch: noarch" if arch == "noarch" else f"ExclusiveArch: {arch}"
+    f2_excludes = ""
+    if is_native_node:
+        from rs9.burst_native import BURST_CLOSED_PREBUILDS
+        from rs9.hosted_platforms import platform_contract
+        from rs9.product_classes import packaging_system_for_arch
+        target_key = platform_contract(packaging_system_for_arch("rpm", arch)).native_prebuild_key
+        # RPM uses POSIX ERE. Exclude only the three authenticated foreign files;
+        # the target prebuild remains subject to normal dependency generation.
+        foreign_paths = ["/usr/lib/" + name + "/" + path.removeprefix("package/")
+                         for key, path in sorted(BURST_CLOSED_PREBUILDS.items()) if key != target_key]
+        pattern = "^(" + "|".join(re.escape(path) for path in foreign_paths) + ")$"
+        f2_excludes = (f"%global __requires_exclude_from {pattern}\n"
+                       f"%global __provides_exclude_from {pattern}\n")
 
     return (
         f"# RS9 LIVE1 RPM spec candidate from exact authenticated release capture.\n"
@@ -104,6 +119,7 @@ def _render_rpm_spec(
         f"%undefine __brp_mangle_shebangs\n"
         f"%global _build_id_links none\n"
         f"%global __os_install_post %{{nil}}\n"
+        f"{f2_excludes}"
         f"Name: {name}\n"
         f"Version: {version}\n"
         f"Release: {revision}%{{?dist}}\n"
@@ -198,7 +214,11 @@ def build_rpm_candidate(
     desktop_sha = icon_sha = ""
     cmds: list[dict[str, str]] = []
 
-    if is_native:
+    is_native_desktop = ctx.get("is_native_desktop", False)
+    is_native_node_cli = ctx.get("is_native_node_cli", False)
+    is_pure_js_cli = ctx.get("is_pure_js_cli", not is_native)
+
+    if is_native_desktop:
         payload = ctx["payload"]
         launchers = payload.get("launchers", {})
         l_raw = launchers.get("tfnf", {}).get("path")
@@ -275,8 +295,66 @@ def build_rpm_candidate(
 
         derived_deps = sorted(fedora_packages)
         dependency_classification = "native-tool-derived"
+    elif is_native_node_cli:
+        # Native node CLI (Burst): stage offline authenticated npm closure
+        payload_root = ctx["payload_root"]
+        cmd_dict = ctx["payload"].get("commands", {}) or intent.get("commands", {})
+        cmds = [
+            {"name": k, "path": v["path"][len(payload_root) + 1:]}
+            for k, v in sorted(cmd_dict.items())
+        ]
+        staged_nm = rpm_topdir / "staged_node_modules"
+        stage_offline_npm_closure(capture, project_id, offline_npm_archives, staged_nm)
+        from rs9.build_native import npm_bundle
+        closure_sha = npm_bundle(staged_nm, rpm_topdir / "SOURCES/npm-closure.tar.gz")
+
+        # Dependency derivation strictly targets matching prebuild; foreign exact closed prebuilds remain inert
+        target_prebuild_path = (
+            ctx.get("burst_prebuild_info", {}).get("target_path")
+            if ctx.get("burst_prebuild_info")
+            else (
+                "package/native/directory-snapshot/prebuilds/linux-x64-gnu/native-addon-posix-openat-v1.node"
+                if matched_arch == "x86_64"
+                else "package/native/directory-snapshot/prebuilds/linux-arm64-gnu/native-addon-posix-openat-v1.node"
+            )
+        )
+        from rs9.dependencies import LIBRARIES
+        from rs9.elf import parse_elf
+        import tarfile
+
+        elf_objects = []
+        system_sonames = set()
+        fedora_packages = {"nodejs >= 22"}
+
+        with tarfile.open(ctx["asset_file"], "r:*") as tar:
+            found_target = False
+            for member in tar.getmembers():
+                if member.isfile() and (member.name == target_prebuild_path or member.name.endswith("/" + target_prebuild_path) or target_prebuild_path.endswith(member.name)):
+                    found_target = True
+                    f = tar.extractfile(member)
+                    if f is not None:
+                        data = f.read()
+                        if data.startswith(b"\x7fELF"):
+                            elf_info = parse_elf(data)
+                            elf_objects.append({
+                                "path": member.name,
+                                "needed": elf_info["needed"],
+                                "interpreter": elf_info.get("interpreter"),
+                            })
+                            for soname in elf_info["needed"]:
+                                system_sonames.add(soname)
+                                if soname in LIBRARIES:
+                                    fedora_packages.add(LIBRARIES[soname][1])
+                            interp = elf_info.get("interpreter")
+                            if interp in {"/lib64/ld-linux-x86-64.so.2", "/lib/ld-linux-aarch64.so.1"}:
+                                fedora_packages.add("glibc")
+            if not found_target or not elf_objects:
+                raise ContractError("MISSING_ASSET", f"Matching native prebuild missing from tarball: {target_prebuild_path}")
+
+        derived_deps = sorted(fedora_packages)
+        dependency_classification = "native-tool-derived"
     else:
-        # CLI projects: stage offline authenticated npm closure
+        # Pure JS CLI projects: stage offline authenticated npm closure; pure JS retain no native checks
         payload_root = ctx["payload_root"]
         cmd_dict = ctx["payload"].get("commands", {}) or intent.get("commands", {})
         cmds = [
@@ -303,13 +381,14 @@ def build_rpm_candidate(
         matched_arch,
         derived_deps,
         cmds,
-        is_native,
+        is_native_desktop,
         ctx["payload_root"],
         desktop_sha,
         icon_sha,
+        is_native_node=is_native_node_cli,
     )
     spec_path = rpm_topdir / "SPECS" / f"{project_id}.spec"
-    if not is_native:
+    if not is_native_desktop:
         text = spec_bytes.decode()
         text = text.replace("Source0:", "Source3: npm-closure.tar.gz\nSource0:", 1)
         text = text.replace("%build\n", "printf '%s  %s\\n' '" + closure_sha + "' '%{SOURCE3}' | sha256sum -c -\ntar -xzf '%{SOURCE3}'\n\n%build\n", 1)
@@ -381,6 +460,9 @@ def build_rpm_candidate(
                 "payload_digest": parts[4],
                 "payload_digest_algo": parts[5],
             }
+    if (rpm_v6_identity.get("name") != project_id or rpm_v6_identity.get("version") != version
+            or rpm_v6_identity.get("arch") != matched_arch):
+        raise ContractError("INVALID_ARCHITECTURE", "Actual RPM metadata differs from the qualified product architecture")
 
     rpm_requires_receipt = None
     if is_native:
@@ -395,6 +477,16 @@ def build_rpm_candidate(
             raise ContractError("DEPENDENCY_DERIVATION", "Actual RPM requirement readback required")
         policy_dependencies = list(derived_deps)
         derived_deps = sorted(set(rpm_requires_receipt.stdout_text.splitlines()))
+        if is_native_node_cli:
+            allowed_sonames = set(system_sonames)
+            for requirement in derived_deps:
+                base = requirement.split("(", 1)[0]
+                if not (base in allowed_sonames or base == "rtld"
+                        or requirement.startswith("rpmlib(")
+                        or requirement in {"/bin/sh", "/usr/bin/env"}
+                        or re.fullmatch(r"nodejs(?:\s*(?:>=|=)\s*[0-9][0-9.]*)?", requirement)
+                        or requirement in policy_dependencies):
+                    raise ContractError("DEPENDENCY_DERIVATION", "RPM requirement lies outside the target prebuild closure")
 
     # Execute rpmlint
     rpmlint_cmd = ["rpmlint", str(spec_path), str(dest_rpm)]
@@ -478,6 +570,7 @@ def build_rpm_candidate(
         "qualification": "unqualified-candidate",
         "can_publish": False,
         "adapter": "rpm",
+        "package_class": ctx["product_class"],
         "project": project_id,
         "version": version,
         "revision": revision,

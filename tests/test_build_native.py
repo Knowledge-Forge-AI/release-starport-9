@@ -334,7 +334,92 @@ class BuildNativeCommonTests(unittest.TestCase):
         )
         with self.assertRaises(ContractError) as caught:
             build_pacman_candidate(capture, intent, "any", scratch, offline_npm_archives=offline_npm, runner=runner)
-        self.assertEqual(caught.exception.code, "BUILD_FAILED")
+        self.assertEqual(caught.exception.code, "INVALID_ARCHITECTURE")
+
+    def test_burst_rpm_plan_f2_and_architecture_validation(self):
+        from rs9.burst_native import BURST_CLOSED_PREBUILDS
+        from tests.test_burst_platform_wheel import make_synthetic_elf, make_synthetic_macho
+
+        prebuild_binaries = {
+            "darwin-arm64": make_synthetic_macho("arm64", 13, 0),
+            "darwin-x64": make_synthetic_macho("x86_64", 15, 0),
+            "linux-arm64-gnu": make_synthetic_elf("aarch64"),
+            "linux-x64-gnu": make_synthetic_elf("x86_64"),
+        }
+        extra_entries = [
+            (path.removeprefix("package/"), prebuild_binaries[key])
+            for key, path in BURST_CLOSED_PREBUILDS.items()
+        ]
+        capture, intent, offline_npm = create_cli_fixture(
+            self.root / "burst_rpm_input",
+            product="theme-forge-stellar-burst",
+            extra_asset_entries=extra_entries,
+        )
+        scratch = self.root / "scratch_burst_rpm"
+        scratch.mkdir()
+
+        runner = MockCommandRunner(
+            available_tools={"rpmbuild": "/usr/bin/rpmbuild", "rpm": "/usr/bin/rpm", "createrepo_c": "/usr/bin/createrepo_c"}
+        )
+        with self.assertRaises(ContractError) as caught:
+            build_rpm_candidate(capture, intent, "noarch", scratch, offline_npm_archives=offline_npm, runner=runner)
+        self.assertEqual(caught.exception.code, "INVALID_ARCHITECTURE")
+
+        spec_captured = []
+        def rpmbuild_handler(argv, cwd=None, env=None):
+            spec_file = Path(argv[2])
+            spec_captured.append(spec_file.read_text("utf-8"))
+            rpm_dir = Path(cwd) / "RPMS/x86_64"
+            rpm_dir.mkdir(parents=True, exist_ok=True)
+            (rpm_dir / "theme-forge-stellar-burst-0.6.1-1.fc42.x86_64.rpm").write_bytes(b"synthetic-burst-rpm")
+            return CommandReceipt(argv, 0, b"rpmbuild ok\n", b"")
+
+        def rpm_handler(argv, cwd=None, env=None):
+            if "--requires" in argv:
+                return CommandReceipt(argv, 0, b"nodejs >= 22\n", b"")
+            return CommandReceipt(argv, 0, b"theme-forge-stellar-burst|0.6.1|1.fc43|x86_64|abcdef0123456789|sha256\n", b"")
+
+        def createrepo_handler(argv, cwd=None, env=None):
+            repodata = Path(argv[-1]) / "repodata"
+            repodata.mkdir(parents=True, exist_ok=True)
+            (repodata / "repomd.xml").write_bytes(b"<repomd/>")
+            return CommandReceipt(argv, 0, b"createrepo ok\n", b"")
+
+        def rpmlint_handler(argv, cwd=None, env=None):
+            return CommandReceipt(argv, 0, b"0 packages and 0 specfiles checked; 0 errors, 0 warnings.\n", b"")
+
+        runner = MockCommandRunner(
+            available_tools={
+                "rpmbuild": "/usr/bin/rpmbuild",
+                "rpm": "/usr/bin/rpm",
+                "rpmlint": "/usr/bin/rpmlint",
+                "createrepo_c": "/usr/bin/createrepo_c",
+            },
+            handlers={
+                "rpmbuild": rpmbuild_handler,
+                "rpm": rpm_handler,
+                "rpmlint": rpmlint_handler,
+                "createrepo_c": createrepo_handler,
+            },
+        )
+        result = build_rpm_candidate(
+            capture, intent, "x86_64", scratch,
+            offline_npm_archives=offline_npm,
+            runner=runner,
+        )
+        self.assertEqual(result["manifest"]["architecture"], "x86_64")
+        self.assertEqual(result["derivation_record"]["dependency_classification"], "native-tool-derived")
+        self.assertTrue(spec_captured)
+        spec_text = spec_captured[0]
+        import re
+        for directive in ("__requires_exclude_from", "__provides_exclude_from"):
+            pattern = next(line.split(" ", 2)[2] for line in spec_text.splitlines() if line.startswith("%global " + directive + " "))
+            for key, path in BURST_CLOSED_PREBUILDS.items():
+                installed = "/usr/lib/theme-forge-stellar-burst/" + path.removeprefix("package/")
+                self.assertEqual(bool(re.fullmatch(pattern, installed)), key != "linux-x64-gnu")
+            self.assertIsNone(re.fullmatch(pattern, "/usr/lib/theme-forge-stellar-burst/native/unexpected.node"))
+            self.assertNotIn("(?:", pattern)
+        self.assertIn("ExclusiveArch: x86_64", spec_text)
 
     def test_pacman_builder_seam_and_derivation_record(self):
         capture, intent, offline_npm = create_cli_fixture(self.root / "loom_input")

@@ -660,5 +660,96 @@ class ElfInventoryTests(unittest.TestCase):
         self.assertEqual(ELF_MACHINE, {"amd64": "x86_64", "arm64": "aarch64"})
 
 
+class BurstDebCandidateTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name).resolve()
+        self.scratch = self.root / "scratch"
+        self.scratch.mkdir()
+
+    def _make_burst_fixture(self):
+        from rs9.burst_native import BURST_CLOSED_PREBUILDS
+        from tests.test_burst_platform_wheel import make_synthetic_elf, make_synthetic_macho
+
+        prebuild_binaries = {
+            "darwin-arm64": make_synthetic_macho("arm64", 13, 0),
+            "darwin-x64": make_synthetic_macho("x86_64", 15, 0),
+            "linux-arm64-gnu": make_synthetic_elf("aarch64"),
+            "linux-x64-gnu": make_synthetic_elf("x86_64"),
+        }
+        extra_entries = [
+            (path.removeprefix("package/"), prebuild_binaries[key])
+            for key, path in BURST_CLOSED_PREBUILDS.items()
+        ]
+        burst_input = self.root / "burst_input"
+        capture, intent, offline_npm = create_cli_fixture(
+            burst_input,
+            product="theme-forge-stellar-burst",
+            extra_asset_entries=extra_entries,
+        )
+        return capture, intent, offline_npm
+
+    def test_burst_deb_rejects_architecture_all(self):
+        capture, intent, offline_npm = self._make_burst_fixture()
+        runner = MockCommandRunner(
+            available_tools={"dpkg-deb": "/usr/bin/dpkg-deb", "dpkg-shlibdeps": "/usr/bin/dpkg-shlibdeps", "dpkg-query": "/usr/bin/dpkg-query"}
+        )
+        with self.assertRaises(ContractError) as caught:
+            build_deb_candidate(
+                capture, intent, "all", self.scratch,
+                maintainer="Team <team@example.com>",
+                offline_npm_archives=offline_npm,
+                runner=runner,
+            )
+        self.assertEqual(caught.exception.code, "INVALID_ARCHITECTURE")
+
+    def test_burst_deb_builds_amd64_isolating_matching_prebuild(self):
+        capture, intent, offline_npm = self._make_burst_fixture()
+        calls = {"deb": [], "shlibdeps": [], "query": []}
+
+        def deb_handler(argv, cwd=None, env=None):
+            calls["deb"].append(argv)
+            Path(argv[4]).write_bytes(make_minimal_deb(
+                "theme-forge-stellar-burst", "0.6.1", 1, "amd64", "Team <team@example.com>", "Burst", "nodejs (>= 22), libc6"
+            ))
+            return CommandReceipt(argv, 0, b"", b"")
+
+        def shlibdeps_handler(argv, cwd=None, env=None):
+            calls["shlibdeps"].append(argv)
+            exe_args = [a for a in argv if a.startswith("-e")]
+            assert len(exe_args) == 1, f"Expected 1 matching prebuild ELF, got {exe_args}"
+            assert "linux-x64-gnu" in exe_args[0], f"Expected linux-x64-gnu in {exe_args[0]}"
+            return CommandReceipt(argv, 0, b"shlibs:Depends=libc6 (>= 2.34)\n", b"")
+
+        def query_handler(argv, cwd=None, env=None):
+            calls["query"].append(argv)
+            return CommandReceipt(argv, 0, b"libc6\t2.35-0ubuntu3\tamd64\n", b"")
+
+        runner = MockCommandRunner(
+            available_tools={
+                "dpkg-deb": "/usr/bin/dpkg-deb",
+                "dpkg-shlibdeps": "/usr/bin/dpkg-shlibdeps",
+                "dpkg-query": "/usr/bin/dpkg-query",
+            },
+            handlers={
+                "dpkg-deb": deb_handler,
+                "dpkg-shlibdeps": shlibdeps_handler,
+                "dpkg-query": query_handler,
+            },
+        )
+        result = build_deb_candidate(
+            capture, intent, "amd64", self.scratch,
+            maintainer="Team <team@example.com>",
+            offline_npm_archives=offline_npm,
+            runner=runner,
+        )
+        self.assertEqual(result["manifest"]["architecture"], "amd64")
+        self.assertEqual(result["manifest"]["dependency_classification"], "native-tool-derived")
+        self.assertIn("nodejs (>= 22)", result["manifest"]["dependencies"])
+        self.assertIn("libc6 (>= 2.34)", result["manifest"]["dependencies"])
+        self.assertEqual(result["manifest"]["elf_object_count"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

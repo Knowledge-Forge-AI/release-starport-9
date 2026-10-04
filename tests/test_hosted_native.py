@@ -26,3 +26,41 @@ class NativeHelpersTests(unittest.TestCase):
         with patch("rs9.hosted_commands.run_probes",return_value=[{"status":"pass"}]) as probe:
             execute_probes("tfsb-studio-service","/usr/bin/tfsb-studio-service",prefix=["docker","exec","-i"],runner=object())
             self.assertEqual(probe.call_args.kwargs["prefix"],["docker","exec","-i"])
+
+    def test_empty_architecture_output_raises_contract_error_not_index_error(self):
+        class EmptyArchRunner:
+            def run(self, argv, **kw):
+                if argv[1] == "pull":
+                    return CommandReceipt(argv, 0, b"", b"", executed=True)
+                if argv[1] == "run":
+                    # Empty output or whitespace-only output must fail closed with CONTAINER_ARCH, never IndexError
+                    return CommandReceipt(argv, 0, b"   \n\n", b"", executed=True)
+                return CommandReceipt(argv, 0, b"", b"", executed=True)
+
+        pins = {"pacman": {"container_digest": "docker.io/library/archlinux@sha256:" + "a" * 64}}
+        with self.assertRaises(ContractError) as caught:
+            provision("pacman", "x86_64-linux", pins, runner=EmptyArchRunner())
+        self.assertEqual(caught.exception.code, "CONTAINER_ARCH")
+        self.assertEqual(caught.exception.details.get("substage"), "architecture")
+        self.assertEqual(caught.exception.details.get("tool"), "uname")
+
+    def test_container_provision_failures_have_safe_context_details(self):
+        from rs9.errors import safe_details
+        class FailingPullRunner:
+            def run(self, argv, **kw):
+                if argv[1] == "pull":
+                    return CommandReceipt(argv, 1, b"error stdout", b"pull failed", executed=True)
+                return CommandReceipt(argv, 0, b"", b"", executed=True)
+
+        pins = {"pacman": {"container_digest": "docker.io/library/archlinux@sha256:" + "b" * 64}}
+        with self.assertRaises(ContractError) as caught:
+            provision("pacman", "x86_64-linux", pins, runner=FailingPullRunner())
+        self.assertEqual(caught.exception.code, "CONTAINER_PULL")
+        details = caught.exception.details
+        self.assertEqual(details.get("substage"), "pull")
+        self.assertEqual(details.get("tool"), "docker")
+        self.assertEqual(details.get("exit_code"), 1)
+        safe = safe_details(details)
+        self.assertEqual(safe.get("substage"), "pull")
+        self.assertEqual(safe.get("tool"), "docker")
+        self.assertEqual(safe.get("exit_code"), 1)

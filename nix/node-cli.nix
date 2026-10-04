@@ -1,6 +1,6 @@
 { lib, stdenvNoCC, makeWrapper, nodejs_22 }:
 { product, capture }:
-assert product.authenticated && product.kind == "node-cli";
+assert product.authenticated && (product.kind == "node-cli" || product.kind == "pure-js-cli" || product.kind == "native-node-cli");
 stdenvNoCC.mkDerivation {
   pname = product.pname;
   inherit (product) version;
@@ -19,4 +19,5 @@ stdenvNoCC.mkDerivation {
     '') product.commands}
   '';
   meta.license = lib.licenses.agpl3Plus;
+  meta.platforms = product.platforms;
 }

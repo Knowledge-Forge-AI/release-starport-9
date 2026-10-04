@@ -28,19 +28,25 @@ import sys
 from typing import Any, Mapping
 
 from rs9.candidate import capture_generation
-from rs9.errors import ContractError
+from rs9.errors import ContractError, safe_details
 from rs9.hosted_commands import linux_runtime_prefix, runtime_environment
 from rs9.hosted_contract import (
     REQUIRED_GATES,
     validate_execution_context,
     validate_execution_result,
 )
+from rs9.hosted_platforms import (
+    PLATFORM_TABLE,
+    SUPPORTED_WHEEL_SYSTEMS,
+    PlatformContract,
+    platform_contract,
+    select_payload,
+)
 from rs9.npm_deps import closure_for_capture
 from rs9.release_core import ReleaseCapture, digest
 from rs9.scratch import canonical, physical_directory
 from rs9.verify_wheel import (
     verify_double_build,
-    verify_nebular_sidecar_representation,
     verify_offline_venv_lifecycle,
 )
 from rs9.wheel import (
@@ -50,27 +56,12 @@ from rs9.wheel import (
 )
 from rs9.wheel_capture import build_capture_wheel
 from rs9.wheel_native import build_native_wheel
-
-SUPPORTED_WHEEL_SYSTEMS: frozenset[str] = frozenset(
-    {"aarch64-darwin", "x86_64-linux", "aarch64-linux"}
-)
-
-PRODUCT_VERSIONS: dict[str, str] = {
-    "theme-forge-stellar-burst": "0.6.1",
-    "theme-forge-stellar-loom": "0.4.0",
-    "theme-forge-solar-sail": "0.2.1",
-    "theme-forge-nebular-fusion": "0.6.1",
-}
+from rs9.hosted_burst import verify_installed_burst
+from rs9.product_classes import get_product_class as package_class
 
 
 def _get_target_platform(system: str) -> str:
-    if "darwin" in system:
-        return "aarch64-apple-darwin"
-    elif "x86_64" in system:
-        return "x86_64-unknown-linux-gnu"
-    elif "aarch64" in system:
-        return "aarch64-unknown-linux-gnu"
-    raise ContractError("INVALID_ARCHITECTURE", f"Unsupported wheel system: {system}")
+    return platform_contract(system).target_triple
 
 
 def _resolve_offline_npm_archives(
@@ -81,7 +72,7 @@ def _resolve_offline_npm_archives(
     client: Any | None,
 ) -> dict[str, Path] | None:
     pkg_json = json.loads(capture.source.get("package.json", "{}"))
-    if not (pkg_json.get("dependencies") or product_id == "theme-forge-stellar-burst"):
+    if not (pkg_json.get("dependencies") or package_class(product_id) == "native-node-cli"):
         return None
 
     closure = closure_for_capture(capture)
@@ -137,78 +128,133 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
 
     is_darwin = "darwin" in system.lower()
     is_linux = "linux" in system.lower()
-    target_platform = _get_target_platform(system)
+    contract_row = platform_contract(system)
+    target_platform = contract_row.target_triple
+    diagnostics_dir = scratch / "diagnostics"
+    diagnostics_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Deterministic double-build and strict RECORD check for all candidate products
     build_all_passed = True
     for capture, intent, profile in captures:
         product_id = intent["project"]["id"]
-        version = PRODUCT_VERSIONS[product_id]
-        is_native = product_id == "theme-forge-nebular-fusion"
+        version = THEME_FORGE_PRODUCTS[product_id]["version"]
+        is_native = package_class(product_id) == "native-desktop"
 
         proj_build_a = build_root / product_id / "build_a"
         proj_build_b = build_root / product_id / "build_b"
         proj_build_a.mkdir(parents=True, exist_ok=True)
         proj_build_b.mkdir(parents=True, exist_ok=True)
 
-        if is_native:
-            first, second = verify_double_build(
-                build_native_wheel,
-                product_id,
-                version,
-                capture=capture,
-                target_platform=target_platform,
-                candidate_only=True,
-                profile_result=profile,
-                output_dir_a=proj_build_a,
-                output_dir_b=proj_build_b,
-            )
-        else:
-            dep_archives = _resolve_offline_npm_archives(
-                capture, product_id, scratch, inputs, client
-            )
-            first, second = verify_double_build(
-                build_capture_wheel,
-                product_id,
-                version,
-                capture=capture,
-                dependency_archives=dep_archives,
-                profile_result=profile,
-                output_dir_a=proj_build_a,
-                output_dir_b=proj_build_b,
-            )
+        try:
+            if is_native:
+                first, second = verify_double_build(
+                    build_native_wheel,
+                    product_id,
+                    version,
+                    capture=capture,
+                    system=system,
+                    target_platform=target_platform,
+                    candidate_only=True,
+                    profile_result=profile,
+                    output_dir_a=proj_build_a,
+                    output_dir_b=proj_build_b,
+                )
+            else:
+                dep_archives = _resolve_offline_npm_archives(
+                    capture, product_id, scratch, inputs, client
+                )
+                first, second = verify_double_build(
+                    build_capture_wheel,
+                    product_id,
+                    version,
+                    capture=capture,
+                    dependency_archives=dep_archives,
+                    **({"system": system} if package_class(product_id) == "native-node-cli" else {}),
+                    profile_result=profile,
+                    output_dir_a=proj_build_a,
+                    output_dir_b=proj_build_b,
+                )
 
-        # Strict bidirectional RECORD verification across entire inventory
-        record_inv = verify_wheel_record_bidirectional(first.wheel_path)
-        if not record_inv["record_valid"]:
+            # Strict bidirectional RECORD verification across entire inventory
+            record_inv = verify_wheel_record_bidirectional(first.wheel_path)
+            if not record_inv["record_valid"]:
+                build_all_passed = False
+                gates.append({
+                    "name": f"record.{product_id}",
+                    "status": "fail",
+                    "reason": "strict-record-validation-failed",
+                })
+                gates.append({
+                    "name": f"build.{product_id}",
+                    "status": "fail",
+                    "reason": "strict-record-validation-failed",
+                })
+                continue
+            else:
+                gates.append({"name": f"record.{product_id}", "status": "pass"})
+
+            # Retain candidate wheel artifact
+            if product_id == "theme-forge-stellar-burst":
+                if (first.record.get("platform_specific") is not True
+                        or first.record.get("target_system") != system or first.tag == "py3-none-any"):
+                    raise ContractError("BURST_NATIVE_TARGET", "Burst candidate must bind the hosted native platform")
+            retained_wheel = retained_dir / first.filename
+            retained_wheel.write_bytes(first.wheel_bytes)
+            artifacts.append(retained_wheel)
+
+            product_records[product_id] = {
+                "package_class": package_class(product_id),
+                "architecture": "any" if package_class(product_id) == "pure-js-cli" else contract_row.expected_binary_arch,
+                "filename": first.filename,
+                "sha256": first.sha256,
+                "size": first.size,
+                "tag": first.tag,
+                "can_publish": first.can_publish,
+                "candidate_only": first.record.get("candidate_only", False),
+                "promotability": first.record.get("promotability", "candidate"),
+                "manylinux_proven": first.record.get("manylinux_proven", False),
+                "inventory_members_count": record_inv["member_count"],
+                **{key: first.record[key] for key in ("platform_specific", "target_system", "target_native_addon",
+                    "foreign_prebuilds", "downstream_transform", "production_promotion", "linux_compatibility", "native_loader")
+                   if key in first.record},
+            }
+            gates.append({"name": f"build.{product_id}", "status": "pass"})
+
+        except ContractError as err:
             build_all_passed = False
+            error_details = {
+                "product": product_id,
+                "substage": "build",
+                "origin": getattr(err, "details", {}).get("origin") or "wheel_build",
+                "system": system,
+                "target_triple": contract_row.target_triple,
+                "asset_platform": contract_row.asset_platform,
+                "wheel_tag": contract_row.wheel_tag,
+                **(err.details or {}),
+            }
+            diag_file = diagnostics_dir / f"{product_id}-build-diagnostic.json"
+            diag_record = {
+                "schema": "rs9.hosted-candidate-diagnostic.v1alpha2",
+                "system": system,
+                "product": product_id,
+                "substage": "build",
+                "error_code": err.code,
+                "details": safe_details(error_details),
+            }
+            diag_file.write_bytes(canonical(diag_record))
+            artifacts.append(diag_file)
+            gates.append({
+                "name": f"build.{product_id}",
+                "status": "fail",
+                "reason": err.code,
+            })
             gates.append({
                 "name": f"record.{product_id}",
                 "status": "fail",
-                "reason": "strict-record-validation-failed",
+                "reason": err.code,
             })
-        else:
-            gates.append({"name": f"record.{product_id}", "status": "pass"})
 
-        # Retain candidate wheel artifact
-        retained_wheel = retained_dir / first.filename
-        retained_wheel.write_bytes(first.wheel_bytes)
-        artifacts.append(retained_wheel)
-
-        product_records[product_id] = {
-            "filename": first.filename,
-            "sha256": first.sha256,
-            "size": first.size,
-            "tag": first.tag,
-            "can_publish": first.can_publish,
-            "candidate_only": first.record.get("candidate_only", False),
-            "promotability": first.record.get("promotability", "candidate"),
-            "manylinux_proven": first.record.get("manylinux_proven", False),
-            "inventory_members_count": record_inv["member_count"],
-        }
-        gates.append({"name": f"build.{product_id}", "status": "pass"})
-
-    if build_all_passed:
+    if build_all_passed and len(product_records) == len(captures):
         gates.append({"name": "wheel-deterministic-build", "status": "pass"})
     else:
         gates.append({"name": "wheel-deterministic-build", "status": "fail", "reason": "double-build-record-mismatch"})
@@ -216,58 +262,194 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
     # Runtime denial is proved by an actual negative TCP probe, not tool discovery.
     net_prefix = []
     if is_darwin:
-        gates.append({"name": "wheel-offline-isolation", "status": "not-run",
-                      "reason": "darwin-offline-isolation-unsupported"})
+        gates.append({
+            "name": "wheel-offline-isolation",
+            "status": "not-run",
+            "reason": "darwin-offline-isolation-unsupported",
+        })
     else:
         net_prefix = linux_runtime_prefix()
-        negative = subprocess.run([*net_prefix, sys.executable, "-c",
-            "import socket; s=socket.socket(); s.settimeout(2); "
-            "assert s.connect_ex(('1.1.1.1',443)) != 0"], capture_output=True,
-            env=runtime_environment(), timeout=10)
+        negative = subprocess.run(
+            [*net_prefix, sys.executable, "-c",
+             "import socket; s=socket.socket(); s.settimeout(2); "
+             "assert s.connect_ex(('1.1.1.1',443)) != 0"],
+            capture_output=True,
+            env=runtime_environment(),
+            timeout=10,
+        )
         if negative.returncode:
             raise ContractError("NETWORK_DENIAL", "Runtime egress denial probe failed")
         gates.append({"name": "wheel-offline-isolation", "status": "pass"})
 
     from rs9.hosted_commands import run_probes
-    from rs9.hosted_smoke import prepare_smoke, verify_nebular_runtime
-    neb = next(c for c, i, _ in captures if i["project"]["id"] == "theme-forge-nebular-fusion")
-    prepared = prepare_smoke(neb, captures, client, scratch / "native-smoke")
+    from rs9.hosted_smoke import prepare_smoke, verify_nebular_runtime, snapshot_nebular_runtime
+
+    neb = next((c for c, i, _ in captures if i["project"]["id"] == "theme-forge-nebular-fusion"), None)
+    neb_built = "theme-forge-nebular-fusion" in product_records
+    prepared = None
     sidecar_details = None
+    burst_details = None
+
+    if neb_built and neb is not None:
+        try:
+            prepared = prepare_smoke(neb, captures, client, scratch / "native-smoke")
+        except ContractError as err:
+            error_details = {
+                "product": "theme-forge-nebular-fusion",
+                "substage": "prepare_smoke",
+                "origin": getattr(err, "details", {}).get("origin") or "prepare_smoke",
+                "system": system,
+                "target_triple": contract_row.target_triple,
+                "asset_platform": contract_row.asset_platform,
+                "wheel_tag": product_records.get("theme-forge-nebular-fusion", {}).get("tag", contract_row.wheel_tag),
+                **(err.details or {}),
+            }
+            diag_file = diagnostics_dir / "nebular-smoke-prepare-diagnostic.json"
+            diag_file.write_bytes(canonical({
+                "schema": "rs9.hosted-candidate-diagnostic.v1alpha2",
+                "system": system,
+                "product": "theme-forge-nebular-fusion",
+                "substage": "prepare_smoke",
+                "error_code": err.code,
+                "details": safe_details(error_details),
+            }))
+            artifacts.append(diag_file)
+
     probe_gates, lifecycle_records = [], {}
+    lifecycle_all_passed = True
     for capture, intent, _ in captures:
         product_id = intent["project"]["id"]
+        if product_id not in product_records:
+            lifecycle_all_passed = False
+            gates.append({
+                "name": f"lifecycle.{product_id}",
+                "status": "fail",
+                "reason": "product-not-built",
+            })
+            continue
+
         wheel_path = retained_dir / product_records[product_id]["filename"]
-        def verify_installed(path, prefix, env, command=None):
-            nonlocal sidecar_details
+
+        def verify_installed(path, prefix, env, command=None, current_pid=product_id):
+            nonlocal sidecar_details, burst_details
             if is_linux:
                 prefix = linux_runtime_prefix(env)
-            rows = run_probes(command, path, repository=repository, prefix=prefix, env=env)
+            baseline = None
+            def after_probe():
+                nonlocal baseline
+                if baseline is None and current_pid == "theme-forge-nebular-fusion" and prepared is not None:
+                    roots = list(Path(env["THEME_FORGE_CACHE_DIR"]).glob("entries/*/payload/*"))
+                    if len(roots) != 1:
+                        raise ContractError("SIDECAR_REPRESENTATION", "Installed wheel did not materialize one payload")
+                    baseline = snapshot_nebular_runtime(roots[0], prepared, system)
+            rows = run_probes(command, path, repository=repository, prefix=prefix, env=env,
+                              **({"after_probe": after_probe} if current_pid == "theme-forge-nebular-fusion" else {}))
             if any(r["status"] != "pass" for r in rows):
-                raise ContractError("COMMAND_CONTRACT", "Released command contract is incomplete")
+                raise ContractError("COMMAND_CONTRACT", f"Released command contract is incomplete for {current_pid}")
             probe_gates.extend(rows)
-            if command == "tfnf":
+            if current_pid == "theme-forge-nebular-fusion" and command == "tfnf" and prepared is not None:
                 roots = list(Path(env["THEME_FORGE_CACHE_DIR"]).glob("entries/*/payload/*"))
                 if len(roots) != 1:
                     raise ContractError("SIDECAR_REPRESENTATION", "Installed wheel did not materialize one payload")
-                sidecar_details = verify_nebular_runtime(roots[0], prepared, system, prefix, env)
+                if baseline is None:
+                    raise ContractError("SIDECAR_BASELINE", "Runtime baseline must precede remaining command probes")
+                sidecar_details = verify_nebular_runtime(roots[0], prepared, system, prefix, env, baseline=baseline)
+            if current_pid == "theme-forge-stellar-burst" and command == "tfsb":
+                burst_details = verify_installed_burst(path, product_records[current_pid], system,
+                                                       scratch / "burst-probe", prefix, env)
             return {"status": "pass"}
+
         commands = {}
         for name in THEME_FORGE_PRODUCTS[product_id]["console_scripts"]:
-            commands[name] = {"verifier": lambda p, pre, env, name=name: verify_installed(p, pre, env, name)}
-        lifecycle_records[product_id] = verify_offline_venv_lifecycle(
-            wheel_path, distribution_name=THEME_FORGE_PRODUCTS[product_id]["distribution_name"],
-            commands_to_test=commands, venv_dir=scratch / "venvs" / product_id,
-            cache_dir=scratch / "cache" / product_id, command_prefix=net_prefix)
+            commands[name] = {"verifier": lambda p, pre, env, name=name, pid=product_id: verify_installed(p, pre, env, name, pid)}
+
+        try:
+            lifecycle_records[product_id] = verify_offline_venv_lifecycle(
+                wheel_path,
+                distribution_name=THEME_FORGE_PRODUCTS[product_id]["distribution_name"],
+                commands_to_test=commands,
+                venv_dir=scratch / "venvs" / product_id,
+                cache_dir=scratch / "cache" / product_id,
+                command_prefix=net_prefix,
+            )
+            gates.append({"name": f"lifecycle.{product_id}", "status": "pass"})
+        except ContractError as err:
+            lifecycle_all_passed = False
+            error_details = {
+                "product": product_id,
+                "substage": "lifecycle",
+                "origin": getattr(err, "details", {}).get("origin") or "verify_offline_venv_lifecycle",
+                "system": system,
+                "target_triple": contract_row.target_triple,
+                "asset_platform": contract_row.asset_platform,
+                "wheel_tag": product_records.get(product_id, {}).get("tag", contract_row.wheel_tag),
+                **(err.details or {}),
+            }
+            diag_file = diagnostics_dir / f"{product_id}-lifecycle-diagnostic.json"
+            diag_file.write_bytes(canonical({
+                "schema": "rs9.hosted-candidate-diagnostic.v1alpha2",
+                "system": system,
+                "product": product_id,
+                "substage": "lifecycle",
+                "error_code": err.code,
+                "details": safe_details(error_details),
+            }))
+            artifacts.append(diag_file)
+            gates.append({"name": f"lifecycle.{product_id}", "status": "fail", "reason": err.code})
+
     gates.extend(probe_gates)
-    gates.append({"name": "wheel-lifecycle-install-test", "status": "pass"})
-    if sidecar_details is None:
-        raise ContractError("SIDECAR_REPRESENTATION", "Installed wheel native verifier was not executed")
-    gates.append({"name": "wheel-native-verifier", "status": "pass"})
+    burst_built = "theme-forge-stellar-burst" in product_records
+    gates.extend([{"name": "burst-native-addon-target", "status": "pass" if burst_built else "fail"},
+                  {"name": "burst-native-addon-load", "status": "pass" if burst_details else "fail",
+                   **({"reason": "installed-target-load-unproven"} if not burst_details else {})}])
+
+    if lifecycle_all_passed and len(product_records) == len(captures):
+        gates.append({"name": "wheel-lifecycle-install-test", "status": "pass"})
+    else:
+        gates.append({"name": "wheel-lifecycle-install-test", "status": "fail", "reason": "lifecycle-validation-incomplete"})
+
+    if not neb_built:
+        gates.append({"name": "wheel-native-verifier", "status": "fail", "reason": "nebular-unbuilt"})
+    elif sidecar_details is None:
+        gates.append({"name": "wheel-native-verifier", "status": "fail", "reason": "sidecar-verifier-not-executed"})
+    else:
+        gates.append({"name": "wheel-native-verifier", "status": "pass"})
+
     if is_linux:
         from rs9.hosted_wheel_clients import qualify
-        client_gates, client_files = qualify(context, {pid:retained_dir / rec["filename"] for pid,rec in product_records.items()}, prepared)
-        gates.extend(client_gates)
-        artifacts.extend(client_files)
+        built_wheels = {pid: retained_dir / rec["filename"] for pid, rec in product_records.items()}
+        if neb_built and prepared is not None:
+            try:
+                client_gates, client_files = qualify(context, built_wheels, prepared)
+                gates.extend(client_gates)
+                artifacts.extend(client_files)
+            except ContractError as err:
+                error_details = {
+                    "product": "theme-forge-nebular-fusion",
+                    "substage": "client_qualification",
+                    "origin": getattr(err, "details", {}).get("origin") or "qualify",
+                    "system": system,
+                    "target_triple": contract_row.target_triple,
+                    "asset_platform": contract_row.asset_platform,
+                    "wheel_tag": product_records.get("theme-forge-nebular-fusion", {}).get("tag", contract_row.wheel_tag),
+                    **(err.details or {}),
+                }
+                diag_file = diagnostics_dir / "client-qualification-diagnostic.json"
+                diag_file.write_bytes(canonical({
+                    "schema": "rs9.hosted-candidate-diagnostic.v1alpha2",
+                    "system": system,
+                    "product": "theme-forge-nebular-fusion",
+                    "substage": "client_qualification",
+                    "error_code": err.code,
+                    "details": safe_details(error_details),
+                }))
+                artifacts.append(diag_file)
+                gates.append({"name": "wheel-client-deb", "status": "fail", "reason": err.code})
+                gates.append({"name": "wheel-client-rpm", "status": "fail", "reason": err.code})
+        else:
+            gates.append({"name": "wheel-client-deb", "status": "fail", "reason": "nebular-unbuilt-or-unprepared"})
+            gates.append({"name": "wheel-client-rpm", "status": "fail", "reason": "nebular-unbuilt-or-unprepared"})
+
     # 5. Manifest generation
     manifest = {
         "schema": "rs9.hosted-wheels-manifest.v1alpha1",
@@ -276,6 +458,7 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
         "gates": gates,
         "products": product_records,
         "sidecar_verifier": sidecar_details,
+        "burst_native_load": burst_details,
     }
     manifest_path = scratch / "hosted-wheels-manifest.json"
     manifest_bytes = canonical(manifest)

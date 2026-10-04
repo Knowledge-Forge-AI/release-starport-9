@@ -164,10 +164,12 @@ jobs:
           RS9_GITHUB_READ_TOKEN: ${{ github.token }}
         run: python3 -m rs9.hosted_nix install --repository . --scratch "$RUNNER_TEMP/rs9-nix-install"
       - name: Enable installed Nix
+        if: ${{ !cancelled() }}
         run: |
           echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH"
           echo "NIX_CONFIG=experimental-features = nix-command flakes" >> "$GITHUB_ENV"
       - name: Execute non-production nix lane
+        if: ${{ !cancelled() }}
         env:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'

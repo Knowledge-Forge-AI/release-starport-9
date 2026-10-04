@@ -54,7 +54,7 @@ class ExactReadbackTests(unittest.TestCase):
         integrity = "sha512-" + base64.b64encode(hashlib.sha512(payload).digest()).decode()
         registry = {"name": package["name"], "versions": {"1.0.0": {**package, "dist": {
             "integrity": integrity, "tarball": "https://registry.npmjs.org/fixture-package/-/fixture-package-1.0.0.tgz"}}}}
-        for body, expected_state in ((payload, "exact"), (b"changed", "unknown")):
+        for body, expected_state in ((payload, "exact"), (b"changed", "conflict")):
             with patch("rs9.readers._get", side_effect=[canonical(registry), body]) as get:
                 observation = read_npm("fixture-package", "1.0.0", expected_integrity=integrity,
                     expected_license=package["license"], expected_commands=package["bin"],

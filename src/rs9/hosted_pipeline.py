@@ -1,5 +1,6 @@
 """GitHub-hosted non-production execution and exact candidate artifact custody."""
 import argparse
+import hashlib
 import importlib
 import json
 import os
@@ -7,6 +8,7 @@ import platform
 from pathlib import Path
 import subprocess
 import sys
+import traceback
 
 from rs9.candidate import capture_generation
 from rs9.command_report import report_generation
@@ -17,6 +19,25 @@ from rs9.hosted_contract import canonical_release_auth_projection, compute_auth_
 from rs9.hosted_custody import provenance, retain, runner_facts, verify_set
 from rs9.hosted_summary import contract, required, gate_blockers, summarize
 from rs9.scratch import canonical, physical_directory
+
+
+def internal_error_details(error, lane, module):
+    """Hash private exception text; retain only a package-relative frame."""
+    frames = traceback.extract_tb(error.__traceback__)
+    package = Path(__file__).parent
+    frame = None
+    for item in frames:
+        try:
+            relative = Path(item.filename).relative_to(package)
+        except ValueError:
+            continue
+        frame = "rs9/" + relative.as_posix() + ":" + str(item.lineno) + ":" + item.name
+    details = {"stage": lane, "module": module,
+               "exception_type": type(error).__name__,
+               "traceback_sha256": hashlib.sha256("".join(traceback.format_exception(error)).encode()).hexdigest()}
+    if frame:
+        details["frame"] = frame
+    return safe_details(details)
 
 
 def _inputs(inputs, repository, commit):
@@ -56,9 +77,12 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
     record = {"schema": "rs9.hosted-candidate-diagnostic.v1alpha2", "lane": lane, "system": system,
               "production_enabled": False, "publication_authority": False, "attended_gates_satisfied": False,
               "trust_root": "hosted-candidate-unattested", "gates": [], "execution_error": None,
-              "policy_blockers": [], "runner": runner_facts(),
+              "policy_blockers": [], "production_promotion_blockers": [], "runner": runner_facts(),
               "fixture": {"used": False, "production": False}}
+    if lane == "wheels" and system.endswith("linux"):
+        record["production_promotion_blockers"].append("linux-wheel-production-promotion-compatibility-unproven")
     files, ingestion = [], None
+    lane_scratch = scratch / "lane-work"
     bytes_authenticated = False
     try:
         validate_host(system)
@@ -97,7 +121,9 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
                          for r in client.receipts]}))
         files.append(transport)
         files.append(bind_commands(captures, repository, scratch))
-        context = {"repository": repository, "scratch": scratch, "captures": captures, "client": client,
+        lane_scratch.mkdir()
+        physical_directory(lane_scratch)
+        context = {"repository": repository, "scratch": lane_scratch, "captures": captures, "client": client,
                    "binding": {"source_commit": commit, "checkout_binding": "hosted:" + commit}, "system": system,
                    "inputs": inputs, "pins": pins, "authentication_sha256": ingestion, "family": lane, "phase": phase}
         if lane == "authenticate":
@@ -107,12 +133,10 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
             record["gates"] = result["gates"]
             files.extend(result["artifacts"])
             record["details"] = result.get("details", {})
-            if lane == "nix" and not pins["nix"].get("installer_sha256"):
+            if lane == "nix" and not pins.get("nix", {}).get("installer_sha256_by_system", {}).get(system):
                 record["policy_blockers"].append("nix-installer-run-resolved-not-source-reproducible")
             if lane == "pins" and not result["details"]["pins"]["all_source_pinned"]:
                 record["policy_blockers"].append("container-pins-run-resolved-not-source-reproducible")
-            if lane == "wheels" and system.endswith("linux"):
-                record["policy_blockers"].append("nebular-linux-wheel-promotion-policy-pending")
         if gate_blockers(row, record):
             record["execution_error"] = "required-gates-unsatisfied"
     except Exception as error:
@@ -120,7 +144,7 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
         # Interrupts and process termination remain outside this boundary.
         record["execution_error"] = error.code if isinstance(error, ContractError) else "hosted-execution-failed"
         record["execution_error_detail"] = safe_details({"stage": lane,
-            **(error.details if isinstance(error, ContractError) else {})})
+            **(error.details if isinstance(error, ContractError) else internal_error_details(error, lane, row["module"]))})
         if not record["gates"]:
             record["gates"] = [{"name": n, "status": "fail", "reason": record["execution_error"]} for n in row["required_gates"]]
     # A capture can be complete before core authentication fails. Preserve the
@@ -141,14 +165,14 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
         "runtime_mechanism": mechanism,
         "runtime_offline_status": "pass" if runtime_lane and not darwin and not record["execution_error"] else "not-run",
         "runtime_reason": "darwin-offline-isolation-unsupported" if darwin else "negative-connectivity-and-unprivileged-runtime-required" if runtime_lane else "no-application-runtime-in-lane"}
-    fixture_identity = scratch / "fixture-identity.json"
+    fixture_identity = lane_scratch / "fixture-identity.json"
     if fixture_identity.is_file() and not fixture_identity.is_symlink():
         record["fixture"] = json.loads(fixture_identity.read_bytes())
         files.append(fixture_identity)
     # Preserve completed package bytes after a later verifier fails. Never retain
     # fixture homedirs, raw transport payloads, or private fixture keys.
-    for folder in ("retained", "unsigned", "unsigned-custody", "custody-deb"):
-        files.extend(p for p in (scratch / folder).rglob("*") if p.is_file() and not p.is_symlink())
+    for folder in ("retained", "unsigned", "unsigned-custody", "custody-deb", "diagnostics", "pages-client/diagnostics"):
+        files.extend(p for p in (lane_scratch / folder).rglob("*") if p.is_file() and not p.is_symlink())
     retain(scratch, receipts, files, record)
     return 2 if record["execution_error"] else 0
 

@@ -47,7 +47,9 @@
         "wheel-deterministic-build",
         "wheel-offline-isolation",
         "wheel-lifecycle-install-test",
-        "wheel-native-verifier"
+        "wheel-native-verifier",
+        "burst-native-addon-target",
+        "burst-native-addon-load"
       ],
       "custody_required": true,
       "allowed_not_run": {
@@ -73,7 +75,9 @@
         "wheel-lifecycle-install-test",
         "wheel-native-verifier",
         "wheel-client-deb",
-        "wheel-client-rpm"
+        "wheel-client-rpm",
+        "burst-native-addon-target",
+        "burst-native-addon-load"
       ],
       "custody_required": true,
       "required_products": [
@@ -96,7 +100,9 @@
         "wheel-lifecycle-install-test",
         "wheel-native-verifier",
         "wheel-client-deb",
-        "wheel-client-rpm"
+        "wheel-client-rpm",
+        "burst-native-addon-target",
+        "burst-native-addon-load"
       ],
       "custody_required": true,
       "required_products": [
@@ -116,7 +122,9 @@
       "required_gates": [
         "nix-lock-pin",
         "nix-native-closure",
-        "nix-build-check-run"
+        "nix-build-check-run",
+        "burst-native-addon-target",
+        "burst-native-addon-load"
       ],
       "custody_required": false
     },
@@ -130,7 +138,9 @@
       "required_gates": [
         "nix-lock-pin",
         "nix-native-closure",
-        "nix-build-check-run"
+        "nix-build-check-run",
+        "burst-native-addon-target",
+        "burst-native-addon-load"
       ],
       "custody_required": false
     },
@@ -144,7 +154,9 @@
       "required_gates": [
         "nix-lock-pin",
         "nix-native-closure",
-        "nix-build-check-run"
+        "nix-build-check-run",
+        "burst-native-addon-target",
+        "burst-native-addon-load"
       ],
       "custody_required": false
     },
@@ -160,7 +172,9 @@
         "pacman-container-environment",
         "pacman-package-build",
         "pacman-repository-indexing",
-        "pacman-client-qualification"
+        "pacman-client-qualification",
+        "burst-native-addon-target",
+        "burst-native-addon-load"
       ],
       "custody_required": true,
       "required_products": [
@@ -183,7 +197,9 @@
         "rpm-package-build",
         "rpm-rpmlint-clean",
         "rpm-repository-indexing",
-        "rpm-client-qualification"
+        "rpm-client-qualification",
+        "burst-native-addon-target",
+        "burst-native-addon-load"
       ],
       "custody_required": true,
       "required_products": [
@@ -206,7 +222,9 @@
         "rpm-package-build",
         "rpm-rpmlint-clean",
         "rpm-repository-indexing",
-        "rpm-client-qualification"
+        "rpm-client-qualification",
+        "burst-native-addon-target",
+        "burst-native-addon-load"
       ],
       "custody_required": true,
       "required_products": [
@@ -229,7 +247,9 @@
         "deb-package-build",
         "deb-shlibdeps-closure",
         "deb-apt-repository-indexing",
-        "deb-client-qualification"
+        "deb-client-qualification",
+        "burst-native-addon-target",
+        "burst-native-addon-load"
       ],
       "custody_required": true,
       "required_products": [
@@ -252,7 +272,9 @@
         "deb-package-build",
         "deb-shlibdeps-closure",
         "deb-apt-repository-indexing",
-        "deb-client-qualification"
+        "deb-client-qualification",
+        "burst-native-addon-target",
+        "burst-native-addon-load"
       ],
       "custody_required": true,
       "required_products": [

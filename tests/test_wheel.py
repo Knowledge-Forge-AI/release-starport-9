@@ -63,7 +63,10 @@ class WheelTests(unittest.TestCase):
         self.assertEqual(resolve_wheel_tag("theme-forge-stellar-loom"),"py3-none-any")
         for kwargs in ({},{"platform_tag":"any"},{"js_fallback":True,"evidence":{"verdict":"pass"}}):
             with self.assertRaises(ContractError): resolve_wheel_tag("theme-forge-stellar-burst",**kwargs)
-        self.assertEqual(resolve_wheel_tag("theme-forge-stellar-burst",platform_tag="manylinux_2_34_x86_64"),"py3-none-manylinux_2_34_x86_64")
+        for tag in ("linux_x86_64", "linux_aarch64", "macosx_13_0_arm64"):
+            self.assertEqual(resolve_wheel_tag("theme-forge-stellar-burst", platform_tag=tag), "py3-none-" + tag)
+        for tag in ("manylinux_2_34_x86_64", "musllinux_1_2_aarch64", "macosx_13_0_x86_64"):
+            with self.assertRaises(ContractError): resolve_wheel_tag("theme-forge-stellar-burst", platform_tag=tag)
         for tag in (None,"linux_x86_64","macosx_11_0_x86_64","macosx_11_0_arm64"):
             with self.assertRaises(ContractError): resolve_wheel_tag("theme-forge-nebular-fusion",platform_tag=tag,mode_restoration_verified=True)
         with self.assertRaises(ContractError): resolve_wheel_tag("unknown-product")

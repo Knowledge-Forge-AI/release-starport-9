@@ -10,6 +10,7 @@ import re
 import socket
 import ssl
 from datetime import datetime, timezone
+from http.client import HTTPException
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
@@ -54,6 +55,23 @@ def _make_live_observation(destination, subject, expected_hashes, desired_identi
     ))
     result._proof, result._hash = _LIVE_PROOF, record_sha256(result)
     return result
+
+
+def _reader_failure(error):
+    """Retain a closed transport/schema classification, never response or exception text."""
+    if isinstance(error, HTTPError):
+        error.close()
+        status = error.code if type(error.code) is int and 100 <= error.code <= 599 else "unknown"
+        return {"code": "destination-http-error", "message": "HTTP status " + str(status)}
+    if isinstance(error, HTTPException):
+        return {"code": "destination-protocol-error", "message": "HTTP protocol failure"}
+    if isinstance(error, (URLError, OSError)):
+        return {"code": "destination-transport-error", "message": "Destination transport failure"}
+    if isinstance(error, ContractError):
+        from rs9.errors import safe_details
+        reason = safe_details({"reason": error.code}).get("reason", "unclassified")
+        return {"code": "destination-contract-error", "message": "Contract failure " + reason}
+    return {"code": "destination-schema-error", "message": "Destination metadata schema failure"}
 
 
 def _normalize_reader_target(target, subject=None, desired_identity=None, expected_hashes=None,
@@ -142,7 +160,7 @@ def read_pypi(output):
     url = "https://pypi.org/pypi/" + quote(subject["package"], safe="") + "/" + quote(subject["version"], safe="") + "/json"
     readback = {"authenticated": False, "transport": "unknown", "presence": "unknown",
                 "components": {}, "content_identity_sha256": None, "level": "none"}
-    remote = {}
+    remote, diagnostics = {}, []
     try:
         try:
             metadata_bytes = _get(url, {"pypi.org"}, 4 * 1024 ** 2)
@@ -150,6 +168,7 @@ def read_pypi(output):
             error_url = _http_error_url(error)
             if error.code == 404 and error_url == url:
                 readback.update(authenticated=True, transport="ok", presence="absent", level="full")
+            error.close()
             raise
         metadata = json.loads(metadata_bytes)
         normalized = lambda name: re.sub(r"[-_.]+", "-", name).lower()
@@ -184,12 +203,12 @@ def read_pypi(output):
         remote = {"sequence": metadata["last_serial"]}
         readback.update(authenticated=True, transport="ok", presence="present", components=components,
                         content_identity_sha256=identity, level="full")
-    except (HTTPError, URLError, OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile, ContractError):
-        pass
+    except (HTTPError, URLError, HTTPException, OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile, ContractError) as error:
+        diagnostics.append(_reader_failure(error))
     result = LiveObservation(observe(output["destination"], subject, expected_components(output),
         output["content_identity_sha256"], readback=readback, source="live-read",
         reader={"id": "pypi-json-files", "version": "v1alpha1"},
-        observed_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"), remote=remote))
+        observed_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"), remote=remote, diagnostics=diagnostics))
     result._proof, result._hash = _LIVE_PROOF, record_sha256(result)
     return result
 
@@ -217,6 +236,7 @@ def read_pypi_project(output_or_destination, subject=None, *, desired_identity=N
             error_url = _http_error_url(error)
             if error.code == 404 and error_url == url:
                 readback.update(authenticated=True, transport="ok", presence="absent", level="full")
+            error.close()
             raise
         metadata = json.loads(metadata_bytes)
         normalized = lambda name: re.sub(r"[-_.]+", "-", name).lower()
@@ -258,8 +278,8 @@ def read_pypi_project(output_or_destination, subject=None, *, desired_identity=N
             readback.update(authenticated=True, transport="ok", presence="present",
                             components={"_pypi_project_metadata": hashlib.sha256(metadata_bytes).hexdigest()},
                             content_identity_sha256=None, level="metadata")
-    except (HTTPError, URLError, OSError, ValueError, KeyError, TypeError, ContractError):
-        pass
+    except (HTTPError, URLError, HTTPException, OSError, ValueError, KeyError, TypeError, ContractError) as error:
+        diagnostics.append(_reader_failure(error))
     return _make_live_observation(
         destination, subject, exp_hashes, desired_identity,
         readback=readback, reader={"id": "pypi-project", "version": "v1alpha1"},
@@ -288,6 +308,7 @@ def read_npm(output_or_destination, subject=None, *, desired_identity=None, expe
             error_url = _http_error_url(error)
             if error.code == 404 and error_url == url:
                 readback.update(authenticated=True, transport="ok", presence="absent", level="full")
+            error.close()
             raise
         doc = json.loads(data)
         if doc.get("name") != subject["package"]:
@@ -314,10 +335,12 @@ def read_npm(output_or_destination, subject=None, *, desired_identity=None, expe
                 conflict = True
                 reasons.append(f"license {observed_license} != {expected_license}")
             if expected_commands is not None:
-                exp_keys = set(expected_commands.keys()) if isinstance(expected_commands, dict) else set(expected_commands)
-                if set(observed_bin.keys()) != exp_keys:
+                command_drift = (observed_bin != _normalized_npm_bin(subject["package"], expected_commands)
+                                 if isinstance(expected_commands, dict)
+                                 else set(observed_bin) != set(expected_commands))
+                if command_drift:
                     conflict = True
-                    reasons.append(f"commands {set(observed_bin)} != {exp_keys}")
+                    reasons.append("published command mapping differs from the authenticated generation")
 
             tarball_url = dist.get("tarball", "")
             tarball_name = tarball_url.rsplit("/", 1)[-1] if "/" in tarball_url else f"{subject['package']}-{version}.tgz"
@@ -338,6 +361,11 @@ def read_npm(output_or_destination, subject=None, *, desired_identity=None, expe
                 payload = _get(tarball_url, {"registry.npmjs.org"}, 256 * 1024 ** 2)
                 actual_integrity = "sha512-" + base64.b64encode(hashlib.sha512(payload).digest()).decode()
                 if actual_integrity != integrity:
+                    readback.update(authenticated=True, transport="ok", presence="present",
+                                    components={tarball_name: hashlib.sha256(payload).hexdigest()},
+                                    content_identity_sha256="f" * 64 if desired_identity != "f" * 64 else "e" * 64,
+                                    level="full")
+                    diagnostics.append({"code": "npm-conflict", "message": "Remote tarball differs from registry integrity"})
                     raise ContractError("NPM_INTEGRITY", "Remote tarball differs from registry integrity")
                 with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as archive:
                     members = [m for m in archive.getmembers() if m.name == "package/package.json"]
@@ -357,8 +385,8 @@ def read_npm(output_or_destination, subject=None, *, desired_identity=None, expe
                     readback.update(authenticated=True, transport="ok", presence="present",
                                     components={tarball_name: hashlib.sha256(payload).hexdigest()},
                                     content_identity_sha256=desired_identity, level="full")
-    except (HTTPError, URLError, OSError, ValueError, KeyError, TypeError, tarfile.TarError, ContractError):
-        pass
+    except (HTTPError, URLError, HTTPException, OSError, ValueError, KeyError, TypeError, tarfile.TarError, ContractError) as error:
+        diagnostics.append(_reader_failure(error))
     return _make_live_observation(
         destination, subject, exp_hashes, desired_identity,
         readback=readback, reader={"id": "npm-registry", "version": "v1alpha1"},
@@ -397,8 +425,10 @@ def _normalized_npm_bin(name, value):
 
 
 def read_homebrew(output_or_destination, subject=None, *, pinned_ref, tap="Knowledge-Forge-AI/homebrew-tap",
-                  desired_identity=None, expected_hashes=None, expected_payload_url=None, expected_payload_sha256=None):
-    """Homebrew pinned ref formula URL/hash readback."""
+                  desired_identity=None, expected_hashes=None, expected_payload_url=None, expected_payload_sha256=None,
+                  expected_license=None, expected_commands=None, expected_restrictions=None, expected_blob_sha=None,
+                  evidence_sink=None):
+    """Homebrew pinned ref formula URL/hash readback with deterministic static parsing."""
     destination, subject, desired_identity, expected_hashes = _normalize_reader_target(
         output_or_destination, subject, desired_identity, expected_hashes, default_adapter="homebrew", default_mode="projection"
     )
@@ -407,6 +437,15 @@ def read_homebrew(output_or_destination, subject=None, *, pinned_ref, tap="Knowl
     if not isinstance(pinned_ref, str) or not re.fullmatch(r"[0-9a-f]{40}", pinned_ref):
         raise ContractError("HOMEBREW_PIN", "Homebrew readback requires an immutable pinned ref")
     validate_repository(tap)
+    scan_for_credentials(tap)
+    scan_for_credentials(pinned_ref)
+    if expected_payload_url:
+        scan_for_credentials(expected_payload_url)
+    if expected_payload_sha256:
+        from rs9.records import validate_sha256
+        validate_sha256(expected_payload_sha256)
+    if expected_license:
+        scan_for_credentials(expected_license)
     formula_name = subject["package"]
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", formula_name):
         raise ContractError("HOMEBREW_FORMULA", "Safe formula name required")
@@ -422,41 +461,61 @@ def read_homebrew(output_or_destination, subject=None, *, pinned_ref, tap="Knowl
             error_url = _http_error_url(error)
             if error.code == 404 and error_url == url:
                 readback.update(authenticated=True, transport="ok", presence="absent", level="full")
+            error.close()
             raise
         formula_text = data.decode("utf-8", errors="replace")
-        url_match = re.search(r'url\s+"([^"]+)"', formula_text)
-        sha_match = re.search(r'sha256\s+"([0-9a-f]{64})"', formula_text)
-        if not url_match or not sha_match:
-            raise ContractError("HOMEBREW_FORMULA", "Formula lacks url or sha256")
-        observed_url = url_match.group(1)
-        observed_sha = sha_match.group(1)
         formula_sha = hashlib.sha256(data).hexdigest()
         formula_path = f"Formula/{formula_name}.rb"
+        if evidence_sink is not None:
+            evidence_sink.update(path=formula_path, sha256=formula_sha, size=len(data))
 
-        conflict = False
-        reasons = []
-        if expected_payload_url and observed_url != expected_payload_url:
-            conflict = True
-            reasons.append("payload URL mismatch")
-        if expected_payload_sha256 and observed_sha != expected_payload_sha256:
-            conflict = True
-            reasons.append("payload SHA256 mismatch")
-        if expected_hashes and formula_path in expected_hashes and expected_hashes[formula_path] != formula_sha:
-            conflict = True
-            reasons.append("formula SHA256 mismatch")
+        from rs9.homebrew_formula import parse_formula, compare_formula_identity
+        try:
+            parsed = parse_formula(data)
+            is_full_formula = True
+        except ContractError:
+            parsed = None
+            is_full_formula = False
 
-        if conflict:
-            diagnostics.append({"code": "homebrew-conflict", "message": "; ".join(reasons) or "Formula mismatch"})
-            exp_hashes = expected_hashes
+        if is_full_formula:
+            expect_spec = {
+                "project": formula_name,
+                "payload_url": expected_payload_url,
+                "payload_sha256": expected_payload_sha256,
+                "license": expected_license,
+                "commands": expected_commands,
+                "restrictions": expected_restrictions,
+                "blob_sha": expected_blob_sha,
+                "formula_sha256": expected_hashes.get(formula_path) if expected_hashes else None,
+                "data": data,
+            }
+            is_exact, reasons = compare_formula_identity(parsed, expect_spec)
+            if not is_exact:
+                diagnostics.append({"code": "homebrew-conflict", "message": "; ".join(reasons) or "Formula mismatch"})
+                exp_hashes = expected_hashes or {formula_path: formula_sha}
+                readback.update(authenticated=True, transport="ok", presence="present",
+                                components={formula_path: formula_sha},
+                                content_identity_sha256="f" * 64 if desired_identity != "f" * 64 else "e" * 64,
+                                level="full")
+            elif not all((expected_payload_url, expected_payload_sha256, expected_license,
+                          expected_commands is not None, expected_restrictions, expected_blob_sha)):
+                diagnostics.append({"code": "homebrew-identity-unavailable",
+                                    "message": "Exact candidate payload URL and digest required"})
+                readback.update(transport="ok", presence="present", level="metadata")
+            else:
+                exp_hashes = expected_hashes if (expected_hashes and formula_path in expected_hashes) else {formula_path: formula_sha}
+                readback.update(authenticated=True, transport="ok", presence="present",
+                                components={formula_path: formula_sha},
+                                content_identity_sha256=desired_identity, level="full")
+        else:
+            diagnostics.append({"code": "homebrew-conflict", "message": "Formula schema drift"})
+            exp_hashes = expected_hashes or {formula_path: formula_sha}
             readback.update(authenticated=True, transport="ok", presence="present",
                             components={formula_path: formula_sha},
                             content_identity_sha256="f" * 64 if desired_identity != "f" * 64 else "e" * 64,
                             level="full")
-        else:
-            diagnostics.append({"code": "homebrew-identity-unavailable", "message": "Formula parsing is diagnostic; complete platform/command/license identity required"})
-            readback.update(transport="ok", presence="present", level="metadata")
-    except (HTTPError, URLError, OSError, ValueError, KeyError, TypeError, ContractError):
-        pass
+    except (HTTPError, URLError, HTTPException, OSError, ValueError, KeyError, TypeError, ContractError) as error:
+        diagnostics.append(_reader_failure(error))
     return _make_live_observation(
         destination, subject, exp_hashes, desired_identity,
         readback=readback, reader={"id": "homebrew-formula", "version": "v1alpha1"},
@@ -470,7 +529,14 @@ def read_pages(output_or_destination, subject=None, *, path, host="rs9.knowledge
     destination, subject, desired_identity, expected_hashes = _normalize_reader_target(
         output_or_destination, subject, desired_identity, None, default_adapter="pages", default_mode="direct"
     )
+    if destination["adapter"] != "pages":
+        raise ContractError("READER_DESTINATION", "Pages adapter required")
     validate_safe_relative_posix_path(path.lstrip("/"))
+    scan_for_credentials(path)
+    scan_for_credentials(host)
+    if expected_sha256:
+        from rs9.records import validate_sha256
+        validate_sha256(expected_sha256)
     clean_path = path.lstrip("/")
     url = f"https://{host}/{clean_path}"
     readback = {"authenticated": False, "transport": "unknown", "presence": "unknown",
@@ -484,6 +550,7 @@ def read_pages(output_or_destination, subject=None, *, path, host="rs9.knowledge
             error_url = _http_error_url(error)
             if error.code == 404 and error_url == url:
                 readback.update(authenticated=True, transport="ok", presence="absent", level="full")
+            error.close()
             raise
         except URLError as error:
             reason = getattr(error, "reason", None)
@@ -491,6 +558,9 @@ def read_pages(output_or_destination, subject=None, *, path, host="rs9.knowledge
                 diagnostics.append({"code": "pages-dns-unknown", "message": "DNS resolution unavailable"})
             elif isinstance(reason, ssl.SSLError):
                 diagnostics.append({"code": "pages-tls-error", "message": "TLS verification failed"})
+            raise
+        except HTTPException:
+            diagnostics.append({"code": "pages-protocol-error", "message": "HTTP protocol error"})
             raise
         sha = hashlib.sha256(data).hexdigest()
         components = {clean_path: sha}
@@ -504,8 +574,8 @@ def read_pages(output_or_destination, subject=None, *, path, host="rs9.knowledge
             exp_hashes = {clean_path: sha}
             readback.update(authenticated=True, transport="ok", presence="present",
                             components=components, content_identity_sha256=desired_identity, level="full")
-    except (HTTPError, URLError, OSError, ValueError, KeyError, TypeError, ContractError):
-        pass
+    except (HTTPError, URLError, HTTPException, OSError, ValueError, KeyError, TypeError, ContractError) as error:
+        diagnostics.append(_reader_failure(error))
     return _make_live_observation(
         destination, subject, exp_hashes, desired_identity,
         readback=readback, reader={"id": "pages-http", "version": "v1alpha1"},
@@ -531,6 +601,8 @@ def read_github(output_or_destination, subject=None, *, repository=None, query_t
     destination, subject, desired_identity, expected_hashes = _normalize_reader_target(
         output_or_destination, subject, desired_identity, None, default_adapter="github", default_mode="projection"
     )
+    if destination["adapter"] != "github":
+        raise ContractError("READER_DESTINATION", "GitHub adapter required")
     readback = {"authenticated": False, "transport": "unknown", "presence": "unknown",
                 "components": {}, "content_identity_sha256": None, "level": "none"}
     diagnostics = []
@@ -558,6 +630,7 @@ def read_github(output_or_destination, subject=None, *, repository=None, query_t
                 error_url = _http_error_url(error)
                 if error.code == 404 and error_url == url:
                     readback.update(authenticated=True, transport="ok", presence="absent", level="full")
+                error.close()
                 raise
             doc = json.loads(data)
             sha = doc.get("object", {}).get("sha", "")
@@ -575,7 +648,7 @@ def read_github(output_or_destination, subject=None, *, repository=None, query_t
                 readback.update(transport="ok", presence="present", level="metadata")
         else:
             raise ContractError("GITHUB_QUERY", "Unknown GitHub query type")
-    except (HTTPError, URLError, OSError, ValueError, KeyError, TypeError, ContractError):
+    except (HTTPError, URLError, HTTPException, OSError, ValueError, KeyError, TypeError, ContractError):
         pass
     return _make_live_observation(
         destination, subject, exp_hashes, desired_identity,
@@ -594,12 +667,17 @@ def read_signed_repo(output_or_destination, subject=None, *, base_url, index_pat
     from rs9.signed_store import PRODUCTION_PRIMARY_FINGERPRINT, PRODUCTION_SIGNING_SUBKEY
     destination, subject, desired_identity, inventory = _normalize_reader_target(
         output_or_destination, subject, desired_identity, expected_hashes, default_adapter="signed-store", default_mode="direct")
+    if destination["adapter"] != "signed-store":
+        raise ContractError("READER_DESTINATION", "Signed-store adapter required")
     validate_safe_relative_posix_path(index_path)
+    scan_for_credentials(index_path)
     if signature_path is not None:
         validate_safe_relative_posix_path(signature_path)
+        scan_for_credentials(signature_path)
     parsed = urlsplit(base_url)
     if parsed.scheme != "https" or parsed.hostname != "rs9.knowledge-forge.ai" or parsed.query or parsed.fragment:
         raise ContractError("READER_URL", "Signed repository read outside RS9 authority")
+    scan_for_credentials(base_url)
     hosts = {parsed.hostname}
     index_url = base_url.rstrip("/") + "/" + index_path
     readback = {"authenticated": False, "transport": "unknown", "presence": "unknown",
@@ -612,6 +690,7 @@ def read_signed_repo(output_or_destination, subject=None, *, base_url, index_pat
             error_url = _http_error_url(error)
             if error.code == 404 and error_url == index_url:
                 readback.update(authenticated=True, transport="ok", presence="absent", level="full")
+            error.close()
             raise
         if verifier is None:
             diagnostics.append({"code": "signature-unverified", "message": "Reviewed signature verifier required"})
@@ -646,7 +725,7 @@ def read_signed_repo(output_or_destination, subject=None, *, base_url, index_pat
             components[path] = actual
         readback.update(authenticated=True, transport="ok", presence="present", components=components,
                         content_identity_sha256=desired_identity, level="full")
-    except (HTTPError, URLError, OSError, ValueError, KeyError, TypeError, ContractError):
+    except (HTTPError, URLError, HTTPException, OSError, ValueError, KeyError, TypeError, ContractError):
         pass
     return _make_live_observation(destination, subject, inventory, desired_identity, readback=readback,
         reader={"id": "signed-repo", "version": "v1alpha1"}, diagnostics=diagnostics)

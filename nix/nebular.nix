@@ -11,8 +11,8 @@ let
     dontBuild = true;
     dontFixup = true;
     installPhase = ''
-      mkdir -p "$out/${product.root}"
-      cp -a ./. "$out/${product.root}/"
+      mkdir -p "$out"
+      cp -a ./. "$out/"
     '';
   };
   runtime = buildFHSEnv {
@@ -29,7 +29,7 @@ let
   };
   launcher = writeShellScript "rs9-nebular-launch" ''
     export PYTHONPATH="${capture}/runtime"
-    exec "${python3}/bin/python3" "${capture}/runtime/launch.py" "${payload}" "$@"
+    exec "${python3}/bin/python3" "${capture}/runtime/launch.py" "${payload}/payload.tar.gz" "$@"
   '';
 in runCommand product.pname { passthru = { inherit payload runtime; }; } ''
   mkdir -p "$out/bin"

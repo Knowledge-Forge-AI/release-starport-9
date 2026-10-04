@@ -15,6 +15,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import MagicMock
 import zipfile
 
 from rs9.errors import ContractError
@@ -394,3 +395,154 @@ class WheelNativeTests(unittest.TestCase):
         with self.assertRaises(ContractError) as ctx:
             build_native_wheel("theme-forge-nebular-fusion", "0.6.1", archive_bytes=arc_bytes, output_dir=link)
         self.assertIn("UNSAFE_DESTINATION", str(ctx.exception))
+
+    def test_build_native_wheel_with_system_parameter(self) -> None:
+        """Verify build_native_wheel respects system parameter across all 3 systems."""
+        arc_bytes = make_darwin_archive(make_standard_darwin_entries())
+
+        # 1. Darwin
+        res_darwin = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc_bytes,
+            system="aarch64-darwin",
+            output_dir=self.root / "out_darwin",
+        )
+        self.assertEqual(res_darwin.filename, "theme_forge_nebular_fusion-0.6.1-py3-none-macosx_11_0_arm64.whl")
+        self.assertFalse(res_darwin.can_publish)
+
+        # 2. Linux x86_64 candidate
+        res_x86 = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc_bytes,
+            system="x86_64-linux",
+            candidate_only=True,
+            output_dir=self.root / "out_x86",
+        )
+        self.assertEqual(res_x86.filename, "theme_forge_nebular_fusion-0.6.1-py3-none-linux_x86_64.whl")
+        self.assertFalse(res_x86.can_publish)
+        self.assertTrue(res_x86.record["candidate_only"])
+        self.assertEqual(res_x86.record["promotability"], "policy-pending")
+        self.assertFalse(res_x86.record["manylinux_proven"])
+
+        # 3. Linux aarch64 candidate
+        res_arm = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc_bytes,
+            system="aarch64-linux",
+            candidate_only=True,
+            output_dir=self.root / "out_arm",
+        )
+        self.assertEqual(res_arm.filename, "theme_forge_nebular_fusion-0.6.1-py3-none-linux_aarch64.whl")
+        self.assertFalse(res_arm.can_publish)
+        self.assertTrue(res_arm.record["candidate_only"])
+        self.assertEqual(res_arm.record["promotability"], "policy-pending")
+        self.assertFalse(res_arm.record["manylinux_proven"])
+
+    def test_build_native_wheel_select_payload_capture_integration(self) -> None:
+        """Verify build_native_wheel uses select_payload to resolve capture payload without name guessing."""
+        arc_bytes = make_darwin_archive(make_standard_darwin_entries())
+        arc_sha = digest(arc_bytes)
+        from rs9.archives import inspect_archive
+        arc_file = self.root / "darwin.tar.gz"
+        arc_file.write_bytes(arc_bytes)
+        manifest = inspect_archive(arc_file, commands={})
+
+        mock_capture = MagicMock()
+        mock_capture._proof = None
+        mock_capture.record = {
+            "repository": {"full_name": "Knowledge-Forge-AI/theme-forge-nebular-fusion"},
+            "release": {"tag": "v0.6.1"},
+            "payloads": [
+                {
+                    "id": "darwin-arm64",
+                    "name": "darwin.tar.gz",
+                    "platforms": ["aarch64-darwin"],
+                    "size": len(arc_bytes),
+                    "sha256": arc_sha,
+                    "payload_manifest_sha256": manifest["manifest_sha256"],
+                }
+            ],
+        }
+        mock_capture.archives = {"darwin-arm64": arc_file}
+        mock_capture.manifests = {"darwin-arm64": manifest}
+
+        # Build with matching system
+        res = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            capture=mock_capture,
+            system="aarch64-darwin",
+            output_dir=self.root / "out_capture_darwin",
+        )
+        self.assertEqual(res.filename, "theme_forge_nebular_fusion-0.6.1-py3-none-macosx_11_0_arm64.whl")
+
+        # Build with missing system fails with MISSING_ASSET
+        with self.assertRaises(ContractError) as ctx:
+            build_native_wheel(
+                "theme-forge-nebular-fusion",
+                "0.6.1",
+                capture=mock_capture,
+                system="x86_64-linux",
+                candidate_only=True,
+                output_dir=self.root / "out_missing",
+            )
+        self.assertEqual(ctx.exception.code, "MISSING_ASSET")
+        self.assertEqual(ctx.exception.details.get("asset_platform"), "x86_64-linux")
+
+    def test_inconsistent_system_and_target_platform_rejected(self) -> None:
+        """Explicit inconsistent system and target_platform triple must be rejected."""
+        arc_bytes = make_darwin_archive(make_standard_darwin_entries())
+        with self.assertRaises(ContractError) as ctx:
+            build_native_wheel(
+                "theme-forge-nebular-fusion",
+                "0.6.1",
+                archive_bytes=arc_bytes,
+                system="x86_64-linux",
+                target_platform="aarch64-apple-darwin",
+                candidate_only=True,
+                output_dir=self.root / "out_inconsistent",
+            )
+        self.assertEqual(ctx.exception.code, "INCONSISTENT_PLATFORM")
+        self.assertEqual(ctx.exception.details.get("system"), "x86_64-linux")
+        self.assertEqual(ctx.exception.details.get("target_triple"), "aarch64-apple-darwin")
+
+        # Consistent system and triple succeeds
+        res = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc_bytes,
+            system="x86_64-linux",
+            target_platform="x86_64-unknown-linux-gnu",
+            candidate_only=True,
+            output_dir=self.root / "out_consistent",
+        )
+        self.assertEqual(res.filename, "theme_forge_nebular_fusion-0.6.1-py3-none-linux_x86_64.whl")
+
+    def test_darwin_wheel_tag_reflects_actual_plist_floor(self) -> None:
+        """Darwin wheel tag dynamically reads deployment floor from Info.plist, not hardcoded 11.0."""
+        arc_bytes = make_darwin_archive(make_standard_darwin_entries(min_os="13.0.0"))
+        res = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc_bytes,
+            system="aarch64-darwin",
+            output_dir=self.root / "out_darwin_13",
+        )
+        self.assertEqual(res.tag, "py3-none-macosx_13_0_arm64")
+        self.assertEqual(res.filename, "theme_forge_nebular_fusion-0.6.1-py3-none-macosx_13_0_arm64.whl")
+
+    def test_legacy_target_platform_triple_conversion(self) -> None:
+        """Legacy target_platform triple is converted at API boundary; invalid triple rejected."""
+        arc_bytes = make_darwin_archive(make_standard_darwin_entries())
+        with self.assertRaises(ContractError) as ctx:
+            build_native_wheel(
+                "theme-forge-nebular-fusion",
+                "0.6.1",
+                archive_bytes=arc_bytes,
+                target_platform="invalid-triple",
+                output_dir=self.root / "out_invalid_triple",
+            )
+        self.assertEqual(ctx.exception.code, "INVALID_ARCHITECTURE")

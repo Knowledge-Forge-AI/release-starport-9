@@ -1,0 +1,128 @@
+{
+  "foreign_prebuilds": [
+    {
+      "architecture": "x86_64",
+      "disposition": "retained-inert",
+      "path": "package/native/directory-snapshot/prebuilds/darwin-x64/native-addon-posix-openat-v1.node",
+      "sha256": "41eb0b3091173132012565560d62b31f7320764c6fd6e780994fcef8803704c6",
+      "size_bytes": 24200
+    },
+    {
+      "architecture": "aarch64",
+      "disposition": "retained-inert",
+      "path": "package/native/directory-snapshot/prebuilds/linux-arm64-gnu/native-addon-posix-openat-v1.node",
+      "sha256": "67fb6b85f339a7c2f43ababa20434b26a3ea9bb65b17e70257a03c07810beb79",
+      "size_bytes": 73336
+    },
+    {
+      "architecture": "x86_64",
+      "disposition": "retained-inert",
+      "path": "package/native/directory-snapshot/prebuilds/linux-x64-gnu/native-addon-posix-openat-v1.node",
+      "sha256": "a2999fc9ac1b1f0a31600595f7069e10aadb032f01059b4d7e64ed80cd8a38a8",
+      "size_bytes": 27240
+    }
+  ],
+  "loader_contract": {
+    "backend_abi": 1,
+    "backend_name": "native-addon-posix-openat-v1",
+    "dlopen_behavior": "exactly-once-memoized",
+    "export_function": "loadDirectorySnapshotNative()",
+    "module_path": "package/dist/directory-snapshot-native.js",
+    "result_shape": {
+      "failure": {
+        "artifact": "str",
+        "ok": false,
+        "reason": "str"
+      },
+      "failure_reasons": [
+        "unsupported-platform",
+        "artifact-missing-or-corrupt",
+        "backend-mismatch",
+        "self-test-failed"
+      ],
+      "success": {
+        "addon": "object",
+        "artifact": "str",
+        "ok": true
+      }
+    },
+    "sha256": "23a3bf942fa1f92fbf686b4cedc0ec2a9f6653ded6fd2df7ef9d3c58d6591e69",
+    "size_bytes": 3639
+  },
+  "observed_load_receipt": {
+    "architecture": "arm64",
+    "artifact": "darwin-arm64",
+    "loaded": true,
+    "loaded_sha256": "2f842ce43f62c76b04884a92980037067c8e55dfd183c86e788f1c3ac8a533c8",
+    "loads": [
+      "package/native/directory-snapshot/prebuilds/darwin-arm64/native-addon-posix-openat-v1.node"
+    ],
+    "loads_count": 1,
+    "node_abi": "127",
+    "node_version": "v22.22.2",
+    "platform": "darwin",
+    "proof": "installed-released-loader-self-test"
+  },
+  "offline_closure": [
+    {
+      "integrity": "sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==",
+      "package": "@xmldom/xmldom",
+      "sha256": "08245e18c248b957b4c6e07f8549ad5f55ae11b7a8abd4c1113a0fd61ddc67ee",
+      "size_bytes": 109708,
+      "version": "0.9.12"
+    },
+    {
+      "integrity": "sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==",
+      "package": "fflate",
+      "sha256": "38c2cd824402407b43153c782274aec2ea83ea688e4aa0b743c5f2c305857d92",
+      "size_bytes": 173034,
+      "version": "0.8.3"
+    },
+    {
+      "integrity": "sha512-kCZr2V3ch9i00x8zXRhjUNVcjG9ijES5dDudkXvUVCT5QlJNQWElSJdZqyPemffHoLNUYwOcou0Fy+ojN0uHSQ==",
+      "package": "smol-toml",
+      "sha256": "1fc995be91cdb777fc13e20c2edfebaaf60ef4e4d2d5331caef2837b04d37892",
+      "size_bytes": 23162,
+      "version": "1.8.0"
+    }
+  ],
+  "probe": {
+    "exit_code": 0,
+    "harness_sha256": "8762b781a784c3a6284b65fce7cccfda47149c002fc4d68652e8e18f256861ae",
+    "preload_sha256": "a2b898911f56be5b0517ed2b989c344dda9cd5d3224ee662dc5cfd40d5d7bf5d",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_sha256": "a67db9daeaf15fbe0ff0e6b2ef64f250cbb0ec6c162e8750873c1027fe774de9"
+  },
+  "product": "theme-forge-stellar-burst",
+  "release": {
+    "payload_asset": "knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+    "payload_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+    "payload_size_bytes": 644313,
+    "release_id": 399542205,
+    "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+    "tag": "v0.6.1"
+  },
+  "release_record_sha256": "8914a88194ba7d5b2549734a8d1aa49d48d5c93e3b2f8cb31cbf534c3b970f54",
+  "schema": "rs9.burst-loader-proof.v1alpha1",
+  "status": "pass",
+  "system": "aarch64-darwin",
+  "target_prebuild": {
+    "architecture": "arm64",
+    "deployment_minimum": [
+      13,
+      0
+    ],
+    "format": "Mach-O 64-bit arm64",
+    "key": "darwin-arm64",
+    "path": "package/native/directory-snapshot/prebuilds/darwin-arm64/native-addon-posix-openat-v1.node",
+    "sha256": "2f842ce43f62c76b04884a92980037067c8e55dfd183c86e788f1c3ac8a533c8",
+    "size_bytes": 53344
+  },
+  "version": "0.6.1",
+  "wheel_artifact": {
+    "filename": "theme_forge_stellar_burst-0.6.1-py3-none-macosx_13_0_arm64.whl",
+    "record_valid": true,
+    "sha256": "f492656fe1f21c67c728425079643aec65be355f6e54e2454bde029b64e7eb0c",
+    "tag": "py3-none-macosx_13_0_arm64"
+  }
+}

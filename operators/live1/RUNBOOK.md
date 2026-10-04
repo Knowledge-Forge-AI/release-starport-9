@@ -1,11 +1,10 @@
 # Attended Theme Forge LIVE1 preparation and future publication contract
 
-Status: **CONT5 payload-license source candidate; hosted run 4 pending; not ready for production publication**.
-`rs9.operator` supports status and fresh release authentication only. `publish-pages`
-and `publish-pypi` stop with PUBLICATION_NOT_READY. Manual environment setup cannot
-complete the missing package, qualification, reader and transport implementations.
+Status: **CONT6R2 terminal source amendment; dispatcher finalization pending; production disabled**.
 
-The accepted CONT1 checkpoint is historical partial source. The current [payload-license source candidate](../../docs/live1-hosted-candidate.md) repairs hosted run 3 (`37173827457`), which remains not-qualified with `HOSTED_COMPLETENESS`. Unit/config and npm transport passed; Nebular profile `PAYLOAD_LICENSE_MISSING` is the primary failure. The native copy list becomes LICENSE/NOTICE while tagged COMMERCIAL-LICENSE.md remains authenticated independently. The downstream expression stays AGPL-3.0-or-later. Downstream completeness remains mandatory. The bound proposal disposition is amend for SHA `fcc2846a48bfa5b1dc91e68cd3bd681993d32a13381095d66a4f64083d84826c`. Manager acceptance of the exact reviewed candidate is required before executing the attended operator below. The provider does not stage, commit, push, rerun or production-publish.
+The [cumulative candidate](../../docs/live1-hosted-candidate.md) preserves CONT6/CONT6R1 and amends proposal SHA `c40cdf9a43c0954d7d180481f444e724394b8c6b696af525260a6afac944009f`. Source verification and pre-final advisory dispositions are recorded in [CONT6R2 evidence](../../evidence/live1/cont6r2-verification.json). The dispatcher stage envelope authorizes the verified terminal amendment without another independent review. Manager acceptance of its exact bytes precedes attended adoption. The producer never stages, commits, pushes or invokes a reviewer.
+
+`rs9.operator` publication commands remain disabled. Burst is architecture-specific in wheels, pacman, RPM and APT; its complete foreign prebuild inventory is retained. Installed released-loader proofs are required in every Burst runtime lane. Production Linux wheel compatibility remains unproved. No product is omitted to obtain a qualified verdict.
 
 ## Environment and qualification realities
 
@@ -19,63 +18,36 @@ The accepted CONT1 checkpoint is historical partial source. The current [payload
 - **Corroboration states**: npm comparison records `blocked` when an unrelated profile failure prevents comparison, and preserves `pass` when a later failure follows completed npm checks. Overall authentication still requires every selected profile to pass. Any closeout amendment requires manager disposition of the exact terminal delta.
 - **Registry availability**: Hosted run 3 passed exact version `0.6.1` packument/tarball transport. Fresh authentication must retain any new `NPM_IDENTITY` or HTTP failure as evidence; never substitute `latest`, another version or registry, or retry failed hosted jobs automatically.
 
-## Source adoption and hosted collection
+## Source adoption and hosted-run-5 collection
 
-After manager acceptance, the reviewed parent is
-`6f5227586e944bf2016f4cf44000f49c16947351`; live remote `main` must still match it.
-Derive the review bindings from the final accepted bytes:
+Only after acceptance of the exact final-review candidate, copy the accepted terminal tree and manifest SHA into `RS9_REVIEWED_TREE` and `RS9_MANIFEST_SHA256`. Require public parent `e2c6cb5fcc55462e2e28e889a6c9f3ed60c9d131`. The complete manifest includes every reviewed new product path and excludes `.serena`, `.pytest_cache`, `__pycache__` and `.pyc`.
 
-~~~sh
-rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
-import hashlib, json
-from pathlib import Path
-from rs9.candidate_inventory import MANIFEST, verify_inventory
-raw = Path(MANIFEST).read_bytes()
-print(json.dumps({"reviewed_tree": verify_inventory(Path.cwd(), json.loads(raw)),
-                  "manifest_sha256": hashlib.sha256(raw).hexdigest()}))
-PY
-~~~
-
-Manager approval binds those exact values; set `RS9_REVIEWED_TREE` and
-`RS9_MANIFEST_SHA256` from the accepted result. Every new test/evidence path must
-appear in the final inventory, or adoption refuses it. Create an empty physical
-packet directory through the configured scratch workflow and set `RS9_PACKET_DIR`
-to it. It must be **outside the repository** (`ADOPTION_OUTPUT` otherwise).
-The sibling log path must also be external. From the reviewed repository:
+Create a new empty physical packet directory below the manager outbox `Documents/agent/outbox/release-starport-9_dev`, outside the repository, and set `RS9_PACKET_DIR` to it. Its sibling `.operator.log` must not already exist. From the accepted repository:
 
 ~~~sh
-rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 operators/live1/adopt-and-qualify.py adopt \
-  --reviewed-parent "6f5227586e944bf2016f4cf44000f49c16947351" \
+rtk proxy python3 operators/live1/run-hosted5.py \
   --reviewed-tree "$RS9_REVIEWED_TREE" \
   --manifest-sha256 "$RS9_MANIFEST_SHA256" \
-  --commit-message "Separate Nebular payload legal copies from tagged license authority" \
-  --output "$RS9_PACKET_DIR" > "$RS9_PACKET_DIR.operator.log" 2>&1
-RS9_OPERATOR_STATUS=$?
-rtk tail -n 40 "$RS9_PACKET_DIR.operator.log"
-rtk printf 'operator_exit=%s\n' "$RS9_OPERATOR_STATUS"
+  --output "$RS9_PACKET_DIR"
 ~~~
 
-This authenticates the inventory, checks main/remote parent twice, stages explicit reviewed
-paths and deletions, commits normally with `--commit-message` (the explicit message is required for this handoff), fast-forward pushes and collects the new push run bound to that
-commit's new push-triggered `rs9-candidate-tests.yml`. No rerun and no production publication is performed. Unrelated .serena state and
-ordinary interpreter/test caches are tolerated and never staged. Collection is bounded to two
-hours by default, six hours maximum.
+This operator checks main/HEAD/origin against the fixed public parent, validates exact inventory/tree/manifest, delegates normal commit and fast-forward push to the attended adoption tool, then waits for one new push-triggered workflow for that new SHA. Collection defaults to two hours, with a six-hour maximum. Event, branch, attempt and creation timestamp are checked; at most 60 seconds of clock skew is allowed and recorded. No rerun or dispatch endpoint is invoked.
 
-If collection times out, create a different empty outbox directory and explicitly resume read-only collection:
+The wrapper sets its own source `PYTHONPATH` and bytecode-disabled child environment. Argument, directory, import and exclusive-log failures stop inside bounded preflight. Packet-directory validation precedes log creation. All child stdout/stderr is written to the sibling operator log. The terminal prints only `LOG=`, `RC=` and `MANAGER_PACKET=` paths, including collisions; it preserves an existing log. A stale or unvalidated packet is never advertised: early failures print `MANAGER_PACKET=unavailable`, and a packet path is printed only after the child produces a physical file. Stop for manager disposition of that packet; do not rerun failed jobs automatically.
+
+The v2 collector retains every job and step, streams every artifact with byte/time bounds, verifies each outer digest, extracts safely, and rehashes candidate custody manifests. One artifact failure does not suppress attempts to collect the remaining artifacts. Extracted summaries are retained in full; the packet contains bounded identities, reported blockers and validation reasons. Production promotion blockers remain mandatory on Linux wheels but are separate from candidate qualification blockers.
+
+If collection times out, resume **read-only collection** explicitly in a different empty outbox directory, using the original push boundary as `RS9_PUSH_BOUNDARY` (ISO8601Z):
 
 ~~~sh
 rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 operators/live1/adopt-and-qualify.py collect \
-  --commit "$RS9_ADOPTED_COMMIT" --run-id "$RS9_RUN_ID" --output "$RS9_PACKET_DIR" > "$RS9_PACKET_DIR.operator.log" 2>&1
+  --commit "$RS9_ADOPTED_COMMIT" --run-id "$RS9_RUN_ID" --not-before "$RS9_PUSH_BOUNDARY" \
+  --output "$RS9_PACKET_DIR" > "$RS9_PACKET_DIR.operator.log" 2>&1
 RS9_OPERATOR_STATUS=$?
-rtk tail -n 40 "$RS9_PACKET_DIR.operator.log"
-rtk printf 'operator_exit=%s\n' "$RS9_OPERATOR_STATUS"
+rtk proxy printf 'LOG=%s\nRC=%s\nMANAGER_PACKET=%s\n' "$RS9_PACKET_DIR.operator.log" "$RS9_OPERATOR_STATUS" "$RS9_PACKET_DIR/manager-packet.json"
 ~~~
 
-The collection step uses the v2 collector (`rs9.collect_candidate`); historical CONT1 v1
-`validate_receipts` is not used. The packet is written before validation and includes all
-job/step conclusions, artifact IDs/digests/expiry, bounded summary bytes and reason codes.
-A failed run is not rerun automatically. Neither subcommand publishes, deploys, signs
-production bytes, mutates npm/Homebrew or emits a production receipt. The operator stops with the complete manager packet. New downstream defects remain evidence for the next manager disposition; no automatic failed-job reruns or downstream repairs are authorized by this handoff. Preparation pins and Linux wheel promotion policy remain qualification limits.
+Neither operator publishes, deploys, production-signs, mutates npm/Homebrew or emits production receipts. The released Theme Forge generation is unchanged. Preparation source pins have no floating fallback. Linux wheel compatibility remains an explicit production promotion limit. The manifest binds its public parent and mechanically checks the complete cumulative changed-path set before staging exactly that reviewed set.
 
 The signing-preflight.py operator takes an independently reviewed public-export
 SHA-256. It inspects existing local-key availability and public bytes only; it never

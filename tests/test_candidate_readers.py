@@ -1,6 +1,7 @@
 """Comprehensive unit tests for candidate readers and live observation boundaries."""
 import copy
 import hashlib
+import http.client
 import json
 from pathlib import Path
 import socket
@@ -144,6 +145,8 @@ class CandidateReadersTests(unittest.TestCase):
             URLError("network down"),
             HTTPError("https://pypi.org/pypi/theme-forge-stellar-loom/json", 429, "Too Many Requests", {}, None),
             HTTPError("https://pypi.org/pypi/theme-forge-stellar-loom/json", 503, "Service Unavailable", {}, None),
+            http.client.HTTPException("protocol error"),
+            http.client.RemoteDisconnected("remote disconnected"),
             ContractError("READER_REDIRECT", "Redirect rejected"),
         ):
             with patch("rs9.readers._get", side_effect=exc):
@@ -183,7 +186,7 @@ class CandidateReadersTests(unittest.TestCase):
         self.assertEqual(obs["state"], "absent")
         self.assertTrue(has_live_proof(obs))
 
-    def test_npm_exact_match(self):
+    def test_npm_metadata_returned_as_tarball_is_conflict(self):
         integrity = "sha512-" + "B" * 86 + "=="
         doc = {
             "name": "@knowledge-forge-ai/theme-forge-stellar-loom",
@@ -208,7 +211,7 @@ class CandidateReadersTests(unittest.TestCase):
                 expected_license="AGPL-3.0-or-later",
                 expected_commands={"tfsl": "bin/tfsl.js"}
             )
-        self.assertEqual(obs["state"], "unknown")
+        self.assertEqual(obs["state"], "conflict")
         self.assertTrue(has_live_proof(obs))
 
     def test_npm_conflict_on_integrity_or_license_or_commands(self):
@@ -246,12 +249,42 @@ class CandidateReadersTests(unittest.TestCase):
             URLError("connect timeout"),
             HTTPError("https://registry.npmjs.org/pkg", 429, "Rate limited", {}, None),
             HTTPError("https://registry.npmjs.org/pkg", 500, "Server Error", {}, None),
+            http.client.HTTPException("protocol error"),
             ContractError("READER_REDIRECT", "No redirect"),
         ):
             with patch("rs9.readers._get", side_effect=exc):
                 obs = read_npm(self.npm_dest, self.npm_subj)
             self.assertEqual(obs["state"], "unknown")
             self.assertTrue(has_live_proof(obs))
+
+    def test_npm_same_command_name_with_changed_target_is_conflict(self):
+        metadata = {"name": self.npm_subj["package"], "versions": {self.npm_subj["version"]: {
+            "dist": {"integrity": "sha512-" + "C" * 86 + "==",
+                     "tarball": "https://registry.npmjs.org/pkg/-/pkg.tgz"},
+            "license": "MIT", "bin": {"tfsl": "bin/changed.js"}}}}
+        with patch("rs9.readers._get", return_value=canonical(metadata)) as fetch:
+            obs = read_npm(self.npm_dest, self.npm_subj, desired_identity="b" * 64,
+                           expected_hashes={"pkg.tgz": "a" * 64}, expected_license="MIT",
+                           expected_commands={"tfsl": "bin/tfsl.js"})
+        self.assertEqual(obs["state"], "conflict")
+        self.assertTrue(has_live_proof(obs))
+        self.assertEqual(fetch.call_count, 1)
+        self.assertIn("npm-conflict", [row["code"] for row in obs["diagnostics"]])
+
+    def test_npm_received_tarball_integrity_drift_is_conflict(self):
+        payload = b"payload differs from the declared integrity"
+        metadata = {"name": self.npm_subj["package"], "versions": {self.npm_subj["version"]: {
+            "dist": {"integrity": "sha512-" + "C" * 86 + "==",
+                     "tarball": "https://registry.npmjs.org/pkg/-/pkg.tgz"},
+            "license": "MIT", "bin": {"tfsl": "bin/tfsl.js"}}}}
+        with patch("rs9.readers._get", side_effect=[canonical(metadata), payload]):
+            obs = read_npm(self.npm_dest, self.npm_subj, desired_identity="b" * 64,
+                           expected_hashes={"pkg.tgz": "a" * 64}, expected_license="MIT",
+                           expected_commands={"tfsl": "bin/tfsl.js"})
+        self.assertEqual(obs["state"], "conflict")
+        self.assertTrue(has_live_proof(obs))
+        self.assertEqual(obs["readback"]["components"], {"pkg.tgz": hashlib.sha256(payload).hexdigest()})
+        self.assertIn("npm-conflict", [row["code"] for row in obs["diagnostics"]])
 
     # ------------------------------------------------------------------
     # Homebrew Reader Tests
@@ -278,8 +311,93 @@ class CandidateReadersTests(unittest.TestCase):
                 expected_payload_url="https://registry.npmjs.org/pkg.tgz",
                 expected_payload_sha256="e" * 64
             )
-        self.assertEqual(obs["state"], "unknown")
+        self.assertEqual(obs["state"], "conflict")
         self.assertTrue(has_live_proof(obs))
+
+    def test_homebrew_full_agreement_yields_exact(self):
+        formula_text = (
+            'class ThemeForgeStellarLoom < Formula\n'
+            '  desc "Theme builder"\n'
+            '  homepage "https://github.com/Knowledge-Forge-AI/theme-forge-stellar-loom"\n'
+            '  url "https://registry.npmjs.org/pkg.tgz"\n'
+            '  sha256 "' + "e" * 64 + '"\n'
+            '  license "AGPL-3.0-or-later"\n'
+            '  depends_on "node"\n'
+            '  def install\n'
+            '    (bin/"tfsl").write "exec node"\n'
+            '  end\n'
+            '  test do\n'
+            '    assert_match version.to_s, shell_output("#{bin}/tfsl --version")\n'
+            '  end\n'
+            'end\n'
+        )
+        formula_bytes = formula_text.encode()
+        expected_blob = hashlib.sha1(f"blob {len(formula_bytes)}\0".encode() + formula_bytes).hexdigest()
+
+        with patch("rs9.readers._get", return_value=formula_bytes):
+            obs = read_homebrew(
+                self.brew_dest, self.brew_subj, pinned_ref="a" * 40,
+                desired_identity="b" * 64,
+                expected_payload_url="https://registry.npmjs.org/pkg.tgz",
+                expected_payload_sha256="e" * 64,
+                expected_license="AGPL-3.0-or-later",
+                expected_commands=["tfsl"],
+                expected_restrictions="node",
+                expected_blob_sha=expected_blob,
+            )
+        self.assertEqual(obs["state"], "exact")
+        self.assertEqual(obs["readback"]["presence"], "present")
+        self.assertEqual(obs["readback"]["level"], "full")
+        self.assertEqual(obs["readback"]["content_identity_sha256"], "b" * 64)
+        self.assertTrue(has_live_proof(obs))
+
+    def test_homebrew_license_and_command_mismatches_yield_conflict(self):
+        formula_text = (
+            'class ThemeForgeStellarLoom < Formula\n'
+            '  url "https://registry.npmjs.org/pkg.tgz"\n'
+            '  sha256 "' + "e" * 64 + '"\n'
+            '  license "MIT"\n'
+            '  def install\n'
+            '    (bin/"tfsl").write "exec node"\n'
+            '  end\n'
+            'end\n'
+        )
+        formula_bytes = formula_text.encode()
+
+        with patch("rs9.readers._get", return_value=formula_bytes):
+            # License mismatch
+            obs_lic = read_homebrew(
+                self.brew_dest, self.brew_subj, pinned_ref="a" * 40,
+                desired_identity="b" * 64,
+                expected_payload_url="https://registry.npmjs.org/pkg.tgz",
+                expected_payload_sha256="e" * 64,
+                expected_license="AGPL-3.0-or-later",
+            )
+            self.assertEqual(obs_lic["state"], "conflict")
+            self.assertIn("homebrew-conflict", [d["code"] for d in obs_lic["diagnostics"]])
+
+            # Command mismatch
+            obs_cmd = read_homebrew(
+                self.brew_dest, self.brew_subj, pinned_ref="a" * 40,
+                desired_identity="b" * 64,
+                expected_payload_url="https://registry.npmjs.org/pkg.tgz",
+                expected_payload_sha256="e" * 64,
+                expected_license="MIT",
+                expected_commands=["other-command"],
+            )
+            self.assertEqual(obs_cmd["state"], "conflict")
+
+            # Blob SHA mismatch
+            obs_blob = read_homebrew(
+                self.brew_dest, self.brew_subj, pinned_ref="a" * 40,
+                desired_identity="b" * 64,
+                expected_payload_url="https://registry.npmjs.org/pkg.tgz",
+                expected_payload_sha256="e" * 64,
+                expected_license="MIT",
+                expected_commands=["tfsl"],
+                expected_blob_sha="f" * 40,
+            )
+            self.assertEqual(obs_blob["state"], "conflict")
 
     def test_homebrew_conflict_on_mismatch(self):
         formula_bytes = b'url "https://registry.npmjs.org/pkg.tgz"\nsha256 "' + b"e" * 64 + b'"\n'
@@ -297,6 +415,7 @@ class CandidateReadersTests(unittest.TestCase):
         for exc in (
             URLError("ref not reached"),
             HTTPError("https://raw.githubusercontent.com/", 429, "Rate limit", {}, None),
+            http.client.HTTPException("protocol error"),
             ContractError("READER_REDIRECT", "Redirect"),
         ):
             with patch("rs9.readers._get", side_effect=exc):
@@ -456,3 +575,124 @@ class CandidateReadersTests(unittest.TestCase):
         # Serialized JSON loses proof
         raw_json = json.loads(canonical(obs))
         self.assertFalse(has_live_proof(raw_json))
+
+    # ------------------------------------------------------------------
+    # HTTPException and Identity Gap Closure Tests
+    # ------------------------------------------------------------------
+    def test_http_exception_and_protocol_errors_map_to_unknown_across_all_readers(self):
+        from tests.test_live1_readers_operator import registry_fixture
+        pypi_out, _, _ = registry_fixture()
+
+        for exc in (
+            http.client.HTTPException("protocol error"),
+            http.client.RemoteDisconnected("remote disconnected"),
+            http.client.IncompleteRead(b"partial bytes"),
+        ):
+            # 1. read_pypi
+            with patch("rs9.readers._get", side_effect=exc):
+                obs = read_pypi(pypi_out)
+            self.assertEqual(obs["state"], "unknown")
+            self.assertTrue(has_live_proof(obs))
+
+            # 2. read_pypi_project
+            with patch("rs9.readers._get", side_effect=exc):
+                obs = read_pypi_project(self.pypi_dest, self.pypi_subj)
+            self.assertEqual(obs["state"], "unknown")
+            self.assertTrue(has_live_proof(obs))
+
+            # 3. read_npm
+            with patch("rs9.readers._get", side_effect=exc):
+                obs = read_npm(self.npm_dest, self.npm_subj)
+            self.assertEqual(obs["state"], "unknown")
+            self.assertTrue(has_live_proof(obs))
+
+            # 4. read_homebrew
+            with patch("rs9.readers._get", side_effect=exc):
+                obs = read_homebrew(self.brew_dest, self.brew_subj, pinned_ref="a" * 40)
+            self.assertEqual(obs["state"], "unknown")
+            self.assertTrue(has_live_proof(obs))
+
+            # 5. read_pages
+            with patch("rs9.readers._get", side_effect=exc):
+                obs = read_pages(self.pages_dest, self.pages_subj, path="pool/main/t/pkg.deb")
+            self.assertEqual(obs["state"], "unknown")
+            self.assertTrue(has_live_proof(obs))
+            self.assertIn("pages-protocol-error", [d["code"] for d in obs["diagnostics"]])
+
+            # 6. read_github (pages query)
+            with patch("rs9.readers._get", side_effect=exc):
+                obs = read_github("Knowledge-Forge-AI/release-starport-9", query_type="pages")
+            self.assertEqual(obs["state"], "unknown")
+            self.assertTrue(has_live_proof(obs))
+
+            # 7. read_github (ref query)
+            with patch("rs9.readers._get", side_effect=exc):
+                obs = read_github("Knowledge-Forge-AI/release-starport-9", query_type="ref", ref="refs/heads/main")
+            self.assertEqual(obs["state"], "unknown")
+            self.assertTrue(has_live_proof(obs))
+
+            # 8. read_signed_repo
+            with patch("rs9.readers._get", side_effect=exc):
+                obs = read_signed_repo("theme-forge", base_url="https://rs9.knowledge-forge.ai",
+                                       index_path="InRelease", verifier=lambda x: True)
+            self.assertEqual(obs["state"], "unknown")
+            self.assertTrue(has_live_proof(obs))
+
+    def test_destination_adapter_identity_gaps_fail_closed(self):
+        # Mismatched adapter must raise ContractError(READER_DESTINATION)
+        bad_cases = [
+            (read_pages, {"id": "pages", "adapter": "npm", "mode": "direct"}, {"path": "test"}),
+            (read_github, {"id": "github", "adapter": "pages", "mode": "projection"}, {"repository": "repo/name"}),
+            (read_signed_repo, {"id": "signed-store", "adapter": "pypi", "mode": "direct"},
+             {"base_url": "https://rs9.knowledge-forge.ai", "index_path": "InRelease"}),
+            (read_pypi_project, {"id": "pypi", "adapter": "npm", "mode": "direct"}, {}),
+            (read_homebrew, {"id": "homebrew", "adapter": "pypi", "mode": "projection"}, {"pinned_ref": "a" * 40}),
+        ]
+        for fn, dest, kwargs in bad_cases:
+            with self.assertRaises(ContractError) as caught:
+                fn(dest, **kwargs)
+            self.assertEqual(caught.exception.code, "READER_DESTINATION")
+
+    def test_credentials_in_reader_inputs_fail_closed(self):
+        token = "ghp_" + "a" * 36
+        # Credentials in path or host for read_pages
+        with self.assertRaises(ContractError):
+            read_pages(self.pages_dest, self.pages_subj, path=f"sub/{token}")
+        with self.assertRaises(ContractError):
+            read_pages(self.pages_dest, self.pages_subj, path="sub/file", host=f"user:{token}@example.com")
+
+        # Credentials in homebrew
+        with self.assertRaises(ContractError):
+            read_homebrew(self.brew_dest, self.brew_subj, pinned_ref="a" * 40,
+                          expected_payload_url=f"https://user:{token}@github.com/file")
+
+        # Credentials in signed repo
+        with self.assertRaises(ContractError):
+            read_signed_repo("theme-forge", base_url=f"https://user:{token}@rs9.knowledge-forge.ai",
+                             index_path="InRelease")
+
+    def test_pypi_metadata_404_only_absence_not_file_404(self):
+        from tests.test_live1_readers_operator import registry_fixture
+        pypi_out, metadata, _ = registry_fixture()
+        meta_url = f"https://pypi.org/pypi/{pypi_out['subject']['package']}/{pypi_out['subject']['version']}/json"
+        file_url = metadata["urls"][0]["url"]
+
+        # Metadata 404 yields absent
+        with patch("rs9.readers._get", side_effect=HTTPError(meta_url, 404, "Not Found", {}, None)):
+            obs = read_pypi(pypi_out)
+        self.assertEqual(obs["state"], "absent")
+        self.assertTrue(has_live_proof(obs))
+
+        # File 404 yields unknown, NOT absent
+        def fake_get_file_404(url, hosts, limit):
+            if url == meta_url:
+                return canonical(metadata)
+            if url == file_url:
+                raise HTTPError(file_url, 404, "Not Found", {}, None)
+            raise ValueError(url)
+
+        with patch("rs9.readers._get", side_effect=fake_get_file_404):
+            obs = read_pypi(pypi_out)
+        self.assertEqual(obs["state"], "unknown")
+        self.assertNotEqual(obs["readback"]["presence"], "absent")
+        self.assertTrue(has_live_proof(obs))

@@ -12,6 +12,7 @@
       "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
       "tag": "v0.6.1",
       "kind": "node-cli",
+      "packaging_class": "native-node-cli",
       "license": "AGPL-3.0-or-later",
       "node_engine": ">=22",
       "authenticated": false,
@@ -28,9 +29,8 @@
       },
       "platforms": [
         "aarch64-darwin",
-        "x86_64-darwin",
-        "aarch64-linux",
-        "x86_64-linux"
+        "x86_64-linux",
+        "aarch64-linux"
       ],
       "command_paths": {
         "tfsb": "dist/cli.js",
@@ -45,6 +45,7 @@
       "repository": "Knowledge-Forge-AI/theme-forge-stellar-loom",
       "tag": "v0.4.0",
       "kind": "node-cli",
+      "packaging_class": "pure-js-cli",
       "license": "AGPL-3.0-or-later",
       "node_engine": ">=22",
       "authenticated": false,
@@ -77,6 +78,7 @@
       "repository": "Knowledge-Forge-AI/theme-forge-solar-sail",
       "tag": "v0.2.1",
       "kind": "node-cli",
+      "packaging_class": "pure-js-cli",
       "license": "AGPL-3.0-or-later",
       "node_engine": ">=22",
       "authenticated": false,
@@ -108,6 +110,7 @@
       "tag": "v0.6.1",
       "commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
       "kind": "materialized-desktop",
+      "packaging_class": "native-desktop",
       "license": "AGPL-3.0-or-later",
       "authenticated": false,
       "commands": [

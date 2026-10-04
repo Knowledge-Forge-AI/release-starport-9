@@ -259,6 +259,9 @@ def build_deb_candidate(
     project_id = ctx["project_id"]
     version = ctx["version"]
     is_native = ctx["is_native"]
+    is_native_desktop = ctx.get("is_native_desktop", False)
+    is_native_node_cli = ctx.get("is_native_node_cli", False)
+    is_pure_js_cli = ctx.get("is_pure_js_cli", not is_native)
     matched_arch = ctx["arch"]
 
     r = runner or SubprocessRunner()
@@ -290,7 +293,7 @@ def build_deb_candidate(
     shlibdeps_receipt = None
     shlibs_receipt = None
     shlibs_inventory = None
-    if is_native:
+    if is_native_desktop:
         # Every ELF object in the staged payload feeds dpkg-shlibdeps; a payload with no ELF
         # object (for example only the shell launcher) can never qualify a native package.
         elf_objects = collect_elf_inventory(pkg_root)
@@ -306,6 +309,50 @@ def build_deb_candidate(
         )
         dependency_classification = "native-tool-derived"
         _stage_native_launcher_and_desktop(capture, intent, ctx, pkg_root, install_lib, install_bin)
+    elif is_native_node_cli:
+        # Native node CLI (Burst): stage commands, offline npm closure, and target prebuild
+        cmd_dict = ctx["payload"].get("commands", {}) or intent.get("commands", {})
+        for cmd_name, cmd_info in sorted(cmd_dict.items()):
+            rel_bin = cmd_info["path"][len(payload_root) + 1:]
+            wrapper = f'#!/bin/sh\nexec node "/usr/lib/{project_id}/{rel_bin}" "$@"\n'
+            w_file = install_bin / cmd_name
+            w_file.write_text(wrapper, encoding="utf-8")
+            w_file.chmod(0o755)
+        stage_offline_npm_closure(capture, project_id, offline_npm_archives, install_lib / "node_modules")
+
+        target_prebuild_path = (
+            ctx.get("burst_prebuild_info", {}).get("target_path")
+            if ctx.get("burst_prebuild_info")
+            else (
+                "package/native/directory-snapshot/prebuilds/linux-x64-gnu/native-addon-posix-openat-v1.node"
+                if matched_arch == "amd64"
+                else "package/native/directory-snapshot/prebuilds/linux-arm64-gnu/native-addon-posix-openat-v1.node"
+            )
+        )
+        target_prebuild_rel = (
+            target_prebuild_path[len(payload_root) + 1:]
+            if target_prebuild_path.startswith(payload_root + "/")
+            else target_prebuild_path
+        )
+        all_elfs = collect_elf_inventory(pkg_root)
+        elf_objects = [
+            row for row in all_elfs
+            if row["path"] == target_prebuild_path
+            or row["path"].endswith("/" + target_prebuild_path)
+            or row["path"].endswith("/" + target_prebuild_rel)
+            or row["path"] == target_prebuild_rel
+        ]
+        if not elf_objects:
+            raise ContractError("MISSING_ASSET", f"Matching native prebuild missing: {target_prebuild_path}")
+        if elf_objects[0]["machine"] != ELF_MACHINE[matched_arch]:
+            raise ContractError("INVALID_ARCHITECTURE", f"ELF machine differs from deb architecture {matched_arch}")
+
+        # Ensure dependency derivation ONLY targets matching prebuild; foreign exact closed prebuilds remain inert
+        shlibdeps_receipt, shlib_depends, shlibs_receipt, shlibs_inventory = derive_native_dependencies(
+            r, scratch, pkg_root, project_id, matched_arch, valid_maintainer, elf_objects
+        )
+        derived_depends = f"nodejs (>= 22), {shlib_depends}" if shlib_depends else "nodejs (>= 22)"
+        dependency_classification = "native-tool-derived"
     else:
         cmd_dict = ctx["payload"].get("commands", {}) or intent.get("commands", {})
         for cmd_name, cmd_info in sorted(cmd_dict.items()):
@@ -411,6 +458,7 @@ def build_deb_candidate(
         "qualification": "unqualified-candidate",
         "can_publish": False,
         "adapter": "debian",
+        "package_class": ctx["product_class"],
         "project": project_id,
         "version": version,
         "revision": revision,

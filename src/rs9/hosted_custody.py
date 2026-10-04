@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 
@@ -12,6 +13,37 @@ from rs9.scratch import canonical
 from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
 
 SCHEMA = "rs9.hosted-artifact-set.v1alpha2"
+
+
+def diagnostic_bytes(source):
+    """Validate bounded diagnostic JSON without exposing its rejected contents."""
+    if source.stat().st_size > 64 * 1024 or source.suffix != ".json":
+        raise ContractError("DIAGNOSTIC_LIMIT", "Bounded JSON diagnostics required")
+    data = source.read_bytes()
+    if len(data) > 64 * 1024:
+        raise ContractError("DIAGNOSTIC_LIMIT", "Bounded JSON diagnostics required")
+    try:
+        text = data.decode("utf-8")
+        value = json.loads(text)
+    except (ValueError, UnicodeError, RecursionError):
+        raise ContractError("DIAGNOSTIC_SCHEMA", "Diagnostic JSON required") from None
+    scan_for_credentials(text)
+    private = re.compile(r"/(?:" + "Users" + r"|home|root|private|tmp)/|~[/\\]|[A-Za-z]:\\")
+    def scan(item, depth=0):
+        if depth > 32:
+            raise ContractError("DIAGNOSTIC_LIMIT", "Diagnostic nesting exceeds bound")
+        if isinstance(item, str):
+            if private.search(item):
+                raise ContractError("PRIVATE_PATH", "Private paths forbidden in diagnostic custody")
+        elif isinstance(item, dict):
+            for key, child in item.items():
+                scan(key, depth + 1)
+                scan(child, depth + 1)
+        elif isinstance(item, list):
+            for child in item:
+                scan(child, depth + 1)
+    scan(value)
+    return data
 
 
 def file_identity(path):
@@ -55,21 +87,39 @@ def runner_facts():
 def retain(scratch, output, files, record):
     output.mkdir(parents=True, exist_ok=True)
     rows = []
+    seen = set()
     for source in files:
         source = Path(source)
         if any(p.is_symlink() for p in (source, *source.parents)):
             raise ContractError("CUSTODY_FILE", "Linked custody source refused")
         relative = Path(source).relative_to(scratch).as_posix()
         validate_safe_relative_posix_path(relative)
-        if relative in {r["path"] for r in rows}:
+        if relative in seen:
             continue
+        seen.add(relative)
         target = output / "objects" / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source, target)
+        if "diagnostics" in Path(relative).parts:
+            try:
+                data = diagnostic_bytes(source)
+            except ContractError as error:
+                identity = file_identity(source)
+                failure = {"path": relative, "reason": error.code, **identity}
+                record.setdefault("diagnostic_scan_failures", []).append(failure)
+                # The primary client/verifier failure remains the lane's cause.
+                if not record.get("execution_error"):
+                    record["execution_error"] = "DIAGNOSTIC_CUSTODY"
+                data = canonical({"schema": "rs9.withheld-diagnostic.v1alpha1",
+                                  "status": "withheld", **failure})
+                if target.suffix != ".json":
+                    target = target.with_name(target.name + ".withheld.json")
+            target.write_bytes(data)
+        else:
+            shutil.copyfile(source, target)
         kind = "custody" if target.name.endswith((".whl", ".rpm", ".deb", ".pkg.tar.zst", ".pkg.tar.xz")) else "evidence"
         fixture_copy = kind == "custody" and record["lane"] in {"rpm", "pacman", "pages"} and "unsigned" not in relative and "custody" not in relative
-        rows.append({"path": "objects/" + relative, **file_identity(target), "kind": kind,
-                     "promotion": "fixture-test-only" if fixture_copy else "candidate-policy-pending" if "linux" in target.name and "nebular" in target.name and target.suffix == ".whl" else "candidate-only"})
+        rows.append({"path": target.relative_to(output).as_posix(), **file_identity(target), "kind": kind,
+                     "promotion": "fixture-test-only" if fixture_copy else "candidate-policy-pending" if target.suffix == ".whl" and target.stem.rsplit("-", 1)[-1].startswith("linux_") else "candidate-only"})
     receipt_name = record["lane"] + "-" + record["system"] + ".json"
     raw = canonical(record)
     scan_for_credentials(raw.decode())

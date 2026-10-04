@@ -43,7 +43,12 @@ def make_synthetic_archive(entries: list[tuple[str, bytes, int, bytes]]) -> byte
     return buf.getvalue()
 
 
-def make_test_loom_capture(directory: Path, *, extra_sources: dict[str, bytes] | None = None) -> tuple[dict, ReleaseCapture]:
+def make_test_loom_capture(
+    directory: Path,
+    *,
+    extra_sources: dict[str, bytes] | None = None,
+    extra_tar_entries: list[tuple[str, bytes, int, bytes]] | None = None,
+) -> tuple[dict, ReleaseCapture]:
     sources = {
         "LICENSE": b"Synthetic AGPL-3.0-or-later license text.\n",
         "NOTICE": b"Synthetic notice.\n",
@@ -66,6 +71,8 @@ def make_test_loom_capture(directory: Path, *, extra_sources: dict[str, bytes] |
         ("package/LICENSE", sources["LICENSE"], 0o644, tarfile.REGTYPE),
         ("package/NOTICE", sources["NOTICE"], 0o644, tarfile.REGTYPE),
     ]
+    if extra_tar_entries:
+        tar_entries.extend(extra_tar_entries)
     pkg_tgz = make_synthetic_archive(tar_entries)
     archive_name = "knowledge-forge-ai-theme-forge-stellar-loom-0.4.0.tgz"
 
@@ -404,3 +411,108 @@ class WheelCaptureTests(unittest.TestCase):
         )
         self.assertTrue(parity["parity_confirmed"])
         self.assertEqual(parity["returncode"], 1)
+
+    def test_unqualified_platform_native_member_error_details(self) -> None:
+        """Verify UNQUALIFIED_PLATFORM carries required safe error details when native member is found."""
+        evidence_dir = self.root / "evidence_native"
+        _, capture = make_test_loom_capture(
+            evidence_dir,
+            extra_tar_entries=[("package/binding.node", b"\x7fELF" + b"\x00" * 32, 0o755, tarfile.REGTYPE)],
+        )
+
+        with self.assertRaises(ContractError) as ctx:
+            build_capture_wheel(
+                "theme-forge-stellar-loom",
+                "0.4.0",
+                capture,
+                output_dir=self.root / "out",
+            )
+        self.assertEqual(ctx.exception.code, "UNQUALIFIED_PLATFORM")
+        details = ctx.exception.details
+        self.assertEqual(details["product"], "theme-forge-stellar-loom")
+        self.assertEqual(details["substage"], "closure-platform-scan")
+        self.assertEqual(details["archive_path"], "package/binding.node")
+        self.assertEqual(details["wheel_tag"], "py3-none-any")
+        self.assertEqual(details["asset_platform"], "any")
+
+    def test_unqualified_platform_constrained_package_json_error_details(self) -> None:
+        """Verify UNQUALIFIED_PLATFORM carries required safe error details when platform-constrained package.json is found."""
+        evidence_dir = self.root / "evidence_constrained"
+        _, capture = make_test_loom_capture(
+            evidence_dir,
+            extra_tar_entries=[(
+                "package/node_modules/arch_dep/package.json",
+                json.dumps({"name": "arch_dep", "os": ["linux"]}).encode("utf-8"),
+                0o644,
+                tarfile.REGTYPE,
+            )],
+        )
+
+        with self.assertRaises(ContractError) as ctx:
+            build_capture_wheel(
+                "theme-forge-stellar-loom",
+                "0.4.0",
+                capture,
+                output_dir=self.root / "out",
+            )
+        self.assertEqual(ctx.exception.code, "UNQUALIFIED_PLATFORM")
+        details = ctx.exception.details
+        self.assertEqual(details["product"], "theme-forge-stellar-loom")
+        self.assertEqual(details["substage"], "closure-platform-scan")
+        self.assertEqual(details["archive_path"], "package/node_modules/arch_dep/package.json")
+        self.assertEqual(details["wheel_tag"], "py3-none-any")
+        self.assertEqual(details["asset_platform"], "any")
+
+    def test_burst_system_none_retains_global_rejection_when_native_present(self) -> None:
+        """When system=None, build_capture_wheel retains global rejection for Burst when native members present."""
+        evidence_dir = self.root / "evidence_burst_system_none"
+        _, burst_capture = make_test_burst_capture(evidence_dir)
+
+        # Inject native binary into burst archive
+        dep_tar = make_synthetic_archive([
+            ("package", b"", 0o755, tarfile.DIRTYPE),
+            ("package/package.json", canonical({"name": "simple-dep", "version": "1.0.0", "license": "MIT"}), 0o644, tarfile.REGTYPE),
+            ("package/index.js", b"module.exports = 'dep';\n", 0o644, tarfile.REGTYPE),
+            ("package/LICENSE", b"MIT License\n", 0o644, tarfile.REGTYPE),
+            ("package/native/directory-snapshot/prebuilds/linux-x64-gnu/native-addon-posix-openat-v1.node", b"\x7fELF" + b"\x00" * 32, 0o755, tarfile.REGTYPE),
+        ])
+        dep_archive_path = self.root / "simple-dep-native.tgz"
+        dep_archive_path.write_bytes(dep_tar)
+        dep_integrity = "sha512-" + base64.b64encode(hashlib.sha512(dep_tar).digest()).decode("ascii")
+        dep_rel = "node_modules/simple-dep"
+
+        burst_pkg = canonical({
+            "name": "theme-forge-stellar-burst",
+            "version": "0.6.1",
+            "license": "AGPL-3.0-or-later",
+            "dependencies": {"simple-dep": "1.0.0"},
+        })
+        burst_lock = canonical({
+            "lockfileVersion": 3,
+            "packages": {
+                "": {"dependencies": {"simple-dep": "1.0.0"}},
+                dep_rel: {
+                    "version": "1.0.0",
+                    "resolved": "https://registry.npmjs.org/simple-dep/-/simple-dep-1.0.0.tgz",
+                    "integrity": dep_integrity,
+                },
+            },
+        })
+
+        _, burst_capture_with_dep = make_test_burst_capture(
+            evidence_dir,
+            extra_sources={"package.json": burst_pkg, "package-lock.json": burst_lock},
+        )
+
+        with self.assertRaises(ContractError) as ctx:
+            build_capture_wheel(
+                "theme-forge-stellar-burst",
+                "0.6.1",
+                burst_capture_with_dep,
+                system=None,
+                platform_tag="any",
+                dependency_archives={dep_rel: dep_archive_path},
+                integrate_closure=True,
+                output_dir=self.root / "out_none",
+            )
+        self.assertEqual(ctx.exception.code, "UNQUALIFIED_PLATFORM")

@@ -159,7 +159,7 @@ def staging_paths(root, manifest, git):
 
 
 def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256, timeout=7200,
-          commit_message="Repair hosted command authentication and hermetic source contracts"):
+          commit_message="Recover hosted matrix boundaries and platform-specific Burst candidates"):
     from rs9.collect_candidate import collect, output_directory
     root = physical_directory(repository)
     if any(not re.fullmatch(r"[0-9a-f]{40}", x) for x in (reviewed_parent, reviewed_tree)) or not re.fullmatch(r"[0-9a-f]{64}", manifest_sha256):
@@ -184,7 +184,7 @@ def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256
     output = output_directory(output)
     if output == root or root in output.parents:
         raise ContractError("ADOPTION_OUTPUT", "External result directory required")
-    if verify_inventory(root, manifest) != reviewed_tree:
+    if verify_inventory(root, manifest, parent=reviewed_parent) != reviewed_tree:
         raise ContractError("ADOPTION_REVIEW", "Source tree differs from manager review")
     git = lambda *args: run(root, ["git", *args])
     if git("branch", "--show-current") != "main" or git("rev-parse", "HEAD") != reviewed_parent or git("diff", "--cached", "--name-only"):
@@ -195,11 +195,17 @@ def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256
     git("fetch", "origin", "main")
     if git("rev-parse", "origin/main") != reviewed_parent:
         raise ContractError("ADOPTION_PARENT", "Remote main advanced; fresh review required")
-    if (verify_inventory(root, manifest) != reviewed_tree or git("branch", "--show-current") != "main"
+    if (verify_inventory(root, manifest, parent=reviewed_parent) != reviewed_tree or git("branch", "--show-current") != "main"
             or git("rev-parse", "HEAD") != reviewed_parent or git("diff", "--cached", "--name-only")
             or paths != staging_paths(root, manifest, git)):
         raise ContractError("ADOPTION_REVIEW", "Source or index changed during preflight")
-    git("add", "-A", "--", *paths)
+    changed_paths = manifest.get("changed_paths")
+    if not changed_paths or not isinstance(changed_paths, list):
+        raise ContractError("ADOPTION_REVIEW", "Reviewed changed_paths required")
+    git("add", "-A", "--", *changed_paths)
+    cached = {p for p in git("diff", "--cached", "--name-only", "--no-renames", reviewed_parent, "--").splitlines() if p}
+    if cached != set(changed_paths):
+        raise ContractError("ADOPTION_REVIEW", "Staged cached set differs from reviewed changed_paths")
     if git("write-tree") != reviewed_tree:
         raise ContractError("ADOPTION_REVIEW", "Staged tree differs; index retained for inspection")
     git("commit", "-m", commit_message)
@@ -208,7 +214,7 @@ def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256
         raise ContractError("ADOPTION_REVIEW", "Commit hook changed candidate; stop before push")
     started = datetime.now(timezone.utc).replace(microsecond=0)
     git("push", "origin", "HEAD:main")
-    packet = collect(root, output, commit=commit, started_at=started, timeout=timeout, runner=run)
+    packet = collect(root, output, commit=commit, started_at=started, timeout=timeout)
     packet["reviewed_tree"] = reviewed_tree
     from rs9.collect_candidate import write_packet
     write_packet(output, packet)
@@ -226,9 +232,10 @@ def main(argv=None):
         command.add_argument("--timeout", type=int, default=7200)
     for flag in ("reviewed-parent", "reviewed-tree", "manifest-sha256"):
         adoption.add_argument("--" + flag, required=True)
-    adoption.add_argument("--commit-message", default="Repair hosted command authentication and hermetic source contracts")
+    adoption.add_argument("--commit-message", default="Recover hosted matrix boundaries and platform-specific Burst candidates")
     collection.add_argument("--commit", required=True)
-    collection.add_argument("--run-id", type=int, required=True)
+    collection.add_argument("--run-id", type=int, default=None)
+    collection.add_argument("--not-before", required=True, help="ISO8601Z timestamp")
     args = parser.parse_args(argv)
     try:
         if args.command == "adopt":
@@ -237,8 +244,14 @@ def main(argv=None):
                            commit_message=args.commit_message)
         else:
             from rs9.collect_candidate import collect
+            if not args.not_before.endswith("Z"):
+                raise ContractError("HOSTED_ARGUMENT", "Timezone-aware --not-before (ISO8601Z) required")
+            try:
+                started_at = datetime.fromisoformat(args.not_before.replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ContractError("HOSTED_ARGUMENT", "Malformed --not-before timestamp") from exc
             result = collect(args.repository, args.output, commit=args.commit, run_id=args.run_id,
-                             timeout=args.timeout, runner=run)
+                             started_at=started_at, timeout=args.timeout)
         print(canonical({"status": result["status"], "run_id": result["run_id"],
                          "validation": result["validation"], "production_enabled": False}).decode(), end="")
         return 0 if result["validation"]["status"] == "pass" else 2

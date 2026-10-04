@@ -222,6 +222,13 @@ def plan(intent, capture, profile_result, output, gates, policy, observation, *,
         config = {"semantic-inputs": record_sha256(semantics)}
     else:
         config = {"configuration": record_sha256(intent)}
+    if "packaging_policy" in identity["configuration_identity"]:
+        from rs9.product_classes import get_product_class, supported_architectures
+        packaging_policy = {"package_class": get_product_class(intent["project"]["id"]),
+                            "qualified_architectures": sorted(supported_architectures(intent["project"]["id"], output["destination"]["adapter"]))}
+        config["packaging_policy"] = record_sha256(packaging_policy)
+        if any(output["source_manifest"].get(key) != value for key, value in packaging_policy.items()):
+            raise ContractError("OUTPUT_BINDING", "Publication architecture policy differs from the explicit product contract")
     if identity["configuration_identity"] != config:
         raise ContractError("OUTPUT_BINDING", "Semantic configuration must bind normalized inputs")
     observation = validate_observation(observation, output["destination"], output["subject"], expected_components(output), output["content_identity_sha256"])
