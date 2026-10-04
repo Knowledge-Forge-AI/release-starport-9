@@ -34,8 +34,14 @@ class CandidateCaptureTests(unittest.TestCase):
 
     def test_workflow_identity_never_copied_to_release_redirect(self):
         handler = ScopedGitHubAuthorization("test-only-identity")
-        request = handler.https_request(Request("https://api.github.com/repos/example/project"))
+        request = Request("https://api.github.com/repos/example/project")
+        request.rs9_operation = "github-api"
+        request = handler.https_request(request)
         self.assertIsNotNone(request.get_header("Authorization"))
+        request = Request("https://github.com/example/project/releases/download/tag/file")
+        request.rs9_operation = "github-asset"
+        request.rs9_trace = {"operation": "github-asset", "host": "github.com", "redirect_hops": 0}
+        request.rs9_no_redirect = False
         redirected = Redirects().redirect_request(request, None, 302, "", {}, "https://release-assets.githubusercontent.com/file")
         self.assertIsNone(handler.https_request(redirected).get_header("Authorization"))
         self.assertIsNone(handler.https_request(Request("https://raw.githubusercontent.com/example/project/file")).get_header("Authorization"))

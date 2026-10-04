@@ -23,7 +23,8 @@ def tagged_files(capture, client, output, prefixes):
         if entry.get("mode") not in ("100644", "100755") or entry.get("size", 0) > 2 * 1024 ** 2:
             raise ContractError("SMOKE_SOURCE", "Bounded regular tagged source required")
         data = client.get("https://raw.githubusercontent.com/" + capture.record["repository"]["full_name"]
-                          + "/" + capture.record["tag"]["commit"] + "/" + name, limit=2 * 1024 ** 2)
+                          + "/" + capture.record["tag"]["commit"] + "/" + name,
+                          request_class="github-source", limit=2 * 1024 ** 2)
         total += len(data)
         blob = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
         if blob != entry["sha"] or total > 32 * 1024 ** 2 or len(records) >= 1000:

@@ -27,7 +27,7 @@ def execute(context):
     client = context["client"] or PublicClient()
     tap = "Knowledge-Forge-AI/homebrew-tap"
     try:
-        ref = client.json("https://api.github.com/repos/" + tap + "/commits/main")["sha"]
+        ref = client.json("https://api.github.com/repos/" + tap + "/commits/main", request_class="github-api")["sha"]
     except (ContractError, OSError, KeyError, ValueError):
         ref = None
     observations = []

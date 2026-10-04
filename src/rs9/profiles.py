@@ -4,7 +4,6 @@ import hashlib
 import json
 import re
 import struct
-from urllib.parse import quote
 
 from rs9.archives import inspect_archive
 from rs9.errors import ContractError
@@ -66,30 +65,107 @@ def selection_for_intent(normalized, *, include_configuration=False):
             "checksums": evidence["checksums"], "source_paths": sorted(sources)}
 
 
-def capture_supplemental(normalized, output, client):
+def _npm_packument_url(name):
+    validate_ecosystem_name("npm", name)
+    scan_for_credentials(name)
+    return "https://registry.npmjs.org/" + name.replace("/", "%2F", 1)
+
+
+def _npm_tarball_url(name, version):
+    _npm_packument_url(name)
+    number = r"(?:0|[1-9][0-9]*)"
+    prerelease = r"(?:" + number + r"|[0-9]*[A-Za-z-][0-9A-Za-z-]*)"
+    if (not isinstance(version, str) or len(version) > 128
+            or not re.fullmatch(number + r"\." + number + r"\." + number
+                                + r"(?:-" + prerelease + r"(?:\." + prerelease + r")*)?"
+                                + r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?", version)):
+        raise ContractError("NPM_IDENTITY", "Exact safe npm version required")
+    return "https://registry.npmjs.org/" + name + "/-/" + name.rsplit("/", 1)[-1] + "-" + version + ".tgz"
+
+
+def _npm_version(packument, name, version):
+    if (not isinstance(packument, dict) or packument.get("name") != name
+            or not isinstance(packument.get("versions"), dict)):
+        raise ContractError("NPM_IDENTITY", "Malformed npm packument", details={"reason": "malformed-packument"})
+    metadata = packument["versions"].get(version)
+    if (not isinstance(metadata, dict) or metadata.get("name") != name or metadata.get("version") != version
+            or not isinstance(metadata.get("dist"), dict)):
+        raise ContractError("NPM_IDENTITY", "Exact npm version identity required", details={"reason": "exact-version"})
+    dist = metadata["dist"]
+    integrity = dist.get("integrity")
+    try:
+        valid_integrity = (isinstance(integrity, str) and integrity.startswith("sha512-")
+                           and len(base64.b64decode(integrity[7:], validate=True)) == 64)
+    except ValueError:
+        valid_integrity = False
+    if not valid_integrity or dist.get("tarball") != _npm_tarball_url(name, version):
+        raise ContractError("NPM_IDENTITY", "Exact public npm distribution identity required", details={"reason": "npm-dist"})
+    return metadata
+
+
+def capture_supplemental(normalized, output, client, *, corroboration=None, core_authenticated=False):
     profile, evidence, roles = evidence_policy(normalized)
     if profile not in {TAURI_PROFILE, TAURI_AUTHORITY_PROFILE}:
         return
     # This corroboration belongs solely to the desktop evidence profile.
-    package = json_evidence(output, "source/package.json")["name"]
-    validate_ecosystem_name("npm", package)
-    metadata = client.json("https://registry.npmjs.org/" + quote(package, safe="") + "/" + quote(normalized["version"], safe=""))
-    url = metadata["dist"]["tarball"]
-    if not url.startswith("https://registry.npmjs.org/"):
-        raise ContractError("NPM_IDENTITY", "Supplemental capture must use public registry authority")
+    tagged = json_evidence(output, "source/package.json")
+    if not isinstance(tagged, dict) or not isinstance(tagged.get("name"), str):
+        raise ContractError("NPM_IDENTITY", "Tagged npm name required")
+    package, version = tagged["name"], normalized["version"]
+    url = _npm_packument_url(package)
+    tarball = _npm_tarball_url(package, version)
+    receipt = corroboration if corroboration is not None else {}
+    receipt.update(schema="rs9.npm-corroboration.v1alpha1", profile=profile,
+                   release_authentication="core-authenticated" if core_authenticated else "captured-unverified",
+                   npm_corroboration="pending", wrapper_bytes="pending", integrity="pending",
+                   packument={"operation": "npm-packument", "url": url, "name": package,
+                              "selected_version": version, "accept": "application/json", "status": "pending"},
+                   tarball={"operation": "npm-tarball", "url": tarball, "accept": "*/*", "status": "pending"})
     target = physical_directory(output) / "npm"
     try:
         target.mkdir()
     except OSError:
         raise ContractError("OUTPUT_CONFINEMENT", "Exclusive supplemental output required") from None
     with ConfinedWriter(target) as writer:
-        writer.write("metadata.json", canonical(metadata))
-        writer.write("package.tgz", client.get(url, limit=32 * 1024 * 1024))
-        writer.write("profile-fetch-receipt.json", canonical({"schema": "rs9.profile-fetch-receipt.v1alpha1",
-                     "profile": profile, "requests": client.receipts}))
+        operation = "npm-packument"
+        try:
+            packument = client.json(url, request_class=operation, limit=16 * 1024 * 1024)
+            receipt["packument"].update(status="fetched", http_status=200)
+            for request in reversed(client.receipts):
+                if request.get("url") == url and request.get("operation") == operation:
+                    receipt["packument"].update({k: request[k] for k in ("size", "sha256")})
+                    break
+            metadata = _npm_version(packument, package, version)
+            receipt["packument"]["status"] = "pass"
+            writer.write("metadata.json", canonical(metadata))
+            operation = "npm-tarball"
+            body = client.get(tarball, request_class=operation, limit=32 * 1024 * 1024)
+            writer.write("package.tgz", body)
+            receipt["tarball"].update(status="pass", http_status=200, size=len(body), sha256=digest(body))
+        except ContractError as error:
+            receipt["npm_corroboration"] = "fail"
+            receipt["packument" if operation == "npm-packument" else "tarball"]["status"] = "fail"
+            receipt["error"] = error.code
+            receipt["diagnostic"] = error.with_details(operation=operation, host="registry.npmjs.org").details
+            raise error.with_details(operation=operation, host="registry.npmjs.org") from None
+        finally:
+            # Capture remains pending until the authenticated profile compares bytes.
+            writer.write("profile-fetch-receipt.json", canonical(receipt))
 
 
-def evaluate_profile(capture, profile, intent, *, roles=None):
+def record_corroboration_failure(corroboration, error):
+    """Keep npm evidence distinct from an unrelated required profile failure."""
+    if corroboration is None:
+        return
+    state = corroboration.get("npm_corroboration", "pending")
+    if error.code.startswith("NPM_"):
+        state = "fail"
+    elif state == "pending":
+        state = "blocked"
+    corroboration.update(npm_corroboration=state, error=error.code)
+
+
+def evaluate_profile(capture, profile, intent, *, roles=None, corroboration=None):
     release_hash = authenticated_record_hash(capture)
     if profile not in PROFILE_ROLES:
         raise ContractError("EVIDENCE_PROFILE", "Unknown RS9-owned evidence profile")
@@ -106,17 +182,25 @@ def evaluate_profile(capture, profile, intent, *, roles=None):
         if not any(row["role"] == role and row["name"] == name for row in capture.record["assets"]):
             raise ContractError("EVIDENCE_ROLES", "Profile roles must bind selected authenticated assets")
     try:
-        sections = (_evaluate_tauri(capture, intent, roles, repository_authority=profile == TAURI_AUTHORITY_PROFILE)
+        sections = (_evaluate_tauri(capture, intent, roles, repository_authority=profile == TAURI_AUTHORITY_PROFILE,
+                                   corroboration=corroboration)
                     if profile in {TAURI_PROFILE, TAURI_AUTHORITY_PROFILE} else _evaluate_package(capture, intent, roles))
+    except ContractError as error:
+        record_corroboration_failure(corroboration, error)
+        raise
     except (KeyError, TypeError, ValueError, UnicodeError, AttributeError):
-        raise ContractError("INVALID_EVIDENCE", "Profile evidence does not satisfy its schema") from None
+        error = ContractError("INVALID_EVIDENCE", "Profile evidence does not satisfy its schema")
+        record_corroboration_failure(corroboration, error)
+        raise error from None
     result = {"schema": "rs9.evidence-profile-result.v1alpha1", "profile": profile,
               "release_record_sha256": release_hash, "intent_sha256": digest(canonical(intent)), "sections": sections}
     capture._profile_results.add(digest(canonical(result)))
+    if corroboration is not None:
+        corroboration["npm_corroboration"] = "pass"
     return result
 
 
-def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False):
+def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False, corroboration=None):
     root, source, metadata, payloads = capture.root, capture.source, capture.asset_metadata, capture.evidence_bytes
     repository = capture.record["repository"]
     release = capture.record["release"]
@@ -204,10 +288,15 @@ def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False):
             raise ContractError("NPM_IDENTITY", "Published npm supporting evidence identity differs")
         declarations.append({"source": "npm-registry:version-metadata", "expression": npm["license"]})
         npm_bytes = read_evidence(root, "npm/package.tgz", limit=32 * 1024 * 1024)
+        if corroboration is not None:
+            corroboration["release_wrapper"] = {"asset": wrappers[0], "sha256": digest(payloads[wrappers[0]])}
+            corroboration["wrapper_bytes"] = "pass" if npm_bytes == payloads[wrappers[0]] else "fail"
         if npm_bytes != payloads[wrappers[0]]:
             raise ContractError("NPM_RELEASE_MISMATCH", "Published wrapper differs from GitHub release attachment")
         integrity = npm["dist"]["integrity"]
         expected = "sha512-" + base64.b64encode(hashlib.sha512(npm_bytes).digest()).decode("ascii")
+        if corroboration is not None:
+            corroboration["integrity"] = "pass" if integrity == expected else "fail"
         if integrity != expected:
             raise ContractError("NPM_INTEGRITY", "Published npm bytes disagree with integrity")
         packaged = {}
@@ -224,6 +313,8 @@ def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False):
         if package.get("name") != npm["name"] or package.get("version") != normalized["version"]:
             raise ContractError("NPM_IDENTITY", "Published package bytes identity differs")
         declarations.append({"source": "npm-artifact:package/package.json", "expression": package["license"]})
+        if corroboration is not None:
+            corroboration["npm_corroboration"] = "pass"
         spdx = json.loads(payloads[roles["sbom-spdx"]])
         for item in spdx.get("packages", []):
             if item.get("name") in (tagged_package["name"], normalized["project"]["id"]) and item.get("versionInfo") == normalized["version"]:

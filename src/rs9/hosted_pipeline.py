@@ -66,7 +66,10 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
         capture_root = scratch / "capture"
         capture_root.mkdir()
         client = client or PublicClient(api_token=os.environ.get("RS9_GITHUB_READ_TOKEN"))
-        captures = capture_generation(repository, capture_root, client=client, checkout_binding="hosted:" + commit)
+        supplemental_receipts = []
+        record["npm_corroboration"] = supplemental_receipts
+        captures = capture_generation(repository, capture_root, client=client, checkout_binding="hosted:" + commit,
+                                      supplemental_receipts=supplemental_receipts)
         bytes_authenticated = True
         projection = canonical_release_auth_projection(json.loads((capture_root / "summary/authentication.json").read_bytes()))
         ingestion = compute_auth_sha256(projection)

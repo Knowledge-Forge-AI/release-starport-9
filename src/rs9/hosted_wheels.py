@@ -94,7 +94,7 @@ def _resolve_offline_npm_archives(
         elif client:
             dest = scratch / "npm_downloads" / f"dep-{product_id}-{idx}.tgz"
             dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(client.get(row["url"], limit=32 * 1024 * 1024))
+            dest.write_bytes(client.get(row["url"], request_class="npm-tarball", limit=32 * 1024 * 1024))
             archives[row["path"]] = dest
     return archives
 

@@ -1,10 +1,9 @@
 # LIVE1 hosted candidate source
 
-Status: REPAIR1 non-production candidate source following the hosted repair amendments.
-Proposal disposition: amend. Bound proposal SHA `e55cb8ab059b22ed799c3504cb67185d318317b9fc7e35706324971bd55e301d`; all plan-review corrections are retained.
-Dispatcher work-review findings were dispositioned at closeout. Terminal corrections are recorded in the source repair evidence and have no subsequent independent review; exact terminal bindings require manager disposition.
-First hosted run 37166638590 failed due to primary source defects; a second hosted run has not been performed, downstream cascades are untouched, and no hosted green qualification is claimed.
-No fresh full release capture, hosted PASS, destination publication or production receipt is claimed. Local synthetic package and installed-wheel tests establish source contracts; real hosted package lanes remain mandatory integration.
+Status: CONT4 bounded npm supplemental source repair; hosted run 2 remains **not-qualified** (`HOSTED_COMPLETENESS`).
+Proposal disposition: **amend**, bound SHA `c7bd62a9a3be1b8a1d213abf6b01ca30353decc7b02e659402314200909ed329` (19,929 bytes). The original task scope remains the authentication source repair. The proposal and advisory findings are dispositioned separately in [source verification evidence](../evidence/live1/hosted2-npm-supplemental-verification.json).
+Hosted run `37170664747` passed its complete stock Ubuntu 24.04 unit job and retained current-generation command facts. Its primary failure was Nebular supplemental `FETCH_FAILED`; package lanes remained skipped. The prior command-mode and hermetic source-contract repairs remain in force.
+The exact npm HTTP status and whether metadata or tarball failed cannot be recovered from that receipt. New bounded diagnostics resolve that ambiguity on hosted run 3. No fresh complete release capture, hosted run 3 PASS, destination publication or production receipt is claimed. Dispatcher pre-final review returned advisory findings; closeout amended receipt states and added regression evidence. The exact terminal delta requires manager disposition and has no independent terminal rereview.
 
 The immutable generation is Stellar Burst 0.6.1, Stellar Loom 0.4.0, Solar Sail 0.2.1 and Nebular Fusion 0.6.1. The pre-RS9 bootstrap remains migration authority. No upstream version or release is changed.
 
@@ -44,6 +43,31 @@ Generic archive command inspection records now bind `path`, `sha256`, `size`, an
 
 The hosted pipeline retains `command-report.json` on success and failure whenever scratch capture directories exist. Reports and command rows explicitly record `bytes_authenticated` and `basis`: completed generation authentication is distinguished from captured-archive inspection, including digest failures. Retained-payload inspection in the source evidence binds sizes/hashes but does not claim full generation authentication. `execution_error_detail` is closed and sanitized (allows spaces; forbids absolute paths and secrets).
 
+## npm supplemental request contract
+
+GitHub Release remains the sole release ingestion authority. npm corroborates the already-authenticated wrapper; it cannot replace release/tag/asset authentication. Generation authentication succeeds only after every selected profile passes.
+
+The [official npm registry API](https://github.com/npm/registry/blob/main/docs/REGISTRY-API.md) documents both package and version endpoints. The [package metadata contract](https://github.com/npm/registry/blob/main/docs/responses/package-metadata.md) documents packuments and JSON content negotiation. This repair uses the packument for deterministic `versions["0.6.1"]` selection, with `Accept: application/json` to retain full license metadata. `latest` and semver ranges never select evidence.
+
+The exact URL is `https://registry.npmjs.org/@knowledge-forge-ai%2Ftheme-forge-nebular-fusion`: literal scope marker, uppercase escaped slash. [Current npm-package-arg source](https://github.com/npm/npm-package-arg/blob/main/lib/npa.js) preserves `@` but emits lowercase `%2f`; this candidate deliberately follows the task's uppercase encoding requirement. Package names and exact versions are validated before construction; controls, backslashes, credentials and query/authority injection are rejected. The selected name/version must agree exactly. `dist.tarball` must equal the canonical public npm tarball URL for that identity, and `dist.integrity` must contain a SHA-512 digest. Alternate paths/registries fail closed. The authenticated profile compares tarball bytes to the GitHub wrapper and independently verifies SRI.
+
+| Request class | Accept | Initial origin | Allowed redirect origins | GitHub identity |
+|---|---|---|---|---|
+| github-api | application/vnd.github+json | api.github.com | api.github.com | GET only, scoped unredirected header |
+| github-asset | `*/*` | github.com | github.com, objects.githubusercontent.com, release-assets.githubusercontent.com | none |
+| github-source | `*/*` | raw.githubusercontent.com | raw.githubusercontent.com | none |
+| npm-packument | application/json | registry.npmjs.org | none | none |
+| npm-tarball | `*/*` | registry.npmjs.org | registry.npmjs.org | none |
+| nix-installer | `*/*` | releases.nixos.org | releases.nixos.org | none |
+
+Callers must choose a closed request class; arbitrary header arguments are forbidden. Initial, redirect and final URLs are HTTPS/allowlisted and class-bound, including with injected openers. Redirects retain request class/trace, so same-host API redirects retain scoped identity. Every packument redirect, including one within the registry host, fails closed. Raw source and release/CDN requests never receive authorization. No npm credentials or ambient proxies are used. Header values reject CR/LF and other controls. All callers, including downstream npm lock downloads and Nix provisioning, select their appropriate class. Version build metadata never authorizes a normalized tarball identity: a `0.6.1+build` version with a `0.6.1` tarball fails `NPM_IDENTITY`; this candidate selects exactly `0.6.1`.
+
+`FETCH_FAILED` now carries only bounded `operation`, allowlisted `host`, `http_status` or closed `transport_error`, `redirect_hops`, and generated `reason`; candidate capture adds `project` and `stage`. Redirect/URL/transfer failures retain their stable codes. Error bodies, authorization, cookies, credentials and signed query strings are never retained in diagnostics. HTTP errors and failed responses are closed. There are no automatic retries. The existing single-request 20-second socket timeout and 120-second transfer deadline checked between reads remain; this is not a hard wall-clock timer around a blocking socket read.
+
+The immutable `npm/profile-fetch-receipt.json` records capture-time pending/pass/fail request states and exact metadata/tarball identity. It stays pending after fetch until authenticated profile comparison. The hosted lane's retained `npm_corroboration` record carries the **final** outcome: `release_authentication: core-authenticated`, `npm_corroboration: pending/pass/fail/blocked`, packument/tarball operations and identities, wrapper byte outcome, SRI outcome, and wrapper/tarball hashes when reached. An unrelated profile failure before npm comparison records `blocked`; an unrelated failure after completed npm identity, wrapper and SRI checks preserves `pass`. Both still fail the required profile, retain the profile error, and withhold the global authentication summary. The record is retained on failure as well as success, independently of the success-only transport projection, without retaining npm payload bytes in hosted diagnostics. The profile result and canonical authentication projection retain their existing shapes.
+
+Offline tests exercise real urllib header/redirect processing, exact selection, malformed metadata, host escape, HTTP/transport failure, byte and SRI mismatch, and hosted success/failure custody with synthetic token-leak negatives. The optional unprivileged npm canary was unavailable due to provider DNS failure; that has no source-acceptance impact and is not a product failure. Hosted run 3 must establish real registry and downstream lane behavior.
+
 ## Hermetic testing, Pages fixtures, and resource management
 
 Hermetic Pages sibling tests always run. Tests patch synthetic `sign_rpm` for both real GPG and fake runners. Production checks stay strict: `production_enabled: false` remains mandatory, and custom files supplying production key paths (`keys/rs9.asc`, `keys/rs9-archive-keyring.gpg`) are strictly rejected with `FIXTURE_KEY_PATH`. The exact NONPRODUCTION fixture inventory is maintained:
@@ -56,13 +80,13 @@ The test inventory binds fixture-owned public armor independently of the assembl
 ## Qualification limits and environment reality
 
 The qualification verdict remains **not-qualified** and hosted PASS is not claimed:
-- **First hosted run**: Run 37166638590 failed due to primary source defects; a second hosted run has not been performed, downstream cascades are untouched, and no hosted green qualification is claimed.
+- **Hosted run 2**: Run 37170664747 passed unit and preserved command facts, but failed Nebular supplemental authentication. The exact old HTTP/socket cause is unavailable. Hosted run 3 and downstream qualification remain pending.
 - **Local environment**: The local execution environment is Darwin with Python 3.13; no Python 3.12 or GnuPG usable was observed locally. Minimal scratch symlink PATH reruns serve strictly as tool-isolation checks, not Ubuntu equivalence.
 - **Stock Ubuntu 24.04 environment**: A stock ubuntu-24.04 source unit assumes Python 3.12, Node 22, and GnuPG are present, and the unit suite must work without Docker, Nix, Arch/RPM builders, or zstd. Real hosted package lanes remain mandatory integration.
 - **Run-resolved inputs**: Container digests and Nix installer checksums resolved during preparation prevent source-reproducibility qualification until committed as reviewed pins.
 - **Linux wheel policy**: Linux Nebular wheels use generic `linux_x86_64`/`linux_aarch64` candidate tags; manylinux remains refused and production paths remain withheld pending manager disposition.
 - **Homebrew observations**: Readbacks remain incomplete/unknown when unreachable; no noop is fabricated.
-- **Verification**: Counts and scoped skips are recorded in [source repair evidence](../evidence/live1/hosted-repair-verification.json).
+- **Verification**: Counts and scoped skips are recorded in [npm supplemental source verification](../evidence/live1/hosted2-npm-supplemental-verification.json).
 
 The summary reports `lanes_executed_ok` separately from `qualification_verdict` and `blocking_reasons`. A failed hosted lane is repair input and is never automatically rerun.
 
@@ -78,6 +102,6 @@ Assembled Pages client tests cover amd64/x86_64 APT, DNF and pacman, including p
 
 ## Attended handoff
 
-Use [the runbook](../operators/live1/RUNBOOK.md) after the dispatcher finishes review. The operator authenticates exact manager-reviewed inventory/tree/manifest, requires current remote main to equal the reviewed parent `2095e9d84295e09e4f1d4fc517fe0d5006478803`, stages only reviewed paths including deletions, commits with `--commit-message "Repair hosted command authentication and hermetic source contracts"`, and fast-forward pushes. It finds the new push run for that commit, refuses reruns/non-main runs, waits with a bound, and stores all jobs/steps, artifact identities, summary bytes and validation reasons before returning.
+Use [the runbook](../operators/live1/RUNBOOK.md) after the dispatcher finishes review. The operator authenticates exact manager-reviewed inventory/tree/manifest, requires current remote main to equal the reviewed parent `00bfaeae4268810d5231ec570c63920af2304593`, stages only reviewed paths including deletions, commits with `--commit-message "Repair npm supplemental transport identity and diagnostics"`, and fast-forward pushes. It finds the new push run for that commit, refuses reruns/non-main runs, waits with a bound, and stores all jobs/steps, artifact identities, summary bytes and validation reasons before returning.
 
 The collection step uses the v2 collector (`rs9.collect_candidate`), preserving packet artifacts and summary blockers before validation; legacy `validate_receipts` is not used. The operator stops on failure or timeout. The manager packet retains all summary-reported blockers even when validation stops at its first error; reported diagnostics confer no qualification authority. An explicit collect command can resume read-only collection into another empty outbox directory. No production publication, key access, npm/Homebrew mutation, Pages deployment or production receipt is performed.

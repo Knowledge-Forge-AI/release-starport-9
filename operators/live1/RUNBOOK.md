@@ -1,18 +1,11 @@
 # Attended Theme Forge LIVE1 preparation and future publication contract
 
-Status: **REPAIR1 attended source candidate; not ready for production publication**.
+Status: **CONT4 npm supplemental source candidate; hosted run 3 pending; not ready for production publication**.
 `rs9.operator` supports status and fresh release authentication only. `publish-pages`
 and `publish-pypi` stop with PUBLICATION_NOT_READY. Manual environment setup cannot
 complete the missing package, qualification, reader and transport implementations.
 
-The accepted CONT1 checkpoint is historical partial source. Current [REPAIR1 hosted candidate source](../../docs/live1-hosted-candidate.md)
-prepares a non-production runner workflow. Source adoption does not require local Docker,
-Nix, GPG or live capture. First hosted run 37166638590 failed due to primary source defects;
-a second hosted run has not been performed, downstream cascades are untouched, and no hosted
-green qualification is claimed. Plan disposition amends for exact proposal SHA
-`e55cb8ab059b22ed799c3504cb67185d318317b9fc7e35706324971bd55e301d`. Manager disposition of
-the exact terminal source bindings is required before executing the operator below. Real
-hosted package lanes remain mandatory integration.
+The accepted CONT1 checkpoint is historical partial source. The current [npm supplemental source candidate](../../docs/live1-hosted-candidate.md) repairs hosted run 2 (`37170664747`), which remains not-qualified with `HOSTED_COMPLETENESS`. Unit and command-report progress are preserved; Nebular supplemental authentication is the primary source failure. Downstream completeness remains mandatory. The bound proposal disposition is amend for SHA `c7bd62a9a3be1b8a1d213abf6b01ca30353decc7b02e659402314200909ed329`. Manager acceptance of the exact reviewed candidate is required before executing the attended operator below. The provider does not stage, commit, push, rerun or production-publish.
 
 ## Environment and qualification realities
 
@@ -23,26 +16,27 @@ hosted package lanes remain mandatory integration.
   Node 22, and GnuPG are present, and the unit suite must work without Docker, Nix, Arch/RPM builders, or zstd.
   Real hosted package lanes remain mandatory integration.
 - **Verification**: Source checks and scoped skips are recorded in the repair verification evidence.
+- **Terminal amendment**: npm comparison records `blocked` when an unrelated profile failure prevents comparison, and preserves `pass` when a later profile failure follows completed npm checks. Overall authentication still requires every selected profile to pass. Manager disposition must use the terminal inventory, not the pre-final candidate binding.
+- **Registry availability**: The provider has not confirmed that exact version `0.6.1` is currently published. Attended authentication must retain any `NPM_IDENTITY` or HTTP failure as evidence; never substitute `latest`, another version or registry, or retry failed hosted jobs automatically.
 
 ## Source adoption and hosted collection
 
-After review, set `RS9_REVIEWED_PARENT` to the reviewed parent commit `2095e9d84295e09e4f1d4fc517fe0d5006478803`.
+After review, set `RS9_REVIEWED_PARENT` to the reviewed parent commit `00bfaeae4268810d5231ec570c63920af2304593`.
 Manager supplies `RS9_REVIEWED_TREE` and `RS9_MANIFEST_SHA256` for the exact candidate. Create
 an empty physical directory below `~/Documents/agent/outbox/release-starport-9_dev/` and set `RS9_PACKET_DIR`
 to that path. From the reviewed repository:
 
 ~~~sh
 rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 operators/live1/adopt-and-qualify.py adopt \
-  --reviewed-parent "2095e9d84295e09e4f1d4fc517fe0d5006478803" \
+  --reviewed-parent "00bfaeae4268810d5231ec570c63920af2304593" \
   --reviewed-tree "$RS9_REVIEWED_TREE" \
   --manifest-sha256 "$RS9_MANIFEST_SHA256" \
-  --commit-message "Repair hosted command authentication and hermetic source contracts" \
+  --commit-message "Repair npm supplemental transport identity and diagnostics" \
   --output "$RS9_PACKET_DIR"
 ~~~
 
 This authenticates the inventory, checks main/remote parent twice, stages explicit reviewed
-paths and deletions, commits normally with `--commit-message` (defaulting to the repair message
-shown above), fast-forward pushes and collects the new push run bound to that
+paths and deletions, commits normally with `--commit-message` (the explicit message is required for this handoff), fast-forward pushes and collects the new push run bound to that
 commit. No rerun and no production publication is performed. Unrelated .serena state and
 ordinary interpreter/test caches are tolerated and never staged. Collection is bounded to two
 hours by default, six hours maximum.
@@ -58,8 +52,7 @@ The collection step uses the v2 collector (`rs9.collect_candidate`); historical 
 `validate_receipts` is not used. The packet is written before validation and includes all
 job/step conclusions, artifact IDs/digests/expiry, bounded summary bytes and reason codes.
 A failed run is not rerun automatically. Neither subcommand publishes, deploys, signs
-production bytes, mutates npm/Homebrew or emits a production receipt. A not-qualified first
-run is expected while preparation pins and Linux wheel promotion policy are unresolved.
+production bytes, mutates npm/Homebrew or emits a production receipt. The operator stops with the complete manager packet. New downstream defects remain evidence for the next manager disposition; no automatic failed-job reruns or downstream repairs are authorized by this handoff. Preparation pins and Linux wheel promotion policy remain qualification limits.
 
 The signing-preflight.py operator takes an independently reviewed public-export
 SHA-256. It inspects existing local-key availability and public bytes only; it never
