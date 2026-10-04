@@ -17,3 +17,14 @@ Authenticated derived hashes belong in ingestion evidence, not ordinary tenant
 config. The [bootstrap specification](../../../docs/specs/rs9-bootstrap-tenant-v1alpha1.md)
 defines hash computation and refusal rules. Exact file hashes appear in the
 [candidate inventory](../../../operators/live1/candidate-manifest.json).
+
+Nebular 0.6.1 `intent.license.files` requires the native payload copies `LICENSE`
+and `NOTICE` only. The separate manifest `license_authority.files` and Tauri
+source selection still authenticate tagged `COMMERCIAL-LICENSE.md`; the loader
+checks that authority files remain selected. Do not require the commercial-offer
+document inside a native archive or use a payload copy as tagged authority.
+Downstream metadata remains `AGPL-3.0-or-later`, with historical npm
+`OR Commercial` retained as a conflict. No release bytes or metadata are rewritten.
+
+CONT5 manifest candidate SHA-256:
+`93081d30cb2eedb88eb6248653177ab03570dbd51f7047293e25670d860b8e64`.

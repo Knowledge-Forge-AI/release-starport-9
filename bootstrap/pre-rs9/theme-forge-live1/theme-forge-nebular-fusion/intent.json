@@ -11,8 +11,7 @@
     "source": "tagged-repository",
     "files": [
       "LICENSE",
-      "NOTICE",
-      "COMMERCIAL-LICENSE.md"
+      "NOTICE"
     ]
   },
   "runtime": {

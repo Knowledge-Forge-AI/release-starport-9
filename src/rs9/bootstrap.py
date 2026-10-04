@@ -42,7 +42,15 @@ def checked_bootstrap_configurations(manifest_path, *, approved_manifests):
         if (intent["version"] != row["version"] or intent["tag"] != row["tag"]
                 or intent["project"]["repository"] != row["repository"]):
             raise ContractError("BOOTSTRAP_BINDING", "Configuration identity differs from exception")
-        validate_selection(selection_for_intent(intent))
+        selection = selection_for_intent(intent)
+        validate_selection(selection)
+        if "license_authority" in row:
+            authority = row["license_authority"]
+            authority_files = authority.get("files") if isinstance(authority, dict) else None
+            if (not isinstance(authority_files, list) or not authority_files
+                    or any(not isinstance(p, str) for p in authority_files)
+                    or not set(authority_files) <= set(selection["source_paths"])):
+                raise ContractError("BOOTSTRAP_LICENSE_AUTHORITY", "Tagged license authority files must be selected")
         identity = (row["repository"], row["tag"])
         if identity in identities or row["configuration"] in directories or intent["project"]["id"] in projects:
             raise ContractError("BOOTSTRAP_BINDING", "Unique generation identities required")

@@ -37,3 +37,18 @@ before selecting network requests or creating per-project evidence directories.
 The example Nebular `.rs9/` files are historical examples. Operators must not
 merge them with bootstrap configuration or silently choose between authorities.
 Bootstrap hash and all four config hashes are in the candidate inventory.
+
+Manifest `license_authority.files` records tagged source authority evidence.
+When present, the loader requires every listed authority file to be selected by
+the intent/profile before capture (`BOOTSTRAP_LICENSE_AUTHORITY` otherwise).
+It is separate from the desktop intent's `license.files`, which lists native
+payload legal copies. Nebular requires `LICENSE` and `NOTICE` inside its native
+archives; tagged `COMMERCIAL-LICENSE.md` remains selected through `TAURI_SOURCES`
+and authenticated as community/commercial-offer evidence. The npm-profile
+bootstrap lists retain their broader source-selection meaning.
+
+The CONT5 reviewed-manifest candidate digest is
+`93081d30cb2eedb88eb6248653177ab03570dbd51f7047293e25670d860b8e64`.
+Its Nebular configuration inventory digest is
+`b985546482cfff16436d166ff3ba175b54b4afc03b35c48e4310cf070690c27f`.
+These identify source bytes for review, not production authorization.

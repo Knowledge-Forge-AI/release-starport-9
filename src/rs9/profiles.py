@@ -15,6 +15,8 @@ from rs9.spdx import validate_spdx_expression
 TAURI_PROFILE = "tauri-desktop-archive.v1alpha1"
 TAURI_AUTHORITY_PROFILE = "tauri-desktop-archive.v1alpha2"
 PACKAGE_PROFILE = "npm-package-archive.v1alpha1"
+# Tagged licensing authority is independent of license.files (native payload
+# legal copies). COMMERCIAL-LICENSE.md remains authenticated source evidence.
 TAURI_SOURCES = ("LICENSE", "NOTICE", "COMMERCIAL-LICENSE.md", "package.json",
                  "src-tauri/Cargo.toml", "src-tauri/tauri.conf.json")
 PROFILE_ROLES = {TAURI_PROFILE: {"provenance", "sbom-spdx", "third-party-notices", "npm-wrapper"},
@@ -201,6 +203,14 @@ def evaluate_profile(capture, profile, intent, *, roles=None, corroboration=None
 
 
 def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False, corroboration=None):
+    profile = TAURI_AUTHORITY_PROFILE if repository_authority else TAURI_PROFILE
+    expected_legal = normalized["license"]["files"]
+    if (not isinstance(expected_legal, list) or not expected_legal
+            or any(not isinstance(path, str) for path in expected_legal)
+            or len(set(expected_legal)) != len(expected_legal)):
+        raise ContractError("PAYLOAD_LICENSE_POLICY", "Nonempty unique payload legal paths required", details={"profile": profile})
+    for legal_path in expected_legal:
+        validate_safe_relative_posix_path(legal_path)
     root, source, metadata, payloads = capture.root, capture.source, capture.asset_metadata, capture.evidence_bytes
     repository = capture.record["repository"]
     release = capture.record["release"]
@@ -219,20 +229,24 @@ def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False, c
         license_base = archive_root + ("/Contents/Resources/" if archive_root.endswith(".app") else "/")
 
         def capture_license(name, data, mode):
-            for license_path in normalized["license"]["files"]:
+            for license_path in expected_legal:
                 if name == license_base + license_path:
-                    copies[name] = data
+                    copies[license_path] = data
 
         command_paths = {**asset["commands"], **{"launcher:" + k: v for k, v in asset.get("launchers", {}).items()}}
         manifest = inspect_archive(path, command_paths, on_file=capture_license)
         if manifest != capture.manifests[asset["id"]]:
             raise ContractError("INPUT_CHANGED", "Archive changed after core authentication")
-        if len(copies) != len(normalized["license"]["files"]):
-            raise ContractError("PAYLOAD_LICENSE_MISSING", "Payload project license copies are required")
-        for name, data in sorted(copies.items()):
-            declared = name[len(license_base):]
+        if set(copies) != set(expected_legal):
+            raise ContractError("PAYLOAD_LICENSE_MISSING", "Payload project license copies are required", details={
+                "asset": asset["id"], "profile": profile,
+                "expected_legal_files": " ".join(sorted({p.rsplit("/", 1)[-1] for p in expected_legal})),
+                "observed_legal_files": " ".join(sorted({p.rsplit("/", 1)[-1] for p in copies})) or "none"})
+        for declared, data in sorted(copies.items()):
+            name = license_base + declared
             if data != source[declared]:
-                raise ContractError("PAYLOAD_LICENSE_MISMATCH", "Archive license differs from tagged authority")
+                raise ContractError("PAYLOAD_LICENSE_MISMATCH", "Archive license differs from tagged authority",
+                                    details={"asset": asset["id"], "profile": profile, "archive_path": name})
             license_copies.append({"asset": asset["id"], "path": name, "source": declared, "sha256": digest(data)})
         archives[asset["id"]] = path
         manifests[asset["id"]] = manifest

@@ -1,11 +1,11 @@
 # Attended Theme Forge LIVE1 preparation and future publication contract
 
-Status: **CONT4 npm supplemental source candidate; hosted run 3 pending; not ready for production publication**.
+Status: **CONT5 payload-license source candidate; hosted run 4 pending; not ready for production publication**.
 `rs9.operator` supports status and fresh release authentication only. `publish-pages`
 and `publish-pypi` stop with PUBLICATION_NOT_READY. Manual environment setup cannot
 complete the missing package, qualification, reader and transport implementations.
 
-The accepted CONT1 checkpoint is historical partial source. The current [npm supplemental source candidate](../../docs/live1-hosted-candidate.md) repairs hosted run 2 (`37170664747`), which remains not-qualified with `HOSTED_COMPLETENESS`. Unit and command-report progress are preserved; Nebular supplemental authentication is the primary source failure. Downstream completeness remains mandatory. The bound proposal disposition is amend for SHA `c7bd62a9a3be1b8a1d213abf6b01ca30353decc7b02e659402314200909ed329`. Manager acceptance of the exact reviewed candidate is required before executing the attended operator below. The provider does not stage, commit, push, rerun or production-publish.
+The accepted CONT1 checkpoint is historical partial source. The current [payload-license source candidate](../../docs/live1-hosted-candidate.md) repairs hosted run 3 (`37173827457`), which remains not-qualified with `HOSTED_COMPLETENESS`. Unit/config and npm transport passed; Nebular profile `PAYLOAD_LICENSE_MISSING` is the primary failure. The native copy list becomes LICENSE/NOTICE while tagged COMMERCIAL-LICENSE.md remains authenticated independently. The downstream expression stays AGPL-3.0-or-later. Downstream completeness remains mandatory. The bound proposal disposition is amend for SHA `fcc2846a48bfa5b1dc91e68cd3bd681993d32a13381095d66a4f64083d84826c`. Manager acceptance of the exact reviewed candidate is required before executing the attended operator below. The provider does not stage, commit, push, rerun or production-publish.
 
 ## Environment and qualification realities
 
@@ -16,28 +16,48 @@ The accepted CONT1 checkpoint is historical partial source. The current [npm sup
   Node 22, and GnuPG are present, and the unit suite must work without Docker, Nix, Arch/RPM builders, or zstd.
   Real hosted package lanes remain mandatory integration.
 - **Verification**: Source checks and scoped skips are recorded in the repair verification evidence.
-- **Terminal amendment**: npm comparison records `blocked` when an unrelated profile failure prevents comparison, and preserves `pass` when a later profile failure follows completed npm checks. Overall authentication still requires every selected profile to pass. Manager disposition must use the terminal inventory, not the pre-final candidate binding.
-- **Registry availability**: The provider has not confirmed that exact version `0.6.1` is currently published. Attended authentication must retain any `NPM_IDENTITY` or HTTP failure as evidence; never substitute `latest`, another version or registry, or retry failed hosted jobs automatically.
+- **Corroboration states**: npm comparison records `blocked` when an unrelated profile failure prevents comparison, and preserves `pass` when a later failure follows completed npm checks. Overall authentication still requires every selected profile to pass. Any closeout amendment requires manager disposition of the exact terminal delta.
+- **Registry availability**: Hosted run 3 passed exact version `0.6.1` packument/tarball transport. Fresh authentication must retain any new `NPM_IDENTITY` or HTTP failure as evidence; never substitute `latest`, another version or registry, or retry failed hosted jobs automatically.
 
 ## Source adoption and hosted collection
 
-After review, set `RS9_REVIEWED_PARENT` to the reviewed parent commit `00bfaeae4268810d5231ec570c63920af2304593`.
-Manager supplies `RS9_REVIEWED_TREE` and `RS9_MANIFEST_SHA256` for the exact candidate. Create
-an empty physical directory below `~/Documents/agent/outbox/release-starport-9_dev/` and set `RS9_PACKET_DIR`
-to that path. From the reviewed repository:
+After manager acceptance, the reviewed parent is
+`6f5227586e944bf2016f4cf44000f49c16947351`; live remote `main` must still match it.
+Derive the review bindings from the final accepted bytes:
+
+~~~sh
+rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
+import hashlib, json
+from pathlib import Path
+from rs9.candidate_inventory import MANIFEST, verify_inventory
+raw = Path(MANIFEST).read_bytes()
+print(json.dumps({"reviewed_tree": verify_inventory(Path.cwd(), json.loads(raw)),
+                  "manifest_sha256": hashlib.sha256(raw).hexdigest()}))
+PY
+~~~
+
+Manager approval binds those exact values; set `RS9_REVIEWED_TREE` and
+`RS9_MANIFEST_SHA256` from the accepted result. Every new test/evidence path must
+appear in the final inventory, or adoption refuses it. Create an empty physical
+packet directory through the configured scratch workflow and set `RS9_PACKET_DIR`
+to it. It must be **outside the repository** (`ADOPTION_OUTPUT` otherwise).
+The sibling log path must also be external. From the reviewed repository:
 
 ~~~sh
 rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 operators/live1/adopt-and-qualify.py adopt \
-  --reviewed-parent "00bfaeae4268810d5231ec570c63920af2304593" \
+  --reviewed-parent "6f5227586e944bf2016f4cf44000f49c16947351" \
   --reviewed-tree "$RS9_REVIEWED_TREE" \
   --manifest-sha256 "$RS9_MANIFEST_SHA256" \
-  --commit-message "Repair npm supplemental transport identity and diagnostics" \
-  --output "$RS9_PACKET_DIR"
+  --commit-message "Separate Nebular payload legal copies from tagged license authority" \
+  --output "$RS9_PACKET_DIR" > "$RS9_PACKET_DIR.operator.log" 2>&1
+RS9_OPERATOR_STATUS=$?
+rtk tail -n 40 "$RS9_PACKET_DIR.operator.log"
+rtk printf 'operator_exit=%s\n' "$RS9_OPERATOR_STATUS"
 ~~~
 
 This authenticates the inventory, checks main/remote parent twice, stages explicit reviewed
 paths and deletions, commits normally with `--commit-message` (the explicit message is required for this handoff), fast-forward pushes and collects the new push run bound to that
-commit. No rerun and no production publication is performed. Unrelated .serena state and
+commit's new push-triggered `rs9-candidate-tests.yml`. No rerun and no production publication is performed. Unrelated .serena state and
 ordinary interpreter/test caches are tolerated and never staged. Collection is bounded to two
 hours by default, six hours maximum.
 
@@ -45,7 +65,10 @@ If collection times out, create a different empty outbox directory and explicitl
 
 ~~~sh
 rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 operators/live1/adopt-and-qualify.py collect \
-  --commit "$RS9_ADOPTED_COMMIT" --run-id "$RS9_RUN_ID" --output "$RS9_PACKET_DIR"
+  --commit "$RS9_ADOPTED_COMMIT" --run-id "$RS9_RUN_ID" --output "$RS9_PACKET_DIR" > "$RS9_PACKET_DIR.operator.log" 2>&1
+RS9_OPERATOR_STATUS=$?
+rtk tail -n 40 "$RS9_PACKET_DIR.operator.log"
+rtk printf 'operator_exit=%s\n' "$RS9_OPERATOR_STATUS"
 ~~~
 
 The collection step uses the v2 collector (`rs9.collect_candidate`); historical CONT1 v1

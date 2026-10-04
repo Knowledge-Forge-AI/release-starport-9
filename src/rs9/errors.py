@@ -9,7 +9,8 @@ def safe_details(details):
     """Closed, bounded public identifiers only; reject credentials and host paths."""
     from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
     allowed = {"stage", "project", "asset", "command", "command_kind", "archive_path",
-               "member_type", "mode", "size", "sha256", "reason",
+               "member_type", "mode", "size", "sha256", "reason", "profile",
+               "expected_legal_files", "observed_legal_files",
                "operation", "host", "http_status", "transport_error", "redirect_hops"}
     result, dropped = {}, False
     if not isinstance(details, dict):
