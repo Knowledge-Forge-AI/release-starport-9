@@ -1,0 +1,194 @@
+{
+  "bootstrap_role": "one-time migration configuration",
+  "closeout_amendments": [
+    "Restore only runtime environment after Linux network namespace and privilege drop.",
+    "Filter pip environment; preserve full venv lifecycle and credential exclusion.",
+    "Bind matrix artifact names/timeouts to source and test exact required jobs.",
+    "Repair attended operator shell continuations and retain all reported summary blockers.",
+    "Reject conflicting unsigned noarch RPM custody before Pages assembly.",
+    "Test signature tampering and report required client gates after Pages setup failures.",
+    "Repair synthetic Pages unit fixtures without weakening mandatory released smoke capture.",
+    "Refresh terminal disposition, handoff, verification and exact source inventory."
+  ],
+  "closeout_bound_candidate": {
+    "head": "93639f036da0763bcea960b8420420e8bedae662",
+    "kind": "git_tree",
+    "manifest_sha256": "dd72ef6e6d2b0a5a6410a01fb36b021d60bb29e75fd6716e99558625fa2dbff6",
+    "tree": "75ea7ecb59bbed00fae540a8930a81b6e20ec064"
+  },
+  "closeout_changed_paths": [
+    ".github/workflows/rs9-candidate-tests.yml",
+    "docs/live1-hosted-candidate.md",
+    "evidence/live1/hosted-candidate-handoff.json",
+    "evidence/live1/hosted-proposal-disposition.json",
+    "evidence/live1/hosted-source-verification.json",
+    "evidence/live1/hosted-workers.json",
+    "operators/live1/RUNBOOK.md",
+    "operators/live1/candidate-manifest.json",
+    "operators/live1/readiness.json",
+    "src/rs9/collect_candidate.py",
+    "src/rs9/hosted_commands.py",
+    "src/rs9/hosted_contract.py",
+    "src/rs9/hosted_deb.py",
+    "src/rs9/hosted_nix.py",
+    "src/rs9/hosted_wheels.py",
+    "src/rs9/verify_wheel.py",
+    "tests/test_collect_candidate.py",
+    "tests/test_hosted_commands.py",
+    "tests/test_hosted_deb.py",
+    "tests/test_workflow_static.py"
+  ],
+  "closeout_qualification": "627 source tests, zero failures/errors, nine live-capture/GPG skips; YAML, workflow contract, runbook, inventory, credential, relative-link, syntax and diff checks passed. Real hosted builds pending externally.",
+  "disposition": "amend",
+  "implementation_amendments": [
+    "Build and qualify exact retained bytes in one hosted job per system rather than separate build/qualification matrices.",
+    "Use v1alpha2 custody and receipt contracts, with source-required products and gates; lane matrices and expected artifacts derive from configuration.",
+    "Source nixpkgs revision/narHash is pinned. Platform container digests and installer checksums may resolve in hosted preparation but prevent source-reproducibility qualification until committed.",
+    "Linux Nebular candidates use generic platform tags rather than an unsupported manylinux claim; production paths remain withheld.",
+    "Fetch released Nebular smoke tools and fixture blobs from their authenticated Git tree; execute against actual installed/materialized runtime.",
+    "Hosted Foundation 3 deterministic verification uses hosted-candidate-unattested trust; production attended gates remain unsatisfied.",
+    "Missing inputs, unexpected builder exceptions, runtime failures and policy blockers retain diagnostic receipts; no fabricated hosted PASS."
+  ],
+  "observed_stage_deltas_before_work": [],
+  "original_scope": "Complete non-production hosted source and attended adoption/collection operator. No provider production publication or Git mutation.",
+  "plan_review": {
+    "authority": "dispatcher-owned advisory",
+    "findings": [
+      {
+        "disposition": "amend",
+        "finding": 1,
+        "implementation": "Projection excludes collected_at and redirect transport receipts; exact release/tag/asset/checksum/provenance hashes must agree.",
+        "topic": "canonical authentication"
+      },
+      {
+        "disposition": "amend",
+        "finding": 2,
+        "implementation": "Pages and Foundation 3 use !cancelled(); observations have independent authentication dependencies; summary runs always and checks all job results.",
+        "topic": "failure evidence graph"
+      },
+      {
+        "disposition": "amend",
+        "finding": 3,
+        "implementation": "Operator stages explicit reviewed inventory plus declared tracked deletions with git add -A; tree binding remains exact.",
+        "topic": "reviewed deletions"
+      },
+      {
+        "disposition": "amend",
+        "finding": 4,
+        "implementation": "Summary records execution health separately from policy/reproducibility qualification; first-run red outcome documented.",
+        "topic": "separate health and qualification"
+      },
+      {
+        "disposition": "amend",
+        "finding": 5,
+        "implementation": "APT, DNF and pacman clients install from the assembled tree with runtime network denied; real smoke prerequisites are provisioned.",
+        "topic": "assembled Pages install tests"
+      },
+      {
+        "disposition": "amend",
+        "finding": 6,
+        "implementation": "Candidate-only generic Linux tags and candidate-policy-pending custody; manylinux and production builder paths still refuse unsupported Linux publication.",
+        "topic": "Linux wheel custody"
+      },
+      {
+        "disposition": "amend",
+        "finding": 7,
+        "implementation": "Collector persists jobs, steps, artifact identities and summary before validation and writes reason codes on failure or timeout.",
+        "topic": "packet before failure"
+      },
+      {
+        "disposition": "amend",
+        "finding": 8,
+        "implementation": "Manifests bind event/ref/attempt; collector requires a new push on main and attempt 1.",
+        "topic": "manual/rerun provenance"
+      },
+      {
+        "disposition": "amend",
+        "finding": 9,
+        "implementation": "Operator preserves API archive digests, identities and effective expiry; future publisher must verify archive and logical inventories.",
+        "topic": "artifact handoff"
+      },
+      {
+        "disposition": "supersede",
+        "finding": 10,
+        "implementation": "No diagnostic no-argument parity is used; researched supported probes require authenticated implementation guards and bounded service protocol handling.",
+        "topic": "safe parity fallback"
+      },
+      {
+        "disposition": "accept",
+        "finding": 11,
+        "implementation": "Observed entry matched the structured dispatcher tree binding and main/origin semantics; historical prose hashes are not runtime gates.",
+        "topic": "entry identity"
+      }
+    ],
+    "outcome": "reviewed_with_findings"
+  },
+  "prior_stage_delta_disposition": "Accept all cumulative task-scoped source additions/modifications with recorded terminal amendments; preserve unrelated local state and operational metadata.",
+  "production_enabled": false,
+  "proposal": {
+    "bytes": 26675,
+    "materialization_kind": "inline_stdout",
+    "relative_path": "plan-material.md",
+    "sha256": "170b5b94035ed5f07f1d74965ed40b62d6f7f57bc72cc90d0cfe74f19da84baa"
+  },
+  "publication_receipts": [],
+  "review_status": "dispatcher-pre-final-reviewed-with-findings; terminal amendments not independently re-reviewed",
+  "schema": "rs9.hosted-proposal-disposition.v1alpha1",
+  "scope_preserved": true,
+  "task": "RS9-LIVE1-THEME-FORGE-CONT2-HOSTED-CANDIDATE1",
+  "terminal_amendment_review": "dispatcher-bound terminal evidence; no further substantive review obtained",
+  "unchanged_generation": {
+    "nebular-fusion": "0.6.1",
+    "solar-sail": "0.2.1",
+    "stellar-burst": "0.6.1",
+    "stellar-loom": "0.4.0"
+  },
+  "work_review": {
+    "authority": "dispatcher-owned advisory",
+    "findings": [
+      {
+        "disposition": "amend",
+        "finding": 1,
+        "rationale": "Reinject filtered runtime environment after setpriv for Linux wheel/Nix commands and smoke; retain negative egress probes and nonroot guards."
+      },
+      {
+        "disposition": "defer",
+        "finding": 2,
+        "rationale": "Run-resolved preparation inputs and Linux wheel promotion policy remain explicit qualification blockers. Exact destination readbacks stay fail-closed. Collector now preserves all summary-reported blockers."
+      },
+      {
+        "disposition": "amend",
+        "finding": 3,
+        "rationale": "Runbook uses one backslash for shell line continuations."
+      },
+      {
+        "disposition": "amend",
+        "finding": 4,
+        "rationale": "Add Pages signature tamper rejection. Assembled arm64 Pages installation is deferred; required arm64 family lanes remain unchanged."
+      },
+      {
+        "disposition": "amend",
+        "finding": 5,
+        "rationale": "Reject conflicting unsigned noarch RPM bytes or filenames for the same product before Pages assembly; aggregate cannot qualify ambiguous custody."
+      },
+      {
+        "disposition": "amend",
+        "finding": 6,
+        "rationale": "Matrices carry source artifact names and timeouts; singleton timeouts match contract. Static contract tests reject job, artifact or timeout drift."
+      },
+      {
+        "disposition": "defer",
+        "finding": 7,
+        "rationale": "Actual nixpkgs identity and action commit provenance are not independently authenticated in closeout. Nine facility-dependent tests remain pending their available facilities; no external evidence fabricated."
+      },
+      {
+        "disposition": "amend",
+        "finding": 8,
+        "rationale": "Pages setup/assembly failure reports every required client gate; pip excludes capture/Actions tokens. Native environment gate retained because provision checks immutable image, actual OS and architecture. Legacy readers and 90-day custody retention are retained within scope."
+      }
+    ],
+    "outcome": "reviewed_with_findings",
+    "terminal_disposition": "amend"
+  },
+  "work_stage_deltas": "Workflow, source contract, builders, clients, aggregation, collector, documentation and source verification changed within original scope."
+}

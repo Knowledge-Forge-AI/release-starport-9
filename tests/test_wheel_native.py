@@ -133,6 +133,72 @@ class WheelNativeTests(unittest.TestCase):
             )
         self.assertEqual(ctx.exception.code, "MANYLINUX_UNPROVEN")
 
+    def test_candidate_only_linux_wheels_build_and_fail_closed(self) -> None:
+        arc = make_darwin_archive(make_standard_darwin_entries())
+        # Default candidate_only=False withholds
+        with self.assertRaises(WheelWithheldError) as ctx:
+            build_native_wheel(
+                "theme-forge-nebular-fusion",
+                "0.6.1",
+                archive_bytes=arc,
+                target_platform="x86_64-unknown-linux-gnu",
+                output_dir=self.root / "withheld",
+            )
+        self.assertEqual(ctx.exception.code, "MANYLINUX_UNPROVEN")
+
+        # candidate_only=True builds honest Linux candidate wheel
+        res_x86 = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc,
+            target_platform="x86_64-unknown-linux-gnu",
+            candidate_only=True,
+            output_dir=self.root / "cand_x86",
+        )
+        self.assertEqual(res_x86.filename, "theme_forge_nebular_fusion-0.6.1-py3-none-linux_x86_64.whl")
+        self.assertFalse(res_x86.can_publish)
+        self.assertTrue(res_x86.record["candidate_only"])
+        self.assertEqual(res_x86.record["promotability"], "policy-pending")
+        self.assertFalse(res_x86.record["manylinux_proven"])
+
+        # aarch64 linux candidate
+        res_arm = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc,
+            target_platform="aarch64-unknown-linux-gnu",
+            candidate_only=True,
+            output_dir=self.root / "cand_arm",
+        )
+        self.assertEqual(res_arm.filename, "theme_forge_nebular_fusion-0.6.1-py3-none-linux_aarch64.whl")
+
+        # Deterministic double build and strict RECORD
+        res_a, res_b = verify_double_build(
+            build_native_wheel,
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc,
+            target_platform="x86_64-unknown-linux-gnu",
+            candidate_only=True,
+            output_dir_a=self.root / "cand_db_a",
+            output_dir_b=self.root / "cand_db_b",
+        )
+        self.assertEqual(res_a.wheel_bytes, res_b.wheel_bytes)
+        inv = verify_wheel_record_bidirectional(res_a.wheel_path)
+        self.assertTrue(inv["record_valid"])
+
+        # Even with candidate_only=True, fake manylinux claim is strictly refused
+        with self.assertRaises(WheelWithheldError):
+            build_native_wheel(
+                "theme-forge-nebular-fusion",
+                "0.6.1",
+                archive_bytes=arc,
+                target_platform="x86_64-unknown-linux-gnu",
+                platform_tag="manylinux_2_34_x86_64",
+                candidate_only=True,
+                output_dir=self.root / "fake_manylinux",
+            )
+
     def test_raw_archive_cannot_claim_authenticated_release(self):
         archive = make_darwin_archive(make_standard_darwin_entries())
         with self.assertRaises(ContractError) as raised:

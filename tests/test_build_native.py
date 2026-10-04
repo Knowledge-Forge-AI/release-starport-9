@@ -651,6 +651,135 @@ class BuildNativeCommonTests(unittest.TestCase):
             stage_offline_npm_closure(capture, "theme-forge-stellar-loom", offline_npm, target_dir)
         self.assertEqual(caught.exception.code, "INVALID_ARCHITECTURE")
 
+    def test_pacman_builder_native_nebular_dt_needed(self):
+        neb_dir = self.root / "neb_pacman"
+        neb_dir.mkdir()
+        intent = fixture_evidence(neb_dir)
+        capture = authenticate_release(selection_for_intent(intent), neb_dir)
+        authorize_fixture_configuration(neb_dir, intent, capture)
+
+        scratch = self.root / "scratch_neb_pacman"
+        scratch.mkdir()
+
+        def makepkg_handler(argv, cwd=None, env=None):
+            src_dir = Path(cwd) / "src"
+            assert (src_dir / "theme-forge-nebular-fusion").is_dir(), "$srcdir/theme-forge-nebular-fusion must exist"
+            assert (src_dir / "theme-forge-nebular-fusion.desktop").is_file(), "desktop file must exist in $srcdir"
+            assert (src_dir / "icon.png").is_file(), "icon.png must exist in $srcdir"
+
+            pkg_name = "theme-forge-nebular-fusion-0.6.1-1-x86_64.pkg.tar.zst"
+            pkg_path = Path(cwd) / pkg_name
+            pkg_path.write_bytes(b"synthetic-nebular-pacman-package-bytes")
+            return CommandReceipt(argv, 0, b"makepkg success\n", b"")
+
+        def repo_add_handler(argv, cwd=None, env=None):
+            db_path = Path(argv[1])
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            db_path.write_bytes(b"synthetic-repo-db-tar-gz")
+            return CommandReceipt(argv, 0, b"repo-add success\n", b"")
+
+        runner = MockCommandRunner(
+            available_tools={"makepkg": "/usr/bin/makepkg", "repo-add": "/usr/bin/repo-add", "pacman":"/usr/bin/pacman"},
+            handlers={"makepkg": makepkg_handler, "repo-add": repo_add_handler, "pacman":lambda argv,cwd,env:CommandReceipt(argv,0,b"glibc\n",b"")},
+        )
+
+        result = build_pacman_candidate(
+            capture, intent, "x86_64", scratch, runner=runner
+        )
+
+        manifest = result["manifest"]
+        derivation = result["derivation_record"]
+
+        self.assertEqual(manifest["status"], "unsigned-candidate")
+        self.assertEqual(manifest["architecture"], "x86_64")
+        self.assertEqual(manifest["dependency_classification"], "native-tool-derived")
+        self.assertIn("glibc", manifest["dependencies"])
+
+        self.assertEqual(derivation["dependency_classification"], "native-tool-derived")
+        self.assertIn("dt_needed_evidence", derivation["evidence"])
+        self.assertIn("libc.so.6", derivation["evidence"]["dt_needed_evidence"]["system_sonames"])
+
+    def test_rpm_builder_native_nebular_elf_and_rpm_query(self):
+        neb_dir = self.root / "neb_rpm"
+        neb_dir.mkdir()
+        intent = fixture_evidence(neb_dir)
+        capture = authenticate_release(selection_for_intent(intent), neb_dir)
+        authorize_fixture_configuration(neb_dir, intent, capture)
+
+        scratch = self.root / "scratch_neb_rpm"
+        scratch.mkdir()
+
+        def rpmbuild_handler(argv, cwd=None, env=None):
+            spec_file = Path(argv[2])
+            spec_content = spec_file.read_text("utf-8")
+            self.assertIn("ExclusiveArch: x86_64", spec_content)
+            self.assertIn("Requires: glibc", spec_content)
+
+            rpm_dir = Path(cwd) / "RPMS" / "x86_64"
+            rpm_dir.mkdir(parents=True, exist_ok=True)
+            (rpm_dir / "theme-forge-nebular-fusion-0.6.1-1.fc43.x86_64.rpm").write_bytes(b"synthetic-neb-rpm")
+            return CommandReceipt(argv, 0, b"rpmbuild success\n", b"")
+
+        def rpm_handler(argv, cwd=None, env=None):
+            if "--requires" in argv:
+                out = b"libc.so.6()(64bit)\nrtld(GNU_HASH)\n"
+                return CommandReceipt(argv, 0, out, b"")
+            out = "theme-forge-nebular-fusion|0.6.1|1.fc43|x86_64|nebular123456789|sha256\n".encode()
+            return CommandReceipt(argv, 0, out, b"")
+
+        def rpmlint_handler(argv, cwd=None, env=None):
+            return CommandReceipt(argv, 0, b"0 errors, 0 warnings.\n", b"")
+
+        def createrepo_handler(argv, cwd=None, env=None):
+            repodata = Path(argv[-1]) / "repodata"
+            repodata.mkdir(parents=True, exist_ok=True)
+            (repodata / "repomd.xml").write_bytes(b"<repomd/>")
+            return CommandReceipt(argv, 0, b"createrepo_c complete\n", b"")
+
+        runner = MockCommandRunner(
+            available_tools={
+                "rpmbuild": "/usr/bin/rpmbuild",
+                "rpm": "/usr/bin/rpm",
+                "rpmlint": "/usr/bin/rpmlint",
+                "createrepo_c": "/usr/bin/createrepo_c",
+            },
+            handlers={
+                "rpmbuild": rpmbuild_handler,
+                "rpm": rpm_handler,
+                "rpmlint": rpmlint_handler,
+                "createrepo_c": createrepo_handler,
+            },
+        )
+
+        result = build_rpm_candidate(
+            capture, intent, "x86_64", scratch, runner=runner
+        )
+
+        manifest = result["manifest"]
+        derivation = result["derivation_record"]
+
+        self.assertEqual(manifest["architecture"], "x86_64")
+        self.assertEqual(manifest["dependency_classification"], "native-tool-derived")
+        self.assertIn("libc.so.6()(64bit)", manifest["dependencies"])
+        self.assertIn("glibc", derivation["evidence"]["policy_dependencies"])
+        self.assertEqual(len(derivation["tool_receipts"]), 5)
+        self.assertIn("rpm_query_evidence", derivation["evidence"])
+        self.assertIn("libc.so.6()(64bit)", derivation["evidence"]["rpm_query_evidence"]["requires"])
+
+    def test_pacman_root_execution_refused(self):
+        capture, intent, offline_npm = create_cli_fixture(self.root / "root_test")
+        scratch = self.root / "scratch_root"
+        scratch.mkdir()
+        runner = MockCommandRunner(
+            available_tools={"makepkg": "/usr/bin/makepkg", "repo-add": "/usr/bin/repo-add"}
+        )
+        with patch("os.geteuid", return_value=0):
+            with self.assertRaises(ContractError) as caught:
+                build_pacman_candidate(
+                    capture, intent, "any", scratch, offline_npm_archives=offline_npm, runner=runner
+                )
+            self.assertEqual(caught.exception.code, "NONROOT_REQUIRED")
+
 
 if __name__ == "__main__":
     unittest.main()

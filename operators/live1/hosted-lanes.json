@@ -1,0 +1,330 @@
+{
+  "schema": "rs9.hosted-lanes.v1alpha1",
+  "production_enabled": false,
+  "lanes": [
+    {
+      "lane": "unit",
+      "system": "generation",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 15,
+      "kind": "source-test"
+    },
+    {
+      "lane": "pins",
+      "system": "generation",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 30,
+      "module": "rs9.hosted_pins",
+      "artifact_name": "candidate-pins-generation",
+      "required_gates": [
+        "pinned-targets-readback",
+        "container-digests-resolved",
+        "nixpkgs-pin-resolved"
+      ],
+      "custody_required": false
+    },
+    {
+      "lane": "authenticate",
+      "system": "generation",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 30,
+      "module": "rs9.hosted_candidate",
+      "artifact_name": "candidate-authenticate-generation",
+      "required_gates": [
+        "release-authentication",
+        "credential-sanitization"
+      ],
+      "custody_required": false
+    },
+    {
+      "lane": "wheels",
+      "system": "aarch64-darwin",
+      "runner": "macos-15",
+      "timeout_minutes": 90,
+      "module": "rs9.hosted_wheels",
+      "artifact_name": "candidate-wheels-aarch64-darwin",
+      "required_gates": [
+        "wheel-deterministic-build",
+        "wheel-offline-isolation",
+        "wheel-lifecycle-install-test",
+        "wheel-native-verifier"
+      ],
+      "custody_required": true,
+      "allowed_not_run": {
+        "wheel-offline-isolation": "darwin-offline-isolation-unsupported"
+      },
+      "required_products": [
+        "theme-forge-stellar-burst",
+        "theme-forge-stellar-loom",
+        "theme-forge-solar-sail",
+        "theme-forge-nebular-fusion"
+      ]
+    },
+    {
+      "lane": "wheels",
+      "system": "x86_64-linux",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 90,
+      "module": "rs9.hosted_wheels",
+      "artifact_name": "candidate-wheels-x86_64-linux",
+      "required_gates": [
+        "wheel-deterministic-build",
+        "wheel-offline-isolation",
+        "wheel-lifecycle-install-test",
+        "wheel-native-verifier",
+        "wheel-client-deb",
+        "wheel-client-rpm"
+      ],
+      "custody_required": true,
+      "required_products": [
+        "theme-forge-stellar-burst",
+        "theme-forge-stellar-loom",
+        "theme-forge-solar-sail",
+        "theme-forge-nebular-fusion"
+      ]
+    },
+    {
+      "lane": "wheels",
+      "system": "aarch64-linux",
+      "runner": "ubuntu-24.04-arm",
+      "timeout_minutes": 90,
+      "module": "rs9.hosted_wheels",
+      "artifact_name": "candidate-wheels-aarch64-linux",
+      "required_gates": [
+        "wheel-deterministic-build",
+        "wheel-offline-isolation",
+        "wheel-lifecycle-install-test",
+        "wheel-native-verifier",
+        "wheel-client-deb",
+        "wheel-client-rpm"
+      ],
+      "custody_required": true,
+      "required_products": [
+        "theme-forge-stellar-burst",
+        "theme-forge-stellar-loom",
+        "theme-forge-solar-sail",
+        "theme-forge-nebular-fusion"
+      ]
+    },
+    {
+      "lane": "nix",
+      "system": "aarch64-darwin",
+      "runner": "macos-15",
+      "timeout_minutes": 90,
+      "module": "rs9.hosted_nix",
+      "artifact_name": "candidate-nix-aarch64-darwin",
+      "required_gates": [
+        "nix-lock-pin",
+        "nix-native-closure",
+        "nix-build-check-run"
+      ],
+      "custody_required": false
+    },
+    {
+      "lane": "nix",
+      "system": "x86_64-linux",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 90,
+      "module": "rs9.hosted_nix",
+      "artifact_name": "candidate-nix-x86_64-linux",
+      "required_gates": [
+        "nix-lock-pin",
+        "nix-native-closure",
+        "nix-build-check-run"
+      ],
+      "custody_required": false
+    },
+    {
+      "lane": "nix",
+      "system": "aarch64-linux",
+      "runner": "ubuntu-24.04-arm",
+      "timeout_minutes": 90,
+      "module": "rs9.hosted_nix",
+      "artifact_name": "candidate-nix-aarch64-linux",
+      "required_gates": [
+        "nix-lock-pin",
+        "nix-native-closure",
+        "nix-build-check-run"
+      ],
+      "custody_required": false
+    },
+    {
+      "lane": "pacman",
+      "system": "x86_64-linux",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 90,
+      "family": "pacman",
+      "module": "rs9.hosted_native",
+      "artifact_name": "candidate-pacman-x86_64-linux",
+      "required_gates": [
+        "pacman-container-environment",
+        "pacman-package-build",
+        "pacman-repository-indexing",
+        "pacman-client-qualification"
+      ],
+      "custody_required": true,
+      "required_products": [
+        "theme-forge-stellar-burst",
+        "theme-forge-stellar-loom",
+        "theme-forge-solar-sail",
+        "theme-forge-nebular-fusion"
+      ]
+    },
+    {
+      "lane": "rpm",
+      "system": "x86_64-linux",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 90,
+      "family": "rpm",
+      "module": "rs9.hosted_native",
+      "artifact_name": "candidate-rpm-x86_64-linux",
+      "required_gates": [
+        "rpm-container-environment",
+        "rpm-package-build",
+        "rpm-rpmlint-clean",
+        "rpm-repository-indexing",
+        "rpm-client-qualification"
+      ],
+      "custody_required": true,
+      "required_products": [
+        "theme-forge-stellar-burst",
+        "theme-forge-stellar-loom",
+        "theme-forge-solar-sail",
+        "theme-forge-nebular-fusion"
+      ]
+    },
+    {
+      "lane": "rpm",
+      "system": "aarch64-linux",
+      "runner": "ubuntu-24.04-arm",
+      "timeout_minutes": 90,
+      "family": "rpm",
+      "module": "rs9.hosted_native",
+      "artifact_name": "candidate-rpm-aarch64-linux",
+      "required_gates": [
+        "rpm-container-environment",
+        "rpm-package-build",
+        "rpm-rpmlint-clean",
+        "rpm-repository-indexing",
+        "rpm-client-qualification"
+      ],
+      "custody_required": true,
+      "required_products": [
+        "theme-forge-stellar-burst",
+        "theme-forge-stellar-loom",
+        "theme-forge-solar-sail",
+        "theme-forge-nebular-fusion"
+      ]
+    },
+    {
+      "lane": "deb",
+      "system": "amd64",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 90,
+      "family": "deb",
+      "module": "rs9.hosted_deb",
+      "artifact_name": "candidate-deb-amd64",
+      "required_gates": [
+        "deb-container-environment",
+        "deb-package-build",
+        "deb-shlibdeps-closure",
+        "deb-apt-repository-indexing",
+        "deb-client-qualification"
+      ],
+      "custody_required": true,
+      "required_products": [
+        "theme-forge-stellar-burst",
+        "theme-forge-stellar-loom",
+        "theme-forge-solar-sail",
+        "theme-forge-nebular-fusion"
+      ]
+    },
+    {
+      "lane": "deb",
+      "system": "arm64",
+      "runner": "ubuntu-24.04-arm",
+      "timeout_minutes": 90,
+      "family": "deb",
+      "module": "rs9.hosted_deb",
+      "artifact_name": "candidate-deb-arm64",
+      "required_gates": [
+        "deb-container-environment",
+        "deb-package-build",
+        "deb-shlibdeps-closure",
+        "deb-apt-repository-indexing",
+        "deb-client-qualification"
+      ],
+      "custody_required": true,
+      "required_products": [
+        "theme-forge-stellar-burst",
+        "theme-forge-stellar-loom",
+        "theme-forge-solar-sail",
+        "theme-forge-nebular-fusion"
+      ]
+    },
+    {
+      "lane": "pages",
+      "system": "generation",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 90,
+      "family": "pages",
+      "module": "rs9.hosted_deb",
+      "artifact_name": "candidate-pages-generation",
+      "required_gates": [
+        "pages-repository-objects",
+        "pages-inventory-integrity",
+        "pages-privacy-scan",
+        "pages-client.apt",
+        "pages-client.dnf",
+        "pages-client.pacman"
+      ],
+      "custody_required": false
+    },
+    {
+      "lane": "observe",
+      "system": "generation",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 30,
+      "module": "rs9.hosted_observe",
+      "artifact_name": "candidate-observe-generation",
+      "required_gates": [
+        "destination-observations-recorded",
+        "readback-byte-comparison"
+      ],
+      "custody_required": false
+    },
+    {
+      "lane": "foundation3",
+      "system": "generation",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 30,
+      "module": "rs9.hosted_foundation3",
+      "artifact_name": "candidate-foundation3-generation",
+      "required_gates": [
+        "foundation3-plan-assembly",
+        "publication-readiness-evaluation"
+      ],
+      "custody_required": false
+    },
+    {
+      "lane": "summary",
+      "system": "generation",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 15,
+      "kind": "aggregate"
+    }
+  ],
+  "required_jobs": [
+    "config",
+    "unit",
+    "authenticate",
+    "pins",
+    "wheels",
+    "nix",
+    "native",
+    "pages",
+    "observe",
+    "foundation3",
+    "summary"
+  ]
+}

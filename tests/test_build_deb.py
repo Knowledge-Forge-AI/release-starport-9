@@ -17,9 +17,14 @@ from unittest.mock import patch
 from rs9.build_deb import (
     DEB_NATIVE_REQUIRED_TOOLS,
     DEB_REQUIRED_TOOLS,
+    ELF_MACHINE,
+    SOURCE_DATE_EPOCH,
     build_deb_candidate,
+    collect_elf_inventory,
+    derive_native_dependencies,
     main as deb_main,
 )
+from tests.elf_builder import build_elf
 from rs9.build_native import (
     CommandReceipt,
     MockCommandRunner,
@@ -425,6 +430,234 @@ class BuildDebTests(unittest.TestCase):
     def test_deb_cli_command_driver(self, _which):
         code = deb_main(["--arch", "all", "--capture", "c", "--intent", "i", "--scratch", "s", "--maintainer", "m", "--check-prerequisites"])
         self.assertEqual(code, 1)
+
+    def test_cli_deb_is_clamped_to_source_date_epoch_and_proves_no_elf(self):
+        capture, intent, offline_npm = create_cli_fixture(self.root / "loom_input")
+        scratch = self.root / "scratch_epoch"
+        scratch.mkdir()
+        maintainer = "Theme Forge Lead <maintainer@example.com>"
+        seen = {}
+
+        def dpkg_deb_handler(argv, cwd=None, env=None):
+            seen["env"] = env
+            Path(argv[4]).write_bytes(make_minimal_deb(
+                "theme-forge-stellar-loom", "0.4.0", 1, "all", maintainer, "Synthetic Loom summary", "nodejs (>= 22)"))
+            return CommandReceipt(argv, 0, b"", b"")
+
+        runner = MockCommandRunner(available_tools={"dpkg-deb": "/usr/bin/dpkg-deb"},
+                                   handlers={"dpkg-deb": dpkg_deb_handler})
+        result = build_deb_candidate(capture, intent, "all", scratch, maintainer=maintainer,
+                                     offline_npm_archives=offline_npm, runner=runner)
+        self.assertEqual(seen["env"], {"SOURCE_DATE_EPOCH": SOURCE_DATE_EPOCH})
+        self.assertEqual(result["manifest"]["elf_object_count"], 0)
+        self.assertIsNone(result["manifest"]["shlibs_inventory"])
+        evidence = result["derivation_record"]["evidence"]
+        self.assertFalse(evidence["dpkg_shlibdeps_executed"])
+        self.assertEqual(evidence["elf_objects"], [])
+        self.assertEqual(result["derivation_record"]["derivation_source"], "reviewed-policy")
+
+
+class NativeDependencyDerivationTests(unittest.TestCase):
+    MAINTAINER = "Theme Forge Lead <maintainer@example.com>"
+    DEPENDS = "libc6 (>= 2.34), libgtk-3-0t64 (>= 3.24)"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name).resolve()
+        self.calls = {"shlibdeps": [], "query": [], "deb": []}
+
+    def native(self, extra_linux=()):
+        directory = self.root / f"nebular-{len(list(self.root.iterdir()))}"
+        directory.mkdir()
+        intent = fixture_evidence(directory, extra_linux=extra_linux)
+        capture = authenticate_release(selection_for_intent(intent), directory)
+        authorize_fixture_configuration(directory, intent, capture)
+        return capture, intent
+
+    def runner(self, *, shlibdeps=None, query=None, tools=("dpkg-deb", "dpkg-shlibdeps", "dpkg-query")):
+        def deb(argv, cwd=None, env=None):
+            self.calls["deb"].append(env)
+            Path(argv[4]).write_bytes(make_minimal_deb(
+                "theme-forge-nebular-fusion", "0.6.1", 1, "amd64", self.MAINTAINER, "Synthetic Nebular", self.DEPENDS))
+            return CommandReceipt(argv, 0, b"", b"")
+
+        def default_shlibdeps(argv, cwd=None, env=None):
+            self.calls["shlibdeps"].append((argv, cwd))
+            return CommandReceipt(argv, 0, f"shlibs:Depends={self.DEPENDS}\n".encode(), b"")
+
+        def default_query(argv, cwd=None, env=None):
+            self.calls["query"].append(argv)
+            return CommandReceipt(argv, 0, b"libc6\t2.43-1\tamd64\nlibgtk-3-0t64:amd64\t3.24.43\tamd64\n", b"")
+
+        return MockCommandRunner(
+            available_tools={tool: f"/usr/bin/{tool}" for tool in tools},
+            handlers={"dpkg-deb": deb, "dpkg-shlibdeps": shlibdeps or default_shlibdeps,
+                      "dpkg-query": query or default_query})
+
+    def build(self, runner, **kwargs):
+        capture, intent = self.native(**kwargs)
+        scratch = self.root / f"scratch-{len(list(self.root.iterdir()))}"
+        scratch.mkdir()
+        return scratch, lambda: build_deb_candidate(
+            capture, intent, "amd64", scratch, maintainer=self.MAINTAINER, runner=runner)
+
+    def test_native_dependencies_come_only_from_dpkg_shlibdeps_over_every_elf(self):
+        scratch, run = self.build(self.runner())
+        result = run()
+        manifest, derivation = result["manifest"], result["derivation_record"]
+        self.assertEqual(manifest["architecture"], "amd64")
+        self.assertEqual(manifest["dependencies"], self.DEPENDS)
+        self.assertEqual(manifest["dependency_classification"], "native-tool-derived")
+        self.assertEqual(manifest["elf_object_count"], 1)
+        self.assertEqual(derivation["dependency_classification"], "native-tool-derived")
+        self.assertEqual(derivation["derived_dependencies"], sorted(self.DEPENDS.split(", ")))
+        # A mock seam is labelled synthetic; only a real subprocess may claim an actual derivation.
+        self.assertEqual(derivation["derivation_source"], "synthetic-command-seam")
+        evidence = derivation["evidence"]
+        self.assertTrue(evidence["dpkg_shlibdeps_executed"])
+        self.assertEqual([row["machine"] for row in evidence["elf_objects"]], ["x86_64"])
+        self.assertEqual(evidence["elf_objects"][0]["needed"], ["libc.so.6"])
+        self.assertEqual([row["name"] for row in evidence["shlibs_inventory"]["packages"]], ["libc6", "libgtk-3-0t64:amd64"])
+
+        (argv, cwd), = self.calls["shlibdeps"]
+        self.assertEqual(argv[:2], ["dpkg-shlibdeps", "-O"])
+        exe_args = [a for a in argv if a.startswith("-e")]
+        self.assertEqual(len(exe_args), manifest["elf_object_count"])
+        self.assertTrue(exe_args[0].endswith("/usr/lib/theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion"))
+        control = (Path(cwd) / "debian/control").read_text("utf-8")
+        self.assertIn("Package: theme-forge-nebular-fusion", control)
+        self.assertIn("Architecture: amd64", control)
+        (query,) = self.calls["query"]
+        self.assertEqual(query[:2], ["dpkg-query", "-W"])
+        # Query the derived names; dpkg-query reports the installed multiarch identity.
+        self.assertEqual(query[3:], ["libc6", "libgtk-3-0t64"])
+        self.assertEqual(self.calls["deb"], [{"SOURCE_DATE_EPOCH": SOURCE_DATE_EPOCH}])
+
+        pkg = scratch / "pkg/theme-forge-nebular-fusion_0.6.1-1_amd64"
+        self.assertIn(f"Depends: {self.DEPENDS}", (pkg / "DEBIAN/control").read_text("utf-8"))
+        link = pkg / "usr/bin/tfnf"
+        self.assertTrue(link.is_symlink())
+        self.assertEqual(os.readlink(link), "../lib/theme-forge-nebular-fusion/bin/tfnf")
+        self.assertTrue((pkg / "usr/share/applications/theme-forge-nebular-fusion.desktop").is_file())
+        self.assertTrue((pkg / "usr/share/icons/hicolor/256x256/apps/theme-forge-nebular-fusion.png").is_file())
+        self.assertEqual(result["manifest"]["apt_repository"]["verified_packages"], 1)
+
+    def test_shlibdeps_failure_withholds_the_native_package(self):
+        def failing(argv, cwd=None, env=None):
+            return CommandReceipt(argv, 2, b"", b"dpkg-shlibdeps: error: cannot find library")
+
+        scratch, run = self.build(self.runner(shlibdeps=failing))
+        with self.assertRaises(ContractError) as caught:
+            run()
+        self.assertEqual(caught.exception.code, "NATIVE_DEPENDENCY_DERIVATION_FAILED")
+        self.assertEqual(list(scratch.glob("*.deb")), [])
+
+    def test_derived_package_missing_from_installed_inventory_is_unqualified(self):
+        def partial(argv, cwd=None, env=None):
+            return CommandReceipt(argv, 0, b"libc6\t2.43-1\tamd64\n", b"")
+
+        _, run = self.build(self.runner(query=partial))
+        with self.assertRaises(ContractError) as caught:
+            run()
+        self.assertEqual(caught.exception.code, "NATIVE_DEPENDENCY_DERIVATION_UNQUALIFIED")
+
+        def failing(argv, cwd=None, env=None):
+            return CommandReceipt(argv, 1, b"libc6\t2.43-1\tamd64\nlibgtk-3-0t64\t3.24\tamd64\n", b"")
+
+        _, run = self.build(self.runner(query=failing))
+        with self.assertRaises(ContractError) as caught:
+            run()
+        self.assertEqual(caught.exception.code, "NATIVE_DEPENDENCY_DERIVATION_UNQUALIFIED")
+
+    def test_missing_dpkg_query_is_explicit_unavailable_not_a_fabricated_inventory(self):
+        _, run = self.build(self.runner(tools=("dpkg-deb", "dpkg-shlibdeps")))
+        with self.assertRaises(NativePrerequisiteUnavailable) as caught:
+            run()
+        self.assertEqual(caught.exception.missing_tools, ["dpkg-query"])
+
+    def test_foreign_architecture_elf_anywhere_in_the_payload_is_rejected(self):
+        foreign = build_elf(machine="aarch64", elf_type="shared", needed=["libc.so.6"], soname="libforeign.so")
+        extra = [("theme-forge-nebular-fusion/lib/libforeign.so", foreign, 0o755, tarfile.REGTYPE, "")]
+        _, run = self.build(self.runner(), extra_linux=extra)
+        with self.assertRaises(ContractError) as caught:
+            run()
+        self.assertEqual(caught.exception.code, "INVALID_ARCHITECTURE")
+        self.assertEqual(self.calls["shlibdeps"], [])
+
+    def test_unparseable_or_empty_derived_dependencies_never_qualify(self):
+        elf = [{"path": "bin/tool", "type": "executable"}]
+        for output, code in ((b"shlibs:Depends=Bad_Name (>= 1)\n", "NATIVE_DEPENDENCY_DERIVATION_UNQUALIFIED"),
+                             (b"", "NATIVE_DEPENDENCY_DERIVATION_UNQUALIFIED"),
+                             (b"unrelated output\n", "NATIVE_DEPENDENCY_DERIVATION_UNQUALIFIED")):
+            scratch = self.root / f"direct-{len(list(self.root.iterdir()))}"
+            scratch.mkdir()
+            pkg_root = scratch / "pkg"
+            pkg_root.mkdir()
+            runner = MockCommandRunner(available_tools={"dpkg-shlibdeps": "/x", "dpkg-query": "/y"},
+                                       handlers={"dpkg-shlibdeps": {"stdout": output}})
+            with self.subTest(output=output), self.assertRaises(ContractError) as caught:
+                derive_native_dependencies(runner, scratch, pkg_root, "proj", "amd64", self.MAINTAINER, elf)
+            self.assertEqual(caught.exception.code, code)
+
+    def test_private_library_directories_are_passed_to_shlibdeps(self):
+        scratch = self.root / "libdirs"
+        scratch.mkdir()
+        pkg_root = scratch / "pkg"
+        pkg_root.mkdir()
+        elf = [{"path": "usr/lib/p/bin/app", "type": "executable"}, {"path": "usr/lib/p/lib/libp.so", "type": "shared"}]
+        runner = MockCommandRunner(
+            available_tools={"dpkg-shlibdeps": "/x", "dpkg-query": "/y"},
+            handlers={"dpkg-shlibdeps": {"stdout": b"shlibs:Depends=libc6 (>= 2.34)\n"},
+                      "dpkg-query": {"stdout": b"libc6\t2.43-1\tamd64\n"}})
+        receipt, depends, query, inventory = derive_native_dependencies(
+            runner, scratch, pkg_root, "proj", "amd64", self.MAINTAINER, elf)
+        argv = receipt.command
+        self.assertIn(f"-l{pkg_root / 'usr/lib/p/lib'}", argv)
+        self.assertEqual([a for a in argv if a.startswith("-e")],
+                         [f"-e{pkg_root / 'usr/lib/p/bin/app'}", f"-e{pkg_root / 'usr/lib/p/lib/libp.so'}"])
+        self.assertEqual(depends, "libc6 (>= 2.34)")
+        self.assertEqual(inventory["packages"], [{"name": "libc6", "version": "2.43-1", "architecture": "amd64"}])
+        self.assertEqual(inventory["query_stdout_sha256"], query.stdout_sha256)
+
+
+class ElfInventoryTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name).resolve()
+
+    def test_inventory_lists_every_regular_elf_in_sorted_order_with_strict_parsing(self):
+        (self.root / "usr/lib/p/lib").mkdir(parents=True)
+        (self.root / "usr/bin").mkdir(parents=True)
+        exe = build_elf(machine="x86_64", needed=["libc.so.6"], interpreter="/lib64/ld-linux-x86-64.so.2")
+        lib = build_elf(machine="x86_64", elf_type="shared", soname="libp.so", needed=["libm.so.6"], rpath=["$ORIGIN"])
+        (self.root / "usr/lib/p/lib/libp.so").write_bytes(lib)
+        (self.root / "usr/bin/tool").write_bytes(exe)
+        (self.root / "usr/bin/script").write_bytes(b"#!/bin/sh\n")
+        (self.root / "usr/bin/data").write_bytes(b"\x00\x01binary but not elf")
+        try:
+            os.symlink("tool", self.root / "usr/bin/alias")
+        except OSError:
+            pass
+        rows = collect_elf_inventory(self.root)
+        self.assertEqual([row["path"] for row in rows], ["usr/bin/tool", "usr/lib/p/lib/libp.so"])
+        self.assertEqual(rows[0]["needed"], ["libc.so.6"])
+        self.assertEqual(rows[0]["interpreter"], "/lib64/ld-linux-x86-64.so.2")
+        self.assertEqual((rows[1]["type"], rows[1]["rpath"], rows[1]["machine"]), ("shared", ["$ORIGIN"], "x86_64"))
+        self.assertEqual(rows[0]["sha256"], digest(exe))
+        # Paths are relative to the inspected root.
+        self.assertEqual(collect_elf_inventory(self.root / "usr/lib"), [{**rows[1], "path": "p/lib/libp.so"}])
+
+    def test_unsupported_elf_fails_closed_rather_than_being_skipped(self):
+        (self.root / "bin").mkdir()
+        (self.root / "bin/elf32").write_bytes(build_elf(ei_class=1))
+        with self.assertRaises(ContractError) as caught:
+            collect_elf_inventory(self.root)
+        self.assertEqual(caught.exception.code, "UNSUPPORTED_ELF")
+
+    def test_machine_mapping_matches_deb_architectures(self):
+        self.assertEqual(ELF_MACHINE, {"amd64": "x86_64", "arm64": "aarch64"})
 
 
 if __name__ == "__main__":

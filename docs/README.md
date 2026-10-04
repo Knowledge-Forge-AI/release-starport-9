@@ -5,6 +5,10 @@ Release Starport 9 is organized around stable, evidence-bound contracts across i
 Theme Forge LIVE1 is pending / not live. See the [candidate disposition](live1-candidate.md),
 [source inventory](live1-inventory.md) and [attended preparation runbook](../operators/live1/RUNBOOK.md).
 
+- [CONT2 hosted candidate source](live1-hosted-candidate.md) — Source-defined lanes, custody and attended handoff.
+- [ADR 0007](adr/0007-hosted-candidate-lane-contract.md) — Hosted qualification authority.
+- [Hosted artifact set v1alpha2](specs/rs9-hosted-artifact-set-v1alpha2.md) — Exact logical and archive custody.
+
 ## Architecture and governance
 
 - [Architecture](architecture.md) — Control-plane responsibilities, publication modes, and trust boundaries.

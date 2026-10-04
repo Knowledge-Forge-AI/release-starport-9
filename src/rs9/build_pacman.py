@@ -201,11 +201,81 @@ def build_pacman_candidate(
         desktop_sha = digest(desktop_bytes)
         icon_sha = digest(icon_bytes)
 
+        # Stage native desktop entry and icon into pkg_work and src_dir
         (pkg_work / f"{project_id}.desktop").write_bytes(desktop_bytes)
         (pkg_work / "icon.png").write_bytes(icon_bytes)
 
-        # Nebular dependencies derived from DT_NEEDED / system libs
-        raise ContractError("NATIVE_DEPENDENCY_DERIVATION_UNQUALIFIED", "Native dependency provider queries and clean client closure proof are required")
+        src_dir = pkg_work / "src"
+        src_dir.mkdir(parents=True, exist_ok=True)
+        extract_for_packaging(asset_file, src_dir, expected_sha256=ctx["asset_sha"])
+        (src_dir / f"{project_id}.desktop").write_bytes(desktop_bytes)
+        (src_dir / "icon.png").write_bytes(icon_bytes)
+
+        # Derive DT_NEEDED dependencies from extracted ELF binaries
+        from rs9.dependencies import INTERPRETERS, LIBRARIES, shebang
+        from rs9.elf import parse_elf
+
+        elf_objects = []
+        scripts = []
+        system_sonames = set()
+        arch_packages = set()
+
+        for path in sorted(src_dir.rglob("*")):
+            if path.is_file() and not path.is_symlink():
+                data = path.read_bytes()
+                rel_path = path.relative_to(src_dir).as_posix()
+                if data.startswith(b"\x7fELF"):
+                    elf_info = parse_elf(data)
+                    elf_objects.append({
+                        "path": rel_path,
+                        "needed": elf_info["needed"],
+                        "interpreter": elf_info.get("interpreter"),
+                    })
+                    for soname in elf_info["needed"]:
+                        system_sonames.add(soname)
+                        if soname in LIBRARIES:
+                            arch_packages.add(LIBRARIES[soname][0])
+                    interp = elf_info.get("interpreter")
+                    if interp in {"/lib64/ld-linux-x86-64.so.2", "/lib/ld-linux-aarch64.so.1"}:
+                        arch_packages.add("glibc")
+                elif data.startswith(b"#!") and (path.stat().st_mode & 0o111):
+                    sh_info = shebang(data)
+                    if sh_info and sh_info.get("interpreter"):
+                        interp_name = sh_info["interpreter"]
+                        scripts.append({"path": rel_path, "interpreter": interp_name})
+                        if interp_name in INTERPRETERS:
+                            arch_packages.add(INTERPRETERS[interp_name][0])
+
+        if not elf_objects:
+            raise ContractError("NO_ELF_OBJECTS", "Native package contains no ELF binaries")
+
+        providers, derived = [], set()
+        bundled = {p.name for p in src_dir.rglob("*") if p.is_file() or p.is_symlink()}
+        for soname in sorted(system_sonames - bundled):
+            receipt = r.run(["pacman","-Qo","--quiet","/usr/lib/" + soname])
+            if receipt.exit_code or not receipt.stdout_text.strip():
+                receipt = r.run(["pacman","-F","--machinereadable",soname])
+                package_names = {line.split(chr(0))[1] for line in receipt.stdout_text.splitlines()
+                                 if len(line.split(chr(0))) >= 4}
+            else:
+                package_names = set(receipt.stdout_text.strip().splitlines())
+            if receipt.exit_code or len(package_names) != 1:
+                raise ContractError("DEPENDENCY_DERIVATION", "Native soname lacks one actual pacman provider")
+            derived.update(package_names)
+            providers.append({"soname":soname,"provider":next(iter(package_names)),
+                              "tool_receipt":receipt.to_record()})
+        # Shell interpreters and dlopen dependencies are explicit reviewed policy.
+        policy_deps = sorted(arch_packages)
+        derived_deps = sorted(derived | arch_packages)
+        dependency_classification = "native-tool-derived"
+        extra_evidence = {
+            "policy_dependencies": policy_deps, "native_provider_queries": providers,
+            "dt_needed_evidence": {
+                "objects": elf_objects,
+                "system_sonames": sorted(system_sonames),
+                "derived_packages": derived_deps,
+            }
+        }
     else:
         # CLI projects: stage offline authenticated npm closure
         payload_root = ctx["payload_root"]
@@ -228,6 +298,8 @@ def build_pacman_candidate(
 
         # CLI packages depend on nodejs >= 22 (classified as reviewed policy)
         derived_deps = ["nodejs>=22"]
+        dependency_classification = "reviewed-policy"
+        extra_evidence = None
 
     # Render PKGBUILD
     pkgbuild_bytes = _render_pkgbuild(
@@ -264,7 +336,7 @@ def build_pacman_candidate(
         "--force",
         "--clean",
     ]
-    makepkg_receipt = r.run(makepkg_cmd, cwd=pkg_work)
+    makepkg_receipt = r.run(makepkg_cmd, cwd=pkg_work, env={"SOURCE_DATE_EPOCH":"1767225600"})
     if makepkg_receipt.exit_code != 0:
         raise ContractError(
             "BUILD_FAILED",
@@ -318,7 +390,8 @@ def build_pacman_candidate(
         version=version,
         derived_dependencies=derived_deps,
         extra_tools=[repo_add_receipt],
-        dependency_classification="reviewed-policy",
+        extra_evidence=extra_evidence,
+        dependency_classification=dependency_classification,
     )
 
     manifest = {
@@ -336,7 +409,7 @@ def build_pacman_candidate(
         "package_sha256": digest(pkg_bytes),
         "package_size": len(pkg_bytes),
         "dependencies": derived_deps,
-        "dependency_classification": "reviewed-policy",
+        "dependency_classification": dependency_classification,
         "derivation": derivation,
     }
 

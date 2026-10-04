@@ -13,14 +13,21 @@ import io
 import lzma
 import os
 from pathlib import Path
+import re
 import stat
 import tarfile
 from typing import Any, Callable
+import zlib
 
 from rs9.errors import ContractError
 from rs9.records import Record, snapshot, validate_bounded_int, validate_sanitized_string, validate_sha256
 from rs9.scratch import canonical, physical_directory
-from rs9.security import validate_ecosystem_name, validate_safe_relative_posix_path, validate_version_string
+from rs9.security import (
+    validate_ecosystem_name,
+    validate_nonproduction_key_path,
+    validate_safe_relative_posix_path,
+    validate_version_string,
+)
 from rs9.signed_store import SignedStore, _check_no_symlinks, _safe_read_file, _safe_write_file
 
 ARCHITECTURES = ("amd64", "arm64")
@@ -316,6 +323,38 @@ class AptRepositoryCandidate:
         self._is_signed, self._signed_objects[rel_path] = True, record["signed_sha256"]
         return record
 
+    def sign_with_fixture(self, signer: Any) -> dict[str, Any]:
+        """Write InRelease (clearsigned) and Release.gpg (detached, armored) from a fixture signer.
+
+        The signer must be a NONPRODUCTION fixture authority exposing clearsign, detach_sign
+        and verify; both signatures are verified against the exact Release bytes before the
+        repository is marked signed. Signature objects also receive by-hash copies.
+        """
+        dist_dir = self.root / f"dists/{self.distribution}"
+        release_file = dist_dir / "Release"
+        if not release_file.exists():
+            raise ContractError("MISSING_RELEASE", "Release file missing")
+        release_bytes = _safe_read_file(release_file)
+        inrelease = signer.clearsign(release_bytes)
+        release_gpg = signer.detach_sign(release_bytes, armor=True)
+        if clearsigned_body(inrelease).rstrip(b"\n") != release_bytes.rstrip(b"\n"):
+            raise ContractError("SIGNATURE_BODY_MISMATCH", "InRelease body differs from Release")
+        verified = signer.verify(inrelease)
+        signer.verify(release_bytes, release_gpg)
+        by_hash = dist_dir / "by-hash/SHA256"
+        by_hash.mkdir(parents=True, exist_ok=True)
+        for name, blob in (("InRelease", inrelease), ("Release.gpg", release_gpg)):
+            _safe_write_file(dist_dir / name, blob)
+            _safe_write_file(by_hash / _digest(blob), blob)
+            self._signed_objects[f"dists/{self.distribution}/{name}"] = _digest(blob)
+        self._is_signed = True
+        return {
+            "verified_issuer": verified.get("verified_issuer"),
+            "inrelease_sha256": _digest(inrelease),
+            "release_gpg_sha256": _digest(release_gpg),
+            "release_sha256": _digest(release_bytes),
+        }
+
     def status(self) -> dict[str, Any]:
         return {
             "status": "candidate", "qualification": "pending", "is_live": False,
@@ -385,6 +424,7 @@ def validate_apt_repository(root: str | Path, distribution: str = DEFAULT_DISTRI
                 raise ContractError("INVALID_REPO", "Missing required index in Release")
 
     pool_packages_seen: set[str] = set()
+    stanzas_by_arch: dict[str, list[dict[str, str]]] = {arch: [] for arch in ARCHITECTURES}
     for rel_path, (expected_sha, expected_size) in index_manifest.items():
         validate_safe_relative_posix_path(rel_path)
         tf = dist_dir / rel_path
@@ -393,6 +433,13 @@ def validate_apt_repository(root: str | Path, distribution: str = DEFAULT_DISTRI
         actual_bytes = _safe_read_file(tf)
         if len(actual_bytes) != expected_size or _digest(actual_bytes) != expected_sha:
             raise ContractError("TAMPER_DETECTED", "Hash or size mismatch for index file")
+        if tf.name in ("Packages.gz", "Packages.xz"):
+            try:
+                decoded = gzip.decompress(actual_bytes) if tf.name.endswith(".gz") else lzma.decompress(actual_bytes)
+            except (OSError, EOFError, lzma.LZMAError, zlib.error):
+                raise ContractError("TAMPER_DETECTED", "Compressed index is not decodable") from None
+            if decoded != _safe_read_file(tf.parent / "Packages"):
+                raise ContractError("TAMPER_DETECTED", "Compressed index differs from Packages")
 
         bh_file = tf.parent / f"by-hash/SHA256/{expected_sha}"
         if not bh_file.exists():
@@ -412,6 +459,10 @@ def validate_apt_repository(root: str | Path, distribution: str = DEFAULT_DISTRI
                 deb_rel, sha, sz_s = fields.get("Filename"), fields.get("SHA256"), fields.get("Size")
                 if not deb_rel or not sha or not sz_s:
                     raise ContractError("INVALID_METADATA", "Corrupted package stanza")
+                index_arch = tf.parent.name.removeprefix("binary-")
+                if index_arch not in stanzas_by_arch or fields.get("Architecture") not in (index_arch, "all"):
+                    raise ContractError("INVALID_ARCHITECTURE", "Package listed in an index for a different architecture")
+                stanzas_by_arch[index_arch].append(fields)
 
                 validate_safe_relative_posix_path(deb_rel)
                 pool_packages_seen.add(deb_rel)
@@ -428,6 +479,15 @@ def validate_apt_repository(root: str | Path, distribution: str = DEFAULT_DISTRI
                 if "Installed-Size" in control and fields.get("Installed-Size") != str(control["Installed-Size"]):
                     raise ContractError("TAMPER_DETECTED", "Package control Installed-Size mismatch")
 
+    # Architecture-all packages must be advertised identically in every client architecture index.
+    all_rows = [
+        {(f.get("Package"), f.get("Version"), f.get("Filename"), f.get("SHA256"))
+         for f in stanzas_by_arch[arch] if f.get("Architecture") == "all"}
+        for arch in ARCHITECTURES
+    ]
+    if any(rows != all_rows[0] for rows in all_rows[1:]):
+        raise ContractError("INVALID_REPO", "Architecture all packages must appear in every binary index")
+
     pool_root = root_path / "pool"
     if pool_root.exists():
         for cur, _, files in os.walk(str(pool_root)):
@@ -443,3 +503,136 @@ def validate_apt_repository(root: str | Path, distribution: str = DEFAULT_DISTRI
         "signature_authenticated": False,
         "confers_signature_authentication": False,
     }
+
+
+def clearsigned_body(data: bytes) -> bytes:
+    """Cleartext of a clearsigned document with dash-escaping removed (final newline excluded)."""
+    marker = b"-----BEGIN PGP SIGNED MESSAGE-----\n"
+    if not isinstance(data, bytes) or not data.startswith(marker):
+        raise ContractError("INVALID_SIGNATURE_FORMAT", "Clearsigned document required")
+    _, separator, rest = data[len(marker):].partition(b"\n\n")
+    if not separator:
+        raise ContractError("INVALID_SIGNATURE_FORMAT", "Clearsigned header terminator missing")
+    body, separator, _ = rest.partition(b"\n-----BEGIN PGP SIGNATURE-----")
+    if not separator:
+        raise ContractError("INVALID_SIGNATURE_FORMAT", "Clearsigned signature block missing")
+    return b"\n".join(line[2:] if line.startswith(b"- ") else line for line in body.split(b"\n"))
+
+
+def verify_apt_signatures(
+    root: str | Path, signer: Any, distribution: str = DEFAULT_DISTRIBUTION
+) -> dict[str, Any]:
+    """Structural validation plus cryptographic verification of InRelease and Release.gpg.
+
+    ``signer.verify`` must perform real signature verification pinned to the fixture key;
+    any failure, a missing signature object or a body that differs from Release is fatal.
+    """
+    structural = validate_apt_repository(root, distribution)
+    dist_dir = physical_directory(root) / f"dists/{distribution}"
+    release = _safe_read_file(dist_dir / "Release")
+    blobs = {}
+    for name in ("InRelease", "Release.gpg"):
+        path = dist_dir / name
+        if not path.exists():
+            raise ContractError("MISSING_SIGNATURE", "Signed release object missing")
+        blobs[name] = _safe_read_file(path)
+        by_hash = dist_dir / f"by-hash/SHA256/{_digest(blobs[name])}"
+        if not by_hash.exists() or _safe_read_file(by_hash) != blobs[name]:
+            raise ContractError("MISSING_BY_HASH", "Signed release by-hash object missing or corrupted")
+    if clearsigned_body(blobs["InRelease"]).rstrip(b"\n") != release.rstrip(b"\n"):
+        raise ContractError("TAMPER_DETECTED", "InRelease body differs from Release")
+    inline = signer.verify(blobs["InRelease"])
+    signer.verify(release, blobs["Release.gpg"])
+    return {
+        **structural,
+        "signature_authenticated": True,
+        "confers_signature_authentication": False,
+        "verified_issuer": inline.get("verified_issuer"),
+        "inrelease_sha256": _digest(blobs["InRelease"]),
+        "release_gpg_sha256": _digest(blobs["Release.gpg"]),
+    }
+
+
+_SOURCE_VALUE_RE = re.compile(r"^[A-Za-z0-9:/._@%+-]+$")
+
+
+def apt_source_line(
+    url: str, keyring_path: str, *, distribution: str = DEFAULT_DISTRIBUTION, arch: str | None = None
+) -> str:
+    """One-line APT source pinned to an explicit NONPRODUCTION keyring via signed-by."""
+    validate_nonproduction_key_path(keyring_path)
+    if distribution not in SUPPORTED_DISTRIBUTIONS:
+        raise ContractError("INVALID_DISTRIBUTION", "LIVE1 APT requires Ubuntu 26.04 codename 'resolute'")
+    if arch is not None and arch not in ARCHITECTURES:
+        raise ContractError("INVALID_ARCHITECTURE", "APT client architecture must be amd64 or arm64")
+    for value in (url, keyring_path):
+        if not _SOURCE_VALUE_RE.fullmatch(value):
+            raise ContractError("INVALID_METADATA", "APT source value contains unsafe characters")
+    options = f"signed-by={keyring_path}" + (f" arch={arch}" if arch else "")
+    return f"deb [{options}] {url} {distribution} main\n"
+
+
+TAMPER_KINDS = ("package", "index", "signature", "wrongkey")
+
+
+def tamper_apt_repository(
+    root: str | Path, kind: str, *, distribution: str = DEFAULT_DISTRIBUTION, wrong_signer: Any = None,
+    arch: str = "amd64", package: str | None = None,
+) -> list[str]:
+    """Corrupt a COPY of an assembled repository for fail-closed client tests.
+
+    package: flip one byte of the first pool package (of ``package`` when named, so the
+    client installs the tampered object); index: alter every Packages variant
+    (and its by-hash object) of binary-<arch>, the client's own index; signature: corrupt
+    InRelease and Release.gpg; wrongkey: replace both signatures with ones from ``wrong_signer``.
+    Returns the changed repository-relative paths.
+    """
+    if kind not in TAMPER_KINDS:
+        raise ContractError("INVALID_ARGUMENT", "Unsupported tamper kind")
+    if arch not in ARCHITECTURES:
+        raise ContractError("INVALID_ARCHITECTURE", "APT client architecture must be amd64 or arm64")
+    if package is not None:
+        validate_ecosystem_name("apt", package)
+    base = physical_directory(root)
+    dist_dir = base / f"dists/{distribution}"
+    changed: list[str] = []
+
+    def rewrite(path: Path, data: bytes) -> None:
+        _safe_write_file(path, data)
+        changed.append(path.relative_to(base).as_posix())
+
+    if kind == "package":
+        debs = sorted((base / "pool").rglob(f"{package}_*.deb" if package else "*.deb"))
+        if not debs:
+            raise ContractError("MISSING_PACKAGE", "No pool package to tamper")
+        original = _safe_read_file(debs[0])
+        rewrite(debs[0], original[:-1] + bytes([original[-1] ^ 0x01]))
+    elif kind == "index":
+        index_dir = dist_dir / f"main/binary-{arch}"
+        for name in ("Packages", "Packages.gz", "Packages.xz"):
+            original = _safe_read_file(index_dir / name)
+            tampered = original + b"\n# tampered\n"
+            rewrite(index_dir / name, tampered)
+            rewrite(index_dir / f"by-hash/SHA256/{_digest(original)}", tampered)
+    elif kind == "signature":
+        for name in ("InRelease", "Release.gpg"):
+            original = _safe_read_file(dist_dir / name)
+            lines = original.split(b"\n")
+            end = max(i for i, line in enumerate(lines) if line.startswith(b"-----END PGP SIGNATURE-----"))
+            target = next(
+                (i for i in range(end - 1, -1, -1)
+                 if lines[i] and not lines[i].startswith((b"=", b"-")) and (len(lines[i]) > 6)),
+                None,
+            )
+            if target is None:
+                raise ContractError("INVALID_SIGNATURE_FORMAT", "No signature body line to tamper")
+            line = bytearray(lines[target])
+            line[5] = ord("A") if line[5] != ord("A") else ord("B")
+            lines[target] = bytes(line)
+            rewrite(dist_dir / name, b"\n".join(lines))
+    else:
+        if wrong_signer is None:
+            raise ContractError("INVALID_ARGUMENT", "wrongkey tamper requires a different fixture signer")
+        AptRepositoryCandidate(base, distribution=distribution).sign_with_fixture(wrong_signer)
+        changed.extend(f"dists/{distribution}/{name}" for name in ("InRelease", "Release.gpg"))
+    return changed

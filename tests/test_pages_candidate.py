@@ -20,9 +20,23 @@ from rs9.pages import (
     scan_pages_tree,
     validate_pages_tree,
 )
+import json
+
+from rs9.pages import merkle_inventory
 from rs9.pages_candidate import (
+    CUSTODY_MANIFEST,
+    NONPRODUCTION_BANNER,
+    PAGES_HOST,
+    REQUIRED_PAGES_FILES,
     assemble_pages_candidate,
+    collect_candidate_sources,
+    exact_inventory_for,
+    load_custody_bundle,
+    render_install_docs,
+    verify_pages_completeness,
+    write_custody_bundle,
 )
+from rs9.scratch import canonical
 from rs9.signing_fixture import SigningFixture, find_gpg_binary
 from tests.pages_candidate_fixtures import construct_candidate_signed_tree
 
@@ -124,8 +138,8 @@ class PagesCandidateTests(unittest.TestCase):
 
         # 4. Keys prefix paths: keys/{rs9.asc,rs9-archive-keyring.gpg}
         key_cases = [
-            ("keys/rs9.asc", True, CATEGORY_PUBLIC_KEY),
-            ("keys/rs9-archive-keyring.gpg", True, CATEGORY_PUBLIC_KEY),
+            ("keys/rs9-candidate-fixture-NONPRODUCTION.asc", True, CATEGORY_PUBLIC_KEY),
+            ("keys/rs9-candidate-fixture-NONPRODUCTION.gpg", True, CATEGORY_PUBLIC_KEY),
         ]
         for path, exp_ok, exp_cat in key_cases:
             with self.subTest(path=path):
@@ -153,7 +167,7 @@ class PagesCandidateTests(unittest.TestCase):
             "somewhere/theme-forge.rpm",
             "other/x86_64/pkg.pkg.tar.zst",
             "nested/deep/rs9.db.sig",
-            "unknown/keys/rs9.asc",
+            "unknown/keys/rs9-candidate-fixture-NONPRODUCTION.asc",
             "random/dir/rs9.repo",
             # Wrong architecture or fedora version
             "rpm/fedora/42/x86_64/Packages/pkg.rpm",
@@ -199,8 +213,8 @@ class PagesCandidateTests(unittest.TestCase):
         keys_dir = self.root / "keys_test_tree"
         keys_dir.mkdir()
 
-        # Place ASCII secret key block in keys/rs9.asc
-        secret_key_file = keys_dir / "keys/rs9.asc"
+        # Place ASCII secret key block in keys/rs9-candidate-fixture-NONPRODUCTION.asc
+        secret_key_file = keys_dir / "keys/rs9-candidate-fixture-NONPRODUCTION.asc"
         keys_dir.joinpath("keys").mkdir()
         secret_armor = (
             "-----BEGIN PGP SECRET KEY BLOCK-----\n"
@@ -214,9 +228,9 @@ class PagesCandidateTests(unittest.TestCase):
             scan_pages_tree(keys_dir)
         self.assertEqual(ctx.exception.code, "CREDENTIAL_DETECTED")
 
-        # Place binary secret packet in keys/rs9-archive-keyring.gpg
+        # Place binary secret packet in keys/rs9-candidate-fixture-NONPRODUCTION.gpg
         secret_key_file.unlink()
-        binary_key_file = keys_dir / "keys/rs9-archive-keyring.gpg"
+        binary_key_file = keys_dir / "keys/rs9-candidate-fixture-NONPRODUCTION.gpg"
         tag5_new = bytes([0xC0 | 5, 4, 1, 2, 3, 4])
         binary_key_file.write_bytes(tag5_new)
 
@@ -234,8 +248,8 @@ class PagesCandidateTests(unittest.TestCase):
             "README.md": "# Candidate Mirror\n",
             "docs/install/index.html": "<!DOCTYPE html><html><body>Install</body></html>\n",
             "rpm/rs9.repo": "[rs9]\nname=rs9\nbaseurl=https://rs9.knowledge-forge.ai/\n",
-            "keys/rs9.asc": TRUTHFUL_ARMOR_PUBLIC_KEY,
-            "keys/rs9-archive-keyring.gpg": bytes([0xC0 | 6, 2, 10, 20]),
+            "keys/rs9-candidate-fixture-NONPRODUCTION.asc": TRUTHFUL_ARMOR_PUBLIC_KEY,
+            "keys/rs9-candidate-fixture-NONPRODUCTION.gpg": bytes([0xC0 | 6, 2, 10, 20]),
         }
 
         cand = assemble_pages_candidate(scratch, files=files, exact_inventory=inventory(files))
@@ -264,7 +278,7 @@ class PagesCandidateTests(unittest.TestCase):
         files = {
             "CNAME": "rs9.knowledge-forge.ai\n",
             "index.html": "<!DOCTYPE html><html><body>RS9</body></html>\n",
-            "keys/rs9.asc": TRUTHFUL_ARMOR_PUBLIC_KEY,
+            "keys/rs9-candidate-fixture-NONPRODUCTION.asc": TRUTHFUL_ARMOR_PUBLIC_KEY,
         }
         cand = assemble_pages_candidate(scratch, files=files, exact_inventory=inventory(files))
 
@@ -319,10 +333,10 @@ class PagesCandidateTests(unittest.TestCase):
         (apt / "Release").write_bytes(b"original")
         store = SimpleNamespace(list_records=lambda **kw: [{"rel_path": "rpm/rs9.repo"}],
                                 get=lambda *args, **kw: ({}, b"original"))
-        fixture = SimpleNamespace(public_key_bytes=b"public", public_key_binary=b"public")
+        fixture = SimpleNamespace(public_key_bytes=b"public", public_key_binary=b"public", primary_fingerprint="A"*40)
         cases = [({"apt_repo": SimpleNamespace(root=apt)}, "apt/Release"),
                  ({"signed_store": store}, "rpm/rs9.repo"),
-                 ({"signing_fixture": fixture}, "keys/rs9.asc"),
+                 ({"signing_fixture": fixture}, "keys/rs9-candidate-fixture-NONPRODUCTION.asc"),
                  ({"cname": "rs9.knowledge-forge.ai"}, "CNAME")]
         for i, (kwargs, path) in enumerate(cases):
             scratch = self.root / f"collision-{i}"
@@ -364,8 +378,8 @@ class PagesCandidateTests(unittest.TestCase):
             self.assertTrue(status["is_candidate"])
             self.assertFalse(status["is_live"])
             self.assertEqual(status["qualification"], "pending")
-            self.assertIn("keys/rs9.asc", cand.exact_inventory)
-            self.assertIn("keys/rs9-archive-keyring.gpg", cand.exact_inventory)
+            self.assertIn("keys/rs9-candidate-fixture-NONPRODUCTION.asc", cand.exact_inventory)
+            self.assertIn("keys/rs9-candidate-fixture-NONPRODUCTION.gpg", cand.exact_inventory)
             self.assertIn("rpm/fedora/43/x86_64/repodata/repomd.xml.asc", cand.exact_inventory)
             self.assertIn("pacman/x86_64/rs9.db.sig", cand.exact_inventory)
 
@@ -375,6 +389,161 @@ class PagesCandidateTests(unittest.TestCase):
             ver = fixture.verify(repomd_xml, repomd_asc)
             self.assertEqual(ver["status"], "valid")
             self.assertEqual(ver["verified_issuer"], fixture.primary_fingerprint)
+            # The bound inventory is exactly committed by the Merkle root.
+            self.assertEqual(status["merkle_root"], merkle_inventory(cand.exact_inventory)["root"])
+
+
+class CustodyAndCompletenessTests(unittest.TestCase):
+    AUTH = "a" * 64
+    COMMIT = "b" * 40
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp_dir.name).resolve()
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def bundle(self, name: str = "deb-amd64", family: str = "deb", packages=None) -> Path:
+        target = self.root / name
+        target.mkdir()
+        write_custody_bundle(
+            target, family=family, system="amd64",
+            packages=packages or {"tf-cli_1.0-1_all.deb": b"deb-one", "tf-nebular_1.0-1_amd64.deb": b"deb-two"},
+            authentication_sha256=self.AUTH, source_commit=self.COMMIT)
+        return target
+
+    def rewrite_manifest(self, target: Path, **changes) -> None:
+        manifest = json.loads((target / CUSTODY_MANIFEST).read_bytes())
+        manifest.update(changes)
+        (target / CUSTODY_MANIFEST).write_bytes(canonical(manifest))
+
+    def test_round_trip_is_exact_and_nonproduction(self):
+        target = self.bundle()
+        loaded = load_custody_bundle(target, expected_family="deb", expected_authentication_sha256=self.AUTH)
+        manifest = loaded["manifest"]
+        self.assertTrue(manifest["nonproduction"])
+        self.assertFalse(manifest["production_enabled"])
+        self.assertEqual(sorted(loaded["packages"]), ["tf-cli_1.0-1_all.deb", "tf-nebular_1.0-1_amd64.deb"])
+        self.assertEqual(loaded["packages"]["tf-cli_1.0-1_all.deb"].read_bytes(), b"deb-one")
+        self.assertEqual(manifest["merkle"], merkle_inventory(
+            {name: row["sha256"] for name, row in manifest["files"].items()}))
+        self.assertEqual(sorted(p.relative_to(target).as_posix() for p in target.rglob("*") if p.is_file()),
+                         [CUSTODY_MANIFEST, "files/tf-cli_1.0-1_all.deb", "files/tf-nebular_1.0-1_amd64.deb"])
+
+    def test_write_accepts_only_unsigned_package_bytes_for_the_family(self):
+        cases = [
+            {"family": "other", "packages": {"a.deb": b"x"}},
+            {"family": "deb", "packages": {}},
+            {"family": "deb", "packages": {"a.deb.sig": b"x"}},
+            {"family": "deb", "packages": {"InRelease": b"x"}},
+            {"family": "deb", "packages": {"a.rpm": b"x"}},
+            {"family": "rpm", "packages": {"a.deb": b"x"}},
+            {"family": "deb", "packages": {"../a.deb": b"x"}},
+            {"family": "deb", "packages": {"a.deb": b""}},
+            {"family": "deb", "packages": {"a.deb": "text"}},
+        ]
+        for i, case in enumerate(cases):
+            target = self.root / f"bad-{i}"
+            target.mkdir()
+            with self.subTest(case=case), self.assertRaises(ContractError):
+                write_custody_bundle(target, system="amd64", authentication_sha256=None, source_commit=None, **case)
+        for family, name in (("rpm", "a.rpm"), ("pacman", "a-1-1-x86_64.pkg.tar.zst")):
+            target = self.root / f"ok-{family}"
+            target.mkdir()
+            write_custody_bundle(target, family=family, system="x86_64-linux", packages={name: b"bytes"},
+                                 authentication_sha256=None, source_commit=None)
+        target = self.root / "bad-auth"
+        target.mkdir()
+        with self.assertRaises(ContractError):
+            write_custody_bundle(target, family="deb", system="amd64", packages={"a.deb": b"x"},
+                                 authentication_sha256="short", source_commit=None)
+
+    def test_load_rejects_every_deviation_from_the_exact_custody_tree(self):
+        def case(name, mutate, code):
+            target = self.bundle(name)
+            mutate(target)
+            with self.subTest(case=name), self.assertRaises(ContractError) as caught:
+                load_custody_bundle(target, expected_authentication_sha256=self.AUTH)
+            self.assertEqual(caught.exception.code, code)
+
+        case("no-manifest", lambda t: (t / CUSTODY_MANIFEST).unlink(), "CUSTODY_MISSING")
+        case("tampered", lambda t: (t / "files/tf-cli_1.0-1_all.deb").write_bytes(b"deb-ONE"), "TAMPER_DETECTED")
+        case("extra-signature", lambda t: (t / "files/tf-cli_1.0-1_all.deb.asc").write_bytes(b"sig"), "CUSTODY_INVENTORY")
+        case("extra-root-file", lambda t: (t / "notes.txt").write_bytes(b"x"), "CUSTODY_INVENTORY")
+        case("missing-package", lambda t: (t / "files/tf-cli_1.0-1_all.deb").unlink(), "CUSTODY_INVENTORY")
+        case("wrong-merkle", lambda t: self.rewrite_manifest(
+            t, merkle={**json.loads((t / CUSTODY_MANIFEST).read_bytes())["merkle"], "root": "0" * 64}), "MERKLE_MISMATCH")
+        case("production-flag", lambda t: self.rewrite_manifest(t, production_enabled=True), "CUSTODY_POLICY")
+        case("not-nonproduction", lambda t: self.rewrite_manifest(t, nonproduction=False), "CUSTODY_POLICY")
+        case("extra-key", lambda t: self.rewrite_manifest(t, extra=1), "CUSTODY_SCHEMA")
+        case("bad-family", lambda t: self.rewrite_manifest(t, family="zip"), "CUSTODY_SCHEMA")
+        case("wrong-provenance", lambda t: self.rewrite_manifest(t, authentication_sha256="c" * 64), "HOSTED_PROVENANCE")
+        case("malformed", lambda t: (t / CUSTODY_MANIFEST).write_bytes(b"{not json"), "CUSTODY_SCHEMA")
+        with self.assertRaises(ContractError) as caught:
+            load_custody_bundle(self.bundle("family-check"), expected_family="rpm")
+        self.assertEqual(caught.exception.code, "CUSTODY_SCHEMA")
+
+    def test_symlinked_custody_package_is_rejected(self):
+        target = self.bundle("symlink")
+        victim = target / "files/tf-cli_1.0-1_all.deb"
+        victim.unlink()
+        try:
+            os.symlink(target / "files/tf-nebular_1.0-1_amd64.deb", victim)
+        except OSError:
+            self.skipTest("Symlinks not supported on this filesystem")
+        with self.assertRaises(ContractError) as caught:
+            load_custody_bundle(target)
+        self.assertEqual(caught.exception.code, "SYMLINK_REJECTED")
+
+    def test_completeness_requires_every_document_key_and_family_object(self):
+        families = {
+            "apt": ["apt/dists/resolute/Release", "apt/dists/resolute/InRelease", "apt/dists/resolute/Release.gpg"],
+            "rpm": [f"rpm/fedora/43/{a}/repodata/{n}" for a in ("x86_64", "aarch64") for n in ("repomd.xml", "repomd.xml.asc")],
+            "pacman": ["pacman/x86_64/rs9.db.tar.gz", "pacman/x86_64/rs9.db.tar.gz.sig"],
+        }
+        inventory = {path: "a" * 64 for path in [*REQUIRED_PAGES_FILES, *sum(families.values(), [])]}
+        verify_pages_completeness(inventory)
+        for path in list(inventory):
+            with self.subTest(missing=path), self.assertRaises(ContractError) as caught:
+                verify_pages_completeness({k: v for k, v in inventory.items() if k != path})
+            self.assertEqual(caught.exception.code, "MISSING_MANIFESTED_FILE")
+        verify_pages_completeness({k: v for k, v in inventory.items() if not k.startswith("pacman/")}, families=("apt", "rpm"))
+        with self.assertRaises(ContractError) as caught:
+            verify_pages_completeness({**inventory, "other/readme.txt": "a" * 64})
+        self.assertEqual(caught.exception.code, "DISALLOWED_FILE")
+        with self.assertRaises(ContractError):
+            verify_pages_completeness(inventory, families=("zypper",))
+
+    def test_install_docs_state_the_nonproduction_boundary_and_assemble(self):
+        docs = render_install_docs()
+        self.assertEqual(set(docs), {"docs/install/README.md", "docs/install/index.html", "docs/index.html", "docs/README.md", "rpm/rs9.repo"})
+        for path, text in docs.items():
+            if path != "rpm/rs9.repo":
+                self.assertIn("NONPRODUCTION", text, path)
+        self.assertIn("gpgcheck=1", docs["rpm/rs9.repo"])
+        self.assertIn("repo_gpgcheck=1", docs["rpm/rs9.repo"])
+        self.assertIn(NONPRODUCTION_BANNER, docs["docs/index.html"])
+        sources = collect_candidate_sources(files=dict(docs), cname=PAGES_HOST)
+        self.assertEqual(sorted(sources), sorted([*docs, "CNAME"]))
+        scratch = self.root / "assembled"
+        scratch.mkdir()
+        candidate = assemble_pages_candidate(scratch, files=dict(docs), cname=PAGES_HOST,
+                                             exact_inventory=exact_inventory_for(sources))
+        self.assertEqual(candidate.merkle["leaf_count"], 6)
+        self.assertEqual(candidate.status()["merkle_root"], candidate.merkle["root"])
+        self.assertEqual((scratch / "CNAME").read_bytes(), (PAGES_HOST + "\n").encode())
+
+    def test_source_collection_still_rejects_collisions_and_foreign_cname(self):
+        with self.assertRaises(ContractError) as collision:
+            collect_candidate_sources(files={"CNAME": "x\n"}, cname=PAGES_HOST)
+        self.assertEqual(collision.exception.code, "CANDIDATE_COLLISION")
+        with self.assertRaises(ContractError) as foreign:
+            collect_candidate_sources(cname="example.com")
+        self.assertEqual(foreign.exception.code, "CANDIDATE_CNAME")
+        with self.assertRaises(ContractError) as empty:
+            collect_candidate_sources()
+        self.assertEqual(empty.exception.code, "EMPTY_CANDIDATE")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 # Theme Forge real-candidate continuation
 
+Historical CONT1 checkpoint. Current source-adoption work is described in [CONT2 hosted candidate](live1-hosted-candidate.md).
+
 Status: **blocked partial source candidate; adoption disabled; not production ready**.
 This is the terminal amended source candidate for RS9-LIVE1-THEME-FORGE-CONT1-REAL-CANDIDATES1.
 The dispatcher supplied the independent work review, which found material source defects

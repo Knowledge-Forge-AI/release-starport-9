@@ -1,0 +1,113 @@
+{
+  "checks": {
+    "credential_scan": "pass-source-inventory",
+    "diff_hygiene": "pass",
+    "nix_profile": {
+      "basis": "bounded native FHS dependencies and cross-platform representation; source-only inspection",
+      "build_and_closure": "not-run-locally; required-hosted-gates",
+      "level": "Orange",
+      "nix_version": "2.31.2-hosted-installer",
+      "nixpkgs_revision": "0921fdb3e13e40fe25fbc52b89661a9d6d32ac68",
+      "rollback": "source candidate not adopted; no host activation",
+      "store_inputs": "public authenticated payloads and offline dependency closure only"
+    },
+    "nix_static_syntax": "pass",
+    "preserved_local_state": "serena-and-caches-excluded-from-adoption",
+    "python_syntax": "pass",
+    "relative_links": "pass",
+    "workflow_static_contract": "pass-unittest",
+    "workflow_yaml": "pass-Psych"
+  },
+  "checks_evidence_owner": "producer-stage evidence; fresh closeout_checks separately recorded",
+  "closeout_checks": {
+    "credential_scan": "pass; complete 271-file bounded candidate inventory",
+    "diff_hygiene": "pass; tracked diff and introduced whitespace",
+    "hosted_builds_and_runtime": "not-run; pending manager source adoption and external hosted execution",
+    "no_git_metadata_mutation": "provider performed none",
+    "python_syntax": "pass; 139 source/test/operator files",
+    "relative_links": "pass; 242 links",
+    "runbook_zsh": "pass; both adopt/collect commands intercepted by a local stub",
+    "source_unit_contracts": "pass; 627 run, zero failures/errors, nine facility-dependent skips",
+    "workflow_source_contract": "pass; required jobs, artifact names, timeouts, security and aggregation fixtures",
+    "workflow_yaml": "pass-Psych; eleven jobs"
+  },
+  "closeout_commands": {
+    "diff_hygiene": "rtk git diff --check",
+    "links_syntax_credentials": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -c <AST, 242 relative links, credential scan and introduced-whitespace checks>",
+    "runbook": "rtk proxy python3 -c <two documented operator commands through a zsh local stub>",
+    "source_inventory": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -c <candidate_paths, file_inventory and verify_inventory>",
+    "source_suite": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -c <unittest discovery and result recorder>",
+    "source_suite_api": "unittest.defaultTestLoader.discover('tests'); unittest.TextTestRunner(verbosity=1).run(suite)",
+    "workflow_contract": "rtk proxy env PYTHONPATH=src:tests PYTHONDONTWRITEBYTECODE=1 python3 -m unittest test_workflow_static test_hosted_contract -q",
+    "workflow_yaml": "rtk proxy ruby -e <Psych YAML.load_file and jobs validation>"
+  },
+  "closeout_source_tests": {
+    "command": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -c <unittest discovery and result recorder>",
+    "discovery": "unittest.defaultTestLoader.discover('tests'); unittest.TextTestRunner(verbosity=1).run(suite)",
+    "errors": 0,
+    "failures": 0,
+    "python": "3.13.12",
+    "skip_reasons": [
+      "GnuPG binary not available",
+      "GnuPG binary not available in environment",
+      "both live capture directories required",
+      "live capture directory not supplied"
+    ],
+    "skipped": 9,
+    "skipped_tests": [
+      "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+      "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+      "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+      "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+      "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+      "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+      "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+      "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+      "setUpClass (test_signing_fixture.SigningFixtureTests)"
+    ],
+    "status": "pass",
+    "tests_run": 627
+  },
+  "closeout_verification": "pass-source-only; hosted execution pending externally",
+  "hosted_run": "not-run",
+  "limitations": [
+    "No live release authentication or downstream artifacts produced in provider",
+    "No local Docker, Nix build or production GPG prerequisite for source acceptance",
+    "Nine facility-dependent live/GPG tests skipped",
+    "Hosted outcome requires the manager-adopted push; no PASS receipts prefilled",
+    "Run-resolved container/installer pins and pending Linux wheel policy prevent source-reproducibility qualification",
+    "Homebrew diagnostic-only readback cannot establish a noop; unknown/incomplete destinations block qualification"
+  ],
+  "production_enabled": false,
+  "real_candidate_artifacts": 0,
+  "review_status": "dispatcher-pre-final-reviewed-with-findings; terminal-amended-not-independently-re-reviewed",
+  "schema": "rs9.hosted-source-verification.v1alpha1",
+  "source_tests": {
+    "command": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -c <unittest discovery and result recorder>",
+    "discovery": "unittest.defaultTestLoader.discover('tests'); unittest.TextTestRunner(verbosity=1).run(suite)",
+    "errors": 0,
+    "failures": 0,
+    "python": "3.13.12",
+    "skip_reasons": [
+      "GnuPG binary not available",
+      "GnuPG binary not available in environment",
+      "both live capture directories required",
+      "live capture directory not supplied"
+    ],
+    "skipped": 9,
+    "skipped_tests": [
+      "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+      "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+      "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+      "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+      "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+      "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+      "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+      "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+      "setUpClass (test_signing_fixture.SigningFixtureTests)"
+    ],
+    "status": "pass",
+    "tests_run": 627
+  },
+  "task": "RS9-LIVE1-THEME-FORGE-CONT2-HOSTED-CANDIDATE1"
+}

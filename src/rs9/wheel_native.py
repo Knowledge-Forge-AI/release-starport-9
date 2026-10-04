@@ -63,7 +63,7 @@ def extract_darwin_minimum_version(plist_bytes: bytes) -> tuple[int, int]:
 
 def resolve_native_darwin_tag(plist_bytes: bytes, platform_tag: str | None = None) -> str:
     """Resolve and validate truthful Darwin wheel platform tag.
-    
+
     Linux wheel tags must NOT claim manylinux compliance with external GTK/WebKit
     dependencies: withhold with explicit blocker until truthful PyPI-accepted policy proven,
     no fake universal.
@@ -103,6 +103,29 @@ def resolve_native_darwin_tag(plist_bytes: bytes, platform_tag: str | None = Non
     return f"py3-none-macosx_{plist_major}_{plist_minor}_arm64"
 
 
+def resolve_native_linux_candidate_tag(target_platform: str | None = None, platform_tag: str | None = None) -> str:
+    """Resolve honest Linux candidate platform tag (linux_x86_64 or linux_aarch64).
+
+    Manylinux compliance claims remain strictly refused until genuinely proven by auditwheel.
+    """
+    if platform_tag == "any":
+        raise ContractError("UNSUPPORTED_PLATFORM", "Native wheels cannot use fake universal 'any' tag")
+    if platform_tag and ("manylinux" in platform_tag or "musllinux" in platform_tag):
+        raise WheelWithheldError(
+            "MANYLINUX_UNPROVEN",
+            "Linux wheel tags must NOT claim manylinux compliance with external GTK/WebKit dependencies: "
+            "withhold with explicit blocker until truthful PyPI-accepted policy proven, no fake universal",
+            product_id=PRODUCT_ID,
+            reason="manylinux_unproven",
+        )
+    if platform_tag in ("linux_x86_64", "linux_aarch64"):
+        return f"py3-none-{platform_tag}"
+    plat = (target_platform or "").lower()
+    if "aarch64" in plat or "arm64" in plat:
+        return "py3-none-linux_aarch64"
+    return "py3-none-linux_x86_64"
+
+
 def get_embedded_rs9_helpers() -> dict[str, bytes]:
     """Retrieve unchanged materialize.py and reviewed rs9 helper source bytes."""
     rs9_dir = Path(__file__).resolve().parent
@@ -117,8 +140,38 @@ def get_embedded_rs9_helpers() -> dict[str, bytes]:
     return embedded
 
 
-def render_native_launcher(archive_filename: str, manifest_sha256: str, archive_sha256: str, launcher: str) -> str:
+def render_native_launcher(
+    archive_filename: str,
+    manifest_sha256: str,
+    archive_sha256: str,
+    launcher: str,
+    platform_family: str = "darwin",
+    target_arch: str = "arm64",
+) -> str:
     """Render stdlib launcher embedding unchanged materialize.py runtime."""
+    if platform_family == "linux":
+        arch_norm = "aarch64" if target_arch in ("aarch64", "arm64") else "x86_64"
+        arch_check = f'platform.machine() in ({arch_norm!r}, "arm64" if {arch_norm!r} == "aarch64" else "amd64")'
+        platform_check = f'''    if not sys.platform.startswith("linux") or not ({arch_check}):
+        sys.stderr.write("Error: Theme Forge Nebular Fusion candidate wheel requires Linux ({arch_norm}).\\n")
+        sys.exit(1)'''
+        cache_fn = '''def _get_cache_dir() -> Path:
+    if "THEME_FORGE_CACHE_DIR" in os.environ:
+        return Path(os.environ["THEME_FORGE_CACHE_DIR"]).absolute()
+    if "XDG_CACHE_HOME" in os.environ:
+        return (Path(os.environ["XDG_CACHE_HOME"]) / "rs9" / "theme-forge-nebular-fusion").absolute()
+    return (Path.home() / ".cache" / "rs9" / "theme-forge-nebular-fusion").absolute()'''
+    else:
+        platform_check = '''    if sys.platform != "darwin" or platform.machine() not in ("arm64", "aarch64"):
+        sys.stderr.write("Error: Theme Forge Nebular Fusion native wheel requires macOS (Darwin arm64).\\n")
+        sys.exit(1)'''
+        cache_fn = '''def _get_cache_dir() -> Path:
+    if "THEME_FORGE_CACHE_DIR" in os.environ:
+        return Path(os.environ["THEME_FORGE_CACHE_DIR"]).absolute()
+    if "XDG_CACHE_HOME" in os.environ:
+        return (Path(os.environ["XDG_CACHE_HOME"]) / "rs9" / "theme-forge-nebular-fusion").absolute()
+    return (Path.home() / "Library" / "Caches" / "rs9" / "theme-forge-nebular-fusion").absolute()'''
+
     return f'''"""Theme Forge Nebular Fusion native wheel launcher. Isolated materialize runtime. No network access."""
 from __future__ import annotations
 import hashlib, json, os, platform, sys
@@ -138,17 +191,10 @@ EXPECTED_MANIFEST_SHA256: str = {manifest_sha256!r}
 EXPECTED_ARCHIVE_SHA256: str = {archive_sha256!r}
 LAUNCHER_TARGETS: dict[str, str] = {{"tfnf": {launcher!r}}}
 
-def _get_cache_dir() -> Path:
-    if "THEME_FORGE_CACHE_DIR" in os.environ:
-        return Path(os.environ["THEME_FORGE_CACHE_DIR"]).absolute()
-    if "XDG_CACHE_HOME" in os.environ:
-        return (Path(os.environ["XDG_CACHE_HOME"]) / "rs9" / "theme-forge-nebular-fusion").absolute()
-    return (Path.home() / "Library" / "Caches" / "rs9" / "theme-forge-nebular-fusion").absolute()
+{cache_fn}
 
 def run_launcher(command_name: str, argv: list[str] | None = None) -> int:
-    if sys.platform != "darwin" or platform.machine() not in ("arm64", "aarch64"):
-        sys.stderr.write("Error: Theme Forge Nebular Fusion native wheel requires macOS (Darwin arm64).\\n")
-        sys.exit(1)
+{platform_check}
     argv = sys.argv[1:] if argv is None else argv
     payload_dir = _PKG_DIR / "payload"
     archive_path = payload_dir / ARCHIVE_FILENAME
@@ -181,6 +227,7 @@ def main_tfnf() -> None:
 '''
 
 
+
 def build_native_wheel(
     product_id: str,
     version: str,
@@ -200,12 +247,13 @@ def build_native_wheel(
     deterministic_timestamp: tuple[int, int, int, int, int, int] | None = None,
     profile_result: dict[str, Any] | None = None,
     fixture_only: bool = False,
+    candidate_only: bool = False,
 ) -> WheelBuildResult:
-    """Build a deterministic native Nebular Darwin compressed-archive wheel.
-    
+    """Build a deterministic native Nebular Darwin or Linux candidate compressed-archive wheel.
+
     Embeds unchanged materialize.py and reviewed rs9 helpers under an isolated package namespace.
     Preserves exact mode/type/symlink/manifest fail-closed semantics and actual compressed released payload.
-    Withholds Linux wheels claiming manylinux compliance with external GTK/WebKit dependencies.
+    Withholds Linux production wheels claiming manylinux compliance with external GTK/WebKit dependencies.
     """
     if output_path is None and output_dir is None:
         raise ContractError("DESTINATION_REQUIRED", "Caller output destination (output_path or output_dir) is required")
@@ -216,17 +264,29 @@ def build_native_wheel(
     if version != VERSION:
         raise ContractError("INVALID_VERSION", f"Version {version} differs from bound product version {VERSION}")
 
-    # Explicit withholding for Linux / manylinux requests
-    if "linux" in target_platform or (platform_tag and ("linux" in platform_tag or "manylinux" in platform_tag or "musllinux" in platform_tag)):
-        raise WheelWithheldError(
-            "MANYLINUX_UNPROVEN",
-            "Linux wheel tags must NOT claim manylinux compliance with external GTK/WebKit dependencies: "
-            "withhold with explicit blocker until truthful PyPI-accepted policy proven, no fake universal",
-            product_id=PRODUCT_ID,
-            reason="manylinux_unproven",
-        )
+    is_linux_target = "linux" in target_platform or (platform_tag is not None and "linux" in platform_tag)
+    if is_linux_target:
+        if not candidate_only:
+            raise WheelWithheldError(
+                "MANYLINUX_UNPROVEN",
+                "Linux wheel tags must NOT claim manylinux compliance with external GTK/WebKit dependencies: "
+                "withhold with explicit blocker until truthful PyPI-accepted policy proven, no fake universal",
+                product_id=PRODUCT_ID,
+                reason="manylinux_unproven",
+            )
+        if platform_tag and ("manylinux" in platform_tag or "musllinux" in platform_tag):
+            raise WheelWithheldError(
+                "MANYLINUX_UNPROVEN",
+                "Linux wheel tags must NOT claim manylinux compliance with external GTK/WebKit dependencies: "
+                "withhold with explicit blocker until truthful PyPI-accepted policy proven, no fake universal",
+                product_id=PRODUCT_ID,
+                reason="manylinux_unproven",
+            )
+
     if platform_tag == "any":
         raise ContractError("UNSUPPORTED_PLATFORM", "Native wheels cannot use fake universal 'any' tag")
+
+    target_arch = "aarch64" if ("aarch64" in target_platform or "arm64" in target_platform or (platform_tag and "aarch64" in platform_tag)) else "x86_64"
 
     # Destination safety checks
     dest_path_check = Path(output_path) if output_path else Path(output_dir)  # type: ignore
@@ -258,37 +318,63 @@ def build_native_wheel(
     if capture is not None and (capture.record["repository"]["full_name"] != "Knowledge-Forge-AI/" + PRODUCT_ID or capture.record["release"]["tag"] != "v" + VERSION):
         raise ContractError("REPOSITORY_MISMATCH", "Native wheel requires the exact selected product generation")
 
-    # 2. Acquire Darwin compressed archive bytes and archive filename
+    # 2. Acquire compressed archive bytes and archive filename
     payload_archive_name: str
     payload_archive_bytes: bytes
     if capture is not None:
-        darwin_asset = next(
-            (
-                a for a in capture.record.get("payloads", [])
-                if "aarch64-darwin" in a.get("platforms", [])
-            ),
-            None,
-        )
-        if not darwin_asset:
-            raise ContractError("MISSING_ASSET", "No Darwin arm64 payload asset found in release capture")
-        asset_id = darwin_asset["id"]
-        archive_file = capture.archives[asset_id]
-        payload_archive_name = darwin_asset["name"]
-        payload_archive_bytes = archive_file.read_bytes()
-        if len(payload_archive_bytes) != darwin_asset["size"] or digest(payload_archive_bytes) != darwin_asset["sha256"]:
-            raise ContractError("INPUT_CHANGED", "Released native archive changed")
-        archive_manifest = manifest or capture.manifests[asset_id]
-        if archive_manifest["manifest_sha256"] != darwin_asset["payload_manifest_sha256"]:
-            raise ContractError("INPUT_CHANGED", "Native manifest differs from captured release")
-        if digest(canonical(archive_manifest)) != digest(canonical(capture.manifests[asset_id])):
-            raise ContractError("INPUT_CHANGED", "Native manifest override differs")
+        if is_linux_target:
+            matched_asset = next(
+                (
+                    a for a in capture.record.get("payloads", [])
+                    if any(p in a.get("platforms", []) for p in (target_platform, f"{target_arch}-linux", f"{target_arch}-unknown-linux-gnu"))
+                    or (target_arch in a.get("name", "") and "linux" in a.get("name", ""))
+                ),
+                None,
+            )
+            if not matched_asset:
+                raise ContractError("MISSING_ASSET", f"No Linux {target_arch} payload asset found in release capture")
+            asset_id = matched_asset["id"]
+            archive_file = capture.archives[asset_id]
+            payload_archive_name = matched_asset["name"]
+            payload_archive_bytes = archive_file.read_bytes()
+            if len(payload_archive_bytes) != matched_asset["size"] or digest(payload_archive_bytes) != matched_asset["sha256"]:
+                raise ContractError("INPUT_CHANGED", "Released native archive changed")
+            archive_manifest = manifest or capture.manifests[asset_id]
+            if archive_manifest["manifest_sha256"] != matched_asset["payload_manifest_sha256"]:
+                raise ContractError("INPUT_CHANGED", "Native manifest differs from captured release")
+            if digest(canonical(archive_manifest)) != digest(canonical(capture.manifests[asset_id])):
+                raise ContractError("INPUT_CHANGED", "Native manifest override differs")
+        else:
+            darwin_asset = next(
+                (
+                    a for a in capture.record.get("payloads", [])
+                    if "aarch64-darwin" in a.get("platforms", [])
+                ),
+                None,
+            )
+            if not darwin_asset:
+                raise ContractError("MISSING_ASSET", "No Darwin arm64 payload asset found in release capture")
+            asset_id = darwin_asset["id"]
+            archive_file = capture.archives[asset_id]
+            payload_archive_name = darwin_asset["name"]
+            payload_archive_bytes = archive_file.read_bytes()
+            if len(payload_archive_bytes) != darwin_asset["size"] or digest(payload_archive_bytes) != darwin_asset["sha256"]:
+                raise ContractError("INPUT_CHANGED", "Released native archive changed")
+            archive_manifest = manifest or capture.manifests[asset_id]
+            if archive_manifest["manifest_sha256"] != darwin_asset["payload_manifest_sha256"]:
+                raise ContractError("INPUT_CHANGED", "Native manifest differs from captured release")
+            if digest(canonical(archive_manifest)) != digest(canonical(capture.manifests[asset_id])):
+                raise ContractError("INPUT_CHANGED", "Native manifest override differs")
     elif archive_path is not None:
         p_path = Path(archive_path).resolve()
         payload_archive_name = p_path.name
         payload_archive_bytes = p_path.read_bytes()
         archive_manifest = manifest or inspect_archive(p_path, commands={})
     elif archive_bytes is not None:
-        payload_archive_name = f"theme-forge-nebular-fusion-v{version}-aarch64-apple-darwin.app.tar.gz"
+        if is_linux_target:
+            payload_archive_name = f"theme-forge-nebular-fusion-v{version}-{target_arch}-unknown-linux-gnu.tar.gz"
+        else:
+            payload_archive_name = f"theme-forge-nebular-fusion-v{version}-aarch64-apple-darwin.app.tar.gz"
         payload_archive_bytes = archive_bytes
         if manifest is not None:
             archive_manifest = manifest
@@ -306,24 +392,26 @@ def build_native_wheel(
     from rs9.materialize import parse_manifest_members
     parse_manifest_members(archive_manifest)
 
-    # 3. Locate and parse Info.plist from inside the Darwin archive
-    plist_bytes: bytes | None = None
-    try:
-        with gzip.GzipFile(fileobj=io.BytesIO(payload_archive_bytes)) as gz, tarfile.open(fileobj=gz, mode="r|") as tf:
-            for member in tf:
-                if member.name.endswith("/Contents/Info.plist") or member.name == "Contents/Info.plist":
-                    extracted = tf.extractfile(member)
-                    if extracted is not None:
-                        plist_bytes = extracted.read()
-                    break
-    except Exception as exc:
-        raise ContractError("INVALID_ARCHIVE", "Failed reading Darwin archive members") from exc
+    # 3. Resolve truthful wheel tag
+    if is_linux_target:
+        wheel_tag = resolve_native_linux_candidate_tag(target_platform, platform_tag)
+    else:
+        plist_bytes: bytes | None = None
+        try:
+            with gzip.GzipFile(fileobj=io.BytesIO(payload_archive_bytes)) as gz, tarfile.open(fileobj=gz, mode="r|") as tf:
+                for member in tf:
+                    if member.name.endswith("/Contents/Info.plist") or member.name == "Contents/Info.plist":
+                        extracted = tf.extractfile(member)
+                        if extracted is not None:
+                            plist_bytes = extracted.read()
+                        break
+        except Exception as exc:
+            raise ContractError("INVALID_ARCHIVE", "Failed reading Darwin archive members") from exc
 
-    if plist_bytes is None:
-        raise ContractError("INVALID_PLIST", "Missing Contents/Info.plist in Darwin application bundle")
+        if plist_bytes is None:
+            raise ContractError("INVALID_PLIST", "Missing Contents/Info.plist in Darwin application bundle")
 
-    # 4. Resolve truthful wheel tag and Darwin arm64 >= 11.0 check
-    wheel_tag = resolve_native_darwin_tag(plist_bytes, platform_tag)
+        wheel_tag = resolve_native_darwin_tag(plist_bytes, platform_tag)
 
     # 5. Licenses
     licenses_dict = dict(license_files or {})
@@ -358,12 +446,23 @@ def build_native_wheel(
     embedded_helpers = get_embedded_rs9_helpers()
 
     # 7. Render launcher
-    launcher = (darwin_asset["launchers"].get("tfnf", {}).get("path") if capture is not None
-                else "Theme Forge Nebular Fusion.app/Contents/Resources/bin/tfnf")
+    if is_linux_target:
+        launcher = (matched_asset["launchers"].get("tfnf", {}).get("path") if capture is not None
+                    else "theme-forge-nebular-fusion/bin/tfnf")
+    else:
+        launcher = (darwin_asset["launchers"].get("tfnf", {}).get("path") if capture is not None
+                    else "Theme Forge Nebular Fusion.app/Contents/Resources/bin/tfnf")
     if not launcher:
         raise ContractError("MISSING_LAUNCHER", "Released launcher identity required")
     validate_safe_relative_posix_path(launcher)
-    launcher_code = render_native_launcher(payload_archive_name, manifest_sha256, digest(payload_archive_bytes), launcher).encode("utf-8")
+    launcher_code = render_native_launcher(
+        payload_archive_name,
+        manifest_sha256,
+        digest(payload_archive_bytes),
+        launcher,
+        platform_family="linux" if is_linux_target else "darwin",
+        target_arch=target_arch,
+    ).encode("utf-8")
     init_code = f'"""Theme Forge Nebular Fusion native release package."""\n__version__ = {version!r}\n__product_id__ = {canonical_id!r}\n'.encode("utf-8")
 
     # Provenance
@@ -375,6 +474,10 @@ def build_native_wheel(
         "wheel_tag": wheel_tag,
         "release_record_sha256": release_hash if capture is not None else None,
         "fixture_only": fixture_only,
+        "candidate_only": candidate_only,
+        "candidate_status": "policy-pending" if is_linux_target else "candidate",
+        "promotability": "policy-pending" if is_linux_target else "candidate",
+        "manylinux_proven": False,
         "helper_source_sha256": {name: digest(data) for name, data in embedded_helpers.items()},
         "payload_archive_sha256": digest(payload_archive_bytes),
         "manifest_sha256": manifest_sha256,
@@ -384,11 +487,15 @@ def build_native_wheel(
         provenance_data["release_record"] = capture.record
 
     # Metadata & dist-info
-    summary_text = summary or "Theme Forge Nebular Fusion native Darwin application wheel"
+    summary_text = summary or (f"Theme Forge Nebular Fusion candidate Linux {target_arch} application wheel" if is_linux_target else "Theme Forge Nebular Fusion native Darwin application wheel")
     if any(ord(c) < 32 or ord(c) == 127 for c in summary_text):
         raise ContractError("METADATA_CONTENT", "Wheel summary contains unsafe header content")
 
     desc = (
+        f"Theme Forge Nebular Fusion candidate wheel for Linux {target_arch} ({version}).\n\n"
+        "Encapsulates exact compressed release payload with isolated, safe offline runtime materialization.\n"
+        "Promotability: policy-pending; Manylinux compliance: unproven."
+        if is_linux_target else
         f"Theme Forge Nebular Fusion native wheel for macOS arm64 ({version}).\n\n"
         "Encapsulates exact compressed release payload with isolated, safe offline runtime materialization."
     )

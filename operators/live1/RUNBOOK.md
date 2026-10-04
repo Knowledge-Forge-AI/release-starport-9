@@ -5,14 +5,28 @@ and fresh release authentication only. `publish-pages` and `publish-pypi` stop w
 PUBLICATION_NOT_READY. Manual environment setup cannot complete the missing package,
 qualification, reader and transport implementations.
 
-The latest [real-candidate continuation](../../docs/live1-real-candidate-continuation.md)
-is also **not ready for source adoption**. The candidate manifest refuses adoption
-while real artifacts/platform qualification are missing. The separate attended
-adopt-and-qualify.py operator accepts a reviewed parent/tree/manifest digest and an
-empty external output directory; it has no production publication path. Do not run
-it against this blocked candidate. Complete qualification and obtain manager review
-before changing candidate_adoption_ready. Future hosted receipt hashes must be matched
-by an attended rebuild or exact bytes held in reviewed durable custody before production.
+The accepted CONT1 checkpoint is historical partial source. Current [CONT2 hosted source](../../docs/live1-hosted-candidate.md) prepares a non-production runner workflow. Source adoption does not require local Docker, Nix, GPG or live capture. The dispatcher advisory pre-final review has completed; closeout amendments are recorded in the source evidence and receive no automatic independent review. Manager disposition of the exact terminal source bindings is required before executing the operator below. Real hosted qualification remains pending.
+
+## Source adoption and hosted collection
+
+After review, set RS9_REVIEWED_PARENT, RS9_REVIEWED_TREE and RS9_MANIFEST_SHA256 to the exact reviewed candidate. Create an empty physical directory below ~/Documents/agent/outbox/release-starport-9_dev/ and set RS9_PACKET_DIR to that path. From the reviewed repository:
+
+~~~sh
+rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 operators/live1/adopt-and-qualify.py adopt \
+  --reviewed-parent "$RS9_REVIEWED_PARENT" --reviewed-tree "$RS9_REVIEWED_TREE" \
+  --manifest-sha256 "$RS9_MANIFEST_SHA256" --output "$RS9_PACKET_DIR"
+~~~
+
+This authenticates the inventory, checks main/remote parent twice, stages explicit reviewed paths and deletions, commits normally, fast-forward pushes and collects the new push run bound to that commit. Unrelated .serena state and ordinary interpreter/test caches are tolerated and never staged. Collection is bounded to two hours by default, six hours maximum.
+
+If collection times out, create a different empty outbox directory and explicitly resume read-only collection:
+
+~~~sh
+rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 operators/live1/adopt-and-qualify.py collect \
+  --commit "$RS9_ADOPTED_COMMIT" --run-id "$RS9_RUN_ID" --output "$RS9_PACKET_DIR"
+~~~
+
+The packet is written before validation and includes all job/step conclusions, artifact IDs/digests/expiry, bounded summary bytes and reason codes. A failed run is not rerun automatically. Neither subcommand publishes, deploys, signs production bytes, mutates npm/Homebrew or emits a production receipt. A not-qualified first run is expected while preparation pins and Linux wheel promotion policy are unresolved.
 
 The signing-preflight.py operator takes an independently reviewed public-export
 SHA-256. It inspects existing local-key availability and public bytes only; it never
@@ -31,7 +45,7 @@ review/adoption, use the resulting reviewed commit/tree; do not substitute hashe
 from historical task prose. The operator requires main, those exact identities,
 no tracked changes and no unreviewed untracked or ignored files except preserved
 `.serena/`. Use the documented bytecode-disabled environment in a dedicated reviewed
-checkout; ignored interpreter files are also refused.
+checkout; This older authentication operator retains its own stricter checkout rules.
 It never updates product source or publication documentation.
 
 From the reviewed repository, inspect status:

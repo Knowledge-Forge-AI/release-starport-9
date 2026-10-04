@@ -15,6 +15,7 @@ DNF/RPM and APT are pending / not live.** Real release downloads, native
 qualification and attended production transports remain incomplete. Existing
 Theme Forge publication surfaces remain authoritative.
 
+- [CONT2 non-production hosted candidate](docs/live1-hosted-candidate.md)
 - [Documentation index](docs/README.md)
 - [LIVE1 candidate, scope and remaining gates](docs/live1-candidate.md)
 - [Attended preparation and publication readiness](operators/live1/RUNBOOK.md)

@@ -1,0 +1,89 @@
+{
+  "closeout_source_tests": {
+    "command": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -c <unittest discovery and result recorder>",
+    "discovery": "unittest.defaultTestLoader.discover('tests'); unittest.TextTestRunner(verbosity=1).run(suite)",
+    "errors": 0,
+    "failures": 0,
+    "python": "3.13.12",
+    "skip_reasons": [
+      "GnuPG binary not available",
+      "GnuPG binary not available in environment",
+      "both live capture directories required",
+      "live capture directory not supplied"
+    ],
+    "skipped": 9,
+    "skipped_tests": [
+      "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+      "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+      "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+      "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+      "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+      "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+      "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+      "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+      "setUpClass (test_signing_fixture.SigningFixtureTests)"
+    ],
+    "status": "pass",
+    "tests_run": 627
+  },
+  "contract": "operators/live1/hosted-lanes.json",
+  "dispatcher_review": "pre-final-reviewed-with-findings",
+  "known_first_run_blockers": [
+    "Container and installer pins require source adoption after hosted readback",
+    "Linux Nebular wheel promotion policy remains pending",
+    "Incomplete or unknown destination readbacks cannot qualify exact/noop behavior"
+  ],
+  "limitations": [
+    "First run remains expected not-qualified until preparation pins, Linux wheel policy and exact destination readbacks are resolved.",
+    "Assembled arm64 Pages install checks are deferred; architecture-specific family lanes remain required.",
+    "Terminal amendments receive no automatic independent review.",
+    "Git staging, commit and publication are dispatcher-owned; provider performed none."
+  ],
+  "manager_sequence": [
+    "Disposition the terminal amendments and authenticate exact terminal source bindings",
+    "Adopt the reviewed inventory and fast-forward push main with the attended operator",
+    "Collect the new commit-bound candidate run; preserve failed lanes and do not rerun automatically",
+    "Return hosted results for manager disposition; stop before production publication"
+  ],
+  "operator": "operators/live1/adopt-and-qualify.py",
+  "production_enabled": false,
+  "proposal_disposition": "amend",
+  "publication_authority": false,
+  "publication_receipts": [],
+  "real_hosted_run": "not-run",
+  "required_hosted_lane_receipts": 16,
+  "runbook": "operators/live1/RUNBOOK.md",
+  "schema": "rs9.hosted-source-handoff.v1alpha1",
+  "source_adoption_scope": "hosted-candidate-qualification-only",
+  "source_tests": {
+    "command": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -c <unittest discovery and result recorder>",
+    "discovery": "unittest.defaultTestLoader.discover('tests'); unittest.TextTestRunner(verbosity=1).run(suite)",
+    "errors": 0,
+    "failures": 0,
+    "python": "3.13.12",
+    "skip_reasons": [
+      "GnuPG binary not available",
+      "GnuPG binary not available in environment",
+      "both live capture directories required",
+      "live capture directory not supplied"
+    ],
+    "skipped": 9,
+    "skipped_tests": [
+      "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+      "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+      "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+      "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+      "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+      "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+      "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+      "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+      "setUpClass (test_signing_fixture.SigningFixtureTests)"
+    ],
+    "status": "pass",
+    "tests_run": 627
+  },
+  "status": "terminal-source-candidate-hosted-qualification-pending",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT2-HOSTED-CANDIDATE1",
+  "terminal_disposition": "amend",
+  "workflow": ".github/workflows/rs9-candidate-tests.yml"
+}

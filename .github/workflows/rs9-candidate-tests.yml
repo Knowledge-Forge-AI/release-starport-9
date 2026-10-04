@@ -1,62 +1,32 @@
-name: RS9 non-production candidate checks
+name: RS9 non-production hosted candidate
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: rs9-candidate-${{ github.sha }}
+  group: rs9-candidate-${{ github.sha }}-${{ github.run_id }}
   cancel-in-progress: false
 jobs:
-  unit:
+  config:
     runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: '22'
-      - name: Test source contracts
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: python3 -m unittest discover -s tests -q
-  authenticate:
-    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix_wheels: ${{ steps.lanes.outputs.matrix_wheels }}
+      matrix_nix: ${{ steps.lanes.outputs.matrix_nix }}
+      matrix_native: ${{ steps.lanes.outputs.matrix_native }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
-      - name: Reauthenticate immutable releases
+      - id: lanes
         env:
           PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/rs9-auth" "$RUNNER_TEMP/rs9-receipts"
-          python3 -m rs9.hosted_candidate authenticate --scratch "$RUNNER_TEMP/rs9-auth" --receipts "$RUNNER_TEMP/rs9-receipts"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: always()
-        with:
-          name: candidate-receipts-authenticate
-          path: ${{ runner.temp }}/rs9-receipts/*.json
-          retention-days: 1
-          if-no-files-found: error
-  wheels:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-15
-            system: aarch64-darwin
-          - runner: ubuntu-24.04
-            system: x86_64-linux
-          - runner: ubuntu-24.04-arm
-            system: aarch64-linux
-    runs-on: ${{ matrix.runner }}
+        run: python3 -m rs9.hosted_pipeline config --repository .
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -64,94 +34,322 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Reauthenticate and exercise CLI wheel lifecycle
+      - name: Source contracts
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest discover -s tests -q
+  authenticate:
+    needs: [config]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Execute non-production authenticate lane
         env:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
           RS9_GITHUB_READ_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p "$RUNNER_TEMP/rs9-wheels" "$RUNNER_TEMP/rs9-receipts"
-          python3 -m rs9.hosted_candidate wheels --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-wheels" --receipts "$RUNNER_TEMP/rs9-receipts"
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline 'authenticate' --system 'generation' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        if: ${{ !cancelled() }}
         with:
-          name: candidate-receipts-wheels-${{ matrix.system }}
-          path: ${{ runner.temp }}/rs9-receipts/*.json
-          retention-days: 1
+          name: candidate-authenticate-generation
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
           if-no-files-found: error
-  prerequisites:
+  pins:
+    needs: [config, authenticate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Execute non-production pins lane
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline 'pins' --system 'generation' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: candidate-pins-generation
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  wheels:
+    name: ${{ matrix.job_name }}
+    needs: [config, authenticate, pins]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - lane: nix
-            system: aarch64-darwin
-            runner: macos-15
-          - lane: nix
-            system: x86_64-linux
-            runner: ubuntu-24.04
-          - lane: nix
-            system: aarch64-linux
-            runner: ubuntu-24.04-arm
-          - lane: pacman
-            system: x86_64-linux
-            runner: ubuntu-24.04
-          - lane: rpm
-            system: x86_64-linux
-            runner: ubuntu-24.04
-          - lane: rpm
-            system: aarch64-linux
-            runner: ubuntu-24.04-arm
-          - lane: deb
-            system: amd64
-            runner: ubuntu-24.04
-          - lane: deb
-            system: arm64
-            runner: ubuntu-24.04-arm
-          - lane: pages
-            system: generation
-            runner: ubuntu-24.04
+      matrix: ${{ fromJson(needs.config.outputs.matrix_wheels) }}
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout_minutes }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
-      - name: Require qualified native inputs and pinned builders
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Provision Linux runtime libraries and display
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb dbus-x11 libgtk-3-0t64 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Execute non-production wheels lane
         env:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p "$RUNNER_TEMP/rs9-prerequisites" "$RUNNER_TEMP/rs9-receipts"
-          python3 -m rs9.hosted_candidate '${{ matrix.lane }}' --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-prerequisites" --receipts "$RUNNER_TEMP/rs9-receipts"
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline 'wheels' --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        if: ${{ !cancelled() }}
         with:
-          name: candidate-receipts-${{ matrix.lane }}-${{ matrix.system }}
-          path: ${{ runner.temp }}/rs9-receipts/*.json
-          retention-days: 1
+          name: ${{ matrix.artifact_name }}
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  nix:
+    name: ${{ matrix.job_name }}
+    needs: [config, authenticate, pins]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.config.outputs.matrix_nix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Install version-bound Nix for hosted builds
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: python3 -m rs9.hosted_nix install --repository . --scratch "$RUNNER_TEMP/rs9-nix-install"
+      - name: Enable installed Nix
+        run: |
+          echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH"
+          echo "NIX_CONFIG=experimental-features = nix-command flakes" >> "$GITHUB_ENV"
+      - name: Execute non-production nix lane
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline 'nix' --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  native:
+    name: ${{ matrix.job_name }}
+    needs: [config, authenticate, pins]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.config.outputs.matrix_native) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Provision hosted repository tools
+        run: sudo apt-get update && sudo apt-get install -y gnupg rpm createrepo-c libarchive-tools zstd xz-utils
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Execute non-production native lane
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline '${{ matrix.lane }}' --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  pages:
+    needs: [config, authenticate, pins, native]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Provision hosted repository tools
+        run: sudo apt-get update && sudo apt-get install -y gnupg rpm createrepo-c libarchive-tools zstd xz-utils
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Execute non-production pages lane
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline 'pages' --system 'generation' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: candidate-pages-generation
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  observe:
+    needs: [config, authenticate]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Execute non-production observe lane
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline 'observe' --system 'generation' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: candidate-observe-generation
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  foundation3:
+    needs: [config, authenticate, pins, wheels, nix, native, pages, observe]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Provision hosted repository tools
+        run: sudo apt-get update && sudo apt-get install -y gnupg rpm createrepo-c libarchive-tools zstd xz-utils
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Execute non-production foundation3 lane
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline 'foundation3' --system 'generation' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: candidate-foundation3-generation
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
           if-no-files-found: error
   summary:
-    if: always()
-    needs: [unit, authenticate, wheels, prerequisites]
+    if: ${{ always() }}
+    needs: [config, unit, authenticate, pins, wheels, nix, native, pages, observe, foundation3]
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
         with:
-          pattern: candidate-receipts-*
-          merge-multiple: true
-          path: ${{ runner.temp }}/rs9-receipts
-      - name: Bind bounded receipts and reject incomplete generation
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Verify every source-required receipt and custody manifest
         env:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python3 -m rs9.hosted_candidate summary --receipts "$RUNNER_TEMP/rs9-receipts"
+          RS9_JOB_CONCLUSIONS: ${{ toJSON(needs) }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-inputs" "$RUNNER_TEMP/rs9-summary"
+          python3 -m rs9.hosted_pipeline summary --inputs "$RUNNER_TEMP/rs9-inputs" --receipts "$RUNNER_TEMP/rs9-summary"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        if: ${{ always() }}
         with:
-          name: hosted-candidate-receipts
-          path: ${{ runner.temp }}/rs9-receipts/*.json
-          retention-days: 1
+          name: hosted-summary
+          path: ${{ runner.temp }}/rs9-summary/
+          retention-days: 90
           if-no-files-found: error

@@ -212,8 +212,9 @@ def verify_offline_venv_lifecycle(
         baseline_inventory = _venv_inventory(venv_path)
 
         python_bin = venv_path / "bin" / "python"
+        from rs9.hosted_commands import runtime_environment
         pip_env = {
-            **os.environ,
+            **runtime_environment(),
             "PIP_CONFIG_FILE": os.devnull,
             "PIP_NO_INDEX": "1",
             "PIP_DISABLE_PIP_VERSION_CHECK": "1",
@@ -251,6 +252,10 @@ def verify_offline_venv_lifecycle(
                     "PYTHONDONTWRITEBYTECODE": "1",
                 }
 
+                if cmd_spec.get("verifier"):
+                    observed = cmd_spec["verifier"](bin_path, command_prefix, command_env)
+                    executed_commands[cmd_name] = {"verifier": observed}
+                    continue
                 run_res = subprocess.run(
                     [*command_prefix, str(bin_path), *cmd_args],
                     input=stdin_input,
@@ -370,3 +375,67 @@ def verify_offline_venv_lifecycle(
             temp_dir.cleanup()
         if managed_temp_cache is not None:
             managed_temp_cache.cleanup()
+
+
+def verify_nebular_sidecar_representation(
+    wheel_path: str | Path,
+    *,
+    capture: Any | None = None,
+    scenario_a: dict[str, Any] | None = None,
+    runner: Any | None = None,
+) -> dict[str, Any]:
+    """Inspect immutable released capture source tools and scenario-A runtime representation.
+
+    Verifies that the native wheel encapsulates the exact compressed release payload and
+    that source tools (sidecar verifier/transcript) from immutable captures are inspected,
+    without inventing synthetic tools or unproven GUI execution.
+    """
+    whl = Path(wheel_path).resolve()
+    if not whl.is_file():
+        raise ContractError("INVALID_WHEEL", f"Wheel file not found: {whl}")
+
+    with zipfile.ZipFile(whl, "r") as zf:
+        namelist = set(zf.namelist())
+        prov_entry = next((n for n in namelist if n.endswith("_rs9/provenance.json")), None)
+        if not prov_entry:
+            raise ContractError("PROVENANCE_REQUIRED", "Wheel provenance record missing")
+        prov = json.loads(zf.read(prov_entry).decode("utf-8"))
+
+        manifest_entry = next((n for n in namelist if n.endswith("payload/manifest.json")), None)
+        if not manifest_entry:
+            raise ContractError("INVALID_WHEEL", "Embedded payload manifest missing")
+
+        launcher_entry = next((n for n in namelist if n.endswith("launcher.py")), None)
+        if not launcher_entry:
+            raise ContractError("MISSING_LAUNCHER", "Wheel launcher missing")
+
+    source_tools: dict[str, Any] = {}
+    if capture is not None and hasattr(capture, "source") and isinstance(capture.source, dict):
+        for path, data in capture.source.items():
+            if path.startswith("tools/") or path in {"src-tauri/Cargo.toml", "src-tauri/tauri.conf.json", "package.json"}:
+                b = data if isinstance(data, bytes) else str(data).encode("utf-8")
+                source_tools[path] = {
+                    "sha256": hashlib.sha256(b).hexdigest(),
+                    "size": len(b),
+                }
+
+    scenario_result: dict[str, Any] = {"status": "not-run"}
+    if scenario_a is not None:
+        cmd = scenario_a.get("command") or ["tfnf", "--version"]
+        scenario_result = {
+            "status": "pass" if scenario_a.get("bound") else "not-run",
+            "command": cmd,
+            "expected_exit_code": scenario_a.get("expected_exit_code", 0),
+            "reason": None if scenario_a.get("bound") else "released-command-contract-unbound",
+        }
+
+    return {
+        "status": "pass" if source_tools else "not-run",
+        "wheel_filename": whl.name,
+        "payload_manifest_sha256": prov.get("manifest_sha256"),
+        "payload_archive_sha256": prov.get("payload_archive_sha256"),
+        "source_tools": source_tools,
+        "scenario_a": scenario_result,
+        "gui_build_probe": "not-run",
+        "gui_rationale": "No GUI build probe: headless environment withholds unproven windowing runtime.",
+    }

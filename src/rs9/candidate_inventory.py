@@ -19,7 +19,7 @@ def git_oid(kind, data):
 def candidate_paths(root):
     root = physical_directory(root)
     tracked = subprocess.check_output(["git", "-C", str(root), "ls-files", "-z"]).decode().split("\0")
-    paths = {p for p in tracked if p}
+    paths = {p for p in tracked if p and (root / p).exists()}
     for directory in DIRECTORIES:
         paths.update(p.relative_to(root).as_posix() for p in (root / directory).rglob("*")
                      if (p.is_file() or p.is_symlink()) and "__pycache__" not in p.parts)
