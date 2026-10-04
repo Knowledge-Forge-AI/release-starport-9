@@ -1,0 +1,366 @@
+{
+  "entry": {
+    "branch": "main",
+    "changed_product_paths": 58,
+    "head_matches_public_parent": true,
+    "manifest_sha256": "36bade76292b69ab9dbe6bd2ab3bfbfc7897fbf5bd619489b7285e7957e9753b",
+    "origin_main_matches_head": true,
+    "reviewed_cumulative_tree": "3980bc7327a7c4d80099413efc11b2fa9d8c49eb",
+    "semantic_inventory_and_structured_binding": "verified-before-edits"
+  },
+  "observed_stage_deltas_at_entry": [],
+  "original_scope": [
+    "explicit native package classification and qualified publication architectures",
+    "real authenticated Burst released-loader proof",
+    "Nix extractor symlink confinement and root-mode restoration",
+    "authoritative npm and Homebrew exact-to-noop observation",
+    "bounded attended hosted-run-5 preflight and internal source environment",
+    "causal sidecar drift classification and verifier-rejected token",
+    "Pages-client diagnostic custody with bounded privacy checks",
+    "full cumulative manifest and exact adoption delta"
+  ],
+  "plan_review_findings": [
+    {
+      "disposition": "addressed",
+      "id": "F1",
+      "result": "Required Burst target/load gates cover wheels, Nix, pacman, RPM and APT; workflow, summary and collector use the source lane contract."
+    },
+    {
+      "disposition": "source-addressed-qualification-limited",
+      "id": "F2",
+      "result": "Foreign prebuild bytes retained; RPM scanner excludes only three exact foreign files and target dependency readback stays strict. No rpmlint filter or pruning introduced. Native container build/lint and full package-format privacy qualification remain mandatory hosted gates; local Docker access is unavailable."
+    },
+    {
+      "disposition": "addressed",
+      "id": "F3",
+      "result": "Drift precedes flags only with intersecting mismatch/drift paths. Unrelated runtime tokens cannot establish causality; flags/xattr counts remain separate evidence."
+    },
+    {
+      "disposition": "addressed",
+      "id": "F4",
+      "result": "Parser errors, imports, output checks and exclusive log creation are bounded; an existing empty physical packet directory is required and the handoff states this explicitly."
+    },
+    {
+      "disposition": "addressed",
+      "id": "F5",
+      "result": "Resolve the actual default branch and bind four static formula blobs to one observed commit tree; no main fallback."
+    },
+    {
+      "disposition": "addressed",
+      "id": "F6",
+      "result": "Manifest records the explicit parent, verifier checks it against adoption's reviewed parent, and local exact-delta regression is authoritative when the object exists."
+    },
+    {
+      "disposition": "addressed",
+      "id": "F7",
+      "result": "Unsafe Pages-client diagnostics leave a hashes-only substitute and a separate custody scan failure while preserving the primary failure code."
+    }
+  ],
+  "production_enabled": false,
+  "proposal": {
+    "bytes": 17281,
+    "disposition": "amend",
+    "reason": "Preserve the original eight-work scope while incorporating plan-review findings and fail-closed integration fixes.",
+    "sha256": "c40cdf9a43c0954d7d180481f444e724394b8c6b696af525260a6afac944009f"
+  },
+  "public_parent": "e2c6cb5fcc55462e2e28e889a6c9f3ed60c9d131",
+  "qualification_limits": [
+    "Hosted run 5 has not executed; installed Linux/Nix/native package loader gates remain required.",
+    "Local container build, RPM lint/dependency readback and full native-family privacy scans are unavailable in this sandbox.",
+    "Live destination reads can remain unknown on transport failure; no unknown state is accepted as exact or noop.",
+    "Linux wheels use generic linux_x86_64/linux_aarch64 candidate tags; production compatibility remains unproved."
+  ],
+  "review_and_handoff": {
+    "adoption": "Manager acceptance of exact terminal tree and candidate-manifest SHA before attended run-5 operator",
+    "closeout": "Terminal amendment authorized by dispatcher stage envelope; no additional substantive review obtained",
+    "dispatcher_review_required": "full cumulative candidate against public parent",
+    "git_publication_performed": false,
+    "hosted_run": "one new push-triggered candidate workflow; no automatic rerun",
+    "production_receipts": []
+  },
+  "schema": "rs9.cont6r2-source-verification.v1alpha1",
+  "stage": "implementation_testing",
+  "status": "terminal-source-amendment",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT6R2-PRE-RUN5-POLICY1",
+  "terminal_verification": {
+    "candidate_inventory": {
+      "changed_product_paths": 89,
+      "inventoried_product_files_including_manifest": 316,
+      "parent": "e2c6cb5fcc55462e2e28e889a6c9f3ed60c9d131",
+      "verification": "Complete final bytes/modes plus live full product delta; tree and manifest digest returned outside the self-inventoried evidence report"
+    },
+    "cumulative_suite_attempts": [
+      {
+        "causes": [
+          "Existing real-byte npm fixture expected unknown for an established integrity mismatch; corrected to conflict",
+          "Worker test contained a literal private-path marker; replaced by a runtime-generated absolute-path fixture"
+        ],
+        "failures": 2,
+        "skipped": 9,
+        "status": "failed-before-correction",
+        "tests_run": 914
+      },
+      {
+        "exit_code": 0,
+        "failures": 0,
+        "skipped": 9,
+        "status": "pass",
+        "tests_run": 914
+      }
+    ],
+    "cumulative_unit_suite": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest discover -s tests -q",
+      "exit_code": 0,
+      "note": "Final executable source and test bytes; evidence report and manifest finalized afterward and checked separately",
+      "resource_warning_errors": 0,
+      "skipped": 9,
+      "source_test_inventory_sha256": "66adf79fb6acc73432752e17f8faf620f47a683dd69ed04860a964ad1ec1334e",
+      "status": "pass",
+      "tests_run": 914
+    },
+    "disposition": "amend",
+    "external_pending": [
+      "Hosted run 5 has not executed",
+      "Native package build/install/loader and RPM lint/dependency gates",
+      "Linux target-native loader proof",
+      "Live npm/Homebrew readback and planner noop"
+    ],
+    "finalization_boundary": "After the cumulative suite, only this evidence report and candidate-manifest are finalized. Final exact inventory, hygiene and relative-link checks are required after those writes; no new code changes or substantive review.",
+    "focused_correction_followup": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_exact_candidate_readback tests.test_hosted_diagnostics tests.test_hygiene -q",
+      "skipped": 0,
+      "status": "pass",
+      "tests_run": 14
+    },
+    "focused_native_packaging_nix_workflow": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_product_classes tests.test_burst_platform_wheel tests.test_hosted_burst tests.test_hosted_burst_clients tests.test_build_native tests.test_build_deb tests.test_hosted_packaging tests.test_hosted_deb tests.test_hosted_foundation3 tests.test_hosted_wheels tests.test_hosted_nix tests.test_homebrew_formula tests.test_nix_installer tests.test_workflow_static -q",
+      "skip_boundary": "Local GnuPG fixture setup unavailable",
+      "skipped": 1,
+      "status": "pass",
+      "tests_run": 222
+    },
+    "focused_preflight_loader_observe_readers": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_run_hosted5 tests.test_burst_loader_proof tests.test_hosted_observe tests.test_candidate_readers -q",
+      "skipped": 0,
+      "status": "pass",
+      "tests_run": 74
+    },
+    "focused_sidecar_pages_diagnostics": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_hosted_smoke tests.test_hosted_diagnostics tests.test_pages_diagnostic_custody -q",
+      "parent_refinement": "Baseline corruption and truncated mismatch samples cannot establish causal drift; invocation labels bounded to 64 characters",
+      "skipped": 0,
+      "status": "pass",
+      "tests_run": 28
+    },
+    "official_nix_archives": {
+      "execution": "Re-extracted all three retained official archives without executing installers; source SHA, extraction and physical manifest readback passed",
+      "status": "pass",
+      "systems": [
+        "aarch64-darwin",
+        "x86_64-linux",
+        "aarch64-linux"
+      ]
+    },
+    "provider_actions": {
+      "additional_review": false,
+      "git_metadata_mutation": false,
+      "hosted_run": false,
+      "production_write": false
+    },
+    "real_burst_loader": {
+      "evidence_path": "evidence/live1/burst-loader-darwin-arm64.json",
+      "evidence_sha256": "418d1d81bc59223db38e24fa4c94716bf5be978b7733ce5e7fd11bdfb2876ad3",
+      "execution": "Confirmed retained independently inspected proof via tests.test_burst_loader_proof; no new real loader execution during closeout",
+      "status": "retained-proof-confirmed"
+    },
+    "source_identity_at_entry": {
+      "changed_product_paths": 88,
+      "head": "e2c6cb5fcc55462e2e28e889a6c9f3ed60c9d131",
+      "manifest_sha256": "addf5951596a34310cd5ea938764127d220fbaa2b49686c63867712f0a379fe6",
+      "tree": "391224e740847fb432e17527812b63b2a41e7c3f",
+      "verification": "live full inventory/tree and product delta verified; main and origin/main observed"
+    },
+    "state": "pass-source-qualified; hosted-qualification-pending",
+    "static": {
+      "broken_relative_links": 0,
+      "git_diff_check": "pass",
+      "private_path_scan_exception": "Existing hygiene regex source only; no new exception",
+      "product_files_credential_and_private_path_scanned": 316,
+      "python_parsed_and_compiled": 170,
+      "relative_links_checked": 250,
+      "unexpected_ignored_operational_dirt": 0
+    },
+    "static_preliminary": {
+      "broken_relative_links": 0,
+      "git_diff_check": "pass",
+      "product_files_credential_scanned": 316,
+      "python_parsed_and_compiled": 170,
+      "relative_links_checked": 250
+    },
+    "worker": {
+      "cleanup_proven": true,
+      "dispatcher_checkpoint": false,
+      "effective_model": "not-independently-observed",
+      "facility": "selected-dispatcher-shared-worker",
+      "kind": "gemini",
+      "requested_profile": "gemini-3.8-flash-high",
+      "state": "accepted-after-parent-integration-and-fresh-focused-tests",
+      "task": "closeout-sidecar-F1-F2-F3"
+    }
+  },
+  "verification": {
+    "candidate_inventory": {
+      "changed_product_paths": 88,
+      "inventoried_product_files_including_manifest": 316,
+      "parent": "e2c6cb5fcc55462e2e28e889a6c9f3ed60c9d131",
+      "verification": "full bytes/modes/tree reconstruction plus live exact delta; final tree and manifest digest returned to dispatcher outside self-inventoried report"
+    },
+    "cumulative_unit_suite": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest discover -s tests -q",
+      "exit_code": 0,
+      "live_delta_regression": "executed-with-public-parent-object-present; not-skipped",
+      "resource_warning_errors": 0,
+      "skip_boundaries": [
+        "Five opt-in retained live capture tests: capture directories not supplied.",
+        "Four local GnuPG fixture checks/class setup: binary or agent unavailable."
+      ],
+      "skipped": 9,
+      "status": "pass",
+      "tests_run": 900
+    },
+    "focused_checks": {
+      "status": "pass",
+      "suites": [
+        "Burst platform wheels and native package architectures",
+        "Real authenticated Darwin loader proof and synthetic selection/failure tests",
+        "Nix extractor confinement, root-mode cleanup and three official archives",
+        "Hosted native metadata and custody architectures",
+        "Observe/Homebrew closed formula schema, snapshot identity and real planner noop",
+        "Sidecar causal drift, raw verifier phase and verifier-rejected classification",
+        "Pages diagnostic retention, unsafe hashes-only substitution and exact custody filenames",
+        "Attended wrapper collision, import/argument preflight and internal source environment",
+        "Candidate manifest explicit parent and exact cumulative delta",
+        "Workflow static permission, completeness and required native loader gates",
+        "Fresh planner binding of product packaging policy"
+      ]
+    },
+    "official_nix_archives": [
+      {
+        "archive_sha256": "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8",
+        "extraction_manifest_sha256": "20819f0058a9bcaab5dbdfa375ff2c30e7a493e7b3622a5adb58f5cef54a8ff0",
+        "physical_manifest_sha256": "520f69e234e4d00f6f06725e04c27a4e76c5a7280ccbaf3e95f5d709a90f7b56",
+        "status": "pass",
+        "system": "aarch64-darwin"
+      },
+      {
+        "archive_sha256": "64db528412096d718b4bf8f78f85e5ac2b714b774e5005500dee37d23f560456",
+        "extraction_manifest_sha256": "52745cf3021e15f45d01c773b3a966f4851a9e04524a01388472c8e7dbacb5b1",
+        "physical_manifest_sha256": "c2d5973b4dbd5f93f78d4e6e2853d3a2d5686b1ecc40052583ee8f0d39ee8617",
+        "status": "pass",
+        "system": "aarch64-linux"
+      },
+      {
+        "archive_sha256": "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60",
+        "extraction_manifest_sha256": "686a8addf7800de21370bbccdec9189adccb1b3b57114c1cb47f4e3520a8454c",
+        "physical_manifest_sha256": "f8b9e45927cc790b9dc687e9ea75980bc9ecde627c907a07fa6fa6deaba8c832",
+        "status": "pass",
+        "system": "x86_64-linux"
+      }
+    ],
+    "real_burst_loader": {
+      "artifact": "darwin-arm64",
+      "evidence_path": "evidence/live1/burst-loader-darwin-arm64.json",
+      "evidence_sha256": "418d1d81bc59223db38e24fa4c94716bf5be978b7733ce5e7fd11bdfb2876ad3",
+      "execution": "shared-worker-on-local-target-host; integrated hardened source",
+      "foreign_prebuilds": "three-retained-inert",
+      "loads": 1,
+      "node_abi": "127",
+      "node_version": "v22.22.2",
+      "parent_direct_network_probe": "unavailable; no fabricated proof",
+      "status": "pass"
+    },
+    "scope": "producer-pre-final-bound-candidate; fresh terminal checks are recorded separately",
+    "static": {
+      "broken_relative_links": 0,
+      "credential_and_private_path_scan": "pass",
+      "git_diff_check": "pass",
+      "python_parsed_and_compiled": 170,
+      "relative_links_checked": 250,
+      "unexpected_ignored_operational_dirt": 0
+    }
+  },
+  "work_review_findings": [
+    {
+      "disposition": "amend",
+      "id": "F1",
+      "result": "Retain per-invocation Pages-client sidecar diagnostics so package families cannot overwrite earlier diagnostics."
+    },
+    {
+      "disposition": "amend",
+      "id": "F2",
+      "result": "Classify causally established post-probe drift before the mismatch it explains, using real nonzero runtime mismatch counts; preserve unrelated mismatch precedence and flags/xattr evidence."
+    },
+    {
+      "disposition": "amend",
+      "id": "F3",
+      "result": "Retain unknown verifier phase when no parseable phase evidence exists; preserve bounded output hashes and execution outcome."
+    },
+    {
+      "disposition": "defer",
+      "id": "F4",
+      "result": "RPM lint with complete foreign prebuilds remains a mandatory hosted gate. No local native container/RPM tools available; no pruning or lint waiver introduced. Hosted failure requires manager disposition."
+    },
+    {
+      "disposition": "amend",
+      "id": "F5",
+      "result": "Validate packet directory before exclusive log creation. Collisions and early failure never advertise stale packets; only child-produced physical packets are reported."
+    },
+    {
+      "disposition": "amend",
+      "id": "F6",
+      "result": "Standalone loader proof requires an explicit caller-owned physical scratch root before runtime probing; no host-specific fallback."
+    },
+    {
+      "disposition": "amend",
+      "id": "F7",
+      "result": "Missing Homebrew target payload records a gate-blocking conflict and preserves the full observation sweep; known npm command-path and received integrity drift records conflict. Transport/protocol failures remain unknown."
+    },
+    {
+      "disposition": "accept",
+      "id": "F8",
+      "result": "Current authenticated Burst deployment floor remains 13.0; wheel builders derive floor and publication/custody policy rejects differing tags. Dynamic publication-floor policy is deferred until a different authenticated generation requires it."
+    }
+  ],
+  "worker_disposition": {
+    "admissions": 5,
+    "cleanup_proven": true,
+    "completed_attempts": 5,
+    "dispatcher_checkpoints_satisfied_by_workers": false,
+    "facility": "selected-dispatcher-shared-worker",
+    "observed_kind": "gemini",
+    "observed_profile": "gemini-3.8-flash-high",
+    "results": [
+      {
+        "outcome": "accepted-after-parent-integration",
+        "task": "native-classification"
+      },
+      {
+        "outcome": "accepted-after-parent-integration",
+        "task": "observe"
+      },
+      {
+        "outcome": "accepted-after-parent-integration",
+        "task": "hardening"
+      },
+      {
+        "outcome": "partial-adopted; integrated proof supersedes historical evidence",
+        "task": "real-loader-attempt-1"
+      },
+      {
+        "outcome": "accepted; linked amendment after proven cleanup",
+        "task": "real-loader-attempt-2"
+      }
+    ],
+    "scope": "producer-stage workers; terminal worker is recorded separately"
+  }
+}

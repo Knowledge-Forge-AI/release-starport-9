@@ -1,0 +1,167 @@
+{
+  "schema": "rs9.hosted4-wheel-trigger.v1alpha1",
+  "status": "reproduced",
+  "proof": {
+    "methodology": "Fresh authenticated candidate release capture and wheel build execution across all four release-starport-9 products using live GitHub release assets, official expectations, and npm dependency closure resolution.",
+    "execution_type": "authorized_public_evidence_capture",
+    "network_transport": "authenticated_public_github_and_npm",
+    "summary": "Stellar Burst contains real precompiled native binary addons (.node) across four platform targets, triggering UNQUALIFIED_PLATFORM during wheel_capture and fail-closed candidate withholding. Solar Sail and Stellar Loom succeed with universal py3-none-any. Nebular Fusion evaluates Darwin macOS 13.0 deployment floor from authenticated Info.plist."
+  },
+  "trigger": {
+    "product": "theme-forge-stellar-burst",
+    "substage": "closure-platform-scan",
+    "error_code": "UNQUALIFIED_PLATFORM",
+    "member": "package/native/directory-snapshot/prebuilds/darwin-arm64/native-addon-posix-openat-v1.node",
+    "hash": "2f842ce43f62c76b04884a92980037067c8e55dfd183c86e788f1c3ac8a533c8",
+    "size_bytes": 53344,
+    "magic_header": "Mach-O 64-bit arm64",
+    "reason": "Authentic released package contains precompiled native Node binary addons (.node) with compiled Mach-O and ELF executable code. Universal py3-none-any wheel tag is rejected by wheel_capture fail-closed native detector; candidate wheel is withheld and policy blocker recorded rather than claiming universal pure JS compliance.",
+    "all_trigger_members": [
+      {
+        "path": "package/native/directory-snapshot/prebuilds/darwin-arm64/native-addon-posix-openat-v1.node",
+        "sha256": "2f842ce43f62c76b04884a92980037067c8e55dfd183c86e788f1c3ac8a533c8",
+        "size_bytes": 53344,
+        "format": "Mach-O 64-bit arm64"
+      },
+      {
+        "path": "package/native/directory-snapshot/prebuilds/darwin-x64/native-addon-posix-openat-v1.node",
+        "sha256": "41eb0b3091173132012565560d62b31f7320764c6fd6e780994fcef8803704c6",
+        "size_bytes": 24200,
+        "format": "Mach-O 64-bit x86_64"
+      },
+      {
+        "path": "package/native/directory-snapshot/prebuilds/linux-arm64-gnu/native-addon-posix-openat-v1.node",
+        "sha256": "67fb6b85f339a7c2f43ababa20434b26a3ea9bb65b17e70257a03c07810beb79",
+        "size_bytes": 73336,
+        "format": "ELF 64-bit aarch64"
+      },
+      {
+        "path": "package/native/directory-snapshot/prebuilds/linux-x64-gnu/native-addon-posix-openat-v1.node",
+        "sha256": "a2999fc9ac1b1f0a31600595f7069e10aadb032f01059b4d7e64ed80cd8a38a8",
+        "size_bytes": 27240,
+        "format": "ELF 64-bit x86_64"
+      }
+    ],
+    "origin": "release-payload",
+    "requested_hosted_systems": [
+      "aarch64-darwin",
+      "x86_64-linux",
+      "aarch64-linux"
+    ],
+    "selected_asset_platform": "any",
+    "requested_wrapper_tag": "py3-none-any"
+  },
+  "release_identities": {
+    "theme-forge-stellar-burst": {
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+      "repository_id": 1342490027,
+      "tag": "v0.6.1",
+      "release_id": 399542205,
+      "commit": "a3e89683f92b8240c800ed303c866e7b12aa3277",
+      "tree": "158bd6d03b21d747385fb25f49e6e148d62043c8",
+      "asset_name": "knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+      "asset_id": 599265851,
+      "asset_size": 644313,
+      "asset_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+      "build_status": "withheld",
+      "policy_blocker": "UNQUALIFIED_PLATFORM",
+      "computed_tag": "withheld"
+    },
+    "theme-forge-stellar-loom": {
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-loom",
+      "repository_id": 1361513719,
+      "tag": "v0.4.0",
+      "release_id": 399542451,
+      "commit": "d6f3cc457ee68224cef06e9599c9d2401057c618",
+      "tree": "9388e305fd516755f01fdd01e66c72f09cc8e1d8",
+      "asset_name": "knowledge-forge-ai-theme-forge-stellar-loom-0.4.0.tgz",
+      "asset_id": 599266537,
+      "asset_size": 273462,
+      "asset_sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+      "build_status": "built",
+      "computed_tag": "py3-none-any",
+      "wheel_filename": "theme_forge_stellar_loom-0.4.0-py3-none-any.whl"
+    },
+    "theme-forge-solar-sail": {
+      "repository": "Knowledge-Forge-AI/theme-forge-solar-sail",
+      "repository_id": 1374611333,
+      "tag": "v0.2.1",
+      "release_id": 399542664,
+      "commit": "68e3f95a27cf1681aabb1fccb55e8b78d23b5fa0",
+      "tree": "35a865bdea29dac6e39feb6afcba39485b23b3a6",
+      "asset_name": "knowledge-forge-ai-theme-forge-solar-sail-0.2.1.tgz",
+      "asset_id": 599267369,
+      "asset_size": 110658,
+      "asset_sha256": "ebc4f21d1e61dbc0ac4e87ce81f7ecec4f97d7c15562356e429d4c1a4e9aa5a0",
+      "build_status": "built",
+      "computed_tag": "py3-none-any",
+      "wheel_filename": "theme_forge_solar_sail-0.2.1-py3-none-any.whl"
+    },
+    "theme-forge-nebular-fusion": {
+      "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+      "repository_id": 1358643872,
+      "tag": "v0.6.1",
+      "release_id": 400494635,
+      "commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+      "tree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b",
+      "assets": {
+        "aarch64-darwin": {
+          "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+          "id": 601953438,
+          "size": 47079690,
+          "sha256": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be"
+        },
+        "aarch64-linux": {
+          "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+          "id": 601953522,
+          "size": 54248930,
+          "sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f"
+        },
+        "x86_64-linux": {
+          "name": "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+          "id": 601953596,
+          "size": 54105413,
+          "sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d"
+        }
+      },
+      "build_status": "built",
+      "computed_tags": {
+        "aarch64-darwin": "py3-none-macosx_13_0_arm64",
+        "x86_64-linux": "py3-none-linux_x86_64",
+        "aarch64-linux": "py3-none-linux_aarch64"
+      },
+      "darwin_deployment_floor": {
+        "source": "Contents/Info.plist",
+        "key": "LSMinimumSystemVersion",
+        "value": "13.0",
+        "major": 13,
+        "minor": 0,
+        "pre_computation_marker": "pending"
+      },
+      "linux_candidate_promotability": {
+        "candidate_only": true,
+        "promotability": "policy-pending",
+        "manylinux_proven": false,
+        "production_status": "strictly-withheld"
+      }
+    }
+  },
+  "namespace": {
+    "hosted_systems": [
+      "aarch64-darwin",
+      "x86_64-linux",
+      "aarch64-linux"
+    ],
+    "target_triples": [
+      "aarch64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu"
+    ],
+    "isolation_policy": "platform_contract strictly rejects target triples; system_from_target_triple performs explicit conversion exclusively at legacy build_native_wheel boundary; inconsistent explicit system/triple pairs are rejected with INCONSISTENT_PLATFORM.",
+    "immutability": "Frozen dataclass rows exposed through a read-only mapping table."
+  },
+  "diagnostics_sanitization": {
+    "error_message_policy": "Raw error_message omitted from all candidate diagnostic records to prevent credential or host path leakage.",
+    "safe_details_enforced": true
+  }
+}

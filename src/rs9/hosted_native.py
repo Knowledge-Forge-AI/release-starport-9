@@ -111,18 +111,26 @@ def provision(family, system, pins=None, *, repository=None, runner=None):
     arch = "aarch64" if "aarch64" in system else "x86_64"
     image = cfg.get("container_digest") if family == "pacman" else cfg.get("container_digests", {}).get(arch)
     if not image or not re.fullmatch(r"[a-z0-9./_-]+@sha256:[0-9a-f]{64}", image):
-        raise ContractError("CONTAINER_PIN", "Run-wide immutable platform image required")
+        raise ContractError("CONTAINER_PIN", "Run-wide immutable platform image required",
+                            details={"substage": "pin", "family": family, "system": system})
     platform = "linux/arm64" if arch == "aarch64" else "linux/amd64"
     pull = runner.run(["docker", "pull", "--platform", platform, image])
     if pull.exit_code:
-        raise ContractError("CONTAINER_PULL", "Pinned platform image pull failed")
+        raise ContractError("CONTAINER_PULL", "Pinned platform image pull failed",
+                            details={"substage": "pull", "tool": "docker", "exit_code": pull.exit_code,
+                                     "stdout_sha256": pull.stdout_sha256, "stderr_sha256": pull.stderr_sha256})
     result = runner.run(["docker", "run", "--rm", "--network", "none", "--platform", platform, image,
                          "sh", "-c", "cat /etc/os-release; uname -m"])
-    if result.exit_code or arch not in result.stdout_text.splitlines()[-1]:
-        raise ContractError("CONTAINER_ARCH", "Actual container architecture mismatch")
-    release = dict(line.split("=",1) for line in result.stdout_text.splitlines() if "=" in line)
+    lines = [line.strip() for line in result.stdout_text.splitlines() if line.strip()]
+    if result.exit_code or not lines or arch not in lines[-1]:
+        raise ContractError("CONTAINER_ARCH", "Actual container architecture mismatch",
+                            details={"substage": "architecture", "tool": "uname", "exit_code": result.exit_code,
+                                     "stdout_sha256": result.stdout_sha256, "stderr_sha256": result.stderr_sha256})
+    release = dict(line.split("=",1) for line in lines if "=" in line)
     if (family == "rpm" and release.get("VERSION_ID", "").strip(chr(34)) != "43") or (family == "pacman" and release.get("ID", "").strip(chr(34)) != "arch"):
-        raise ContractError("CONTAINER_DISTRO", "Actual distro differs from contract")
+        raise ContractError("CONTAINER_DISTRO", "Actual distro differs from contract",
+                            details={"substage": "distro", "tool": "cat", "exit_code": result.exit_code,
+                                     "stdout_sha256": result.stdout_sha256, "stderr_sha256": result.stderr_sha256})
     packages = ["nodejs", "gtk3", "cairo", "pango", "gdk-pixbuf2", "libsoup3", "webkit2gtk-4.1"] if family == "pacman" else ["nodejs", "gtk3", "cairo", "pango", "gdk-pixbuf2", "libsoup3", "webkit2gtk4.1"]
     source_pinned = (pins or {}).get("pin_provenance", {}).get(family + "." + arch) == "source-pinned"
     return {"family":family,"system":system,"image_ref":image,"digest":image.split("@")[1],

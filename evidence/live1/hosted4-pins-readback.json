@@ -1,0 +1,213 @@
+{
+  "containers": {
+    "deb.amd64": {
+      "architecture": "amd64",
+      "config_architecture": "amd64",
+      "config_digest": "sha256:6e92c4fd8dfdf7276d56743a65002a91c9eb35dbe7af327e6c85bd204b646156",
+      "config_os": "linux",
+      "config_size_bytes": 4383,
+      "distribution": "ubuntu-26.04",
+      "family": "deb",
+      "layer_count": 2,
+      "manifest_digest": "sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794",
+      "manifest_media_type": "application/vnd.oci.image.manifest.v1+json",
+      "manifest_raw_sha256": "sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794",
+      "manifest_size_bytes": 1392,
+      "read_authority": "Registry manifest and image config readback via docker.io/library/ubuntu",
+      "repository": "docker.io/library/ubuntu",
+      "tag": "26.04",
+      "target_architecture": "amd64",
+      "verified_config_command": "docker buildx imagetools inspect --format {{json .Image}} docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794",
+      "verified_raw_command": "docker buildx imagetools inspect --raw docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794"
+    },
+    "deb.arm64": {
+      "architecture": "arm64",
+      "config_architecture": "arm64",
+      "config_digest": "sha256:a1b016b8418dc08803fa0fb3aea39d5029a8a6c05a861adf9905a20d7307bdb4",
+      "config_os": "linux",
+      "config_size_bytes": 4478,
+      "distribution": "ubuntu-26.04",
+      "family": "deb",
+      "layer_count": 2,
+      "manifest_digest": "sha256:3ad1c71aa6b7e477f7aa91445a5442fbb163742849393b511661a88081c3d7a2",
+      "manifest_media_type": "application/vnd.oci.image.manifest.v1+json",
+      "manifest_raw_sha256": "sha256:3ad1c71aa6b7e477f7aa91445a5442fbb163742849393b511661a88081c3d7a2",
+      "manifest_size_bytes": 1392,
+      "read_authority": "Registry manifest and image config readback via docker.io/library/ubuntu",
+      "repository": "docker.io/library/ubuntu",
+      "tag": "26.04",
+      "target_architecture": "arm64",
+      "verified_config_command": "docker buildx imagetools inspect --format {{json .Image}} docker.io/library/ubuntu@sha256:3ad1c71aa6b7e477f7aa91445a5442fbb163742849393b511661a88081c3d7a2",
+      "verified_raw_command": "docker buildx imagetools inspect --raw docker.io/library/ubuntu@sha256:3ad1c71aa6b7e477f7aa91445a5442fbb163742849393b511661a88081c3d7a2"
+    },
+    "pacman.x86_64": {
+      "architecture": "x86_64",
+      "config_architecture": "amd64",
+      "config_digest": "sha256:66e676a0a26efc7da658cc3763b65e9bd1927de617c30fd2db7a5b405d5cfc4d",
+      "config_os": "linux",
+      "config_size_bytes": 4214,
+      "distribution": "archlinux",
+      "family": "pacman",
+      "layer_count": 2,
+      "manifest_digest": "sha256:eb8f6dcc89a38977c9735f10fcf6ae4afe496283e7008eb7a3420cdba31fbd04",
+      "manifest_media_type": "application/vnd.oci.image.manifest.v1+json",
+      "manifest_raw_sha256": "sha256:eb8f6dcc89a38977c9735f10fcf6ae4afe496283e7008eb7a3420cdba31fbd04",
+      "manifest_size_bytes": 1223,
+      "read_authority": "Registry manifest and image config readback via docker.io/library/archlinux",
+      "repository": "docker.io/library/archlinux",
+      "tag": "base",
+      "target_architecture": "amd64",
+      "verified_config_command": "docker buildx imagetools inspect --format {{json .Image}} docker.io/library/archlinux@sha256:eb8f6dcc89a38977c9735f10fcf6ae4afe496283e7008eb7a3420cdba31fbd04",
+      "verified_raw_command": "docker buildx imagetools inspect --raw docker.io/library/archlinux@sha256:eb8f6dcc89a38977c9735f10fcf6ae4afe496283e7008eb7a3420cdba31fbd04"
+    },
+    "rpm.aarch64": {
+      "architecture": "aarch64",
+      "config_architecture": "arm64",
+      "config_digest": "sha256:36ed54b7ce47012fa93d01983e728807ee40a8faf395d5e40c3d611c865e5060",
+      "config_os": "linux",
+      "config_size_bytes": 989,
+      "distribution": "fedora-43",
+      "family": "rpm",
+      "layer_count": 1,
+      "manifest_digest": "sha256:0b0303ee12217251f2ec18a71a21284f383e99d1d3bae1eb6c8970fd2e16e26b",
+      "manifest_media_type": "application/vnd.oci.image.manifest.v1+json",
+      "manifest_raw_sha256": "sha256:0b0303ee12217251f2ec18a71a21284f383e99d1d3bae1eb6c8970fd2e16e26b",
+      "manifest_size_bytes": 572,
+      "read_authority": "Registry manifest and image config readback via registry.fedoraproject.org/fedora",
+      "repository": "registry.fedoraproject.org/fedora",
+      "tag": "43",
+      "target_architecture": "arm64",
+      "verified_config_command": "docker buildx imagetools inspect --format {{json .Image}} registry.fedoraproject.org/fedora@sha256:0b0303ee12217251f2ec18a71a21284f383e99d1d3bae1eb6c8970fd2e16e26b",
+      "verified_raw_command": "docker buildx imagetools inspect --raw registry.fedoraproject.org/fedora@sha256:0b0303ee12217251f2ec18a71a21284f383e99d1d3bae1eb6c8970fd2e16e26b"
+    },
+    "rpm.x86_64": {
+      "architecture": "x86_64",
+      "config_architecture": "amd64",
+      "config_digest": "sha256:4fb45f231df14878b3df9dec159461d1d90590884fb728dc796981854c2b3d0e",
+      "config_os": "linux",
+      "config_size_bytes": 973,
+      "distribution": "fedora-43",
+      "family": "rpm",
+      "layer_count": 1,
+      "manifest_digest": "sha256:c5e15bd1e07c25904d0c5b9865fb7ee4589f8ca234e635742b0c1195838f4bfd",
+      "manifest_media_type": "application/vnd.oci.image.manifest.v1+json",
+      "manifest_raw_sha256": "sha256:c5e15bd1e07c25904d0c5b9865fb7ee4589f8ca234e635742b0c1195838f4bfd",
+      "manifest_size_bytes": 572,
+      "read_authority": "Registry manifest and image config readback via registry.fedoraproject.org/fedora",
+      "repository": "registry.fedoraproject.org/fedora",
+      "tag": "43",
+      "target_architecture": "amd64",
+      "verified_config_command": "docker buildx imagetools inspect --format {{json .Image}} registry.fedoraproject.org/fedora@sha256:c5e15bd1e07c25904d0c5b9865fb7ee4589f8ca234e635742b0c1195838f4bfd",
+      "verified_raw_command": "docker buildx imagetools inspect --raw registry.fedoraproject.org/fedora@sha256:c5e15bd1e07c25904d0c5b9865fb7ee4589f8ca234e635742b0c1195838f4bfd"
+    }
+  },
+  "limitations": [
+    "Actual installed Nix and platform application smoke remain hosted qualification work."
+  ],
+  "maintainer": "Knowledge Forge AI <nonproduction@invalid>",
+  "nix_installer": {
+    "checksum_map_contract": {
+      "exact_system_count": 3,
+      "installer_sha256_by_system": {
+        "aarch64-darwin": "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8",
+        "aarch64-linux": "64db528412096d718b4bf8f78f85e5ac2b714b774e5005500dee37d23f560456",
+        "x86_64-linux": "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60"
+      }
+    },
+    "systems": {
+      "aarch64-darwin": {
+        "archive_url": "https://releases.nixos.org/nix/nix-2.31.2/nix-2.31.2-aarch64-darwin.tar.xz",
+        "directory_count": 1867,
+        "official_sha256_file_content": "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8",
+        "read_authority": "Official NixOS release artifacts at https://releases.nixos.org/nix/nix-2.31.2/nix-2.31.2-aarch64-darwin.tar.xz",
+        "regular_file_count": 18173,
+        "sha256": "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8",
+        "sha256_url": "https://releases.nixos.org/nix/nix-2.31.2/nix-2.31.2-aarch64-darwin.tar.xz.sha256",
+        "size_bytes": 29833104,
+        "symlink_count": 114,
+        "system": "aarch64-darwin",
+        "tar_member_count": 20154,
+        "tar_root_prefix": "nix-2.31.2-aarch64-darwin",
+        "version": "2.31.2"
+      },
+      "aarch64-linux": {
+        "archive_url": "https://releases.nixos.org/nix/nix-2.31.2/nix-2.31.2-aarch64-linux.tar.xz",
+        "directory_count": 525,
+        "official_sha256_file_content": "64db528412096d718b4bf8f78f85e5ac2b714b774e5005500dee37d23f560456",
+        "read_authority": "Official NixOS release artifacts at https://releases.nixos.org/nix/nix-2.31.2/nix-2.31.2-aarch64-linux.tar.xz",
+        "regular_file_count": 1578,
+        "sha256": "64db528412096d718b4bf8f78f85e5ac2b714b774e5005500dee37d23f560456",
+        "sha256_url": "https://releases.nixos.org/nix/nix-2.31.2/nix-2.31.2-aarch64-linux.tar.xz.sha256",
+        "size_bytes": 23888056,
+        "symlink_count": 175,
+        "system": "aarch64-linux",
+        "tar_member_count": 2278,
+        "tar_root_prefix": "nix-2.31.2-aarch64-linux",
+        "version": "2.31.2"
+      },
+      "x86_64-linux": {
+        "archive_url": "https://releases.nixos.org/nix/nix-2.31.2/nix-2.31.2-x86_64-linux.tar.xz",
+        "directory_count": 531,
+        "official_sha256_file_content": "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60",
+        "read_authority": "Official NixOS release artifacts at https://releases.nixos.org/nix/nix-2.31.2/nix-2.31.2-x86_64-linux.tar.xz",
+        "regular_file_count": 1587,
+        "sha256": "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60",
+        "sha256_url": "https://releases.nixos.org/nix/nix-2.31.2/nix-2.31.2-x86_64-linux.tar.xz.sha256",
+        "size_bytes": 25865344,
+        "symlink_count": 179,
+        "system": "x86_64-linux",
+        "tar_member_count": 2297,
+        "tar_root_prefix": "nix-2.31.2-x86_64-linux",
+        "version": "2.31.2"
+      }
+    },
+    "version": "2.31.2"
+  },
+  "nixpkgs": {
+    "api_verification": "https://api.github.com/repos/NixOS/nixpkgs/commits/0921fdb3e13e40fe25fbc52b89661a9d6d32ac68 (HTTP 200)",
+    "nar_hash": "sha256-ESJ4VgytmAt+98YLM8466luln4HyEZ9Q36b9+Bb4P5w=",
+    "repository": "github:NixOS/nixpkgs",
+    "revision": "0921fdb3e13e40fe25fbc52b89661a9d6d32ac68"
+  },
+  "parent_closed_extractor_validation": {
+    "aarch64-darwin": {
+      "absolute_store_symlinks": 0,
+      "authenticated_archive_sha256": "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8",
+      "closed_extractor": "pass",
+      "directories": 1867,
+      "extraction_manifest_sha256": "20819f0058a9bcaab5dbdfa375ff2c30e7a493e7b3622a5adb58f5cef54a8ff0",
+      "member_count": 20154,
+      "regular_files": 18173,
+      "source_checksum_matches": true,
+      "symlinks": 114,
+      "uncompressed_bytes": 280196831
+    },
+    "aarch64-linux": {
+      "absolute_store_symlinks": 2,
+      "authenticated_archive_sha256": "64db528412096d718b4bf8f78f85e5ac2b714b774e5005500dee37d23f560456",
+      "closed_extractor": "pass",
+      "directories": 525,
+      "extraction_manifest_sha256": "52745cf3021e15f45d01c773b3a966f4851a9e04524a01388472c8e7dbacb5b1",
+      "member_count": 2278,
+      "regular_files": 1578,
+      "source_checksum_matches": true,
+      "symlinks": 175,
+      "uncompressed_bytes": 119068459
+    },
+    "x86_64-linux": {
+      "absolute_store_symlinks": 2,
+      "authenticated_archive_sha256": "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60",
+      "closed_extractor": "pass",
+      "directories": 531,
+      "extraction_manifest_sha256": "686a8addf7800de21370bbccdec9189adccb1b3b57114c1cb47f4e3520a8454c",
+      "member_count": 2297,
+      "regular_files": 1587,
+      "source_checksum_matches": true,
+      "symlinks": 179,
+      "uncompressed_bytes": 106182904
+    }
+  },
+  "recorded_at": "2026-10-04T14:04:23.908075+00:00",
+  "schema": "rs9.hosted4-pins-readback.v1alpha1",
+  "verification_scope": "Authoritative official Nix installer releases and container registry readbacks"
+}

@@ -95,27 +95,15 @@ REQUIRED_COMMANDS: dict[str, set[str]] = {
     "theme-forge-nebular-fusion": {"tfnf"},
 }
 
-NATIVE_PROJECTS = {"theme-forge-nebular-fusion"}
-CLI_PROJECTS = {
-    "theme-forge-stellar-burst",
-    "theme-forge-stellar-loom",
-    "theme-forge-solar-sail",
-}
-
-ADAPTER_COVERAGE: dict[str, dict[str, set[str]]] = {
-    "pacman": {
-        "native": {"x86_64"},
-        "cli": {"any"},
-    },
-    "rpm": {
-        "native": {"x86_64", "aarch64"},
-        "cli": {"noarch"},
-    },
-    "debian": {
-        "native": {"amd64", "arm64"},
-        "cli": {"all"},
-    },
-}
+from rs9.product_classes import (
+    NATIVE_DESKTOP,
+    NATIVE_NODE_CLI,
+    PURE_JS_CLI,
+    get_product_class,
+    is_native_product,
+    packaging_system_for_arch,
+    supported_architectures,
+)
 
 SUPPORTED_DISTROS: dict[str, set[str]] = {
     "pacman": {"arch", "archlinux"},
@@ -191,6 +179,9 @@ class CommandRunner:
 class SubprocessRunner(CommandRunner):
     """Real subprocess runner invoking normal native host tools."""
 
+    def __init__(self, timeout=600):
+        self.timeout = timeout
+
     def which(self, tool_name: str) -> str | None:
         return shutil.which(tool_name)
 
@@ -214,14 +205,23 @@ class SubprocessRunner(CommandRunner):
         if env:
             cmd_env.update(env)
 
-        proc = subprocess.run(
-            argv,
-            cwd=str(cwd) if cwd else None,
-            env=cmd_env,
-            capture_output=True,
-            check=False,
-            timeout=600,
-        )
+        try:
+            proc = subprocess.run(
+                argv,
+                cwd=str(cwd) if cwd else None,
+                env=cmd_env,
+                capture_output=True,
+                check=False,
+                timeout=self.timeout,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise ContractError("TOOL_TIMEOUT", "Native tool exceeded its bounded execution time",
+                details={"substage": "tool-execution", "tool": Path(tool).name,
+                         "stdout_sha256": digest(error.stdout or b""),
+                         "stderr_sha256": digest(error.stderr or b"")}) from None
+        except OSError:
+            raise ContractError("TOOL_EXECUTION", "Native tool could not be executed",
+                details={"substage": "tool-execution", "tool": Path(tool).name}) from None
         return CommandReceipt(
             argv,
             proc.returncode,
@@ -361,7 +361,7 @@ def validate_build_inputs(
     authenticated_record_hash(capture)
     require_configuration_authority(capture, intent)
 
-    if adapter not in ADAPTER_COVERAGE:
+    if adapter not in SUPPORTED_DISTROS:
         raise ContractError("UNSUPPORTED_PLATFORM", f"Unsupported adapter: {adapter}")
 
     distro_norm = normalize_distro(adapter, distro)
@@ -400,30 +400,30 @@ def validate_build_inputs(
     if lic_expr != REQUIRED_LICENSE:
         raise ContractError("UNSUPPORTED_LICENSE", "Invalid candidate project license")
 
-    is_native = project_id in NATIVE_PROJECTS
-    is_cli = not is_native
+    product_class = get_product_class(project_id)
+    is_pure_js = product_class == PURE_JS_CLI
+    is_native_node = product_class == NATIVE_NODE_CLI
+    is_native_desk = product_class == NATIVE_DESKTOP
+    is_native = is_native_product(project_id)
+    is_cli = product_class in (PURE_JS_CLI, NATIVE_NODE_CLI)
 
-    # Architecture truthfulness check:
-    # CLI projects must be pacman any, RPM noarch, deb all.
-    # Native projects (Nebular) must target actual platform archs.
     arch_norm = arch.strip().lower()
-    if is_cli:
-        cli_arch_expected = {
-            "pacman": "any",
-            "rpm": "noarch",
-            "debian": "all",
-        }[adapter]
-        if arch_norm != cli_arch_expected:
+    allowed_archs = supported_architectures(project_id, adapter)
+    if arch_norm not in allowed_archs:
+        if is_pure_js:
+            cli_arch_expected = {
+                "pacman": "any",
+                "rpm": "noarch",
+                "debian": "all",
+            }[adapter]
             raise ContractError(
                 "INVALID_ARCHITECTURE",
                 f"CLI project '{project_id}' must target '{cli_arch_expected}' for {adapter}, not '{arch}'",
             )
-    else:
-        native_arch_allowed = ADAPTER_COVERAGE[adapter]["native"]
-        if arch_norm not in native_arch_allowed:
+        else:
             raise ContractError(
                 "INVALID_ARCHITECTURE",
-                f"Native project '{project_id}' architecture '{arch}' not supported for {adapter}; allowed: {sorted(native_arch_allowed)}",
+                f"Native project '{project_id}' architecture '{arch}' not supported for {adapter}; allowed: {sorted(allowed_archs)}",
             )
 
     matched_payload = None
@@ -452,19 +452,43 @@ def validate_build_inputs(
     summary = proj_val.get("summary", "Theme Forge release package") if isinstance(proj_val, dict) else "Theme Forge release package"
     validate_summary(summary)
 
-    if is_cli:
+    burst_prebuild_info = None
+    if is_pure_js:
         cli_files: dict[str, bytes] = {}
         inspect_archive(Path(asset_file), {}, on_file=lambda name, data, mode: cli_files.update({name: data}))
         assert_no_native_payloads(cli_files, context=f"CLI project payload '{project_id}'")
+    elif is_native_node:
+        target_system = packaging_system_for_arch(adapter, arch_norm)
+        burst_files: dict[str, bytes] = {}
+        inspect_archive(Path(asset_file), {}, on_file=lambda name, data, mode: burst_files.update({name: data}))
+        burst_origins = {name: "release-payload" for name in burst_files}
+        source_files = capture.source
+        from rs9.burst_native import validate_burst_native_prebuilds
+        burst_prebuild_info = validate_burst_native_prebuilds(
+            burst_files,
+            burst_origins,
+            target_system,
+            source_files=source_files,
+        )
+        from rs9.elf import parse_elf
+        from rs9.dependencies import LIBRARIES
+        target_elf = parse_elf(burst_files[burst_prebuild_info["target_path"]])
+        if set(target_elf["needed"]) - set(LIBRARIES):
+            raise ContractError("DEPENDENCY_DERIVATION", "Native Node target has an unmapped runtime library")
 
     return {
         "project_id": project_id,
+        "product_class": product_class,
         "version": version,
         "repository": repo,
         "license": lic_expr,
         "summary": summary,
         "is_native": is_native,
         "is_cli": is_cli,
+        "is_pure_js_cli": is_pure_js,
+        "is_native_node_cli": is_native_node,
+        "is_native_desktop": is_native_desk,
+        "burst_prebuild_info": burst_prebuild_info,
         "arch": arch_norm,
         "distro": distro_norm,
         "adapter": adapter,

@@ -154,7 +154,7 @@ def linux_runtime_prefix(env=None):
             "/usr/bin/env", "-i", *[key + "=" + env[key] for key in sorted(env)]]
 
 
-def run_probes(command, path, repository=None, prefix=None, env=None):
+def run_probes(command, path, repository=None, prefix=None, env=None, after_probe=None):
     env = runtime_environment(env)
     if _BOUND.get(command, {}).get("status") != "bound":
         return [{"name": "command." + command + ".supported-behavior", "status": "not-run",
@@ -172,4 +172,6 @@ def run_probes(command, path, repository=None, prefix=None, env=None):
                     or any(s not in result.stderr for s in probe.get("stderr_contains", []))):
                 raise ContractError("COMMAND_BEHAVIOR", "Released command expectation failed")
         gates.append({"name": "command." + command + ".supported-behavior", "status": "pass"})
+        if after_probe is not None:
+            after_probe()
     return gates

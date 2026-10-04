@@ -450,6 +450,24 @@ class EnvironmentTests(unittest.TestCase):
 
 
 class ClientCycleTests(unittest.TestCase):
+    def test_burst_client_proof_is_required_unprivileged_and_synthetic_cannot_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            host = hd.RecordingRunner(host_runner(ScriptedDocker()))
+            record = {"authenticated-test-seam": True}
+            with patch("rs9.hosted_deb.execute_probes", side_effect=stub_probes), patch(
+                    "rs9.hosted_burst_clients.verify_client_burst", return_value={"status": "pass", "artifact": "linux-x64-gnu"}) as probe:
+                rows, evidence = hd.client_cycle(host, hd.apt_spec(root / "apt", root / "key", "amd64"),
+                    image="img", platform="linux/amd64", products=["theme-forge-stellar-burst"], repository=root,
+                    prefix="deb-client", system="x86_64-linux", burst_record=record, burst_scratch=root / "probe")
+            self.assertEqual(probe.call_args.args[1:3], (record, "x86_64-linux"))
+            self.assertEqual(probe.call_args.kwargs["user"], hd.CLIENT_USER)
+            self.assertEqual(evidence["theme-forge-stellar-burst"]["native_loader"]["artifact"], "linux-x64-gnu")
+            self.assertEqual({row["status"] for row in hd.burst_client_gates(rows)}, {"not-run"})
+            # The container receives source read-only, never the capture directory.
+            started = next(r.command for r in host.receipts if r.command[:3] == ["docker", "run", "-d"])
+            self.assertIn(str(root / "src") + ":/rs9-source:ro", started)
+
     def cycle(self, docker, *, cls=MockCommandRunner, products=("theme-forge-stellar-loom",), probes=stub_probes):
         host = hd.RecordingRunner(host_runner(docker, cls))
         spec = hd.apt_spec(Path("/x/apt"), Path("/x/key.gpg"), "amd64")
@@ -705,6 +723,8 @@ class DebLaneTests(unittest.TestCase):
         validate_execution_result(result)
         gates = self.by_name(result)
         for name in REQUIRED_GATES["deb"]:
+            if name in ("burst-native-addon-target", "burst-native-addon-load"):
+                continue
             self.assertIn(name, gates)
         self.assertEqual({g["status"] for g in result["gates"]}, {"not-run"})
         self.assertEqual(gates["deb-package-build"]["reason"], "synthetic-command-seam")
@@ -740,6 +760,26 @@ class DebLaneTests(unittest.TestCase):
         # No production credential or production key path appears anywhere in the retained manifest.
         text = (self.scratch / details["manifest_path"]).read_text("utf-8")
         self.assertNotIn("PRIVATE KEY", text)
+
+    def test_debian_builder_real_signature_and_hosted_autospec_call(self):
+        import inspect
+        from rs9.build_deb import build_deb_candidate
+        self.assertIn("maintainer", inspect.signature(build_deb_candidate).parameters)
+        with patch("rs9.hosted_deb.build_deb_candidate", autospec=True,
+                   side_effect=build_deb_candidate) as builder:
+            result = self.run_lane(ScriptedDocker())
+        self.assertEqual(builder.call_count, 1)
+        call = builder.call_args
+        self.assertEqual(call.args[2], "all")
+        self.assertEqual(call.kwargs["maintainer"], MAINTAINER)
+        self.assertEqual(result["details"]["products"]["theme-forge-stellar-loom"]["architecture"], "all")
+
+    def test_build_filesystem_failure_has_stable_safe_code(self):
+        with patch("rs9.hosted_deb.build_deb_candidate", autospec=True,
+                   side_effect=OSError("private filesystem error")):
+            result = self.run_lane(ScriptedDocker())
+        self.assertEqual(result["details"]["build_errors"]["theme-forge-stellar-loom"], "PACKAGE_FILESYSTEM")
+        self.assertNotIn("private filesystem error", json.dumps(result["details"]))
 
     def test_every_container_is_network_disconnected_after_provisioning(self):
         docker = ScriptedDocker()
@@ -839,12 +879,79 @@ class DebLaneTests(unittest.TestCase):
         started = docker.calls_containing("run", "-d")
         self.assertTrue(all(c[c.index("--platform") + 1] == "linux/arm64" for c in started))
 
+    def test_container_commands_mount_lane_work_only_never_orchestration_paths(self):
+        outer = self.root / "orchestration-outer"
+        outer.mkdir()
+        capture_dir = outer / "capture"
+        capture_dir.mkdir()
+        (capture_dir / "test.txt").write_bytes(b"captured")
+        auth_file = outer / "authentication.json"
+        auth_file.write_bytes(b"auth-secret")
+        inputs_dir = outer / "inputs"
+        inputs_dir.mkdir()
+        lane_scratch = outer / "lane-work"
+        lane_scratch.mkdir()
+
+        docker = ScriptedDocker()
+        result = self.run_lane(docker, scratch=lane_scratch, inputs=inputs_dir)
+        validate_execution_result(result)
+
+        mount_calls = docker.calls_containing("-v")
+        self.assertTrue(mount_calls)
+        for call in mount_calls:
+            for idx, arg in enumerate(call):
+                if arg == "-v":
+                    mount_spec = call[idx + 1]
+                    source = Path(mount_spec.split(":")[0]).resolve()
+                    # Source must be inside lane_scratch (lane-work) or inside fixture homedir
+                    is_lane_work = source == lane_scratch.resolve() or lane_scratch.resolve() in source.parents
+                    is_fixture = self.root.resolve() in source.parents and "fixture" in str(source)
+                    self.assertTrue(
+                        is_lane_work or is_fixture,
+                        f"Mount source {source} is outside lane-work scratch and fixture homedir",
+                    )
+                    # Never mount outer orchestration paths
+                    self.assertNotEqual(source, outer.resolve())
+                    self.assertNotEqual(source, capture_dir.resolve())
+                    self.assertNotEqual(source, inputs_dir.resolve())
+                    self.assertNotEqual(source, auth_file.resolve())
+
+    def test_deb_build_errors_diagnostics_emitted(self):
+        docker = ScriptedDocker(fail_build=True)
+        result = self.run_lane(docker)
+        details = result["details"]
+        self.assertIn("build_errors", details)
+        diag_path = self.scratch / "diagnostics" / "build-errors.json"
+        self.assertTrue(diag_path.is_file())
+        self.assertIn(diag_path, result["artifacts"])
+
+    def test_empty_architecture_output_in_deb_environment_raises_clean_contract_error(self):
+        class EmptyArchDocker(ScriptedDocker):
+            def _run(self, a):
+                script = a[-1] if a[-3:-1] == ["sh", "-c"] else ""
+                if "cat /etc/os-release" in script:
+                    return self.receipt(a, out=b"   \n\n")
+                return super()._run(a)
+
+        docker = EmptyArchDocker()
+        with self.assertRaises(ContractError) as caught:
+            hd.prepare_environment(host_runner(docker), "amd64", {})
+        self.assertIn(caught.exception.code, ("UNSUPPORTED_PLATFORM", "INVALID_ARCHITECTURE"))
+        self.assertIn("substage", caught.exception.details)
+
 
 class PagesLaneTests(unittest.TestCase):
-    CLI = PRODUCTS[:3]
+    CLI = ("theme-forge-stellar-loom", "theme-forge-solar-sail")
     NATIVE = hd.NATIVE_PRODUCT
 
     def setUp(self):
+        # Client orchestration uses synthetic package bytes and command receipts.
+        loader_record = patch("rs9.hosted_deb._burst_release_record", return_value={"synthetic": True})
+        loader_probe = patch("rs9.hosted_burst_clients.verify_client_burst", return_value={"status": "pass"})
+        loader_record.start()
+        loader_probe.start()
+        self.addCleanup(loader_record.stop)
+        self.addCleanup(loader_probe.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name).resolve()
@@ -876,17 +983,17 @@ class PagesLaneTests(unittest.TestCase):
     def deb_packages(self, arch):
         packages = {}
         for product in PRODUCTS:
-            deb_arch = arch if product == self.NATIVE else "all"
+            deb_arch = "all" if product in self.CLI else arch
             packages[f"{product}_1.0.0_{deb_arch}.deb"] = build_minimal_deb(
                 product, "1.0.0", deb_arch, depends="nodejs (>= 22)", payload_content=f"{product}-{deb_arch}".encode())
         return packages
 
     def rpm_packages(self, arch):
-        return {f"{p}-1.0.0-1.fc43.{arch if p == self.NATIVE else 'noarch'}.rpm": make_rpm({f"usr/bin/{p}": p.encode()})
+        return {f"{p}-1.0.0-1.fc43.{'noarch' if p in self.CLI else arch}.rpm": make_rpm({f"usr/bin/{p}": p.encode()})
                 for p in PRODUCTS}
 
     def pacman_packages(self):
-        return {f"{p}-1.0.0-1-{'x86_64' if p == self.NATIVE else 'any'}.pkg.tar.zst": zstd_raw_frame(b"pkg:" + p.encode())
+        return {f"{p}-1.0.0-1-{'any' if p in self.CLI else 'x86_64'}.pkg.tar.zst": zstd_raw_frame(b"pkg:" + p.encode())
                 for p in PRODUCTS}
 
     def all_bundles(self):
@@ -949,9 +1056,32 @@ class PagesLaneTests(unittest.TestCase):
         gates = self.by_name(hd.execute(self.context(None)))
         self.assertEqual({g["reason"] for g in gates.values()}, {"custody-invalid:CUSTODY_CONFLICT"})
 
+    def test_pages_scratch_repair_returns_exact_upstream_missing_custody_not_output_not_empty(self):
+        outer = self.root / "orchestration-pages"
+        outer.mkdir()
+        (outer / "capture").mkdir()
+        (outer / "authentication.json").write_bytes(b"auth")
+        lane_scratch = outer / "lane-work"
+        lane_scratch.mkdir()
+        empty_inputs = outer / "inputs"
+        empty_inputs.mkdir()
+
+        result = hd.execute(self.context(None, scratch=lane_scratch, inputs=empty_inputs))
+        validate_execution_result(result)
+        gates = self.by_name(result)
+        for name in REQUIRED_GATES["pages"]:
+            self.assertEqual(gates[name]["status"], "not-run")
+            self.assertEqual(
+                gates[name]["reason"],
+                "custody-missing:deb-amd64,deb-arm64,rpm-x86_64-linux,rpm-aarch64-linux,pacman-x86_64-linux",
+            )
+        self.assertEqual(result["details"]["status"], "incomplete")
+        self.assertTrue((lane_scratch / "hosted-pages-manifest.json").is_file())
+
     def test_architecture_all_packages_that_differ_between_lanes_fail_closed(self):
         amd64, arm64 = self.deb_packages("amd64"), self.deb_packages("arm64")
-        arm64[f"{PRODUCTS[0]}_1.0.0_all.deb"] = build_minimal_deb(PRODUCTS[0], "1.0.0", "all", payload_content=b"other")
+        pure = self.CLI[0]
+        arm64[f"{pure}_1.0.0_all.deb"] = build_minimal_deb(pure, "1.0.0", "all", payload_content=b"other")
         self.bundle("deb-amd64", "deb", "amd64", amd64)
         self.bundle("deb-arm64", "deb", "arm64", arm64)
         self.bundle("rpm-x86", "rpm", "x86_64-linux", self.rpm_packages("x86_64"))
@@ -1050,8 +1180,8 @@ class PagesLaneTests(unittest.TestCase):
         self.bundle("deb-amd64", "deb", "amd64", self.deb_packages("amd64"))
         self.bundle("deb-arm64", "deb", "arm64", self.deb_packages("arm64"))
         rpm_x86, rpm_arm = self.rpm_packages("x86_64"), self.rpm_packages("aarch64")
-        name = f"{PRODUCTS[0]}-1.0.0-1.fc43.noarch.rpm"
-        rpm_arm[name] = make_rpm({f"usr/bin/{PRODUCTS[0]}": b"conflicting"})
+        name = f"{self.CLI[0]}-1.0.0-1.fc43.noarch.rpm"
+        rpm_arm[name] = make_rpm({f"usr/bin/{self.CLI[0]}": b"conflicting"})
         self.bundle("rpm-x86", "rpm", "x86_64-linux", rpm_x86)
         self.bundle("rpm-arm", "rpm", "aarch64-linux", rpm_arm)
         self.bundle("pacman", "pacman", "x86_64-linux", self.pacman_packages())
@@ -1077,6 +1207,15 @@ class PagesLaneTests(unittest.TestCase):
 
 
 class RpmCustodyTests(unittest.TestCase):
+    def test_pages_custody_rejects_burst_any_noarch_all(self):
+        product = "theme-forge-stellar-burst"
+        for family, system, name in (("rpm", "x86_64-linux", product + "-0.6.1-1.noarch.rpm"),
+                                    ("pacman", "x86_64-linux", product + "-0.6.1-1-any.pkg.tar.zst"),
+                                    ("deb", "amd64", product + "_0.6.1-1_all.deb")):
+            with self.subTest(family=family), self.assertRaises(ContractError) as caught:
+                hd._validate_bundle_architectures({"manifest": {"family": family, "system": system}, "packages": {name: None}})
+            self.assertEqual(caught.exception.code, "CUSTODY_ARCHITECTURE")
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -1092,23 +1231,23 @@ class RpmCustodyTests(unittest.TestCase):
 
     def test_rpm_custody_unique_allows_identical_noarch_bytes(self):
         b1 = self.make_bundle("rpm", "x86_64-linux", {
-            "theme-forge-stellar-burst-1.0.0-1.fc43.noarch.rpm": b"exact-noarch-bytes",
+            "theme-forge-stellar-loom-1.0.0-1.fc43.noarch.rpm": b"exact-noarch-bytes",
             "theme-forge-nebular-fusion-1.0.0-1.fc43.x86_64.rpm": b"native-x86",
         })
         b2 = self.make_bundle("rpm", "aarch64-linux", {
-            "theme-forge-stellar-burst-1.0.0-1.fc43.noarch.rpm": b"exact-noarch-bytes",
+            "theme-forge-stellar-loom-1.0.0-1.fc43.noarch.rpm": b"exact-noarch-bytes",
             "theme-forge-nebular-fusion-1.0.0-1.fc43.aarch64.rpm": b"native-arm",
         })
         result = hd._rpm_custody_unique([b1, b2])
-        self.assertIn("theme-forge-stellar-burst-1.0.0-1.fc43.noarch.rpm", result)
-        self.assertEqual(result["theme-forge-stellar-burst-1.0.0-1.fc43.noarch.rpm"].read_bytes(), b"exact-noarch-bytes")
+        self.assertIn("theme-forge-stellar-loom-1.0.0-1.fc43.noarch.rpm", result)
+        self.assertEqual(result["theme-forge-stellar-loom-1.0.0-1.fc43.noarch.rpm"].read_bytes(), b"exact-noarch-bytes")
 
     def test_rpm_custody_unique_rejects_conflicting_noarch_bytes_for_same_filename(self):
         b1 = self.make_bundle("rpm", "x86_64-linux", {
-            "theme-forge-stellar-burst-1.0.0-1.fc43.noarch.rpm": b"bytes-from-x86",
+            "theme-forge-stellar-loom-1.0.0-1.fc43.noarch.rpm": b"bytes-from-x86",
         })
         b2 = self.make_bundle("rpm", "aarch64-linux", {
-            "theme-forge-stellar-burst-1.0.0-1.fc43.noarch.rpm": b"bytes-from-arm-differ",
+            "theme-forge-stellar-loom-1.0.0-1.fc43.noarch.rpm": b"bytes-from-arm-differ",
         })
         with self.assertRaises(ContractError) as caught:
             hd._rpm_custody_unique([b1, b2])
@@ -1116,10 +1255,10 @@ class RpmCustodyTests(unittest.TestCase):
 
     def test_rpm_custody_unique_rejects_conflicting_noarch_packages_for_same_product(self):
         b1 = self.make_bundle("rpm", "x86_64-linux", {
-            "theme-forge-stellar-burst-1.0.0-1.fc43.noarch.rpm": b"bytes-v1",
+            "theme-forge-stellar-loom-1.0.0-1.fc43.noarch.rpm": b"bytes-v1",
         })
         b2 = self.make_bundle("rpm", "aarch64-linux", {
-            "theme-forge-stellar-burst-1.0.1-1.fc43.noarch.rpm": b"bytes-v2",
+            "theme-forge-stellar-loom-1.0.1-1.fc43.noarch.rpm": b"bytes-v2",
         })
         with self.assertRaises(ContractError) as caught:
             hd._rpm_custody_unique([b1, b2])

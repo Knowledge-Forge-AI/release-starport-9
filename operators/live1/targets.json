@@ -2,11 +2,54 @@
   "schema": "rs9.live1-candidate-targets.v1alpha1",
   "production_enabled": false,
   "maintainer": "Knowledge Forge AI <nonproduction@invalid>",
-  "pacman": {"architectures": ["x86_64"], "container_repository": "docker.io/library/archlinux", "container_tag": "base", "container_digest": null, "snapshot": "2026/10/01"},
-  "rpm": {"distribution": "fedora-43", "architectures": ["x86_64", "aarch64"], "container_repository": "registry.fedoraproject.org/fedora", "container_tag": "43", "container_digests": {}},
-  "deb": {"distribution": "ubuntu-26.04", "suite": "resolute", "architectures": ["amd64", "arm64"], "container_repository": "docker.io/library/ubuntu", "container_tag": "26.04", "container_digests": {}, "snapshot": "20261001T000000Z"},
-  "nix": {"nixpkgs_revision": "0921fdb3e13e40fe25fbc52b89661a9d6d32ac68", "nixpkgs_nar_hash": "sha256-ESJ4VgytmAt+98YLM8466luln4HyEZ9Q36b9+Bb4P5w=", "outputs_exposed": false, "installer_version": "2.31.2", "installer_sha256": null},
-  "dependency_free_cli_architectures": {"pacman": "any", "rpm": "noarch", "deb": "all"},
-  "pypi": {"nebular_linux_tag_policy": "candidate-linux-tags-policy-pending", "production_linux_wheels": "withheld"},
-  "pin_status": "nixpkgs-source-pinned-container-digests-resolved-once-hosted-not-reproducible-until-source-pinned"
+  "pacman": {
+    "architectures": ["x86_64"],
+    "container_repository": "docker.io/library/archlinux",
+    "container_tag": "base",
+    "container_digest": "sha256:eb8f6dcc89a38977c9735f10fcf6ae4afe496283e7008eb7a3420cdba31fbd04",
+    "snapshot": "2026/10/01"
+  },
+  "rpm": {
+    "distribution": "fedora-43",
+    "architectures": ["x86_64", "aarch64"],
+    "container_repository": "registry.fedoraproject.org/fedora",
+    "container_tag": "43",
+    "container_digests": {
+      "x86_64": "sha256:c5e15bd1e07c25904d0c5b9865fb7ee4589f8ca234e635742b0c1195838f4bfd",
+      "aarch64": "sha256:0b0303ee12217251f2ec18a71a21284f383e99d1d3bae1eb6c8970fd2e16e26b"
+    }
+  },
+  "deb": {
+    "distribution": "ubuntu-26.04",
+    "suite": "resolute",
+    "architectures": ["amd64", "arm64"],
+    "container_repository": "docker.io/library/ubuntu",
+    "container_tag": "26.04",
+    "container_digests": {
+      "amd64": "sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794",
+      "arm64": "sha256:3ad1c71aa6b7e477f7aa91445a5442fbb163742849393b511661a88081c3d7a2"
+    },
+    "snapshot": "20261001T000000Z"
+  },
+  "nix": {
+    "nixpkgs_revision": "0921fdb3e13e40fe25fbc52b89661a9d6d32ac68",
+    "nixpkgs_nar_hash": "sha256-ESJ4VgytmAt+98YLM8466luln4HyEZ9Q36b9+Bb4P5w=",
+    "outputs_exposed": false,
+    "installer_version": "2.31.2",
+    "installer_sha256_by_system": {
+      "aarch64-darwin": "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8",
+      "x86_64-linux": "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60",
+      "aarch64-linux": "64db528412096d718b4bf8f78f85e5ac2b714b774e5005500dee37d23f560456"
+    }
+  },
+  "dependency_free_cli_architectures": {
+    "pacman": "any",
+    "rpm": "noarch",
+    "deb": "all"
+  },
+  "pypi": {
+    "nebular_linux_tag_policy": "candidate-linux-tags-policy-pending",
+    "production_linux_wheels": "withheld"
+  },
+  "pin_status": "source-pinned-containers-nixpkgs-and-three-nix-installer-systems"
 }

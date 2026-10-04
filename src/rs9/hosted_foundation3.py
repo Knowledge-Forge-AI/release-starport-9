@@ -19,6 +19,28 @@ from rs9.pages import scan_binary_artifact
 from rs9.hosted_custody import verify_set
 from rs9.observation import observe
 from rs9.planner import expected_components
+from rs9.product_classes import get_product_class, supported_architectures, extract_package_arch, is_pure_js_cli
+
+
+def wheel_architecture_set(product, filenames):
+    observed = set()
+    for filename in filenames:
+        platform = filename.removesuffix(".whl").rsplit("-", 1)[-1]
+        if is_pure_js_cli(product):
+            if platform != "any":
+                raise ContractError("CUSTODY_ARCHITECTURE", "Pure JS wheel architecture changed")
+            observed.add("any")
+        elif platform in ("linux_x86_64", "linux_aarch64"):
+            observed.add(platform)
+        elif platform == "macosx_13_0_arm64":
+            observed.add(platform)
+        else:
+            raise ContractError("CUSTODY_ARCHITECTURE", "Native wheel has an unqualified architecture tag")
+    return observed
+
+
+def publication_policy(product, architectures):
+    return {"package_class": get_product_class(product), "qualified_architectures": sorted(architectures)}
 
 
 def verify_candidate_files(root):
@@ -60,6 +82,12 @@ def execute(context):
         if not matches:
             missing.append(product + ":wheel-custody")
             continue
+        expected_wheels = supported_architectures(product, "pypi")
+        observed_wheels = wheel_architecture_set(product, [p.name for p in matches])
+        if observed_wheels != expected_wheels:
+            missing.extend(product + ":wheel:" + arch + ":custody" for arch in sorted(expected_wheels - observed_wheels))
+            continue
+        policy = publication_policy(product, expected_wheels)
         root = context["scratch"] / product
         root.mkdir()
         rows = []
@@ -77,12 +105,12 @@ def execute(context):
         inventory_path.write_bytes(canonical(rows))
         raw = inventory_path.read_bytes()
         inventory = rows + [{"path": inventory_path.name, "size": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}]
-        payloads = {p["name"]: p["sha256"] for p in capture.record["payloads"]}
+        payloads = {p["name"]: p["sha256"] for p in (capture.record.get("payloads") or capture.record.get("assets") or [])}
         identity = build_semantic_content_identity(product, intent["version"], product, "pypi", payloads,
-                                                  {"configuration": record_sha256(intent)})
+                                                  {"configuration": record_sha256(intent), "packaging_policy": record_sha256(policy)})
         output = adapter_output({"id": "pypi", "adapter": "pypi", "mode": "direct"},
             {"package": product, "version": intent["version"], "revision": None}, identity, inventory,
-            {"release_record_sha256": authenticated_record_hash(capture), "wheel_inventory": rows},
+            {"release_record_sha256": authenticated_record_hash(capture), "wheel_inventory": rows, **policy},
             implementation={"id": "rs9-hosted-candidate", "version": "v1alpha1"}, source_version="LIVE1-CONT2")
         qualification = execute_qualification(capture, output, "pypi.wheel-record", root, verify_candidate_files,
             verifier_id="rs9-independent-wheel-inventory", verifier_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
@@ -107,11 +135,20 @@ def execute(context):
     for family, adapter in (("deb","debian"),("rpm","rpm"),("pacman","pacman")):
         for capture,intent,profile in context["captures"]:
             product = intent["project"]["id"]
+            expected_archs = supported_architectures(product, adapter)
             candidates = [(directory,row) for directory,manifest in native_sets if manifest["lane"] == family
                           for row in manifest["files"] if row["kind"] == "custody" and row["path"].split("/")[-1].startswith(product)
                           and "custody" in row["path"] and row.get("promotion") != "fixture-test-only"]
             if not candidates:
                 missing.append(family + ":" + product + ":custody")
+                continue
+            observed_archs = {extract_package_arch(Path(row["path"]).name) for _, row in candidates}
+            if observed_archs - expected_archs:
+                raise ContractError("CUSTODY_ARCHITECTURE", "Native package custody includes an unqualified architecture")
+            missing_archs = expected_archs - observed_archs
+            if missing_archs:
+                for a in sorted(missing_archs):
+                    missing.append(f"{family}:{product}:{a}:custody")
                 continue
             root = context["scratch"] / (family + "-" + product)
             root.mkdir()
@@ -129,11 +166,18 @@ def execute(context):
             inventory_path.write_bytes(canonical(rows))
             inventory = rows + [{"path":"inventory.json","size":inventory_path.stat().st_size,
                                 "sha256":hashlib.sha256(inventory_path.read_bytes()).hexdigest()}]
+            payload_dict = {p["name"]: p["sha256"] for p in (capture.record.get("payloads") or capture.record.get("assets") or [])}
+            policy = publication_policy(product, expected_archs)
             identity = build_semantic_content_identity(product,intent["version"],product,adapter,
-                {p["name"]:p["sha256"] for p in capture.record["payloads"]},{"configuration":record_sha256(intent)})
+                payload_dict, {"configuration":record_sha256(intent), "packaging_policy":record_sha256(policy)})
             output = adapter_output({"id":family,"adapter":adapter,"mode":"direct"},
                 {"package":product,"version":intent["version"],"revision":1},identity,inventory,
-                {"release_record_sha256":authenticated_record_hash(capture),"unsigned_packages":rows},
+                {
+                    "release_record_sha256": authenticated_record_hash(capture),
+                    "unsigned_packages": rows,
+                    "architecture_set": sorted(expected_archs),
+                    **policy,
+                },
                 implementation={"id":"rs9-hosted-candidate","version":"v1alpha1"},source_version="LIVE1-CONT2",
                 revision_scheme={"deb":"apt-revision","rpm":"rpm-release","pacman":"pkgrel"}[family])
             qualification = execute_qualification(capture,output,adapter+".candidate-inventory",root,verify_candidate_files,

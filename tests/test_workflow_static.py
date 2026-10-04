@@ -208,6 +208,19 @@ class WorkflowStaticTests(unittest.TestCase):
         doc = _parse_yaml(self.text)
         self.assertIn("unit", doc["jobs"])
 
+    def test_every_burst_runtime_lane_requires_target_and_released_loader_proof(self):
+        from rs9.hosted_summary import gate_blockers
+        contract = json.loads((ROOT / "operators/live1/hosted-lanes.json").read_bytes())
+        for lane in contract["lanes"]:
+            if lane["lane"] not in {"wheels", "nix", "pacman", "rpm", "deb"}:
+                continue
+            with self.subTest(lane=lane["lane"], system=lane["system"]):
+                for name in ("burst-native-addon-target", "burst-native-addon-load"):
+                    self.assertIn(name, lane["required_gates"])
+                    receipt = {"gates": [{"name": n, "status": "pass"}
+                                         for n in lane["required_gates"] if n != name]}
+                    self.assertIn("missing-or-duplicate-gate:" + name, gate_blockers(lane, receipt))
+
 
 if __name__ == "__main__":
     unittest.main()

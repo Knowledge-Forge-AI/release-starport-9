@@ -1,7 +1,32 @@
 # LIVE1 hosted candidate source
 
-Status: CONT5 bounded payload-license source repair; hosted run 3 remains **not-qualified** (`HOSTED_COMPLETENESS`).
-Proposal disposition: **amend**, bound SHA `fcc2846a48bfa5b1dc91e68cd3bd681993d32a13381095d66a4f64083d84826c` (15,625 bytes). The original scope is the hosted-run-3 source repair. The proposal, advisory findings and stage deltas are dispositioned separately in [source verification evidence](../evidence/live1/hosted3-payload-license-verification.json). Pre-final review and closeout remain dispatcher-owned.
+Status: **CONT6R2 terminal source amendment; dispatcher finalization pending; production disabled**.
+
+Current proposal disposition: **amend**, bound SHA `c40cdf9a43c0954d7d180481f444e724394b8c6b696af525260a6afac944009f` (17,281 bytes). The original eight-work scope is preserved separately from the proposal and advisory findings in [CONT6R2 verification](../evidence/live1/cont6r2-verification.json). The reviewed CONT6/CONT6R1 candidate is preserved cumulatively. There were no observed stage deltas at entry. The dispatcher owns reviewer selection, final review and Git publication.
+
+The dispatcher pre-final review returned advisory findings. Terminal disposition amends the bound candidate under the closeout stage envelope; no additional reviewer is invoked. The verification evidence records each finding's disposition, fresh source checks and externally pending qualification. Attended adoption remains subject to manager acceptance of the exact terminal tree and manifest.
+
+Historical CONT6R1 proposal disposition: **amend**, bound SHA `d0c1c052a45a503cb6b1dcdf1a41958cee476512c8c5b58e056b07bb9258ee74` (29,042 bytes). Its recovery scope and findings remain in [recovery verification evidence](../evidence/live1/hosted4-matrix-recovery-verification.json).
+
+## Recovery contracts
+
+Mutable lane scratch is `lane-work`. Authentication/capture bytes and downloaded input custody stay outside it. All ten lanes are tested against this contract. Native clean-client loader probes also mount the verifier source read-only; mutable mounts remain inside lane work. The pacman/RPM builder signature repair is retained; Debian's separate `maintainer` parameter is exercised through its real signature. Expected build and transport failures retain safe stable codes, including underlying per-product build codes.
+
+Nix uses three authenticated installer archive pins and descriptor-relative extraction. Archive SHA is checked before parsing; paths, types, symlink chains, store references and resource bounds are validated before writes. Physical file hashes, modes and symlink targets are read back afterward. Partial failures report cleanup status. The three real official archives are exercised without running their installers. Container digests and nixpkgs revision/narHash are source pinned, with no floating fallback; the duplicate Nix pin projection is checked for equality.
+
+Stellar Burst candidates bind exactly one of `aarch64-darwin`, `x86_64-linux`, or `aarch64-linux`. Its authenticated native target must exist and match the binary architecture. Foreign prebuilds and the offline dependency closure are retained without pruning. Darwin tags respect the native deployment floor; Linux uses only `linux_x86_64`/`linux_aarch64`. Receipts include native identities, foreign inventories, Node version/ABI and an observed single native load through the installed released lazy loader. Universal Burst wheels and unproved manylinux/musllinux claims are refused. Loom and Solar Sail remain universal only after the complete closure scan.
+
+Linux wheel receipts require `production_promotion_blockers`, which do not prevent candidate qualification when its required gates pass. `policy_blockers` still prevent qualification. Aggregate validation rejects a missing Linux promotion blocker or altered aggregate. Production promotion remains disabled on every platform.
+
+Exact product IDs select `pure-js-cli`, `native-node-cli`, or `native-desktop`. Burst is native: pacman x86_64, RPM x86_64/aarch64, APT amd64/arm64, and Nix on the three LIVE1 systems. `any`/`noarch`/`all` Burst packages are rejected by builders, custody, Pages and Foundation 3. Foreign prebuilds remain intact. RPM dependency scanning excludes only the three foreign files; dependency derivation and client loader proof target the matching prebuild. Foundation 3 binds class and complete qualified architecture sets into desired publication identities. Real loader gates are required in wheels, Nix, pacman, RPM and APT lanes. The [Darwin proof](../evidence/live1/burst-loader-darwin-arm64.json) observes the unchanged released loader, one matching dlopen and bounded harness/output identities; Linux and installed native-family proofs remain hosted gates.
+
+Nebular's exact compressed archive and canonical manifest remain in the Nix store. Runtime materialization stays outside the store; the store archive SHA must equal the authenticated release asset SHA. The unchanged released sidecar verifier binds to the installed runtime. A baseline before remaining command probes, bounded mismatch/mode/symlink/ancestry/flags/xattr diagnostics and a direct archive control distinguish failure causes. The control cannot satisfy the installed gate. **The Darwin Nix repair is unqualified until hosted run 5 passes.**
+
+Destination observation uses authenticated `release.tag`. Protocol failures are unknown, only PyPI metadata 404 proves absence, and payload-file failure does not. Homebrew resolves the tap default branch once, binds all four formula bytes to that commit's Git tree, and uses a closed static reader for URL, hash, license, commands and restrictions. CLI formulas compare authenticated npm tarball facts; Nebular compares the native Darwin asset and tagged license despite supplemental npm metadata. Exact npm/Homebrew readback must reach the fresh planner's `noop`; schema/identity drift fails and transport failures remain unknown. Pages remains undeployed.
+
+Nix absolute-store symlink chains reject ambiguous upward traversal; failure cleanup restores the caller's physical root mode and reports restoration failure. Causal post-probe drift is classified before the mismatch it explains and before generic flags/xattrs; unrelated mismatches retain their specific class. A released verify-phase rejection without a specific cause uses `verifier-rejected`, and absent verifier phase evidence remains unknown. Pages-client diagnostics use distinct invocation identities and retain every package family's diagnostic with lane/source/system binding, size and credential/private-path checks; unsafe diagnostics leave hashes-only custody while preserving the primary failure. The standalone Burst proof requires an explicit caller-owned physical scratch root.
+
+## Historical hosted-run-3 repair
 
 Per manager evidence, hosted run `37173827457` passed stock `unit` and `config`.
 Nebular's npm packument and tarball operations passed with HTTP 200, selecting
@@ -99,13 +124,13 @@ The test inventory binds fixture-owned public armor independently of the assembl
 ## Qualification limits and environment reality
 
 The qualification verdict remains **not-qualified** and hosted PASS is not claimed:
-- **Hosted run 3**: Run 37173827457 passed unit/config and npm transport, then failed Nebular profile payload-copy authentication. Hosted run 4 and downstream qualification remain pending. The old run is not rerun.
+- **Hosted history**: Run 3 established npm transport and exposed the repaired payload-copy boundary. Run 4 exposed matrix scratch, packaging, observation and Nix failures. Run 5 is fresh qualification; no old run is rerun.
 - **Local environment**: The local execution environment is Darwin with Python 3.13; no Python 3.12 or GnuPG usable was observed locally. Minimal scratch symlink PATH reruns serve strictly as tool-isolation checks, not Ubuntu equivalence.
 - **Stock Ubuntu 24.04 environment**: A stock ubuntu-24.04 source unit assumes Python 3.12, Node 22, and GnuPG are present, and the unit suite must work without Docker, Nix, Arch/RPM builders, or zstd. Real hosted package lanes remain mandatory integration.
-- **Run-resolved inputs**: Container digests and Nix installer checksums resolved during preparation prevent source-reproducibility qualification until committed as reviewed pins.
-- **Linux wheel policy**: Linux Nebular wheels use generic `linux_x86_64`/`linux_aarch64` candidate tags; manylinux remains refused and production paths remain withheld pending manager disposition.
+- **Source pins**: All required container, installer and nixpkgs inputs are now source pinned. Fresh hosted readback remains mandatory.
+- **Linux wheel policy**: Burst and Nebular use generic Linux candidate tags. Compatibility policy blocks production promotion and is recorded separately from candidate qualification.
 - **Homebrew observations**: Readbacks remain incomplete/unknown when unreachable; no noop is fabricated.
-- **Verification**: Current counts and scoped skips are recorded in [payload-license source verification](../evidence/live1/hosted3-payload-license-verification.json); [npm supplemental evidence](../evidence/live1/hosted2-npm-supplemental-verification.json) remains historical.
+- **Verification**: Cumulative source checks and scoped skips are recorded in [CONT6R2 verification](../evidence/live1/cont6r2-verification.json). Earlier recovery, payload-license and npm evidence remains historical. Local native container build/lint qualification is unavailable; strict hosted RPM lint and dependency readback remain required. No filter or pruning policy was introduced to obtain a pass.
 
 The summary reports `lanes_executed_ok` separately from `qualification_verdict` and `blocking_reasons`. A failed hosted lane is repair input and is never automatically rerun.
 
@@ -119,13 +144,10 @@ Pages uses only apt/, rpm/, pacman/, keys/, docs/ and CNAME, with CNAME exactly 
 
 Assembled Pages client tests cover amd64/x86_64 APT, DNF and pacman, including package, index, signature and wrong-key rejection. The arm64 APT and aarch64 RPM family lanes qualify their own repositories; installation from the final assembled arm64 Pages repositories remains deferred. No assembled arm64 client result is claimed.
 
-## Attended handoff
+## Attended hosted-run-5 handoff
 
-Use [the runbook](../operators/live1/RUNBOOK.md) after manager acceptance of the dispatcher-reviewed candidate. The operator authenticates exact inventory/tree/manifest, requires current remote main to equal the reviewed parent `6f5227586e944bf2016f4cf44000f49c16947351`, stages only reviewed paths including new tests/evidence, commits with `--commit-message "Separate Nebular payload legal copies from tagged license authority"`, and fast-forward pushes. It finds the new push-triggered `rs9-candidate-tests.yml` run for that commit, refuses reruns/non-main runs, waits with a bound, and stores all jobs/steps, artifact identities, summary bytes and validation reasons before returning. Stdout/stderr go to an external log with bounded terminal output.
+After independent exact final-review acceptance and manager adoption authorization, use [the runbook](../operators/live1/RUNBOOK.md) and [the attended operator](../operators/live1/run-hosted5.py). It requires public parent `e2c6cb5fcc55462e2e28e889a6c9f3ed60c9d131`, the accepted terminal tree and candidate manifest SHA. It stages reviewed product inventory only, commits normally and fast-forward pushes. It waits for one new main push run matching that new commit and its push boundary, with a recorded maximum 60-second clock-skew tolerance; reruns and dispatch events are rejected.
 
-Once authentication passes, the preserved dependency graph opens pins, wheel,
-Nix, pacman/RPM/APT, Pages, observations and Foundation 3 planning lanes. Any new
-independent failures remain evidence for manager disposition. This source phase
-does not repair speculative downstream failures or authorize production publication.
+The collector retains every job/step and attempts every artifact even if one fails. ZIP downloads stream to bounded files (2 GiB per artifact, 8 GiB total), verify API digests, and extract without traversal, links or overwrite. Every candidate custody set is rehashed; the packet records artifact digests and manifest hashes, while extracted summaries stay in the external packet directory. Missing artifacts and failed gates remain qualification failures. No automatic rerun, deployment, production signing, upload, npm/Homebrew mutation or production receipt occurs.
 
-The collection step uses the v2 collector (`rs9.collect_candidate`), preserving packet artifacts and summary blockers before validation; legacy `validate_receipts` is not used. The operator stops on failure or timeout. The manager packet retains all summary-reported blockers even when validation stops at its first error; reported diagnostics confer no qualification authority. An explicit collect command can resume read-only collection into another empty outbox directory. No production publication, key access, npm/Homebrew mutation, Pages deployment or production receipt is performed.
+The operator validates the fresh packet directory before creating its exclusive log, captures child stdout/stderr to that file, and prints only `LOG=`, `RC=` and `MANAGER_PACKET=`. Early failures and collisions report `MANAGER_PACKET=unavailable`; only a physical packet produced by the child operation is advertised. It stops for manager disposition. The dispatcher stage envelope authorizes this verified terminal amendment without another independent review; manager acceptance of its exact bytes precedes attended adoption.

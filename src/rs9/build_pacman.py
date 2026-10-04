@@ -4,8 +4,8 @@ Executes real host makepkg (strictly nonroot) and repo-add to generate candidate
 and repository databases:
 - Rejects root execution (makepkg nonroot requirement).
 - Requires empty scratch root and exact authenticated release capture.
-- CLI projects enforce arch 'any' and authenticated offline npm closure or fail closed.
-- Native project (Nebular) enforces arch 'x86_64'.
+- Pure JS CLI projects enforce arch 'any' and authenticated offline npm closure.
+- Native Node CLI and native desktop products enforce arch 'x86_64'.
 - Native prerequisites absent -> explicit unavailable, never fabricated files.
 - Subprocess derivation records bound to artifact, tool, container, and source.
 """
@@ -135,6 +135,9 @@ def build_pacman_candidate(
     project_id = ctx["project_id"]
     version = ctx["version"]
     is_native = ctx["is_native"]
+    is_native_desktop = ctx.get("is_native_desktop", False)
+    is_native_node_cli = ctx.get("is_native_node_cli", False)
+    is_pure_js_cli = ctx.get("is_pure_js_cli", not is_native)
     matched_arch = ctx["arch"]
 
     r = runner or SubprocessRunner()
@@ -170,7 +173,7 @@ def build_pacman_candidate(
     desktop_sha = icon_sha = ""
     cmds: list[dict[str, str]] = []
 
-    if is_native:
+    if is_native_desktop:
         payload = ctx["payload"]
         launchers = payload.get("launchers", {})
         l_raw = launchers.get("tfnf", {}).get("path")
@@ -276,8 +279,86 @@ def build_pacman_candidate(
                 "derived_packages": derived_deps,
             }
         }
+    elif is_native_node_cli:
+        # Native node CLI (Burst): stage offline authenticated npm closure
+        payload_root = ctx["payload_root"]
+        cmd_dict = ctx["payload"].get("commands", {}) or intent.get("commands", {})
+        cmds = [
+            {"name": k, "path": v["path"][len(payload_root) + 1:]}
+            for k, v in sorted(cmd_dict.items())
+        ]
+        staged_nm = pkg_work / "staged_node_modules"
+        stage_offline_npm_closure(capture, project_id, offline_npm_archives, staged_nm)
+        from rs9.build_native import npm_bundle
+        closure_sha = npm_bundle(staged_nm, pkg_work / "npm-closure.tar.gz")
+
+        src_dir = pkg_work / "src"
+        src_dir.mkdir(parents=True, exist_ok=True)
+        extract_for_packaging(asset_file, src_dir, expected_sha256=ctx["asset_sha"])
+        shutil.copytree(staged_nm, src_dir / "node_modules")
+
+        # Dependency derivation strictly targets matching prebuild; foreign exact closed prebuilds remain inert
+        target_prebuild_path = (
+            ctx.get("burst_prebuild_info", {}).get("target_path")
+            if ctx.get("burst_prebuild_info")
+            else "package/native/directory-snapshot/prebuilds/linux-x64-gnu/native-addon-posix-openat-v1.node"
+        )
+        candidate_file = src_dir / target_prebuild_path
+        if not candidate_file.is_file():
+            rel = target_prebuild_path[len(payload_root) + 1:] if target_prebuild_path.startswith(payload_root + "/") else target_prebuild_path
+            candidate_file = src_dir / payload_root / rel
+            if not candidate_file.is_file():
+                candidate_file = src_dir / rel
+        if not candidate_file.is_file():
+            raise ContractError("MISSING_ASSET", f"Matching native prebuild missing: {target_prebuild_path}")
+
+        from rs9.dependencies import LIBRARIES
+        from rs9.elf import parse_elf
+        elf_data = candidate_file.read_bytes()
+        elf_info = parse_elf(elf_data)
+        rel_path = candidate_file.relative_to(src_dir).as_posix()
+        elf_objects = [{
+            "path": rel_path,
+            "needed": elf_info["needed"],
+            "interpreter": elf_info.get("interpreter"),
+        }]
+        system_sonames = set(elf_info["needed"])
+        arch_packages = {"nodejs>=22"}
+        for soname in elf_info["needed"]:
+            if soname in LIBRARIES:
+                arch_packages.add(LIBRARIES[soname][0])
+        interp = elf_info.get("interpreter")
+        if interp in {"/lib64/ld-linux-x86-64.so.2", "/lib/ld-linux-aarch64.so.1"}:
+            arch_packages.add("glibc")
+
+        providers, derived = [], set()
+        for soname in sorted(system_sonames):
+            receipt = r.run(["pacman", "-Qo", "--quiet", "/usr/lib/" + soname])
+            if receipt.exit_code or not receipt.stdout_text.strip():
+                receipt = r.run(["pacman", "-F", "--machinereadable", soname])
+                package_names = {line.split(chr(0))[1] for line in receipt.stdout_text.splitlines()
+                                 if len(line.split(chr(0))) >= 4}
+            else:
+                package_names = set(receipt.stdout_text.strip().splitlines())
+            if receipt.exit_code or len(package_names) != 1:
+                raise ContractError("DEPENDENCY_DERIVATION", "Native soname lacks one actual pacman provider")
+            derived.update(package_names)
+            providers.append({"soname": soname, "provider": next(iter(package_names)),
+                              "tool_receipt": receipt.to_record()})
+
+        policy_deps = sorted(arch_packages)
+        derived_deps = sorted(derived | arch_packages)
+        dependency_classification = "native-tool-derived"
+        extra_evidence = {
+            "policy_dependencies": policy_deps, "native_provider_queries": providers,
+            "dt_needed_evidence": {
+                "objects": elf_objects,
+                "system_sonames": sorted(system_sonames),
+                "derived_packages": derived_deps,
+            }
+        }
     else:
-        # CLI projects: stage offline authenticated npm closure
+        # Pure JS CLI projects: stage offline authenticated npm closure; pure JS retain no native checks
         payload_root = ctx["payload_root"]
         cmd_dict = ctx["payload"].get("commands", {}) or intent.get("commands", {})
         cmds = [
@@ -313,13 +394,13 @@ def build_pacman_candidate(
         matched_arch,
         derived_deps,
         cmds,
-        is_native,
+        is_native_desktop,
         ctx["payload_root"],
         desktop_sha,
         icon_sha,
     )
     pkgbuild_path = pkg_work / "PKGBUILD"
-    if not is_native:
+    if not is_native_desktop:
         text = pkgbuild_bytes.decode()
         text = text.replace("source=(", "source=('npm-closure.tar.gz' ", 1)
         text = text.replace("sha256sums=(", "sha256sums=('" + closure_sha + "' ", 1)
@@ -400,6 +481,7 @@ def build_pacman_candidate(
         "qualification": "unqualified-candidate",
         "can_publish": False,
         "adapter": "pacman",
+        "package_class": ctx["product_class"],
         "project": project_id,
         "version": version,
         "revision": revision,

@@ -2,6 +2,7 @@
 import hashlib
 import os
 from pathlib import Path
+import re
 import subprocess
 
 from rs9.errors import ContractError
@@ -10,6 +11,10 @@ from rs9.scratch import physical_directory
 
 MANIFEST = "operators/live1/candidate-manifest.json"
 DIRECTORIES = ("src", "tests", "docs", "examples", "bootstrap", "nix", "operators", "evidence", ".github")
+
+
+def operational_path(path):
+    return bool({".serena", ".pytest_cache", "__pycache__"} & set(Path(path).parts)) or path.endswith(".pyc")
 
 
 def git_oid(kind, data):
@@ -24,7 +29,7 @@ def candidate_paths(root):
         paths.update(p.relative_to(root).as_posix() for p in (root / directory).rglob("*")
                      if (p.is_file() or p.is_symlink()) and "__pycache__" not in p.parts)
     paths.update(p.name for p in root.glob("flake.*") if p.is_file())
-    return sorted(paths)
+    return sorted(p for p in paths if not operational_path(p))
 
 
 def file_inventory(root, paths):
@@ -34,6 +39,8 @@ def file_inventory(root, paths):
         raise ContractError("CANDIDATE_INVENTORY", "Duplicate paths")
     for relative in sorted(paths):
         validate_safe_relative_posix_path(relative)
+        if operational_path(relative):
+            raise ContractError("CANDIDATE_INVENTORY", "Operational metadata cannot enter product custody")
         path = root / relative
         if any(p.is_symlink() for p in (path, *path.parents)) or not path.is_file():
             raise ContractError("CANDIDATE_INVENTORY", "Physical source file required")
@@ -72,7 +79,40 @@ def source_tree(rows):
     return tree(root)
 
 
-def verify_inventory(root, manifest):
+def product_delta(root, parent):
+    """Read-only delta relative to explicit parent, plus untracked product files minus allowed operational."""
+    root = physical_directory(root)
+    if not isinstance(parent, str) or not re.fullmatch(r"[0-9a-f]{40}", parent):
+        raise ContractError("CANDIDATE_PARENT", "Explicit 40-character parent commit SHA required")
+    raw_diff = subprocess.check_output(
+        ["git", "-C", str(root), "diff", "--name-only", "--no-renames", "-z", parent, "--"],
+        stderr=subprocess.DEVNULL,
+    ).decode("utf-8")
+    diff_paths = {p for p in raw_diff.split("\0") if p}
+
+    raw_untracked = subprocess.check_output(
+        ["git", "-C", str(root), "ls-files", "--others", "--exclude-standard", "-z"],
+        stderr=subprocess.DEVNULL,
+    ).decode("utf-8")
+    untracked_paths = {p for p in raw_untracked.split("\0") if p}
+
+    combined = diff_paths | untracked_paths
+    for path in combined:
+        validate_safe_relative_posix_path(path)
+    return sorted(p for p in combined if not operational_path(p))
+
+
+def verify_inventory(root, manifest, parent=None):
+    if parent is not None:
+        if not isinstance(parent, str) or not re.fullmatch(r"[0-9a-f]{40}", parent):
+            raise ContractError("CANDIDATE_PARENT", "Explicit 40-character parent commit SHA required")
+        if manifest.get("parent") != parent:
+            raise ContractError("CANDIDATE_PARENT", "Manifest parent does not match explicit parent")
+        if manifest.get("changed_paths") != product_delta(root, parent):
+            raise ContractError("CANDIDATE_CHANGED", "Reviewed changed paths differ from the full product delta")
+    elif manifest.get("parent") is not None:
+        raise ContractError("CANDIDATE_PARENT", "Explicit parent required when manifest specifies parent")
+
     expected = manifest["files"]
     if file_inventory(root, [r["path"] for r in expected]) != expected:
         raise ContractError("CANDIDATE_CHANGED", "Reviewed inventory differs from source bytes or modes")

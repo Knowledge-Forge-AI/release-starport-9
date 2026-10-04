@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from rs9.adopt_candidate import adopt, validate_receipts
-from rs9.candidate_inventory import MANIFEST, git_oid, source_tree
+from rs9.candidate_inventory import MANIFEST, file_inventory, git_oid, operational_path, source_tree
 from rs9.errors import ContractError
 from rs9.hosted_candidate import REQUIRED_RECEIPTS
 from rs9.scratch import canonical
@@ -50,6 +50,43 @@ def _create_valid_receipt_fixture(root: Path, commit: str, workflow_hash: str):
 
 
 class CandidateAdoptionTests(unittest.TestCase):
+    def test_operational_metadata_cannot_enter_reviewed_product_inventory(self):
+        for path in (".serena/state.json", "tests/.pytest_cache/state", "src/__pycache__/test.pyc", "src/old.pyc"):
+            self.assertTrue(operational_path(path))
+            with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ContractError):
+                file_inventory(Path(tmp).resolve(), [path])
+        self.assertFalse(operational_path("src/rs9/candidate_inventory.py"))
+
+    def test_hosted5_wrapper_binds_public_parent_and_only_prints_log_status_packet(self):
+        import contextlib
+        import importlib.util
+        import io
+        import subprocess
+        path = Path(__file__).resolve().parents[1] / "operators/live1/run-hosted5.py"
+        spec = importlib.util.spec_from_file_location("rs9_hosted5_wrapper", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / MANIFEST).parent.mkdir(parents=True)
+            raw = b"{}"
+            (root / MANIFEST).write_bytes(raw)
+            out = root / "out"
+            out.mkdir()
+            stdout = io.StringIO()
+            with patch.object(module, "ROOT", root), \
+                 patch.object(module, "dependencies", return_value=(MANIFEST, lambda *a, **k: "a" * 40, lambda p: out, ContractError)), \
+                 patch.object(module.subprocess, "check_output", side_effect=[b"main", module.PARENT.encode(), module.PARENT.encode()]), \
+                 patch.object(module.subprocess, "run", return_value=subprocess.CompletedProcess([], 2)) as run, \
+                 contextlib.redirect_stdout(stdout):
+                code = module.main(["--reviewed-tree", "a" * 40, "--manifest-sha256", hashlib.sha256(raw).hexdigest(), "--output", str(out)])
+            self.assertEqual(module.PARENT, "e2c6cb5fcc55462e2e28e889a6c9f3ed60c9d131")
+            self.assertEqual(code, 2)
+            self.assertEqual([r.split("=", 1)[0] for r in stdout.getvalue().splitlines()], ["LOG", "RC", "MANAGER_PACKET"])
+            argv = run.call_args.args[0]
+            self.assertEqual(argv[argv.index("--reviewed-parent") + 1], module.PARENT)
+            self.assertIs(run.call_args.kwargs["stdout"], run.call_args.kwargs["stderr"])
+
     def test_blocked_candidate_cannot_stage_commit_or_push(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
@@ -63,6 +100,59 @@ class CandidateAdoptionTests(unittest.TestCase):
                     adopt(repo, out, reviewed_parent="1" * 40, reviewed_tree="2" * 40, manifest_sha256=hashlib.sha256(raw).hexdigest())
                 self.assertEqual(raised.exception.code, "ADOPTION_NOT_READY")
                 command.assert_not_called()
+
+    def test_adopt_stages_exactly_changed_paths_and_verifies_cached_set(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            repo, out = root / "repository", root / "results"
+            (repo / "operators/live1").mkdir(parents=True)
+            out.mkdir()
+            manifest_doc = {
+                "candidate_adoption_ready": True,
+                "adoption_scope": "hosted-candidate-qualification-only",
+                "production_enabled": False,
+                "changed_paths": ["src/changed.py"],
+                "files": [{"path": "src/changed.py", "size": 1, "sha256": "0" * 64, "mode": "100644", "git_blob": "0" * 40}],
+            }
+            raw = canonical(manifest_doc)
+            (repo / "src").mkdir(parents=True)
+            (repo / "src/changed.py").write_bytes(b"data")
+            (repo / MANIFEST).write_bytes(raw)
+            parent = "1" * 40
+            tree = "2" * 40
+            manifest_sha = hashlib.sha256(raw).hexdigest()
+
+            added = False
+            def mock_git(r, args):
+                nonlocal added
+                cmd = args[1:]
+                if cmd == ["branch", "--show-current"]:
+                    return "main"
+                if cmd == ["rev-parse", "HEAD"] or cmd == ["rev-parse", "origin/main"]:
+                    return parent
+                if cmd == ["diff", "--cached", "--name-only"]:
+                    return "src/changed.py\nsrc/unexpected.py" if added else ""
+                if cmd == ["remote", "get-url", "origin"]:
+                    return "https://github.com/Knowledge-Forge-AI/release-starport-9.git"
+                if cmd == ["ls-files", "-z"]:
+                    return "src/changed.py\0operators/live1/candidate-manifest.json"
+                if cmd[:2] == ["ls-files", "--others"]:
+                    return ""
+                if cmd[:2] == ["fetch", "origin"]:
+                    return ""
+                if cmd[:3] == ["add", "-A", "--"]:
+                    added = True
+                    return ""
+                if cmd == ["write-tree"]:
+                    return tree
+                return ""
+
+            with patch("rs9.adopt_candidate.run", side_effect=mock_git), \
+                 patch("rs9.adopt_candidate.verify_inventory", return_value=tree), \
+                 patch("rs9.collect_candidate.output_directory", return_value=out):
+                with self.assertRaises(ContractError) as caught:
+                    adopt(repo, out, reviewed_parent=parent, reviewed_tree=tree, manifest_sha256=manifest_sha)
+                self.assertEqual(caught.exception.code, "ADOPTION_REVIEW")
 
     def test_tree_calculation_uses_directory_sorting_and_mode(self):
         blob = git_oid("blob", b"data")

@@ -5,7 +5,7 @@
 blockers, so partial evidence is retained. Everything is nonproduction:
 
 deb lane (amd64 or arm64 runner, Ubuntu 26.04 'resolute' container of the runner architecture)
-- builds the three architecture-all CLI debs and the native Nebular deb; Nebular dependencies
+- builds two architecture-all pure JS debs and architecture-specific Burst/Nebular debs; Nebular dependencies
   come only from dpkg-shlibdeps over every ELF object plus the installed dpkg inventory;
 - assembles ONE repository (pool, dists, by-hash, Packages/.gz/.xz in both amd64 and arm64
   indexes) and signs it with a real GnuPG NONPRODUCTION fixture key (InRelease, Release.gpg);
@@ -215,7 +215,10 @@ class ContainerRunner(CommandRunner):
     def run(self, argv: list[str], *, cwd: Path | str | None = None, env: dict[str, str] | None = None) -> CommandReceipt:
         if not argv:
             raise ContractError("INVALID_ARGUMENT", "Command argv cannot be empty")
-        outer = self.host.run(self.docker_argv(argv, cwd, env))
+        try:
+            outer = self.host.run(self.docker_argv(argv, cwd, env))
+        except ContractError as error:
+            raise error.with_details(tool=Path(argv[0]).name, substage="container-tool") from None
         return CommandReceipt(
             list(argv), outer.exit_code, outer.stdout_bytes, outer.stderr_bytes,
             tool_name=argv[0], tool_path=f"container:{self.image}", executed=outer.executed,
@@ -281,15 +284,22 @@ def prepare_environment(host: CommandRunner, system: str, pins: Mapping[str, Any
     platform = DEB_PLATFORMS[system]
     pulled = host.run(["docker", "pull", "--platform", platform, reference])
     if pulled.exit_code != 0:
-        raise ContractError("CONTAINER_PULL_FAILED", f"docker pull failed with exit code {pulled.exit_code}")
+        raise ContractError("CONTAINER_PULL_FAILED", f"docker pull failed with exit code {pulled.exit_code}",
+                            details={"substage": "pull", "tool": "docker", "exit_code": pulled.exit_code,
+                                     "stdout_sha256": pulled.stdout_sha256, "stderr_sha256": pulled.stderr_sha256})
     inspected = host.run(["docker", "image", "inspect", "--format", "{{index .RepoDigests 0}}|{{.Architecture}}", reference])
     resolved, image_arch = _digest_from_inspect(inspected.stdout_text)
     if inspected.exit_code != 0 or not resolved:
-        raise ContractError("CONTAINER_DIGEST_UNRESOLVED", "Container image digest could not be resolved")
+        raise ContractError("CONTAINER_DIGEST_UNRESOLVED", "Container image digest could not be resolved",
+                            details={"substage": "inspect", "tool": "docker", "exit_code": inspected.exit_code,
+                                     "stdout_sha256": inspected.stdout_sha256, "stderr_sha256": inspected.stderr_sha256})
     if pin_digest is not None and resolved != pin_digest:
-        raise ContractError("CONTAINER_DIGEST_MISMATCH", "Pulled image digest differs from the source pin")
+        raise ContractError("CONTAINER_DIGEST_MISMATCH", "Pulled image digest differs from the source pin",
+                            details={"substage": "pin", "tool": "docker", "expected_digest": pin_digest, "actual_digest": resolved})
     if image_arch != system:
-        raise ContractError("INVALID_ARCHITECTURE", "Container image architecture differs from the lane system")
+        raise ContractError("INVALID_ARCHITECTURE", "Container image architecture differs from the lane system",
+                            details={"substage": "architecture", "tool": "docker", "exit_code": inspected.exit_code,
+                                     "stdout_sha256": inspected.stdout_sha256, "stderr_sha256": inspected.stderr_sha256})
     pinned_ref = f"ubuntu@{resolved}"
     release = host.run(["docker", "run", "--rm", "--platform", platform, "--network", "none", pinned_ref,
                         "sh", "-c", "cat /etc/os-release && dpkg --print-architecture"])
@@ -300,9 +310,13 @@ def prepare_environment(host: CommandRunner, system: str, pins: Mapping[str, Any
     version_id = fields.get("VERSION_ID", "").strip('"')
     codename = fields.get("VERSION_CODENAME", "").strip('"')
     if release.exit_code != 0 or version_id != "26.04" or codename != "resolute":
-        raise ContractError("UNSUPPORTED_PLATFORM", "Container is not Ubuntu 26.04 resolute")
+        raise ContractError("UNSUPPORTED_PLATFORM", "Container is not Ubuntu 26.04 resolute",
+                            details={"substage": "distro", "tool": "cat", "exit_code": release.exit_code,
+                                     "stdout_sha256": release.stdout_sha256, "stderr_sha256": release.stderr_sha256})
     if not lines or lines[-1].strip() != system:
-        raise ContractError("INVALID_ARCHITECTURE", "Container dpkg architecture differs from the lane system")
+        raise ContractError("INVALID_ARCHITECTURE", "Container dpkg architecture differs from the lane system",
+                            details={"substage": "architecture", "tool": "dpkg", "exit_code": release.exit_code,
+                                     "stdout_sha256": release.stdout_sha256, "stderr_sha256": release.stderr_sha256})
     source_pinned = pin_digest is not None and (pins.get("pin_provenance") or {}).get("deb." + system, "source-pinned") == "source-pinned"
     return {
         "image_ref": pinned_ref,
@@ -339,10 +353,14 @@ def provision_image(
     try:
         run = host.run(["docker", "run", "--name", name, "--platform", platform, base_ref, "sh", "-c", script])
         if run.exit_code != 0:
-            raise ContractError("PROVISION_FAILED", f"{family} provisioning failed with exit code {run.exit_code}")
+            raise ContractError("PROVISION_FAILED", f"{family} provisioning failed with exit code {run.exit_code}",
+                                details={"substage": "provision", "tool": family, "exit_code": run.exit_code,
+                                         "stdout_sha256": run.stdout_sha256, "stderr_sha256": run.stderr_sha256})
         commit = host.run(["docker", "commit", name, tag])
         if commit.exit_code != 0:
-            raise ContractError("PROVISION_FAILED", "Provisioned image commit failed")
+            raise ContractError("PROVISION_FAILED", "Provisioned image commit failed",
+                                details={"substage": "commit", "tool": "docker", "exit_code": commit.exit_code,
+                                         "stdout_sha256": commit.stdout_sha256, "stderr_sha256": commit.stderr_sha256})
     finally:
         try:
             host.run(["docker", "rm", "-f", name])
@@ -474,6 +492,8 @@ def client_cycle(
     prefix: str,
     smoke: Mapping[str, Any] | None = None,
     system: str | None = None,
+    burst_record: Mapping[str, Any] | None = None,
+    burst_scratch: Path | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Fresh container per product: configure, inventory, install, probe, remove, inventory."""
     gates: list[dict[str, Any]] = []
@@ -483,8 +503,12 @@ def client_cycle(
         label = f"{prefix}.{product}"
         mark = host.mark()
         rows: list[dict[str, Any]] = []
+        product_evidence: dict[str, Any] = {}
         try:
-            with ClientContainer(host, image, platform, spec["mounts"], family) as client:
+            mounts = list(spec["mounts"])
+            if burst_record is not None:
+                mounts.append((str(repository / "src"), "/rs9-source", False))
+            with ClientContainer(host, image, platform, mounts, family) as client:
                 for command in spec["configure"]:
                     if client.exec(command).exit_code != 0:
                         raise ContractError("CLIENT_CONFIGURE_FAILED", "Client repository trust setup failed")
@@ -511,6 +535,14 @@ def client_cycle(
                         probe_rows = [{"name": f"probe.{command}", "status": "fail", "reason": _family_error(err)}]
                     for row in probe_rows:
                         rows.append(_gate(f"{label}.{row['name']}", row["status"], row.get("reason")))
+                if product == "theme-forge-stellar-burst":
+                    if burst_record is None or burst_scratch is None or system is None:
+                        raise ContractError("BURST_NATIVE_TARGET", "Authenticated installed Burst proof required")
+                    from rs9.hosted_burst_clients import verify_client_burst
+                    product_evidence["native_loader"] = verify_client_burst(
+                        client, burst_record, system, burst_scratch / product, user=CLIENT_USER)
+                    rows.append(_gate(f"{label}.burst-native-addon-target", "pass"))
+                    rows.append(_gate(f"{label}.burst-native-addon-load", "pass"))
                 if product == NATIVE_PRODUCT:
                     closure = client.exec(["python3","-c",
                         "from pathlib import Path;import subprocess;root=Path('/usr/lib/theme-forge-nebular-fusion');"
@@ -539,17 +571,36 @@ def client_cycle(
                     f"{label}.inventory", *_pair(comparison["clean"]),
                     **({} if comparison["clean"] else {"leftover": comparison["added"][:20] + comparison["modified"][:20]}),
                 ))
-                evidence[product] = {"inventory_clean": comparison["clean"], "removed": comparison["removed"][:20]}
+                evidence[product] = {**product_evidence, "inventory_clean": comparison["clean"], "removed": comparison["removed"][:20]}
         except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
             rows.append(_gate(f"{label}.client", "fail" if not isinstance(err, NativePrerequisiteUnavailable) else "not-run",
                               _family_error(err)))
             evidence[product] = {"error": _family_error(err)}
+            if product == "theme-forge-stellar-burst":
+                for name in ("burst-native-addon-target", "burst-native-addon-load"):
+                    if not any(row["name"].endswith("." + name) for row in rows):
+                        rows.append(_gate(f"{label}.{name}", "fail", _family_error(err)))
         real = host.real_since(mark)
         for row in rows:
             if row["status"] == "pass" and not real:
                 row["status"], row["reason"] = "not-run", "synthetic-command-seam"
         gates.extend(rows)
     return gates, evidence
+
+
+def burst_client_gates(rows):
+    """A required loader gate passes only through a real successful client row."""
+    return [_gate(name, _fold([row for row in rows if row["name"].endswith("." + name)]),
+                  None if any(row["name"].endswith("." + name) for row in rows) else "missing-native-loader-proof")
+            for name in ("burst-native-addon-target", "burst-native-addon-load")]
+
+
+def _burst_release_record(captures, system):
+    from rs9.hosted_burst_clients import release_load_record
+    matches = [c for c, i, _ in captures if i["project"]["id"] == "theme-forge-stellar-burst"]
+    if len(matches) != 1:
+        raise ContractError("BURST_NATIVE_TARGET", "One authenticated Burst capture required")
+    return release_load_record(matches[0], system)
 
 
 def _pair(ok: bool) -> tuple[str, str | None]:
@@ -795,14 +846,16 @@ def _build_products(
         build_dir = scratch / "build" / product
         build_dir.mkdir(parents=True)
         try:
+            from rs9.product_classes import is_pure_js_cli, get_product_class
+            target_arch = "all" if is_pure_js_cli(product) else system
             built = build_deb_candidate(
-                capture, intent, system if product == NATIVE_PRODUCT else "all", build_dir,
+                capture, intent, target_arch, build_dir,
                 maintainer=maintainer,
                 offline_npm_archives=_offline_npm_archives(capture, product, inputs, client, scratch),
                 runner=builder,
             )
-        except (ContractError, NativePrerequisiteUnavailable) as err:
-            errors[product] = _family_error(err)
+        except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
+            errors[product] = "PACKAGE_FILESYSTEM" if isinstance(err, OSError) else _family_error(err)
             continue
         manifest = built["manifest"]
         derivation = built["derivation_record"]
@@ -812,6 +865,7 @@ def _build_products(
             "sha256": manifest["package_sha256"],
             "size": manifest["package_size"],
             "architecture": manifest["architecture"],
+            "package_class": get_product_class(product),
             "dependencies": manifest["dependencies"],
             "dependency_classification": manifest["dependency_classification"],
             "elf_object_count": manifest["elf_object_count"],
@@ -889,16 +943,30 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
             details["products"] = {k: {kk: vv for kk, vv in v.items() if kk != "path"} for k, v in products.items()}
             if errors:
                 details["build_errors"] = errors
+                diag_dir = scratch / "diagnostics"
+                diag_dir.mkdir(exist_ok=True)
+                diag_file = diag_dir / "build-errors.json"
+                diag_file.write_bytes(canonical({"schema": "rs9.build-errors.v1alpha1", "family": "deb", "system": system, "errors": errors}))
+                artifacts.append(diag_file)
             native_error = errors.get(NATIVE_PRODUCT, "")
+            from rs9.product_classes import is_pure_js_cli
+            native_prods = [k for k in required if not is_pure_js_cli(k)]
             shlibs_ok = (
                 not errors
-                and products[NATIVE_PRODUCT]["dependency_classification"] == "native-tool-derived"
-                and products[NATIVE_PRODUCT]["elf_object_count"] >= 1
-                and all(p["elf_object_count"] == 0 for k, p in products.items() if k != NATIVE_PRODUCT)
-            ) if NATIVE_PRODUCT in required else not errors
+                and all(
+                    products[k]["dependency_classification"] == "native-tool-derived"
+                    and products[k]["elf_object_count"] >= 1
+                    for k in native_prods if k in products
+                )
+                and all(
+                    p["elf_object_count"] == 0
+                    for k, p in products.items()
+                    if is_pure_js_cli(k)
+                )
+            ) if native_prods else not errors
             native_real = all(
                 p["derivation_source"] == "actual-native-tool-subprocess"
-                for k, p in products.items() if k == NATIVE_PRODUCT
+                for k, p in products.items() if not is_pure_js_cli(k)
             ) and host.real_since(mark)
             status, reason = _status(not errors, host.real_since(mark))
             gates.append(_gate("deb-package-build", status, reason or (
@@ -976,7 +1044,10 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
                 cycle_rows, evidence = client_cycle(
                     host, spec, image=client_tag, platform=platform,
                     products=required, repository=repository, prefix="deb-client", smoke=prepared,
-                    system="aarch64-linux" if system=="arm64" else "x86_64-linux")
+                    system="aarch64-linux" if system=="arm64" else "x86_64-linux",
+                    burst_record=(_burst_release_record(context["captures"], "aarch64-linux" if system=="arm64" else "x86_64-linux")
+                                  if "theme-forge-stellar-burst" in required else None),
+                    burst_scratch=scratch / "burst-native-probe")
                 rows.extend(cycle_rows)
                 details["client"] = evidence
                 wrong_signer, wrong_owned = _new_wrong_signer(context)
@@ -988,6 +1059,7 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
                 rows.append(_gate("deb-client.setup", "not-run" if isinstance(err, NativePrerequisiteUnavailable) else "fail",
                                   _family_error(err)))
             gates.extend(rows)
+            gates.extend(burst_client_gates(rows))
             aggregate = _fold(rows)
             gates.append(_gate("deb-client-qualification", aggregate,
                                None if aggregate == "pass" else "see-client-gates"))
@@ -1027,12 +1099,21 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
 # --------------------------------------------------------------------------- pages lane
 
 
+def _validate_bundle_architectures(bundle):
+    from rs9.hosted_summary import validate_product_architectures
+    manifest = bundle["manifest"]
+    validate_product_architectures({"lane": manifest["family"], "system": manifest["system"],
+                                   "required_products": list(REQUIRED_PRODUCTS)},
+                                  [{"path": name, "kind": "custody"} for name in bundle["packages"]])
+
+
 def _gather_custody(inputs: Path | None, authentication_sha256: str | None, source_commit: str | None = None) -> dict[tuple[str, str], dict[str, Any]]:
     bundles: dict[tuple[str, str], dict[str, Any]] = {}
     if inputs is None:
         return bundles
     for manifest in sorted(inputs.rglob(CUSTODY_MANIFEST)):
         bundle = load_custody_bundle(manifest.parent, expected_authentication_sha256=authentication_sha256)
+        _validate_bundle_architectures(bundle)
         if source_commit is not None and bundle["manifest"].get("source_commit") != source_commit:
             raise ContractError("CUSTODY_SOURCE", "Unsigned bundle source differs from the candidate source")
         key = (bundle["manifest"]["family"], bundle["manifest"]["system"])
@@ -1046,6 +1127,7 @@ def _custody_unique(bundles: Sequence[dict[str, Any]]) -> dict[str, Path]:
     """Same package name from several lanes (architecture all) must be byte-identical."""
     unique: dict[str, Path] = {}
     for bundle in bundles:
+        _validate_bundle_architectures(bundle)
         for name, path in bundle["packages"].items():
             if name in unique and digest(unique[name].read_bytes()) != digest(path.read_bytes()):
                 raise ContractError("CUSTODY_CONFLICT", "Architecture-all package bytes differ between lanes")
@@ -1058,6 +1140,7 @@ def _rpm_custody_unique(bundles: Sequence[dict[str, Any]]) -> dict[str, Path]:
     unique: dict[str, Path] = {}
     products: dict[str, tuple[str, Path]] = {}
     for bundle in bundles:
+        _validate_bundle_architectures(bundle)
         for name, path in bundle["packages"].items():
             path_bytes = path.read_bytes()
             path_sha = digest(path_bytes)
@@ -1081,7 +1164,10 @@ def _run_tool_container(host: RecordingRunner, image: str, platform: str, work: 
                              user=_user(), network=network)
     receipt = runner.run(argv, cwd=work)
     if receipt.exit_code != 0:
-        raise ContractError("METADATA_BUILD_FAILED", f"{argv[0]} failed with exit code {receipt.exit_code}")
+        tool = Path(argv[0]).name if argv else "tool"
+        raise ContractError("METADATA_BUILD_FAILED", f"{argv[0]} failed with exit code {receipt.exit_code}",
+                            details={"substage": "metadata", "tool": tool, "exit_code": receipt.exit_code,
+                                     "stdout_sha256": receipt.stdout_sha256, "stderr_sha256": receipt.stderr_sha256})
 
 
 PAGES_GATES = ("pages-repository-objects", "pages-inventory-integrity", "pages-privacy-scan", "pages-client.apt", "pages-client.dnf", "pages-client.pacman")
@@ -1108,7 +1194,10 @@ def execute_pages(context: dict[str, Any]) -> dict[str, Any]:
         try:
             bundles = _gather_custody(inputs, auth, (context.get("binding") or {}).get("source_commit"))
         except ContractError as err:
-            block(PAGES_GATES, f"custody-invalid:{err.code}")
+            if err.code == "CUSTODY_ARCHITECTURE":
+                gates.extend(_gate(name, "fail", err.code) for name in PAGES_GATES)
+            else:
+                block(PAGES_GATES, f"custody-invalid:{err.code}")
             bundles, needed = {}, []
             details["custody_error"] = err.code
         missing = [f"{family}-{system}" for family, system in needed if (family, system) not in bundles]
@@ -1315,7 +1404,9 @@ def _pages_client_tests(
         spec = spec_for(dirs)
         spec["mounts"].append((str(scratch),str(scratch),True))
         rows, evidence = client_cycle(host, spec, image=tag, platform="linux/amd64", products=products,
-                                      repository=repository, prefix=prefix, smoke=prepared, system="x86_64-linux")
+                                      repository=repository, prefix=prefix, smoke=prepared, system="x86_64-linux",
+                                      burst_record=_burst_release_record(context["captures"], "x86_64-linux"),
+                                      burst_scratch=work / ("burst-probe-" + family))
         rows += tamper_cycle(host, spec_for, family, dirs, image=tag, platform="linux/amd64", product=products[0],
                              work=work, arch=arch, wrong_signer=wrong_signer, kinds=TAMPER_KINDS_PAGES, prefix=prefix)
         gates.extend(rows)

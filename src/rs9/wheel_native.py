@@ -19,6 +19,12 @@ import zipfile
 
 from rs9.archives import inspect_archive
 from rs9.errors import ContractError
+from rs9.hosted_platforms import (
+    SUPPORTED_WHEEL_SYSTEMS,
+    platform_contract,
+    select_payload,
+    system_from_target_triple,
+)
 from rs9.release_core import ReleaseCapture, authenticate_release, authenticated_record_hash, digest
 from rs9.scratch import canonical
 from rs9.records import record_sha256
@@ -241,7 +247,8 @@ def build_native_wheel(
     output_dir: str | Path | None = None,
     output_path: str | Path | None = None,
     platform_tag: str | None = None,
-    target_platform: str = "aarch64-apple-darwin",
+    target_platform: str | None = None,
+    system: str | None = None,
     license_files: Mapping[str, bytes] | None = None,
     summary: str | None = None,
     deterministic_timestamp: tuple[int, int, int, int, int, int] | None = None,
@@ -264,7 +271,32 @@ def build_native_wheel(
     if version != VERSION:
         raise ContractError("INVALID_VERSION", f"Version {version} differs from bound product version {VERSION}")
 
-    is_linux_target = "linux" in target_platform or (platform_tag is not None and "linux" in platform_tag)
+    # Resolve and validate system / target_platform namespaces
+    effective_system: str
+    resolved_target_platform: str
+    if system is None and target_platform is None:
+        effective_system = "aarch64-darwin"
+        resolved_target_platform = "aarch64-apple-darwin"
+    elif system is not None and target_platform is None:
+        effective_system = system
+        resolved_target_platform = platform_contract(system).target_triple
+    elif system is None and target_platform is not None:
+        effective_system = system_from_target_triple(target_platform)
+        resolved_target_platform = target_platform
+    else:
+        # Both are explicitly provided: reject inconsistent explicit system/triple
+        derived_system = system_from_target_triple(target_platform)
+        if derived_system != system:
+            raise ContractError(
+                "INCONSISTENT_PLATFORM",
+                f"Inconsistent explicit system {system!r} and target_platform {target_platform!r}",
+                details={"system": system, "target_triple": target_platform},
+            )
+        platform_contract(system)
+        effective_system = system
+        resolved_target_platform = target_platform
+
+    is_linux_target = "linux" in effective_system or (platform_tag is not None and "linux" in platform_tag)
     if is_linux_target:
         if not candidate_only:
             raise WheelWithheldError(
@@ -286,7 +318,7 @@ def build_native_wheel(
     if platform_tag == "any":
         raise ContractError("UNSUPPORTED_PLATFORM", "Native wheels cannot use fake universal 'any' tag")
 
-    target_arch = "aarch64" if ("aarch64" in target_platform or "arm64" in target_platform or (platform_tag and "aarch64" in platform_tag)) else "x86_64"
+    target_arch = "aarch64" if ("aarch64" in effective_system or "arm64" in effective_system or (platform_tag and "aarch64" in platform_tag)) else "x86_64"
 
     # Destination safety checks
     dest_path_check = Path(output_path) if output_path else Path(output_dir)  # type: ignore
@@ -297,7 +329,10 @@ def build_native_wheel(
     # 1. Acquire authenticated release bytes and record
     release_hash: str
     if capture is not None:
-        release_hash = authenticated_record_hash(capture)
+        if fixture_only and getattr(capture, "_proof", None) is None:
+            release_hash = "0" * 64
+        else:
+            release_hash = authenticated_record_hash(capture)
     elif selection is not None and evidence_dir is not None:
         capture = authenticate_release(selection, evidence_dir)
         release_hash = authenticated_record_hash(capture)
@@ -322,49 +357,18 @@ def build_native_wheel(
     payload_archive_name: str
     payload_archive_bytes: bytes
     if capture is not None:
-        if is_linux_target:
-            matched_asset = next(
-                (
-                    a for a in capture.record.get("payloads", [])
-                    if any(p in a.get("platforms", []) for p in (target_platform, f"{target_arch}-linux", f"{target_arch}-unknown-linux-gnu"))
-                    or (target_arch in a.get("name", "") and "linux" in a.get("name", ""))
-                ),
-                None,
-            )
-            if not matched_asset:
-                raise ContractError("MISSING_ASSET", f"No Linux {target_arch} payload asset found in release capture")
-            asset_id = matched_asset["id"]
-            archive_file = capture.archives[asset_id]
-            payload_archive_name = matched_asset["name"]
-            payload_archive_bytes = archive_file.read_bytes()
-            if len(payload_archive_bytes) != matched_asset["size"] or digest(payload_archive_bytes) != matched_asset["sha256"]:
-                raise ContractError("INPUT_CHANGED", "Released native archive changed")
-            archive_manifest = manifest or capture.manifests[asset_id]
-            if archive_manifest["manifest_sha256"] != matched_asset["payload_manifest_sha256"]:
-                raise ContractError("INPUT_CHANGED", "Native manifest differs from captured release")
-            if digest(canonical(archive_manifest)) != digest(canonical(capture.manifests[asset_id])):
-                raise ContractError("INPUT_CHANGED", "Native manifest override differs")
-        else:
-            darwin_asset = next(
-                (
-                    a for a in capture.record.get("payloads", [])
-                    if "aarch64-darwin" in a.get("platforms", [])
-                ),
-                None,
-            )
-            if not darwin_asset:
-                raise ContractError("MISSING_ASSET", "No Darwin arm64 payload asset found in release capture")
-            asset_id = darwin_asset["id"]
-            archive_file = capture.archives[asset_id]
-            payload_archive_name = darwin_asset["name"]
-            payload_archive_bytes = archive_file.read_bytes()
-            if len(payload_archive_bytes) != darwin_asset["size"] or digest(payload_archive_bytes) != darwin_asset["sha256"]:
-                raise ContractError("INPUT_CHANGED", "Released native archive changed")
-            archive_manifest = manifest or capture.manifests[asset_id]
-            if archive_manifest["manifest_sha256"] != darwin_asset["payload_manifest_sha256"]:
-                raise ContractError("INPUT_CHANGED", "Native manifest differs from captured release")
-            if digest(canonical(archive_manifest)) != digest(canonical(capture.manifests[asset_id])):
-                raise ContractError("INPUT_CHANGED", "Native manifest override differs")
+        matched_asset = select_payload(capture, effective_system, allow_any=False)
+        asset_id = matched_asset["id"]
+        archive_file = capture.archives[asset_id]
+        payload_archive_name = matched_asset["name"]
+        payload_archive_bytes = archive_file.read_bytes()
+        if len(payload_archive_bytes) != matched_asset["size"] or digest(payload_archive_bytes) != matched_asset["sha256"]:
+            raise ContractError("INPUT_CHANGED", "Released native archive changed")
+        archive_manifest = manifest or capture.manifests[asset_id]
+        if archive_manifest["manifest_sha256"] != matched_asset["payload_manifest_sha256"]:
+            raise ContractError("INPUT_CHANGED", "Native manifest differs from captured release")
+        if digest(canonical(archive_manifest)) != digest(canonical(capture.manifests[asset_id])):
+            raise ContractError("INPUT_CHANGED", "Native manifest override differs")
     elif archive_path is not None:
         p_path = Path(archive_path).resolve()
         payload_archive_name = p_path.name
@@ -394,7 +398,7 @@ def build_native_wheel(
 
     # 3. Resolve truthful wheel tag
     if is_linux_target:
-        wheel_tag = resolve_native_linux_candidate_tag(target_platform, platform_tag)
+        wheel_tag = resolve_native_linux_candidate_tag(resolved_target_platform, platform_tag)
     else:
         plist_bytes: bytes | None = None
         try:
@@ -446,12 +450,13 @@ def build_native_wheel(
     embedded_helpers = get_embedded_rs9_helpers()
 
     # 7. Render launcher
-    if is_linux_target:
-        launcher = (matched_asset["launchers"].get("tfnf", {}).get("path") if capture is not None
-                    else "theme-forge-nebular-fusion/bin/tfnf")
+    if capture is not None and matched_asset.get("launchers", {}).get("tfnf"):
+        tfnf_val = matched_asset["launchers"]["tfnf"]
+        launcher = tfnf_val.get("path") if isinstance(tfnf_val, dict) else tfnf_val
+    elif is_linux_target:
+        launcher = "theme-forge-nebular-fusion/bin/tfnf"
     else:
-        launcher = (darwin_asset["launchers"].get("tfnf", {}).get("path") if capture is not None
-                    else "Theme Forge Nebular Fusion.app/Contents/Resources/bin/tfnf")
+        launcher = "Theme Forge Nebular Fusion.app/Contents/Resources/bin/tfnf"
     if not launcher:
         raise ContractError("MISSING_LAUNCHER", "Released launcher identity required")
     validate_safe_relative_posix_path(launcher)

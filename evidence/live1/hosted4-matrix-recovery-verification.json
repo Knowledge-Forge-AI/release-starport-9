@@ -1,0 +1,432 @@
+{
+  "entry_evidence": {
+    "branch": "main",
+    "head_matches_origin_main": true,
+    "head_tree": "f06ea73d543145e75d2404d11f810d519802c6f6",
+    "index_mutated": false,
+    "inherited_product_path_count": 40,
+    "inherited_tree": "f73d97648d6e8302e5467c45566189f4f62720f4",
+    "public_parent": "e2c6cb5fcc55462e2e28e889a6c9f3ed60c9d131"
+  },
+  "inherited_audit": {
+    "completed_before_mutation": true,
+    "historical_evidence_rewritten": false,
+    "integration_gaps": [
+      "Burst remained withheld and mocks falsely used universal tags.",
+      "Linux promotion policy was conflated with qualification policy.",
+      "Installer lacked symlink-aware resolution, cleanup and physical inventory readback.",
+      "Sidecar diagnostics lacked a connected pre-probe baseline and bounded nested control samples.",
+      "Artifact collection listed custody without authenticating all outer ZIPs."
+    ],
+    "method": "Review inherited source diffs, new modules, configuration, historical evidence and affected test assertions against predecessor scope and hosted-run-4 failures.",
+    "paths": [
+      ".github/workflows/rs9-candidate-tests.yml",
+      "evidence/live1/hosted4-pins-readback.json",
+      "evidence/live1/hosted4-wheel-trigger.json",
+      "nix/nebular.nix",
+      "nix/pins.nix",
+      "operators/live1/targets.json",
+      "src/rs9/build_native.py",
+      "src/rs9/collect_candidate.py",
+      "src/rs9/errors.py",
+      "src/rs9/hosted_custody.py",
+      "src/rs9/hosted_deb.py",
+      "src/rs9/hosted_native.py",
+      "src/rs9/hosted_nix.py",
+      "src/rs9/hosted_observe.py",
+      "src/rs9/hosted_packaging.py",
+      "src/rs9/hosted_pins.py",
+      "src/rs9/hosted_pipeline.py",
+      "src/rs9/hosted_platforms.py",
+      "src/rs9/hosted_smoke.py",
+      "src/rs9/hosted_wheels.py",
+      "src/rs9/nix_installer.py",
+      "src/rs9/readers.py",
+      "src/rs9/wheel_capture.py",
+      "src/rs9/wheel_native.py",
+      "tests/test_candidate_readers.py",
+      "tests/test_collect_candidate.py",
+      "tests/test_hosted_candidate.py",
+      "tests/test_hosted_deb.py",
+      "tests/test_hosted_diagnostics.py",
+      "tests/test_hosted_native.py",
+      "tests/test_hosted_nix.py",
+      "tests/test_hosted_observe.py",
+      "tests/test_hosted_packaging.py",
+      "tests/test_hosted_pins.py",
+      "tests/test_hosted_platforms.py",
+      "tests/test_hosted_smoke.py",
+      "tests/test_hosted_wheels.py",
+      "tests/test_nix_installer.py",
+      "tests/test_wheel_capture.py",
+      "tests/test_wheel_native.py"
+    ],
+    "required_behavior_overwrite_identified": false,
+    "retained": [
+      "Strict empty scratch validation and lane-work split.",
+      "Pacman/RPM maintainer call repair, unsigned custody and fixture-only signing.",
+      "Release.tag destination boundary, protocol unknown handling and metadata-404-only PyPI absence.",
+      "Exact compressed Nebular archive in store with release-SHA readback; released materializer/verifier unchanged.",
+      "Explicit platform namespaces and exact source-reviewed pins.",
+      "Read-only push-bound collector and attended adoption preflight."
+    ]
+  },
+  "limits_and_deferrals": [
+    "Independent exact dispatcher final review and closeout pending.",
+    "Hosted run 5 not executed; actual three-platform Burst native loading and Darwin installed Nix/Nebular qualification remain hosted gates.",
+    "Burst native package architecture policy awaits manager disposition; four-product native lanes remain blocked rather than mislabelled or omitted.",
+    "Linux PyPI compatibility and promotion unproved; no manylinux/musllinux or production claim.",
+    "Homebrew metadata-only readback remains unknown; Pages undeployed.",
+    "No stage, commit, push, release mutation, production signing or publication performed."
+  ],
+  "official_installer_readback": {
+    "aarch64-darwin": {
+      "absolute_store_symlinks": 0,
+      "authenticated_archive_sha256": "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8",
+      "closed_extractor": "pass",
+      "directories": 1867,
+      "extraction_manifest_sha256": "20819f0058a9bcaab5dbdfa375ff2c30e7a493e7b3622a5adb58f5cef54a8ff0",
+      "historical_inventory_matches": true,
+      "install_sha256": "6491112a02aeabc4fbf0a88b1cf034023bc9c2d79ed6d89a13c5e136e9a4af0b",
+      "installer_executed": false,
+      "member_count": 20154,
+      "physical_manifest_sha256": "520f69e234e4d00f6f06725e04c27a4e76c5a7280ccbaf3e95f5d709a90f7b56",
+      "regular_files": 18173,
+      "source_checksum_matches": true,
+      "symlinks": 114,
+      "uncompressed_bytes": 280196831
+    },
+    "aarch64-linux": {
+      "absolute_store_symlinks": 2,
+      "authenticated_archive_sha256": "64db528412096d718b4bf8f78f85e5ac2b714b774e5005500dee37d23f560456",
+      "closed_extractor": "pass",
+      "directories": 525,
+      "extraction_manifest_sha256": "52745cf3021e15f45d01c773b3a966f4851a9e04524a01388472c8e7dbacb5b1",
+      "historical_inventory_matches": true,
+      "install_sha256": "fbf82316e00729347ffa67929934f6f53fd2ca46e36143137ffb8292107b5432",
+      "installer_executed": false,
+      "member_count": 2278,
+      "physical_manifest_sha256": "c2d5973b4dbd5f93f78d4e6e2853d3a2d5686b1ecc40052583ee8f0d39ee8617",
+      "regular_files": 1578,
+      "source_checksum_matches": true,
+      "symlinks": 175,
+      "uncompressed_bytes": 119068459
+    },
+    "x86_64-linux": {
+      "absolute_store_symlinks": 2,
+      "authenticated_archive_sha256": "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60",
+      "closed_extractor": "pass",
+      "directories": 531,
+      "extraction_manifest_sha256": "686a8addf7800de21370bbccdec9189adccb1b3b57114c1cb47f4e3520a8454c",
+      "historical_inventory_matches": true,
+      "install_sha256": "853e9546e148f370b2238b35742c01218892b1bcf5e4d626b6e73b2d0aa03b0c",
+      "installer_executed": false,
+      "member_count": 2297,
+      "physical_manifest_sha256": "f8b9e45927cc790b9dc687e9ea75980bc9ecde627c907a07fa6fa6deaba8c832",
+      "regular_files": 1587,
+      "source_checksum_matches": true,
+      "symlinks": 179,
+      "uncompressed_bytes": 106182904
+    }
+  },
+  "original_scope": "Preserve and audit inherited candidate; repair closed Nix extraction, Burst platform wheels, source pins, lane custody, native call boundaries, destination readers, sidecar diagnostics and attended collection; qualify the integrated source before dispatcher final review.",
+  "plan_review_dispositions": [
+    {
+      "disposition": "amend/defer",
+      "evidence": "Shared build_native CLI guard already rejects .node/Mach-O/ELF/PE before pacman/RPM/Debian builders. Silent pacman mislabelling is falsified; real Burst native-package qualification remains blocked. Manager native architecture policy requested separately; no guard weakened.",
+      "finding": 1,
+      "severity": "high"
+    },
+    {
+      "disposition": "accept",
+      "evidence": "Installer symlink-aware inventory resolver with hop bound and adverse chained-parent/loop tests.",
+      "finding": 2,
+      "severity": "medium"
+    },
+    {
+      "disposition": "amend",
+      "evidence": "Target-compatible constraints are admitted only inside the Burst platform contract; malformed or incompatible constraints fail. Prebuild paths and the existing full native detector prevent magic omissions.",
+      "finding": 3,
+      "severity": "medium"
+    },
+    {
+      "disposition": "amend",
+      "evidence": "Installed released lazy loader is actively called; dlopen realpath must remain inside physical installed payload and match one target hash. Node version and ABI are recorded. This is the manager-authorized can-load proof, with actual hosted execution pending.",
+      "finding": 4,
+      "severity": "medium"
+    },
+    {
+      "disposition": "accept",
+      "evidence": "Linux production blocker mandatory at receipt and aggregate validation, including failed lane receipts.",
+      "finding": 5,
+      "severity": "low"
+    },
+    {
+      "disposition": "accept",
+      "evidence": "Nix pin projection equality test; targets.json remains runtime authority.",
+      "finding": 6,
+      "severity": "low"
+    },
+    {
+      "disposition": "amend",
+      "evidence": "Explicit required push timestamp with recorded 60-second skew tolerance; production streaming has byte and time bounds, exclusive files, cleanup and no buffered fallback.",
+      "finding": 7,
+      "severity": "low"
+    },
+    {
+      "disposition": "accept",
+      "evidence": "Parent alone owns installed load probe, hosted integration and contract changes; writer scopes were disjoint.",
+      "finding": 8,
+      "severity": "low"
+    }
+  ],
+  "production_enabled": false,
+  "proposal": {
+    "amendments": [
+      "Resolve installer symlink chains over authenticated inventory, including loops and absolute store projection.",
+      "Permit only target-compatible package constraints on platform-specific Burst; preserve released prebuild metadata.",
+      "Exercise the installed released lazy loader and observe one confined dlopen, with Node version/ABI. This proves can-load as permitted by manager wheel policy.",
+      "Require Linux production blockers in receipts and aggregate validation, separately from qualification blockers.",
+      "Authenticate bounded streamed ZIPs in the production collector; collect remaining artifacts after a failure.",
+      "Preserve native CLI architecture guard pending distinct manager policy; no architecture-independent Burst package is permitted."
+    ],
+    "bytes": 29042,
+    "disposition": "amend",
+    "sha256": "d0c1c052a45a503cb6b1dcdf1a41958cee476512c8c5b58e056b07bb9258ee74"
+  },
+  "publication_authority": false,
+  "recovery_additional_changed_paths": [
+    {
+      "path": "docs/live1-hosted-candidate.md",
+      "reason": "Document recovery contracts, truthful qualifications and explicit native-policy deferral."
+    },
+    {
+      "path": "evidence/live1/hosted4-matrix-recovery-verification.json",
+      "reason": "Sanitized recovery scope, audit, findings, checks, worker disposition and deferrals."
+    },
+    {
+      "path": "operators/live1/RUNBOOK.md",
+      "reason": "Attended run-5 review bindings, bounded logging and complete read-only collection."
+    },
+    {
+      "path": "operators/live1/candidate-manifest.json",
+      "reason": "Complete reviewed product inventory and changed-path binding."
+    },
+    {
+      "path": "operators/live1/hosted-lanes.json",
+      "reason": "Require Burst native target and installed load gates for all three wheels lanes."
+    },
+    {
+      "path": "operators/live1/run-hosted5.py",
+      "reason": "Fixed public-parent operator with exact tree/manifest preflight and bounded terminal output."
+    },
+    {
+      "path": "src/rs9/adopt_candidate.py",
+      "reason": "Current phase message and mandatory collection freshness without buffered binary runner."
+    },
+    {
+      "path": "src/rs9/burst_native.py",
+      "reason": "Closed native prebuild admission, truthful architecture/deployment tags and complete provenance."
+    },
+    {
+      "path": "src/rs9/candidate_inventory.py",
+      "reason": "Explicit operational metadata exclusion and rejection."
+    },
+    {
+      "path": "src/rs9/hosted_burst.py",
+      "reason": "Installed released lazy loader proof with one confined target dlopen and observed Node ABI."
+    },
+    {
+      "path": "src/rs9/hosted_commands.py",
+      "reason": "Snapshot hook after first successful materialization probe."
+    },
+    {
+      "path": "src/rs9/hosted_summary.py",
+      "reason": "Require Linux production blockers while retaining separate qualification gates."
+    },
+    {
+      "path": "src/rs9/wheel.py",
+      "reason": "Restrict Burst public candidate tags and retain product-scoped native provenance."
+    },
+    {
+      "path": "tests/test_burst_platform_wheel.py",
+      "reason": "Three deterministic platform wheels and adverse admission/header/tag tests."
+    },
+    {
+      "path": "tests/test_candidate_adoption.py",
+      "reason": "Operational metadata exclusion and attended wrapper/public-parent/logging tests."
+    },
+    {
+      "path": "tests/test_hosted_burst.py",
+      "reason": "Missing, altered, linked, foreign, multiple or absent native-load negatives."
+    },
+    {
+      "path": "tests/test_hosted_summary.py",
+      "reason": "Promotion-blocker stripping negatives and qualified-but-promotion-blocked semantics."
+    },
+    {
+      "path": "tests/test_wheel.py",
+      "reason": "Replace stale manylinux acceptance with explicit candidate-tag policy negatives."
+    }
+  ],
+  "review_required": [
+    "Full candidate relative to public parent, including inherited paths and all recovery amendments.",
+    "Nix extractor security and three official archive results.",
+    "Source pin authority and duplicate projection equality.",
+    "Burst platform-specific admission, retained foreign prebuilds, tags and installed load proof.",
+    "Lane scratch and custody isolation.",
+    "Native builder signatures, architecture-policy deferral and safe codes.",
+    "Destination reader identity/transport semantics.",
+    "Nebular installed gate, baseline, control and bounded diagnostics.",
+    "Workflow permissions and nonproduction boundary.",
+    "Attended exact adoption, push freshness and all-artifact collection.",
+    "Production-promotion versus qualification blocker semantics."
+  ],
+  "schema": "rs9.hosted4-matrix-recovery-verification.v1alpha1",
+  "stage_deltas": {
+    "disposition": "No dispatcher-reported stage delta; original task scope remains authoritative.",
+    "observed": []
+  },
+  "status": "pre-final-source-candidate",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT6R1-HOSTED4-MATRIX-RECOVERY1",
+  "terminal_inventory": {
+    "changed_paths": [
+      ".github/workflows/rs9-candidate-tests.yml",
+      "docs/live1-hosted-candidate.md",
+      "evidence/live1/hosted4-matrix-recovery-verification.json",
+      "evidence/live1/hosted4-pins-readback.json",
+      "evidence/live1/hosted4-wheel-trigger.json",
+      "nix/nebular.nix",
+      "nix/pins.nix",
+      "operators/live1/RUNBOOK.md",
+      "operators/live1/candidate-manifest.json",
+      "operators/live1/hosted-lanes.json",
+      "operators/live1/run-hosted5.py",
+      "operators/live1/targets.json",
+      "src/rs9/adopt_candidate.py",
+      "src/rs9/build_native.py",
+      "src/rs9/burst_native.py",
+      "src/rs9/candidate_inventory.py",
+      "src/rs9/collect_candidate.py",
+      "src/rs9/errors.py",
+      "src/rs9/hosted_burst.py",
+      "src/rs9/hosted_commands.py",
+      "src/rs9/hosted_custody.py",
+      "src/rs9/hosted_deb.py",
+      "src/rs9/hosted_native.py",
+      "src/rs9/hosted_nix.py",
+      "src/rs9/hosted_observe.py",
+      "src/rs9/hosted_packaging.py",
+      "src/rs9/hosted_pins.py",
+      "src/rs9/hosted_pipeline.py",
+      "src/rs9/hosted_platforms.py",
+      "src/rs9/hosted_smoke.py",
+      "src/rs9/hosted_summary.py",
+      "src/rs9/hosted_wheels.py",
+      "src/rs9/nix_installer.py",
+      "src/rs9/readers.py",
+      "src/rs9/wheel.py",
+      "src/rs9/wheel_capture.py",
+      "src/rs9/wheel_native.py",
+      "tests/test_burst_platform_wheel.py",
+      "tests/test_candidate_adoption.py",
+      "tests/test_candidate_readers.py",
+      "tests/test_collect_candidate.py",
+      "tests/test_hosted_burst.py",
+      "tests/test_hosted_candidate.py",
+      "tests/test_hosted_deb.py",
+      "tests/test_hosted_diagnostics.py",
+      "tests/test_hosted_native.py",
+      "tests/test_hosted_nix.py",
+      "tests/test_hosted_observe.py",
+      "tests/test_hosted_packaging.py",
+      "tests/test_hosted_pins.py",
+      "tests/test_hosted_platforms.py",
+      "tests/test_hosted_smoke.py",
+      "tests/test_hosted_summary.py",
+      "tests/test_hosted_wheels.py",
+      "tests/test_nix_installer.py",
+      "tests/test_wheel.py",
+      "tests/test_wheel_capture.py",
+      "tests/test_wheel_native.py"
+    ],
+    "changed_product_path_count": 58,
+    "full_product_file_count": 296,
+    "operational_metadata_excluded": true,
+    "terminal_tree_and_manifest_sha256": "Supplied separately in pre-final candidate summary; manifest does not recursively hash itself."
+  },
+  "verification": {
+    "credential_scan": {
+      "findings": 0,
+      "product_files": 296,
+      "status": "pass"
+    },
+    "diff_check": {
+      "tracked": "pass",
+      "untracked_product": "pass"
+    },
+    "environment": {
+      "gpg_available": false,
+      "nix_evaluator_available": true,
+      "node_available": true,
+      "platform": "darwin",
+      "python": "3.13.12"
+    },
+    "focused_recovery_suite": {
+      "exit_code": 0,
+      "skipped": 4,
+      "tests": 310
+    },
+    "markdown_relative_links": {
+      "checked": 11,
+      "missing": 0,
+      "status": "pass"
+    },
+    "official_nix_extractor_suite": {
+      "all_source_pins_reauthenticated": true,
+      "exit_code": 0,
+      "historical_inventory_matches": true,
+      "skipped": 0,
+      "systems": 3,
+      "tests": 26
+    },
+    "parent_integrated": true,
+    "python_parse_compile": {
+      "bytecode_directory": "ephemeral-external-removed",
+      "files": 157,
+      "status": "pass"
+    },
+    "repaired_check_findings": [
+      "Closed error details initially discarded cleanup status; added a closed cleanup token field.",
+      "A stale legacy wheel test admitted manylinux; changed to manager-approved candidate tags and explicit rejection negatives.",
+      "Removed trailing whitespace in the new Burst module before final inventory."
+    ],
+    "skip_scope": "Three official archive opt-in tests pass separately; live-capture tests and GnuPG-dependent integration remain unavailable locally. No hosted Linux native package or installed Darwin Nix qualification is inferred.",
+    "status": "pass",
+    "unit_suite": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest discover -s tests -q",
+      "exit_code": 0,
+      "skipped": 12,
+      "tests": 832
+    },
+    "workflow": {
+      "matrix_and_artifacts_match_source_contract": true,
+      "no_production_environment_or_operation": true,
+      "permissions": {
+        "contents": "read"
+      },
+      "sha_pinned_actions": true,
+      "static_tests": "pass",
+      "yaml_parse": "pass"
+    }
+  },
+  "workers": {
+    "abandoned": 1,
+    "abandonment_reason": "No meaningful progress reported after a bounded 27-minute attempt. No partial source mutation was observed; parent adopted preserved inherited bytes and completed extraction directly.",
+    "cleanup_proven": true,
+    "completed_and_amended_by_parent": 3,
+    "dispatcher_checkpoint_authority": false,
+    "submitted": 4,
+    "used": "gemini"
+  }
+}

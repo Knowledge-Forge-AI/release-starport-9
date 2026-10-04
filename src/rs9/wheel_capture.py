@@ -8,6 +8,13 @@ from typing import Any, Mapping
 
 from rs9.archives import inspect_archive
 from rs9.errors import ContractError
+from rs9.burst_native import (
+    BURST_PRODUCT_ID,
+    make_burst_native_provenance,
+    resolve_burst_platform_wheel_tag,
+    validate_burst_native_prebuilds,
+)
+from rs9.hosted_platforms import SUPPORTED_WHEEL_SYSTEMS
 from rs9.npm_deps import authenticate_dependencies, closure_for_capture
 from rs9.profiles import PACKAGE_PROFILE, evaluate_profile
 from rs9.release_core import ReleaseCapture, authenticate_release, authenticated_record_hash, digest
@@ -29,6 +36,7 @@ def build_capture_wheel(
     version: str,
     capture: ReleaseCapture | None = None,
     *,
+    system: str | None = None,
     selection: dict[str, Any] | None = None,
     evidence_dir: str | Path | None = None,
     output_dir: str | Path | None = None,
@@ -123,10 +131,12 @@ def build_capture_wheel(
 
     payload_files: dict[str, bytes] = {}
     payload_modes: dict[str, int] = {}
+    payload_origins: dict[str, str] = {}
 
     def _extract_payload_member(name: str, content: bytes, mode: int) -> None:
         payload_files[name] = content
         payload_modes[name] = mode
+        payload_origins[name] = "release-payload"
 
     archive_manifest = inspect_archive(
         archive_path,
@@ -188,6 +198,7 @@ def build_capture_wheel(
                     target_key = f"package/{dep_path}/{rel_sub}"
                     payload_files[target_key] = content
                     payload_modes[target_key] = mode
+                    payload_origins[target_key] = "npm-closure"
 
             inspect_archive(
                 dep_archive,
@@ -205,19 +216,80 @@ def build_capture_wheel(
 
         extra_prov["npm_dependencies"] = dep_snapshot
 
-    # Refuse native payload members or platform-constrained metadata. Universal
-    # is justified only by the authenticated JS closure inspected here.
-    for name, data in payload_files.items():
-        if data.startswith((b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xca\xfe\xba\xbe")) or name.endswith(".node"):
-            raise ContractError("UNQUALIFIED_PLATFORM", "Native CLI dependency wheels require platform qualification")
-        if name.endswith("/package.json"):
-            metadata = json.loads(data)
-            if metadata.get("os") or metadata.get("cpu"):
-                raise ContractError("UNQUALIFIED_PLATFORM", "Platform constrained dependencies require qualification")
-    if platform_tag not in (None, "any"):
-        raise ContractError("UNSUPPORTED_PLATFORM", "Authenticated pure JS closure uses the any tag")
+    # 6. Native admission vs global rejection
+    if canonical_id == BURST_PRODUCT_ID and system is not None:
+        if system not in SUPPORTED_WHEEL_SYSTEMS:
+            raise ContractError(
+                "INVALID_ARCHITECTURE",
+                f"Unsupported wheel system: {system}",
+                details={"system": system},
+            )
 
-    # 6. Build deterministic wheel
+        # Product-scoped native admission only for Stellar Burst + one of three supported systems
+        prebuild_audit = validate_burst_native_prebuilds(
+            payload_files,
+            payload_origins,
+            system,
+            source_files=capture.source if capture else None,
+        )
+        target_path = prebuild_audit["target_path"]
+        target_info = prebuild_audit["target_info"]
+        target_bytes = payload_files[target_path]
+
+        target_macho_bytes = target_bytes if system == "aarch64-darwin" else None
+        resolved_plat_tag, _ = resolve_burst_platform_wheel_tag(
+            system,
+            target_macho_bytes=target_macho_bytes,
+            requested_tag=platform_tag,
+        )
+
+        burst_prov = make_burst_native_provenance(system, target_path, target_bytes, target_info, payload_files)
+        extra_prov.update(burst_prov)
+
+        effective_platform_tag = resolved_plat_tag
+        evidence = None
+    else:
+        # Retain global rejection if system absent or product is not Stellar Burst.
+        # Universal is justified only by the authenticated JS closure inspected here.
+        for name, data in payload_files.items():
+            from rs9.build_native import is_native_payload
+            if is_native_payload(name, data):
+                raise ContractError(
+                    "UNQUALIFIED_PLATFORM",
+                    "Native CLI dependency wheels require platform qualification",
+                    details={
+                        "product": canonical_id,
+                        "substage": "closure-platform-scan",
+                        "origin": payload_origins[name],
+                        "archive_path": name,
+                        "reason": "node-addon-member" if name.endswith(".node") else "native-binary-member",
+                        "wheel_tag": "py3-none-any",
+                        "asset_platform": "any",
+                    },
+                )
+            if name.endswith("/package.json") or name == "package.json":
+                metadata = json.loads(data)
+                if metadata.get("os") or metadata.get("cpu"):
+                    raise ContractError(
+                        "UNQUALIFIED_PLATFORM",
+                        "Platform constrained dependencies require qualification",
+                        details={
+                            "product": canonical_id,
+                            "substage": "closure-platform-scan",
+                            "origin": payload_origins[name],
+                            "archive_path": name,
+                            "reason": "package-os-cpu-constraint",
+                            "wheel_tag": "py3-none-any",
+                            "asset_platform": "any",
+                        },
+                    )
+        if platform_tag not in (None, "any"):
+            raise ContractError("UNSUPPORTED_PLATFORM", "Authenticated pure JS closure uses the any tag")
+
+        effective_platform_tag = platform_tag
+        evidence = _OFFLINE_JS_PROOF
+
+    # 7. Build deterministic wheel
     return build_wheel(
         product_id=canonical_id,
         version=version,
@@ -228,8 +300,8 @@ def build_capture_wheel(
         release_record=capture.record,
         release_hash=release_hash,
         content_identity_sha256=content_identity_sha256,
-        platform_tag=platform_tag,
-        evidence=_OFFLINE_JS_PROOF,
+        platform_tag=effective_platform_tag,
+        evidence=evidence,
         license_files=licenses_dict,
         summary=summary,
         deterministic_timestamp=deterministic_timestamp,

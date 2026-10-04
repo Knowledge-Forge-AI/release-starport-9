@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 from rs9.errors import ContractError
 from rs9.hosted_custody import provenance, retain
-from rs9.hosted_summary import contract, required, summarize, validate_summary
+from rs9.hosted_summary import contract, required, summarize, validate_summary, LINUX_WHEEL_PROMOTION_BLOCKER
 from rs9.scratch import canonical
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -26,7 +26,18 @@ class HostedSummaryTests(unittest.TestCase):
             files=[]
             if row.get("custody_required"):
                 for product in row["required_products"]:
-                    name=product.replace("-","_")+"-0.6.1-py3-none-any.whl" if row["lane"]=="wheels" else product+"_0.6.1_all.deb" if row["lane"]=="deb" else product+"-0.6.1-1.rpm" if row["lane"]=="rpm" else product+"-0.6.1-1.pkg.tar.zst"
+                    from rs9.product_classes import is_pure_js_cli
+                    pure = is_pure_js_cli(product)
+                    if row["lane"] == "wheels":
+                        tag = "any" if pure else {"aarch64-darwin": "macosx_11_0_arm64", "x86_64-linux": "linux_x86_64", "aarch64-linux": "linux_aarch64"}[row["system"]]
+                        name = product.replace("-", "_") + "-0.6.1-py3-none-" + tag + ".whl"
+                    elif row["lane"] == "deb":
+                        name = product + "_0.6.1_" + ("all" if pure else row["system"]) + ".deb"
+                    elif row["lane"] == "rpm":
+                        arch = "noarch" if pure else {"x86_64-linux": "x86_64", "aarch64-linux": "aarch64"}[row["system"]]
+                        name = product + "-0.6.1-1." + arch + ".rpm"
+                    else:
+                        name = product + "-0.6.1-1-" + ("any" if pure else "x86_64") + ".pkg.tar.zst"
                     path=scratch / "unsigned" / name;path.parent.mkdir(exist_ok=True);path.write_bytes(b"fixture-custody")
                     files.append(path)
             else:
@@ -34,8 +45,23 @@ class HostedSummaryTests(unittest.TestCase):
             receipt={"schema":"rs9.hosted-candidate-diagnostic.v1alpha2","lane":row["lane"],"system":row["system"],
                 "production_enabled":False,"publication_authority":False,"attended_gates_satisfied":False,
                 "execution_error":None,"policy_blockers":[],"runner":{},"provenance":provenance(ROOT,"a"*64),
+                "production_promotion_blockers": [LINUX_WHEEL_PROMOTION_BLOCKER] if row["lane"] == "wheels" and row["system"].endswith("linux") else [],
                 "gates":[{"name":g,"status":"pass"} for g in row["required_gates"]]}
             retain(scratch,self.inputs / row["artifact_name"],files,receipt)
+
+    def test_burst_architecture_independent_custody_is_rejected(self):
+        from rs9.hosted_summary import validate_product_architectures
+        for family, system, name in (
+            ("wheels", "x86_64-linux", "theme_forge_stellar_burst-0.6.1-py3-none-any.whl"),
+            ("pacman", "x86_64-linux", "theme-forge-stellar-burst-0.6.1-1-any.pkg.tar.zst"),
+            ("rpm", "x86_64-linux", "theme-forge-stellar-burst-0.6.1-1.noarch.rpm"),
+            ("deb", "amd64", "theme-forge-stellar-burst_0.6.1_all.deb"),
+        ):
+            with self.subTest(family=family):
+                lane = {"lane": family, "system": system, "required_products": ["theme-forge-stellar-burst"]}
+                with self.assertRaises(ContractError) as caught:
+                    validate_product_architectures(lane, [{"path": "objects/" + name, "kind": "custody"}])
+                self.assertEqual(caught.exception.code, "CUSTODY_ARCHITECTURE")
 
     def mutate_receipt(self,lane,system,change):
         directory=self.inputs / ("candidate-"+lane+"-"+system)
@@ -55,6 +81,8 @@ class HostedSummaryTests(unittest.TestCase):
         self.assertEqual(code,0)
         self.assertTrue(row["lanes_executed_ok"])
         self.assertFalse(row["publication_authority"])
+        self.assertTrue(row["production_promotion_blocked"])
+        self.assertEqual(row["production_promotion_blockers"], [LINUX_WHEEL_PROMOTION_BLOCKER])
         self.assertEqual(validate_summary(row,ROOT,"1"*40)["qualification_verdict"],"qualified")
 
     def test_missing_artifact_preserves_bounded_failed_summary(self):
@@ -110,3 +138,18 @@ class HostedSummaryTests(unittest.TestCase):
         row["receipts"][0]["policy_blockers"]=["pending"]
         with self.assertRaises(ContractError):
             validate_summary(row,ROOT,"1"*40)
+
+    def test_linux_promotion_blocker_cannot_be_omitted(self):
+        self.mutate_receipt("wheels", "x86_64-linux", lambda r: r.update(production_promotion_blockers=[]))
+        code, row = self.finish()
+        self.assertEqual(code, 2)
+        with self.assertRaises(ContractError) as caught:
+            validate_summary(row, ROOT, "1" * 40)
+        self.assertEqual(caught.exception.code, "HOSTED_POLICY")
+
+    def test_summary_cannot_strip_promotion_blockers(self):
+        _, row = self.finish()
+        row.update(production_promotion_blockers=[], production_promotion_blocked=False)
+        with self.assertRaises(ContractError) as caught:
+            validate_summary(row, ROOT, "1" * 40)
+        self.assertEqual(caught.exception.code, "HOSTED_POLICY")

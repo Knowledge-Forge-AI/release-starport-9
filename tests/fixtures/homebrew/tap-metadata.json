@@ -1,0 +1,54 @@
+{
+  "default_branch": "main",
+  "commit_sha": "b8b695bbb27e607a181e8ddedc506a1235831484",
+  "tree_sha": "d0a4143bfce23567f9fbd25948335a95630918e4",
+  "tap": "Knowledge-Forge-AI/homebrew-tap",
+  "formulas": {
+    "theme-forge-stellar-burst": {
+      "path": "Formula/theme-forge-stellar-burst.rb",
+      "blob_sha": "0a5cf66b85a7e88172bba72c6cbe2de65a888f48",
+      "formula_sha256": "af8b1ee1784553745d93e8f9cbc6f15194b6dbeb8c0ad98a4de01669640db8fa",
+      "class_name": "ThemeForgeStellarBurst",
+      "payload_url": "https://registry.npmjs.org/@knowledge-forge-ai/theme-forge-stellar-burst/-/theme-forge-stellar-burst-0.6.1.tgz",
+      "payload_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+      "license": "AGPL-3.0-or-later",
+      "dependencies": ["node"],
+      "commands": ["tfsb", "tfsb-studio-service"]
+    },
+    "theme-forge-stellar-loom": {
+      "path": "Formula/theme-forge-stellar-loom.rb",
+      "blob_sha": "a6ece55af3578e2c67cf4d794361684b4a25acd0",
+      "formula_sha256": "5d9e848a9023e46f3d4a8d9f0d6e70f7919ea7bfca5b10bf68105d8663070ce9",
+      "class_name": "ThemeForgeStellarLoom",
+      "payload_url": "https://registry.npmjs.org/@knowledge-forge-ai/theme-forge-stellar-loom/-/theme-forge-stellar-loom-0.4.0.tgz",
+      "payload_sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+      "license": "AGPL-3.0-or-later",
+      "dependencies": ["node"],
+      "commands": ["tfsl", "tfsl-batch"]
+    },
+    "theme-forge-solar-sail": {
+      "path": "Formula/theme-forge-solar-sail.rb",
+      "blob_sha": "5a607dbef7da39003db2bb7cbda2f7411cc50947",
+      "formula_sha256": "2470e65d56830f5a167f9120b56f627bcd96b0797258d7a44df9ca7b32909666",
+      "class_name": "ThemeForgeSolarSail",
+      "payload_url": "https://registry.npmjs.org/@knowledge-forge-ai/theme-forge-solar-sail/-/theme-forge-solar-sail-0.2.1.tgz",
+      "payload_sha256": "ebc4f21d1e61dbc0ac4e87ce81f7ecec4f97d7c15562356e429d4c1a4e9aa5a0",
+      "license": "AGPL-3.0-or-later",
+      "dependencies": ["node"],
+      "commands": ["tfss"]
+    },
+    "theme-forge-nebular-fusion": {
+      "path": "Formula/theme-forge-nebular-fusion.rb",
+      "blob_sha": "9e1664b290dafaa377161e275b7f7d2116e65596",
+      "formula_sha256": "3ceab48cc7ea8d64d178b45ae3475ac61d25a60f090b0396148110a691914e61",
+      "class_name": "ThemeForgeNebularFusion",
+      "payload_url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+      "payload_sha256": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be",
+      "license": "AGPL-3.0-or-later",
+      "dependencies": [],
+      "arch_restrictions": ["arm64"],
+      "os_restrictions": ["macos"],
+      "commands": ["tfnf"]
+    }
+  }
+}
