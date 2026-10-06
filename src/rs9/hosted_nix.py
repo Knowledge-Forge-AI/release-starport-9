@@ -9,10 +9,10 @@ import sys
 
 from rs9.build_native import stage_payload, stage_offline_npm_closure
 from rs9.errors import ContractError, safe_details
-from rs9.hosted_commands import linux_runtime_prefix, run_probes, runtime_environment
+from rs9.hosted_commands import command_diagnostic, linux_runtime_prefix, run_probes, runtime_environment
 from rs9.hosted_platforms import select_payload
-from rs9.hosted_smoke import prepare_smoke, snapshot_nebular_runtime, verify_nebular_runtime
-from rs9.hosted_wheels import _resolve_offline_npm_archives
+from rs9.hosted_smoke import prepare_smoke, snapshot_nebular_runtime, verify_nebular_runtime, verifier_import_preflight
+from rs9.npm_deps import resolve_offline_npm_archives as _resolve_offline_npm_archives
 from rs9 import nix_installer
 from rs9.product_classes import get_product_class as package_class
 from rs9.hosted_burst import verify_burst_payload
@@ -25,6 +25,24 @@ from rs9.wheel_native import get_embedded_rs9_helpers
 SYSTEMS = {"aarch64-darwin", "x86_64-linux", "aarch64-linux"}
 PRODUCTS = ("theme-forge-stellar-burst", "theme-forge-stellar-loom",
             "theme-forge-solar-sail", "theme-forge-nebular-fusion")
+
+
+def fhs_runtime_smoke(runtime, system, prefix, env):
+    """Exercise the same disconnected FHS invocation before Nebular probes."""
+    result = subprocess.run([*prefix, str(Path(runtime) / "bin/rs9-nebular-fhs"), "true"],
+                            env=env, capture_output=True, timeout=30)
+    details = command_diagnostic("tfnf", 0, {"kind": "fhs-runtime", "expect_exit": 0}, result,
+                                 system=system, substage="nix-fhs-runtime-smoke")
+    policy = Path("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")
+    try:
+        value = policy.read_text().strip()
+    except OSError:
+        value = None
+    details["userns_policy"] = {"0": "unrestricted", "1": "restricted"}.get(value, "unavailable")
+    if result.returncode:
+        code = "NIX_FHS_USERNS" if details["diagnostic_token"] in {"userns-denied", "uid-map-denied"} else "NIX_FHS_RUNTIME"
+        raise ContractError(code, "Disconnected native FHS runtime failed", details=details)
+    return {"name": "nix-fhs-runtime-smoke", "status": "pass", "details": details}
 
 
 def command(argv, *, cwd=None, env=None, timeout=3600):
@@ -217,13 +235,15 @@ def execute(context):
     env = runtime_environment(dict(os.environ, THEME_FORGE_CACHE_DIR=str(scratch / "nix-runtime-cache")))
     neb = next(c for c, i, _ in context["captures"] if i["project"]["id"] == PRODUCTS[-1])
     baseline = None
+    prepared = None
+    runtime_prefix = []
     def after_nebular_probe():
         nonlocal baseline
         if baseline is None:
             roots = list(Path(env["THEME_FORGE_CACHE_DIR"]).glob("entries/*/payload/*"))
             if len(roots) != 1:
                 raise ContractError("NIX_RUNTIME", "First Nix launcher materialization missing")
-            baseline = snapshot_nebular_runtime(roots[0], {"capture": neb}, system)
+            baseline = snapshot_nebular_runtime(roots[0], prepared, system)
     prefix = []
     if system.endswith("linux"):
         prefix = linux_runtime_prefix(env)
@@ -249,6 +269,11 @@ def execute(context):
             gates.extend({"name": name, "status": "pass"} for name in
                          ("burst-native-addon-target", "burst-native-addon-load"))
         if pid == PRODUCTS[-1]:
+            if system.endswith("linux"):
+                runtime = json.loads(command(["nix", "build", "--json", "--no-link", *overrides,
+                    str(source) + "#candidates." + system + "." + pid + ".runtime"]))[0]["outputs"]["out"]
+                gates.append(fhs_runtime_smoke(runtime, system, prefix, env))
+                runtime_prefix = [str(Path(runtime) / "bin/rs9-nebular-fhs")]
             # Native outPath has symlink payload passthru: read back compressed archive from store
             store_payload_dir = Path(output) / "payload"
             if not store_payload_dir.exists():
@@ -264,26 +289,24 @@ def execute(context):
             paths[pid]["store_archive_sha256"] = store_archive_sha256
             paths[pid]["asset_sha256"] = expected_release_sha256
             gates.append({"name": "nix-store-archive-readback", "status": "pass"})
+            prepared = prepare_smoke(neb, context["captures"], context["client"], scratch / "nix-smoke")
+            verifier_import_preflight(prepared, system, [*prefix, *runtime_prefix], env)
 
         for name in products[pid]["commands"]:
             rows = run_probes(name, Path(output) / "bin" / name, repository=repository, prefix=prefix, env=env,
+                              system=system, substage="nix-command-probe",
                               **({"after_probe": after_nebular_probe} if pid == PRODUCTS[-1] else {}))
             if any(g["status"] != "pass" for g in rows):
                 raise ContractError("NIX_COMMAND", "Installed Nix command contract failed")
             gates.extend(rows)
     # Actually build the check derivations, not just evaluate them.
     command(["nix", "flake", "check", *overrides, str(source)])
-    prepared = prepare_smoke(neb, context["captures"], context["client"], scratch / "nix-smoke")
     roots = list(Path(env["THEME_FORGE_CACHE_DIR"]).glob("entries/*/payload/*"))
     if len(roots) != 1:
         raise ContractError("NIX_RUNTIME", "Actual Nix launcher materialization missing")
     if baseline is None:
         raise ContractError("SIDECAR_BASELINE", "Pre-probe Nix runtime identity required")
-    runtime_prefix = []
     if system.endswith("linux"):
-        runtime = json.loads(command(["nix", "build", "--json", "--no-link", *overrides,
-                      str(source) + "#candidates." + system + "." + PRODUCTS[-1] + ".runtime"]))[0]["outputs"]["out"]
-        runtime_prefix = [str(Path(runtime) / "bin/rs9-nebular-fhs")]
         for file in roots[0].rglob("*"):
             if not file.is_file() or file.is_symlink():
                 continue

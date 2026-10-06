@@ -1,0 +1,536 @@
+{
+  "diagnosis": {
+    "A": {
+      "cause_module": "tools/platform-targets.mjs",
+      "current_preflight": {
+        "exit_code": 0,
+        "node_version": "22.22.2",
+        "status": "pass",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "e102eaa94053c918362ef9c95e9ba3812d82958377214ae80f5e44cc7a86969d"
+      },
+      "git_blob_readback_matched": true,
+      "invocation": "Small structured wrapper calls unchanged released sidecar-common.verifyDistribution; sidecar-verify CLI uses fixed src-tauri inputs and cannot select installed runtime paths. Released sidecar-verify export and application smoke also import in preflight.",
+      "missing_path": "package.json",
+      "path_basis": "new URL relative to import.meta.url",
+      "payload_mutated": false,
+      "replay": [
+        {
+          "code": "ENOENT",
+          "exit_code": 2,
+          "message_sha256": "afe407cc3ef4b1a14d2d1300f38dedbc1bce571b0b174a746e1e8b2215206f54",
+          "missing_path": "package.json",
+          "node_version": "22.22.2",
+          "phase": "before-support",
+          "status": "fail",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_sha256": "d1d1b9af1bb530adedf2a3e95aebc4868daa0de20f17781e15b8dfe5dad952bb",
+          "syscall": "open"
+        },
+        {
+          "exit_code": 0,
+          "export_type": "function",
+          "node_version": "22.22.2",
+          "phase": "authenticated-support",
+          "status": "pass",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_sha256": "d876c25f858644b301ff0e19755a1a0d968858159ab276f418afc95ef5298464"
+        }
+      ],
+      "replay_scope": "reachable import closure only; production preparation fetches complete authenticated tools prefixes plus reviewed support",
+      "runtime_verifier_success_claimed": false,
+      "source_bindings": [
+        {
+          "blob": "4251796133a8c4a9780cf2a496e265c6fc395bba",
+          "path": "package.json",
+          "role": "verifier-support",
+          "sha256": "8555670c2648985e1193eaef4fd4756793672afcde6a20cc3a862ecc447f33d0",
+          "size": 1833,
+          "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+        },
+        {
+          "blob": "8c40af0b9b90657aadff4df0146c60326912eeaa",
+          "path": "tools/build-inputs.mjs",
+          "role": "verifier-module",
+          "sha256": "6e8e9e13c06522bfa3c65dab4b2b0dab6cad0f79f23360034548ada253c9d43c",
+          "size": 10144,
+          "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+        },
+        {
+          "blob": "b3c59a41e89935c14a3915a8cd553433a4c3e37f",
+          "path": "tools/build-settings.mjs",
+          "role": "verifier-module",
+          "sha256": "4c78920dab296bc550b10ad1d7563ff265da1b7e54c263ddf8721bee702c9a41",
+          "size": 19210,
+          "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+        },
+        {
+          "blob": "9cbdc96bc641fb4ae61350163725cb2af5036e45",
+          "path": "tools/candidate-provenance.mjs",
+          "role": "verifier-module",
+          "sha256": "d6e3e1aa0ee61c8ef88db27f42722233209d6a23506da64018632ca9c792080c",
+          "size": 10739,
+          "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+        },
+        {
+          "blob": "a55afca1286846990a582d1431a90b19058f7d81",
+          "path": "tools/darwin-linkage-validator.mjs",
+          "role": "verifier-module",
+          "sha256": "91bf0038a94e430494b06450dbfc5d047ae55e2bbf7bcdcd31880426ec9c1207",
+          "size": 6299,
+          "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+        },
+        {
+          "blob": "eac902d742a4a07a6a13573109a86ea4b3301a1e",
+          "path": "tools/fs-snapshot.mjs",
+          "role": "verifier-module",
+          "sha256": "a85cd9e81602ddc585baa4164f98707debe5158d260130e489431e9ae699bbde",
+          "size": 10936,
+          "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+        },
+        {
+          "blob": "c8ca125b644fb05c2c44c2d792ed8da5465c525b",
+          "path": "tools/native-rc-smoke.mjs",
+          "role": "application-smoke",
+          "sha256": "3d1eb991bd586dbb90e926049b516549e7518c0851c2e90ecbcc4e20838963f2",
+          "size": 23213,
+          "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+        },
+        {
+          "blob": "7a3e6afd79f472f81de5ce7b4509e78cb3649df8",
+          "path": "tools/node-runtime-authority.mjs",
+          "role": "verifier-module",
+          "sha256": "5bef23e0fea39c9a08177a3c33d380b96a043a9c0045823b4d88d2986ddf55ec",
+          "size": 34288,
+          "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+        },
+        {
+          "blob": "e8a7119852a21c37a8d0364088bae95ee34e8ef2",
+          "path": "tools/platform-targets.mjs",
+          "role": "verifier-module",
+          "sha256": "b60379182eea809609f84ca8211d93d6bce433f3c5449fa3ea5564f34bcfc0e0",
+          "size": 5412,
+          "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+        },
+        {
+          "blob": "bb2d8bcbe9dbec8e3b7770f55484403ecc5419d8",
+          "path": "tools/sidecar-common.mjs",
+          "role": "verifier-module",
+          "sha256": "67d45471554906b989ea6d01bfae93dba88b247090307201da14f2db9f8db3c1",
+          "size": 67256,
+          "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+        },
+        {
+          "blob": "a456da327097d26bec9a41fdfaf288af57f38657",
+          "path": "tools/sidecar-verify.mjs",
+          "role": "verifier-module",
+          "sha256": "fba7f292b3c01ed062f4727e0c22912bc269b6ca76fca8328fb5329c098aac77",
+          "size": 1906,
+          "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+        }
+      ],
+      "status": "source-repaired-authentic-import-replayed",
+      "syscall": "open",
+      "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+    },
+    "B": {
+      "logical_path": "root.prepared.capture",
+      "non_json_type": "ReleaseCapture",
+      "producer": "hosted_wheel_clients.qualify copied prepared with only Path values projected",
+      "regression": "Both Linux systems retain all four product records, Burst target/load evidence and independent Debian/RPM client gates after Nebular lifecycle failure.",
+      "repair": "Explicit JSON client schema omits capture and carries authenticated expected_members and manifest_sha256; child rechecks binding.",
+      "status": "source-repaired-regression-tested"
+    },
+    "C": {
+      "cause": "unknown from available run-5 logs",
+      "qualification": "No claim that real Linux Nix COMMAND_BEHAVIOR is repaired.",
+      "runtime_change": "No Theme Forge semantics, runner sysctl or AppArmor policy change. FHS smoke invokes exact disconnected wrapper with true and classifies userns failures separately.",
+      "safe_fields": [
+        "product",
+        "command",
+        "probe_id",
+        "substage",
+        "system",
+        "exit_code",
+        "expected_exit",
+        "stdout_sha256",
+        "stderr_sha256",
+        "diagnostic_token"
+      ],
+      "status": "diagnostics-added-exact-replay-unresolved"
+    },
+    "D": {
+      "native-desktop": "Nebular uses authenticated platform payload and supporting evidence; no unrelated npm-lock reconstruction.",
+      "native-node-cli": "Burst retains authenticated npm/package native prebuild closure.",
+      "pure-js-cli": "Exact npm closure when dependencies require it; otherwise None.",
+      "status": "source-repaired-regression-tested"
+    },
+    "E": {
+      "codes": [
+        "INVALID_NAME",
+        "INVALID_VERSION",
+        "INVALID_ARCHITECTURE",
+        "RPM_QUERY_FAILED"
+      ],
+      "expected_architectures": {
+        "aarch64-linux": "aarch64",
+        "pure-js-cli": "noarch",
+        "x86_64-linux": "x86_64"
+      },
+      "parse_failure_diagnostics": {
+        "observed_architecture": "Fourth positional token is retained safely even on parse failure; it remains an observation, never qualification authority.",
+        "observed_field_count": "Count all pipe-delimited fields without accepting a malformed record.",
+        "observed_field_tokens": "At most six positional tokens; each at most 64 characters, otherwise a SHA-256 digest. Closed diagnostic schema rejects credentials, private paths and unbounded values.",
+        "observed_fields_truncated": "True when additional fields exist; the parser still fails closed."
+      },
+      "qualification": "Synthetic query/build metadata tests pass. Run-5 raw query and real Fedora RPM/rpmlint/client replay unavailable; no architecture success claimed.",
+      "query_shape": "One six-tag pipe-separated record from the actual rpm query; no filename/banner/source-RPM/blank-line fallback.",
+      "status": "strict-diagnostics-added-exact-replay-unresolved"
+    },
+    "F": {
+      "authority": "operators/live1/targets.json",
+      "maintainer": "Knowledge Forge AI <nonproduction@knowledge-forge.invalid>",
+      "qualification": "Syntax and source client regressions cover control/build/index/closure and disconnected behavior. Actual dpkg-deb/shlibdeps/APT client path remains mandatory and was not run locally.",
+      "status": "source-repaired-native-integration-pending"
+    },
+    "G": {
+      "formulas": [
+        "theme-forge-stellar-burst",
+        "theme-forge-stellar-loom",
+        "theme-forge-solar-sail",
+        "theme-forge-nebular-fusion"
+      ],
+      "license_authority": "Explicit authenticated normalized intent plus consistent profile facts; no ReleaseCapture.normalized.",
+      "live_current_formula_qualification": "Pending fresh hosted observation; fixture readers and planner regressions are source proof only.",
+      "preserved": [
+        "one observed tap commit/tree",
+        "Git-blob formula binding",
+        "static parser without Ruby eval",
+        "exact to planner noop",
+        "transport failures unknown",
+        "identity drift fail closed"
+      ],
+      "status": "source-repaired-four-formula-fixture-readers-tested"
+    },
+    "H": {
+      "archive_control": "Evidence only; satisfies_installed_gate remains false.",
+      "custody": "Pages/Foundation3 still fail closed on missing native package custody; production disabled.",
+      "status": "source-gates-preserved-installed-runtime-proof-pending",
+      "verifier": "Only real released verifier success can satisfy native verifier gate. Application smoke remains required."
+    }
+  },
+  "entry": {
+    "branch": "main",
+    "head_matches_public_parent": true,
+    "origin_main_matches_head": true,
+    "semantic_repository_checks": "live",
+    "unrelated_serena_preserved": true
+  },
+  "observed_stage_deltas_at_entry": [],
+  "original_scope": [
+    "A authenticated released verifier closure and import preflight",
+    "B Linux wheel canonical JSON producers and retained gates",
+    "C exact Linux Nix command behavior diagnosis and evidence-gated invocation repair",
+    "D product-class dependency preparation",
+    "E actual RPM identity and architecture readback",
+    "F reserved Debian maintainer and candidate client path",
+    "G Homebrew intent/profile license authority and exact/noop readers",
+    "H unchanged released verifier integration and custody fail-closed gates",
+    "source qualification and attended one-new-run-6 handoff"
+  ],
+  "plan_review_findings": [
+    {
+      "disposition": "accept",
+      "id": "F1",
+      "result": "Import replay identifies open(package.json), not spawn. No repository is fabricated; spawn failures remain SIDECAR_HARNESS_IMPORT."
+    },
+    {
+      "disposition": "amend",
+      "id": "F2",
+      "result": "Fetch the complete authenticated tools prefixes plus exact package.json support for the reviewed tag; unknown tags fail closed. Real import preflight is authoritative. No general-purpose speculative import parser is added."
+    },
+    {
+      "disposition": "accept",
+      "id": "F3",
+      "result": "Preflight retains the actual Node version in each lane. Import-only local Node 22.22.2 evidence is not installed-runtime or embedded Node qualification."
+    },
+    {
+      "disposition": "amend",
+      "id": "F4",
+      "result": "Validate the explicit wheel client config, wheel manifest and child receipt at their producers. Default canonical exception behavior remains unchanged; no default=str or arbitrary conversion is used."
+    },
+    {
+      "disposition": "accept",
+      "id": "F5",
+      "result": "The disconnected child verifies expected_members against manifest_sha256 before qualification. Dependency preparation preserves None for dependency-free pure-JS products."
+    },
+    {
+      "disposition": "amend",
+      "id": "F6",
+      "result": "No global sysctl or AppArmor change is justified by the available evidence. The exact disconnected FHS invocation and safe user-namespace diagnostics are now retained; actual run-5 command replay remains unresolved."
+    },
+    {
+      "disposition": "amend",
+      "id": "F7",
+      "result": "Do not assume RPM queryformat punctuation caused the failure. Keep the actual six-tag query, reject alternate output shapes, and distinguish name/version/architecture failures with bounded observed tokens. Run-5 raw query replay remains unresolved."
+    },
+    {
+      "disposition": "accept",
+      "id": "F8",
+      "result": "Burst DEB closure regressions, captures without normalized, reserved maintainer syntax, and target-metadata inventory delta are covered."
+    }
+  ],
+  "preserved_scope": [
+    "run-5 unit/config/authenticate/pins source contracts",
+    "source pin identities and npm supplemental transport",
+    "Nebular payload-license authority and released payload bytes/modes/symlinks/sidecar binaries",
+    "Burst architecture-specific policy and complete prebuild inventory",
+    "scratch/lane-work split and command-path archive semantics",
+    "non-production workflow and publication boundaries"
+  ],
+  "production_enabled": false,
+  "proposal": {
+    "bytes": 16525,
+    "disposition": "amend",
+    "reason": "Retain original scope while applying review findings, mechanically confirmed import and JSON causes, and explicit unresolved native replay limits.",
+    "sha256": "524853ac20560a63cfedc312f70e8687787a853bde5b46564906de21cee387cf"
+  },
+  "public_parent": "a09fcc21c68c292cd526033bb2ecebccf3167b90",
+  "qualification_limits": [
+    "Shell GitHub download cannot connect; connector read-only job logs do not include the failing command/query raw streams. Artifact ZIP reference could not be materialized through an available local transfer route.",
+    "Local Docker engine socket is unavailable; Linux Nix/native distro builds and disconnected package clients cannot be replayed.",
+    "The local authentic import is Node 22.22.2 only; hosted lane Node versions and unchanged released runtime authority remain required.",
+    "Hosted run 5 was not rerun. No hosted run 6, Git publication, deployment, registry mutation, release mutation, production signing or production receipt occurred."
+  ],
+  "review_and_handoff": {
+    "acceptance_required": "Manager/dispatcher acceptance of the exact terminal tree and candidate-manifest before attended adoption. Run 6 is diagnostic for unresolved Linux Nix and RPM causes.",
+    "dispatcher_review_required": "Dispatcher-owned pre-final work review received; terminal amendment is dispatcher-bound evidence without another substantive review.",
+    "git_publication_performed": false,
+    "new_run": "One new push event bound to the adopted commit; never rerun run 5.",
+    "operator": "operators/live1/run-hosted6.py",
+    "operator_executed": false,
+    "production_receipts": [],
+    "reviewer_invoked": false
+  },
+  "schema": "rs9.hosted5-gates-repair-source-verification.v1alpha1",
+  "stage": "closeout",
+  "status": "terminal-source-checks-passed-phase-blocked-on-required-native-evidence",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT7-HOSTED5-GATES-REPAIR1",
+  "terminal_closeout": {
+    "blocking_requirements": [
+      "Failure C: exact Linux Nix command-contract replay and cause were not obtained; current source adds diagnostics only.",
+      "Failure E: exact run-5 RPM query cause and real RPM ARCH/rpmlint/client proof were not obtained.",
+      "Real native package and disconnected client qualification, including the full Debian candidate path, remains unverified."
+    ],
+    "disposition": "amend",
+    "handoff": "The attended operator is retained for manager disposition; it was not executed or accepted locally. Manager acceptance must bind the terminal tree and manifest, and treat unresolved Nix/RPM lanes as diagnostic.",
+    "omissions": [
+      "No run-5 rerun or run-6 execution",
+      "No real native package, installed runtime or fresh Homebrew observation qualification",
+      "No Git metadata mutation or production publication"
+    ],
+    "phase_outcome": "blocked",
+    "rationale": "Retain the reviewed source repairs and bounded RPM diagnostic amendment, with no verifier, payload or command-contract weakening. Source checks pass, but mandatory exact Nix/RPM diagnosis and real native client proof remain missing; implementation qualification is blocked pending manager disposition.",
+    "reviewed_candidate": {
+      "manifest_sha256": "4cdc090d4107e8fa83d3f410f08d724eaa4ab477a35432468f8601e2a0ba2ef5",
+      "tree": "38766286c107833e5972fd7efd6efcd4c7c1f137"
+    },
+    "source_changes": [
+      "src/rs9/build_rpm.py",
+      "src/rs9/errors.py",
+      "tests/test_build_rpm.py"
+    ],
+    "verification": {
+      "cumulative_unit_suite": {
+        "collection": "Child stdout/stderr captured in memory; only sanitized summary emitted.",
+        "command": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest discover -s tests -q",
+        "errors": 0,
+        "exit_code": 0,
+        "failures": 0,
+        "log_sha256": "feb3bb1399f6d330fa11ce28af3cc91ba3e50972df64059d19dfb22e95fad2af",
+        "note": "This suite ran after the terminal source amendment and initial inventory rebind. Only evidence and inventory metadata were finalized afterward; post-evidence checks verify those final bytes.",
+        "resource_warning_errors": 0,
+        "skip_boundaries": [
+          {
+            "count": 5,
+            "reason": "Opt-in retained live capture directories were not supplied."
+          },
+          {
+            "count": 3,
+            "reason": "Official Nix archive directory was not locatable; authenticated source pin policy remains unchanged."
+          },
+          {
+            "count": 4,
+            "reason": "Local GnuPG binary unavailable (one class setup and three fixture checks)."
+          }
+        ],
+        "skipped": 12,
+        "source_test_inventory_sha256": "db9708d3ff082861397466cf9826fd563bee57445a964d466552730139c998a4",
+        "status": "pass",
+        "tests_run": 987
+      },
+      "focused": {
+        "command": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_build_rpm tests.test_hosted_diagnostics tests.test_npm_transport -q",
+        "exit_code": 0,
+        "regression_reproduction": "Three new malformed-query regressions failed with missing diagnostic keys before correction. Final focused and full suites pass.",
+        "status": "pass",
+        "tests_run": 36
+      },
+      "post_evidence_checks": {
+        "command": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_candidate_inventory tests.test_hygiene tests.test_workflow_static tests.test_run_hosted6 -q",
+        "exit_code": 0,
+        "note": "32 targeted checks passed on finalized evidence/inventory. The final record update is followed by the same checks to qualify the terminal bytes.",
+        "skipped": 0,
+        "status": "pass",
+        "tests_run": 32
+      },
+      "static": {
+        "broken_relative_links": 0,
+        "bytecode_written_by_compile_check": false,
+        "credential_private_key_private_path_scan": "pass in complete unittest suite and post-evidence HygieneTests",
+        "git_diff_check": "pass",
+        "python_parsed_and_compiled": 177,
+        "relative_links_checked": 249
+      },
+      "status": "source-checks-pass-required-native-evidence-unresolved"
+    },
+    "work_review_dispositions": [
+      {
+        "disposition": "defer",
+        "finding": 1,
+        "rationale": "Exact Linux Nix command cause is unresolved. The user-namespace explanation remains a hypothesis; preserve diagnostic-only status and unchanged command semantics."
+      },
+      {
+        "disposition": "amend",
+        "finding": 2,
+        "rationale": "Retain bounded field count, field tokens and architecture observation on malformed RPM query output. Actual run-5 cause remains unresolved."
+      },
+      {
+        "disposition": "accept",
+        "finding": 3,
+        "rationale": "Preserve authenticated verifier module closure, unchanged released verifier and import preflight. Local import evidence uses Node 22.22.2; hosted runtime proof is pending."
+      },
+      {
+        "disposition": "defer",
+        "finding": 4,
+        "rationale": "Accept canonical JSON producer repair. Per-product client partial results and unexpected Docker exception classification remain limitations; family gates stay independently visible and fail closed."
+      },
+      {
+        "disposition": "accept",
+        "finding": 5,
+        "rationale": "Preserve class-aware native-desktop preparation and Burst authenticated npm closure."
+      },
+      {
+        "disposition": "accept",
+        "finding": 6,
+        "rationale": "Preserve reserved Debian maintainer, explicit authenticated license authority and formula identity checks."
+      },
+      {
+        "disposition": "accept",
+        "finding": 7,
+        "rationale": "Preserve non-production adoption boundary, exact candidate binding, one-new-push collection and unrelated local state."
+      }
+    ],
+    "worker_disposition": "declined: the terminal diagnostic correction and inventory binding are small and tightly coupled; no internal worker or further substantive review was invoked."
+  },
+  "verification": {
+    "candidate_inventory": {
+      "changed_product_paths": 32,
+      "inventoried_product_files_including_manifest": 324,
+      "parent": "a09fcc21c68c292cd526033bb2ecebccf3167b90",
+      "verification": "Full current file bytes/modes and exact live product delta; final tree/manifest digest returned outside the self-inventoried report."
+    },
+    "cumulative_unit_suite": {
+      "command": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest discover -s tests -q",
+      "exit_code": 0,
+      "failures": 0,
+      "log_sha256": "5cf885fdd4fc660ef9d31e11c489427742d0a5330df948120997cbbc30670446",
+      "note": "Only three trailing blank lines in tests and report/manifest metadata were finalized after this suite; final inventory/hygiene/static checks follow.",
+      "resource_warning_errors": 0,
+      "skip_boundaries": [
+        {
+          "count": 5,
+          "reason": "Opt-in retained live capture directories were not supplied."
+        },
+        {
+          "count": 3,
+          "reason": "Official Nix archive directory was not locatable; authenticated source pin policy remains unchanged."
+        },
+        {
+          "count": 4,
+          "reason": "Local GnuPG binary unavailable (one class setup and three fixture checks)."
+        }
+      ],
+      "skipped": 12,
+      "source_test_inventory_sha256": "e76a1a6a2f89c539c2aa8e64eae22038c177ab6472bc4b7724cf3fd2a2034026",
+      "tests_run": 983
+    },
+    "not_claimed": [
+      "Exact failing run-5 Nix command replay or its behavior repair",
+      "Exact failing run-5 RPM output diagnosis or actual Fedora ARCH/rpmlint proof",
+      "Real Linux wheel verifier/client success",
+      "Full native distro build and disconnected package installation qualification",
+      "Fresh live Homebrew all-formula exact/noop qualification",
+      "Pages/Foundation3 success or production readiness"
+    ],
+    "post_evidence_checks": {
+      "note": "Only evidence and inventory metadata are rebound after these checks; source code and test behavior are unchanged.",
+      "skipped": 0,
+      "status": "pass",
+      "suites": [
+        "candidate exact delta and inventory",
+        "credential/private-path hygiene",
+        "workflow static boundaries",
+        "attended run-6 operator"
+      ],
+      "tests_run": 32
+    },
+    "required_regressions": [
+      "Authenticated tagged module closure, exact support path, Git-blob mismatch and source roles",
+      "Real Node import preflight failures before runtime evidence; spawn failure does not fabricate Git metadata",
+      "Exact ReleaseCapture producer diagnosis, bounded JSON validation and explicit transported schema",
+      "Both Linux wheel manifests after Nebular failure retain four products, Burst evidence and independent client gates",
+      "Linux Nix command/protocol identity and digest diagnostics plus disconnected FHS smoke token replay",
+      "Native desktop dependency preparation without lock; Burst native-node DEB and shared closure retained",
+      "Strict RPM query noarch/x86_64/aarch64 vocabulary and distinct name/version/architecture failure",
+      "Reserved .invalid Debian maintainer syntax and source package/index/client regressions",
+      "Four current-generation Homebrew formula fixture readers, explicit license authority and exact/noop semantics",
+      "Package client qualification and Pages/Foundation3 missing-custody failure preservation",
+      "Candidate exact delta and workflow static production boundaries",
+      "Attended run-6 parent/tree/manifest binding and bounded failure output"
+    ],
+    "static": {
+      "broken_relative_links": 0,
+      "bytecode_written_by_compile_check": false,
+      "credential_private_key_private_path_scan": "pass",
+      "git_diff_check": "pass",
+      "hygiene_tests_run": 4,
+      "python_parsed_and_compiled": 177,
+      "relative_links_checked": 249
+    },
+    "status": "pass-with-explicit-integration-limits"
+  },
+  "worker_disposition": {
+    "admissions": 3,
+    "cleanup_proven": true,
+    "completed_attempts": 3,
+    "dispatcher_checkpoints_satisfied_by_workers": false,
+    "facility": "selected-dispatcher-shared-worker",
+    "observed_kind": "gemini",
+    "observed_profile": "gemini-3.8-flash-high",
+    "results": [
+      {
+        "outcome": "accepted-after-parent-bounding-and-integration",
+        "task": "json"
+      },
+      {
+        "outcome": "partial-adopted; permissive RPM filename/banner fallbacks rejected and replaced by strict query interpretation",
+        "task": "native-packaging"
+      },
+      {
+        "outcome": "accepted-after-parent-authority-and-fixture-integration",
+        "task": "observe"
+      }
+    ]
+  }
+}

@@ -92,7 +92,7 @@ class HostedWheelIsolationTests(unittest.TestCase):
             verifier = kw["commands_to_test"]["tfsb"]["verifier"]
             verifier(self.root / "venv/bin/tfsb", [], {})
             return {"installed": True}
-        with patch("rs9.hosted_wheels.closure_for_capture", return_value=[]), \
+        with patch("rs9.npm_deps.closure_for_capture", return_value=[]), \
              patch("rs9.hosted_wheels.verify_double_build", return_value=(wheel, wheel)) as build, \
              patch("rs9.hosted_wheels.verify_wheel_record_bidirectional", return_value={"record_valid": True, "member_count": 5}), \
              patch("rs9.hosted_wheels.verify_offline_venv_lifecycle", side_effect=lifecycle), \
@@ -104,7 +104,7 @@ class HostedWheelIsolationTests(unittest.TestCase):
         gates = {g["name"]: g["status"] for g in result["gates"]}
         self.assertEqual(gates["burst-native-addon-load"], "pass")
 
-    @patch("rs9.hosted_wheels.closure_for_capture", return_value=[])
+    @patch("rs9.npm_deps.closure_for_capture", return_value=[])
     @patch("rs9.hosted_wheels.verify_wheel_record_bidirectional")
     @patch("rs9.hosted_wheels.verify_double_build")
     @patch("rs9.hosted_wheels.verify_offline_venv_lifecycle")
@@ -209,7 +209,7 @@ class HostedWheelIsolationTests(unittest.TestCase):
         self.assertIn("theme-forge-stellar-burst", result["details"]["products"])
         self.assertNotIn("theme-forge-nebular-fusion", result["details"]["products"])
 
-    @patch("rs9.hosted_wheels.closure_for_capture", return_value=[])
+    @patch("rs9.npm_deps.closure_for_capture", return_value=[])
     @patch("rs9.hosted_wheels.linux_runtime_prefix", return_value=[])
     @patch("subprocess.run")
     @patch("rs9.hosted_wheels.verify_wheel_record_bidirectional")
@@ -268,7 +268,7 @@ class HostedWheelIsolationTests(unittest.TestCase):
         self.assertEqual(gate_names["wheel-client-rpm"]["status"], "fail")
         self.assertEqual(gate_names["wheel-client-rpm"]["reason"], "nebular-unbuilt-or-unprepared")
 
-    @patch("rs9.hosted_wheels.closure_for_capture", return_value=[])
+    @patch("rs9.npm_deps.closure_for_capture", return_value=[])
     @patch("rs9.hosted_smoke.prepare_smoke")
     @patch("rs9.hosted_wheels.verify_wheel_record_bidirectional")
     @patch("rs9.hosted_wheels.verify_double_build")
@@ -316,6 +316,113 @@ class HostedWheelIsolationTests(unittest.TestCase):
         life_diag = json.loads(life_diag_file.read_bytes())
         self.assertEqual(life_diag["details"]["wheel_tag"], "py3-none-macosx_13_0_arm64")
         self.assertNotIn("error_message", life_diag)
+
+    def _run_linux_nebular_lifecycle_fail_regression(self, system: str):
+        """When Nebular fails lifecycle on Linux, manifest retains 4 built records, Burst evidence, independent client gates."""
+        arch = "x86_64" if system == "x86_64-linux" else "aarch64"
+        burst_tag = f"py3-none-linux_{arch}"
+        neb_tag = f"py3-none-linux_{arch}"
+
+        burst_wheel = self._create_mock_wheel(f"theme_forge_stellar_burst-0.6.1-{burst_tag}.whl", tag=burst_tag)
+        burst_wheel.record.update(
+            platform_specific=True,
+            target_system=system,
+            target_native_addon={"path": "target", "sha256": "a" * 64},
+        )
+        loom_wheel = self._create_mock_wheel("theme_forge_stellar_loom-0.6.1-py3-none-any.whl")
+        sail_wheel = self._create_mock_wheel("theme_forge_solar_sail-0.6.1-py3-none-any.whl")
+        neb_wheel = self._create_mock_wheel(f"theme_forge_nebular_fusion-0.6.1-{neb_tag}.whl", tag=neb_tag)
+
+        wheel_map = {
+            "theme-forge-stellar-burst": burst_wheel,
+            "theme-forge-stellar-loom": loom_wheel,
+            "theme-forge-solar-sail": sail_wheel,
+            "theme-forge-nebular-fusion": neb_wheel,
+        }
+
+        def side_effect_double_build(builder, product_id, *args, **kwargs):
+            w = wheel_map[product_id]
+            return w, w
+
+        captures = []
+        for pid in ("theme-forge-stellar-burst", "theme-forge-stellar-loom", "theme-forge-solar-sail", "theme-forge-nebular-fusion"):
+            c = MagicMock()
+            c.source = {"package.json": "{}"}
+            captures.append((c, {"project": {"id": pid}}, {}))
+
+        context = {
+            "repository": self.repo,
+            "scratch": self.scratch,
+            "system": system,
+            "captures": captures,
+        }
+
+        burst_load_receipt = {"status": "pass", "node_abi": "127", "proof": "installed-released-loader-self-test"}
+
+        def side_effect_lifecycle(wheel_path, distribution_name, commands_to_test, venv_dir, cache_dir, command_prefix=None):
+            if "nebular_fusion" in wheel_path.name:
+                raise ContractError("SMOKE_FAILED", "Simulated nebular lifecycle verification failure",
+                                    details={"origin": "verify_offline_venv_lifecycle"})
+            if "stellar_burst" in wheel_path.name:
+                verifier = commands_to_test["tfsb"]["verifier"]
+                verifier(self.scratch / "bin/tfsb", [], {"THEME_FORGE_CACHE_DIR": str(self.scratch / "cache")})
+            return {"installed": True}
+
+        receipt_path = self.scratch / "wheel-client-deb-receipt.json"
+        receipt_path.write_bytes(b"{}")
+        mock_client_gates = [
+            {"name": "wheel-client-deb", "status": "pass"},
+            {"name": "wheel-client-rpm", "status": "fail", "reason": "rpm-client-failed"},
+        ]
+
+        with patch("rs9.npm_deps.closure_for_capture", return_value=[]), \
+             patch("rs9.hosted_wheels.linux_runtime_prefix", return_value=[]), \
+             patch("subprocess.run", return_value=MagicMock(returncode=0)), \
+             patch("rs9.hosted_commands.run_probes", return_value=[{"name": "tfsb", "status": "pass"}]), \
+             patch("rs9.hosted_wheels.verify_double_build", side_effect=side_effect_double_build), \
+             patch("rs9.hosted_wheels.verify_wheel_record_bidirectional", return_value={"record_valid": True, "member_count": 5}), \
+             patch("rs9.hosted_smoke.prepare_smoke", return_value={"source": self.scratch, "tools": self.scratch, "scratch": self.scratch, "records": []}), \
+             patch("rs9.hosted_wheels.verify_installed_burst", return_value=burst_load_receipt), \
+             patch("rs9.hosted_wheels.verify_offline_venv_lifecycle", side_effect=side_effect_lifecycle), \
+             patch("rs9.hosted_wheel_clients.qualify", return_value=(mock_client_gates, [receipt_path])) as mock_qualify:
+            result = execute(context)
+
+        # 1. Linux manifests retain four records
+        manifest = result["details"]["manifest"]
+        products = manifest["products"]
+        self.assertEqual(len(products), 4)
+        for pid in ("theme-forge-stellar-burst", "theme-forge-stellar-loom", "theme-forge-solar-sail", "theme-forge-nebular-fusion"):
+            self.assertIn(pid, products)
+            self.assertTrue((self.scratch / "retained" / products[pid]["filename"]).is_file())
+
+        # 2. Retains Burst target and load evidence
+        self.assertEqual(manifest["burst_native_load"], burst_load_receipt)
+        gate_map = {g["name"]: g for g in result["gates"]}
+        self.assertEqual(gate_map["burst-native-addon-target"]["status"], "pass")
+        self.assertEqual(gate_map["burst-native-addon-load"]["status"], "pass")
+
+        # 3. Nebular lifecycle failed gracefully with diagnostic
+        self.assertEqual(gate_map["lifecycle.theme-forge-nebular-fusion"]["status"], "fail")
+        self.assertEqual(gate_map["wheel-lifecycle-install-test"]["status"], "fail")
+        self.assertEqual(gate_map["wheel-native-verifier"]["status"], "fail")
+        diag_path = self.scratch / "diagnostics/theme-forge-nebular-fusion-lifecycle-diagnostic.json"
+        self.assertTrue(diag_path.is_file())
+
+        # 4. Independent client gates evaluated and recorded
+        mock_qualify.assert_called_once()
+        self.assertEqual(gate_map["wheel-client-deb"]["status"], "pass")
+        self.assertEqual(gate_map["wheel-client-rpm"]["status"], "fail")
+        self.assertEqual(gate_map["wheel-client-rpm"]["reason"], "rpm-client-failed")
+
+        # 5. Manifest artifact written
+        self.assertTrue((self.scratch / "hosted-wheels-manifest.json").is_file())
+        self.assertIn("manifest_sha256", result["details"])
+
+    def test_linux_x86_64_nebular_lifecycle_fail_retains_four_records_burst_evidence_independent_gates(self):
+        self._run_linux_nebular_lifecycle_fail_regression("x86_64-linux")
+
+    def test_linux_aarch64_nebular_lifecycle_fail_retains_four_records_burst_evidence_independent_gates(self):
+        self._run_linux_nebular_lifecycle_fail_regression("aarch64-linux")
 
 
 if __name__ == "__main__":

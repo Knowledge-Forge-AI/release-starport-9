@@ -69,7 +69,7 @@ def bind_commands(captures, repository, output):
     return target
 
 
-def _read_frame(child, selector, deadline):
+def _read_frame(child, selector, deadline, observed=None):
     buffered = bytearray()
     while time.monotonic() < deadline:
         if selector.select(min(1, max(0, deadline - time.monotonic()))):
@@ -77,6 +77,8 @@ def _read_frame(child, selector, deadline):
             if not raw:
                 raise ContractError("SERVICE_FRAME", "Bounded NDJSON response required")
             buffered.extend(raw)
+            if observed is not None:
+                observed.update(raw)
             if len(buffered) > 1024 * 1024:
                 raise ContractError("SERVICE_FRAME", "Studio response exceeded bound")
             if raw == b"\n":
@@ -91,6 +93,7 @@ def service_protocol(argv, env=None):
     selector = selectors.DefaultSelector()
     selector.register(child.stdout, selectors.EVENT_READ)
     deadline = time.monotonic() + 30
+    observed = hashlib.sha256()
     def send(method, params, ident=None):
         frame = {"jsonrpc": "2.0", "method": method, "params": params}
         if ident is not None:
@@ -101,7 +104,7 @@ def service_protocol(argv, env=None):
         send("initialize", {"protocol": "tfsb.studio", "minVersion": "1.0", "maxVersion": "1.0",
                             "client": {"name": "rs9-hosted-candidate", "version": "1"},
                             "capabilities": {"progress": True, "cancellation": True}}, 1)
-        initial = _read_frame(child, selector, deadline)
+        initial = _read_frame(child, selector, deadline, observed)
         result = initial.get("result", {})
         if (initial.get("jsonrpc") != "2.0" or initial.get("id") != 1 or "error" in initial
                 or result.get("selectedVersion") != "1.0" or not isinstance(result.get("sessionNonce"), str)
@@ -109,7 +112,7 @@ def service_protocol(argv, env=None):
             raise ContractError("SERVICE_INITIALIZE", "Studio negotiation failed")
         send("initialized", {"sessionNonce": result["sessionNonce"]})
         send("shutdown", {"sessionNonce": result["sessionNonce"]}, 2)
-        shutdown = _read_frame(child, selector, deadline)
+        shutdown = _read_frame(child, selector, deadline, observed)
         if shutdown != {"jsonrpc": "2.0", "id": 2, "result": None}:
             raise ContractError("SERVICE_SHUTDOWN", "Studio shutdown failed")
         send("exit", {})
@@ -118,7 +121,18 @@ def service_protocol(argv, env=None):
         stdout, stderr = child.communicate(timeout=max(1, deadline - time.monotonic()))
         if child.returncode != 0 or stdout or stderr:
             raise ContractError("SERVICE_TERMINATION", "Studio lifecycle did not terminate cleanly")
-        return {"selected_version": result["selectedVersion"], "exit_code": child.returncode}
+        observed.update(stdout)
+        return {"selected_version": result["selectedVersion"], "exit_code": child.returncode,
+                "stdout_sha256": observed.hexdigest(), "stderr_sha256": hashlib.sha256(stderr).hexdigest()}
+    except (ContractError, ValueError, OSError, subprocess.TimeoutExpired) as error:
+        if child.poll() is None:
+            child.kill()
+        stdout, stderr = child.communicate(timeout=5)
+        observed.update(stdout or b"")
+        raise ContractError(error.code if isinstance(error, ContractError) else "SERVICE_PROTOCOL",
+                            "Released service protocol failed", details={"exit_code": child.returncode,
+                                "stdout_sha256": observed.hexdigest(),
+                                "stderr_sha256": hashlib.sha256(stderr or b"").hexdigest()}) from None
     finally:
         selector.close()
         if child.poll() is None:
@@ -154,23 +168,73 @@ def linux_runtime_prefix(env=None):
             "/usr/bin/env", "-i", *[key + "=" + env[key] for key in sorted(env)]]
 
 
-def run_probes(command, path, repository=None, prefix=None, env=None, after_probe=None):
+def command_diagnostic(command, index, probe, result, repository=None, system=None, substage="command-probe"):
+    """Fixed contract identity and stream digests; never retain raw command output."""
+    stdout = result.stdout or ""
+    stderr = result.stderr or ""
+    stdout = stdout.encode() if isinstance(stdout, str) else stdout
+    stderr = stderr.encode() if isinstance(stderr, str) else stderr
+    text = stderr.decode("utf-8", errors="replace").lower()
+    tokens = (("uid-map-denied", ("uid_map", "permission denied")),
+              ("uid-map-denied", ("uid map", "permission denied")),
+              ("userns-denied", ("no permissions to create new namespace",)),
+              ("userns-denied", ("creating new namespace", "operation not permitted")),
+              ("userns-denied", ("user namespace", "permission denied")),
+              ("shared-library-missing", ("error while loading shared libraries",)),
+              ("display-unavailable", ("cannot open display",)),
+              ("no-such-file", ("no such file or directory",)))
+    token = next((name for name, parts in tokens if all(p in text for p in parts)), "unclassified-command-failure")
+    identity = {"product": contracts(repository)[command]["project"], "command": command,
+                "probe_id": f"{command}.{index}.{probe['kind']}", "substage": substage,
+                "exit_code": result.returncode, "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
+                "stderr_sha256": hashlib.sha256(stderr).hexdigest(), "diagnostic_token": token}
+    if system:
+        identity["system"] = system
+    if "expect_exit" in probe:
+        identity.update(expected_exit=probe["expect_exit"],
+                        stdout_matches=all(s.encode() in stdout for s in probe.get("stdout_contains", [])),
+                        stderr_matches=all(s.encode() in stderr for s in probe.get("stderr_contains", [])))
+    return identity
+
+
+def run_probes(command, path, repository=None, prefix=None, env=None, after_probe=None, *, system=None, substage="command-probe"):
     env = runtime_environment(env)
     if _BOUND.get(command, {}).get("status") != "bound":
         return [{"name": "command." + command + ".supported-behavior", "status": "not-run",
                  "reason": "released-command-contract-unbound"}]
     gates = []
-    for probe in probes_for(command, repository):
+    for index, probe in enumerate(probes_for(command, repository)):
         argv = [*(prefix or []), str(path), *probe["argv"]]
         if probe["kind"] == "service-protocol":
-            service_protocol(argv, env)
+            try:
+                service_protocol(argv, env)
+            except ContractError as error:
+                raise error.with_details(product=contracts(repository)[command]["project"], command=command,
+                                         probe_id=f"{command}.{index}.{probe['kind']}", system=system,
+                                         substage=substage) from None
+            except OSError:
+                raise ContractError("SERVICE_EXECUTION", "Released service probe unavailable",
+                                    details={"product": contracts(repository)[command]["project"], "command": command,
+                                             "probe_id": f"{command}.{index}.{probe['kind']}", "system": system,
+                                             "substage": substage, "diagnostic_token": "spawn-unavailable"}) from None
         else:
-            result = subprocess.run(argv, input=probe.get("input", ""), capture_output=True,
-                                    text=True, env=env, timeout=30)
+            try:
+                result = subprocess.run(argv, input=probe.get("input", ""), capture_output=True,
+                                        text=True, env=env, timeout=30)
+            except subprocess.TimeoutExpired as error:
+                result = subprocess.CompletedProcess([], None, error.stdout, error.stderr)
+                raise ContractError("COMMAND_TIMEOUT", "Released command probe timed out",
+                                    details=command_diagnostic(command, index, probe, result, repository, system, substage)) from None
+            except OSError:
+                raise ContractError("COMMAND_EXECUTION", "Released command probe unavailable",
+                                    details={"product": contracts(repository)[command]["project"], "command": command,
+                                             "probe_id": f"{command}.{index}.{probe['kind']}", "system": system,
+                                             "substage": substage, "diagnostic_token": "spawn-unavailable"}) from None
             if (result.returncode != probe["expect_exit"]
                     or any(s not in result.stdout for s in probe.get("stdout_contains", []))
                     or any(s not in result.stderr for s in probe.get("stderr_contains", []))):
-                raise ContractError("COMMAND_BEHAVIOR", "Released command expectation failed")
+                raise ContractError("COMMAND_BEHAVIOR", "Released command expectation failed",
+                                    details=command_diagnostic(command, index, probe, result, repository, system, substage))
         gates.append({"name": "command." + command + ".supported-behavior", "status": "pass"})
         if after_probe is not None:
             after_probe()

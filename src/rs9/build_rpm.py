@@ -40,6 +40,45 @@ from rs9.security import validate_safe_relative_posix_path
 
 RPM_REQUIRED_TOOLS = ["rpmbuild", "rpm", "rpmlint"]
 CREATEREPO_CANDIDATES = ["createrepo_c", "createrepo"]
+RPM_EXPECTED_ARCHITECTURES = frozenset({"noarch", "x86_64", "aarch64"})
+
+
+def _safe_observed_token(value: str | None) -> str:
+    """Retain bounded observed token; compute safe hash otherwise."""
+    if not value or not isinstance(value, str):
+        return ""
+    token = value
+    if 1 <= len(token) <= 64 and re.fullmatch(r"[A-Za-z0-9_.+-]+", token):
+        return token
+    return digest(token.encode("utf-8", errors="replace"))
+
+
+def read_rpm_identity(receipt, product, version, architecture):
+    """Interpret only the exact six-tag query record, never a filename or banner."""
+    raw = receipt.stdout_text
+    details = {"product": product, "substage": "rpm-query", "tool": "rpm",
+               "exit_code": receipt.exit_code, "stdout_sha256": receipt.stdout_sha256,
+               "stderr_sha256": receipt.stderr_sha256}
+    line = raw[:-1] if raw.endswith("\n") else raw
+    # Keep positional observations even when the record is invalid. They are
+    # diagnostics only; no field from a malformed record qualifies the package.
+    # A capped split bounds the retained token list independently of output size.
+    fields = line.split("|", 6)
+    details.update({"observed_field_count": line.count("|") + 1,
+                    "observed_field_tokens": [_safe_observed_token(x) for x in fields[:6]],
+                    "observed_fields_truncated": len(fields) > 6,
+                    "observed_architecture": _safe_observed_token(fields[3]) if len(fields) > 3 else ""})
+    if len(raw) > 4096 or len(fields) != 6 or not all(fields) or any("\n" in x or "\r" in x for x in fields):
+        raise ContractError("RPM_QUERY_FAILED", "Expected one bounded six-tag RPM query record", details=details)
+    name, observed_version, release, arch, payload_digest, algo = fields
+    for observed, expected, code in ((name, product, "INVALID_NAME"),
+                                      (observed_version, version, "INVALID_VERSION"),
+                                      (arch, architecture, "INVALID_ARCHITECTURE")):
+        if observed != expected or (code == "INVALID_ARCHITECTURE" and arch not in RPM_EXPECTED_ARCHITECTURES):
+            raise ContractError(code, "RPM query identity differs from the qualified product",
+                                details={**details, "diagnostic_token": _safe_observed_token(observed)})
+    return {"name": name, "version": observed_version, "release": release, "arch": arch,
+            "payload_digest": payload_digest, "payload_digest_algo": algo}
 
 
 def _find_createrepo(runner: CommandRunner) -> str | None:
@@ -439,7 +478,7 @@ def build_rpm_candidate(
     dest_rpm = repo_dir / rpm_file.name
     dest_rpm.write_bytes(rpm_bytes)
 
-    # Collect actual RPM v6 package identities using rpm -qp queryformat
+    # Collect actual RPM package identities using rpm -qp queryformat
     rpm_query_cmd = [
         "rpm",
         "-qp",
@@ -448,22 +487,20 @@ def build_rpm_candidate(
         str(dest_rpm),
     ]
     rpm_query_receipt = r.run(rpm_query_cmd, cwd=scratch)
-    rpm_v6_identity: dict[str, str] = {}
-    if rpm_query_receipt.exit_code == 0 and rpm_query_receipt.stdout_text.strip():
-        parts = rpm_query_receipt.stdout_text.strip().split("|")
-        if len(parts) >= 6:
-            rpm_v6_identity = {
-                "name": parts[0],
-                "version": parts[1],
-                "release": parts[2],
-                "arch": parts[3],
-                "payload_digest": parts[4],
-                "payload_digest_algo": parts[5],
-            }
-    if (rpm_v6_identity.get("name") != project_id or rpm_v6_identity.get("version") != version
-            or rpm_v6_identity.get("arch") != matched_arch):
-        raise ContractError("INVALID_ARCHITECTURE", "Actual RPM metadata differs from the qualified product architecture")
+    if rpm_query_receipt.exit_code != 0:
+        raise ContractError(
+            "RPM_QUERY_FAILED",
+            f"rpm query failed with exit code {rpm_query_receipt.exit_code}",
+            details={
+                "substage": "rpm-query",
+                "tool": "rpm",
+                "exit_code": rpm_query_receipt.exit_code,
+                "stdout_sha256": rpm_query_receipt.stdout_sha256,
+                "stderr_sha256": rpm_query_receipt.stderr_sha256,
+            },
+        )
 
+    rpm_v6_identity = read_rpm_identity(rpm_query_receipt, project_id, version, matched_arch)
     rpm_requires_receipt = None
     if is_native:
         rpm_requires_cmd = [

@@ -750,6 +750,66 @@ class BurstDebCandidateTests(unittest.TestCase):
         self.assertIn("libc6 (>= 2.34)", result["manifest"]["dependencies"])
         self.assertEqual(result["manifest"]["elf_object_count"], 1)
 
+    def test_reserved_maintainer_syntax_validation(self):
+        from rs9.build_native import validate_maintainer
+        # Valid reserved maintainer
+        valid = "Knowledge Forge AI <nonproduction@knowledge-forge.invalid>"
+        self.assertEqual(validate_maintainer(valid), valid)
+
+        # Invalid domain without dot fails
+        with self.assertRaises(ContractError) as caught:
+            validate_maintainer("Knowledge Forge AI <nonproduction@invalid>")
+        self.assertEqual(caught.exception.code, "INVALID_METADATA")
+
+        # Verify targets.json maintainer is valid per validate_maintainer
+        targets_path = Path(__file__).resolve().parents[1] / "operators/live1/targets.json"
+        targets = json.loads(targets_path.read_bytes())
+        self.assertEqual(validate_maintainer(targets["maintainer"]), valid)
+
+    def test_burst_deb_closure_retention_regression(self):
+        capture, intent, offline_npm = self._make_burst_fixture()
+
+        def deb_h(argv, cwd=None, env=None):
+            Path(argv[4]).write_bytes(make_minimal_deb(
+                "theme-forge-stellar-burst", "0.6.1", 1, "amd64",
+                "Knowledge Forge AI <nonproduction@knowledge-forge.invalid>", "Burst", "nodejs (>= 22)"
+            ))
+            return CommandReceipt(argv, 0, b"", b"")
+
+        runner = MockCommandRunner(
+            available_tools={"dpkg-deb": "/usr/bin/dpkg-deb", "dpkg-shlibdeps": "/usr/bin/dpkg-shlibdeps", "dpkg-query": "/usr/bin/dpkg-query"},
+            handlers={
+                "dpkg-deb": deb_h,
+                "dpkg-shlibdeps": lambda argv, cwd=None, env=None: CommandReceipt(argv, 0, b"shlibs:Depends=libc6 (>= 2.34)\n", b""),
+                "dpkg-query": lambda argv, cwd=None, env=None: CommandReceipt(argv, 0, b"libc6\t2.35-0ubuntu3\tamd64\n", b""),
+            },
+        )
+        # Omission of offline_npm_archives for Burst fails closed
+        fail_scratch = self.scratch / "fail_scratch"
+        fail_scratch.mkdir()
+        with self.assertRaises(ContractError) as caught:
+            build_deb_candidate(
+                capture, intent, "amd64", fail_scratch,
+                maintainer="Knowledge Forge AI <nonproduction@knowledge-forge.invalid>",
+                offline_npm_archives=None,
+                runner=runner,
+            )
+        self.assertEqual(caught.exception.code, "NPM_CLOSURE")
+
+        # Supplying offline_npm stages the node_modules closure
+        burst_scratch = self.scratch / "burst_closure_scratch"
+        burst_scratch.mkdir()
+        result = build_deb_candidate(
+            capture, intent, "amd64", burst_scratch,
+            maintainer="Knowledge Forge AI <nonproduction@knowledge-forge.invalid>",
+            offline_npm_archives=offline_npm,
+            runner=runner,
+        )
+        pkg_root = burst_scratch / "pkg/theme-forge-stellar-burst_0.6.1-1_amd64"
+        staged_dep = pkg_root / "usr/lib/theme-forge-stellar-burst/node_modules/min-dep"
+        self.assertTrue(staged_dep.is_dir())
+        self.assertTrue((staged_dep / "package.json").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

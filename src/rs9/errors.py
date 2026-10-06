@@ -19,6 +19,10 @@ def safe_details(details):
                     "actual_digest", "exception_type", "module", "frame", "traceback_sha256",
                     "destination", "cleanup"})
     allowed.update({"phase", "reason_token", "preload_sha256", "harness_sha256", "root_mode_restored", "product_errors"})
+    allowed.update({"missing_path", "node_version", "probe_id", "expected_exit", "stdout_matches",
+                    "stderr_matches", "observed_architecture", "observed_name", "observed_version",
+                    "userns_policy", "code", "message_sha256"})
+    allowed.update({"observed_field_count", "observed_field_tokens", "observed_fields_truncated"})
     result, dropped = {}, False
     if not isinstance(details, dict):
         return {}
@@ -28,6 +32,34 @@ def safe_details(details):
             continue
         if key not in allowed:
             dropped = True
+            continue
+        if key == "observed_field_count":
+            if type(value) is int and 1 <= value <= 1024 ** 3:
+                result[key] = value
+            else:
+                dropped = True
+            continue
+        if key == "observed_fields_truncated":
+            if type(value) is bool:
+                result[key] = value
+            else:
+                dropped = True
+            continue
+        if key == "observed_field_tokens":
+            if (not isinstance(value, list) or not 1 <= len(value) <= 6
+                    or any(not isinstance(token, str) or len(token) > 64
+                           or not re.fullmatch(r"[A-Za-z0-9_.+-]*", token) for token in value)):
+                dropped = True
+                continue
+            try:
+                for token in value:
+                    if token:
+                        validate_safe_relative_posix_path(token)
+                        scan_for_credentials(token)
+            except ContractError:
+                dropped = True
+                continue
+            result[key] = list(value)
             continue
         if key == "cleanup":
             if isinstance(value, str) and value in {"complete", "failed", "not-needed"}:
@@ -65,7 +97,13 @@ def safe_details(details):
         if type(value) is int and key in {"mode", "size"} and 0 <= value <= 1024 ** 3:
             result[key] = value
             continue
-        if key == "exit_code":
+        if key in {"stdout_matches", "stderr_matches"}:
+            if type(value) is bool:
+                result[key] = value
+            else:
+                dropped = True
+            continue
+        if key in {"exit_code", "expected_exit"}:
             if type(value) is int and -128 <= value <= 255:
                 result[key] = value
             else:

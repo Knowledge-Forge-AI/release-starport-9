@@ -14,13 +14,18 @@ from rs9.scratch import canonical
 from rs9.security import validate_safe_relative_posix_path
 
 
-def tagged_files(capture, client, output, prefixes):
+def tagged_files(capture, client, output, prefixes, *, paths=(), role="verifier-module"):
     """Supplement a fresh capture with bounded blobs authenticated by its Git tree."""
     authenticated_record_hash(capture)
     records, total = [], 0
     for entry in authenticated_tree(capture)["tree"]:
         name = entry["path"]
-        if entry.get("type") != "blob" or not any(name.startswith(p) for p in prefixes):
+        if not (name in paths or any(name.startswith(p) for p in prefixes)):
+            continue
+        if entry.get("type") != "blob":
+            if name in paths:
+                raise ContractError("SIDECAR_HARNESS_IMPORT", "Regular authenticated support source required",
+                                    details={"substage": "verifier-closure", "missing_path": name})
             continue
         validate_safe_relative_posix_path(name)
         if entry.get("mode") not in ("100644", "100755") or entry.get("size", 0) > 2 * 1024 ** 2:
@@ -35,8 +40,17 @@ def tagged_files(capture, client, output, prefixes):
         target = output / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
-        records.append({"path": name, "blob": blob, "sha256": digest(data), "size": len(data)})
+        records.append({"path": name, "blob": blob, "sha256": digest(data), "size": len(data), "role": role,
+                        "tag_commit": capture.record["tag"]["commit"]})
+    if set(paths) - {r["path"] for r in records}:
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Authenticated support source missing",
+                            details={"substage": "verifier-closure", "missing_path": sorted(set(paths) - {r["path"] for r in records})[0]})
     return records
+
+
+# platform-targets.mjs reads this file at import time. Unknown tagged closures
+# require a reviewed binding; never substitute an ambient checkout's metadata.
+VERIFIER_SUPPORT = {"49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e": ("package.json",)}
 
 
 def _safe_label(value):
@@ -52,14 +66,25 @@ def prepare_smoke(capture, captures, client, scratch, label=None):
     scratch.mkdir(parents=True, exist_ok=True)
     source = scratch / "source"
     source.mkdir()
+    support = VERIFIER_SUPPORT.get(capture.record["tag"]["commit"])
+    if support is None:
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Tagged verifier support closure is unreviewed",
+                            details={"substage": "verifier-closure", "reason": "unknown-tag-closure"})
     records = tagged_files(capture, client, source, ("tools/", "apps/studio/tools/"))
+    records += tagged_files(capture, client, source, (), paths=support, role="verifier-support")
+    for row in records:
+        if row["path"].endswith("/native-rc-smoke.mjs"):
+            row["role"] = "application-smoke"
     tools = source / "tools"
     if not (tools / "native-rc-smoke.mjs").is_file():
         tools = source / "apps/studio/tools"
-    if not all((tools / p).is_file() for p in ("native-rc-smoke.mjs", "sidecar-common.mjs")):
-        raise ContractError("SMOKE_SOURCE", "Released application-aware harness is unavailable")
+    if not all((tools / p).is_file() for p in ("native-rc-smoke.mjs", "sidecar-common.mjs", "sidecar-verify.mjs")):
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Released application-aware harness is unavailable",
+                            details={"substage": "verifier-closure"})
     fixture = next(c for c, intent, _ in captures if intent["project"]["id"] == "theme-forge-stellar-burst")
-    records += tagged_files(fixture, client, source, ("docs/examples/v0.4/brand-system/core-minimal/",))
+    records += tagged_files(fixture, client, source, ("docs/examples/v0.4/brand-system/core-minimal/",), role="fixture")
+    if len(records) > 1000 or sum(r["size"] for r in records) > 32 * 1024 ** 2:
+        raise ContractError("SMOKE_SOURCE", "Complete source closure exceeds bounds")
     if not (source / "docs/examples/v0.4/brand-system/core-minimal").is_dir():
         raise ContractError("SMOKE_FIXTURE", "Authenticated released fixture required")
     (scratch / "source-bindings.json").write_bytes(canonical(records))
@@ -390,10 +415,10 @@ def _verifier_script(module):
             "reason_token:reasons[e.message]??'unclassified-released-verifier-error'})); process.exitCode=2; }\n")
 
 
-def _run_verifier(script, sidecar, payload, prefix, env):
+def _run_verifier(script, sidecar, payload, prefix, env, cwd=None):
     try:
         result = subprocess.run([*prefix, "node", str(script), str(sidecar), str(payload)],
-                                env=env, capture_output=True, timeout=180)
+                                cwd=cwd, env=env, capture_output=True, timeout=180)
     except subprocess.TimeoutExpired as error:
         return {"status": "fail", "phase": "execution", "reason_token": "tool-timeout",
                 "stdout_sha256": digest(error.stdout or b""), "stderr_sha256": digest(error.stderr or b"")}, None
@@ -405,6 +430,13 @@ def _run_verifier(script, sidecar, payload, prefix, env):
         doc = json.loads(stdout)
     except (ValueError, UnicodeError):
         doc = {}
+    if isinstance(doc, dict):
+        node = doc.get("node_version")
+        if isinstance(node, str) and re.fullmatch(r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}", node):
+            evidence["node_version"] = node
+        for key in ("missing_path", "diagnostic_token"):
+            if key in doc:
+                evidence.update(safe_details({key: doc[key]}))
     if result.returncode == 0 and isinstance(doc, dict) and doc.get("status") == "pass" and isinstance(doc.get("result"), dict):
         return {**evidence, "status": "pass"}, doc["result"]
     phases = {"import", "verify", "output", "execution", "unavailable", "unknown"}
@@ -418,11 +450,72 @@ def _run_verifier(script, sidecar, payload, prefix, env):
             evidence["code"] = doc["code"]
         if doc.get("reason_token") in {"symlink-ancestor", "manifest-not-canonical", "manifest-self-digest", "runtime-identity", "payload-inventory", "payload-totals", "actual-input-identity", "manifest-fixed-identity"}:
             evidence["reason_token"] = doc["reason_token"]
-        from rs9.errors import safe_details
         checksum = safe_details({"stderr_sha256": doc.get("message_sha256")}).get("stderr_sha256")
         if checksum:
             evidence["message_sha256"] = checksum
     return evidence, None
+
+
+def verifier_import_preflight(prepared, system, prefix=(), env=None):
+    """Import the authentic released sibling closure before inspecting any runtime."""
+    source = Path(prepared.get("source", prepared["tools"])).resolve()
+    tools = Path(prepared["tools"]).resolve()
+    # Recheck transported blobs before executing them in a wheel/native client.
+    for row in prepared.get("records", []):
+        validate_safe_relative_posix_path(row["path"])
+        path = source / row["path"]
+        if any(p.is_symlink() for p in (path, *path.parents)) or not path.is_file():
+            raise ContractError("SIDECAR_HARNESS_IMPORT", "Authenticated verifier source is missing",
+                                details={"substage": "verifier-source-readback", "missing_path": row["path"]})
+        if path.stat().st_size > 2 * 1024 ** 2:
+            raise ContractError("SIDECAR_HARNESS_IMPORT", "Verifier source exceeds bound")
+        data = path.read_bytes()
+        blob = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+        if len(data) != row["size"] or digest(data) != row["sha256"] or blob != row["blob"]:
+            raise ContractError("SIDECAR_HARNESS_IMPORT", "Authenticated verifier source changed",
+                                details={"substage": "verifier-source-readback", "missing_path": row["path"]})
+    script = Path(prepared["scratch"]) / "verify-import-preflight.mjs"
+    modules = [(tools / p).as_uri() for p in ("sidecar-common.mjs", "sidecar-verify.mjs", "native-rc-smoke.mjs")]
+    script.write_text(
+        "import {createHash} from 'node:crypto'; import {relative,isAbsolute} from 'node:path';\n"
+        "import {fileURLToPath} from 'node:url';\ntry {\n"
+        "const modules=await Promise.all(" + json.dumps(modules) + ".map(p=>import(p)));\n"
+        "if(typeof modules[0].verifyDistribution!=='function'||typeof modules[1].verifySidecar!=='function') throw new TypeError('verifier export missing');\n"
+        "console.log(JSON.stringify({status:'pass',result:{},node_version:process.versions.node}));\n"
+        "} catch(e) { let path=e.path; if(!path&&e.url) {try {path=fileURLToPath(e.url);} catch {}}\n"
+        "const rel=typeof path==='string'?relative(" + json.dumps(str(source)) + ",path):null;\n"
+        "const safe=rel&&!isAbsolute(rel)&&!rel.startsWith('..')&&/^[A-Za-z0-9_./@+-]{1,256}$/.test(rel)?rel:path?'outside-source-root':null;\n"
+        "console.log(JSON.stringify({status:'fail',phase:'import',name:e.name,code:e.code,node_version:process.versions.node,"
+        "missing_path:safe,diagnostic_token:typeof e.syscall==='string'&&e.syscall.startsWith('spawn')?'spawn-unavailable':'module-import',"
+        "message_sha256:createHash('sha256').update(String(e.message)).digest('hex')})); process.exitCode=2; }\n")
+    evidence, result = _run_verifier(script, "", "", prefix, runtime_environment(env), cwd=source)
+    if result is None:
+        diagnostic = {"schema": "rs9.sidecar-import-preflight.v1alpha1", "product": "theme-forge-nebular-fusion",
+                      "system": system, "substage": "verifier-import-preflight",
+                      "classification": "harness/import/execution", "verifier": evidence}
+        diagnostics = Path(prepared["scratch"]).parent / "diagnostics"
+        diagnostics.mkdir(exist_ok=True)
+        label = _safe_label(prepared.get("label") or prepared.get("family"))
+        filename = "sidecar-verifier-" + label + ".json" if label else "sidecar-verifier.json"
+        (diagnostics / filename).write_bytes(canonical(diagnostic))
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Released verifier import preflight failed",
+                            details={"product": "theme-forge-nebular-fusion", "system": system,
+                                     "substage": "verifier-import-preflight", **evidence})
+    return evidence
+
+
+def expected_runtime_members(prepared, system):
+    capture = prepared.get("capture")
+    if capture:
+        candidates = [p for p in capture.record["payloads"] if system in p["platforms"]]
+        if len(candidates) == 1:
+            return capture.manifests[candidates[0]["id"]]["members"]
+    if "expected_members" in prepared:
+        members = prepared["expected_members"]
+        if not isinstance(members, list) or digest(canonical(members)) != prepared.get("manifest_sha256"):
+            raise ContractError("SIDECAR_MANIFEST_BINDING", "Transported runtime manifest identity differs")
+        return members
+    return None
 
 
 def _control_verifier(capture, system, prepared, script, prefix, env, runtime_identity=None):
@@ -446,7 +539,8 @@ def _control_verifier(capture, system, prepared, script, prefix, env, runtime_id
         binaries = [p for p in root.rglob("tfsb-studio-service*") if p.is_file() and p.parent.name in {"bin", "MacOS"}]
         if len(manifests) != 1 or len(binaries) != 1:
             return {"status": "fail", "reason": "control-sidecar-representation"}
-        evidence, _ = _run_verifier(script, binaries[0], manifests[0].parent, prefix, env)
+        evidence, _ = _run_verifier(script, binaries[0], manifests[0].parent, prefix, env,
+                                   cwd=prepared.get("source", prepared["tools"]))
         expected_members = manifest.get("members") if isinstance(manifest, dict) else manifest if isinstance(manifest, list) else None
         control_identity = runtime_evidence(root, binaries[0], manifests[0], expected_members=expected_members)
         comparison = {
@@ -549,12 +643,7 @@ def snapshot_nebular_runtime(runtime_root, prepared, system, discovered=None):
     if len(manifests) != 1 or len(binaries) != 1:
         raise ContractError("SIDECAR_REPRESENTATION", "One released sidecar and payload required")
     sidecar = binaries[0]
-    capture = prepared.get("capture") if prepared else None
-    expected = None
-    if capture:
-        candidates = [p for p in capture.record["payloads"] if system in p["platforms"]]
-        if len(candidates) == 1:
-            expected = capture.manifests[candidates[0]["id"]]["members"]
+    expected = expected_runtime_members(prepared, system) if prepared else None
     identity, members_map = runtime_evidence(root, sidecar, manifests[0], expected, return_members=True)
     return {
         "schema": "rs9.nebular-runtime-baseline.v1alpha1",
@@ -605,6 +694,7 @@ def bound_diagnostic(diagnostic, max_bytes=60 * 1024):
 def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, discovered=None, baseline=None, label=None):
     """No extraction here: runtime_root is the wheel cache, Nix cache, or installed package."""
     env = runtime_environment(env)
+    import_evidence = verifier_import_preflight(prepared, system, prefix, env)
     root = Path(runtime_root)
     darwin = system == "aarch64-darwin"
     if darwin:
@@ -624,13 +714,10 @@ def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, 
     script = prepared["scratch"] / "verify-runtime.mjs"
     script.write_text(_verifier_script(prepared["tools"] / "sidecar-common.mjs"))
     capture = prepared.get("capture")
-    expected = None
-    if capture:
-        candidates = [p for p in capture.record["payloads"] if system in p["platforms"]]
-        if len(candidates) == 1:
-            expected = capture.manifests[candidates[0]["id"]]["members"]
+    expected = expected_runtime_members(prepared, system)
     identity, current_members = runtime_evidence(root, sidecar, manifests[0], expected, return_members=True)
-    verifier, verification = _run_verifier(script, sidecar, payload, prefix, env)
+    verifier, verification = _run_verifier(script, sidecar, payload, prefix, env,
+                                         cwd=prepared.get("source", prepared["tools"]))
     drift = compare_drift(baseline, root, identity, current_members=current_members) if baseline else None
     classification = classify_diagnostic(identity, verifier=verifier, drift=drift)
 
@@ -642,14 +729,15 @@ def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, 
 
     diagnostic = {"schema": "rs9.sidecar-verifier-diagnostic.v1alpha1", "system": system,
                   "product": "theme-forge-nebular-fusion", "substage": "released-sidecar-verifier",
-                  **identity, "classification": classification, "verifier": verifier}
+                  **identity, "classification": classification, "verifier": verifier,
+                  "import_preflight": import_evidence}
     if inv_label:
         diagnostic["family"] = inv_label
         diagnostic["invocation"] = inv_label
     if drift is not None:
         diagnostic["drift"] = drift
     diagnostic["archive_control"] = (_control_verifier(capture, system, prepared, script, prefix, env, runtime_identity=identity)
-                                         if capture else {"status": "not-run", "reason": "capture-unavailable"})
+                                         if capture else {"status": "not-run", "reason": "client-control-not-applicable"})
     diagnostic = bound_diagnostic(diagnostic, max_bytes=60 * 1024)
     diagnostics = prepared["scratch"].parent / "diagnostics"
     diagnostics.mkdir(exist_ok=True)

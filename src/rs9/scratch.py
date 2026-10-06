@@ -1,13 +1,78 @@
 """Descriptor-relative, exclusive writes into a caller-owned empty directory."""
 import json
+import math
 import os
 from pathlib import Path
+import re
 
 from rs9.errors import ContractError
 from rs9.security import validate_safe_relative_posix_path
 
 
-def canonical(value):
+def validate_safe_json(value, *, lane=None, product=None, field=None, path="root", max_depth=32, max_nodes=100000):
+    """Reject non-JSON values with bounded logical identity, never arbitrary values."""
+    import hashlib
+    from rs9.security import scan_for_credentials
+    count, active = 0, set()
+
+    def component(key):
+        if isinstance(key, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]{0,63}", key):
+            try:
+                scan_for_credentials(key)
+                return key
+            except ContractError:
+                pass
+        # Hash only strings; do not invoke arbitrary user methods for other keys.
+        return "key-sha256-" + hashlib.sha256(key.encode()).hexdigest()[:16] if isinstance(key, str) else "non-string-key"
+
+    def fail(val, location, reason):
+        name = type(val).__name__
+        safe_type = name if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", name) else "unknown_type"
+        details = {"origin": location, "exception_type": safe_type, "reason": reason}
+        if product:
+            details["product"] = product
+        if lane:
+            details["substage"] = lane
+        raise ContractError("INVALID_JSON", f"Non-JSON value of type {safe_type} at {location}", details=details)
+
+    def walk(val, location, depth):
+        nonlocal count
+        count += 1
+        if len(location) > 240:
+            location = "logical-path-sha256-" + hashlib.sha256(location.encode()).hexdigest()
+        if count > max_nodes:
+            fail(val, location, "max-nodes-exceeded")
+        if depth > min(max_depth, 64):
+            fail(val, location, "max-depth-exceeded")
+        if type(val) in (str, bool, int) or val is None:
+            return
+        if type(val) is float:
+            if not math.isfinite(val):
+                fail(val, location, "non-finite-float")
+            return
+        if type(val) not in (dict, list):
+            fail(val, location, "non-json-value")
+        if id(val) in active:
+            fail(val, location, "circular-reference")
+        active.add(id(val))
+        try:
+            if type(val) is dict:
+                for key, item in val.items():
+                    if type(key) is not str:
+                        fail(key, location, "non-string-dict-key")
+                    walk(item, location + "." + component(key), depth + 1)
+            else:
+                for index, item in enumerate(val):
+                    walk(item, location + "." + str(index), depth + 1)
+        finally:
+            active.remove(id(val))
+    walk(value, component(field or path), 0)
+    return value
+
+
+def canonical(value, *, validate=False, lane=None, product=None):
+    if validate:
+        validate_safe_json(value, lane=lane, product=product)
     return (json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
 
 

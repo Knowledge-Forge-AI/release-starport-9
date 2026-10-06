@@ -104,3 +104,53 @@ def authenticate_dependencies(capture, archives):
     return snapshot({"schema": "rs9.pinned-npm-dependencies.v1alpha1",
         "release_record_sha256": authenticated_record_hash(capture),
         "lock_sha256": digest(capture.source["package-lock.json"]), "dependencies": records})
+
+
+def resolve_offline_npm_archives(
+    capture,
+    product_id: str,
+    scratch: Path,
+    inputs: Path | None = None,
+    client=None,
+) -> dict[str, Path] | None:
+    """Class-specific offline npm dependency resolver.
+
+    Product class rules:
+    - native-desktop: None (frontend dependencies must not trigger candidate staging)
+    - native-node-cli: always authenticated npm closure
+    - pure-js-cli: closure only when dependencies exist, else None
+    """
+    import posixpath
+    from rs9.product_classes import get_product_class, NATIVE_DESKTOP, PURE_JS_CLI
+
+    product_class = get_product_class(product_id)
+    if product_class == NATIVE_DESKTOP:
+        return None
+
+    source = getattr(capture, "source", None) or {}
+    raw_pkg = source.get("package.json") if isinstance(source, dict) else None
+    try:
+        pkg_json = json.loads(raw_pkg) if raw_pkg else {}
+    except (ValueError, TypeError):
+        raise ContractError("NPM_PACKAGE", "Authenticated package metadata is invalid") from None
+    if not isinstance(pkg_json, dict):
+        raise ContractError("NPM_PACKAGE", "Authenticated package metadata must be an object")
+
+    has_deps = bool(isinstance(pkg_json, dict) and pkg_json.get("dependencies"))
+
+    if product_class == PURE_JS_CLI and not has_deps:
+        return None
+
+    closure = closure_for_capture(capture)
+    archives: dict[str, Path] = {}
+    for idx, row in enumerate(closure):
+        arc_name = posixpath.basename(row["url"])
+        staged = inputs / arc_name if inputs else None
+        if staged is not None and staged.is_file():
+            archives[row["path"]] = staged
+        elif client is not None:
+            dest = scratch / "npm_downloads" / f"dep-{product_id}-{idx}.tgz"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(client.get(row["url"], request_class="npm-tarball", limit=32 * 1024 * 1024))
+            archives[row["path"]] = dest
+    return archives

@@ -14,6 +14,7 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -1275,6 +1276,30 @@ class RpmCustodyTests(unittest.TestCase):
         self.assertIn("theme-forge-nebular-fusion-1.0.0-1.fc43.x86_64.rpm", result)
         self.assertIn("theme-forge-nebular-fusion-1.0.0-1.fc43.aarch64.rpm", result)
 
+    def test_targets_maintainer_returns_valid_reserved_maintainer(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        maintainer = hd._targets_maintainer(repo_root)
+        self.assertEqual(maintainer, "Knowledge Forge AI <nonproduction@knowledge-forge.invalid>")
+        from rs9.build_native import validate_maintainer
+        self.assertEqual(validate_maintainer(maintainer), maintainer)
+
+    def test_hosted_deb_offline_npm_archives_delegates_to_shared_helper(self):
+        scratch = self.root / "scratch"
+        scratch.mkdir()
+        # Native desktop returns None even with dependencies
+        neb_capture = SimpleNamespace(
+            source={"package.json": json.dumps({"dependencies": {"react": "18.0.0"}})}
+        )
+        self.assertIsNone(hd._offline_npm_archives(neb_capture, "theme-forge-nebular-fusion", None, None, scratch))
+
+        # Native node cli resolves closure
+        burst_capture, burst_intent, offline_npm = create_cli_fixture(
+            scratch / "burst_fix", product="theme-forge-stellar-burst"
+        )
+        inputs = scratch / "burst_fix/npm_archives"
+        archives = hd._offline_npm_archives(burst_capture, "theme-forge-stellar-burst", inputs, None, scratch)
+        self.assertIsNotNone(archives)
+        self.assertIn("node_modules/min-dep", archives)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 {
   "schema": "rs9.live1-candidate-targets.v1alpha1",
   "production_enabled": false,
-  "maintainer": "Knowledge Forge AI <nonproduction@invalid>",
+  "maintainer": "Knowledge Forge AI <nonproduction@knowledge-forge.invalid>",
   "pacman": {
     "architectures": ["x86_64"],
     "container_repository": "docker.io/library/archlinux",

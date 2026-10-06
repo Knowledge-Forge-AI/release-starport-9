@@ -16,6 +16,8 @@ from rs9.readers import read_pypi_project, read_npm, read_homebrew, read_pages
 from rs9.records import record_sha256, build_semantic_content_identity
 from rs9.scratch import canonical
 from rs9.product_classes import get_product_class, NATIVE_DESKTOP
+from rs9.security import scan_for_credentials
+from rs9.spdx import validate_spdx_expression
 
 
 def readback_satisfied(row):
@@ -31,21 +33,43 @@ def select_brew_payload(capture):
     return select_payload(capture, "aarch64-darwin", allow_any=True)
 
 
-def homebrew_generation_facts(capture, intent):
+def homebrew_generation_facts(capture, intent, profile):
     """Projection facts come from authenticated native payload or npm closure."""
     payload = select_brew_payload(capture)
     product = intent["project"]["id"]
-    license_expression = capture.normalized["license"]["expression"]
+
+    license_expression = intent.get("license", {}).get("expression")
+    if not license_expression or not isinstance(license_expression, str):
+        raise ContractError("LICENSE_AUTHORITY", "Explicit authenticated license authority required")
+
+    scan_for_credentials(license_expression)
+    validate_spdx_expression(license_expression)
+
+    if isinstance(profile, dict) and profile:
+        sections = profile.get("sections", {})
+        profile_lic = sections.get("license") or sections.get("legacy_ingestion", {}).get("license")
+        if isinstance(profile_lic, dict):
+            status = profile_lic.get("status")
+            if status is not None and status != "consistent":
+                raise ContractError("LICENSE_AUTHORITY", "Consistent release license facts required")
+            if "expression" in profile_lic and profile_lic["expression"] != license_expression:
+                raise ContractError("LICENSE_AUTHORITY", "Profile license authority disagrees with intent")
+            for dec in profile_lic.get("declarations", []):
+                if isinstance(dec, dict) and dec.get("source", "").startswith("tagged:") and dec.get("expression") != license_expression:
+                    raise ContractError("LICENSE_AUTHORITY", "Tagged repository licensing conflicts with candidate metadata")
+
     if get_product_class(product) == NATIVE_DESKTOP:
+        commands = {row["name"]: "released-launcher" for row in intent["commands"]}
         return {"url": f"https://github.com/{capture.record['repository']['full_name']}/releases/download/{capture.record['release']['tag']}/{payload['name']}",
                 "sha256": payload["sha256"], "license": license_expression,
-                "commands": {row["name"]: "released-launcher" for row in intent["commands"]},
+                "commands": commands,
                 "restrictions": "aarch64-darwin"}
     metadata_path = capture.root / "npm/metadata.json"
-    if not metadata_path.is_file():
+    pkg_path = capture.root / "npm/package.tgz"
+    if not metadata_path.is_file() or not pkg_path.is_file():
         raise ContractError("OBSERVATION_IDENTITY", "Authenticated npm projection facts required")
     metadata = json.loads(metadata_path.read_bytes())
-    return {"url": metadata["dist"]["tarball"], "sha256": hashlib.sha256((capture.root / "npm/package.tgz").read_bytes()).hexdigest(),
+    return {"url": metadata["dist"]["tarball"], "sha256": hashlib.sha256(pkg_path.read_bytes()).hexdigest(),
             "license": license_expression, "commands": metadata["bin"], "restrictions": "node"}
 
 
@@ -199,7 +223,7 @@ def execute(context):
 
         if tap_state == "bound" and "Formula/" + project + ".rb" in formula_blobs:
             try:
-                brew_facts = homebrew_generation_facts(capture, intent)
+                brew_facts = homebrew_generation_facts(capture, intent, profile)
             except ContractError as error:
                 if error.code != "MISSING_ASSET":
                     raise

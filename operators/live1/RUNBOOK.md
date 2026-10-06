@@ -1,8 +1,8 @@
 # Attended Theme Forge LIVE1 preparation and future publication contract
 
-Status: **CONT6R2 terminal source amendment; dispatcher finalization pending; production disabled**.
+Status: **Hosted run 5 not qualified; gates-repair candidate pending dispatcher review; production disabled**.
 
-The [cumulative candidate](../../docs/live1-hosted-candidate.md) preserves CONT6/CONT6R1 and amends proposal SHA `c40cdf9a43c0954d7d180481f444e724394b8c6b696af525260a6afac944009f`. Source verification and pre-final advisory dispositions are recorded in [CONT6R2 evidence](../../evidence/live1/cont6r2-verification.json). The dispatcher stage envelope authorizes the verified terminal amendment without another independent review. Manager acceptance of its exact bytes precedes attended adoption. The producer never stages, commits, pushes or invokes a reviewer.
+The cumulative candidate addresses run-5 RS9 harness and metadata failures. Exact Linux Nix and RPM failure replay remains unavailable locally and is recorded as unresolved evidence. The dispatcher owns both review checkpoints and finalization. Manager acceptance of the exact reviewed bytes precedes attended adoption. The producer never stages, commits, pushes, or invokes a reviewer.
 
 `rs9.operator` publication commands remain disabled. Burst is architecture-specific in wheels, pacman, RPM and APT; its complete foreign prebuild inventory is retained. Installed released-loader proofs are required in every Burst runtime lane. Production Linux wheel compatibility remains unproved. No product is omitted to obtain a qualified verdict.
 
@@ -18,22 +18,44 @@ The [cumulative candidate](../../docs/live1-hosted-candidate.md) preserves CONT6
 - **Corroboration states**: npm comparison records `blocked` when an unrelated profile failure prevents comparison, and preserves `pass` when a later failure follows completed npm checks. Overall authentication still requires every selected profile to pass. Any closeout amendment requires manager disposition of the exact terminal delta.
 - **Registry availability**: Hosted run 3 passed exact version `0.6.1` packument/tarball transport. Fresh authentication must retain any new `NPM_IDENTITY` or HTTP failure as evidence; never substitute `latest`, another version or registry, or retry failed hosted jobs automatically.
 
-## Source adoption and hosted-run-5 collection
+## Source adoption and one new hosted run 6
 
-Only after acceptance of the exact final-review candidate, copy the accepted terminal tree and manifest SHA into `RS9_REVIEWED_TREE` and `RS9_MANIFEST_SHA256`. Require public parent `e2c6cb5fcc55462e2e28e889a6c9f3ed60c9d131`. The complete manifest includes every reviewed new product path and excludes `.serena`, `.pytest_cache`, `__pycache__` and `.pyc`.
+Run `37228170217` is not qualified (`HOSTED_GATES`). Do not rerun it.
+The [repair evidence](../../evidence/live1/hosted5-gates-repair-verification.json)
+records the amended proposal, source verification, and unavailable native replay.
+No runner security setting is changed on an unproved hypothesis. The released
+Nebular payload and verifier semantics remain unchanged. Pages and Foundation3
+continue to require complete native custody.
 
-Create a new empty physical packet directory below the manager outbox `Documents/agent/outbox/release-starport-9_dev`, outside the repository, and set `RS9_PACKET_DIR` to it. Its sibling `.operator.log` must not already exist. From the accepted repository:
+After dispatcher acceptance, supply the exact accepted tree and candidate-manifest
+SHA-256 as `RS9_REVIEWED_TREE` and `RS9_MANIFEST_SHA256`. The attended operator
+requires parent `a09fcc21c68c292cd526033bb2ecebccf3167b90`, main, remote parity,
+and the complete reviewed product delta. Use a new empty physical packet directory
+below the manager outbox, set `RS9_PACKET_DIR` to it, and require its sibling
+operator log to be absent:
 
 ~~~sh
-rtk proxy python3 operators/live1/run-hosted5.py \
+rtk proxy python3 operators/live1/run-hosted6.py \
   --reviewed-tree "$RS9_REVIEWED_TREE" \
   --manifest-sha256 "$RS9_MANIFEST_SHA256" \
   --output "$RS9_PACKET_DIR"
 ~~~
 
-This operator checks main/HEAD/origin against the fixed public parent, validates exact inventory/tree/manifest, delegates normal commit and fast-forward push to the attended adoption tool, then waits for one new push-triggered workflow for that new SHA. Collection defaults to two hours, with a six-hour maximum. Event, branch, attempt and creation timestamp are checked; at most 60 seconds of clock skew is allowed and recorded. No rerun or dispatch endpoint is invoked.
+This stages only reviewed paths, creates a normal commit, fast-forward pushes,
+and waits for exactly one new push event for that commit. It retains every job,
+step, artifact, and full summary; full stdout/stderr goes to the exclusive log.
+Terminal output is bounded to `LOG`, `RC`, and `MANAGER_PACKET`. Stop for manager
+disposition. No rerun, production upload, deploy, signing, native repository
+publication, npm/Homebrew mutation, or Theme Forge release mutation is authorized.
 
-The wrapper sets its own source `PYTHONPATH` and bytecode-disabled child environment. Argument, directory, import and exclusive-log failures stop inside bounded preflight. Packet-directory validation precedes log creation. All child stdout/stderr is written to the sibling operator log. The terminal prints only `LOG=`, `RC=` and `MANAGER_PACKET=` paths, including collisions; it preserves an existing log. A stale or unvalidated packet is never advertised: early failures print `MANAGER_PACKET=unavailable`, and a packet path is printed only after the child produces a physical file. Stop for manager disposition of that packet; do not rerun failed jobs automatically.
+## Collection recovery and retained historical operators
+
+The historical `run-hosted5.py` remains for audit only. Do not invoke it.
+The run-6 wrapper supplies its source `PYTHONPATH` and disables child bytecode writes.
+It preserves existing logs and never advertises a stale packet after preflight failure.
+Collection defaults to two hours, with a six-hour maximum. Event, branch, attempt
+and creation timestamp are checked; at most 60 seconds of clock skew is allowed
+and recorded. No rerun or dispatch endpoint is invoked.
 
 The v2 collector retains every job and step, streams every artifact with byte/time bounds, verifies each outer digest, extracts safely, and rehashes candidate custody manifests. One artifact failure does not suppress attempts to collect the remaining artifacts. Extracted summaries are retained in full; the packet contains bounded identities, reported blockers and validation reasons. Production promotion blockers remain mandatory on Linux wheels but are separate from candidate qualification blockers.
 

@@ -9,13 +9,34 @@ import unittest
 from unittest.mock import Mock, patch
 
 from rs9.errors import ContractError
-from rs9.hosted_nix import command, execute, prepare_input, SYSTEMS
+from rs9.hosted_nix import command, execute, fhs_runtime_smoke, prepare_input, SYSTEMS
 from rs9.scratch import canonical
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class NixHostedTests(unittest.TestCase):
+    def test_disconnected_fhs_replay_identifies_user_namespace_failure(self):
+        from subprocess import CompletedProcess
+        for system in ("x86_64-linux", "aarch64-linux"):
+            with self.subTest(system=system), patch("rs9.hosted_nix.subprocess.run", return_value=CompletedProcess(
+                    [], 1, b"", b"bwrap: Creating new namespace failed: Operation not permitted")) as run:
+                with self.assertRaises(ContractError) as caught:
+                    fhs_runtime_smoke("/private/fixture/runtime", system, ["disconnected"], {"PATH": "fixture"})
+            self.assertEqual(run.call_args.args[0], ["disconnected", "/private/fixture/runtime/bin/rs9-nebular-fhs", "true"])
+            self.assertEqual(caught.exception.code, "NIX_FHS_USERNS")
+            self.assertEqual(caught.exception.details["system"], system)
+            self.assertEqual(caught.exception.details["substage"], "nix-fhs-runtime-smoke")
+            self.assertNotIn("/private/", json.dumps(caught.exception.details))
+
+    def test_fhs_success_does_not_waive_following_command_or_verifier(self):
+        from subprocess import CompletedProcess
+        with patch("rs9.hosted_nix.subprocess.run", return_value=CompletedProcess([], 0, b"", b"")):
+            gate = fhs_runtime_smoke("/fixture", "x86_64-linux", [], {})
+        self.assertEqual(gate["name"], "nix-fhs-runtime-smoke")
+        self.assertEqual(gate["status"], "pass")
+        self.assertNotIn("nix-native-closure", gate)
+
     def test_real_tool_failure_is_not_an_output_digest(self):
         from subprocess import CompletedProcess
         with patch("rs9.hosted_nix.subprocess.run", return_value=CompletedProcess(["nix", "build"], 1, b"", b"error")):
@@ -334,6 +355,7 @@ class NixHostedTests(unittest.TestCase):
                  patch("rs9.hosted_nix.run_probes", side_effect=lambda *a, **k: (k.get("after_probe", lambda: None)() or [{"name": "probe", "status": "pass"}])), \
                  patch("rs9.hosted_nix.snapshot_nebular_runtime", return_value={"runtime_root_sha256": "a" * 64}) as snapshot, \
                  patch("rs9.hosted_nix.prepare_smoke", return_value={}), \
+                 patch("rs9.hosted_nix.verifier_import_preflight", return_value={"status": "pass"}), \
                  patch("rs9.hosted_nix.verify_nebular_runtime", return_value={"status": "pass"}) as verifier:
 
                 # Ensure cache directory entry exists for nebular smoke materialization check
