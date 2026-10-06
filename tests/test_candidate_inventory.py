@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 from rs9.candidate_inventory import MANIFEST, candidate_paths, file_inventory, product_delta, verify_inventory
 from rs9.errors import ContractError
 
-PARENT = "e2c6cb5fcc55462e2e28e889a6c9f3ed60c9d131"
+PARENT = "a09fcc21c68c292cd526033bb2ecebccf3167b90"
 
 
 class CandidateInventoryTests(unittest.TestCase):
@@ -98,6 +98,12 @@ class CandidateInventoryTests(unittest.TestCase):
         manifest = json.loads((root / MANIFEST).read_bytes())
         self.assertEqual(manifest["parent"], PARENT)
         self.assertEqual(manifest["changed_paths"], product_delta(root, PARENT))
+        self.assertIn("operators/live1/targets.json", manifest["changed_paths"])
+        target = next(r for r in manifest["files"] if r["path"] == "operators/live1/targets.json")
+        parent_target = subprocess.check_output(["git", "-C", str(root), "show", PARENT + ":operators/live1/targets.json"])
+        self.assertNotEqual(target["sha256"], hashlib.sha256(parent_target).hexdigest())
+        self.assertEqual(json.loads((root / target["path"]).read_bytes())["maintainer"],
+                         "Knowledge Forge AI <nonproduction@knowledge-forge.invalid>")
         self.assertRegex(verify_inventory(root, manifest, parent=PARENT), r"^[0-9a-f]{40}$")
 
     def test_inventory_rejects_incomplete_changed_path_set(self):

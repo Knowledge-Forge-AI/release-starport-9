@@ -3,8 +3,11 @@
 Verifies real release_core record shape regression, tap-head failure handling,
 platform selection, and fail-closed schema boundaries.
 """
+import base64
 import copy
+import hashlib
 import json
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -13,10 +16,14 @@ from urllib.error import HTTPError, URLError
 import http.client
 
 from rs9.errors import ContractError
-from rs9.hosted_observe import execute, readback_satisfied, select_brew_payload
+from rs9.homebrew_formula import formula_class_name
+from rs9.hosted_observe import execute, homebrew_generation_facts, readback_satisfied, select_brew_payload
 from rs9.profiles import selection_for_intent
 from rs9.release_core import authenticate_release
+from rs9.scratch import canonical
 from tests.release_fixtures import package_evidence
+from tests.shadow_fixtures import fixture_evidence
+from tests.test_build_native import create_cli_fixture
 
 
 class HostedReadbackTests(unittest.TestCase):
@@ -28,15 +35,38 @@ class HostedReadbackTests(unittest.TestCase):
             (root / "npm").mkdir()
             (root / "npm/metadata.json").write_text(json.dumps({"dist": {"tarball": "https://registry.npmjs.org/supplemental.tgz"}, "license": "AGPL-3.0-or-later OR Commercial"}))
             payload = {"id": "darwin", "name": "nebular.app.tar.gz", "platforms": ["aarch64-darwin"], "sha256": "b" * 64}
-            capture = SimpleNamespace(root=root, normalized={"license": {"expression": "AGPL-3.0-or-later"}},
+            capture = SimpleNamespace(root=root,
                 record={"repository": {"full_name": "Knowledge-Forge-AI/theme-forge-nebular-fusion"},
                         "release": {"tag": "v0.6.1"}, "payloads": [payload]})
-            facts = homebrew_generation_facts(capture, {"project": {"id": "theme-forge-nebular-fusion"}, "commands": [{"name": "tfnf", "interface": "gui"}]})
+            self.assertFalse(hasattr(capture, "normalized"))
+            intent = {"project": {"id": "theme-forge-nebular-fusion"}, "commands": [{"name": "tfnf", "interface": "gui"}], "license": {"expression": "AGPL-3.0-or-later"}}
+            profile = {"sections": {"legacy_ingestion": {"license": {"status": "consistent"}}}}
+            facts = homebrew_generation_facts(capture, intent, profile)
             self.assertEqual(facts["restrictions"], "aarch64-darwin")
             self.assertEqual(facts["license"], "AGPL-3.0-or-later")
             self.assertEqual(facts["sha256"], payload["sha256"])
             self.assertTrue(facts["url"].endswith("/v0.6.1/nebular.app.tar.gz"))
             self.assertEqual(set(facts["commands"]), {"tfnf"})
+
+            # Inconsistent profile status fails closed
+            with self.assertRaises(ContractError) as caught:
+                homebrew_generation_facts(capture, intent, {"sections": {"legacy_ingestion": {"license": {"status": "conflict"}}}})
+            self.assertEqual(caught.exception.code, "LICENSE_AUTHORITY")
+
+            # Mismatched profile license expression fails closed
+            with self.assertRaises(ContractError) as caught:
+                homebrew_generation_facts(capture, intent, {"sections": {"legacy_ingestion": {"license": {"status": "consistent", "expression": "MIT"}}}})
+            self.assertEqual(caught.exception.code, "LICENSE_AUTHORITY")
+
+            # Invalid SPDX expression in intent fails closed
+            with self.assertRaises(ContractError) as caught:
+                homebrew_generation_facts(capture, {**intent, "license": {"expression": "INVALID SPDX++"}}, profile)
+            self.assertEqual(caught.exception.code, "INVALID_SPDX_EXPRESSION")
+
+            # Missing license authority fails closed
+            with self.assertRaises(ContractError) as caught:
+                homebrew_generation_facts(capture, {"project": {"id": "theme-forge-nebular-fusion"}, "commands": [{"name": "tfnf", "interface": "gui"}]}, None)
+            self.assertEqual(caught.exception.code, "LICENSE_AUTHORITY")
 
     def row(self, adapter, state):
         return {"adapter": adapter, "observation": {"state": state}}
@@ -80,36 +110,60 @@ class HostedReadbackTests(unittest.TestCase):
 
 class HostedObserveExecutionTests(unittest.TestCase):
     def setUp(self):
-        # These reader and tap seams use synthetic profiles; fresh planner binding
-        # is exercised separately with an authenticated profile/configuration.
+        # Fresh planner binding is exercised separately with an authenticated profile/configuration.
         planner = patch("rs9.hosted_observe.reference_noop", return_value={"planner_outcome": "noop", "plan_sha256": "a" * 64})
         planner.start()
         self.addCleanup(planner.stop)
-        original = __import__("rs9.hosted_observe", fromlist=["homebrew_generation_facts"]).homebrew_generation_facts
-        def fixture_facts(capture, intent):
-            if capture.record["repository"]["full_name"] != "Example/second-project":
-                return original(capture, intent)
-            if (capture.root / "npm/metadata.json").is_file():
-                meta = json.loads((capture.root / "npm/metadata.json").read_bytes())
-                from rs9.release_core import digest
-                return {"url": meta["dist"]["tarball"], "sha256": digest((capture.root / "npm/package.tgz").read_bytes()),
-                        "license": "MIT", "commands": meta["bin"], "restrictions": "node"}
-            payload = select_brew_payload(capture)
-            return {"url": f"https://github.com/{capture.record['repository']['full_name']}/releases/download/{capture.record['release']['tag']}/{payload['name']}",
-                    "sha256": payload["sha256"], "license": "MIT", "commands": {"second": "bin/second"}, "restrictions": None}
-        facts = patch("rs9.hosted_observe.homebrew_generation_facts", side_effect=fixture_facts)
-        facts.start()
-        self.addCleanup(facts.stop)
 
     def _create_real_captures(self, root, count=4, prefix="capture"):
+        products = (
+            "theme-forge-stellar-burst",
+            "theme-forge-stellar-loom",
+            "theme-forge-solar-sail",
+            "theme-forge-nebular-fusion",
+        )[:count]
         captures = []
-        for i in range(count):
-            c_root = root / f"{prefix}_{i}"
-            c_root.mkdir(parents=True, exist_ok=True)
-            intent = package_evidence(c_root)
-            selection = selection_for_intent(intent)
-            capture = authenticate_release(selection, c_root)
-            captures.append((capture, intent, {}))
+        for product in products:
+            c_root = root / f"{prefix}_{product}"
+            if product == "theme-forge-nebular-fusion":
+                c_root.mkdir(parents=True, exist_ok=True)
+                neb_norm = fixture_evidence(c_root)
+                intent = {
+                    "project": {"id": product, "repository": neb_norm["project"]["repository"]},
+                    "version": neb_norm["version"],
+                    "tag": neb_norm["tag"],
+                    "license": {"expression": "AGPL-3.0-or-later"},
+                    "assets": neb_norm["assets"],
+                    "commands": [{"name": "tfnf", "interface": "gui"}],
+                    "release": neb_norm["release"],
+                }
+                capture = authenticate_release(selection_for_intent(intent), c_root)
+                npm_data = json.loads((c_root / "npm/metadata.json").read_bytes())
+                npm_data["dist"]["tarball"] = f"https://registry.npmjs.org/@knowledge-forge-ai/theme-forge-nebular-fusion/-/theme-forge-nebular-fusion-{neb_norm['version']}.tgz"
+                (c_root / "npm/metadata.json").write_bytes(canonical(npm_data))
+                profile = {"sections": {"license": {"status": "consistent", "expression": "AGPL-3.0-or-later"}}}
+                captures.append((capture, intent, profile))
+            else:
+                capture, intent, _ = create_cli_fixture(c_root, product=product)
+                npm_dir = c_root / "npm"
+                npm_dir.mkdir(parents=True, exist_ok=True)
+                payload = capture.record["payloads"][0]
+                archive_bytes = capture.archives[payload["id"]].read_bytes()
+                (npm_dir / "package.tgz").write_bytes(archive_bytes)
+                pkg_data = json.loads(capture.source["package.json"])
+                npm_url = f"https://registry.npmjs.org/@knowledge-forge-ai/{product}/-/{payload['name']}"
+                (npm_dir / "metadata.json").write_bytes(canonical({
+                    "name": f"@knowledge-forge-ai/{product}",
+                    "version": intent["version"],
+                    "license": "AGPL-3.0-or-later",
+                    "bin": pkg_data.get("bin", {}),
+                    "dist": {
+                        "tarball": npm_url,
+                        "integrity": "sha512-" + base64.b64encode(hashlib.sha512(archive_bytes).digest()).decode()
+                    }
+                }))
+                profile = {"sections": {"license": {"status": "consistent", "expression": "AGPL-3.0-or-later"}}}
+                captures.append((capture, intent, profile))
         return captures
 
     def test_failure_g_real_record_shape_regression(self):
@@ -130,7 +184,12 @@ class HostedObserveExecutionTests(unittest.TestCase):
             client.json.return_value = {"sha": "c" * 40}
             context = {"captures": captures, "client": client, "scratch": scratch}
 
-            with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "c" * 40, {"Formula/second-project.rb": "b" * 40})), \
+            formula_blobs = {
+                f"Formula/{p}.rb": "b" * 40
+                for p in ("theme-forge-stellar-burst", "theme-forge-stellar-loom", "theme-forge-solar-sail", "theme-forge-nebular-fusion")
+            }
+
+            with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "c" * 40, formula_blobs)), \
                  patch("rs9.hosted_observe.read_pypi_project") as pypi_mock, \
                  patch("rs9.hosted_observe.read_npm") as npm_mock, \
                  patch("rs9.hosted_observe.read_homebrew") as brew_mock, \
@@ -153,10 +212,11 @@ class HostedObserveExecutionTests(unittest.TestCase):
             self.assertEqual(len(doc["observations"]), 4 * 3 + 1)  # 4 * (pypi + npm + brew) + pages
 
             # Verify that read_homebrew received correct release download URL derived from record['release']['tag']
-            expected_brew_url = "https://github.com/Example/second-project/releases/download/v0.6.1/second-0.6.1.tgz"
-            for call in brew_mock.call_args_list:
-                self.assertEqual(call.kwargs["expected_payload_url"], expected_brew_url)
-                self.assertEqual(call.kwargs["pinned_ref"], "c" * 40)
+            expected_nebular_url = "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.6.1/theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz"
+            neb_calls = [c for c in brew_mock.call_args_list if c.args[1]["package"] == "theme-forge-nebular-fusion"]
+            self.assertEqual(len(neb_calls), 1)
+            self.assertEqual(neb_calls[0].kwargs["expected_payload_url"], expected_nebular_url)
+            self.assertEqual(neb_calls[0].kwargs["pinned_ref"], "c" * 40)
 
     def test_release_tag_identity_is_fail_closed(self):
         for tag in (None, 123, {"name": "v0.6.1"}, "v0.6.2", "0.6.1"):
@@ -178,6 +238,8 @@ class HostedObserveExecutionTests(unittest.TestCase):
             captures = self._create_real_captures(root)
             for capture, _, _ in captures:
                 capture.record["payloads"].append({"id": "foreign", "platforms": ["x86_64-linux"]})
+                if (capture.root / "npm/metadata.json").is_file():
+                    (capture.root / "npm/metadata.json").unlink()
             client = MagicMock()
             client.json.return_value = None
             with patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
@@ -198,7 +260,11 @@ class HostedObserveExecutionTests(unittest.TestCase):
             for capture, _, _ in captures:
                 for payload in capture.record["payloads"]:
                     payload["platforms"] = ["x86_64-linux"]
-            with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, {"Formula/second-project.rb": "d" * 40})), \
+            formula_blobs = {
+                f"Formula/{p}.rb": "d" * 40
+                for p in ("theme-forge-stellar-burst", "theme-forge-stellar-loom", "theme-forge-solar-sail", "theme-forge-nebular-fusion")
+            }
+            with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, formula_blobs)), \
                  patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "unknown"}), \
                  patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}), \
@@ -407,85 +473,108 @@ class HostedObserveExecutionTests(unittest.TestCase):
                 self.assertEqual(r["planner_outcome"], "noop")
 
     def test_homebrew_full_agreement_end_to_end_with_real_fixtures(self):
-        """End-to-end exact Homebrew and npm readback using real formula fixtures."""
+        """End-to-end exact Homebrew and npm readback for all four formulas using real captures."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
             scratch = root / "scratch"
             scratch.mkdir()
             captures = self._create_real_captures(root, count=4)
 
-            # Match first capture to second-project
-            capture = captures[0][0]
-            payload = capture.record["payloads"][0]
-            url = f"https://github.com/{capture.record['repository']['full_name']}/releases/download/v0.6.1/{payload['name']}"
+            formulas = {}
+            blobs = {}
+            for cap, itn, prof in captures:
+                p = itn["project"]["id"]
+                facts = homebrew_generation_facts(cap, itn, prof)
+                # Exercise maintained formula syntax and command/restriction parsing.
+                template = (Path(__file__).parent / "fixtures/homebrew/Formula" / (p + ".rb")).read_text()
+                content = re.sub(r"(?m)^  sha256 \"[0-9a-f]{64}\"$", lambda _: f"  sha256 \"{facts['sha256']}\"", template).encode()
+                self.assertIn(facts["url"], content.decode())
+                rel_path = f"Formula/{p}.rb"
+                formulas[rel_path] = content
+                blobs[rel_path] = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
 
-            npm_dir = capture.root / "npm"
-            npm_dir.mkdir(exist_ok=True)
-            (npm_dir / "metadata.json").write_text(json.dumps({"dist": {"tarball": url}, "license": "MIT", "bin": {"second": "bin/second"}}))
-            (npm_dir / "package.tgz").write_bytes(capture.archives[payload["id"]].read_bytes())
-
-            valid_formula = (
-                f'class SecondProject < Formula\n'
-                f'  desc "Second project CLI"\n'
-                f'  homepage "https://github.com/Example/second-project"\n'
-                f'  url "{url}"\n'
-                f'  sha256 "{payload["sha256"]}"\n'
-                f'  license "MIT"\n'
-                f'  depends_on "node"\n'
-                f'  def install\n'
-                f'    bin.install "second"\n'
-                f'  end\n'
-                f'  test do\n'
-                f'    assert_match "version", shell_output("#{{bin}}/second --version")\n'
-                f'  end\n'
-                f'end\n'
-            ).encode()
+            def mock_get(url, *args, **kwargs):
+                for path, content in formulas.items():
+                    if url.endswith(path):
+                        return content
+                raise ValueError(f"Unexpected raw GET URL: {url}")
 
             client = MagicMock()
             client.json.return_value = {"default_branch": "main", "sha": "e" * 40}
 
-            with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, {"Formula/second-project.rb": __import__("hashlib").sha1(b"blob " + str(len(valid_formula)).encode() + b"\0" + valid_formula).hexdigest()})), \
+            with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, blobs)), \
                  patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
                  patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}), \
-                 patch("rs9.readers._get", return_value=valid_formula):
+                 patch("rs9.readers._get", side_effect=mock_get):
                 result = execute({"captures": captures, "scratch": scratch, "client": client})
 
+            self.assertEqual(result["gates"][0]["status"], "pass")
+            self.assertEqual(result["gates"][1]["status"], "pass")
+            self.assertEqual(result["gates"][1]["reason"], "live-byte-readback")
+            self.assertEqual(len(result["details"]["planner_noops"]), 8)  # 4 npm + 4 brew
+
             doc = json.loads((scratch / "destination-observations.json").read_bytes())
-            first_brew = [r for r in doc["observations"] if r["adapter"] == "homebrew"][0]
-            self.assertEqual(first_brew["observation"]["state"], "exact")
-            self.assertEqual(first_brew["planner_outcome"], "noop")
+            brew_rows = [r for r in doc["observations"] if r["adapter"] == "homebrew"]
+            self.assertEqual(len(brew_rows), 4)
+            for brew_row in brew_rows:
+                self.assertEqual(brew_row["observation"]["state"], "exact")
+                self.assertEqual(brew_row["planner_outcome"], "noop")
+                self.assertEqual(brew_row["pinned_ref"], "e" * 40)
 
     def test_homebrew_identity_mismatch_yields_conflict(self):
-        """Mismatched license or class name in a complete formula yields conflict."""
+        """Mismatched license in a formula yields conflict."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
             scratch = root / "scratch"
             scratch.mkdir()
             captures = self._create_real_captures(root, count=4)
 
-            capture = captures[0][0]
-            payload = capture.record["payloads"][0]
-            url = f"https://github.com/{capture.record['repository']['full_name']}/releases/download/v0.6.1/{payload['name']}"
+            formulas = {}
+            blobs = {}
+            for i, (cap, itn, prof) in enumerate(captures):
+                p = itn["project"]["id"]
+                facts = homebrew_generation_facts(cap, itn, prof)
+                lic = "GPL-3.0-only" if i == 0 else facts["license"]
+                lines = [
+                    f"class {formula_class_name(p)} < Formula",
+                    f'  url "{facts["url"]}"',
+                    f'  sha256 "{facts["sha256"]}"',
+                    f'  license "{lic}"',
+                ]
+                if facts["restrictions"] == "aarch64-darwin":
+                    lines += ["  depends_on arch: :arm64", "  depends_on :macos"]
+                else:
+                    lines += ['  depends_on "node"']
+                lines.append("  def install")
+                for cmd in facts["commands"]:
+                    lines.append(f'    (bin/"{cmd}").write "exec"')
+                lines += [
+                    "  end",
+                    "  test do",
+                    "    assert_equal 1, 1",
+                    "  end",
+                    "end\n",
+                ]
+                content = "\n".join(lines).encode()
+                rel_path = f"Formula/{p}.rb"
+                formulas[rel_path] = content
+                blobs[rel_path] = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
 
-            # Mismatched license (GPL-3.0 instead of MIT)
-            conflict_formula = (
-                f'class SecondProject < Formula\n'
-                f'  desc "Second project CLI"\n'
-                f'  url "{url}"\n'
-                f'  sha256 "{payload["sha256"]}"\n'
-                f'  license "GPL-3.0-only"\n'
-                f'end\n'
-            ).encode()
+            def mock_get(url, *args, **kwargs):
+                for path, content in formulas.items():
+                    if url.endswith(path):
+                        return content
+                raise ValueError(f"Unexpected raw GET URL: {url}")
 
             client = MagicMock()
             client.json.return_value = {"sha": "e" * 40}
 
-            with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, {"Formula/second-project.rb": "b" * 40})), \
+            with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, blobs)), \
                  patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
                  patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}), \
-                 patch("rs9.readers._get", return_value=conflict_formula):
+                 patch("rs9.readers._get", side_effect=mock_get):
                 result = execute({"captures": captures, "scratch": scratch, "client": client})
 
             doc = json.loads((scratch / "destination-observations.json").read_bytes())

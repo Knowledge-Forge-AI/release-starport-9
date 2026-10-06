@@ -48,6 +48,7 @@ from rs9.build_native import (
 from rs9.errors import ContractError
 from rs9.hosted_native import compare_inventories, execute_probes, is_excluded_inventory_path
 from rs9.hosted_native import provision as provision_native
+from rs9.npm_deps import resolve_offline_npm_archives
 from rs9.pages import merkle_inventory, verify_merkle_inventory
 from rs9.pages_candidate import (
     CLIENT_KEYRING_PATH,
@@ -785,24 +786,7 @@ def _dependency_names(deb_bytes: bytes) -> list[str]:
 
 
 def _offline_npm_archives(capture: Any, product: str, inputs: Path | None, client: Any, scratch: Path) -> dict[str, Path] | None:
-    import posixpath
-
-    from rs9.npm_deps import closure_for_capture
-
-    package = json.loads(capture.source.get("package.json", "{}"))
-    if not (package.get("dependencies") or product == "theme-forge-stellar-burst"):
-        return None
-    archives: dict[str, Path] = {}
-    for index, row in enumerate(closure_for_capture(capture)):
-        cached = inputs / posixpath.basename(row["url"]) if inputs else None
-        if cached is not None and cached.is_file():
-            archives[row["path"]] = cached
-        elif client is not None:
-            target = scratch / "npm_downloads" / f"dep-{product}-{index}.tgz"
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(client.get(row["url"], request_class="npm-tarball", limit=32 * 1024 ** 2))
-            archives[row["path"]] = target
-    return archives
+    return resolve_offline_npm_archives(capture, product, scratch, inputs=inputs, client=client)
 
 
 def _ensure_captures(context: dict[str, Any], repository: Path, scratch: Path) -> list[Any]:
@@ -851,7 +835,7 @@ def _build_products(
             built = build_deb_candidate(
                 capture, intent, target_arch, build_dir,
                 maintainer=maintainer,
-                offline_npm_archives=_offline_npm_archives(capture, product, inputs, client, scratch),
+                offline_npm_archives=resolve_offline_npm_archives(capture, product, scratch, inputs=inputs, client=client),
                 runner=builder,
             )
         except (ContractError, NativePrerequisiteUnavailable, OSError) as err:

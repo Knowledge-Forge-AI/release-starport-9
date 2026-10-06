@@ -10,7 +10,7 @@ from rs9.build_pacman import build_pacman_candidate
 from rs9.build_rpm import build_rpm_candidate
 from rs9.errors import ContractError, safe_details
 from rs9.hosted_native import provision, container_tool_facts
-from rs9.hosted_wheels import _resolve_offline_npm_archives
+from rs9.npm_deps import resolve_offline_npm_archives as _resolve_offline_npm_archives, resolve_offline_npm_archives
 from rs9.release_core import digest
 from rs9.pages_candidate import _fixture_public_armor
 from rs9.scratch import canonical
@@ -81,7 +81,10 @@ def execute(context):
     repository, scratch, pins = context["repository"], context["scratch"], context["pins"]
     host = RecordingRunner(context.get("runner") or SubprocessRunner(timeout=1800))
     environment = provision(family, system, pins, runner=host)
-    platform, arch = environment["platform"], "aarch64" if "aarch64" in system else "x86_64"
+    architectures = {"aarch64-linux": "aarch64", "x86_64-linux": "x86_64"}
+    if system not in architectures:
+        raise ContractError("INVALID_ARCHITECTURE", "Hosted native package system is unsupported")
+    platform, arch = environment["platform"], architectures[system]
     tag = "rs9-" + family + "-builder:" + uuid.uuid4().hex[:12]
     tools = ["base-devel", "binutils", "pacman-contrib", "gnupg", "findutils", "python"] if family == "pacman" else ["rpm-build", "rpm-sign", "gnupg2", "rpmlint", "createrepo_c", "binutils", "findutils", "python3"]
     client_tools = ["xorg-server-xvfb", "dbus", "python"] if family == "pacman" else ["xorg-x11-server-Xvfb", "dbus-daemon", "python3"]

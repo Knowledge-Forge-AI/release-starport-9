@@ -20,7 +20,6 @@ import json
 import os
 from pathlib import Path
 import platform as sys_platform
-import posixpath
 import shutil
 import stat
 import subprocess
@@ -42,7 +41,6 @@ from rs9.hosted_platforms import (
     platform_contract,
     select_payload,
 )
-from rs9.npm_deps import closure_for_capture
 from rs9.release_core import ReleaseCapture, digest
 from rs9.scratch import canonical, physical_directory
 from rs9.verify_wheel import (
@@ -71,23 +69,8 @@ def _resolve_offline_npm_archives(
     inputs: Path | None,
     client: Any | None,
 ) -> dict[str, Path] | None:
-    pkg_json = json.loads(capture.source.get("package.json", "{}"))
-    if not (pkg_json.get("dependencies") or package_class(product_id) == "native-node-cli"):
-        return None
-
-    closure = closure_for_capture(capture)
-    archives: dict[str, Path] = {}
-    for idx, row in enumerate(closure):
-        arc_name = posixpath.basename(row["url"])
-        staged = inputs / arc_name if inputs else None
-        if staged and staged.is_file():
-            archives[row["path"]] = staged
-        elif client:
-            dest = scratch / "npm_downloads" / f"dep-{product_id}-{idx}.tgz"
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(client.get(row["url"], request_class="npm-tarball", limit=32 * 1024 * 1024))
-            archives[row["path"]] = dest
-    return archives
+    from rs9.npm_deps import resolve_offline_npm_archives
+    return resolve_offline_npm_archives(capture, product_id, scratch, inputs, client)
 
 
 def execute(context: dict[str, Any]) -> dict[str, Any]:
@@ -282,7 +265,7 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
         gates.append({"name": "wheel-offline-isolation", "status": "pass"})
 
     from rs9.hosted_commands import run_probes
-    from rs9.hosted_smoke import prepare_smoke, verify_nebular_runtime, snapshot_nebular_runtime
+    from rs9.hosted_smoke import prepare_smoke, verify_nebular_runtime, snapshot_nebular_runtime, verifier_import_preflight
 
     neb = next((c for c, i, _ in captures if i["project"]["id"] == "theme-forge-nebular-fusion"), None)
     neb_built = "theme-forge-nebular-fusion" in product_records
@@ -334,6 +317,8 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
             nonlocal sidecar_details, burst_details
             if is_linux:
                 prefix = linux_runtime_prefix(env)
+            if current_pid == "theme-forge-nebular-fusion" and prepared is not None:
+                verifier_import_preflight(prepared, system, prefix, env)
             baseline = None
             def after_probe():
                 nonlocal baseline
@@ -343,6 +328,7 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
                         raise ContractError("SIDECAR_REPRESENTATION", "Installed wheel did not materialize one payload")
                     baseline = snapshot_nebular_runtime(roots[0], prepared, system)
             rows = run_probes(command, path, repository=repository, prefix=prefix, env=env,
+                              system=system, substage="wheel-lifecycle-command-probe",
                               **({"after_probe": after_probe} if current_pid == "theme-forge-nebular-fusion" else {}))
             if any(r["status"] != "pass" for r in rows):
                 raise ContractError("COMMAND_CONTRACT", f"Released command contract is incomplete for {current_pid}")
@@ -444,8 +430,10 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
                     "details": safe_details(error_details),
                 }))
                 artifacts.append(diag_file)
-                gates.append({"name": "wheel-client-deb", "status": "fail", "reason": err.code})
-                gates.append({"name": "wheel-client-rpm", "status": "fail", "reason": err.code})
+                for family in ("deb", "rpm"):
+                    gate_name = "wheel-client-" + family
+                    if not any(g["name"] == gate_name for g in gates):
+                        gates.append({"name": gate_name, "status": "fail", "reason": err.code})
         else:
             gates.append({"name": "wheel-client-deb", "status": "fail", "reason": "nebular-unbuilt-or-unprepared"})
             gates.append({"name": "wheel-client-rpm", "status": "fail", "reason": "nebular-unbuilt-or-unprepared"})
@@ -461,6 +449,8 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
         "burst_native_load": burst_details,
     }
     manifest_path = scratch / "hosted-wheels-manifest.json"
+    from rs9.scratch import validate_safe_json
+    validate_safe_json(manifest, lane="wheels", field="hosted_wheels_manifest")
     manifest_bytes = canonical(manifest)
     manifest_path.write_bytes(manifest_bytes)
     artifacts.append(manifest_path)

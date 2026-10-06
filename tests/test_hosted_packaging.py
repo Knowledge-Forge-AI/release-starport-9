@@ -1,5 +1,6 @@
 """Unit tests for rs9.hosted_packaging."""
 
+import json
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -501,6 +502,17 @@ class HostedPackagingTests(unittest.TestCase):
             self.assertNotEqual(src_path, capture_dir.resolve())
             self.assertNotEqual(src_path, inputs_dir.resolve())
             self.assertNotEqual(src_path, auth_file.resolve())
+
+    def test_hosted_packaging_uses_shared_npm_deps_helper(self):
+        from rs9.hosted_packaging import _resolve_offline_npm_archives, resolve_offline_npm_archives
+        from rs9.npm_deps import resolve_offline_npm_archives as npm_helper
+        self.assertIs(_resolve_offline_npm_archives, npm_helper)
+        self.assertIs(resolve_offline_npm_archives, npm_helper)
+
+        scratch = self.root / "pkg_helper_scratch"
+        scratch.mkdir()
+        neb_capture = SimpleNamespace(source={"package.json": json.dumps({"dependencies": {"vue": "3.0"}})})
+        self.assertIsNone(_resolve_offline_npm_archives(neb_capture, "theme-forge-nebular-fusion", scratch, None, None))
 
 
 if __name__ == "__main__":

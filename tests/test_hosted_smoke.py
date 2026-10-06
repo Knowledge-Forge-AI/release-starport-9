@@ -19,6 +19,9 @@ from rs9.hosted_smoke import (
     _control_verifier,
     _run_verifier,
     prepare_smoke,
+    verifier_import_preflight,
+    tagged_files,
+    expected_runtime_members,
 )
 from rs9.release_core import digest
 from rs9.scratch import canonical
@@ -85,10 +88,12 @@ class SmokeEnvironmentTests(unittest.TestCase):
                 scratch.mkdir()
                 if phase == "verify":
                     (scratch / "sidecar-common.mjs").write_text("export async function verifyDistribution(){throw new Error('sidecar payload inventory is invalid');}")
+                    (scratch / "sidecar-verify.mjs").write_text("export function verifySidecar(){}")
+                    (scratch / "native-rc-smoke.mjs").write_text("export const smoke=true;")
                 prepared = {"scratch": scratch, "tools": scratch}
                 with self.assertRaises(ContractError) as caught:
                     verify_nebular_runtime(root, prepared, "x86_64-linux")
-                self.assertEqual(caught.exception.code, "SIDECAR_VERIFIER")
+                self.assertEqual(caught.exception.code, "SIDECAR_VERIFIER" if phase == "verify" else "SIDECAR_HARNESS_IMPORT")
                 diagnostic = json.loads((work / "diagnostics/sidecar-verifier.json").read_bytes())
                 self.assertEqual(diagnostic["verifier"]["phase"], phase)
                 if phase == "verify":
@@ -465,7 +470,7 @@ class SmokeEnvironmentTests(unittest.TestCase):
                 with patch("rs9.hosted_smoke._run_verifier", return_value=(
                     {"status": "fail", "phase": "verify", "reason_token": tokens[fam], "exit_code": 2,
                      "stdout_sha256": digest(fam.encode()), "stderr_sha256": digest(b"err")}, None
-                )):
+                )), patch("rs9.hosted_smoke.verifier_import_preflight", return_value={"status": "pass"}):
                     with self.assertRaises(ContractError) as caught:
                         verify_nebular_runtime(root, prepared, "x86_64-linux")
                     self.assertEqual(caught.exception.code, "SIDECAR_VERIFIER")
@@ -489,7 +494,7 @@ class SmokeEnvironmentTests(unittest.TestCase):
             with patch("rs9.hosted_smoke._run_verifier", return_value=(
                 {"status": "fail", "phase": "verify", "reason_token": "actual-input-identity", "exit_code": 2,
                  "stdout_sha256": digest(b"single"), "stderr_sha256": digest(b"err")}, None
-            )):
+            )), patch("rs9.hosted_smoke.verifier_import_preflight", return_value={"status": "pass"}):
                 with self.assertRaises(ContractError):
                     verify_nebular_runtime(root, prepared_single, "x86_64-linux")
             single_file = diag_dir / "sidecar-verifier.json"

@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from rs9.errors import ContractError
-from rs9.hosted_commands import linux_runtime_prefix, probes_for, run_probes, service_protocol
+from rs9.hosted_commands import _BOUND, command_diagnostic, linux_runtime_prefix, probes_for, run_probes, service_protocol
 
 
 class SupportedCommandsTests(unittest.TestCase):
@@ -80,3 +80,39 @@ for line in sys.stdin:
         script = "import json; input(); print(json.dumps({'jsonrpc':'2.0','id':1,'error':{'code':-1}}),flush=True)"
         with self.assertRaises(ContractError):
             service_protocol([sys.executable, "-u", "-c", script])
+
+    def test_linux_command_failure_retains_contract_and_digests(self):
+        import hashlib
+        result = subprocess.CompletedProcess([], 1, "", "bwrap: Creating new namespace failed: Operation not permitted /private/fixture\n")
+        for system in ("x86_64-linux", "aarch64-linux"):
+            with self.subTest(system=system), patch.dict(_BOUND, {"tfnf": {"status": "bound"}}, clear=True), \
+                    patch("rs9.hosted_commands.subprocess.run", return_value=result):
+                with self.assertRaises(ContractError) as caught:
+                    run_probes("tfnf", "/private/fixture/executable", system=system, substage="nix-command-probe")
+            self.assertEqual(caught.exception.code, "COMMAND_BEHAVIOR")
+            details = caught.exception.details
+            self.assertEqual(details["product"], "theme-forge-nebular-fusion")
+            self.assertEqual(details["command"], "tfnf")
+            self.assertEqual(details["system"], system)
+            self.assertEqual(details["substage"], "nix-command-probe")
+            self.assertTrue(details["probe_id"].startswith("tfnf.0."))
+            self.assertEqual(details["diagnostic_token"], "userns-denied")
+            self.assertEqual(details["exit_code"], 1)
+            self.assertEqual(details["stdout_sha256"], hashlib.sha256(b"").hexdigest())
+            self.assertEqual(details["stderr_sha256"], hashlib.sha256(result.stderr.encode()).hexdigest())
+            self.assertNotIn("/private/", json.dumps(details))
+
+    def test_mismatch_is_visible_even_on_zero_exit(self):
+        result = subprocess.CompletedProcess([], 0, "unexpected", "")
+        details = command_diagnostic("tfnf", 1, {"kind": "cli", "expect_exit": 0, "stdout_contains": ["0.6.1"]}, result,
+                                     system="aarch64-linux", substage="nix-command-probe")
+        self.assertFalse(details["stdout_matches"])
+        self.assertEqual(details["expected_exit"], 0)
+        self.assertEqual(details["exit_code"], 0)
+
+    def test_service_failure_retains_digests(self):
+        script = "import json; input(); print(json.dumps({'jsonrpc':'2.0','id':1,'error':{'code':-1}}),flush=True)"
+        with self.assertRaises(ContractError) as caught:
+            service_protocol([sys.executable, "-u", "-c", script])
+        self.assertRegex(caught.exception.details["stdout_sha256"], r"^[0-9a-f]{64}$")
+        self.assertRegex(caught.exception.details["stderr_sha256"], r"^[0-9a-f]{64}$")
