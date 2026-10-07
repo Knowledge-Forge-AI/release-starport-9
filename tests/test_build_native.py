@@ -393,7 +393,7 @@ class BuildNativeCommonTests(unittest.TestCase):
             return CommandReceipt(argv, 0, b"createrepo ok\n", b"")
 
         def rpmlint_handler(argv, cwd=None, env=None):
-            return CommandReceipt(argv, 0, b"0 packages and 0 specfiles checked; 0 errors, 0 warnings.\n", b"")
+            return CommandReceipt(argv, 0, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings.\n", b"")
 
         runner = MockCommandRunner(
             available_tools={
@@ -537,7 +537,7 @@ class BuildNativeCommonTests(unittest.TestCase):
             return CommandReceipt(argv, 0, out, b"")
 
         def rpmlint_handler(argv, cwd=None, env=None):
-            return CommandReceipt(argv, 0, b"0 packages and 1 specfiles checked; 0 errors, 0 warnings.\n", b"")
+            return CommandReceipt(argv, 0, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings.\n", b"")
 
         def createrepo_handler(argv, cwd=None, env=None):
             self.assertIn("--no-database", argv)
@@ -835,7 +835,8 @@ class BuildNativeCommonTests(unittest.TestCase):
             return CommandReceipt(argv, 0, out, b"")
 
         def rpmlint_handler(argv, cwd=None, env=None):
-            return CommandReceipt(argv, 0, b"0 errors, 0 warnings.\n", b"")
+            # Synthetic complete rpmlint summary; native execution remains separate.
+            return CommandReceipt(argv, 0, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings, 0 filtered, 0 badness; has taken 0.1 s\n", b"")
 
         def createrepo_handler(argv, cwd=None, env=None):
             repodata = Path(argv[-1]) / "repodata"

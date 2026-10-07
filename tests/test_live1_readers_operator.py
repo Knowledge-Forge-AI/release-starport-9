@@ -179,3 +179,47 @@ class ReaderOperatorTests(unittest.TestCase):
                 with self.assertRaises(ContractError): assert_release_expectations(capture, modified)
             expected["assets"][0]["sha256"] = "e" * 64
             with self.assertRaises(ContractError): assert_release_expectations(capture, expected)
+
+    def test_pages_tls_failure_never_implies_absence_and_records_bounded_tokens(self):
+        """TLS failure in read_pages never implies absence and emits bounded TLS enum tokens."""
+        import ssl
+        from rs9.readers import TLS_CLASSES, classify_tls_error, read_pages
+
+        cases = [
+            (URLError(getattr(ssl, "SSLCertVerificationError", ssl.SSLError)("certificate verify failed: self signed certificate")), "certificate-verify-failed"),
+            (URLError(getattr(ssl, "SSLEOFError", ssl.SSLError)("unexpected EOF in TLS stream")), "unexpected-eof"),
+            (URLError(getattr(ssl, "SSLZeroReturnError", ssl.SSLError)("TLS protocol error")), "protocol-error"),
+            (URLError(ssl.SSLError("SSL handshake failure: wrong version")), "handshake-failure"),
+            (URLError(getattr(ssl, "SSLSyscallError", ssl.SSLError)("I/O error during TLS")), "transport-error"),
+            (ssl.SSLError("direct SSL verification failed"), "certificate-verify-failed"),
+        ]
+
+        pages_dest = {"id": "pages", "adapter": "pages", "mode": "direct"}
+        pages_subj = {"package": "rs9-pages", "version": "1", "revision": None}
+
+        for error_instance, expected_token in cases:
+            with self.subTest(error=type(error_instance).__name__, expected_token=expected_token):
+                # Verify bounded enum classification
+                self.assertIn(expected_token, TLS_CLASSES)
+                classified = classify_tls_error(error_instance)
+                self.assertEqual(classified, expected_token)
+
+                with patch("rs9.readers._get", side_effect=error_instance):
+                    obs = read_pages(pages_dest, pages_subj, path="CNAME")
+
+                # Invariant: TLS failure is never absence
+                self.assertEqual(obs["state"], "unknown")
+                self.assertNotEqual(obs["readback"]["presence"], "absent")
+                self.assertEqual(obs["readback"]["presence"], "unknown")
+                self.assertEqual(obs["readback"]["transport"], "unknown")
+                self.assertTrue(has_live_proof(obs))
+
+                diag_codes = [d["code"] for d in obs["diagnostics"]]
+                # Generic TLS error code is preserved
+                self.assertIn("pages-tls-error", diag_codes)
+                # Specific bounded TLS token code is emitted
+                self.assertIn("pages-tls-" + expected_token, diag_codes)
+
+                # Diagnostic message retains the bounded token
+                tls_msg = next(d["message"] for d in obs["diagnostics"] if d["code"] == "pages-tls-error")
+                self.assertIn(expected_token, tls_msg)

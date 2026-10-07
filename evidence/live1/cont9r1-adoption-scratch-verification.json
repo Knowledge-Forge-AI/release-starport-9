@@ -1,0 +1,671 @@
+{
+  "schema": "rs9.cont9r1-adoption-scratch-source-verification.v1",
+  "status": "closeout-tests-pass-terminal-amendments-manager-disposition-required",
+  "scope": "ignored-root-scratch adoption repair; retained CONT9 cumulative source",
+  "stage_product_delta": [
+    ".gitignore",
+    "docs/live1-native-client-cont9.md",
+    "evidence/live1/cont9r1-adoption-scratch-verification.json",
+    "operators/live1/candidate-manifest.json",
+    "src/rs9/adopt_candidate.py",
+    "src/rs9/hosted_deb.py",
+    "src/rs9/rpm_lint.py",
+    "tests/test_adoption_scratch.py",
+    "tests/test_collect_candidate.py",
+    "tests/test_hosted_deb.py",
+    "tests/test_rpm_lint.py"
+  ],
+  "proposal": {
+    "disposition": "amend",
+    "bytes": 15457,
+    "sha256": "b4f3eec6b50547bbe0d68988cbc35bd52ce55765a36ff7d0e829ba33a8d89762",
+    "plan_review": "reviewed_with_findings-advisory",
+    "findings_disposition": "addressed in docs/live1-native-client-cont9.md CONT9R1 section",
+    "original_scope_preserved": true,
+    "entry_stage_deltas": []
+  },
+  "entry_evidence": {
+    "kit_read": true,
+    "manager_reproduction_read": true,
+    "prior_final_review_and_closeout_read": true,
+    "inherited_path_hashes_and_modes_matched": 29,
+    "inherited_candidate_manifest_sha256": "38d810d2e540d9793b0b5c8ac3293cd3b50c14cc8623f0e6a80ee326f41d742e",
+    "inherited_byte_mode_preserved_paths": 26,
+    "explicit_amendments_to_inherited_paths": [
+      ".gitignore",
+      "docs/live1-native-client-cont9.md",
+      "operators/live1/candidate-manifest.json"
+    ],
+    "native_implementation_unchanged": true,
+    "run_hosted8_unchanged": true,
+    "preservation_check": "comparison against supplied source-binding path_metadata; no reconstruction"
+  },
+  "repair": {
+    "untracked_actually_ignored_root_scratch_only": true,
+    "root_ignore_rule": "/.scratch/",
+    "tracked_and_reviewed_scratch_rejected": true,
+    "scratch_never_selected_for_staging_or_product_custody": true,
+    "nested_scratch_source_preserved": true,
+    "unrelated_ignored_files_still_rejected": true,
+    "existing_cache_policy_preserved": true,
+    "scratch_and_serena_bytes_modes_preserved_in_real_git_fixtures": true,
+    "scratch_content_scan": false,
+    "git_listing_trace_probe": {
+      "fixture": "400 scratch files in four subdirectories plus three cache fixtures",
+      "pathspec_exclusion": {
+        "directories_visited": 11,
+        "paths_visited": 415
+      },
+      "directory_listing": {
+        "directories_visited": 4,
+        "paths_visited": 9
+      },
+      "result": "directory collapse avoids scratch traversal; redundant ancestor entries normalized",
+      "evidence_owner": "prior implementation-stage trace; terminal listing expands only ambiguous non-scratch directories"
+    },
+    "parent_tree_manifest_readiness_attestation_checks_preserved": true,
+    "ambiguous_directory_expansion": "literal positive pathspecs; root scratch and recognized cache directories remain collapsed"
+  },
+  "regressions": {
+    "module": "tests/test_adoption_scratch.py",
+    "real_git": true,
+    "real_staging_paths": true,
+    "real_inventory_and_filesystem_reads": true,
+    "pre_mutation_boundary_reached_under_umasks": [
+      "022",
+      "077"
+    ],
+    "tree_changed_paths_and_index_contents_unchanged_after_scratch_log": true,
+    "source_manifest_parent_tree_attestation_index_drift_stops_before_mutation": true,
+    "manifest_files_changed_paths_deleted_paths_scratch_smuggling_stops": true,
+    "tracked_modified_and_deleted_scratch_not_hidden": true,
+    "root_file_symlink_unignored_negated_child_and_unignored_cache_paths_stop": true,
+    "run_hosted8_shared_adoption": {
+      "umasks": [
+        "022",
+        "077"
+      ],
+      "existing_empty_output_directory": true,
+      "matching_external_manager_attestation": true,
+      "local_fixture_commit_tree_and_parent_match_review": true,
+      "one_intercepted_push_and_one_collection_bound_to_new_commit_not_before": true,
+      "stdout_keys": [
+        "LOG",
+        "RC",
+        "MANAGER_PACKET",
+        "UPLOAD"
+      ],
+      "rc": 2,
+      "rc_reason": "fixture collection validation fail after successful local adoption",
+      "packet_zip_and_external_log_created": true,
+      "attestation_outside_packet": true,
+      "fetch_push_and_github_only_test_seams": true,
+      "no_network_or_public_writes": true
+    },
+    "real_checkout_index": "read-only ls-files -s -z and cached paths unchanged; no byte-hash claim",
+    "git_fixture_isolation": "resolved temporary HOME; global/system config, hooks, signing and repository/index overrides isolated",
+    "old_git_behavior": "clear class skip below Git 2.32",
+    "original_bug_reproduced_before_fix": "ADOPTION_INVENTORY under both 022 and 077"
+  },
+  "focused": {
+    "group": "focused",
+    "umask": "022",
+    "resourcewarning": "error",
+    "run": 216,
+    "pass": 215,
+    "skip": 1,
+    "fail": 0,
+    "error": 0,
+    "skipped_test_cases": 1,
+    "skipped_classes": 0,
+    "success": true,
+    "skips": [
+      {
+        "test": "test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family (test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family)",
+        "reason": "GnuPG binary not available"
+      }
+    ],
+    "failed_tests": [],
+    "log_sha256": "2c5335dfc044d47a35c2d652fef34636c31e3e672783e2ac4940acd50f1e44ee"
+  },
+  "full_unittest": [
+    {
+      "group": "full",
+      "umask": "022",
+      "resourcewarning": "error",
+      "run": 1297,
+      "pass": 1284,
+      "skip": 14,
+      "fail": 0,
+      "error": 0,
+      "skipped_test_cases": 13,
+      "skipped_classes": 1,
+      "success": true,
+      "skips": [
+        {
+          "test": "test_raw_invalid_utf8_path_roundtrip_where_supported (test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported)",
+          "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them"
+        },
+        {
+          "test": "test_socket_and_arbitrary_symlink_targets_are_never_read (test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read)",
+          "reason": "sandbox denies local socket creation; socket record grammar tested separately"
+        },
+        {
+          "test": "test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family (test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family)",
+          "reason": "GnuPG binary not available"
+        },
+        {
+          "test": "test_captured_reference_tree_and_byte_comparison (test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison)",
+          "reason": "live capture directory not supplied"
+        },
+        {
+          "test": "test_captured_release_bytes_and_deterministic_goldens (test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens)",
+          "reason": "live capture directory not supplied"
+        },
+        {
+          "test": "test_reference_semantic_facts_detect_material_recipe_drift (test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift)",
+          "reason": "live capture directory not supplied"
+        },
+        {
+          "test": "test_both_real_release_captures_replay_through_same_core (test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core)",
+          "reason": "both live capture directories required"
+        },
+        {
+          "test": "test_reauthenticate_live_bytes_and_deterministic_records (test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records)",
+          "reason": "live capture directory not supplied"
+        },
+        {
+          "test": "test_aarch64_darwin (test_nix_installer.OfficialArchiveTests.test_aarch64_darwin)",
+          "reason": "official archive directory not locatable"
+        },
+        {
+          "test": "test_aarch64_linux (test_nix_installer.OfficialArchiveTests.test_aarch64_linux)",
+          "reason": "official archive directory not locatable"
+        },
+        {
+          "test": "test_x86_64_linux (test_nix_installer.OfficialArchiveTests.test_x86_64_linux)",
+          "reason": "official archive directory not locatable"
+        },
+        {
+          "test": "test_construct_candidate_signed_tree_with_fixture (test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture)",
+          "reason": "GnuPG binary not available"
+        },
+        {
+          "test": "test_real_gnupg_fixture_signs_and_rejects_every_tamper (test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper)",
+          "reason": "GnuPG binary not available"
+        },
+        {
+          "test": "setUpClass (test_signing_fixture.SigningFixtureTests)",
+          "reason": "GnuPG binary not available in environment"
+        }
+      ],
+      "failed_tests": [],
+      "log_sha256": "e5b7e135075a62ae6d4a0e46c8afb1043999db89f1dc7a54ad72bb98ac3172c8"
+    },
+    {
+      "group": "full",
+      "umask": "077",
+      "resourcewarning": "error",
+      "run": 1297,
+      "pass": 1284,
+      "skip": 14,
+      "fail": 0,
+      "error": 0,
+      "skipped_test_cases": 13,
+      "skipped_classes": 1,
+      "success": true,
+      "skips": [
+        {
+          "test": "test_raw_invalid_utf8_path_roundtrip_where_supported (test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported)",
+          "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them"
+        },
+        {
+          "test": "test_socket_and_arbitrary_symlink_targets_are_never_read (test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read)",
+          "reason": "sandbox denies local socket creation; socket record grammar tested separately"
+        },
+        {
+          "test": "test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family (test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family)",
+          "reason": "GnuPG binary not available"
+        },
+        {
+          "test": "test_captured_reference_tree_and_byte_comparison (test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison)",
+          "reason": "live capture directory not supplied"
+        },
+        {
+          "test": "test_captured_release_bytes_and_deterministic_goldens (test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens)",
+          "reason": "live capture directory not supplied"
+        },
+        {
+          "test": "test_reference_semantic_facts_detect_material_recipe_drift (test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift)",
+          "reason": "live capture directory not supplied"
+        },
+        {
+          "test": "test_both_real_release_captures_replay_through_same_core (test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core)",
+          "reason": "both live capture directories required"
+        },
+        {
+          "test": "test_reauthenticate_live_bytes_and_deterministic_records (test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records)",
+          "reason": "live capture directory not supplied"
+        },
+        {
+          "test": "test_aarch64_darwin (test_nix_installer.OfficialArchiveTests.test_aarch64_darwin)",
+          "reason": "official archive directory not locatable"
+        },
+        {
+          "test": "test_aarch64_linux (test_nix_installer.OfficialArchiveTests.test_aarch64_linux)",
+          "reason": "official archive directory not locatable"
+        },
+        {
+          "test": "test_x86_64_linux (test_nix_installer.OfficialArchiveTests.test_x86_64_linux)",
+          "reason": "official archive directory not locatable"
+        },
+        {
+          "test": "test_construct_candidate_signed_tree_with_fixture (test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture)",
+          "reason": "GnuPG binary not available"
+        },
+        {
+          "test": "test_real_gnupg_fixture_signs_and_rejects_every_tamper (test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper)",
+          "reason": "GnuPG binary not available"
+        },
+        {
+          "test": "setUpClass (test_signing_fixture.SigningFixtureTests)",
+          "reason": "GnuPG binary not available in environment"
+        }
+      ],
+      "failed_tests": [],
+      "log_sha256": "20c816917a8e4563f1bbb7f8e2a570f0c8ca83f172f65aeee654ae19d1c462f7"
+    }
+  ],
+  "counting": "pass = run - individual test skips - failures - errors; class skips never increment run",
+  "commands": [
+    "rtk env PYTHONPATH=src:tests PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning .scratch/cont9r1/run_closeout_suite.py 022 focused",
+    "rtk env PYTHONPATH=src:tests PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning .scratch/cont9r1/run_closeout_suite.py 022",
+    "rtk env PYTHONPATH=src:tests PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning .scratch/cont9r1/run_closeout_suite.py 077",
+    "rtk env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 .scratch/cont9r1/check_closeout_source.py"
+  ],
+  "static_checks": {
+    "status": "pass",
+    "diff_check": "pass",
+    "python_parse_files": 26,
+    "json_parse_files": 3,
+    "local_links_checked": 43,
+    "credential_physical_inventory_files": 359,
+    "source_hygiene_tests": "included-in-focused-and-full-discovery",
+    "workflow_and_required_lanes_unchanged": true,
+    "required_linux_nix_preserved": true,
+    "real_index_entries_unchanged": true,
+    "real_staged_paths_empty": true,
+    "root_scratch_outside_custody": true,
+    "changed_paths_count": 33,
+    "live_backend_staging_preflight": "pass-without-mutation"
+  },
+  "tested_binding": {
+    "parent": "2ac5033d936202bd9f505b67fd1f15120b1efef7",
+    "pre_evidence_manifest_sha256": "b1d70e610ee7d0f9389dc55ca91fa18e99a04fbd8730865115935340896c3aaf",
+    "source_inventory_excluding_manifest_and_this_report_sha256": "5fd2e34d27eff86bfc97fc27105649aed96723190d22fa410bcdbd8ed0d6aee6",
+    "source_inventory_excluding_manifest_and_this_report_files": 357,
+    "changed_paths": [
+      ".gitignore",
+      "docs/README.md",
+      "docs/live1-native-client-cont9.md",
+      "docs/live1-pages-endpoint-diagnostic.md",
+      "evidence/live1/cont9-source-verification.json",
+      "evidence/live1/cont9r1-adoption-scratch-verification.json",
+      "operators/live1/candidate-manifest.json",
+      "operators/live1/run-hosted8.py",
+      "src/rs9/adopt_candidate.py",
+      "src/rs9/apt_diagnostics.py",
+      "src/rs9/build_rpm.py",
+      "src/rs9/hosted_container_smoke.py",
+      "src/rs9/hosted_deb.py",
+      "src/rs9/hosted_observe.py",
+      "src/rs9/hosted_packaging.py",
+      "src/rs9/hosted_smoke.py",
+      "src/rs9/hosted_summary.py",
+      "src/rs9/readers.py",
+      "src/rs9/rpm_lint.py",
+      "tests/test_adoption_scratch.py",
+      "tests/test_apt_diagnostics.py",
+      "tests/test_build_native.py",
+      "tests/test_build_rpm.py",
+      "tests/test_candidate_inventory.py",
+      "tests/test_collect_candidate.py",
+      "tests/test_hosted_container_smoke.py",
+      "tests/test_hosted_deb.py",
+      "tests/test_hosted_observe.py",
+      "tests/test_hosted_packaging.py",
+      "tests/test_hosted_summary.py",
+      "tests/test_live1_readers_operator.py",
+      "tests/test_rpm_lint.py",
+      "tests/test_run_hosted8.py"
+    ],
+    "post_suite_changes": "this reporting record and cumulative manifest only; fresh hygiene and cumulative static/inventory verification required afterward",
+    "final_exact_tree_and_manifest_digest": "returned separately to avoid report/manifest self-reference"
+  },
+  "workers": [
+    {
+      "kind": "gemini",
+      "observed_invocation": true,
+      "task": "read-only-verification-procedure-map",
+      "requested_profile": "gemini-3.8-flash-high",
+      "effective_model": "not-observed",
+      "disposition": "accepted-procedure-map-only",
+      "cleanup_proven": true,
+      "dispatcher_checkpoint_credit": false
+    }
+  ],
+  "review": {
+    "dispatcher_pre_final": "reviewed_with_findings-advisory",
+    "cumulative_candidate_including_cont9_terminal_amendments": true,
+    "independent_review_invoked_by_terminal_provider": false,
+    "reviewed_producer_binding": {
+      "parent": "2ac5033d936202bd9f505b67fd1f15120b1efef7",
+      "tree": "b41e2fa9b6dd52a2776f9d9848bcc0ee53f94b73",
+      "manifest_sha256": "444558a0b1371b979edc07b241d33db8a4dfe81054acb813c4bdc054b5ada8f9",
+      "verified_at_closeout_entry": true
+    },
+    "terminal_disposition": "amend",
+    "terminal_amendments_independently_reviewed": false,
+    "external_manager_acceptance": "required"
+  },
+  "native_qualification": false,
+  "pending_external_evidence": [
+    "native RPM lint findings",
+    "actual APT refresh cause and native trust/readability",
+    "installed Linux client runtime and lifecycle on both architectures",
+    "Pages TLS/readback",
+    "required Linux Nix userns runtime qualification",
+    "diagnostic-only PRoot results",
+    "Darwin offline-isolation limitation"
+  ],
+  "fixture_or_skip_native_credit": false,
+  "candidate_adoption_ready": false,
+  "production_enabled": false,
+  "publication_authority": false,
+  "real_checkout_staging_commit_push": false,
+  "hosted_run_created_or_retried": false,
+  "future_operator": "external manager acceptance of exact cumulative source; one new push-triggered run 8 then stop",
+  "producer_qualification": {
+    "focused": {
+      "group": "focused",
+      "umask": "022",
+      "resourcewarning": "error",
+      "run": 51,
+      "pass": 51,
+      "skip": 0,
+      "fail": 0,
+      "error": 0,
+      "skipped_test_cases": 0,
+      "skipped_classes": 0,
+      "success": true,
+      "skips": [],
+      "failed_tests": [],
+      "log_sha256": "15d886beb24862517c7388a895933efcf21f3e95a73104afd122e61fd5a4af7c"
+    },
+    "full_unittest": [
+      {
+        "group": "full",
+        "umask": "022",
+        "resourcewarning": "error",
+        "run": 1294,
+        "pass": 1281,
+        "skip": 14,
+        "fail": 0,
+        "error": 0,
+        "skipped_test_cases": 13,
+        "skipped_classes": 1,
+        "success": true,
+        "skips": [
+          {
+            "test": "test_raw_invalid_utf8_path_roundtrip_where_supported (test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported)",
+            "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them"
+          },
+          {
+            "test": "test_socket_and_arbitrary_symlink_targets_are_never_read (test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read)",
+            "reason": "sandbox denies local socket creation; socket record grammar tested separately"
+          },
+          {
+            "test": "test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family (test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family)",
+            "reason": "GnuPG binary not available"
+          },
+          {
+            "test": "test_captured_reference_tree_and_byte_comparison (test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison)",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_captured_release_bytes_and_deterministic_goldens (test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens)",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_reference_semantic_facts_detect_material_recipe_drift (test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift)",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_both_real_release_captures_replay_through_same_core (test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core)",
+            "reason": "both live capture directories required"
+          },
+          {
+            "test": "test_reauthenticate_live_bytes_and_deterministic_records (test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records)",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_aarch64_darwin (test_nix_installer.OfficialArchiveTests.test_aarch64_darwin)",
+            "reason": "official archive directory not locatable"
+          },
+          {
+            "test": "test_aarch64_linux (test_nix_installer.OfficialArchiveTests.test_aarch64_linux)",
+            "reason": "official archive directory not locatable"
+          },
+          {
+            "test": "test_x86_64_linux (test_nix_installer.OfficialArchiveTests.test_x86_64_linux)",
+            "reason": "official archive directory not locatable"
+          },
+          {
+            "test": "test_construct_candidate_signed_tree_with_fixture (test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture)",
+            "reason": "GnuPG binary not available"
+          },
+          {
+            "test": "test_real_gnupg_fixture_signs_and_rejects_every_tamper (test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper)",
+            "reason": "GnuPG binary not available"
+          },
+          {
+            "test": "setUpClass (test_signing_fixture.SigningFixtureTests)",
+            "reason": "GnuPG binary not available in environment"
+          }
+        ],
+        "failed_tests": [],
+        "log_sha256": "1a3e59c8409a5dd2e62a13f4f6b7b9de299d01dbef017452f2bf741cdd8d21ac"
+      },
+      {
+        "group": "full",
+        "umask": "077",
+        "resourcewarning": "error",
+        "run": 1294,
+        "pass": 1281,
+        "skip": 14,
+        "fail": 0,
+        "error": 0,
+        "skipped_test_cases": 13,
+        "skipped_classes": 1,
+        "success": true,
+        "skips": [
+          {
+            "test": "test_raw_invalid_utf8_path_roundtrip_where_supported (test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported)",
+            "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them"
+          },
+          {
+            "test": "test_socket_and_arbitrary_symlink_targets_are_never_read (test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read)",
+            "reason": "sandbox denies local socket creation; socket record grammar tested separately"
+          },
+          {
+            "test": "test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family (test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family)",
+            "reason": "GnuPG binary not available"
+          },
+          {
+            "test": "test_captured_reference_tree_and_byte_comparison (test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison)",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_captured_release_bytes_and_deterministic_goldens (test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens)",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_reference_semantic_facts_detect_material_recipe_drift (test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift)",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_both_real_release_captures_replay_through_same_core (test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core)",
+            "reason": "both live capture directories required"
+          },
+          {
+            "test": "test_reauthenticate_live_bytes_and_deterministic_records (test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records)",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_aarch64_darwin (test_nix_installer.OfficialArchiveTests.test_aarch64_darwin)",
+            "reason": "official archive directory not locatable"
+          },
+          {
+            "test": "test_aarch64_linux (test_nix_installer.OfficialArchiveTests.test_aarch64_linux)",
+            "reason": "official archive directory not locatable"
+          },
+          {
+            "test": "test_x86_64_linux (test_nix_installer.OfficialArchiveTests.test_x86_64_linux)",
+            "reason": "official archive directory not locatable"
+          },
+          {
+            "test": "test_construct_candidate_signed_tree_with_fixture (test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture)",
+            "reason": "GnuPG binary not available"
+          },
+          {
+            "test": "test_real_gnupg_fixture_signs_and_rejects_every_tamper (test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper)",
+            "reason": "GnuPG binary not available"
+          },
+          {
+            "test": "setUpClass (test_signing_fixture.SigningFixtureTests)",
+            "reason": "GnuPG binary not available in environment"
+          }
+        ],
+        "failed_tests": [],
+        "log_sha256": "a295c23147de9405219d79897369a1d34858074cdceee0d060a9819e03bf8064"
+      }
+    ],
+    "commands": [
+      "env PYTHONPATH=src:tests PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning .scratch/cont9r1/run_suite.py 022 focused",
+      "env PYTHONPATH=src:tests PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning .scratch/cont9r1/run_suite.py 022",
+      "env PYTHONPATH=src:tests PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning .scratch/cont9r1/run_suite.py 077"
+    ],
+    "static_checks": {
+      "status": "pass",
+      "diff_check": "pass",
+      "python_parse_files": 26,
+      "json_parse_files": 3,
+      "local_links_checked": 43,
+      "credential_physical_inventory_files": 359,
+      "source_hygiene_tests": "26-pass-including-workflow-and-readiness",
+      "workflow_and_required_lanes_unchanged": true,
+      "required_linux_nix_preserved": true,
+      "real_index_entries_unchanged": true,
+      "real_staged_paths_empty": true,
+      "root_scratch_outside_custody": true,
+      "changed_paths_count": 33,
+      "live_backend_staging_preflight": "pass-without-mutation"
+    },
+    "tested_binding": {
+      "parent": "2ac5033d936202bd9f505b67fd1f15120b1efef7",
+      "pre_evidence_manifest_sha256": "eec72109882dd70de940651892c3f9b35b328b8c87f70242dc199aa54b24c7d7",
+      "source_inventory_excluding_manifest_and_this_report_sha256": "37055abc7ffb365884570923b4205e114b67bfec2bd90aa237b4a6449623ba8c",
+      "source_inventory_excluding_manifest_and_this_report_files": 357,
+      "changed_paths": [
+        ".gitignore",
+        "docs/README.md",
+        "docs/live1-native-client-cont9.md",
+        "docs/live1-pages-endpoint-diagnostic.md",
+        "evidence/live1/cont9-source-verification.json",
+        "evidence/live1/cont9r1-adoption-scratch-verification.json",
+        "operators/live1/candidate-manifest.json",
+        "operators/live1/run-hosted8.py",
+        "src/rs9/adopt_candidate.py",
+        "src/rs9/apt_diagnostics.py",
+        "src/rs9/build_rpm.py",
+        "src/rs9/hosted_container_smoke.py",
+        "src/rs9/hosted_deb.py",
+        "src/rs9/hosted_observe.py",
+        "src/rs9/hosted_packaging.py",
+        "src/rs9/hosted_smoke.py",
+        "src/rs9/hosted_summary.py",
+        "src/rs9/readers.py",
+        "src/rs9/rpm_lint.py",
+        "tests/test_adoption_scratch.py",
+        "tests/test_apt_diagnostics.py",
+        "tests/test_build_native.py",
+        "tests/test_build_rpm.py",
+        "tests/test_candidate_inventory.py",
+        "tests/test_collect_candidate.py",
+        "tests/test_hosted_container_smoke.py",
+        "tests/test_hosted_deb.py",
+        "tests/test_hosted_observe.py",
+        "tests/test_hosted_packaging.py",
+        "tests/test_hosted_summary.py",
+        "tests/test_live1_readers_operator.py",
+        "tests/test_rpm_lint.py",
+        "tests/test_run_hosted8.py"
+      ],
+      "post_suite_changes": "this reporting record and cumulative manifest only; regenerate and reverify inventory afterwards",
+      "final_exact_tree_and_manifest_digest": "returned separately to avoid report/manifest self-reference"
+    },
+    "evidence_owner": "prior implementation stage; not terminal results"
+  },
+  "closeout": {
+    "disposition": "amend",
+    "accepted_corrections": [
+      {
+        "path": "src/rs9/hosted_deb.py",
+        "severity": "medium",
+        "result": "Accepted tampered content fails regardless of positive control validity; rejection credit still requires a valid control.",
+        "regression": "Missing, failed and mismatched controls with successful tampered install/query reproduce before the fix and fail the tamper gate afterward."
+      },
+      {
+        "path": "src/rs9/adopt_candidate.py",
+        "severity": "low",
+        "result": "Ambiguous ignored directories expand with literal positive pathspecs outside root scratch and recognized caches.",
+        "regression": "Real Git under both umasks accepts a cache-only ignored directory, including a name with pathspec metacharacters; an unrelated ignored .env in the same directory stops adoption."
+      },
+      {
+        "path": "src/rs9/rpm_lint.py",
+        "severity": "low",
+        "result": "A missing or unreadable input digest cannot replace RPMLINT_FAILED or its command receipt hashes; unavailable digests remain empty.",
+        "regression": "Deleting either RPM or spec during fixture lint preserves the original failure code, exit status, stdout/stderr hashes and surviving input digest."
+      }
+    ],
+    "deferred_findings": [
+      {
+        "path": "src/rs9/adopt_candidate.py",
+        "severity": "low",
+        "finding": "Nested .serena is operational to candidate_inventory but rejected by adoption.",
+        "rationale": "Pre-existing conservative refusal; outside the root-scratch seam. No permission or policy widening is needed for M1."
+      }
+    ],
+    "inherited_preservation": {
+      "inherited_paths": 29,
+      "unchanged_bytes_modes": 22,
+      "explicit_amendments": [
+        ".gitignore",
+        "docs/live1-native-client-cont9.md",
+        "operators/live1/candidate-manifest.json",
+        "src/rs9/hosted_deb.py",
+        "src/rs9/rpm_lint.py",
+        "tests/test_hosted_deb.py",
+        "tests/test_rpm_lint.py"
+      ],
+      "run_hosted8_unchanged": true
+    },
+    "new_worker_use": {
+      "disposition": "declined",
+      "reason": "Bounded corrections and verification handled directly; no additional substantive review obtained."
+    },
+    "real_checkout_staging_commit_push": false,
+    "hosted_run_created_or_retried": false,
+    "native_qualification": false
+  }
+}

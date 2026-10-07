@@ -36,6 +36,15 @@ import shutil
 from typing import Any, Mapping, Sequence
 import uuid
 
+from rs9.apt_diagnostics import (
+    trust_identity,
+    build_positive_control,
+    classify_rejection,
+    probe_guest_trust,
+    qualify_tamper_rejection,
+    record_command_diagnostics,
+    validate_positive_control,
+)
 from rs9.build_deb import build_deb_candidate
 from rs9.build_native import (
     REQUIRED_COMMANDS,
@@ -412,13 +421,14 @@ def _printf_file(path: str, lines: Sequence[str]) -> list[str]:
     return ["sh", "-c", f"printf '%s\\n' {quoted} > {path}"]
 
 
-def apt_spec(apt_dir: Path, keyring: Path, arch: str) -> dict[str, Any]:
+def apt_spec(apt_dir: Path, keyring: Path, arch: str, *, public_fingerprint=None) -> dict[str, Any]:
     line = apt_source_line(f"file:{SERVER_ROOT}/apt", CLIENT_KEYRING_PATH, arch=arch).strip()
     opts = ["-o", f"Dir::Etc::sourcelist={APT_LIST}", "-o", "Dir::Etc::sourceparts=-",
             "-o", "APT::Get::AllowUnauthenticated=false", "-o", "Acquire::AllowInsecureRepositories=false",
             "-o", "Acquire::Languages=none"]
     return {
-        "family": "apt",
+        "family": "apt", "public_fingerprint": public_fingerprint,
+        "expected_key_sha256": digest(keyring.read_bytes()) if keyring.is_file() else None,
         "mounts": [(str(apt_dir), f"{SERVER_ROOT}/apt", False), (str(keyring), CLIENT_KEYRING_PATH, False)],
         "configure": [_printf_file(APT_LIST, [line])],
         "refresh": ["apt-get", *opts, "update"],
@@ -476,6 +486,44 @@ def _family_error(err: Exception) -> str:
     return err.code if isinstance(err, ContractError) else type(err).__name__
 
 
+def _cleanup_installed_client(client, spec, product, label, before, family):
+    """Cleanup errors never overwrite the primary probe/smoke failure."""
+    rows, evidence = [], {}
+    try:
+        removed=client.exec(spec["remove"](product))
+        gone=client.exec(spec["query"](product))
+        ok=removed.exit_code==0 and gone.exit_code!=0
+        rows.append(_gate(label+".uninstall", *_pair(ok)))
+        evidence["uninstall"]={"exit_code":removed.exit_code,"query_exit_code":gone.exit_code,
+                              "stdout_sha256":removed.stdout_sha256,"stderr_sha256":removed.stderr_sha256}
+    except (ContractError,NativePrerequisiteUnavailable,OSError) as error:
+        rows.append(_gate(label+".uninstall","fail",_family_error(error)))
+    try:
+        after=client.inventory("post-remove")
+        comparison=compare_inventories(before,after)
+        diag=getattr(client,"last_diagnostics",{})
+        evidence["inventory_stats"]={"post-remove":diag}
+        evidence["inventory_clean"]=comparison["clean"]
+        extra={}
+        if not comparison["clean"]:
+            extra={"leftover":inventory_samples(comparison["added"][:20]+comparison["modified"][:20]),
+                   "counts":{k:len(comparison[k]) for k in ("added","removed","modified")},
+                   "family":family,"stage":"post-remove","safe_cause":"unclean-inventory",
+                   "counters":diag.get("counters",{})}
+            evidence.update(extra)
+        evidence["removed"]=inventory_samples(comparison["removed"][:20])
+        rows.append(_gate(label+".inventory",*_pair(comparison["clean"]),**extra))
+    except (ContractError,NativePrerequisiteUnavailable,OSError) as error:
+        rows.append(_gate(label+".inventory","fail",_family_error(error)))
+        evidence["inventory_clean"]=False
+        evidence.update(error=_family_error(error), safe_cause=_family_error(error), counters=getattr(client,"last_diagnostics",{}).get("counters",{}))
+        rows.append(_gate(label+".client","fail",_family_error(error),family=family,stage="post-remove",safe_cause=_family_error(error),counters=evidence["counters"]))
+    status=_fold(rows)
+    evidence["cleanup"]={"status":status,"uninstall_status":rows[0]["status"],"inventory_status":rows[1]["status"]}
+    rows.append(_gate(label+".cleanup",status))
+    return rows,evidence
+
+
 def client_cycle(
     host: RecordingRunner,
     spec: Mapping[str, Any],
@@ -494,6 +542,7 @@ def client_cycle(
     gates: list[dict[str, Any]] = []
     evidence: dict[str, Any] = {}
     family = spec["family"]
+    setup_sha256 = trust_identity(spec)
     for product in products:
         label = f"{prefix}.{product}"
         mark = host.mark()
@@ -501,16 +550,40 @@ def client_cycle(
         product_evidence: dict[str, Any] = {}
         current_stage = "start"
         client = None
+        installed_ok = False
+        container_smoke = None
         try:
             mounts = list(spec["mounts"])
-            if burst_record is not None:
+            if burst_record is not None or (product == NATIVE_PRODUCT and smoke):
                 mounts.append((str(repository / "src"), "/rs9-source", False))
+            if product == "theme-forge-stellar-burst" and burst_scratch is not None:
+                burst_scratch.mkdir(parents=True, exist_ok=True)
+                burst_scratch.chmod(0o755)
+                mounts.append((str(burst_scratch), str(burst_scratch), True))
+            if product == NATIVE_PRODUCT and smoke:
+                from rs9.hosted_container_smoke import prepare_container_smoke
+                container_smoke = prepare_container_smoke(smoke, system, family)
+                mounts.extend(container_smoke["mounts"])
             with ClientContainer(host, image, platform, mounts, family) as client_ctx:
                 client = client_ctx
+                if container_smoke:
+                    from rs9.hosted_container_smoke import configure_container_output
+                    configure_container_output(client, user=CLIENT_USER)
                 current_stage = "configure"
+                cfg_receipts = []
                 for command in spec["configure"]:
-                    if client.exec(command).exit_code != 0:
-                        raise ContractError("CLIENT_CONFIGURE_FAILED", "Client repository trust setup failed")
+                    cfg_rcpt = client.exec(command)
+                    cfg_receipts.append(cfg_rcpt)
+                    if cfg_rcpt.exit_code != 0:
+                        diag = record_command_diagnostics(
+                            stage="configure", family=family, product=product, arch=platform.split("/")[-1],
+                            receipt=cfg_rcpt, repo_identity=setup_sha256,
+                            public_fingerprint=spec.get("public_fingerprint"),
+                        )
+                        product_evidence["command_diagnostics"] = diag
+                        raise ContractError("CLIENT_CONFIGURE_FAILED", "Client repository trust setup failed",
+                                            details={"stage": "configure", "family": family, "exit_code": cfg_rcpt.exit_code,
+                                                     "stdout_sha256": cfg_rcpt.stdout_sha256, "stderr_sha256": cfg_rcpt.stderr_sha256})
                 current_stage = "network-denial"
                 negative = client.exec(["python3","-c",
                     "import socket;s=socket.socket();s.settimeout(2);assert s.connect_ex(('1.1.1.1',443))!=0"], user=CLIENT_USER)
@@ -520,95 +593,116 @@ def client_cycle(
                 current_stage = "pre-install"
                 before = client.inventory("pre-install")
                 product_evidence["inventory_stats"] = {"pre-install": getattr(client, "last_diagnostics", {})}
+                if family == "apt":
+                    product_evidence["guest_trust_probe"] = probe_guest_trust(
+                        client,
+                        keyring_path=CLIENT_KEYRING_PATH,
+                        repo_root=f"{SERVER_ROOT}/apt",
+                        arch="arm64" if platform=="linux/arm64" else "amd64",
+                        expected_key_sha256=spec.get("expected_key_sha256"),
+                        public_fingerprint=spec.get("public_fingerprint"),
+                    )
                 current_stage = "refresh"
-                if client.exec(spec["refresh"]).exit_code != 0:
-                    raise ContractError("CLIENT_REFRESH_FAILED", "Repository metadata refresh failed")
-                current_stage = "install"
-                installed = client.exec(spec["install"](product))
-                present = client.exec(spec["query"](product))
-                rows.append(_gate(f"{label}.install", *_pair(installed.exit_code == 0 and present.exit_code == 0)))
-                if installed.exit_code != 0 or present.exit_code != 0:
-                    raise ContractError("CLIENT_INSTALL_FAILED", "Candidate package did not install")
-                current_stage = "probes"
-                for command in sorted(REQUIRED_COMMANDS.get(product, [])):
-                    try:
-                        probe_rows = execute_probes(
-                            command, f"/usr/bin/{command}", repository=repository,
-                            prefix=client.unprivileged_prefix, runner=host,
+                refresh_rcpt = client.exec(spec["refresh"])
+                product_evidence["refresh"] = record_command_diagnostics(
+                    stage="refresh", family=family, product=product, arch=platform.split("/")[-1],
+                    receipt=refresh_rcpt, repo_identity=setup_sha256,
+                    public_fingerprint=spec.get("public_fingerprint"),
+                    verification={"untampered_refresh": "pass" if refresh_rcpt.exit_code==0 else "fail"})
+                if refresh_rcpt.exit_code != 0:
+                    if family == "apt":
+                        try:
+                            debug = client.exec([*spec["refresh"][:-1], "-o", "Debug::Acquire::gpgv=true", spec["refresh"][-1]])
+                            product_evidence["refresh_debug"] = record_command_diagnostics(
+                                stage="diagnostic-refresh",family=family,product=product,arch=platform.split("/")[-1],receipt=debug,
+                                repo_identity=setup_sha256,public_fingerprint=spec.get("public_fingerprint"))
+                        except (ContractError, OSError) as debug_error:
+                            product_evidence["refresh_debug"] = {
+                                "stage": "diagnostic-refresh", "status": "unavailable",
+                                "safe_cause": _family_error(debug_error),
+                            }
+                    diag = record_command_diagnostics(
+                        stage="refresh", family=family, product=product, arch=platform.split("/")[-1],
+                        receipt=refresh_rcpt, repo_identity=setup_sha256,
+                        public_fingerprint=spec.get("public_fingerprint"),
+                    )
+                    product_evidence["command_diagnostics"] = diag
+                    raise ContractError("CLIENT_REFRESH_FAILED", "Repository metadata refresh failed",
+                                        details={"stage": "refresh", "family": family, "exit_code": refresh_rcpt.exit_code,
+                                                 "stdout_sha256": refresh_rcpt.stdout_sha256, "stderr_sha256": refresh_rcpt.stderr_sha256})
+                try:
+                    current_stage = "install"
+                    installed = client.exec(spec["install"](product))
+                    installed_ok = installed.exit_code == 0
+                    present = client.exec(spec["query"](product))
+                    rows.append(_gate(f"{label}.install", *_pair(installed.exit_code == 0 and present.exit_code == 0)))
+                    if installed.exit_code != 0 or present.exit_code != 0:
+                        diag = record_command_diagnostics(
+                            stage="install", family=family, product=product, arch=platform.split("/")[-1],
+                            receipt=installed, repo_identity=setup_sha256,
+                            public_fingerprint=spec.get("public_fingerprint"),
                         )
-                    except Exception as err:  # probe execution is untrusted lane input
-                        probe_rows = [{"name": f"probe.{command}", "status": "fail", "reason": _family_error(err)}]
-                    for row in probe_rows:
-                        rows.append(_gate(f"{label}.{row['name']}", row["status"], row.get("reason")))
-                if product == "theme-forge-stellar-burst":
-                    current_stage = "burst"
-                    if burst_record is None or burst_scratch is None or system is None:
-                        raise ContractError("BURST_NATIVE_TARGET", "Authenticated installed Burst proof required")
-                    from rs9.hosted_burst_clients import verify_client_burst
-                    product_evidence["native_loader"] = verify_client_burst(
-                        client, burst_record, system, burst_scratch / product, user=CLIENT_USER)
-                    rows.append(_gate(f"{label}.burst-native-addon-target", "pass"))
-                    rows.append(_gate(f"{label}.burst-native-addon-load", "pass"))
-                if product == NATIVE_PRODUCT:
-                    current_stage = "native-closure"
-                    closure = client.exec(["python3","-c",
-                        "from pathlib import Path;import subprocess;root=Path('/usr/lib/theme-forge-nebular-fusion');"
-                        "files=[p for p in root.rglob('*') if p.is_file() and not p.is_symlink() and p.read_bytes()[:4]==bytes([127])+b'ELF'];"
-                        "assert files;"
-                        "results=[subprocess.run(['ldd',str(p)],capture_output=True) for p in files];"
-                        "assert all(b'not found' not in r.stdout+r.stderr and (r.returncode==0 or b'not a dynamic' in r.stdout+r.stderr or b'statically linked' in r.stdout+r.stderr) for r in results)"], user=CLIENT_USER)
-                    rows.append(_gate(f"{label}.native-closure", *_pair(closure.exit_code == 0)))
-                    if smoke:
-                        current_stage = "smoke"
-                        from rs9.hosted_smoke import verify_nebular_runtime
-                        inspected = client.exec(["python3","-c",
-                            "from pathlib import Path;import json;"
-                            "r=Path('/usr/lib/theme-forge-nebular-fusion');"
-                            "print(json.dumps({'manifests':[str(p) for p in r.rglob('sidecar-payload/manifest.json')],"
-                            "'binaries':[str(p) for p in r.rglob('tfsb-studio-service*') if p.is_file() and p.parent.name in ('bin','MacOS')]}))"])
-                        if inspected.exit_code:
-                            raise ContractError("SIDECAR_REPRESENTATION","Installed package representation missing")
-                        verify_nebular_runtime("/usr/lib/theme-forge-nebular-fusion", smoke, system,
-                            client.unprivileged_prefix, discovered=json.loads(inspected.stdout_bytes))
-                        rows.append(_gate(f"{label}.application-smoke","pass"))
-                current_stage = "uninstall"
-                removed = client.exec(spec["remove"](product))
-                gone = client.exec(spec["query"](product))
-                rows.append(_gate(f"{label}.uninstall", *_pair(removed.exit_code == 0 and gone.exit_code != 0)))
-                current_stage = "post-remove"
-                after = client.inventory("post-remove")
-                comparison = compare_inventories(before, after)
-                diag = getattr(client, "last_diagnostics", {})
-                counters = diag.get("counters", {})
-                product_evidence.setdefault("inventory_stats", {})["post-remove"] = diag
-                is_clean = comparison["clean"]
-                inv_extra = {}
-                if not is_clean:
-                    inv_extra = {
-                        "leftover": inventory_samples(comparison["added"][:20] + comparison["modified"][:20]),
-                        "counts": {k: len(comparison[k]) for k in ("added", "removed", "modified")},
-                        "family": family,
-                        "stage": "post-remove",
-                        "safe_cause": "unclean-inventory",
-                        "counters": counters,
-                    }
-                inv_gate = _gate(
-                    f"{label}.inventory", *_pair(is_clean),
-                    **inv_extra,
-                )
-                rows.append(inv_gate)
-                evidence[product] = {
-                    **product_evidence,
-                    "inventory_clean": is_clean,
-                    "removed": inventory_samples(comparison["removed"][:20]),
-                    "family": family,
-                    "stage": "post-remove",
-                    "counters": counters,
-                }
-                if not is_clean:
-                    evidence[product]["safe_cause"] = "unclean-inventory"
-                    evidence[product]["leftover"] = inv_gate.get("leftover", [])
-                    evidence[product]["counts"] = inv_gate.get("counts", {})
+                        product_evidence["command_diagnostics"] = diag
+                        raise ContractError("CLIENT_INSTALL_FAILED", "Candidate package did not install",
+                                            details={"stage": "install", "family": family, "exit_code": installed.exit_code,
+                                                     "stdout_sha256": installed.stdout_sha256, "stderr_sha256": installed.stderr_sha256})
+                    repo_mount = spec["mounts"][0][0] if spec.get("mounts") else (str(repository) if repository else None)
+                    key_mount = spec["mounts"][1][0] if spec.get("mounts") and len(spec["mounts"]) > 1 else (CLIENT_KEYRING_PATH if family == "apt" else None)
+                    control = build_positive_control(
+                        family=family,
+                        image=image,
+                        platform=platform,
+                        product=product,
+                        repository=repo_mount,
+                        keyring=key_mount,
+                        receipts={"configure": cfg_receipts, "refresh": refresh_rcpt, "install": installed, "query": present},
+                        success=True, setup_sha256=setup_sha256,
+                    )
+                    product_evidence["positive_control"] = control
+                    evidence.setdefault("positive_controls", {})[product] = control
+                    current_stage = "probes"
+                    for command in sorted(REQUIRED_COMMANDS.get(product, [])):
+                        try:
+                            probe_rows = execute_probes(
+                                command, f"/usr/bin/{command}", repository=repository,
+                                prefix=client.unprivileged_prefix, runner=host,
+                            )
+                        except Exception as err:  # probe execution is untrusted lane input
+                            probe_rows = [{"name": f"probe.{command}", "status": "fail", "reason": _family_error(err)}]
+                        for row in probe_rows:
+                            rows.append(_gate(f"{label}.{row['name']}", row["status"], row.get("reason")))
+                    if product == "theme-forge-stellar-burst":
+                        current_stage = "burst"
+                        if burst_record is None or burst_scratch is None or system is None:
+                            raise ContractError("BURST_NATIVE_TARGET", "Authenticated installed Burst proof required")
+                        from rs9.hosted_burst_clients import verify_client_burst
+                        product_evidence["native_loader"] = verify_client_burst(
+                            client, burst_record, system, burst_scratch / product, user=CLIENT_USER)
+                        rows.append(_gate(f"{label}.burst-native-addon-target", "pass"))
+                        rows.append(_gate(f"{label}.burst-native-addon-load", "pass"))
+                    if product == NATIVE_PRODUCT:
+                        current_stage = "native-closure"
+                        closure = client.exec(["python3","-c",
+                            "from pathlib import Path;import subprocess;root=Path('/usr/lib/theme-forge-nebular-fusion');"
+                            "files=[p for p in root.rglob('*') if p.is_file() and not p.is_symlink() and p.read_bytes()[:4]==bytes([127])+b'ELF'];"
+                            "assert files;"
+                            "results=[subprocess.run(['ldd',str(p)],capture_output=True) for p in files];"
+                            "assert all(b'not found' not in r.stdout+r.stderr and (r.returncode==0 or b'not a dynamic' in r.stdout+r.stderr or b'statically linked' in r.stdout+r.stderr) for r in results)"], user=CLIENT_USER)
+                        rows.append(_gate(f"{label}.native-closure", *_pair(closure.exit_code == 0)))
+                        if smoke:
+                            current_stage = "smoke"
+                            from rs9.hosted_container_smoke import verify_container_nebular
+                            product_evidence["application_smoke"] = verify_container_nebular(
+                                client, container_smoke, user=CLIENT_USER)
+                            rows.append(_gate(f"{label}.application-smoke","pass"))
+                finally:
+                    if installed_ok:
+                        cleanup_rows, cleanup_evidence = _cleanup_installed_client(client, spec, product, label, before, family)
+                        rows.extend(cleanup_rows)
+                        stats={**product_evidence.get("inventory_stats",{}),**cleanup_evidence.get("inventory_stats",{})}
+                        product_evidence.update(cleanup_evidence)
+                        product_evidence["inventory_stats"]=stats
+                evidence[product] = {**product_evidence, "family": family, "stage": "post-remove"}
         except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
             err_family = (err.details.get("family") if isinstance(err, ContractError) and err.details else None) or family
             err_stage = (err.details.get("stage") if isinstance(err, ContractError) and err.details else None) or current_stage
@@ -628,12 +722,22 @@ def client_cycle(
                     gate_extra["inventory_failure"] = failure
             rows.append(_gate(f"{label}.client", "fail" if not isinstance(err, NativePrerequisiteUnavailable) else "not-run",
                               safe_cause, **gate_extra))
+            repo_mount = spec["mounts"][0][0] if spec.get("mounts") else (str(repository) if repository else None)
+            key_mount = spec["mounts"][1][0] if spec.get("mounts") and len(spec["mounts"]) > 1 else (CLIENT_KEYRING_PATH if family == "apt" else None)
+            failed_control = product_evidence.get("positive_control") or build_positive_control(
+                family=err_family, image=image, platform=platform, product=product,
+                repository=repo_mount, keyring=key_mount,
+                success=False, setup_sha256=setup_sha256,
+            )
             evidence[product] = {
+                **product_evidence,
                 "error": safe_cause,
                 "family": err_family,
                 "stage": err_stage,
                 "safe_cause": safe_cause,
+                "positive_control": failed_control,
             }
+            evidence.setdefault("positive_controls", {})[product] = failed_control
             evidence[product]["counters"] = err_counters or {}
             evidence[product]["max"] = gate_extra["max"]
             if "inventory_failure" in gate_extra:
@@ -758,12 +862,22 @@ def tamper_cycle(
     wrong_signer: Any,
     kinds: Sequence[str],
     prefix: str,
+    positive_control: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Every tamper must stop installation; the untampered control already passed elsewhere."""
+    """Every tamper must stop installation; causal qualification requires explicit positive control."""
     gates = []
+    control_ok, control_reason = validate_positive_control(
+        positive_control,
+        family=family,
+        image=image,
+        platform=platform,
+        product=product,
+        dirs=dirs, setup_sha256=trust_identity(spec_for(dirs)),
+    )
     for kind in kinds:
         label = f"{prefix}.tamper.{kind}"
         mark = host.mark()
+        raw_negative_receipts: list[dict[str, Any]] = []
         try:
             copy_root = work / f"tamper-{family}-{kind}"
             copy_root.mkdir()
@@ -772,15 +886,64 @@ def tamper_cycle(
             spec = spec_for(tampered)
             with ClientContainer(host, image, platform, spec["mounts"], family) as client:
                 for command in spec["configure"]:
-                    if client.exec(command).exit_code != 0:
+                    cfg_rcpt = client.exec(command)
+                    raw_negative_receipts.append({
+                        "stage": "configure", "exit_code": cfg_rcpt.exit_code, "executed": cfg_rcpt.executed,
+                        "stdout_sha256": cfg_rcpt.stdout_sha256, "stderr_sha256": cfg_rcpt.stderr_sha256,
+                    })
+                    if cfg_rcpt.exit_code != 0:
                         raise ContractError("CLIENT_CONFIGURE_FAILED", "Client repository trust setup failed")
-                client.exec(spec["refresh"])  # may fail first; installation must still never succeed
+                refresh_rcpt = client.exec(spec["refresh"])  # may fail first; installation must still never succeed
+                raw_negative_receipts.append({
+                    "stage": "refresh", "exit_code": refresh_rcpt.exit_code,
+                    "stdout_sha256": refresh_rcpt.stdout_sha256, "stderr_sha256": refresh_rcpt.stderr_sha256,
+                    "executed": refresh_rcpt.executed,
+                })
                 install = client.exec(spec["install"](product))
+                raw_negative_receipts.append({
+                    "stage": "install", "exit_code": install.exit_code,
+                    "stdout_sha256": install.stdout_sha256, "stderr_sha256": install.stderr_sha256,
+                    "executed": install.executed,
+                })
                 present = client.exec(spec["query"](product))
-            rejected = install.exit_code != 0 and present.exit_code != 0
-            row = _gate(label, *_status(rejected, host.real_since(mark)))
+                raw_negative_receipts.append({
+                    "stage": "query", "exit_code": present.exit_code,
+                    "executed": present.executed,
+                    "stdout_sha256": present.stdout_sha256, "stderr_sha256": present.stderr_sha256,
+                })
+
+            is_qualified, category, qual_reason, qual_diag = qualify_tamper_rejection(
+                kind, refresh_rcpt, install, present, family=family
+            )
+            if qual_reason == "tampered-content-accepted":
+                row = _gate(label, "fail", "tampered-content-accepted",
+                            rejection_category=category,
+                            negative_receipts=raw_negative_receipts)
+            elif not control_ok:
+                row = _gate(label, "not-run", "blocked-by:positive-control",
+                            negative_receipts=raw_negative_receipts,
+                            control_error=control_reason)
+            else:
+                if is_qualified:
+                    control_real=all(r.get("executed") is True for stage in positive_control["stages"].values() for r in stage)
+                    status, reason = _status(True, host.real_since(mark) and control_real)
+                    row = _gate(label, status, reason,
+                                rejection_category=category,
+                                negative_receipts=raw_negative_receipts,
+                                **qual_diag)
+                else:
+                    row = _gate(label, "fail", qual_reason or f"wrong-tamper-rejection-reason:{category}",
+                                rejection_category=category,
+                                negative_receipts=raw_negative_receipts,
+                                **qual_diag)
         except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
-            row = _gate(label, "fail" if not isinstance(err, NativePrerequisiteUnavailable) else "not-run", _family_error(err))
+            if not control_ok:
+                row = _gate(label, "not-run", "blocked-by:positive-control",
+                            negative_receipts=raw_negative_receipts,
+                            control_error=control_reason)
+            else:
+                row = _gate(label, "fail" if not isinstance(err, NativePrerequisiteUnavailable) else "not-run",
+                            _family_error(err), negative_receipts=raw_negative_receipts)
         gates.append(row)
     return gates
 
@@ -1084,8 +1247,7 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
                 from rs9.hosted_smoke import prepare_smoke
                 neb = next((c for c,i,_ in context["captures"] if i["project"]["id"] == NATIVE_PRODUCT),None)
                 prepared = prepare_smoke(neb, context["captures"], context["client"], scratch / "application-smoke") if neb else None
-                spec = apt_spec(apt_dir, keyring, system)
-                spec["mounts"].append((str(scratch),str(scratch),True))
+                spec = apt_spec(apt_dir, keyring, system, public_fingerprint=fixture.primary_fingerprint)
                 cycle_rows, evidence = client_cycle(
                     host, spec, image=client_tag, platform=platform,
                     products=required, repository=repository, prefix="deb-client", smoke=prepared,
@@ -1097,9 +1259,10 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
                 details["client"] = evidence
                 wrong_signer, wrong_owned = _new_wrong_signer(context)
                 rows.extend(tamper_cycle(
-                    host, lambda dirs: apt_spec(dirs["apt"], keyring, system), "apt", {"apt": apt_dir},
+                    host, lambda dirs: apt_spec(dirs["apt"], keyring, system, public_fingerprint=fixture.primary_fingerprint), "apt", {"apt": apt_dir},
                     image=client_tag, platform=platform, product=required[0], work=scratch, arch=system,
-                    wrong_signer=wrong_signer, kinds=TAMPER_KINDS_ALL, prefix="deb-client"))
+                    wrong_signer=wrong_signer, kinds=TAMPER_KINDS_ALL, prefix="deb-client",
+                    positive_control=evidence.get(required[0], {}).get("positive_control")))
             except (ContractError, NativePrerequisiteUnavailable) as err:
                 rows.append(_gate("deb-client.setup", "not-run" if isinstance(err, NativePrerequisiteUnavailable) else "fail",
                                   _family_error(err)))
@@ -1451,7 +1614,7 @@ def _pages_client_tests(
         return
 
     families = [
-        ("apt", apt_tag, {"apt": tree / "apt"}, lambda d: apt_spec(d["apt"], keys / "rs9-candidate-fixture-NONPRODUCTION.gpg", "amd64"),
+        ("apt", apt_tag, {"apt": tree / "apt"}, lambda d: apt_spec(d["apt"], keys / "rs9-candidate-fixture-NONPRODUCTION.gpg", "amd64", public_fingerprint=fixture.primary_fingerprint),
          "amd64", list(REQUIRED_PRODUCTS)),
         ("dnf", rpm_tag, {"rpm": tree / "rpm"}, lambda d: dnf_spec(d["rpm"], keys, "x86_64"), "x86_64",
          list(REQUIRED_PRODUCTS)),
@@ -1464,13 +1627,13 @@ def _pages_client_tests(
         neb = next(c for c,i,_ in context["captures"] if i["project"]["id"] == NATIVE_PRODUCT)
         prepared = prepare_smoke(neb, context["captures"], context["client"], work / ("smoke-"+family))
         spec = spec_for(dirs)
-        spec["mounts"].append((str(scratch),str(scratch),True))
         rows, evidence = client_cycle(host, spec, image=tag, platform="linux/amd64", products=products,
                                       repository=repository, prefix=prefix, smoke=prepared, system="x86_64-linux",
                                       burst_record=_burst_release_record(context["captures"], "x86_64-linux"),
                                       burst_scratch=work / ("burst-probe-" + family))
         rows += tamper_cycle(host, spec_for, family, dirs, image=tag, platform="linux/amd64", product=products[0],
-                             work=work, arch=arch, wrong_signer=wrong_signer, kinds=TAMPER_KINDS_PAGES, prefix=prefix)
+                             work=work, arch=arch, wrong_signer=wrong_signer, kinds=TAMPER_KINDS_PAGES, prefix=prefix,
+                             positive_control=evidence.get(products[0], {}).get("positive_control"))
         gates.extend(rows)
         gates.append(_gate(prefix, _fold(rows)))
         details.setdefault("client", {})[family] = evidence

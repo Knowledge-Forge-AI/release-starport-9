@@ -6,6 +6,7 @@ Theme Forge LIVE1 is pending / not live. See the [candidate disposition](live1-c
 [source inventory](live1-inventory.md) and [attended preparation runbook](../operators/live1/RUNBOOK.md).
 
 - [CONT2 hosted candidate source](live1-hosted-candidate.md) — Source-defined lanes, custody and attended handoff.
+- [CONT9 native-client source candidate](live1-native-client-cont9.md) — Lint/trust diagnostics, installed Nebular verification and pending run-8 handoff.
 - [ADR 0007](adr/0007-hosted-candidate-lane-contract.md) — Hosted qualification authority.
 - [Hosted artifact set v1alpha2](specs/rs9-hosted-artifact-set-v1alpha2.md) — Exact logical and archive custody.
 

@@ -370,7 +370,9 @@ def execute(context):
             except (ContractError, OSError) as error:
                 errors[pid] = error.code if isinstance(error, ContractError) else "PACKAGE_FILESYSTEM"
                 receipts = builder.receipts[mark:]
-                failed = next((r for r in receipts if r.exit_code), receipts[-1] if receipts else None)
+                failed = (next((r for r in reversed(receipts) if Path(r.tool_name or r.argv[0]).name == "rpmlint" and "--version" not in r.argv), None)
+                          if errors[pid] == "RPMLINT_FAILED" else
+                          next((r for r in receipts if r.exit_code), receipts[-1] if receipts else None))
                 details = {"product": pid, "family": family, "system": system, "substage": "package-build"}
                 if failed:
                     details.update(tool=Path(failed.tool_name or failed.argv[0]).name, exit_code=failed.exit_code,
@@ -378,16 +380,62 @@ def execute(context):
                 if isinstance(error, ContractError):
                     details.update(error.details)
                 failures[pid] = {"code": errors[pid], **safe_details(details)}
-        gates.append({"name": family + "-package-build", "status": "pass" if len(products) == 4 and not errors else "fail"})
+                if family == "rpm" and isinstance(error, ContractError) and error.code == "RPMLINT_FAILED":
+                    pkg_path = getattr(error, "package_path", None) or error.details.get("package_path")
+                    if pkg_path and Path(pkg_path).is_file():
+                        quarantine = scratch / "quarantine"
+                        quarantine.mkdir(exist_ok=True)
+                        shutil.copyfile(pkg_path, quarantine / Path(pkg_path).name)
+                    spec_path = getattr(error, "spec_path", None) or error.details.get("spec_path") or (work / "rpmbuild" / "SPECS" / f"{pid}.spec")
+                    if Path(spec_path).is_file():
+                        diag_spec_dir = scratch / "diagnostics"
+                        diag_spec_dir.mkdir(exist_ok=True)
+                        # Diagnostic custody is bounded JSON. Keep the exact
+                        # generated spec in a typed record, rather than a raw
+                        # .spec that custody would necessarily withhold.
+                        spec_bytes = Path(spec_path).read_bytes()
+                        diag_spec = diag_spec_dir / f"{pid}.spec.json"
+                        diag_spec.write_bytes(canonical({
+                            "schema": "rs9.generated-rpm-spec.v1", "product": pid,
+                            "system": system, "spec_sha256": digest(spec_bytes),
+                            "spec_bytes": len(spec_bytes), "spec": spec_bytes.decode("utf-8"),
+                        }))
+                        artifacts.append(diag_spec)
+                    ev = getattr(error, "evidence", None) or error.details.get("evidence")
+                    if ev is not None:
+                        diag_ev_dir = scratch / "diagnostics"
+                        diag_ev_dir.mkdir(exist_ok=True)
+                        diag_ev = diag_ev_dir / f"rpmlint-{pid}.json"
+                        diag_ev.write_bytes(canonical(ev))
+                        artifacts.append(diag_ev)
         if family == "rpm":
-            gates.append({"name": "rpm-rpmlint-clean", "status": "pass" if len(products) == 4 and not errors else "fail"})
+            build_failures = {k: v for k, v in errors.items() if v != "RPMLINT_FAILED"}
+            total_built = len(products) + len([k for k, v in errors.items() if v == "RPMLINT_FAILED"])
+            build_pass = (total_built == 4 and not build_failures)
+            lint_pass = (len(products) == 4 and not errors)
+            gates.append({"name": "rpm-package-build", "status": "pass" if build_pass else "fail"})
+            gates.append({"name": "rpm-rpmlint-clean", "status": "pass" if lint_pass else "fail"})
+        else:
+            gates.append({"name": family + "-package-build", "status": "pass" if len(products) == 4 and not errors else "fail"})
         if errors:
             diag_dir = scratch / "diagnostics"
             diag_dir.mkdir(exist_ok=True)
             diag_file = diag_dir / "build-errors.json"
             diag_file.write_bytes(canonical({"schema": "rs9.build-errors.v1alpha1", "family": family, "system": system,
-                                            "errors": errors, "product_failures": failures}))
+                                            "errors": errors, "product_failures": failures, "gates": gates}))
             artifacts.append(diag_file)
+        if family == "rpm" and errors and not build_failures:
+            # Construction succeeded, but candidate lint failures stop custody,
+            # indexing/signing and DNF. Return the actual distinct gates.
+            reason="blocked-by:rpm-rpmlint-clean"
+            gates.extend({"name":n,"status":"not-run","reason":reason}
+                         for n in ("rpm-repository-indexing","rpm-client-qualification",
+                                   "burst-native-addon-target","burst-native-addon-load"))
+            gates.extend({"name":"rpm-trust.tamper."+kind,"status":"not-run","reason":reason}
+                         for kind in ("package","index","signature","wrongkey"))
+            return {"gates":gates,"artifacts":artifacts,
+                    "details":{"environment":environment,"build_errors":errors,"product_failures":failures,
+                               "diagnostic_scope":"candidate-only-lint-failures"}}
         if len(products) != 4 or errors:
             first_product = sorted(errors.keys())[0] if errors else "unknown"
             first_failure = failures.get(first_product, {})
@@ -462,7 +510,6 @@ def execute(context):
             provision_image(host, "pacman" if family == "pacman" else "dnf", environment["image_ref"],
                             platform, client_tag, [*environment["preprovisioned_packages"], *client_tools])
             spec = spec_for(dirs)
-            spec["mounts"].append((str(scratch),str(scratch),True))
             rows, evidence = client_cycle(host, spec, image=client_tag, platform=platform,
                        products=list(products), repository=repository, prefix=family + "-client", smoke=prepared, system=system,
                        burst_record=_burst_release_record(context["captures"], system),
@@ -470,7 +517,8 @@ def execute(context):
             (scratch / "tamper").mkdir()
             rows += tamper_cycle(host, spec_for, "dnf" if family == "rpm" else "pacman", dirs,
                     image=client_tag, platform=platform, product=list(products)[0], work=scratch / "tamper", wrong_signer=wrong, arch=arch,
-                    kinds=("package","index","signature","wrongkey"), prefix=family+"-trust")
+                    kinds=("package","index","signature","wrongkey"), prefix=family+"-trust",
+                    positive_control=evidence.get(list(products)[0],{}).get("positive_control"))
             gates.extend(rows)
             gates.extend(burst_client_gates(rows))
             gates.append({"name": family + "-client-qualification", "status": _fold(rows)})

@@ -488,11 +488,19 @@ def build_rpm_candidate(
                         or requirement in policy_dependencies):
                     raise ContractError("DEPENDENCY_DERIVATION", "RPM requirement lies outside the target prebuild closure")
 
-    # Execute rpmlint
-    rpmlint_cmd = ["rpmlint", str(spec_path), str(dest_rpm)]
-    rpmlint_receipt = r.run(rpmlint_cmd, cwd=scratch)
-    if rpmlint_receipt.exit_code:
-        raise ContractError("RPMLINT_FAILED", "Candidate RPM did not pass rpmlint")
+    # Execute rpmlint with structured evidence and fail-closed validation
+    from rs9.rpm_lint import execute_rpmlint
+
+    rpmlint_evidence, rpmlint_receipts = execute_rpmlint(
+        runner=r,
+        spec_path=spec_path,
+        rpm_path=dest_rpm,
+        product=project_id,
+        rpm_identity=rpm_identity,
+        rpm_payload_digest=rpm_payload_digest,
+        cwd=scratch,
+    )
+    rpmlint_receipt = rpmlint_receipts[0]
 
     # Execute createrepo gzip --no-database
     createrepo_cmd = [
@@ -524,6 +532,7 @@ def build_rpm_candidate(
         "rpm_payload_digest": rpm_payload_digest,
         "rpmlint_status": "executed",
         "rpmlint_exit_code": rpmlint_receipt.exit_code,
+        "rpmlint": rpmlint_evidence,
         "createrepo_flags": ["--no-database", "gzip"],
         "native_preservation": {
             "strip": False,
@@ -584,6 +593,7 @@ def build_rpm_candidate(
         "dependency_classification": dependency_classification,
         "rpm_identity": rpm_identity,
         "rpm_payload_digest": rpm_payload_digest,
+        "rpmlint": rpmlint_evidence,
         "derivation": derivation,
     }
 

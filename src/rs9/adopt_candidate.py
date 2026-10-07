@@ -142,18 +142,39 @@ def _cache_path(relative):
             or ".pytest_cache" in parts or relative.endswith(".pyc"))
 
 
+def _root_scratch(relative):
+    return relative == ".scratch" or relative.startswith(".scratch/")
+
+
 def staging_paths(root, manifest, git):
-    """Reviewed inventory plus explicitly reviewed tracked deletions."""
+    """Reviewed custody; only ignored, untracked root scratch may stay outside it."""
     allowed = {r["path"] for r in manifest["files"]} | {MANIFEST}
     tracked = set(git("ls-files", "-z").split(chr(0))) - {""}
+    changed = manifest.get("changed_paths", [])
+    reviewed_deleted = manifest.get("deleted_paths", [])
+    if not isinstance(changed, list) or not isinstance(reviewed_deleted, list):
+        raise ContractError("ADOPTION_REVIEW", "Reviewed path lists required")
+    if any(_root_scratch(p) for p in allowed | tracked | set(changed) | set(reviewed_deleted)):
+        raise ContractError("ADOPTION_SCRATCH", "Agent scratch cannot enter reviewed custody")
     deleted = {p for p in tracked if not (root / p).exists()}
-    if deleted != set(manifest.get("deleted_paths", [])):
+    if deleted != set(reviewed_deleted):
         raise ContractError("ADOPTION_DELETIONS", "Tracked deletions differ from the reviewed manifest")
     for path in deleted:
         validate_safe_relative_posix_path(path)
-    unknown = git("ls-files", "--others", "--exclude-standard").splitlines()
-    unknown += git("ls-files", "--others", "--ignored", "--exclude-standard").splitlines()
-    if any(p not in allowed and not _cache_path(p) for p in unknown):
+    unignored = set(git("ls-files", "--others", "--exclude-standard", "-z").split(chr(0))) - {""}
+    # Collapse ignored directories so root scratch is never walked per file.
+    ignored = set(git("ls-files", "--others", "--ignored", "--exclude-standard",
+                      "--directory", "-z").split(chr(0))) - {""}
+    # Expand ambiguous directories to preserve the per-file cache policy.
+    # Positive pathspecs keep this read outside root scratch and known caches.
+    expand = sorted(p for p in ignored if p.endswith("/")
+                    and not _cache_path(p) and not p.startswith(".scratch/"))
+    if expand:
+        ignored -= set(expand)
+        ignored |= set(git("ls-files", "--others", "--ignored", "--exclude-standard",
+                           "-z", "--", *(":(literal)" + p for p in expand)).split(chr(0))) - {""}
+    if (any(_root_scratch(p) or (p not in allowed and not _cache_path(p)) for p in unignored)
+            or any(p not in allowed and not _cache_path(p) and not p.startswith(".scratch/") for p in ignored)):
         raise ContractError("ADOPTION_INVENTORY", "Unreviewed checkout state present")
     return sorted(allowed | deleted)
 

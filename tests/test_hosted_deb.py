@@ -94,11 +94,13 @@ class ScriptedDocker:
 
     def __init__(self, system="amd64", *, accept_tampered=False, fail_build=False, dirty_uninstall=False,
                  fail_install=False, fail_provision=False, fail_pre_inventory=False, fail_post_inventory=False,
+                 tamper_wrong_reason=False,
                  os_release=OS_RELEASE, arch_label=None, inspect_out=None, pull_code=0):
         self.system, self.arch_label = system, arch_label or system
         self.accept_tampered, self.fail_build, self.dirty_uninstall = accept_tampered, fail_build, dirty_uninstall
         self.fail_install, self.fail_provision = fail_install, fail_provision
         self.fail_pre_inventory, self.fail_post_inventory = fail_pre_inventory, fail_post_inventory
+        self.tamper_wrong_reason = tamper_wrong_reason
         self.os_release, self.inspect_out, self.pull_code = os_release, inspect_out, pull_code
         self.calls: list[list[str]] = []
         self.containers: dict[str, dict] = {}
@@ -127,8 +129,16 @@ class ScriptedDocker:
         if "-d" in a:
             name = a[a.index("--name") + 1]
             sources = [a[i + 1].split(":")[0] for i, x in enumerate(a) if x == "-v"]
+            tamper_kind = None
+            for s in sources:
+                if "tamper-" in s:
+                    for k in ("package", "index", "signature", "wrongkey"):
+                        if f"-{k}" in s:
+                            tamper_kind = k
+                            break
             self.containers[name] = {"installed": False, "dirty": False,
-                                     "tampered": any("tamper-" in s for s in sources)}
+                                     "tampered": any("tamper-" in s for s in sources),
+                                     "tamper_kind": tamper_kind}
             return self.receipt(a)
         script = a[-1] if a[-3:-1] == ["sh", "-c"] else ""
         if "cat /etc/os-release" in script:
@@ -198,9 +208,32 @@ class ScriptedDocker:
             verb = "query"
         else:
             return self.receipt(a)
+        if getattr(self, "tamper_wrong_reason", False) and state.get("tampered"):
+            return self.receipt(a, 127, b"", b"sh: 1: apt-get: command not found")
+        if verb == "refresh" and state.get("tampered") and not self.accept_tampered:
+            t_kind = state.get("tamper_kind")
+            messages = {
+                'apt-get': {
+                    'signature': b'W: GPG error: InRelease: BADSIG 12345',
+                    'wrongkey': b'Missing key ABCD, which is needed to verify signature.',
+                    'index': b'E: Failed to fetch InRelease Hash Sum mismatch'},
+                'pacman': {
+                    'signature': b'invalid or corrupted database (PGP signature)',
+                    'wrongkey': b'signature from "Fixture" is unknown trust',
+                    'index': b'invalid or corrupted database'},
+                'dnf': {
+                    'signature': b'repomd.xml: Bad GPG signature',
+                    'wrongkey': b'Signing key not found',
+                    'index': b'repomd.xml: checksum mismatch'},
+            }
+            if t_kind in messages[tool]:
+                return self.receipt(a, 100, b"", messages[tool][t_kind])
         if verb == "install":
             if self.fail_install or (state["tampered"] and not self.accept_tampered):
-                return self.receipt(a, 100, b"", b"E: install rejected")
+                message = {'apt-get': b'E: Failed to fetch package.deb Hash Sum mismatch',
+                           'pacman': b'invalid or corrupted package (PGP signature)',
+                           'dnf': b'package.rpm: Bad GPG signature'}[tool] if state.get('tampered') else b'E: install rejected'
+                return self.receipt(a, 100, b"", message)
             state["installed"] = True
             state["had_install"] = True
         elif verb == "remove":
@@ -638,6 +671,54 @@ class ClientCycleTests(unittest.TestCase):
                                    products=("theme-forge-stellar-loom",), repository=Path("."), prefix="c")
         self.assertEqual([(g["status"], g["reason"]) for g in gates], [("not-run", "tool-unavailable:docker")])
 
+    def test_apt_client_cycle_records_guest_trust_probe_and_positive_control(self):
+        docker = ScriptedDocker()
+        gates, evidence = self.cycle(docker)
+        product_ev = evidence["theme-forge-stellar-loom"]
+        self.assertIn("guest_trust_probe", product_ev)
+        self.assertEqual(product_ev["guest_trust_probe"]["status"], "incomplete")
+        self.assertEqual(product_ev["guest_trust_probe"]["users"]["_apt"]["status"], "probe-unavailable")
+        self.assertIn("positive_control", product_ev)
+        ctrl = product_ev["positive_control"]
+        self.assertTrue(ctrl["success"])
+        self.assertEqual(ctrl["family"], "apt")
+        self.assertEqual(ctrl["product"], "theme-forge-stellar-loom")
+        self.assertIn("install", ctrl["stages"])
+
+    def test_apt_client_cycle_install_failure_records_command_diagnostics_and_failed_control(self):
+        docker = ScriptedDocker(fail_install=True)
+        gates, evidence = self.cycle(docker)
+        client_row = next(g for g in gates if g["name"].endswith(".client"))
+        self.assertEqual(client_row["status"], "fail")
+        product_ev = evidence["theme-forge-stellar-loom"]
+        self.assertIn("command_diagnostics", product_ev)
+        diag = product_ev["command_diagnostics"]
+        self.assertEqual(diag["stage"], "install")
+        self.assertEqual(diag["family"], "apt")
+        self.assertEqual(diag["product"], "theme-forge-stellar-loom")
+        self.assertEqual(diag["exit_code"], 100)
+        self.assertEqual(diag["reason_category"], "UNCLASSIFIED_FAILURE")
+        self.assertIn("positive_control", product_ev)
+        self.assertFalse(product_ev["positive_control"]["success"])
+
+    def test_diagnostic_refresh_error_preserves_original_failure_receipt(self):
+        class FailedRefresh(ScriptedDocker):
+            def _exec(self, argv):
+                if "Debug::Acquire::gpgv=true" in argv:
+                    raise OSError("synthetic diagnostic transport failure")
+                if "apt-get" in argv and "update" in argv:
+                    return self.receipt(argv, 100, b"", b"E: Permission denied")
+                return super()._exec(argv)
+        rows, evidence = self.cycle(FailedRefresh())
+        product = evidence["theme-forge-stellar-loom"]
+        self.assertEqual(product["error"], "CLIENT_REFRESH_FAILED")
+        self.assertEqual(product["stage"], "refresh")
+        self.assertEqual(product["refresh"]["exit_code"], 100)
+        self.assertEqual(product["refresh_debug"]["status"], "unavailable")
+        self.assertFalse(product["positive_control"]["success"])
+        self.assertEqual(product["command_diagnostics"]["repo_identity"], product["refresh"]["repo_identity"])
+        self.assertEqual(product["command_diagnostics"]["arch"], product["refresh"]["arch"])
+
 
 class TamperTests(unittest.TestCase):
     def setUp(self):
@@ -752,17 +833,24 @@ class TamperTests(unittest.TestCase):
                                   product="theme-forge-nebular-fusion")
         self.assertEqual(missing.exception.code, "MISSING_PACKAGE")
 
-    def cycle(self, docker, kinds=hd.TAMPER_KINDS_ALL):
+    def cycle(self, docker, kinds=hd.TAMPER_KINDS_ALL, positive_control=...):
         source = self.apt_tree()
         host = hd.RecordingRunner(host_runner(docker))
         work = self.root / "work"
         work.mkdir()
         keyring = self.root / "key.gpg"
         keyring.write_bytes(b"key")
+        if positive_control is ...:
+            spec=hd.apt_spec(source,keyring,"amd64")
+            positive_control = hd.build_positive_control(family="apt",image="img",platform="linux/amd64",
+                product="theme-forge-solar-sail",success=True,setup_sha256=hd.trust_identity(spec),
+                receipts={stage: [CommandReceipt([stage],0,b"",b"",executed=True)]
+                          for stage in ("configure","refresh","install","query")})
         return hd.tamper_cycle(
             host, lambda dirs: hd.apt_spec(dirs["apt"], keyring, "amd64"), "apt", {"apt": source},
             image="img", platform="linux/amd64", product="theme-forge-solar-sail", work=work, arch="amd64",
-            wrong_signer=self.wrong, kinds=kinds, prefix="deb-client")
+            wrong_signer=self.wrong, kinds=kinds, prefix="deb-client",
+            positive_control=positive_control)
 
     def test_rejected_tampering_is_not_run_when_synthetic_and_installation_is_never_a_pass(self):
         gates = self.cycle(ScriptedDocker())
@@ -784,11 +872,59 @@ class TamperTests(unittest.TestCase):
         host = hd.RecordingRunner(host_runner(ScriptedDocker(), ExecutedMock))
         work = self.root / "work-real"
         work.mkdir()
+        keyring = self.root / "key.gpg"
+        keyring.write_bytes(b"key")
+        positive_control = hd.build_positive_control(family="apt",image="img",platform="linux/amd64",
+            product="theme-forge-solar-sail",success=True,setup_sha256=hd.trust_identity(hd.apt_spec(source,keyring,"amd64")),
+            receipts={stage: [CommandReceipt([stage],0,b"",b"",executed=True)]
+                      for stage in ("configure","refresh","install","query")})
         gates = hd.tamper_cycle(
-            host, lambda dirs: hd.apt_spec(dirs["apt"], self.root / "key.gpg", "amd64"), "apt", {"apt": source},
+            host, lambda dirs: hd.apt_spec(dirs["apt"], keyring, "amd64"), "apt", {"apt": source},
             image="img", platform="linux/amd64", product="theme-forge-solar-sail", work=work, arch="amd64",
-            wrong_signer=self.wrong, kinds=("package",), prefix="p")
+            wrong_signer=self.wrong, kinds=("package",), prefix="p",
+            positive_control=positive_control)
         self.assertEqual([g["status"] for g in gates], ["pass"])
+
+    def test_tamper_cycle_requires_explicit_positive_control(self):
+        gates = self.cycle(ScriptedDocker(), positive_control=None)
+        self.assertEqual([g["name"] for g in gates], [f"deb-client.tamper.{k}" for k in hd.TAMPER_KINDS_ALL])
+        self.assertEqual({(g["status"], g["reason"]) for g in gates}, {("not-run", "blocked-by:positive-control")})
+        for g in gates:
+            self.assertIn("negative_receipts", g)
+            self.assertTrue(g["negative_receipts"])
+
+    def test_tamper_cycle_with_failed_positive_control_is_blocked(self):
+        gates = self.cycle(ScriptedDocker(), positive_control={"success": False, "family": "apt", "product": "theme-forge-solar-sail"})
+        self.assertEqual({(g["status"], g["reason"]) for g in gates}, {("not-run", "blocked-by:positive-control")})
+
+    def test_accepted_tamper_fails_even_without_a_valid_positive_control(self):
+        for control in (None, {"success": False}, {"success": True, "family": "dnf"}):
+            with self.subTest(control=control), tempfile.TemporaryDirectory() as tmp:
+                with patch.object(self, "root", Path(tmp).resolve()):
+                    gates = self.cycle(ScriptedDocker(accept_tampered=True), positive_control=control)
+                self.assertEqual({(g["status"], g["reason"]) for g in gates},
+                                 {("fail", "tampered-content-accepted")})
+                for gate in gates:
+                    receipts = {r["stage"]: r for r in gate["negative_receipts"]}
+                    self.assertEqual(receipts["install"]["exit_code"], 0)
+                    self.assertEqual(receipts["query"]["exit_code"], 0)
+
+    def test_tamper_cycle_with_mismatched_positive_control_is_blocked(self):
+        mismatched = {
+            "success": True,
+            "family": "apt",
+            "image": "other-image",
+            "platform": "linux/amd64",
+            "product": "theme-forge-solar-sail",
+        }
+        gates = self.cycle(ScriptedDocker(), positive_control=mismatched)
+        self.assertEqual({(g["status"], g["reason"]) for g in gates}, {("not-run", "blocked-by:positive-control")})
+
+    def test_tamper_cycle_fails_when_rejected_for_wrong_reason(self):
+        gates = self.cycle(ScriptedDocker(tamper_wrong_reason=True))
+        for g in gates:
+            self.assertEqual(g["status"], "fail")
+            self.assertIn("COMMAND_NOT_FOUND", g["reason"])
 
 
 class DebLaneTests(unittest.TestCase):

@@ -127,7 +127,21 @@ class BuildRpmTests(unittest.TestCase):
             return CommandReceipt(argv, 0, f"{name}|{version}|1.fc43|{arch}\n".encode(), b"")
 
         def rpmlint_handler(argv, cwd=None, env=None):
-            return CommandReceipt(argv, rpmlint_exit, b"rpmlint\n", b"error\n" if rpmlint_exit else b"")
+            if "--version" in argv:
+                return CommandReceipt(argv, 0, b"rpmlint version 2.5.0\n", b"")
+            if rpmlint_exit:
+                return CommandReceipt(
+                    argv,
+                    rpmlint_exit,
+                    f"{name}.{arch}: E: explicit-lib-dependency nodejs\n1 packages and 1 specfiles checked; 1 errors, 0 warnings, 0 filtered.\n".encode(),
+                    b"error\n",
+                )
+            return CommandReceipt(
+                argv,
+                0,
+                b"1 packages and 1 specfiles checked; 0 errors, 0 warnings, 0 filtered.\n",
+                b"",
+            )
 
         def createrepo_handler(argv, cwd=None, env=None):
             repodata = Path(argv[-1]) / "repodata"
@@ -347,6 +361,10 @@ class BuildRpmTests(unittest.TestCase):
                 offline_npm_archives=offline_npm, runner=runner,
             )
         self.assertEqual(caught.exception.code, "RPMLINT_FAILED")
+        self.assertEqual(caught.exception.details.get("diagnostic_token"), "explicit-lib-dependency")
+        self.assertTrue(caught.exception.spec_sha256)
+        self.assertTrue(caught.exception.package_sha256)
+        self.assertEqual(caught.exception.details.get("sha256"), caught.exception.package_sha256)
 
     def test_createrepo_failure_raises_build_failed(self):
         capture, intent, offline_npm = create_cli_fixture(self.root / "loom_input", product="theme-forge-stellar-loom")

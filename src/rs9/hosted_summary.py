@@ -119,6 +119,12 @@ def summarize(repository, inputs, output):
     if actual != expected_sets:
         reasons.append("missing-or-surplus-artifact-sets")
     qualified = not reasons
+    observe_receipt = next((r for r in receipts if r.get("lane") == "observe"), None)
+    observe_details = observe_receipt.get("details", {}) if isinstance(observe_receipt, dict) else {}
+    destinations = observe_details.get("destinations", {})
+    planner_noops = observe_details.get("planner_noops", [])
+    satisfied_observations = observe_details.get("satisfied_observations", [])
+    exact_observations = observe_details.get("exact_observations", [])
     record = {"schema": "rs9.hosted-candidate-summary.v1alpha2", **expected,
               "production_enabled": False, "publication_authority": False, "attended_gates_satisfied": False,
               "adoptable": expected["event"] == "push" and expected["ref"] == "refs/heads/main" and expected["attempt"] == 1,
@@ -126,7 +132,11 @@ def summarize(repository, inputs, output):
               "lanes_executed_ok": len(receipts) == len(lanes) and all(not r.get("execution_error") for r in receipts),
               "blocking_reasons": sorted(set(reasons)), "receipts": receipts, "artifact_manifests": manifests,
               "production_promotion_blockers": sorted(set(promotion)),
-              "production_promotion_blocked": bool(promotion)}
+              "production_promotion_blocked": bool(promotion),
+              "destinations": destinations,
+              "destination_planner_noops": planner_noops,
+              "destination_satisfied": satisfied_observations,
+              "destination_exact": exact_observations}
     record["job_conclusions"] = {key: row.get("result") for key, row in jobs.items()}
     raw = canonical(record)
     if len(raw) > 16 * 1024 ** 2:

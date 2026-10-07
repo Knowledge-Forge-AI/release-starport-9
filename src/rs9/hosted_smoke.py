@@ -456,10 +456,37 @@ def _run_verifier(script, sidecar, payload, prefix, env, cwd=None):
     return evidence, None
 
 
-def verifier_import_preflight(prepared, system, prefix=(), env=None):
-    """Import the authentic released sibling closure before inspecting any runtime."""
-    source = Path(prepared.get("source", prepared["tools"])).resolve()
-    tools = Path(prepared["tools"]).resolve()
+def _probe_script(prepared, name, text):
+    """Container wrappers are immutable inputs; host wrappers retain their existing path."""
+    path = Path(prepared.get("probe", prepared["scratch"])) / name
+    if "probe" in prepared:
+        if path.is_symlink() or path.read_bytes() != text.encode():
+            raise ContractError("SIDECAR_HARNESS_IMPORT", "Read-only verifier wrapper differs",
+                                details={"substage": "verifier-wrapper", "missing_path": name})
+    else:
+        path.write_text(text)
+    return path
+
+
+def _import_preflight_script(source, tools):
+    modules = [(tools / p).as_uri() for p in ("sidecar-common.mjs", "sidecar-verify.mjs", "native-rc-smoke.mjs")]
+    return (
+        "import {createHash} from 'node:crypto'; import {relative,isAbsolute} from 'node:path';\n"
+        "import {fileURLToPath} from 'node:url';\ntry {\n"
+        "const modules=await Promise.all(" + json.dumps(modules) + ".map(p=>import(p)));\n"
+        "if(typeof modules[0].verifyDistribution!=='function'||typeof modules[1].verifySidecar!=='function') throw new TypeError('verifier export missing');\n"
+        "console.log(JSON.stringify({status:'pass',result:{},node_version:process.versions.node}));\n"
+        "} catch(e) { let path=e.path; if(!path&&e.url) {try {path=fileURLToPath(e.url);} catch {}}\n"
+        "const rel=typeof path==='string'?relative(" + json.dumps(str(source)) + ",path):null;\n"
+        "const safe=rel&&!isAbsolute(rel)&&!rel.startsWith('..')&&/^[A-Za-z0-9_./@+-]{1,256}$/.test(rel)?rel:path?'outside-source-root':null;\n"
+        "console.log(JSON.stringify({status:'fail',phase:'import',name:e.name,code:e.code,node_version:process.versions.node,"
+        "missing_path:safe,diagnostic_token:typeof e.syscall==='string'&&e.syscall.startsWith('spawn')?'spawn-unavailable':'module-import',"
+        "message_sha256:createHash('sha256').update(String(e.message)).digest('hex')})); process.exitCode=2; }\n"
+    )
+
+
+def verify_source_readback(prepared):
+    source = Path(prepared["source"])
     # Recheck transported blobs before executing them in a wheel/native client.
     for row in prepared.get("records", []):
         validate_safe_relative_posix_path(row["path"])
@@ -474,20 +501,15 @@ def verifier_import_preflight(prepared, system, prefix=(), env=None):
         if len(data) != row["size"] or digest(data) != row["sha256"] or blob != row["blob"]:
             raise ContractError("SIDECAR_HARNESS_IMPORT", "Authenticated verifier source changed",
                                 details={"substage": "verifier-source-readback", "missing_path": row["path"]})
-    script = Path(prepared["scratch"]) / "verify-import-preflight.mjs"
-    modules = [(tools / p).as_uri() for p in ("sidecar-common.mjs", "sidecar-verify.mjs", "native-rc-smoke.mjs")]
-    script.write_text(
-        "import {createHash} from 'node:crypto'; import {relative,isAbsolute} from 'node:path';\n"
-        "import {fileURLToPath} from 'node:url';\ntry {\n"
-        "const modules=await Promise.all(" + json.dumps(modules) + ".map(p=>import(p)));\n"
-        "if(typeof modules[0].verifyDistribution!=='function'||typeof modules[1].verifySidecar!=='function') throw new TypeError('verifier export missing');\n"
-        "console.log(JSON.stringify({status:'pass',result:{},node_version:process.versions.node}));\n"
-        "} catch(e) { let path=e.path; if(!path&&e.url) {try {path=fileURLToPath(e.url);} catch {}}\n"
-        "const rel=typeof path==='string'?relative(" + json.dumps(str(source)) + ",path):null;\n"
-        "const safe=rel&&!isAbsolute(rel)&&!rel.startsWith('..')&&/^[A-Za-z0-9_./@+-]{1,256}$/.test(rel)?rel:path?'outside-source-root':null;\n"
-        "console.log(JSON.stringify({status:'fail',phase:'import',name:e.name,code:e.code,node_version:process.versions.node,"
-        "missing_path:safe,diagnostic_token:typeof e.syscall==='string'&&e.syscall.startsWith('spawn')?'spawn-unavailable':'module-import',"
-        "message_sha256:createHash('sha256').update(String(e.message)).digest('hex')})); process.exitCode=2; }\n")
+
+
+def verifier_import_preflight(prepared, system, prefix=(), env=None):
+    """Import the authentic released sibling closure before inspecting any runtime."""
+    source = Path(prepared.get("source", prepared["tools"])).resolve()
+    tools = Path(prepared["tools"]).resolve()
+    verify_source_readback({**prepared, "source": source})
+    script = Path(prepared.get("probe", prepared["scratch"])) / "verify-import-preflight.mjs"
+    _probe_script(prepared, "verify-import-preflight.mjs", _import_preflight_script(source, tools))
     evidence, result = _run_verifier(script, "", "", prefix, runtime_environment(env), cwd=source)
     if result is None:
         diagnostic = {"schema": "rs9.sidecar-import-preflight.v1alpha1", "product": "theme-forge-nebular-fusion",
@@ -711,8 +733,7 @@ def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, 
     if len(manifests) != 1 or len(binaries) != 1:
         raise ContractError("SIDECAR_REPRESENTATION", "One released sidecar and payload required")
     sidecar, payload = binaries[0], manifests[0].parent
-    script = prepared["scratch"] / "verify-runtime.mjs"
-    script.write_text(_verifier_script(prepared["tools"] / "sidecar-common.mjs"))
+    script = _probe_script(prepared, "verify-runtime.mjs", _verifier_script(prepared["tools"] / "sidecar-common.mjs"))
     capture = prepared.get("capture")
     expected = expected_runtime_members(prepared, system)
     identity, current_members = runtime_evidence(root, sidecar, manifests[0], expected, return_members=True)
@@ -752,22 +773,45 @@ def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, 
     scenarios = ["A"] if darwin else ["B"] if platform == "linux-arm64" else ["C", "C-signal"]
     evidence = prepared["scratch"] / "evidence"
     evidence.mkdir(exist_ok=True)
-    evidence.chmod(0o777)
+    evidence.chmod(0o755 if prepared.get("container_client") else 0o777)
     runs = []
     for scenario in scenarios:
         command = ["node", str(prepared["tools"] / "native-rc-smoke.mjs"), "--platform", platform,
-                   "--scenario", scenario, "--launch-root", str(launch_root), "--checkout", str(prepared["source"]),
+                   "--scenario", scenario, "--launch-root", str(launch_root), "--checkout", str(prepared.get("checkout", prepared["source"])),
                    "--evidence", str(evidence), "--label", platform + "-" + scenario]
         if not darwin:
             command = ["xvfb-run", "-a", "dbus-run-session", "--", *command]
-        result = subprocess.run([*prefix, *command], env=env, capture_output=True, timeout=240)
+        try:
+            result = subprocess.run([*prefix, *command], env=env, capture_output=True, timeout=240)
+        except subprocess.TimeoutExpired as error:
+            raise ContractError("APPLICATION_SMOKE", "Released application-aware smoke timed out", details={
+                "reason_token": "process-timeout", "exception_type": "TimeoutExpired",
+                "stdout_sha256": digest(error.output or b""), "stderr_sha256": digest(error.stderr or b"")}) from None
+        command_details = {"exit_code": result.returncode, "stdout_sha256": digest(result.stdout),
+                           "stderr_sha256": digest(result.stderr)}
         path = evidence / (platform + "-" + scenario + ".run.json")
-        if result.returncode or not path.is_file():
-            raise ContractError("APPLICATION_SMOKE", "Released application-aware smoke failed")
-        record = json.loads(path.read_bytes())
+        if result.returncode:
+            raise ContractError("APPLICATION_SMOKE", "Released application-aware smoke failed",
+                                details={**command_details, "reason_token": "process-nonzero"})
+        if not path.is_file():
+            raise ContractError("APPLICATION_SMOKE", "Released smoke receipt missing", details={
+                **command_details, "reason_token": "receipt-missing", "cause": "smoke-evidence",
+                "missing_path": "output/evidence/" + path.name})
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(descriptor, "rb") as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > 1024 * 1024:
+                raise ContractError("APPLICATION_SMOKE", "Bounded regular smoke receipt required",
+                                    details={**command_details, "reason_token": "receipt-invalid"})
+            raw = stream.read(1024 * 1024 + 1)
+        if len(raw) > 1024 * 1024:
+            raise ContractError("APPLICATION_SMOKE", "Smoke receipt exceeded bound",
+                                details={**command_details, "reason_token": "receipt-oversize"})
+        record = json.loads(raw)
         if record.get("status") != "pass" or record.get("problems"):
-            raise ContractError("APPLICATION_SMOKE", "Released smoke receipt failed")
-        runs.append({"scenario": scenario, "receipt_sha256": digest(path.read_bytes()),
+            raise ContractError("APPLICATION_SMOKE", "Released smoke receipt failed",
+                                details={**command_details, "reason_token": "receipt-failed"})
+        runs.append({"scenario": scenario, "receipt_sha256": digest(raw),
                      "executable_sha256": record["executable"]["sha256"]})
     # Raw harness logs can contain ephemeral paths. Keep only bounded public identities.
     res = {"sidecar": {"verifier_stdout_sha256": digest(canonical(verification)), "verified": True},

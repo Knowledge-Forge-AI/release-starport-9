@@ -92,23 +92,23 @@ class CandidateInventoryTests(unittest.TestCase):
 
     def test_manifest_matches_full_live_product_delta(self):
         root = Path(__file__).resolve().parents[1]
-        if subprocess.run(["git", "-C", str(root), "cat-file", "-e", PARENT + "^{commit}"],
+        manifest = json.loads((root / MANIFEST).read_bytes())
+        parent = manifest["parent"]
+        if subprocess.run(["git", "-C", str(root), "cat-file", "-e", parent + "^{commit}"],
                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
             self.skipTest("public parent object absent in shallow checkout")
-        manifest = json.loads((root / MANIFEST).read_bytes())
-        self.assertEqual(manifest["parent"], PARENT)
         from rs9.candidate_readiness import validate_readiness
         validate_readiness(manifest, require_ready=False)
         self.assertIs(manifest["publication_authority"], False)
-        self.assertEqual(manifest["changed_paths"], product_delta(root, PARENT))
+        self.assertEqual(manifest["changed_paths"], product_delta(root, parent))
         self.assertIn("src/rs9/hosted_observe.py", manifest["changed_paths"])
         target = next(r for r in manifest["files"] if r["path"] == "operators/live1/targets.json")
-        parent_target = subprocess.check_output(["git", "-C", str(root), "show", PARENT + ":operators/live1/targets.json"])
+        parent_target = subprocess.check_output(["git", "-C", str(root), "show", parent + ":operators/live1/targets.json"])
         # The accepted source/container pins are preserved in this repair.
         self.assertEqual(target["sha256"], hashlib.sha256(parent_target).hexdigest())
         self.assertEqual(json.loads((root / target["path"]).read_bytes())["maintainer"],
                          "Knowledge Forge AI <nonproduction@knowledge-forge.invalid>")
-        self.assertRegex(verify_inventory(root, manifest, parent=PARENT), r"^[0-9a-f]{40}$")
+        self.assertRegex(verify_inventory(root, manifest, parent=parent), r"^[0-9a-f]{40}$")
 
     def test_inventory_rejects_incomplete_changed_path_set(self):
         root = Path(__file__).resolve().parents[1]

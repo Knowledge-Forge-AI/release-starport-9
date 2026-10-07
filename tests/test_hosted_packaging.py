@@ -947,6 +947,205 @@ class HostedPackagingTests(unittest.TestCase):
             self.assertTrue(any("_keyring" in a for a in call))
             self.assertTrue(any("_keyringpath" in a for a in call))
 
+    def test_rpm_gate_split_and_quarantine_when_rpmlint_fails(self):
+        """When RPM builds succeed but rpmlint fails: gate split passes package-build, fails rpmlint-clean, blocks custody, quarantines bytes."""
+        outer = self.root / "orchestration-rpm-gate-split"
+        outer.mkdir()
+        lane_scratch = outer / "lane-work"
+        lane_scratch.mkdir()
+
+        product_ids = [
+            "theme-forge-stellar-burst",
+            "theme-forge-stellar-loom",
+            "theme-forge-solar-sail",
+            "theme-forge-nebular-fusion",
+        ]
+        captures = [
+            (
+                SimpleNamespace(root=outer / "capture" / pid),
+                {"project": {"id": pid}},
+                {},
+            )
+            for pid in product_ids
+        ]
+
+        context = {
+            "family": "rpm",
+            "system": "x86_64-linux",
+            "repository": self.root,
+            "scratch": lane_scratch,
+            "pins": {"maintainer": "Lead <lead@example.com>"},
+            "captures": captures,
+            "client": None,
+            "binding": {"source_commit": "0" * 40},
+            "authentication_sha256": "1" * 64,
+        }
+
+        env = {
+            "family": "rpm",
+            "system": "x86_64-linux",
+            "image_ref": "fedora@sha256:" + "0" * 64,
+            "platform": "linux/amd64",
+            "preprovisioned_packages": [],
+            "tools": {},
+        }
+
+        def mock_build(capture, intent, arch, scratch_dir, **kwargs):
+            pid = intent["project"]["id"]
+            pkg_name = f"{pid}-1.0.0-1.fc43.{arch}.rpm"
+            pkg_path = Path(scratch_dir) / pkg_name
+            pkg_path.write_bytes(f"rpm-content-{pid}".encode())
+            spec_path = Path(scratch_dir) / "rpmbuild" / "SPECS" / f"{pid}.spec"
+            spec_path.parent.mkdir(parents=True, exist_ok=True)
+            spec_path.write_bytes(f"Name: {pid}\n".encode())
+
+            if pid == "theme-forge-nebular-fusion":
+                ev_data = {
+                    "schema": "rs9.rpmlint-evidence.v1alpha1",
+                    "product": pid,
+                    "clean": False,
+                    "status": "fail",
+                    "findings": [{"target": pkg_name, "level": "E", "check": "explicit-lib-dependency", "message": "nodejs"}],
+                    "findings_summary": {"packages": 1, "specfiles": 1, "errors": 1, "warnings": 0, "filtered": 0},
+                }
+                lint_err = ContractError(
+                    "RPMLINT_FAILED",
+                    "Candidate RPM did not pass rpmlint: explicit-lib-dependency",
+                    details={
+                        "substage": "rpmlint",
+                        "tool": "rpmlint",
+                        "exit_code": 1,
+                        "stdout_sha256": digest(b"stdout"),
+                        "stderr_sha256": digest(b"stderr"),
+                        "product": pid,
+                        "diagnostic_token": "explicit-lib-dependency",
+                        "reason_token": "lint-errors",
+                        "observed_field_tokens": ["explicit-lib-dependency"],
+                        "observed_field_count": 1,
+                    },
+                )
+                lint_err.package_path = str(pkg_path)
+                lint_err.spec_path = str(spec_path)
+                lint_err.evidence = ev_data
+                raise lint_err
+
+            (Path(scratch_dir) / "rpm-manifest.json").write_bytes(b"{}")
+            return {
+                "rpm_path": pkg_path,
+                "manifest": {
+                    "rpm_identity": {"name": pid, "version": "1.0.0", "release": "1.fc43", "arch": arch},
+                    "rpm_payload_digest": {"tag": "PAYLOADSHA256", "algo_tag": "PAYLOADSHA256ALGO", "payload_digest": "0" * 64},
+                },
+            }
+
+        with patch("rs9.hosted_packaging.provision", return_value=env), \
+             patch("rs9.hosted_deb.provision_image"), \
+             patch("rs9.hosted_packaging.checked", return_value=CommandReceipt(["tool"], 0, b"", b"", executed=True)), \
+             patch("rs9.hosted_packaging.container_tool_facts", return_value={"rpm": "v6"}), \
+             patch("rs9.hosted_packaging._resolve_offline_npm_archives", return_value=None), \
+             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=mock_build):
+            from rs9.hosted_packaging import execute
+            result = execute(context)
+            details = result["details"]["product_failures"]["theme-forge-nebular-fusion"]
+            self.assertEqual(details["code"], "RPMLINT_FAILED")
+            self.assertEqual(details["diagnostic_token"], "explicit-lib-dependency")
+            self.assertEqual(details["reason_token"], "lint-errors")
+            self.assertIn("explicit-lib-dependency", details["observed_field_tokens"])
+            gates_by_name = {g["name"]:g["status"] for g in result["gates"]}
+            self.assertEqual(gates_by_name["rpm-package-build"],"pass")
+            self.assertEqual(gates_by_name["rpm-rpmlint-clean"],"fail")
+            self.assertEqual(gates_by_name["rpm-client-qualification"],"not-run")
+
+            # 1. Gate split verified in build-errors.json
+            diag_file = lane_scratch / "diagnostics" / "build-errors.json"
+            self.assertTrue(diag_file.is_file())
+            diag_data = json.loads(diag_file.read_bytes())
+            gates_by_name = {g["name"]: g["status"] for g in diag_data.get("gates", [])}
+            self.assertEqual(gates_by_name.get("rpm-package-build"), "pass")
+            self.assertEqual(gates_by_name.get("rpm-rpmlint-clean"), "fail")
+
+            # 2. Custody blocked verified: unsigned-custody was NEVER created
+            self.assertFalse((lane_scratch / "unsigned-custody").exists())
+
+            # 3. Quarantine verified: failed RPM bytes are in quarantine only
+            quarantine_rpm = lane_scratch / "quarantine" / "theme-forge-nebular-fusion-1.0.0-1.fc43.x86_64.rpm"
+            self.assertTrue(quarantine_rpm.is_file())
+            self.assertEqual(quarantine_rpm.read_bytes(), b"rpm-content-theme-forge-nebular-fusion")
+
+            # 4. Diagnostics records and spec retained
+            retained_spec = lane_scratch / "diagnostics" / "theme-forge-nebular-fusion.spec.json"
+            self.assertTrue(retained_spec.is_file())
+            spec_record = json.loads(retained_spec.read_bytes())
+            self.assertEqual(spec_record["spec_sha256"], digest(spec_record["spec"].encode()))
+            retained_ev = lane_scratch / "diagnostics" / "rpmlint-theme-forge-nebular-fusion.json"
+            self.assertTrue(retained_ev.is_file())
+            ev_data = json.loads(retained_ev.read_bytes())
+            self.assertEqual(ev_data["product"], "theme-forge-nebular-fusion")
+            self.assertFalse(ev_data["clean"])
+            from rs9.hosted_custody import retain
+            record = {"lane": "rpm", "system": "x86_64-linux", "provenance": {},
+                      "runner": {}, "execution_error": "required-gates-unsatisfied"}
+            output = outer / "retained"
+            retain(lane_scratch, output, result["artifacts"], record)
+            self.assertNotIn("diagnostic_scan_failures", record)
+            uploaded = output / "objects/diagnostics" / retained_spec.name
+            self.assertEqual(uploaded.read_bytes(), retained_spec.read_bytes())
+
+    def test_rpm_gate_split_build_fails_when_rpmbuild_fails(self):
+        """When an actual build failure occurs (BUILD_FAILED): package-build gate fails, rpmlint-clean gate fails."""
+        outer = self.root / "orchestration-rpm-build-fail"
+        outer.mkdir()
+        lane_scratch = outer / "lane-work"
+        lane_scratch.mkdir()
+
+        captures = [
+            (
+                SimpleNamespace(root=outer / "capture" / "theme-forge-stellar-burst"),
+                {"project": {"id": "theme-forge-stellar-burst"}},
+                {},
+            )
+        ]
+
+        context = {
+            "family": "rpm",
+            "system": "x86_64-linux",
+            "repository": self.root,
+            "scratch": lane_scratch,
+            "pins": {"maintainer": "Lead <lead@example.com>"},
+            "captures": captures,
+            "client": None,
+            "binding": {"source_commit": "0" * 40},
+            "authentication_sha256": "1" * 64,
+        }
+
+        env = {
+            "family": "rpm",
+            "system": "x86_64-linux",
+            "image_ref": "fedora@sha256:" + "0" * 64,
+            "platform": "linux/amd64",
+            "preprovisioned_packages": [],
+            "tools": {},
+        }
+
+        with patch("rs9.hosted_packaging.provision", return_value=env), \
+             patch("rs9.hosted_deb.provision_image"), \
+             patch("rs9.hosted_packaging.checked", return_value=CommandReceipt(["tool"], 0, b"", b"", executed=True)), \
+             patch("rs9.hosted_packaging.container_tool_facts", return_value={"rpm": "v6"}), \
+             patch("rs9.hosted_packaging._resolve_offline_npm_archives", return_value=None), \
+             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=ContractError("BUILD_FAILED", "rpmbuild failed")):
+            with self.assertRaises(ContractError) as caught:
+                from rs9.hosted_packaging import execute
+                execute(context)
+
+            self.assertEqual(caught.exception.code, "NATIVE_BUILD")
+            diag_file = lane_scratch / "diagnostics" / "build-errors.json"
+            self.assertTrue(diag_file.is_file())
+            diag_data = json.loads(diag_file.read_bytes())
+            gates_by_name = {g["name"]: g["status"] for g in diag_data.get("gates", [])}
+            self.assertEqual(gates_by_name.get("rpm-package-build"), "fail")
+            self.assertEqual(gates_by_name.get("rpm-rpmlint-clean"), "fail")
+            self.assertFalse((lane_scratch / "unsigned-custody").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
