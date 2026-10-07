@@ -981,3 +981,75 @@ class HostedObserveExecutionTests(unittest.TestCase):
             sail_brew = [r for r in doc["observations"] if r["project"] == "theme-forge-solar-sail" and r["adapter"] == "homebrew"][0]
             self.assertEqual(sail_brew["observation"]["state"], "conflict")
             self.assertEqual(result["gates"][1]["status"], "fail")
+
+    def test_destination_observations_and_noops_exposed_when_pages_unknown(self):
+        """Per-destination observations and 8 noops exposed independently when Pages is unknown, aggregate blocked."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            scratch = root / "scratch"
+            scratch.mkdir()
+            captures = self._create_real_captures(root, count=4)
+
+            formulas = {}
+            blobs = {}
+            for cap, itn, prof in captures:
+                p = itn["project"]["id"]
+                facts = homebrew_generation_facts(cap, itn, prof, npm_projection=authenticated_npm_projection(cap, itn, prof), npm_state="exact")
+                template = (Path(__file__).parent / "fixtures/homebrew/Formula" / (p + ".rb")).read_text()
+                content = re.sub(r"(?m)^  sha256 \"[0-9a-f]{64}\"$", lambda _: f"  sha256 \"{facts['sha256']}\"", template).encode()
+                rel_path = f"Formula/{p}.rb"
+                formulas[rel_path] = content
+                blobs[rel_path] = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
+
+            def mock_get(url, *args, **kwargs):
+                for path, content in formulas.items():
+                    if url.endswith(path):
+                        return content
+                raise ValueError(f"Unexpected raw GET URL: {url}")
+
+            client = MagicMock()
+            client.json.return_value = {"default_branch": "main", "sha": "e" * 40}
+
+            pages_obs = {
+                "state": "unknown",
+                "diagnostics": [
+                    {"code": "pages-tls-error", "message": "TLS verification failed: certificate-verify-failed"},
+                    {"code": "pages-tls-certificate-verify-failed", "message": "TLS failure class certificate-verify-failed"},
+                ],
+            }
+
+            with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, blobs)), \
+                 patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                 patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
+                 patch("rs9.hosted_observe.read_pages", return_value=pages_obs), \
+                 patch("rs9.readers._get", side_effect=mock_get):
+                result = execute({"captures": captures, "scratch": scratch, "client": client})
+
+            # Gate 0 passes, but aggregate gate 1 remains blocked (not-run) because Pages is unknown
+            self.assertEqual(result["gates"][0]["status"], "pass")
+            self.assertEqual(result["gates"][1]["status"], "not-run")
+            self.assertEqual(result["gates"][1]["reason"], "observations-recorded-with-unknown-or-metadata-only-states")
+
+            details = result["details"]
+            destinations = details["destinations"]
+
+            # Pages destination is not satisfied
+            self.assertFalse(destinations["pages"]["satisfied"])
+            self.assertEqual(destinations["pages"]["states"]["generation"], "unknown")
+            self.assertEqual(destinations["pages"]["planner_noops"], [])
+
+            # npm destination is completely satisfied with 4 exact readbacks and planner noops
+            self.assertTrue(destinations["npm"]["satisfied"])
+            self.assertEqual(destinations["npm"]["exact_count"], 4)
+            self.assertEqual(len(destinations["npm"]["planner_noops"]), 4)
+
+            # Homebrew destination is completely satisfied with 4 exact readbacks and planner noops
+            self.assertTrue(destinations["homebrew"]["satisfied"])
+            self.assertEqual(destinations["homebrew"]["exact_count"], 4)
+            self.assertEqual(len(destinations["homebrew"]["planner_noops"]), 4)
+
+            # Total 8 npm/Homebrew planner noops preserved
+            self.assertEqual(len(details["planner_noops"]), 8)
+            self.assertEqual(len(details["exact_observations"]), 8)
+            # 12 satisfied observations (4 pypi + 4 npm + 4 brew)
+            self.assertEqual(len(details["satisfied_observations"]), 12)

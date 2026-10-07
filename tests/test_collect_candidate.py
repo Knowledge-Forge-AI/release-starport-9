@@ -486,12 +486,13 @@ class CollectionTests(unittest.TestCase):
             (root / "kept.py").write_text("pass\n")
             manifest = {"files": [{"path": "kept.py"}], "deleted_paths": ["deleted.py"]}
             def git(*args):
-                if "-z" in args:
+                if "--others" not in args:
                     return "kept.py" + chr(0) + "deleted.py" + chr(0)
-                return ".serena/local\n.pytest_cache/cache\ncache/__pycache__/module.pyc"
+                return chr(0).join((".serena/local", ".pytest_cache/cache", "cache/__pycache__/module.pyc", ""))
             paths = staging_paths(root, manifest, git)
             self.assertIn("deleted.py", paths)
             self.assertNotIn(".serena/local", paths)
+            self.assertFalse(any(p.startswith(".scratch/") for p in paths))
             manifest["deleted_paths"] = []
             with self.assertRaises(ContractError):
                 staging_paths(root, manifest, git)

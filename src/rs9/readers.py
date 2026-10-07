@@ -535,6 +535,44 @@ def read_homebrew(output_or_destination, subject=None, *, pinned_ref, tap="Knowl
     )
 
 
+TLS_CLASSES = (
+    "certificate-verify-failed",
+    "handshake-failure",
+    "protocol-error",
+    "unexpected-eof",
+    "transport-error",
+)
+
+
+def classify_tls_error(error):
+    """Classify a TLS exception into a bounded enum of tokens."""
+    reason = getattr(error, "reason", error)
+    if isinstance(reason, getattr(ssl, "SSLCertVerificationError", ())):
+        return "certificate-verify-failed"
+    if isinstance(reason, getattr(ssl, "CertificateError", ())):
+        return "certificate-verify-failed"
+    if isinstance(reason, getattr(ssl, "SSLEOFError", ())):
+        return "unexpected-eof"
+    if isinstance(reason, getattr(ssl, "SSLZeroReturnError", ())):
+        return "protocol-error"
+    if isinstance(reason, (getattr(ssl, "SSLWantReadError", ()), getattr(ssl, "SSLWantWriteError", ()))):
+        return "transport-error"
+    if isinstance(reason, getattr(ssl, "SSLSyscallError", ())):
+        return "transport-error"
+    if isinstance(reason, ssl.SSLError):
+        msg = str(reason).lower()
+        if any(term in msg for term in ("cert", "verify", "verification", "self-signed", "hostname", "altnames")):
+            return "certificate-verify-failed"
+        if "handshake" in msg:
+            return "handshake-failure"
+        if "eof" in msg:
+            return "unexpected-eof"
+        if "protocol" in msg:
+            return "protocol-error"
+        return "handshake-failure"
+    return "transport-error"
+
+
 def read_pages(output_or_destination, subject=None, *, path, host="rs9.knowledge-forge.ai",
                desired_identity=None, expected_sha256=None):
     """Pages exact HTTP repository object absence only successful TLS exact404 no redirects, DNS unknown."""
@@ -568,8 +606,15 @@ def read_pages(output_or_destination, subject=None, *, path, host="rs9.knowledge
             reason = getattr(error, "reason", None)
             if isinstance(reason, socket.gaierror):
                 diagnostics.append({"code": "pages-dns-unknown", "message": "DNS resolution unavailable"})
-            elif isinstance(reason, ssl.SSLError):
-                diagnostics.append({"code": "pages-tls-error", "message": "TLS verification failed"})
+            elif isinstance(reason, (ssl.SSLError, getattr(ssl, "CertificateError", ()))):
+                token = classify_tls_error(reason)
+                diagnostics.append({"code": "pages-tls-error", "message": "TLS verification failed: " + token})
+                diagnostics.append({"code": "pages-tls-" + token, "message": "TLS failure class " + token})
+            raise
+        except (ssl.SSLError, getattr(ssl, "CertificateError", ())) as error:
+            token = classify_tls_error(error)
+            diagnostics.append({"code": "pages-tls-error", "message": "TLS verification failed: " + token})
+            diagnostics.append({"code": "pages-tls-" + token, "message": "TLS failure class " + token})
             raise
         except HTTPException:
             diagnostics.append({"code": "pages-protocol-error", "message": "HTTP protocol error"})

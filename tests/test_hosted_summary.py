@@ -153,3 +153,46 @@ class HostedSummaryTests(unittest.TestCase):
         with self.assertRaises(ContractError) as caught:
             validate_summary(row, ROOT, "1" * 40)
         self.assertEqual(caught.exception.code, "HOSTED_POLICY")
+
+    def test_destination_details_surfaced_in_summary_independently_of_pages_unknown(self):
+        """WP-DEST: per-destination satisfied/exact/noops surfaced in summary while aggregate is blocked for unknown Pages."""
+        npm_noops = ["theme-forge-stellar-burst", "theme-forge-stellar-loom", "theme-forge-solar-sail", "theme-forge-nebular-fusion"]
+        brew_noops = ["theme-forge-stellar-burst", "theme-forge-stellar-loom", "theme-forge-solar-sail", "theme-forge-nebular-fusion"]
+        all_8_noops = [p + ":npm" for p in npm_noops] + [p + ":homebrew" for p in brew_noops]
+        all_8_exact = all_8_noops
+        all_12_satisfied = [p + ":pypi" for p in npm_noops] + all_8_noops
+        destinations = {
+            "pypi": {"satisfied": True, "satisfied_count": 4, "total_count": 4, "exact": [], "exact_count": 0, "planner_noops": [], "states": {p: "absent" for p in npm_noops}},
+            "npm": {"satisfied": True, "satisfied_count": 4, "total_count": 4, "exact": npm_noops, "exact_count": 4, "planner_noops": npm_noops, "states": {p: "exact" for p in npm_noops}},
+            "homebrew": {"satisfied": True, "satisfied_count": 4, "total_count": 4, "exact": brew_noops, "exact_count": 4, "planner_noops": brew_noops, "states": {p: "exact" for p in brew_noops}},
+            "pages": {"satisfied": False, "satisfied_count": 0, "total_count": 1, "exact": [], "exact_count": 0, "planner_noops": [], "states": {"generation": "unknown"}},
+        }
+        def update_observe(r):
+            # Pages unknown blocks the gate
+            next(g for g in r["gates"] if g["name"] == "readback-byte-comparison").update(
+                status="not-run", reason="observations-recorded-with-unknown-or-metadata-only-states"
+            )
+            r["details"] = {
+                "destinations": destinations,
+                "planner_noops": all_8_noops,
+                "satisfied_observations": all_12_satisfied,
+                "exact_observations": all_8_exact,
+            }
+        self.mutate_receipt("observe", "generation", update_observe)
+        code, row = self.finish()
+
+        # Aggregate qualification is blocked
+        self.assertEqual(code, 2)
+        self.assertEqual(row["qualification_verdict"], "not-qualified")
+        self.assertIn("candidate-observe-generation:not-run:readback-byte-comparison", row["blocking_reasons"])
+
+        # Per-destination observations and 8 noops are exposed in summary independently of Pages unknown
+        self.assertEqual(row["destinations"]["npm"]["satisfied"], True)
+        self.assertEqual(row["destinations"]["npm"]["exact_count"], 4)
+        self.assertEqual(row["destinations"]["homebrew"]["satisfied"], True)
+        self.assertEqual(row["destinations"]["homebrew"]["exact_count"], 4)
+        self.assertEqual(row["destinations"]["pages"]["satisfied"], False)
+        self.assertEqual(len(row["destination_planner_noops"]), 8)
+        self.assertEqual(row["destination_planner_noops"], all_8_noops)
+        self.assertEqual(len(row["destination_exact"]), 8)
+        self.assertEqual(len(row["destination_satisfied"]), 12)

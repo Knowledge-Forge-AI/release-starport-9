@@ -384,10 +384,35 @@ def execute(context):
     known = all(readback_satisfied(r) for r in observations)
     conflict = any(r["observation"]["state"] != "unknown" and not readback_satisfied(r) for r in observations)
     exact_planner_noops = [r["project"] + ":" + r["adapter"] for r in observations if r.get("planner_outcome") == "noop"]
+    destinations = {}
+    for adapter in ("pypi", "npm", "homebrew", "pages"):
+        rows = [r for r in observations if r["adapter"] == adapter]
+        dest_satisfied = bool(rows) and all(readback_satisfied(r) for r in rows)
+        dest_exact = [r["project"] for r in rows if r["observation"].get("state") == "exact"]
+        dest_satisfied_projects = [r["project"] for r in rows if readback_satisfied(r)]
+        dest_noops = [r["project"] for r in rows if r.get("planner_outcome") == "noop"]
+        dest_states = {r["project"]: r["observation"].get("state") for r in rows}
+        destinations[adapter] = {
+            "satisfied": dest_satisfied,
+            "satisfied_count": len(dest_satisfied_projects),
+            "total_count": len(rows),
+            "exact": dest_exact,
+            "exact_count": len(dest_exact),
+            "satisfied_observations": dest_satisfied_projects,
+            "exact_observations": dest_exact,
+            "planner_noops": dest_noops,
+            "states": dest_states,
+        }
+    satisfied_observations = [r["project"] + ":" + r["adapter"] for r in observations if readback_satisfied(r)]
+    exact_observations = [r["project"] + ":" + r["adapter"] for r in observations if r["observation"].get("state") == "exact"]
     return {"gates": [{"name": "destination-observations-recorded", "status": "pass"},
             {"name": "readback-byte-comparison", "status": "pass" if known else "fail" if conflict else "not-run",
              "reason": "identity-conflict-or-required-target-absent" if conflict else "observations-recorded-with-unknown-or-metadata-only-states" if not known else "live-byte-readback"}],
             "artifacts": [path], "details": {"observations_sha256": record_sha256(doc),
             "production_receipt_count": 0, "states": [r["observation"]["state"] for r in observations],
-            "planner_noops": exact_planner_noops, "tap_default_branch": default_branch,
+            "planner_noops": exact_planner_noops,
+            "destinations": destinations,
+            "satisfied_observations": satisfied_observations,
+            "exact_observations": exact_observations,
+            "tap_default_branch": default_branch,
             "tap_commit_sha": ref, "tap_tree_sha": tap_evidence.get("tree_sha"), "bound_formula_blobs": formula_blobs}}
