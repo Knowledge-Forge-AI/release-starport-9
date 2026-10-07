@@ -21,23 +21,23 @@ class BuildRpmTests(unittest.TestCase):
         from rs9.build_native import CommandReceipt
         for arch in ("noarch", "x86_64", "aarch64"):
             with self.subTest(arch=arch):
-                receipt = CommandReceipt(["rpm"], 0, f"product|0.6.1|1.fc43|{arch}|abc|8\n".encode(), b"")
+                receipt = CommandReceipt(["rpm"], 0, f"product|0.6.1|1.fc43|{arch}\n".encode(), b"")
                 self.assertEqual(read_rpm_identity(receipt, "product", "0.6.1", arch)["arch"], arch)
         for raw in (b"", b"\n", b"product-0.6.1-1.fc43.noarch.rpm\n", b"product-0.6.1-1.fc43.src.rpm\n",
-                    b"RPM query\nproduct|0.6.1|1.fc43|noarch|abc|8\n",
-                    b"product|0.6.1|1.fc43|noarch|abc|8|extra\n",
-                    b"product\n0.6.1\n1.fc43\nnoarch\nabc\n8\n"):
+                    b"RPM query\nproduct|0.6.1|1.fc43|noarch\n",
+                    b"product|0.6.1|1.fc43|noarch|extra\n",
+                    b"product\n0.6.1\n1.fc43\nnoarch\n"):
             with self.subTest(raw=raw), self.assertRaises(ContractError) as caught:
                 read_rpm_identity(CommandReceipt(["rpm"], 0, raw, b""), "product", "0.6.1", "noarch")
             self.assertEqual(caught.exception.code, "RPM_QUERY_FAILED")
 
     def test_malformed_query_retains_bounded_field_and_architecture_evidence(self):
         for raw, count, arch in (
-            (b"product|0.6.1|1.fc43|noarch|abc|8|extra\n", 7, "noarch"),
-            (b"RPM query\nproduct|0.6.1|1.fc43|x86_64|abc|8\n", 6, "x86_64"),
-            (b"product|0.6.1|1.fc43|aarch64|abc|8\r\n", 6, "aarch64"),
+            (b"product|0.6.1|1.fc43|noarch|extra\n", 5, "noarch"),
+            (b"RPM query\nproduct|0.6.1|1.fc43|x86_64\n", 4, "x86_64"),
+            (b"product\r|0.6.1|1.fc43|aarch64\n", 4, "aarch64"),
             (b"product|0.6.1|1.fc43\n", 3, ""),
-            (b"product|0.6.1|1.fc43||abc|8\n", 6, ""),
+            (b"product|0.6.1||noarch\n", 4, "noarch"),
         ):
             with self.subTest(raw=raw), self.assertRaises(ContractError) as caught:
                 read_rpm_identity(CommandReceipt(["rpm"], 0, raw, b""), "product", "0.6.1", "noarch")
@@ -45,14 +45,14 @@ class BuildRpmTests(unittest.TestCase):
             self.assertEqual(error.code, "RPM_QUERY_FAILED")
             self.assertEqual(error.details["observed_field_count"], count)
             self.assertEqual(error.details.get("observed_architecture", ""), arch)
-            self.assertEqual(len(error.details["observed_field_tokens"]), min(count, 6))
-            self.assertEqual(error.details["observed_fields_truncated"], count > 6)
+            self.assertEqual(len(error.details["observed_field_tokens"]), min(count, 4))
+            self.assertEqual(error.details["observed_fields_truncated"], count > 4)
             self.assertEqual(error.details["stdout_sha256"], digest(raw))
             self.assertEqual(error.details["product"], "product")
 
     def test_malformed_query_hashes_unsafe_fields_without_disclosing_paths(self):
         unsafe = "/private-query/path"
-        raw = f"{unsafe}|0.6.1|1.fc43|noarch|abc|8|extra\n".encode()
+        raw = f"{unsafe}|0.6.1|1.fc43|noarch|extra\n".encode()
         with self.assertRaises(ContractError) as caught:
             read_rpm_identity(CommandReceipt(["rpm"], 0, raw, b""), "product", "0.6.1", "noarch")
         details = caught.exception.details
@@ -61,20 +61,19 @@ class BuildRpmTests(unittest.TestCase):
         self.assertNotIn(unsafe, str(details))
 
     def test_oversized_query_diagnostics_cap_tokens_and_preserve_field_count(self):
-        raw = ("product|0.6.1|1.fc43|aarch64|" + "a" * 5000 + "|8|" * 5000).encode()
+        raw = ("product|0.6.1|1.fc43|aarch64|" + "a" * 5000).encode()
         with self.assertRaises(ContractError) as caught:
             read_rpm_identity(CommandReceipt(["rpm"], 0, raw, b""), "product", "0.6.1", "aarch64")
         details = caught.exception.details
         self.assertEqual(caught.exception.code, "RPM_QUERY_FAILED")
         self.assertEqual(details["observed_field_count"], raw.count(b"|") + 1)
         self.assertEqual(details["observed_architecture"], "aarch64")
-        self.assertEqual(len(details["observed_field_tokens"]), 6)
+        self.assertEqual(len(details["observed_field_tokens"]), 4)
         self.assertTrue(details["observed_fields_truncated"])
         self.assertTrue(all(len(token) <= 64 for token in details["observed_field_tokens"]))
-        self.assertEqual(details["observed_field_tokens"][4], digest(b"a" * 5000))
 
     def test_query_diagnostic_schema_rejects_unbounded_or_private_values(self):
-        valid = {"observed_field_count": 6, "observed_field_tokens": ["product", "0.6.1", "1", "noarch", "", "8"],
+        valid = {"observed_field_count": 4, "observed_field_tokens": ["product", "0.6.1", "1", "noarch"],
                  "observed_fields_truncated": False}
         self.assertEqual(safe_details(valid), valid)
         for key, values in (
@@ -100,13 +99,11 @@ class BuildRpmTests(unittest.TestCase):
         name="theme-forge-stellar-loom",
         version="0.4.0",
         query_out=None,
+        release_expansion="1.fc43",
         query_exit=0,
         rpmlint_exit=0,
         createrepo_exit=0,
     ):
-        if query_out is None:
-            query_out = f"{name}|{version}|1.fc43|{arch}|abcdef0123456789|sha256\n".encode()
-
         def rpmbuild_handler(argv, cwd=None, env=None):
             rpm_dir = Path(cwd) / "RPMS" / arch
             rpm_dir.mkdir(parents=True, exist_ok=True)
@@ -116,7 +113,18 @@ class BuildRpmTests(unittest.TestCase):
         def rpm_query_handler(argv, cwd=None, env=None):
             if "--requires" in argv:
                 return CommandReceipt(argv, 0, b"nodejs >= 22\nrpmlib(CompressedFileNames) <= 3.0.4-1\n", b"")
-            return CommandReceipt(argv, query_exit, query_out, b"error\n" if query_exit else b"")
+            if query_exit:
+                return CommandReceipt(argv, query_exit, b"", b"error\n")
+            if "--querytags" in argv:
+                return CommandReceipt(argv, 0, b"PAYLOADSHA256\nPAYLOADSHA256ALGO\n", b"")
+            if "--eval" in argv:
+                return CommandReceipt(argv, 0, (release_expansion + "\n").encode(), b"")
+            qf = argv[argv.index("--queryformat") + 1] if "--queryformat" in argv else ""
+            if "%{PAYLOAD" in qf:
+                return CommandReceipt(argv, 0, b"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789|8\n", b"")
+            if query_out is not None:
+                return CommandReceipt(argv, 0, query_out, b"")
+            return CommandReceipt(argv, 0, f"{name}|{version}|1.fc43|{arch}\n".encode(), b"")
 
         def rpmlint_handler(argv, cwd=None, env=None):
             return CommandReceipt(argv, rpmlint_exit, b"rpmlint\n", b"error\n" if rpmlint_exit else b"")
@@ -175,11 +183,28 @@ class BuildRpmTests(unittest.TestCase):
         )
         manifest = result["manifest"]
         self.assertEqual(manifest["architecture"], "noarch")
-        self.assertEqual(manifest["rpm_v6_identity"]["name"], "theme-forge-stellar-loom")
-        self.assertEqual(manifest["rpm_v6_identity"]["version"], "0.4.0")
-        self.assertEqual(manifest["rpm_v6_identity"]["arch"], "noarch")
-        self.assertEqual(manifest["rpm_v6_identity"]["payload_digest_algo"], "sha256")
-        self.assertEqual(manifest["rpm_v6_identity"]["payload_digest"], "abcdef0123456789")
+        self.assertEqual(manifest["rpm_identity"]["name"], "theme-forge-stellar-loom")
+        self.assertEqual(manifest["rpm_identity"]["version"], "0.4.0")
+        self.assertEqual(manifest["rpm_identity"]["release"], "1.fc43")
+        self.assertEqual(manifest["rpm_identity"]["arch"], "noarch")
+        self.assertEqual(manifest["rpm_payload_digest"]["payload_digest_algo"], "sha256")
+        self.assertEqual(manifest["rpm_payload_digest"]["payload_digest"], "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")
+        self.assertEqual(manifest["schema"], "rs9.rpm-candidate.v1alpha2")
+
+    def test_native_requires_exit_zero_with_stderr_fails(self):
+        capture, intent, offline_npm = self._make_burst_fixture("requires-stderr")
+        runner = self._setup_runner(arch="x86_64", name="theme-forge-stellar-burst", version="0.6.1")
+        original = runner.handlers["rpm"]
+        def noisy_requires(argv, **kwargs):
+            receipt = original(argv, **kwargs)
+            if "--requires" in argv:
+                return CommandReceipt(argv, 0, receipt.stdout_bytes, b"error: unsupported query\n")
+            return receipt
+        runner.handlers["rpm"] = noisy_requires
+        with self.assertRaises(ContractError) as caught:
+            build_rpm_candidate(capture, intent, "x86_64", self.scratch,
+                                offline_npm_archives=offline_npm, runner=runner)
+        self.assertEqual(caught.exception.code, "DEPENDENCY_DERIVATION")
 
     def test_rpm_query_unexpected_arch_outside_lane_vocabulary_rejected(self):
         capture, intent, offline_npm = create_cli_fixture(self.root / "loom_input", product="theme-forge-stellar-loom")
@@ -187,7 +212,7 @@ class BuildRpmTests(unittest.TestCase):
             with self.subTest(arch=bad_arch):
                 sub_scratch = self.scratch / f"scratch_{bad_arch}"
                 sub_scratch.mkdir()
-                bad_query = f"theme-forge-stellar-loom|0.4.0|1.fc43|{bad_arch}|abcdef|sha256\n".encode()
+                bad_query = f"theme-forge-stellar-loom|0.4.0|1.fc43|{bad_arch}\n".encode()
                 runner = self._setup_runner(arch="noarch", query_out=bad_query)
                 with self.assertRaises(ContractError) as caught:
                     build_rpm_candidate(
@@ -201,7 +226,7 @@ class BuildRpmTests(unittest.TestCase):
     def test_rpm_query_arch_mismatch_rejected(self):
         capture, intent, offline_npm = create_cli_fixture(self.root / "loom_input", product="theme-forge-stellar-loom")
         # Observed x86_64 when noarch was expected
-        mismatched_query = b"theme-forge-stellar-loom|0.4.0|1.fc43|x86_64|abcdef|sha256\n"
+        mismatched_query = b"theme-forge-stellar-loom|0.4.0|1.fc43|x86_64\n"
         runner = self._setup_runner(arch="noarch", query_out=mismatched_query)
         with self.assertRaises(ContractError) as caught:
             build_rpm_candidate(
@@ -213,7 +238,7 @@ class BuildRpmTests(unittest.TestCase):
 
     def test_rpm_query_name_mismatch_raises_separate_invalid_name_code(self):
         capture, intent, offline_npm = create_cli_fixture(self.root / "loom_input", product="theme-forge-stellar-loom")
-        wrong_name_query = b"wrong-product-name|0.4.0|1.fc43|noarch|abcdef|sha256\n"
+        wrong_name_query = b"wrong-product-name|0.4.0|1.fc43|noarch\n"
         runner = self._setup_runner(arch="noarch", query_out=wrong_name_query)
         with self.assertRaises(ContractError) as caught:
             build_rpm_candidate(
@@ -226,7 +251,7 @@ class BuildRpmTests(unittest.TestCase):
 
     def test_rpm_query_version_mismatch_raises_separate_invalid_version_code(self):
         capture, intent, offline_npm = create_cli_fixture(self.root / "loom_input", product="theme-forge-stellar-loom")
-        wrong_version_query = b"theme-forge-stellar-loom|9.9.9|1.fc43|noarch|abcdef|sha256\n"
+        wrong_version_query = b"theme-forge-stellar-loom|9.9.9|1.fc43|noarch\n"
         runner = self._setup_runner(arch="noarch", query_out=wrong_version_query)
         with self.assertRaises(ContractError) as caught:
             build_rpm_candidate(
@@ -240,7 +265,7 @@ class BuildRpmTests(unittest.TestCase):
     def test_rpm_query_unsafe_observed_token_is_safely_hashed(self):
         capture, intent, offline_npm = create_cli_fixture(self.root / "loom_input", product="theme-forge-stellar-loom")
         unsafe_name = "injected/name;rm -rf /"
-        unsafe_query = f"{unsafe_name}|0.4.0|1.fc43|noarch|abcdef|sha256\n".encode()
+        unsafe_query = f"{unsafe_name}|0.4.0|1.fc43|noarch\n".encode()
         runner = self._setup_runner(arch="noarch", query_out=unsafe_query)
         with self.assertRaises(ContractError) as caught:
             build_rpm_candidate(
@@ -251,6 +276,37 @@ class BuildRpmTests(unittest.TestCase):
         token = caught.exception.details.get("diagnostic_token")
         self.assertNotIn("\n", token)
         self.assertEqual(token, digest(unsafe_name.encode("utf-8")))
+
+    def test_rpm_query_release_distro_validation_plain_fc43_and_wrong_suffix(self):
+        capture, intent, offline_npm = create_cli_fixture(self.root / "loom_input", product="theme-forge-stellar-loom")
+
+        # 1. Plain revision "1" passes
+        s_plain = self.scratch / "s_plain"
+        s_plain.mkdir()
+        runner_plain = self._setup_runner(arch="noarch", release_expansion="1", query_out=b"theme-forge-stellar-loom|0.4.0|1|noarch\n")
+        res_plain = build_rpm_candidate(capture, intent, "noarch", s_plain,
+                                        offline_npm_archives=offline_npm, runner=runner_plain)
+        self.assertEqual(res_plain["manifest"]["rpm_identity"]["release"], "1")
+
+        # 2. Builder-expanded dist "1.fc43" passes
+        s_dist = self.scratch / "s_dist"
+        s_dist.mkdir()
+        runner_dist = self._setup_runner(arch="noarch", query_out=b"theme-forge-stellar-loom|0.4.0|1.fc43|noarch\n")
+        res_dist = build_rpm_candidate(capture, intent, "noarch", s_dist,
+                                       offline_npm_archives=offline_npm, runner=runner_dist)
+        self.assertEqual(res_dist["manifest"]["rpm_identity"]["release"], "1.fc43")
+
+        # 3. Wrong suffix (e.g. "1.wrong", "1.el8", "1.fc42") raises INVALID_RELEASE
+        for bad_rel in ("1.wrong", "1.el8", "1.fc42"):
+            with self.subTest(bad_rel=bad_rel):
+                s_bad = self.scratch / f"s_{bad_rel}"
+                s_bad.mkdir()
+                runner_bad = self._setup_runner(arch="noarch", query_out=f"theme-forge-stellar-loom|0.4.0|{bad_rel}|noarch\n".encode())
+                with self.assertRaises(ContractError) as caught:
+                    build_rpm_candidate(capture, intent, "noarch", s_bad,
+                                        offline_npm_archives=offline_npm, runner=runner_bad)
+                self.assertEqual(caught.exception.code, "INVALID_RELEASE")
+                self.assertEqual(caught.exception.details.get("diagnostic_token"), bad_rel)
 
     def test_rpm_query_command_failure_raises_rpm_query_failed(self):
         capture, intent, offline_npm = create_cli_fixture(self.root / "loom_input", product="theme-forge-stellar-loom")
@@ -334,9 +390,11 @@ class BuildRpmTests(unittest.TestCase):
         )
         manifest = result["manifest"]
         self.assertEqual(manifest["architecture"], "x86_64")
-        self.assertEqual(manifest["rpm_v6_identity"]["name"], "theme-forge-stellar-burst")
-        self.assertEqual(manifest["rpm_v6_identity"]["version"], "0.6.1")
-        self.assertEqual(manifest["rpm_v6_identity"]["arch"], "x86_64")
+        self.assertEqual(manifest["rpm_identity"]["name"], "theme-forge-stellar-burst")
+        self.assertEqual(manifest["rpm_identity"]["version"], "0.6.1")
+        self.assertEqual(manifest["rpm_identity"]["arch"], "x86_64")
+        self.assertEqual(manifest["rpm_payload_digest"]["payload_digest_algo"], "sha256")
+        self.assertEqual(manifest["schema"], "rs9.rpm-candidate.v1alpha2")
 
     def test_rpm_build_proves_aarch64_native_evidence(self):
         capture, intent, offline_npm = self._make_burst_fixture("aarch64")
@@ -349,9 +407,11 @@ class BuildRpmTests(unittest.TestCase):
         )
         manifest = result["manifest"]
         self.assertEqual(manifest["architecture"], "aarch64")
-        self.assertEqual(manifest["rpm_v6_identity"]["name"], "theme-forge-stellar-burst")
-        self.assertEqual(manifest["rpm_v6_identity"]["version"], "0.6.1")
-        self.assertEqual(manifest["rpm_v6_identity"]["arch"], "aarch64")
+        self.assertEqual(manifest["rpm_identity"]["name"], "theme-forge-stellar-burst")
+        self.assertEqual(manifest["rpm_identity"]["version"], "0.6.1")
+        self.assertEqual(manifest["rpm_identity"]["arch"], "aarch64")
+        self.assertEqual(manifest["rpm_payload_digest"]["payload_digest_algo"], "sha256")
+        self.assertEqual(manifest["schema"], "rs9.rpm-candidate.v1alpha2")
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ from rs9.hosted_commands import command_diagnostic, linux_runtime_prefix, run_pr
 from rs9.hosted_platforms import select_payload
 from rs9.hosted_smoke import prepare_smoke, snapshot_nebular_runtime, verify_nebular_runtime, verifier_import_preflight
 from rs9.npm_deps import resolve_offline_npm_archives as _resolve_offline_npm_archives
+from rs9.nix_loader import evaluate as evaluate_direct_loader
 from rs9 import nix_installer
 from rs9.product_classes import get_product_class as package_class
 from rs9.hosted_burst import verify_burst_payload
@@ -167,6 +168,36 @@ os.execv(str(exe),[str(exe),*sys.argv[2:]])
     return source, capture_input, products
 
 
+def record_direct_loader_evaluation(source, system, overrides, scratch, capture, prefix, env):
+    """Retain optional loader diagnostics without preempting the runtime gate."""
+    try:
+        facts_output = json.loads(command(["nix", "build", "--json", "--no-link", *overrides,
+            str(source) + "#candidates." + system + "." + PRODUCTS[-1] + ".runtimeFacts"]))
+        if not isinstance(facts_output, list) or len(facts_output) != 1:
+            raise ContractError("NIX_LOADER_FACTS", "One loader facts output required")
+        facts_path = facts_output[0]["outputs"]["out"]
+        facts_raw = Path(facts_path).read_bytes()
+        if len(facts_raw) > 64 * 1024:
+            raise ContractError("NIX_LOADER_FACTS", "Loader fact bound exceeded")
+        loader_payload = scratch / "nix-loader-payload"
+        loader_work = scratch / "nix-loader-stage"
+        loader_work.mkdir()
+        stage_payload(capture, select_payload(capture, system), loader_payload, loader_work)
+        elfs = []
+        for file in loader_payload.rglob("*"):
+            if file.is_file() and not file.is_symlink():
+                with file.open("rb") as stream:
+                    if stream.read(4) == b"\x7fELF":
+                        elfs.append(file)
+        evaluation = evaluate_direct_loader(json.loads(facts_raw), elfs, prefix=prefix, env=env)
+    except (ContractError, OSError, ValueError, KeyError, TypeError) as error:
+        evaluation = {"schema": "rs9.nix-loader-evaluation.v1", "status": "fail",
+                      "application_qualified": False,
+                      "reason": error.code if isinstance(error, ContractError) else "loader-evaluation-unavailable"}
+    (scratch / "nix-loader-evaluation.json").write_bytes(canonical(evaluation))
+    return evaluation
+
+
 def execute(context):
     system, repository, scratch = context["system"], context["repository"], context["scratch"]
     if system not in SYSTEMS:
@@ -270,6 +301,10 @@ def execute(context):
                          ("burst-native-addon-target", "burst-native-addon-load"))
         if pid == PRODUCTS[-1]:
             if system.endswith("linux"):
+                # Inspect the unmodified released ELFs before the known FHS
+                # boundary. These results never qualify the application.
+                paths[pid]["direct_loader_evaluation"] = record_direct_loader_evaluation(
+                    source, system, overrides, scratch, neb, prefix, env)
                 runtime = json.loads(command(["nix", "build", "--json", "--no-link", *overrides,
                     str(source) + "#candidates." + system + "." + pid + ".runtime"]))[0]["outputs"]["out"]
                 gates.append(fhs_runtime_smoke(runtime, system, prefix, env))
@@ -323,6 +358,8 @@ def execute(context):
         "production_enabled": False, "locked": locked, "outputs": paths, "native_smoke": smoke,
         "installer": installer_identity}))
     artifacts = [evidence]
+    if (scratch / "nix-loader-evaluation.json").is_file():
+        artifacts.append(scratch / "nix-loader-evaluation.json")
     if installer_lane_copy.is_file():
         artifacts.append(installer_lane_copy)
     if installer_failure_copy.is_file():

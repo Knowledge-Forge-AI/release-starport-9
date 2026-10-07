@@ -9,13 +9,34 @@ import unittest
 from unittest.mock import Mock, patch
 
 from rs9.errors import ContractError
-from rs9.hosted_nix import command, execute, fhs_runtime_smoke, prepare_input, SYSTEMS
+from rs9.hosted_nix import command, execute, fhs_runtime_smoke, prepare_input, record_direct_loader_evaluation, SYSTEMS
 from rs9.scratch import canonical
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class NixHostedTests(unittest.TestCase):
+    def test_loader_facts_failures_remain_diagnostics_before_runtime_gate(self):
+        for result in (ContractError("NIX_EXECUTION", "fixture build failed"),
+                       "[]", "{}", '[{"outputs":{}}]', "not-json"):
+            with self.subTest(result=str(result)), tempfile.TemporaryDirectory() as td:
+                scratch = Path(td)
+                kwargs = {"side_effect": result} if isinstance(result, Exception) else {"return_value": result}
+                with patch("rs9.hosted_nix.command", **kwargs), \
+                     patch("rs9.hosted_nix.stage_payload") as stage:
+                    evaluation = record_direct_loader_evaluation(
+                        ROOT, "x86_64-linux", [], scratch, Mock(), [], {})
+                stage.assert_not_called()
+                self.assertEqual(evaluation["status"], "fail")
+                self.assertFalse(evaluation["application_qualified"])
+                self.assertEqual(json.loads((scratch / "nix-loader-evaluation.json").read_bytes()), evaluation)
+                from subprocess import CompletedProcess
+                with patch("rs9.hosted_nix.subprocess.run", return_value=CompletedProcess(
+                        [], 1, b"", b"bwrap: Creating new namespace failed: Operation not permitted")), \
+                     self.assertRaises(ContractError) as caught:
+                    fhs_runtime_smoke("/fixture", "x86_64-linux", [], {})
+                self.assertEqual(caught.exception.code, "NIX_FHS_USERNS")
+
     def test_disconnected_fhs_replay_identifies_user_namespace_failure(self):
         from subprocess import CompletedProcess
         for system in ("x86_64-linux", "aarch64-linux"):

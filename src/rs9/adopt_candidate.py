@@ -159,6 +159,7 @@ def staging_paths(root, manifest, git):
 
 
 def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256, timeout=7200,
+          manager_attestation=None, manager_attestation_sha256=None,
           commit_message="Recover hosted matrix boundaries and platform-specific Burst candidates"):
     from rs9.collect_candidate import collect, output_directory
     root = physical_directory(repository)
@@ -177,10 +178,17 @@ def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256
     if hashlib.sha256(raw).hexdigest() != manifest_sha256:
         raise ContractError("ADOPTION_REVIEW", "Manifest differs from reviewed bytes")
     manifest = json.loads(raw)
-    if (manifest.get("candidate_adoption_ready") is not True
-            or manifest.get("adoption_scope") != "hosted-candidate-qualification-only"
-            or manifest.get("production_enabled") is not False):
-        raise ContractError("ADOPTION_NOT_READY", "Source adoption contract is incomplete")
+    from rs9.candidate_readiness import validate_adoption_authority
+    from rs9.hosted_contract import load_hosted_lanes
+    binding = {"reviewed_parent": reviewed_parent, "reviewed_tree": reviewed_tree,
+               "manifest_sha256": manifest_sha256}
+    # Check source scope before loading the lane contract, including the legacy
+    # ready-source path. The external attestation is checked again pre-staging.
+    from rs9.candidate_readiness import validate_readiness
+    validate_readiness(manifest, require_ready=manager_attestation is None)
+    authority = dict(manager_attestation=manager_attestation,
+                     manager_attestation_sha256=manager_attestation_sha256)
+    validate_adoption_authority(manifest, root, binding, contract=load_hosted_lanes(root), **authority)
     output = output_directory(output)
     if output == root or root in output.parents:
         raise ContractError("ADOPTION_OUTPUT", "External result directory required")
@@ -202,6 +210,7 @@ def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256
     changed_paths = manifest.get("changed_paths")
     if not changed_paths or not isinstance(changed_paths, list):
         raise ContractError("ADOPTION_REVIEW", "Reviewed changed_paths required")
+    validate_adoption_authority(manifest, root, binding, **authority)
     git("add", "-A", "--", *changed_paths)
     cached = {p for p in git("diff", "--cached", "--name-only", "--no-renames", reviewed_parent, "--").splitlines() if p}
     if cached != set(changed_paths):
@@ -216,6 +225,8 @@ def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256
     git("push", "origin", "HEAD:main")
     packet = collect(root, output, commit=commit, started_at=started, timeout=timeout)
     packet["reviewed_tree"] = reviewed_tree
+    if manager_attestation is not None:
+        packet["manager_attestation_sha256"] = manager_attestation_sha256
     from rs9.collect_candidate import write_packet
     write_packet(output, packet)
     return packet
@@ -233,6 +244,8 @@ def main(argv=None):
     for flag in ("reviewed-parent", "reviewed-tree", "manifest-sha256"):
         adoption.add_argument("--" + flag, required=True)
     adoption.add_argument("--commit-message", default="Recover hosted matrix boundaries and platform-specific Burst candidates")
+    adoption.add_argument("--manager-attestation", type=Path)
+    adoption.add_argument("--manager-attestation-sha256")
     collection.add_argument("--commit", required=True)
     collection.add_argument("--run-id", type=int, default=None)
     collection.add_argument("--not-before", required=True, help="ISO8601Z timestamp")
@@ -241,6 +254,8 @@ def main(argv=None):
         if args.command == "adopt":
             result = adopt(args.repository, args.output, reviewed_parent=args.reviewed_parent,
                            reviewed_tree=args.reviewed_tree, manifest_sha256=args.manifest_sha256, timeout=args.timeout,
+                           manager_attestation=args.manager_attestation,
+                           manager_attestation_sha256=args.manager_attestation_sha256,
                            commit_message=args.commit_message)
         else:
             from rs9.collect_candidate import collect

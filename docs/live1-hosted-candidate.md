@@ -1,10 +1,64 @@
 # LIVE1 hosted candidate source
 
-Status: **CONT6R2 terminal source amendment; dispatcher finalization pending; production disabled**.
+Status: **CONT8R2 scoped source candidate; hosted run 7 and full LIVE1 qualification pending; publication disabled**.
 
-Current proposal disposition: **amend**, bound SHA `c40cdf9a43c0954d7d180481f444e724394b8c6b696af525260a6afac944009f` (17,281 bytes). The original eight-work scope is preserved separately from the proposal and advisory findings in [CONT6R2 verification](../evidence/live1/cont6r2-verification.json). The reviewed CONT6/CONT6R1 candidate is preserved cumulatively. There were no observed stage deltas at entry. The dispatcher owns reviewer selection, final review and Git publication.
+Proposal disposition: **amend**, exact 20,117-byte proposal SHA-256
+`db82e032c8c6779e10fcd1cdfeb567c88c752401ad231e688d62215a69b0439a`.
+The [scoped evidence](../evidence/live1/cont8r2-scoped-qualification-verification.json)
+keeps original scope, proposal bytes, plan-review findings and observed stage
+deltas separate. The eight kit records were read; PRoot recipe bytes match the
+supplied hash and Git blob. CONT8R1's full 35-path terminal work and twelve
+closeout corrections remain inherited input, with no independent terminal
+rereview claimed. This candidate is submitted for the dispatcher's cumulative
+pre-final checkpoint against the public parent.
 
-The dispatcher pre-final review returned advisory findings. Terminal disposition amends the bound candidate under the closeout stage envelope; no additional reviewer is invoked. The verification evidence records each finding's disposition, fresh source checks and externally pending qualification. Attended adoption remains subject to manager acceptance of the exact terminal tree and manifest.
+Partial diagnostic source readiness is separate from full qualification.
+The manifest/operator record known unresolved Linux Nix A lanes and always
+retain production/publication authority false. The source readiness Boolean
+requires source checks, exact review and manager disposition; A's unresolved
+runtime does not hold B–E native package evidence behind it. Failure of any
+original required lane still makes the full verdict not-qualified.
+
+RPM queries use isolated fixture trust and reject stderr even at exit zero;
+bounded RPM 6 signed-query probes precede strict post-sign readback. Payload
+SHA256/algorithm 8 is distinct from whole-file custody. Uniform single-thread
+xz Debian packaging and its bounded parser remain preserved. Inventory frames
+retain byte-lossless names, integrity and capacity bounds with stage diagnostics;
+exclusions must preserve newline and raw-byte identity. Homebrew exact
+source-authenticated identity, formula/tap custody and transport-only unknown
+states remain inherited source contracts. None establish native run-7 success.
+
+The [Linux runtime ADR](adr/0008-nix-linux-runtime-without-user-namespaces.md)
+records the authorized pinned PRoot candidate dependency, its license and
+execution hypothesis. Only `experiments.<linux>.theme-forge-nebular-fusion-proot`
+selects it. Original candidates/checks, Darwin, wheels and rendered recipe remain
+preserved. Experimental receipts are separate from required production
+qualification gates, and `published_linux_nix_ready=false` remains explicit.
+Actual executable-self/SEA, child ABI, closure/data/helper, released verifier,
+unchanged smoke, signals/orphans, offline and enabled WebKit sandbox evidence
+must precede any application-qualified claim. Unproved classes remain fail or
+not-run. PRoot does not grant permission to disable WebKit sandboxing.
+
+The [attended run-7 operator](../operators/live1/run-hosted7.py) is source only.
+After exact manager acceptance it commits the full reviewed path set, makes one
+normal push and collects one new push/attempt-1 run. It preserves independent
+B–E diagnostics before qualification errors and records experiment failures.
+No provider-local Git publication or hosted execution was performed.
+
+The inventory transport is V2: successful records require closed counters and
+maxima, and failures retain bounded work counters and numeric capacity observations.
+The exact inherited regex exclusions remain in effect; excluded regular files are
+not hashed, but cache subtrees are still traversed because embedded newline names
+prevent a proof of prefix equivalence. Limits are unchanged.
+
+The PRoot adapter uses separate pinned library directories and collision-rejecting
+executable assembly. Every declared library output is a guest closure root; live
+maps must resolve only to that enumerated closure or the preserved release/workspace.
+Output overflow is a failed probe, and timed probes terminate their process groups.
+Executable-self observations of released ELFs use a sibling guest process; they do
+not prove the application's internal self lookup. Application qualification remains
+false even for a diagnostic-pass receipt. Real closure measurements, executable-self
+compatibility and WebKit sandbox behavior remain native evidence obligations.
 
 Historical CONT6R1 proposal disposition: **amend**, bound SHA `d0c1c052a45a503cb6b1dcdf1a41958cee476512c8c5b58e056b07bb9258ee74` (29,042 bytes). Its recovery scope and findings remain in [recovery verification evidence](../evidence/live1/hosted4-matrix-recovery-verification.json).
 
@@ -144,10 +198,23 @@ Pages uses only apt/, rpm/, pacman/, keys/, docs/ and CNAME, with CNAME exactly 
 
 Assembled Pages client tests cover amd64/x86_64 APT, DNF and pacman, including package, index, signature and wrong-key rejection. The arm64 APT and aarch64 RPM family lanes qualify their own repositories; installation from the final assembled arm64 Pages repositories remains deferred. No assembled arm64 client result is claimed.
 
-## Attended hosted-run-5 handoff
+## Attended hosted-run-7 handoff
 
-After independent exact final-review acceptance and manager adoption authorization, use [the runbook](../operators/live1/RUNBOOK.md) and [the attended operator](../operators/live1/run-hosted5.py). It requires public parent `e2c6cb5fcc55462e2e28e889a6c9f3ed60c9d131`, the accepted terminal tree and candidate manifest SHA. It stages reviewed product inventory only, commits normally and fast-forward pushes. It waits for one new main push run matching that new commit and its push boundary, with a recorded maximum 60-second clock-skew tolerance; reruns and dispatch events are rejected.
+Use the [runbook](../operators/live1/RUNBOOK.md) and
+[operator](../operators/live1/run-hosted7.py) only after exact independent review
+and manager adoption authorization. Bind the accepted public parent, full
+cumulative terminal tree and manifest digest through the runbook's external
+manager attestation and its separately supplied digest. Keep both source
+readiness Booleans false; acceptance does not require a source-byte transition.
+The manager must disposition the listed terminal amendments, which have scoped
+verification and no subsequent independent review. Historical operators are audit records.
+Collect all terminal jobs and artifacts once, retaining the full not-qualified
+verdict when required Linux Nix A fails.
 
-The collector retains every job/step and attempts every artifact even if one fails. ZIP downloads stream to bounded files (2 GiB per artifact, 8 GiB total), verify API digests, and extract without traversal, links or overwrite. Every candidate custody set is rehashed; the packet records artifact digests and manifest hashes, while extracted summaries stay in the external packet directory. Missing artifacts and failed gates remain qualification failures. No automatic rerun, deployment, production signing, upload, npm/Homebrew mutation or production receipt occurs.
-
-The operator validates the fresh packet directory before creating its exclusive log, captures child stdout/stderr to that file, and prints only `LOG=`, `RC=` and `MANAGER_PACKET=`. Early failures and collisions report `MANAGER_PACKET=unavailable`; only a physical packet produced by the child operation is advertised. It stops for manager disposition. The dispatcher stage envelope authorizes this verified terminal amendment without another independent review; manager acceptance of its exact bytes precedes attended adoption.
+Artifact downloads remain bounded at 2 GiB each and 8 GiB total, API-digest
+verified, safely extracted and rehashed. Partial diagnostics survive another
+artifact's custody failure. Declared experiments are verified when present and
+optional only for skipped jobs. The combined exclusive log stays outside source;
+terminal output is only `LOG=`, `RC=` and `MANAGER_PACKET=`. No automatic rerun,
+dispatch, publication, deployment, production signing or destination mutation
+is performed, and no production receipt is issued.

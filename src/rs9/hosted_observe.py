@@ -16,7 +16,7 @@ from rs9.readers import read_pypi_project, read_npm, read_homebrew, read_pages
 from rs9.records import record_sha256, build_semantic_content_identity
 from rs9.scratch import canonical
 from rs9.product_classes import get_product_class, NATIVE_DESKTOP
-from rs9.security import scan_for_credentials
+from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
 from rs9.spdx import validate_spdx_expression
 
 
@@ -33,9 +33,113 @@ def select_brew_payload(capture):
     return select_payload(capture, "aarch64-darwin", allow_any=True)
 
 
-def homebrew_generation_facts(capture, intent, profile):
+def select_npm_payload(capture, expected_commands):
+    """Select authenticated npm payload by npm-package-bin/root package/platform any/source-authenticated command mapping."""
+    payloads = capture.record.get("payloads")
+    if not isinstance(payloads, list) or not payloads:
+        raise ValueError
+    matching = []
+    for p in payloads:
+        if not isinstance(p, dict):
+            continue
+        if p.get("command_policy") != "npm-package-bin":
+            continue
+        if p.get("root") != "package":
+            continue
+        platforms = p.get("platforms")
+        if platforms != ["any"]:
+            continue
+        p_commands = p.get("commands")
+        if not isinstance(p_commands, dict):
+            raise ContractError("OBSERVATION_IDENTITY", "Authenticated npm commands are missing or malformed")
+        p_cmd_map = {}
+        for cmd, row in p_commands.items():
+            if (not isinstance(cmd, str) or not isinstance(row, dict)
+                    or not isinstance(row.get("path"), str) or not row["path"].startswith("package/")):
+                raise ContractError("OBSERVATION_IDENTITY", "Authenticated npm command path is malformed")
+            target = row["path"].removeprefix("package/")
+            validate_safe_relative_posix_path(target)
+            p_cmd_map[cmd] = target
+        if p_cmd_map != expected_commands:
+            raise ContractError("OBSERVATION_IDENTITY", "Authenticated npm commands conflict with source")
+        matching.append(p)
+    if len(matching) > 1:
+        raise ContractError("OBSERVATION_IDENTITY", "Ambiguous matching npm payload rows")
+    if len(matching) == 1:
+        return matching[0]
+    return None
+
+
+def authenticated_npm_projection(capture, intent, profile):
+    """Share one byte-bound projection between npm and Homebrew readback."""
+    from rs9.profiles import _npm_tarball_url
+    from rs9.readers import _normalized_npm_bin
+    project, version = intent["project"]["id"], intent["version"]
+    details = {"product": project, "destination": "npm", "substage": "npm-projection"}
+    try:
+        metadata_path = (capture.root / "npm/metadata.json") if hasattr(capture, "root") and capture.root else None
+        archive_path = (capture.root / "npm/package.tgz") if hasattr(capture, "root") and capture.root else None
+        if get_product_class(project) == NATIVE_DESKTOP:
+            # Preserve the accepted desktop supplemental-npm readback policy.
+            if metadata_path is None or not metadata_path.is_file():
+                return None
+            package = json.loads(capture.source["package.json"])
+            npm = json.loads(metadata_path.read_bytes())
+            body = archive_path.read_bytes()
+            url = npm["dist"]["tarball"]
+            commands = npm.get("bin", package.get("bin", {}))
+            license_expression = npm.get("license")
+            name = package["name"]
+            asset_name = url.rsplit("/", 1)[-1]
+        else:
+            package = json.loads(capture.source["package.json"])
+            if (not isinstance(package, dict) or not isinstance(package.get("name"), str)
+                    or not isinstance(package.get("license"), str)):
+                raise ValueError
+            name = package["name"]
+            if not name.startswith("@") or name.rsplit("/", 1)[-1] != project or package.get("version") != version:
+                raise ValueError
+            url = _npm_tarball_url(name, version)
+            source_rows = [row for row in capture.record["source_files"] if row.get("path") == "package.json"]
+            if len(source_rows) != 1 or hashlib.sha256(capture.source["package.json"]).hexdigest() != source_rows[0]["sha256"]:
+                raise ValueError
+            commands = _normalized_npm_bin(name, package.get("bin"))
+            intended = [row["name"] for row in intent["commands"]]
+            if not commands or len(set(intended)) != len(intended) or set(commands) != set(intended):
+                raise ValueError
+            payload = select_npm_payload(capture, commands)
+            if payload is None:
+                return None
+            if payload.get("id") not in capture.archives:
+                raise ValueError
+            body = capture.archives[payload["id"]].read_bytes()
+            if len(body) != payload["size"] or hashlib.sha256(body).hexdigest() != payload["sha256"]:
+                raise ValueError
+            license_expression = package["license"]
+            asset_name = url.rsplit("/", 1)[-1]
+            # Supplemental files are optional and can only corroborate these facts.
+            if (metadata_path and metadata_path.exists()) or (archive_path and archive_path.exists()):
+                npm = json.loads(metadata_path.read_bytes())
+                if (npm.get("name") != name or npm.get("version") != version
+                        or npm.get("dist", {}).get("tarball") != url
+                        or npm.get("license") != license_expression
+                        or _normalized_npm_bin(name, npm.get("bin")) != commands
+                        or archive_path.read_bytes() != body):
+                    raise ValueError
+        body_sha = hashlib.sha256(body).hexdigest()
+        integrity = "sha512-" + base64.b64encode(hashlib.sha512(body).digest()).decode()
+        return {"package_name": name, "version": version, "asset_name": asset_name,
+                "url": url, "body": body, "sha256": body_sha, "integrity": integrity,
+                "commands": commands, "expected_license": license_expression}
+    except ContractError as error:
+        raise error.with_details(**details) from None
+    except (AttributeError, KeyError, OSError, TypeError, ValueError):
+        raise ContractError("OBSERVATION_IDENTITY", "Authenticated npm projection identity differs or is unavailable",
+                            details=details) from None
+
+
+def homebrew_generation_facts(capture, intent, profile, *, npm_projection=None, npm_state=None):
     """Projection facts come from authenticated native payload or npm closure."""
-    payload = select_brew_payload(capture)
     product = intent["project"]["id"]
 
     license_expression = intent.get("license", {}).get("expression")
@@ -59,18 +163,39 @@ def homebrew_generation_facts(capture, intent, profile):
                     raise ContractError("LICENSE_AUTHORITY", "Tagged repository licensing conflicts with candidate metadata")
 
     if get_product_class(product) == NATIVE_DESKTOP:
+        payload = select_brew_payload(capture)
         commands = {row["name"]: "released-launcher" for row in intent["commands"]}
         return {"url": f"https://github.com/{capture.record['repository']['full_name']}/releases/download/{capture.record['release']['tag']}/{payload['name']}",
                 "sha256": payload["sha256"], "license": license_expression,
                 "commands": commands,
                 "restrictions": "aarch64-darwin"}
-    metadata_path = capture.root / "npm/metadata.json"
-    pkg_path = capture.root / "npm/package.tgz"
-    if not metadata_path.is_file() or not pkg_path.is_file():
-        raise ContractError("OBSERVATION_IDENTITY", "Authenticated npm projection facts required")
-    metadata = json.loads(metadata_path.read_bytes())
-    return {"url": metadata["dist"]["tarball"], "sha256": hashlib.sha256(pkg_path.read_bytes()).hexdigest(),
-            "license": license_expression, "commands": metadata["bin"], "restrictions": "node"}
+
+    if npm_state != "exact" or not isinstance(npm_projection, dict):
+        raise ContractError("OBSERVATION_IDENTITY", "Exact npm corroboration and shared projection facts required")
+    from rs9.profiles import _npm_tarball_url
+    try:
+        name = npm_projection["package_name"]
+        payload = select_npm_payload(capture, npm_projection["commands"])
+        if payload is None:
+            raise ValueError
+        expected_commands = {name: (row["path"] if isinstance(row, dict) and "path" in row else str(row)).removeprefix("package/")
+                             for name, row in payload["commands"].items()}
+        if (name != json.loads(capture.source["package.json"])["name"]
+                or not name.startswith("@") or name.rsplit("/", 1)[-1] != product
+                or npm_projection["version"] != intent["version"]
+                or npm_projection["url"] != _npm_tarball_url(name, intent["version"])
+                or npm_projection["sha256"] != payload["sha256"]
+                or hashlib.sha256(npm_projection["body"]).hexdigest() != payload["sha256"]
+                or npm_projection["commands"] != expected_commands
+                or set(expected_commands) != {row["name"] for row in intent["commands"]}):
+            raise ValueError
+    except (AttributeError, KeyError, TypeError, ValueError):
+        raise ContractError("OBSERVATION_IDENTITY", "Shared npm projection differs from authenticated CLI facts") from None
+    if (license_expression != "AGPL-3.0-or-later"
+            or npm_projection["expected_license"] != license_expression):
+        raise ContractError("LICENSE_AUTHORITY", "Authenticated CLI license authority differs from npm projection")
+    return {"url": npm_projection["url"], "sha256": npm_projection["sha256"],
+            "license": license_expression, "commands": npm_projection["commands"], "restrictions": "node"}
 
 
 def reference_identity(capture, intent, adapter):
@@ -96,7 +221,7 @@ def reference_noop(capture, intent, profile, identity, observation, artifacts):
     return {"planner_outcome": proposal["outcome"], "plan_sha256": record_sha256(proposal)}
 
 
-def tap_snapshot(client, tap):
+def tap_snapshot(client, tap, *, evidence_sink=None):
     """Bind the maintained formulas to one observed default-branch commit tree."""
     repository = client.json("https://api.github.com/repos/" + tap, request_class="github-api")
     branch = repository.get("default_branch") if isinstance(repository, dict) else None
@@ -124,6 +249,8 @@ def tap_snapshot(client, tap):
         blobs[path] = sha
     if set(blobs) != required:
         raise ContractError("HOMEBREW_FORMULA_SCHEMA", "Maintained formula inventory drift")
+    if evidence_sink is not None:
+        evidence_sink.update(commit_sha=ref, tree_sha=tree_sha)
     return branch, ref, blobs
 
 
@@ -137,8 +264,9 @@ def execute(context):
     default_branch = None
     formula_blobs = {}
     tap_state = "unknown"
+    tap_evidence = {}
     try:
-        default_branch, ref, formula_blobs = tap_snapshot(client, tap)
+        default_branch, ref, formula_blobs = tap_snapshot(client, tap, evidence_sink=tap_evidence)
         tap_state = "bound"
     except (ContractError, OSError, KeyError, ValueError, TypeError, http.client.HTTPException, URLError, HTTPError) as error:
         tap_state = "conflict" if isinstance(error, ContractError) and error.code == "HOMEBREW_FORMULA_SCHEMA" else "unknown"
@@ -146,15 +274,21 @@ def execute(context):
     diagnostics = []
     diagnostic_dir = context["scratch"] / "diagnostics"
     diagnostic_dir.mkdir(exist_ok=True)
+
+    def record_diagnostic(project, destination, substage, code):
+        detail = safe_details({"product": project, "destination": destination, "substage": substage, "code": code})
+        diagnostics.append(detail)
+        (diagnostic_dir / "observe-destinations.json").write_bytes(canonical(diagnostics))
+
     def read_destination(project, destination, reader, *args, **kwargs):
         try:
             observation = reader(*args, **kwargs)
         except ContractError as error:
-            detail = safe_details({"product": project, "destination": destination, "substage": "destination-read", **error.details})
-            diagnostics.append({**detail, "code": error.code})
+            detail = safe_details({"product": project, "destination": destination, "substage": "destination-read", "code": error.code, **error.details})
+            diagnostics.append(detail)
             (diagnostic_dir / "observe-destinations.json").write_bytes(canonical(diagnostics))
             raise error.with_details(**detail) from None
-        diagnostics.append({"product": project, "destination": destination, "state": observation["state"],
+        diagnostics.append({"product": project, "destination": destination, "substage": "destination-read", "code": observation["state"], "state": observation["state"],
                             "diagnostic_sha256": hashlib.sha256(canonical(observation.get("diagnostics", []))).hexdigest()})
         (diagnostic_dir / "observe-destinations.json").write_bytes(canonical(diagnostics))
         return observation
@@ -174,84 +308,68 @@ def execute(context):
             raise ContractError("OBSERVATION_RECORD", "Authenticated release identity differs from the intended version",
                                 details={"substage": "record-validation"})
         observations.append({"project": project, "adapter": "pypi", "observation": read_destination(project, "pypi", read_pypi_project, project, version)})
+
         try:
-            package = json.loads(capture.source["package.json"])
-            if (not isinstance(package, dict) or not isinstance(package.get("name"), str)
-                    or not isinstance(package.get("license"), str)):
-                raise ValueError
-        except (KeyError, TypeError, ValueError):
-            raise ContractError("OBSERVATION_IDENTITY", "Authenticated npm package identity and license required",
-                details={"product": project, "destination": "npm", "substage": "package-identity"}) from None
-        body = None
-        if (capture.root / "npm/metadata.json").is_file():
-            npm = json.loads((capture.root / "npm/metadata.json").read_bytes())
-            body = (capture.root / "npm/package.tgz").read_bytes()
-            asset_name = npm["dist"]["tarball"].rsplit("/", 1)[-1]
-            url = npm["dist"]["tarball"]
-            bins = npm.get("bin", package.get("bin", {}))
-            expected_license = npm.get("license")
-        else:
-            payloads = capture.record.get("payloads")
-            if not payloads or not isinstance(payloads, list):
-                raise ContractError("OBSERVATION_RECORD", "Release record requires non-empty payloads", details={"substage": "payload-validation"})
-            if len(payloads) == 1:
-                payload = payloads[0]
-                if not isinstance(payload, dict) or payload.get("id") not in capture.archives:
-                    raise ContractError("OBSERVATION_ARCHIVE", "Payload archive missing", details={"substage": "archive-validation"})
-                body = capture.archives[payload["id"]].read_bytes()
-                asset_name = project + "-" + version + ".tgz"
-                bins = package.get("bin", {})
-                expected_license = package.get("license")
-        if body is None:
+            projection = authenticated_npm_projection(capture, intent, profile)
+        except ContractError as error:
+            record_diagnostic(project, "npm", "npm-projection", error.code)
+            raise
+        if projection is None:
+            record_diagnostic(project, "npm", "npm-projection", "npm-identity-unavailable")
             npm_observation = {"state": "unknown", "reason": "npm-identity-unavailable"}
         else:
-            body_sha = hashlib.sha256(body).hexdigest()
             npm_identity = reference_identity(capture, intent, "npm")
             identity = record_sha256(npm_identity)
-            subject = {"package": package["name"], "version": version, "revision": None}
+            subject = {"package": projection["package_name"], "version": version, "revision": None}
             npm_observation = read_destination(project, "npm", read_npm,
                 {"id": "npm", "adapter": "npm", "mode": "direct"}, subject,
-                desired_identity=identity, expected_hashes={asset_name: body_sha}, expected_commands=bins,
-                expected_integrity="sha512-" + base64.b64encode(hashlib.sha512(body).digest()).decode(),
-                expected_license=expected_license)
+                desired_identity=identity, expected_hashes={projection["asset_name"]: projection["sha256"]},
+                expected_commands=projection["commands"],
+                expected_integrity=projection["integrity"],
+                expected_license=projection["expected_license"])
         npm_entry = {"project": project, "adapter": "npm", "mode": "observe-only",
                      "observation": npm_observation}
         if npm_observation.get("state") == "exact":
             npm_entry.update(reference_noop(capture, intent, profile, npm_identity, npm_observation,
-                             [{"path": asset_name, "sha256": body_sha, "size": len(body)}]))
+                             [{"path": projection["asset_name"], "sha256": projection["sha256"], "size": len(projection["body"])}]))
         observations.append(npm_entry)
 
-        if tap_state == "bound" and "Formula/" + project + ".rb" in formula_blobs:
+        formula_path = f"Formula/{project}.rb"
+        expected_blob = formula_blobs.get(formula_path)
+        native = get_product_class(project) == NATIVE_DESKTOP
+        if tap_state != "bound" or expected_blob is None:
+            observation = {"state": tap_state if tap_state in {"unknown", "conflict"} else "conflict",
+                           "reason": "tap-snapshot-unavailable-or-drifted"}
+        elif not native and npm_observation.get("state") != "exact":
+            state = "unknown" if npm_observation.get("state") == "unknown" else "conflict"
+            reason = "npm-readback-" + state
+            record_diagnostic(project, "homebrew", "npm-prerequisite", reason)
+            observation = {"state": state, "reason": reason}
+        else:
             try:
-                brew_facts = homebrew_generation_facts(capture, intent, profile)
-            except ContractError as error:
+                brew_facts = homebrew_generation_facts(capture, intent, profile,
+                    npm_projection=projection, npm_state=npm_observation.get("state"))
+            except (ContractError, AttributeError, KeyError, OSError, TypeError, ValueError) as error:
+                if not isinstance(error, ContractError):
+                    error = ContractError("OBSERVATION_IDENTITY", "Homebrew projection facts are malformed or unavailable")
+                record_diagnostic(project, "homebrew", "homebrew-generation-facts", error.code)
+                detail = {"product": project, "destination": "homebrew", "substage": "homebrew-generation-facts", "code": error.code}
                 if error.code != "MISSING_ASSET":
-                    raise
+                    raise error.with_details(**detail) from None
                 observation = {"state": "conflict", "reason": "payload-unavailable"}
             else:
-                formula_path = f"Formula/{project}.rb"
-                expected_blob = formula_blobs.get(formula_path)
                 brew_identity = reference_identity(capture, intent, "homebrew")
                 brew_artifact = {}
-
-                observation = read_destination(
-                    project, "homebrew", read_homebrew,
+                observation = read_destination(project, "homebrew", read_homebrew,
                     {"id": "homebrew", "adapter": "homebrew", "mode": "projection"},
-                    {"package": project, "version": version, "revision": None},
-                    pinned_ref=ref,
+                    {"package": project, "version": version, "revision": None}, pinned_ref=ref,
                     desired_identity=record_sha256(brew_identity),
-                    expected_payload_url=brew_facts["url"],
-                    expected_payload_sha256=brew_facts["sha256"],
-                    expected_license=brew_facts["license"],
-                    expected_commands=brew_facts["commands"],
-                    expected_restrictions=brew_facts["restrictions"],
-                    expected_blob_sha=expected_blob,
-                    evidence_sink=brew_artifact,
-                )
-        else:
-            observation = {"state": tap_state if tap_state in {"unknown", "conflict"} else "conflict", "reason": "tap-snapshot-unavailable-or-drifted"}
+                    expected_payload_url=brew_facts["url"], expected_payload_sha256=brew_facts["sha256"],
+                    expected_license=brew_facts["license"], expected_commands=brew_facts["commands"],
+                    expected_restrictions=brew_facts["restrictions"], expected_blob_sha=expected_blob,
+                    evidence_sink=brew_artifact)
         brew_entry = {"project": project, "adapter": "homebrew", "mode": "observe-only",
-                      "pinned_ref": ref, "observation": observation}
+                      "pinned_ref": ref, "formula_blob_sha": expected_blob, "observation": observation}
         if observation.get("state") == "exact":
             brew_entry.update(reference_noop(capture, intent, profile, brew_identity, observation, [brew_artifact]))
         observations.append(brew_entry)
@@ -260,7 +378,7 @@ def execute(context):
     observations.append({"project": "generation", "adapter": "pages", "deployment_performed": False,
                          "observation": pages})
     doc = {"schema": "rs9.hosted-destination-observations.v1alpha1", "production_enabled": False,
-           "observations": observations, "publication_receipts": []}
+           "observations": observations, "homebrew_tap": tap_evidence, "publication_receipts": []}
     path = context["scratch"] / "destination-observations.json"
     path.write_bytes(canonical(doc))
     known = all(readback_satisfied(r) for r in observations)
@@ -272,4 +390,4 @@ def execute(context):
             "artifacts": [path], "details": {"observations_sha256": record_sha256(doc),
             "production_receipt_count": 0, "states": [r["observation"]["state"] for r in observations],
             "planner_noops": exact_planner_noops, "tap_default_branch": default_branch,
-            "tap_commit_sha": ref, "bound_formula_blobs": formula_blobs}}
+            "tap_commit_sha": ref, "tap_tree_sha": tap_evidence.get("tree_sha"), "bound_formula_blobs": formula_blobs}}

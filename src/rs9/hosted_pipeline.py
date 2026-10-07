@@ -69,16 +69,27 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
     repository, scratch = physical_directory(repository), physical_directory(scratch)
     if any(scratch.iterdir()):
         raise ContractError("OUTPUT_NOT_EMPTY", "Fresh hosted scratch required")
-    rows = [r for r in required(repository) if r["lane"] == lane and r["system"] == system]
+    c = contract(repository)
+    all_lanes = c.get("lanes", []) + c.get("experiments", [])
+    rows = [r for r in all_lanes if r["lane"] == lane and r["system"] == system]
     if len(rows) != 1:
         raise ContractError("HOSTED_LANE", "Lane absent or duplicated in source contract")
     row = rows[0]
     commit = os.environ.get("GITHUB_SHA", "0" * 40)
-    record = {"schema": "rs9.hosted-candidate-diagnostic.v1alpha2", "lane": lane, "system": system,
+    is_experiment = lane in c.get("experiment_jobs", []) or row.get("qualification_authority") is False
+    schema = "rs9.hosted-experiment-diagnostic.v1alpha1" if is_experiment else "rs9.hosted-candidate-diagnostic.v1alpha2"
+    record = {"schema": schema, "lane": lane, "system": system,
               "production_enabled": False, "publication_authority": False, "attended_gates_satisfied": False,
+              "qualification_authority": False if is_experiment else True,
+              "application_qualified": False if is_experiment else None,
               "trust_root": "hosted-candidate-unattested", "gates": [], "execution_error": None,
-              "policy_blockers": [], "production_promotion_blockers": [], "runner": runner_facts(),
+              "policy_blockers": [],
+              "production_promotion_blockers": ["experimental-proot-runtime-unqualified-for-production"] if is_experiment else [],
+              "runner": runner_facts(),
               "fixture": {"used": False, "production": False}}
+    if is_experiment:
+        record["experiment_jobs"] = list(c.get("experiment_jobs", ["nix-proot"]))
+        record["mandatory_gates_satisfied"] = False
     if lane == "wheels" and system.endswith("linux"):
         record["production_promotion_blockers"].append("linux-wheel-production-promotion-compatibility-unproven")
     files, ingestion = [], None
@@ -158,13 +169,35 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
         except Exception:
             record["command_report_error"] = "report-unavailable"
     record["provenance"] = provenance(repository, ingestion)
-    runtime_lane = lane in {"wheels", "nix", "pacman", "rpm", "deb", "pages"}
-    darwin = system.endswith("darwin")
-    mechanism = "none" if darwin or not runtime_lane else "netns+setpriv" if lane == "nix" else "netns+setpriv-and-docker-network-none" if lane == "wheels" else "docker-network-none"
-    record["network"] = {"preparation_network": "used-for-authentication-and-provisioning",
-        "runtime_mechanism": mechanism,
-        "runtime_offline_status": "pass" if runtime_lane and not darwin and not record["execution_error"] else "not-run",
-        "runtime_reason": "darwin-offline-isolation-unsupported" if darwin else "negative-connectivity-and-unprivileged-runtime-required" if runtime_lane else "no-application-runtime-in-lane"}
+    if is_experiment:
+        # Offline is proven only by the explicit in-guest denial result the gate itself carries;
+        # a synthesized or absent gate (for example after an earlier execution error) proves nothing.
+        offline_gate = next((g for g in record["gates"] if g.get("name") == "proot-in-guest-offline"), None)
+        reported = offline_gate.get("runtime_offline_status") if offline_gate else None
+        if reported == "pass" and offline_gate.get("status") == "pass":
+            offline_status = "pass"
+            offline_reason = "in-guest-offline-denial-observed"
+        elif reported == "fail" and offline_gate.get("status") == "fail":
+            offline_status = "fail"
+            offline_reason = offline_gate.get("reason", "in-guest-offline-check-failed")
+        else:
+            offline_status = "not-run"
+            offline_reason = (offline_gate.get("reason") if reported == "not-run" and offline_gate.get("reason")
+                              else "experimental-runtime-offline-unproven")
+        record["network"] = {
+            "preparation_network": "used-for-authentication-and-provisioning",
+            "runtime_mechanism": "netns+setpriv",
+            "runtime_offline_status": offline_status,
+            "runtime_reason": offline_reason,
+        }
+    else:
+        runtime_lane = lane in {"wheels", "nix", "pacman", "rpm", "deb", "pages"}
+        darwin = system.endswith("darwin")
+        mechanism = "none" if darwin or not runtime_lane else "netns+setpriv" if lane == "nix" else "netns+setpriv-and-docker-network-none" if lane == "wheels" else "docker-network-none"
+        record["network"] = {"preparation_network": "used-for-authentication-and-provisioning",
+            "runtime_mechanism": mechanism,
+            "runtime_offline_status": "pass" if runtime_lane and not darwin and not record["execution_error"] else "not-run",
+            "runtime_reason": "darwin-offline-isolation-unsupported" if darwin else "negative-connectivity-and-unprivileged-runtime-required" if runtime_lane else "no-application-runtime-in-lane"}
     fixture_identity = lane_scratch / "fixture-identity.json"
     if fixture_identity.is_file() and not fixture_identity.is_symlink():
         record["fixture"] = json.loads(fixture_identity.read_bytes())

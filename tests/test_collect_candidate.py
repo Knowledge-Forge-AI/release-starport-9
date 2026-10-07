@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
+from rs9.candidate_readiness import readiness_record
 from rs9.adopt_candidate import adopt, staging_paths, main as adopt_main
 from rs9.collect_candidate import (
     collect, gh_read, gh_stream_artifact, extract_safe_zip,
@@ -69,6 +70,18 @@ def make_summary_zip(verdict="qualified", blockers=None):
 
 
 class CollectionTests(unittest.TestCase):
+    def setUp(self):
+        # These transport tests use minimal ZIP fixtures. Source/provenance and
+        # partial diagnostic integration are exercised without mocks separately.
+        contract = {"lanes": [{"lane": "wheels", "system": "x86_64-linux", "module": "rs9.hosted_wheels",
+                               "artifact_name": "candidate-wheels", "required_gates": []}]}
+        for target, value in (("rs9.hosted_contract.load_hosted_lanes", contract),
+                              ("rs9.collect_candidate.diagnostic_scope", {"summary_binding": "missing",
+                               "required_lanes": [], "experiments": [], "full_live1_qualification": False,
+                               "partial_diagnostic_lanes_all_pass": False})):
+            patcher = patch(target, return_value=value)
+            patcher.start(); self.addCleanup(patcher.stop)
+
     def test_new_push_filter_and_all_jobs_steps_artifacts_are_collected(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp).resolve()
@@ -490,7 +503,7 @@ class CollectionTests(unittest.TestCase):
                 parent, tree, commit = "a" * 40, "b" * 40, "c" * 40
                 manifest = root / "operators/live1/candidate-manifest.json"
                 manifest.parent.mkdir(parents=True)
-                raw = json.dumps({"candidate_adoption_ready": True, "adoption_scope": "hosted-candidate-qualification-only",
+                raw = json.dumps({"candidate_adoption_ready": True, "adoption_scope": "partial-diagnostic", "readiness": readiness_record(), "publication_authority": False,
                                   "production_enabled": False, "files": [], "parent": parent, "changed_paths": ["reviewed.py"]}).encode()
                 manifest.write_bytes(raw)
                 calls = []; committed = False
@@ -510,6 +523,9 @@ class CollectionTests(unittest.TestCase):
                 packet = {"status": "not-qualified", "run_id": 999, "production_enabled": False,
                           "publication_authority": False, "validation": {"status": "fail"}}
                 with patch("rs9.adopt_candidate.run", side_effect=run), patch("rs9.adopt_candidate.verify_inventory", return_value=tree), \
+                     patch("rs9.hosted_contract.load_hosted_lanes", return_value={"lanes": [
+                         {"lane": "nix", "system": s, "module": "rs9.hosted_nix"}
+                         for s in ("x86_64-linux", "aarch64-linux")]}), \
                      patch("rs9.adopt_candidate.staging_paths", return_value=["reviewed.py"]), \
                      patch("rs9.collect_candidate.output_directory", return_value=out), \
                      patch("rs9.collect_candidate.collect", return_value=packet) as collect_v2, \

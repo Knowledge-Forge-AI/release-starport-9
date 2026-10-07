@@ -1,0 +1,320 @@
+{
+  "entry_observation": {
+    "branch": "main",
+    "dispatcher_observed_stage_deltas_before_work": [],
+    "head": "515d460919ff22e9c323672aa9e4160278c53d6b",
+    "head_tree": "2fdadd76db3ce6ff30ee0cb0e0f864e934c19500",
+    "local_origin_main_equal": true,
+    "preexisting_product_delta": [],
+    "remote_state_fetched": false,
+    "unrelated_operational_state": "preserved-serena"
+  },
+  "environment": {
+    "docker": {
+      "escalation_available": false,
+      "reason_token": "container-daemon-socket-permission-denied",
+      "resources_created": false,
+      "status": "unavailable"
+    },
+    "host": "darwin",
+    "nix": {
+      "basic_expression_eval": "pass",
+      "cache_exception": "A short-lived OS temporary directory was used for the task-owned Nix fetcher cache because shared persistent scratch is outside this session's writable roots; it was removed on completion.",
+      "darwin_drv_comparison": "not-run",
+      "linux_build_runtime": "not-run",
+      "pinned_input_eval": "unavailable",
+      "pinned_revision": "0921fdb3e13e40fe25fbc52b89661a9d6d32ac68",
+      "reason_token": "offline-pinned-input-unavailable",
+      "version": "2.31.5"
+    }
+  },
+  "handoff": {
+    "candidate_adoption_ready": false,
+    "next_boundary": "Manager disposition of unavailable mandatory environments; resume A\u2013D within original scope before full candidate acceptance.",
+    "run_7_operator": "withheld-incomplete-candidate"
+  },
+  "observed_work_deltas": [
+    "evidence/live1/hosted6-gates-repair-verification.json",
+    "operators/live1/RUNBOOK.md",
+    "operators/live1/candidate-manifest.json",
+    "src/rs9/hosted_observe.py",
+    "tests/test_candidate_inventory.py",
+    "tests/test_hosted_observe.py"
+  ],
+  "original_scope": {
+    "handoff_condition": "Only an accepted full cumulative candidate receives an attended one-new-run-7 adoption operator.",
+    "preserved_successes": [
+      "global-unit-config-authenticate-pins",
+      "three-wheel-lanes",
+      "darwin-nix",
+      "released-nebular-verifier",
+      "burst-released-loader"
+    ],
+    "qualification": "Full cumulative source checks plus real environment, package, repository, disconnected client and negative gates; final verification belongs to closeout.",
+    "required_reproductions_before_parser_changes": [
+      "source-pinned-fedora-43",
+      "source-pinned-ubuntu-26.04-dpkg-1.23.7",
+      "source-pinned-arch-baseline"
+    ],
+    "root_gates": [
+      "A-linux-nix-no-userns",
+      "B-rpm-identity",
+      "C-debian-control",
+      "D-client-inventory",
+      "E-homebrew-facts"
+    ]
+  },
+  "plan_review_findings": [
+    {
+      "action": "Nix data paths, modules, font configuration and library collision handling remain prerequisites to the replacement design; no speculative runtime shipped.",
+      "disposition": "accept",
+      "id": 1
+    },
+    {
+      "action": "Wrapper namespace proof cannot qualify WebKit descendants. Restricted-runner released verifier/application smoke and an explicit reviewed sandbox decision remain mandatory.",
+      "disposition": "accept",
+      "id": 2
+    },
+    {
+      "action": "No host executable inside a proot interpreter-binding runtime is a required invariant and falsifier; no such runtime was adopted without proof.",
+      "disposition": "accept",
+      "id": 3
+    },
+    {
+      "action": "Foundation3 linux.fhs-closure gate remains unchanged; a replacement must preserve its semantics or coherently rename planner and fixtures.",
+      "disposition": "accept",
+      "id": 4
+    },
+    {
+      "action": "RPM stderr acceptance policy must derive from the exact Fedora reproduction, not a fabricated warning allowlist.",
+      "disposition": "accept",
+      "id": 5
+    },
+    {
+      "action": "Container reproductions remain unmet. RPM, Debian and inventory parsers are unchanged until the required evidence is available.",
+      "disposition": "accept",
+      "id": 6
+    },
+    {
+      "action": "Inventory special-file comparison requires an explicit contract if implemented. Preserve Nebular npm supplemental behavior; retain tap formula blob identities even when npm prevents Homebrew corroboration.",
+      "disposition": "accept",
+      "id": 7
+    }
+  ],
+  "production_boundary": {
+    "external_reviewer_invoked": false,
+    "hosted_run_6_rerun": false,
+    "hosted_run_7_started": false,
+    "production_enabled": false,
+    "publication_authority": false,
+    "publication_receipts": [],
+    "pypi_pages_native_repositories_npm_homebrew_mutated": false,
+    "source_staged_committed_pushed": false,
+    "theme_forge_release_or_tag_mutated": false
+  },
+  "proposal_binding": {
+    "bytes": 20573,
+    "materialization_kind": "inline_stdout",
+    "profile": "opus-high-plan",
+    "provider": "claude",
+    "relative_path": "plan-material.md",
+    "schema": "agent-phase-plan-material-v1",
+    "sha256": "cc02ba523d5bbd9835203aa5e9270c8fa0a915bd5c274bfc25c690d25d10d8f6"
+  },
+  "proposal_disposition": {
+    "decision": "amend",
+    "entry_identity_policy": "Observe branch and local remote-tracking parity semantically. Entry revision identities are retained as evidence; no reconstructed current-state hash gate was added.",
+    "original_scope_complete": false,
+    "reason": "Preserve original scope and reproduce-before-parser-change. An unavailable reproduction is an unmet requirement needing manager disposition. The proot design also requires resolution of data/module paths, host-executable isolation and descendant sandbox behavior before implementation commitment."
+  },
+  "remaining_required_verification": [
+    "no-userns-linux-nix-design-and-implementation-without-release-byte-mutation",
+    "pinned-linux-x86_64-and-aarch64-eval-build-ldd-verifier-application-smoke",
+    "darwin-nix-derivation-comparison",
+    "exact-fedora-query-protocol-reproduction-and-rpm-identity-repair",
+    "rpm-dependency-rpmlint-repository-signing-disconnected-client-and-negatives",
+    "exact-ubuntu-dpkg-1.23.7-structural-reproduction-and-debian-repair",
+    "debian-shlibdeps-inventory-apt-by-hash-signing-disconnected-client-and-negatives",
+    "exact-arch-first-malformed-baseline-line-and-inventory-transport-repair",
+    "pacman-install-probe-remove-clean-native-loader-and-nebular-smoke",
+    "complete-package-custody-pages-client-and-foundation3-qualification",
+    "dispatcher-owned-independent-full-cumulative-pre-final-review-and-manager-disposition"
+  ],
+  "repairs": {
+    "A": {
+      "reason": "Pinned Linux evaluation/runtime evidence unavailable; reviewed proot design concerns remain unresolved.",
+      "source_changed": false,
+      "status": "open"
+    },
+    "B": {
+      "reason": "Required exact Fedora reproduction unavailable before parser change.",
+      "source_changed": false,
+      "status": "open"
+    },
+    "C": {
+      "reason": "Required exact Ubuntu structural reproduction unavailable before parser change.",
+      "source_changed": false,
+      "status": "open"
+    },
+    "D": {
+      "reason": "Required exact Arch first-malformed-line reproduction unavailable before transport change.",
+      "source_changed": false,
+      "status": "open"
+    },
+    "E": {
+      "authenticated_source_and_payload_hash_checks": true,
+      "canonical_scoped_url": true,
+      "cli_npm_exact_prerequisite": true,
+      "nebular_darwin_payload_preserved": true,
+      "real_reader_and_foundation_planner_regressions": "all-three-cli-and-nebular-homebrew-exact-noop-with-authenticated-synthetic-profiles",
+      "safe_fact_failure_diagnostics": true,
+      "shared_projection": true,
+      "source_changed": true,
+      "status": "source-repaired-regression-tested",
+      "tap_commit_tree_and_four_blob_binding": true,
+      "verification_scope": "Real readers and Foundation3 planner over authenticated synthetic captures; source checks pass; no live registry/tap qualification claimed."
+    }
+  },
+  "required_reproductions": {
+    "deb": {
+      "ar_structural_projection": null,
+      "dpkg_1_23_7_observed": false,
+      "environment": "source-pinned-ubuntu-26.04",
+      "invalid_deb_subreason": null,
+      "parser_changed": false,
+      "reason_token": "container-daemon-socket-permission-denied",
+      "status": "unmet"
+    },
+    "pacman": {
+      "environment": "source-pinned-arch",
+      "first_unparseable_baseline_line_projection": null,
+      "inventory_transport_changed": false,
+      "reason_token": "container-daemon-socket-permission-denied",
+      "status": "unmet"
+    },
+    "rpm": {
+      "candidate_rpm_sha256": null,
+      "environment": "source-pinned-fedora-43",
+      "parser_changed": false,
+      "query_exit_stdout_stderr": null,
+      "reason_token": "container-daemon-socket-permission-denied",
+      "status": "unmet",
+      "supported_tag_readback": null,
+      "tool_version": null
+    }
+  },
+  "schema": "rs9.hosted6-gates-repair-verification.v1alpha1",
+  "source_references_not_reproductions": [
+    {
+      "finding": "Upstream documentation names PAYLOADSHA256 and notes its older PAYLOADDIGEST name. This supports investigation only; exact Fedora query behavior remains unproved.",
+      "topic": "rpm-tag-hypothesis",
+      "url": "https://rpm-software-management.github.io/rpm/manual/signatures_digests.html"
+    },
+    {
+      "finding": "Upstream documents explicit compression selection and an xz default. It does not establish the source-pinned Ubuntu candidate member format or INVALID_DEB subreason.",
+      "topic": "dpkg-compression-hypothesis",
+      "url": "https://manpages.debian.org/unstable/dpkg/dpkg-deb.1.en.html"
+    },
+    {
+      "finding": "Upstream describes ptrace and bind translation. This does not prove the restricted hosted runner's Nebular or WebKit behavior.",
+      "topic": "proot-runtime-hypothesis",
+      "url": "https://proot-me.github.io/"
+    }
+  ],
+  "status": "bounded-pre-final-incomplete-candidate",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT8-HOSTED6-GATES-REPAIR1",
+  "terminal_disposition": "incomplete-original-scope; retain bounded Homebrew repair; no source adoption or hosted run 7",
+  "verification": {
+    "credential_private_path_scan": {
+      "files": 325,
+      "status": "pass"
+    },
+    "diff_check": "pass",
+    "exact_inventory": {
+      "changed_paths_exact": true,
+      "method": "verify_inventory-with-explicit-parent-and-read-only-tree-calculation",
+      "product_files_excluding_manifest": 324,
+      "status": "pass"
+    },
+    "final_metadata_checks": {
+      "checks": [
+        "candidate-inventory",
+        "hygiene",
+        "workflow-static",
+        "python-parse-compile",
+        "markdown-relative-links",
+        "git-diff-check"
+      ],
+      "status": "pass",
+      "tests": 23
+    },
+    "full_unittest_discovery": {
+      "command": "PYTHONPATH=src python3 -W error::ResourceWarning -m unittest discover -s tests",
+      "failures": 0,
+      "passed": 984,
+      "scope": "darwin-source-suite; does not substitute for required native environment qualification",
+      "skipped": 12,
+      "status": "pass",
+      "stderr_sha256": "ce5fab8a8e7d4f4e7a2fdc91cd6920ee8d47480b0d0377f5614c1988f3fb1627",
+      "stdout_sha256": "4f682fa4d9d002257d366cca93e4a28fa1e0d364ef573d91f0c8311b7c90fac9",
+      "tests": 996
+    },
+    "iteration_notes": [
+      "Two focused invocations named absent test modules; corrected to maintained candidate-reader suites. No product regression was suppressed.",
+      "A new adverse regression first failed because the worker projection accepted changed payload bytes; the parent added source/payload binding and validated projection facts."
+    ],
+    "markdown_relative_links": {
+      "links_checked": 249,
+      "status": "pass"
+    },
+    "observe_related_regressions": {
+      "resource_warning_errors": true,
+      "skipped": 0,
+      "status": "pass",
+      "stderr_sha256": "1633a8c8f45e47327de50a7b212d2d401477766e2699c039021a2c083b3213cb",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests": 86
+    },
+    "preserved_bytes": {
+      "paths_checked": 14,
+      "pins_wheels_linux_nix_darwin_nix_rpm_debian_inventory_smoke_workflow_unchanged": true,
+      "serena_unchanged": true,
+      "status": "pass"
+    },
+    "preserved_source_regressions": {
+      "resource_warning_errors": true,
+      "skipped": 2,
+      "status": "pass",
+      "stderr_sha256": "3c431c8b6685bbff4ed3540aa06147e4aebff54598e76a0616ff8bad97944277",
+      "stdout_sha256": "fa9dd0d7b42dd1fae406fcfc9caef126bea40213607d06375389fb26059bea55",
+      "tests": 198
+    },
+    "python_parse_compile": {
+      "bytecode_written": false,
+      "files": 177,
+      "method": "ast-parse-and-in-memory-compile",
+      "status": "pass"
+    },
+    "real_native_qualification": "unmet",
+    "workflow_static_contract": {
+      "method": "maintained-test-workflow-static-in-full-discovery",
+      "status": "pass",
+      "workflow_bytes_unchanged": true
+    }
+  },
+  "workers": {
+    "cleanup_proven": true,
+    "disposition": "drained",
+    "gemini": "used",
+    "internal_output_is_dispatcher_checkpoint": false,
+    "jobs": [
+      "repair-E-homebrew",
+      "repair-A-design"
+    ],
+    "outcomes": {
+      "repair-A-design": "accepted-as-read-only-design-concerns-only",
+      "repair-E-homebrew": "partial-worker-result-adopted; parent-corrections-verified-separately"
+    },
+    "reviewers_invoked": false
+  }
+}

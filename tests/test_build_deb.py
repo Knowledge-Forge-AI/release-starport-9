@@ -23,6 +23,7 @@ from rs9.build_deb import (
     collect_elf_inventory,
     derive_native_dependencies,
     main as deb_main,
+    validate_deb_ar_shape,
 )
 from tests.elf_builder import build_elf
 from rs9.build_native import (
@@ -63,18 +64,18 @@ def make_minimal_deb(
         f"Description: {description}\n"
     ).encode("utf-8")
 
-    # control.tar.gz
+    # control.tar.xz
     ctrl_buf = io.BytesIO()
-    with tarfile.open(fileobj=ctrl_buf, mode="w:gz") as tar:
+    with tarfile.open(fileobj=ctrl_buf, mode="w:xz") as tar:
         ti = tarfile.TarInfo("./control")
         ti.size = len(control_content)
         ti.mode = 0o644
         tar.addfile(ti, io.BytesIO(control_content))
     ctrl_data = ctrl_buf.getvalue()
 
-    # data.tar.gz
+    # data.tar.xz
     data_buf = io.BytesIO()
-    with tarfile.open(fileobj=data_buf, mode="w:gz") as tar:
+    with tarfile.open(fileobj=data_buf, mode="w:xz") as tar:
         ti = tarfile.TarInfo(f"./usr/lib/{package}/NOTICE")
         payload = b"Theme Forge Notice\n"
         ti.size = len(payload)
@@ -93,8 +94,8 @@ def make_minimal_deb(
     return (
         b"!<arch>\n"
         + ar_entry("debian-binary", bin_data)
-        + ar_entry("control.tar.gz", ctrl_data)
-        + ar_entry("data.tar.gz", data_bytes)
+        + ar_entry("control.tar.xz", ctrl_data)
+        + ar_entry("data.tar.xz", data_bytes)
     )
 
 
@@ -236,7 +237,7 @@ class BuildDebTests(unittest.TestCase):
         maintainer = "Theme Forge Lead <maintainer@example.com>"
 
         def dpkg_deb_handler(argv, cwd=None, env=None):
-            out_deb = Path(argv[4])
+            out_deb = Path(argv[-1])
             deb_bytes = make_minimal_deb(
                 "theme-forge-stellar-loom",
                 "0.4.0",
@@ -440,7 +441,8 @@ class BuildDebTests(unittest.TestCase):
 
         def dpkg_deb_handler(argv, cwd=None, env=None):
             seen["env"] = env
-            Path(argv[4]).write_bytes(make_minimal_deb(
+            seen["argv"] = argv
+            Path(argv[-1]).write_bytes(make_minimal_deb(
                 "theme-forge-stellar-loom", "0.4.0", 1, "all", maintainer, "Synthetic Loom summary", "nodejs (>= 22)"))
             return CommandReceipt(argv, 0, b"", b"")
 
@@ -449,12 +451,171 @@ class BuildDebTests(unittest.TestCase):
         result = build_deb_candidate(capture, intent, "all", scratch, maintainer=maintainer,
                                      offline_npm_archives=offline_npm, runner=runner)
         self.assertEqual(seen["env"], {"SOURCE_DATE_EPOCH": SOURCE_DATE_EPOCH})
+        expected_cmd = [
+            "dpkg-deb",
+            "--build",
+            "--root-owner-group",
+            "-Zxz",
+            "-z6",
+            "--uniform-compression",
+            "--threads-max=1",
+            str(scratch / "pkg/theme-forge-stellar-loom_0.4.0-1_all"),
+            str(scratch / "theme-forge-stellar-loom_0.4.0-1_all.deb"),
+        ]
+        self.assertEqual(seen["argv"], expected_cmd)
         self.assertEqual(result["manifest"]["elf_object_count"], 0)
         self.assertIsNone(result["manifest"]["shlibs_inventory"])
         evidence = result["derivation_record"]["evidence"]
         self.assertFalse(evidence["dpkg_shlibdeps_executed"])
         self.assertEqual(evidence["elf_objects"], [])
         self.assertEqual(result["derivation_record"]["derivation_source"], "reviewed-policy")
+
+    def test_validate_deb_ar_shape_closed_exact_structure(self):
+        sample_xz_buf = io.BytesIO()
+        with tarfile.open(fileobj=sample_xz_buf, mode="w:xz") as tar:
+            pass
+        valid_xz = sample_xz_buf.getvalue()
+
+        def make_ar(entries: list[tuple[str, bytes]]) -> bytes:
+            out = io.BytesIO()
+            out.write(b"!<arch>\n")
+            for name, content in entries:
+                header = f"{name:<16}0           0     0     100644  {len(content):<10}`\n".encode("ascii")
+                pad = b"\n" if len(content) % 2 != 0 else b""
+                out.write(header + content + pad)
+            return out.getvalue()
+
+        # Valid shape: exactly debian-binary=2.0\n, control.tar.xz, data.tar.xz
+        valid_deb = make_ar([
+            ("debian-binary", b"2.0\n"),
+            ("control.tar.xz", valid_xz),
+            ("data.tar.xz", valid_xz),
+        ])
+        validate_deb_ar_shape(valid_deb)
+
+        # Non-ar archive rejected
+        with self.assertRaises(ContractError) as caught:
+            validate_deb_ar_shape(b"not an ar archive")
+        self.assertEqual(caught.exception.code, "INVALID_DEB")
+
+        # debian-binary with non-2.0\n content rejected
+        bad_bin = make_ar([
+            ("debian-binary", b"1.0\n"),
+            ("control.tar.xz", valid_xz),
+            ("data.tar.xz", valid_xz),
+        ])
+        with self.assertRaises(ContractError) as caught:
+            validate_deb_ar_shape(bad_bin)
+        self.assertEqual(caught.exception.code, "INVALID_DEB")
+
+        # Second member control.tar.gz rejected
+        gz_ctrl = make_ar([
+            ("debian-binary", b"2.0\n"),
+            ("control.tar.gz", b"gzip-bytes"),
+            ("data.tar.xz", valid_xz),
+        ])
+        with self.assertRaises(ContractError) as caught:
+            validate_deb_ar_shape(gz_ctrl)
+        self.assertEqual(caught.exception.code, "INVALID_DEB")
+
+        # Second member control.tar.zst rejected
+        zst_ctrl = make_ar([
+            ("debian-binary", b"2.0\n"),
+            ("control.tar.zst", b"zstd-bytes"),
+            ("data.tar.xz", valid_xz),
+        ])
+        with self.assertRaises(ContractError) as caught:
+            validate_deb_ar_shape(zst_ctrl)
+        self.assertEqual(caught.exception.code, "INVALID_DEB")
+
+        # Third member data.tar.gz rejected
+        gz_data = make_ar([
+            ("debian-binary", b"2.0\n"),
+            ("control.tar.xz", valid_xz),
+            ("data.tar.gz", b"gzip-bytes"),
+        ])
+        with self.assertRaises(ContractError) as caught:
+            validate_deb_ar_shape(gz_data)
+        self.assertEqual(caught.exception.code, "INVALID_DEB")
+
+        # Non-xz control stream rejected
+        non_xz_ctrl = make_ar([
+            ("debian-binary", b"2.0\n"),
+            ("control.tar.xz", b"not-an-xz-stream"),
+            ("data.tar.xz", valid_xz),
+        ])
+        with self.assertRaises(ContractError) as caught:
+            validate_deb_ar_shape(non_xz_ctrl)
+        self.assertEqual(caught.exception.code, "INVALID_DEB")
+
+        # Non-xz data stream rejected
+        non_xz_data = make_ar([
+            ("debian-binary", b"2.0\n"),
+            ("control.tar.xz", valid_xz),
+            ("data.tar.xz", b"not-an-xz-stream"),
+        ])
+        with self.assertRaises(ContractError) as caught:
+            validate_deb_ar_shape(non_xz_data)
+        self.assertEqual(caught.exception.code, "INVALID_DEB")
+
+        # Missing data member (only 2 members) rejected
+        two_members = make_ar([
+            ("debian-binary", b"2.0\n"),
+            ("control.tar.xz", valid_xz),
+        ])
+        with self.assertRaises(ContractError) as caught:
+            validate_deb_ar_shape(two_members)
+        self.assertEqual(caught.exception.code, "INVALID_DEB")
+
+        # Extra member (4 members) rejected
+        four_members = make_ar([
+            ("debian-binary", b"2.0\n"),
+            ("control.tar.xz", valid_xz),
+            ("data.tar.xz", valid_xz),
+            ("extra.tar.xz", valid_xz),
+        ])
+        with self.assertRaises(ContractError) as caught:
+            validate_deb_ar_shape(four_members)
+        self.assertEqual(caught.exception.code, "INVALID_DEB")
+
+        # Trailing garbage rejected
+        with self.assertRaises(ContractError) as caught:
+            validate_deb_ar_shape(valid_deb + b"trailing-garbage")
+        self.assertEqual(caught.exception.code, "INVALID_DEB")
+
+    def test_build_deb_candidate_post_build_shape_rejects_non_xz_deb(self):
+        capture, intent, offline_npm = create_cli_fixture(self.root / "loom_input")
+        scratch = self.root / "scratch_post_build_bad"
+        scratch.mkdir()
+        maintainer = "Theme Forge Lead <maintainer@example.com>"
+
+        # Mock runner writes a deb with control.tar.gz instead of control.tar.xz
+        def dpkg_deb_bad_handler(argv, cwd=None, env=None):
+            def ar_entry(name, data):
+                header = f"{name:<16}0           0     0     100644  {len(data):<10}`\n".encode("ascii")
+                pad = b"\n" if len(data) % 2 != 0 else b""
+                return header + data + pad
+            bad_deb = (
+                b"!<arch>\n"
+                + ar_entry("debian-binary", b"2.0\n")
+                + ar_entry("control.tar.gz", b"synthetic-gzip-control")
+                + ar_entry("data.tar.gz", b"synthetic-gzip-data")
+            )
+            Path(argv[-1]).write_bytes(bad_deb)
+            return CommandReceipt(argv, 0, b"", b"")
+
+        runner = MockCommandRunner(
+            available_tools={"dpkg-deb": "/usr/bin/dpkg-deb"},
+            handlers={"dpkg-deb": dpkg_deb_bad_handler},
+        )
+        with self.assertRaises(ContractError) as caught:
+            build_deb_candidate(
+                capture, intent, "all", scratch,
+                maintainer=maintainer,
+                offline_npm_archives=offline_npm,
+                runner=runner,
+            )
+        self.assertEqual(caught.exception.code, "INVALID_DEB")
 
 
 class NativeDependencyDerivationTests(unittest.TestCase):
@@ -478,7 +639,7 @@ class NativeDependencyDerivationTests(unittest.TestCase):
     def runner(self, *, shlibdeps=None, query=None, tools=("dpkg-deb", "dpkg-shlibdeps", "dpkg-query")):
         def deb(argv, cwd=None, env=None):
             self.calls["deb"].append(env)
-            Path(argv[4]).write_bytes(make_minimal_deb(
+            Path(argv[-1]).write_bytes(make_minimal_deb(
                 "theme-forge-nebular-fusion", "0.6.1", 1, "amd64", self.MAINTAINER, "Synthetic Nebular", self.DEPENDS))
             return CommandReceipt(argv, 0, b"", b"")
 
@@ -710,7 +871,7 @@ class BurstDebCandidateTests(unittest.TestCase):
 
         def deb_handler(argv, cwd=None, env=None):
             calls["deb"].append(argv)
-            Path(argv[4]).write_bytes(make_minimal_deb(
+            Path(argv[-1]).write_bytes(make_minimal_deb(
                 "theme-forge-stellar-burst", "0.6.1", 1, "amd64", "Team <team@example.com>", "Burst", "nodejs (>= 22), libc6"
             ))
             return CommandReceipt(argv, 0, b"", b"")
@@ -770,7 +931,7 @@ class BurstDebCandidateTests(unittest.TestCase):
         capture, intent, offline_npm = self._make_burst_fixture()
 
         def deb_h(argv, cwd=None, env=None):
-            Path(argv[4]).write_bytes(make_minimal_deb(
+            Path(argv[-1]).write_bytes(make_minimal_deb(
                 "theme-forge-stellar-burst", "0.6.1", 1, "amd64",
                 "Knowledge Forge AI <nonproduction@knowledge-forge.invalid>", "Burst", "nodejs (>= 22)"
             ))

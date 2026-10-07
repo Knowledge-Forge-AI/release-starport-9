@@ -98,6 +98,7 @@ def parse_deb_control(deb_bytes: bytes) -> dict[str, str]:
 
     offset, total_len, control_data, ar_count, ctrl_count = 8, len(deb_bytes), None, 0, 0
     names, control_name = set(), None
+    unsupported_control = None
     while offset + 60 <= total_len:
         ar_count += 1
         if ar_count > MAX_AR_MEMBERS:
@@ -123,6 +124,25 @@ def parse_deb_control(deb_bytes: bytes) -> dict[str, str]:
             control_name = name
         elif name == "debian-binary" and data != b"2.0\n":
             raise ContractError("INVALID_DEB", "Unsupported Debian package format")
+        elif name.startswith("control.tar."):
+            ctrl_count += 1
+            if ctrl_count > 1:
+                raise ContractError("INVALID_DEB", "Duplicate control archive member")
+            unsupported_control = name
+
+    if offset != total_len:
+        raise ContractError("INVALID_DEB", "Trailing data or malformed ar member")
+    if unsupported_control is not None:
+        raise ContractError(
+            "INVALID_DEB",
+            "Unsupported control compression",
+            details={
+                "diagnostic_token": "unsupported-control-compression",
+                "reason_token": "unsupported-control-compression",
+                "reason": "unsupported-control-compression",
+                "archive_path": unsupported_control,
+            },
+        )
 
     if control_data is None or "debian-binary" not in names or offset != total_len:
         raise ContractError("INVALID_DEB", "Missing control archive")

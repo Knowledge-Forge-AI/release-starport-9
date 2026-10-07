@@ -81,6 +81,9 @@ def build_minimal_deb(
     symlink_in_control: bool = False,
     duplicate_control: bool = False,
     installed_size: int | None = None,
+    compression: str = "xz",
+    omit_control: bool = False,
+    extra_members: list[tuple[str, bytes]] | None = None,
 ) -> bytes:
     """Build a deterministic .deb archive for testing."""
     debian_binary = b"2.0\n"
@@ -101,40 +104,83 @@ def build_minimal_deb(
             control_lines.append(f"Depends: {depends}")
         control_text = ("\n".join(control_lines) + "\n").encode("utf-8")
 
-    control_buf = io.BytesIO()
-    with gzip.GzipFile(filename="", mode="wb", fileobj=control_buf, mtime=0) as gz:
-        with tarfile.open(fileobj=gz, mode="w") as tar:
-            ti = tarfile.TarInfo(name="./control")
-            ti.size = len(control_text)
-            ti.mtime = 0
-            ti.mode = 0o644
-            tar.addfile(ti, io.BytesIO(control_text))
+    def _populate_tar(tar: tarfile.TarFile) -> None:
+        ti = tarfile.TarInfo(name="./control")
+        ti.size = len(control_text)
+        ti.mtime = 0
+        ti.mode = 0o644
+        tar.addfile(ti, io.BytesIO(control_text))
 
-            if duplicate_control:
-                ti2 = tarfile.TarInfo(name="control")
-                ti2.size = len(control_text)
-                ti2.mtime = 0
-                ti2.mode = 0o644
-                tar.addfile(ti2, io.BytesIO(control_text))
+        if duplicate_control:
+            ti2 = tarfile.TarInfo(name="control")
+            ti2.size = len(control_text)
+            ti2.mtime = 0
+            ti2.mode = 0o644
+            tar.addfile(ti2, io.BytesIO(control_text))
 
-            if symlink_in_control:
-                ti_sym = tarfile.TarInfo(name="./evil_symlink")
-                ti_sym.type = tarfile.SYMTYPE
-                ti_sym.linkname = "/etc/passwd"
-                ti_sym.mtime = 0
-                tar.addfile(ti_sym)
+        if symlink_in_control:
+            ti_sym = tarfile.TarInfo(name="./evil_symlink")
+            ti_sym.type = tarfile.SYMTYPE
+            ti_sym.linkname = "/etc/passwd"
+            ti_sym.mtime = 0
+            tar.addfile(ti_sym)
 
-    control_tar_gz = control_buf.getvalue()
+    if compression == "xz":
+        ctrl_buf = io.BytesIO()
+        with tarfile.open(fileobj=ctrl_buf, mode="w:xz") as tar:
+            _populate_tar(tar)
+        control_bytes = ctrl_buf.getvalue()
+        ctrl_name = "control.tar.xz"
 
-    data_buf = io.BytesIO()
-    with gzip.GzipFile(filename="", mode="wb", fileobj=data_buf, mtime=0) as gz:
-        with tarfile.open(fileobj=gz, mode="w") as tar:
+        data_buf = io.BytesIO()
+        with tarfile.open(fileobj=data_buf, mode="w:xz") as tar:
             ti = tarfile.TarInfo(name=f"./usr/bin/{package}")
             ti.size = len(payload_content)
             ti.mtime = 0
             ti.mode = 0o755
             tar.addfile(ti, io.BytesIO(payload_content))
-    data_tar_gz = data_buf.getvalue()
+        data_bytes = data_buf.getvalue()
+        data_name = "data.tar.xz"
+    elif compression == "plain":
+        ctrl_buf = io.BytesIO()
+        with tarfile.open(fileobj=ctrl_buf, mode="w:") as tar:
+            _populate_tar(tar)
+        control_bytes = ctrl_buf.getvalue()
+        ctrl_name = "control.tar"
+
+        data_buf = io.BytesIO()
+        with tarfile.open(fileobj=data_buf, mode="w:") as tar:
+            ti = tarfile.TarInfo(name=f"./usr/bin/{package}")
+            ti.size = len(payload_content)
+            ti.mtime = 0
+            ti.mode = 0o755
+            tar.addfile(ti, io.BytesIO(payload_content))
+        data_bytes = data_buf.getvalue()
+        data_name = "data.tar"
+    elif compression in ("zst", "bz2", "lzma"):
+        control_bytes = f"synthetic-{compression}-control-bytes".encode("ascii")
+        ctrl_name = f"control.tar.{compression}"
+        data_bytes = f"synthetic-{compression}-data-bytes".encode("ascii")
+        data_name = f"data.tar.{compression}"
+    else:
+        # Default: gzip
+        control_buf = io.BytesIO()
+        with gzip.GzipFile(filename="", mode="wb", fileobj=control_buf, mtime=0) as gz:
+            with tarfile.open(fileobj=gz, mode="w") as tar:
+                _populate_tar(tar)
+        control_bytes = control_buf.getvalue()
+        ctrl_name = "control.tar.gz"
+
+        data_buf = io.BytesIO()
+        with gzip.GzipFile(filename="", mode="wb", fileobj=data_buf, mtime=0) as gz:
+            with tarfile.open(fileobj=gz, mode="w") as tar:
+                ti = tarfile.TarInfo(name=f"./usr/bin/{package}")
+                ti.size = len(payload_content)
+                ti.mtime = 0
+                ti.mode = 0o755
+                tar.addfile(ti, io.BytesIO(payload_content))
+        data_bytes = data_buf.getvalue()
+        data_name = "data.tar.gz"
 
     def make_ar_header(name: str, size: int) -> bytes:
         name_field = f"{name}/".ljust(16)[:16].encode("ascii")
@@ -148,11 +194,14 @@ def build_minimal_deb(
 
     out = io.BytesIO()
     out.write(b"!<arch>\n")
-    for name, content in [
-        ("debian-binary", debian_binary),
-        ("control.tar.gz", control_tar_gz),
-        ("data.tar.gz", data_tar_gz),
-    ]:
+    members: list[tuple[str, bytes]] = [("debian-binary", debian_binary)]
+    if not omit_control:
+        members.append((ctrl_name, control_bytes))
+    members.append((data_name, data_bytes))
+    if extra_members:
+        members.extend(extra_members)
+
+    for name, content in members:
         out.write(make_ar_header(name, len(content)))
         out.write(content)
         if len(content) % 2 == 1:
@@ -380,6 +429,76 @@ class RepoAptTests(unittest.TestCase):
         with self.assertRaises(ContractError) as ctx:
             parse_deb_control(deb_cr)
         self.assertEqual(ctx.exception.code, "INVALID_METADATA")
+
+    def test_parse_deb_control_xz_gzip_plain_supported(self):
+        # xz compression
+        deb_xz = build_minimal_deb("pkg-xz", "2.0.0", "amd64", description="XZ package", compression="xz")
+        ctrl_xz = parse_deb_control(deb_xz)
+        self.assertEqual(ctrl_xz["Package"], "pkg-xz")
+        self.assertEqual(ctrl_xz["Version"], "2.0.0")
+        self.assertEqual(ctrl_xz["Architecture"], "amd64")
+
+        # gzip compression
+        deb_gz = build_minimal_deb("pkg-gz", "2.0.0", "amd64", description="GZ package", compression="gz")
+        ctrl_gz = parse_deb_control(deb_gz)
+        self.assertEqual(ctrl_gz["Package"], "pkg-gz")
+        self.assertEqual(ctrl_gz["Version"], "2.0.0")
+
+        # plain uncompressed tar
+        deb_plain = build_minimal_deb("pkg-plain", "2.0.0", "amd64", description="Plain tar package", compression="plain")
+        ctrl_plain = parse_deb_control(deb_plain)
+        self.assertEqual(ctrl_plain["Package"], "pkg-plain")
+        self.assertEqual(ctrl_plain["Version"], "2.0.0")
+
+    def test_parse_deb_control_zst_rejected_with_precise_diagnostic(self):
+        deb_zst = build_minimal_deb("pkg-zst", "1.0.0", "amd64", compression="zst")
+        with self.assertRaises(ContractError) as ctx:
+            parse_deb_control(deb_zst)
+        self.assertEqual(ctx.exception.code, "INVALID_DEB")
+        self.assertEqual(ctx.exception.message, "Unsupported control compression")
+        self.assertNotEqual(ctx.exception.message, "Missing control archive")
+        self.assertEqual(ctx.exception.details.get("diagnostic_token"), "unsupported-control-compression")
+        self.assertEqual(ctx.exception.details.get("reason_token"), "unsupported-control-compression")
+        self.assertEqual(ctx.exception.details.get("reason"), "unsupported-control-compression")
+        self.assertEqual(ctx.exception.details.get("archive_path"), "control.tar.zst")
+
+    def test_parse_deb_control_other_recognizable_unsupported_compressions(self):
+        for unsupported_fmt in ("bz2", "lzma"):
+            with self.subTest(fmt=unsupported_fmt):
+                deb_other = build_minimal_deb("pkg-other", "1.0.0", "amd64", compression=unsupported_fmt)
+                with self.assertRaises(ContractError) as ctx:
+                    parse_deb_control(deb_other)
+                self.assertEqual(ctx.exception.code, "INVALID_DEB")
+                self.assertEqual(ctx.exception.message, "Unsupported control compression")
+                self.assertEqual(ctx.exception.details.get("diagnostic_token"), "unsupported-control-compression")
+                self.assertEqual(ctx.exception.details.get("archive_path"), f"control.tar.{unsupported_fmt}")
+
+    def test_parse_deb_control_missing_control_archive_distinction(self):
+        deb_no_ctrl = build_minimal_deb("pkg-noctrl", "1.0.0", "amd64", omit_control=True)
+        with self.assertRaises(ContractError) as ctx:
+            parse_deb_control(deb_no_ctrl)
+        self.assertEqual(ctx.exception.code, "INVALID_DEB")
+        self.assertEqual(ctx.exception.message, "Missing control archive")
+        self.assertNotIn("diagnostic_token", ctx.exception.details)
+
+    def test_parse_deb_control_duplicate_control_with_unsupported_format(self):
+        deb_dup = build_minimal_deb(
+            "pkg-dup", "1.0.0", "amd64", compression="xz",
+            extra_members=[("control.tar.zst", b"zstd-payload")]
+        )
+        with self.assertRaises(ContractError) as ctx:
+            parse_deb_control(deb_dup)
+        self.assertEqual(ctx.exception.code, "INVALID_DEB")
+        self.assertEqual(ctx.exception.message, "Duplicate control archive member")
+
+    def test_apt_repository_candidate_rejects_zst_package(self):
+        repo_root = self.root / "zst_candidate_repo"
+        repo = AptRepositoryCandidate(repo_root)
+        deb_zst = build_minimal_deb("zst-pkg", "1.0.0", "amd64", compression="zst")
+        with self.assertRaises(ContractError) as ctx:
+            repo.add_package(deb_bytes=deb_zst)
+        self.assertEqual(ctx.exception.code, "INVALID_DEB")
+        self.assertEqual(ctx.exception.details.get("diagnostic_token"), "unsupported-control-compression")
 
     def test_architecture_restrictions_ubuntu_2604(self):
         # amd64 and arm64 clients support architecture-independent packages.

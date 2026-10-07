@@ -16,6 +16,7 @@ jobs:
       matrix_wheels: ${{ steps.lanes.outputs.matrix_wheels }}
       matrix_nix: ${{ steps.lanes.outputs.matrix_nix }}
       matrix_native: ${{ steps.lanes.outputs.matrix_native }}
+      matrix_experiments: ${{ steps.lanes.outputs.matrix_experiments }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -177,6 +178,53 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
           python3 -m rs9.hosted_pipeline 'nix' --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  nix-proot:
+    name: ${{ matrix.job_name }}
+    needs: [config, authenticate, pins]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.config.outputs.matrix_experiments) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Install version-bound Nix for hosted builds
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: python3 -m rs9.hosted_nix install --repository . --scratch "$RUNNER_TEMP/rs9-nix-install"
+      - name: Enable installed Nix
+        if: ${{ !cancelled() }}
+        run: |
+          echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH"
+          echo "NIX_CONFIG=experimental-features = nix-command flakes" >> "$GITHUB_ENV"
+      - name: Execute non-production experimental nix-proot lane
+        if: ${{ !cancelled() }}
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline 'nix-proot' --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ !cancelled() }}
         with:

@@ -377,7 +377,14 @@ class BuildNativeCommonTests(unittest.TestCase):
         def rpm_handler(argv, cwd=None, env=None):
             if "--requires" in argv:
                 return CommandReceipt(argv, 0, b"nodejs >= 22\n", b"")
-            return CommandReceipt(argv, 0, b"theme-forge-stellar-burst|0.6.1|1.fc43|x86_64|abcdef0123456789|sha256\n", b"")
+            if "--querytags" in argv:
+                return CommandReceipt(argv, 0, b"PAYLOADSHA256\nPAYLOADSHA256ALGO\n", b"")
+            if "--eval" in argv:
+                return CommandReceipt(argv, 0, b"1.fc43\n", b"")
+            qf = argv[argv.index("--queryformat") + 1] if "--queryformat" in argv else ""
+            if "%{PAYLOAD" in qf:
+                return CommandReceipt(argv, 0, b"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789|8\n", b"")
+            return CommandReceipt(argv, 0, b"theme-forge-stellar-burst|0.6.1|1.fc43|x86_64\n", b"")
 
         def createrepo_handler(argv, cwd=None, env=None):
             repodata = Path(argv[-1]) / "repodata"
@@ -519,7 +526,14 @@ class BuildNativeCommonTests(unittest.TestCase):
             return CommandReceipt(argv, 0, b"rpmbuild success\n", b"")
 
         def rpm_query_handler(argv, cwd=None, env=None):
-            out = "theme-forge-stellar-loom|0.4.0|1.fc43|noarch|abcdef0123456789|sha256\n".encode()
+            if "--querytags" in argv:
+                return CommandReceipt(argv, 0, b"PAYLOADSHA256\nPAYLOADSHA256ALGO\n", b"")
+            if "--eval" in argv:
+                return CommandReceipt(argv, 0, b"1.fc43\n", b"")
+            qf = argv[argv.index("--queryformat") + 1] if "--queryformat" in argv else ""
+            if "%{PAYLOAD" in qf:
+                return CommandReceipt(argv, 0, b"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789|8\n", b"")
+            out = "theme-forge-stellar-loom|0.4.0|1.fc43|noarch\n".encode()
             return CommandReceipt(argv, 0, out, b"")
 
         def rpmlint_handler(argv, cwd=None, env=None):
@@ -560,9 +574,10 @@ class BuildNativeCommonTests(unittest.TestCase):
         derivation = result["derivation_record"]
 
         self.assertEqual(manifest["architecture"], "noarch")
-        self.assertEqual(manifest["rpm_v6_identity"]["payload_digest_algo"], "sha256")
-        self.assertEqual(manifest["rpm_v6_identity"]["payload_digest"], "abcdef0123456789")
-        self.assertEqual(len(derivation["tool_receipts"]), 4)
+        self.assertEqual(manifest["rpm_identity"]["name"], "theme-forge-stellar-loom")
+        self.assertEqual(manifest["rpm_payload_digest"]["payload_digest_algo"], "sha256")
+        self.assertEqual(manifest["rpm_payload_digest"]["payload_digest"], "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")
+        self.assertEqual(len(derivation["tool_receipts"]), 7)
         self.assertFalse(derivation["can_publish"])
         self.assertEqual(derivation["dependency_classification"], "reviewed-policy")
         self.assertEqual(derivation["evidence"]["native_preservation"]["strip"], False)
@@ -809,7 +824,14 @@ class BuildNativeCommonTests(unittest.TestCase):
             if "--requires" in argv:
                 out = b"libc.so.6()(64bit)\nrtld(GNU_HASH)\n"
                 return CommandReceipt(argv, 0, out, b"")
-            out = "theme-forge-nebular-fusion|0.6.1|1.fc43|x86_64|nebular123456789|sha256\n".encode()
+            if "--querytags" in argv:
+                return CommandReceipt(argv, 0, b"PAYLOADSHA256\nPAYLOADSHA256ALGO\n", b"")
+            if "--eval" in argv:
+                return CommandReceipt(argv, 0, b"1.fc43\n", b"")
+            qf = argv[argv.index("--queryformat") + 1] if "--queryformat" in argv else ""
+            if "%{PAYLOAD" in qf:
+                return CommandReceipt(argv, 0, b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|8\n", b"")
+            out = "theme-forge-nebular-fusion|0.6.1|1.fc43|x86_64\n".encode()
             return CommandReceipt(argv, 0, out, b"")
 
         def rpmlint_handler(argv, cwd=None, env=None):
@@ -844,10 +866,12 @@ class BuildNativeCommonTests(unittest.TestCase):
         derivation = result["derivation_record"]
 
         self.assertEqual(manifest["architecture"], "x86_64")
+        self.assertEqual(manifest["rpm_identity"]["name"], "theme-forge-nebular-fusion")
+        self.assertEqual(manifest["rpm_payload_digest"]["payload_digest"], "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         self.assertEqual(manifest["dependency_classification"], "native-tool-derived")
         self.assertIn("libc.so.6()(64bit)", manifest["dependencies"])
         self.assertIn("glibc", derivation["evidence"]["policy_dependencies"])
-        self.assertEqual(len(derivation["tool_receipts"]), 5)
+        self.assertEqual(len(derivation["tool_receipts"]), 8)
         self.assertIn("rpm_query_evidence", derivation["evidence"])
         self.assertIn("libc.so.6()(64bit)", derivation["evidence"]["rpm_query_evidence"]["requires"])
 

@@ -113,11 +113,7 @@ INVENTORY_EXCLUDES: dict[str, list[re.Pattern[str]]] = {
     "pacman": [re.compile(p) for p in (r"^etc/pacman\.d/gnupg(/.*)?$", *_COMMON_EXCLUDES)],
 }
 
-INVENTORY_SCRIPT = (
-    "cd / && find . -xdev "
-    "\\( -path ./proc -o -path ./sys -o -path ./dev -o -path ./run -o -path ./tmp -o -path ./srv/rs9 \\) -prune -o "
-    "\\( -type f -exec sha256sum {} + \\) -o \\( -type l -printf 'L %p -> %l\\n' \\) -o \\( -type d -printf 'D %p\\n' \\)"
-)
+from rs9.client_inventory import parse_inventory as parse_client_inventory, run_and_parse
 
 
 # --------------------------------------------------------------------------- gates and runners
@@ -238,27 +234,15 @@ def inventory_excluded(family: str, rel_path: str) -> bool:
     return is_excluded_inventory_path(rel_path) or any(p.search(rel_path) for p in INVENTORY_EXCLUDES[family])
 
 
+def inventory_samples(paths):
+    """Escape filename bytes and cap failure details without retaining snapshots."""
+    return [path.encode("utf-8", errors="backslashreplace").decode("utf-8").encode("unicode_escape").decode("ascii")[:256]
+            for path in paths[:40]]
+
+
 def parse_inventory(stdout: bytes, family: str) -> dict[str, str]:
-    """Parse INVENTORY_SCRIPT output into {relative path: sha256 | 'dir' | 'symlink:<target>'}."""
-    inventory: dict[str, str] = {}
-    for raw in stdout.decode("utf-8", errors="surrogateescape").split("\n"):
-        if not raw:
-            continue
-        if raw.startswith("D "):
-            path, value = raw[2:], "dir"
-        elif raw.startswith("L "):
-            path, _, target = raw[2:].partition(" -> ")
-            value = f"symlink:{target}"
-        else:
-            match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
-            if match is None:
-                raise ContractError("INVENTORY_PARSE", "Unparseable client inventory line")
-            value, path = match.group(1), match.group(2)
-        rel = path.removeprefix("./")
-        if rel in {"", "."} or inventory_excluded(family, rel):
-            continue
-        inventory[rel] = value
-    return inventory
+    """Versioned byte-lossless transport with the maintained family exclusions."""
+    return parse_client_inventory(stdout, exclusion=lambda path: inventory_excluded(family, path), with_modes=True)
 
 
 # --------------------------------------------------------------------------- containers
@@ -377,6 +361,7 @@ class ClientContainer:
         self.host, self.image, self.platform, self.family = host, image, platform, family
         self.mounts = list(mounts)
         self.name = f"rs9-client-{uuid.uuid4().hex[:12]}"
+        self.last_diagnostics: dict[str, Any] = {}
 
     def __enter__(self) -> ClientContainer:
         command = ["docker", "run", "-d", "--name", self.name, "--platform", self.platform, "--network", "none"]
@@ -403,11 +388,20 @@ class ClientContainer:
     def unprivileged_prefix(self) -> list[str]:
         return ["docker", "exec", "-i", "--user", CLIENT_USER, "-e", "HOME=/tmp", self.name]
 
-    def inventory(self) -> dict[str, str]:
-        receipt = self.exec(["sh", "-c", INVENTORY_SCRIPT])
-        if receipt.exit_code != 0:
-            raise ContractError("INVENTORY_FAILED", "Client inventory command failed")
-        return parse_inventory(receipt.stdout_bytes, self.family)
+    def inventory(self, stage: str | None = None) -> dict[str, str]:
+        self.last_diagnostics = {}
+        res = run_and_parse(
+            self,
+            exclusion=lambda path: inventory_excluded(self.family, path),
+            with_modes=True,
+            stage=stage,
+            family=self.family,
+            return_diagnostics=True,
+        )
+        if isinstance(res, tuple):
+            self.last_diagnostics = res[1] or {}
+            return res[0]
+        return res
 
 
 def _printf_file(path: str, lines: Sequence[str]) -> list[str]:
@@ -505,27 +499,37 @@ def client_cycle(
         mark = host.mark()
         rows: list[dict[str, Any]] = []
         product_evidence: dict[str, Any] = {}
+        current_stage = "start"
+        client = None
         try:
             mounts = list(spec["mounts"])
             if burst_record is not None:
                 mounts.append((str(repository / "src"), "/rs9-source", False))
-            with ClientContainer(host, image, platform, mounts, family) as client:
+            with ClientContainer(host, image, platform, mounts, family) as client_ctx:
+                client = client_ctx
+                current_stage = "configure"
                 for command in spec["configure"]:
                     if client.exec(command).exit_code != 0:
                         raise ContractError("CLIENT_CONFIGURE_FAILED", "Client repository trust setup failed")
+                current_stage = "network-denial"
                 negative = client.exec(["python3","-c",
                     "import socket;s=socket.socket();s.settimeout(2);assert s.connect_ex(('1.1.1.1',443))!=0"], user=CLIENT_USER)
                 if negative.exit_code:
                     raise ContractError("NETWORK_DENIAL", "Disconnected client still has runtime egress")
                 rows.append(_gate(f"{label}.network-denial", "pass"))
-                before = client.inventory()
+                current_stage = "pre-install"
+                before = client.inventory("pre-install")
+                product_evidence["inventory_stats"] = {"pre-install": getattr(client, "last_diagnostics", {})}
+                current_stage = "refresh"
                 if client.exec(spec["refresh"]).exit_code != 0:
                     raise ContractError("CLIENT_REFRESH_FAILED", "Repository metadata refresh failed")
+                current_stage = "install"
                 installed = client.exec(spec["install"](product))
                 present = client.exec(spec["query"](product))
                 rows.append(_gate(f"{label}.install", *_pair(installed.exit_code == 0 and present.exit_code == 0)))
                 if installed.exit_code != 0 or present.exit_code != 0:
                     raise ContractError("CLIENT_INSTALL_FAILED", "Candidate package did not install")
+                current_stage = "probes"
                 for command in sorted(REQUIRED_COMMANDS.get(product, [])):
                     try:
                         probe_rows = execute_probes(
@@ -537,6 +541,7 @@ def client_cycle(
                     for row in probe_rows:
                         rows.append(_gate(f"{label}.{row['name']}", row["status"], row.get("reason")))
                 if product == "theme-forge-stellar-burst":
+                    current_stage = "burst"
                     if burst_record is None or burst_scratch is None or system is None:
                         raise ContractError("BURST_NATIVE_TARGET", "Authenticated installed Burst proof required")
                     from rs9.hosted_burst_clients import verify_client_burst
@@ -545,6 +550,7 @@ def client_cycle(
                     rows.append(_gate(f"{label}.burst-native-addon-target", "pass"))
                     rows.append(_gate(f"{label}.burst-native-addon-load", "pass"))
                 if product == NATIVE_PRODUCT:
+                    current_stage = "native-closure"
                     closure = client.exec(["python3","-c",
                         "from pathlib import Path;import subprocess;root=Path('/usr/lib/theme-forge-nebular-fusion');"
                         "files=[p for p in root.rglob('*') if p.is_file() and not p.is_symlink() and p.read_bytes()[:4]==bytes([127])+b'ELF'];"
@@ -553,6 +559,7 @@ def client_cycle(
                         "assert all(b'not found' not in r.stdout+r.stderr and (r.returncode==0 or b'not a dynamic' in r.stdout+r.stderr or b'statically linked' in r.stdout+r.stderr) for r in results)"], user=CLIENT_USER)
                     rows.append(_gate(f"{label}.native-closure", *_pair(closure.exit_code == 0)))
                     if smoke:
+                        current_stage = "smoke"
                         from rs9.hosted_smoke import verify_nebular_runtime
                         inspected = client.exec(["python3","-c",
                             "from pathlib import Path;import json;"
@@ -564,23 +571,77 @@ def client_cycle(
                         verify_nebular_runtime("/usr/lib/theme-forge-nebular-fusion", smoke, system,
                             client.unprivileged_prefix, discovered=json.loads(inspected.stdout_bytes))
                         rows.append(_gate(f"{label}.application-smoke","pass"))
+                current_stage = "uninstall"
                 removed = client.exec(spec["remove"](product))
                 gone = client.exec(spec["query"](product))
                 rows.append(_gate(f"{label}.uninstall", *_pair(removed.exit_code == 0 and gone.exit_code != 0)))
-                comparison = compare_inventories(before, client.inventory())
-                rows.append(_gate(
-                    f"{label}.inventory", *_pair(comparison["clean"]),
-                    **({} if comparison["clean"] else {"leftover": comparison["added"][:20] + comparison["modified"][:20]}),
-                ))
-                evidence[product] = {**product_evidence, "inventory_clean": comparison["clean"], "removed": comparison["removed"][:20]}
+                current_stage = "post-remove"
+                after = client.inventory("post-remove")
+                comparison = compare_inventories(before, after)
+                diag = getattr(client, "last_diagnostics", {})
+                counters = diag.get("counters", {})
+                product_evidence.setdefault("inventory_stats", {})["post-remove"] = diag
+                is_clean = comparison["clean"]
+                inv_extra = {}
+                if not is_clean:
+                    inv_extra = {
+                        "leftover": inventory_samples(comparison["added"][:20] + comparison["modified"][:20]),
+                        "counts": {k: len(comparison[k]) for k in ("added", "removed", "modified")},
+                        "family": family,
+                        "stage": "post-remove",
+                        "safe_cause": "unclean-inventory",
+                        "counters": counters,
+                    }
+                inv_gate = _gate(
+                    f"{label}.inventory", *_pair(is_clean),
+                    **inv_extra,
+                )
+                rows.append(inv_gate)
+                evidence[product] = {
+                    **product_evidence,
+                    "inventory_clean": is_clean,
+                    "removed": inventory_samples(comparison["removed"][:20]),
+                    "family": family,
+                    "stage": "post-remove",
+                    "counters": counters,
+                }
+                if not is_clean:
+                    evidence[product]["safe_cause"] = "unclean-inventory"
+                    evidence[product]["leftover"] = inv_gate.get("leftover", [])
+                    evidence[product]["counts"] = inv_gate.get("counts", {})
         except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
+            err_family = (err.details.get("family") if isinstance(err, ContractError) and err.details else None) or family
+            err_stage = (err.details.get("stage") if isinstance(err, ContractError) and err.details else None) or current_stage
+            safe_cause = _family_error(err)
+            diag = getattr(client, "last_diagnostics", {}) if client is not None else {}
+            err_counters = (err.details.get("counters") if isinstance(err, ContractError) and err.details else None) or diag.get("counters", {})
+            gate_extra = {
+                "family": err_family,
+                "stage": err_stage,
+                "safe_cause": safe_cause,
+            }
+            gate_extra["counters"] = err_counters or {}
+            gate_extra["max"] = (err.details or {}).get("max", {}) if isinstance(err, ContractError) else {}
+            if isinstance(err, ContractError):
+                failure = {k: err.details[k] for k in ("cause", "limit", "observed", "maximum") if k in err.details}
+                if failure:
+                    gate_extra["inventory_failure"] = failure
             rows.append(_gate(f"{label}.client", "fail" if not isinstance(err, NativePrerequisiteUnavailable) else "not-run",
-                              _family_error(err)))
-            evidence[product] = {"error": _family_error(err)}
+                              safe_cause, **gate_extra))
+            evidence[product] = {
+                "error": safe_cause,
+                "family": err_family,
+                "stage": err_stage,
+                "safe_cause": safe_cause,
+            }
+            evidence[product]["counters"] = err_counters or {}
+            evidence[product]["max"] = gate_extra["max"]
+            if "inventory_failure" in gate_extra:
+                evidence[product]["inventory_failure"] = gate_extra["inventory_failure"]
             if product == "theme-forge-stellar-burst":
                 for name in ("burst-native-addon-target", "burst-native-addon-load"):
                     if not any(row["name"].endswith("." + name) for row in rows):
-                        rows.append(_gate(f"{label}.{name}", "fail", _family_error(err)))
+                        rows.append(_gate(f"{label}.{name}", "fail", safe_cause))
         real = host.real_since(mark)
         for row in rows:
             if row["status"] == "pass" and not real:
@@ -1249,6 +1310,10 @@ def _assemble_and_test_pages(
         provision_image(host, "dnf", rpm_image["image_ref"], "linux/amd64", rpm_tag,
                         ["createrepo_c", "rpm-sign", "gnupg2", "python3", "xorg-x11-server-Xvfb", "dbus-daemon", "findutils", *rpm_image["preprovisioned_packages"]])
         images.append(rpm_tag)
+        rpm_signing_identities = []
+        wrong_rpm, wrong_rpm_owned = _new_wrong_signer(context)
+        if wrong_rpm_owned:
+            closers.append(wrong_rpm)
         for arch, system in (("x86_64", "x86_64-linux"), ("aarch64", "aarch64-linux")):
             arch_dir = stage / "rpm" / "fedora/43" / arch
             (arch_dir / "Packages").mkdir(parents=True)
@@ -1256,8 +1321,22 @@ def _assemble_and_test_pages(
                 shutil.copyfile(path, arch_dir / "Packages" / name)
                 from rs9.hosted_packaging import sign_rpm
                 signer = ContainerRunner(host,rpm_tag,platform="linux/amd64",
-                    mounts=[(str(stage),str(stage),True),(str(fixture.homedir),str(fixture.homedir),True)])
-                sign_rpm(signer, arch_dir / "Packages" / name, fixture)
+                    mounts=[(str(stage),str(stage),True),(str(fixture.homedir),str(fixture.homedir),True)]
+                        + ([(str(wrong_rpm.homedir),str(wrong_rpm.homedir),True)]
+                           if getattr(wrong_rpm, "homedir", None) else []))
+                matches = [(capture, intent) for capture, intent, _ in context["captures"]
+                           if name.startswith(intent["project"]["id"] + "-" +
+                                              str(intent["version"]) + "-")]
+                if len(matches) != 1:
+                    raise ContractError("RPM_SIGNING", "Custody RPM has no unique intended product")
+                _, intent = matches[0]
+                from rs9.product_classes import is_pure_js_cli
+                rpm_signing_identities.append(sign_rpm(signer, arch_dir / "Packages" / name, fixture,
+                    wrong_fixture=wrong_rpm, diagnostics_dir=scratch / "diagnostics",
+                    expected={"package_sha256": bundles[("rpm", system)]["manifest"]["files"][name]["sha256"],
+                              "name": intent["project"]["id"], "version": str(intent["version"]),
+                              "arch": "noarch" if is_pure_js_cli(intent["project"]["id"]) else arch,
+                              "revision": 1}))
             _run_tool_container(host, rpm_tag, "linux/amd64", stage,
                                 ["createrepo_c", "--no-database", "--compress-type", "gz", "-s", "sha256", str(arch_dir)])
             repomd = arch_dir / "repodata/repomd.xml"
@@ -1292,8 +1371,7 @@ def _assemble_and_test_pages(
         tree_sha = {Path(p).name: sha for p, sha in candidate.exact_inventory.items()}
         # Signing RPM headers changes only the fixture copy; commit both identities explicitly.
         bound = all(tree_sha.get(name) == sha for name, sha in custody_sha.items() if not name.endswith(".rpm"))
-        details["rpm_fixture_identities"] = [{"unsigned_sha256":sha,"fixture_signed_sha256":tree_sha.get(name)}
-            for name,sha in custody_sha.items() if name.endswith(".rpm")]
+        details["rpm_fixture_identities"] = rpm_signing_identities
         verify_merkle_inventory(candidate.merkle, _tree_inventory(tree))
         details["pages"] = {"merkle_root": candidate.merkle["root"], "file_count": len(candidate.exact_inventory),
                             "custody_roots": {f"{k[0]}-{k[1]}": v["manifest"]["merkle"]["root"] for k, v in bundles.items()}}

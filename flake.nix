@@ -6,6 +6,8 @@
     let
       systems = [ "aarch64-darwin" "x86_64-linux" "aarch64-linux" ];
       perSystem = f: nixpkgs.lib.genAttrs systems f;
+      linuxSystems = [ "x86_64-linux" "aarch64-linux" ];
+      perLinuxSystem = f: nixpkgs.lib.genAttrs linuxSystems f;
       products = let data = builtins.fromJSON (builtins.readFile (rs9-capture + "/products.json"));
         in assert builtins.length (builtins.attrNames data) == 4; data;
       build = system:
@@ -18,6 +20,23 @@
     in {
       candidates = perSystem build;
       checks = perSystem (system: build system);
+      # Note: 'experiments' is not a standard flake output attribute recognized
+      # by legacy 'nix flake check', which emits:
+      # "warning: unknown flake output 'experiments'".
+      # This is expected and intentional: experimental derivations are excluded
+      # from standard checks and candidates to prevent unvetted promotion.
+      experiments = perLinuxSystem (system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+          product = products."theme-forge-nebular-fusion";
+        in {
+          theme-forge-nebular-fusion-proot = pkgs.callPackage ./nix/nebular-proot-experiment.nix {} {
+            inherit product;
+            capture = rs9-capture;
+            nixpkgsRev = nixpkgs.rev or null;
+          };
+        }
+      );
       qualification = { productionEnabled = false; publicationOutputsExposed = false; };
     };
 }

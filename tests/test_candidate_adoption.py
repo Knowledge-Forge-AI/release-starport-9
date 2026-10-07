@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from rs9.adopt_candidate import adopt, validate_receipts
+from rs9.candidate_readiness import readiness_record
 from rs9.candidate_inventory import MANIFEST, file_inventory, git_oid, operational_path, source_tree
 from rs9.errors import ContractError
 from rs9.hosted_candidate import REQUIRED_RECEIPTS
@@ -108,8 +109,8 @@ class CandidateAdoptionTests(unittest.TestCase):
             (repo / "operators/live1").mkdir(parents=True)
             out.mkdir()
             manifest_doc = {
-                "candidate_adoption_ready": True,
-                "adoption_scope": "hosted-candidate-qualification-only",
+                "candidate_adoption_ready": False,
+                "adoption_scope": "partial-diagnostic", "readiness": readiness_record(), "publication_authority": False,
                 "production_enabled": False,
                 "changed_paths": ["src/changed.py"],
                 "files": [{"path": "src/changed.py", "size": 1, "sha256": "0" * 64, "mode": "100644", "git_blob": "0" * 40}],
@@ -121,6 +122,14 @@ class CandidateAdoptionTests(unittest.TestCase):
             parent = "1" * 40
             tree = "2" * 40
             manifest_sha = hashlib.sha256(raw).hexdigest()
+            attestation = root / "manager-acceptance.json"
+            attestation.write_bytes(canonical({
+                "schema": "rs9.manager-source-adoption-attestation.v1alpha1",
+                "decision": "accept", "source_adoption_scope": "partial-diagnostic",
+                "reviewed_parent": parent, "reviewed_tree": tree, "manifest_sha256": manifest_sha,
+                "full_live1_qualification": False, "production_enabled": False,
+                "publication_authority": False}))
+            attestation_sha = hashlib.sha256(attestation.read_bytes()).hexdigest()
 
             added = False
             def mock_git(r, args):
@@ -148,11 +157,16 @@ class CandidateAdoptionTests(unittest.TestCase):
                 return ""
 
             with patch("rs9.adopt_candidate.run", side_effect=mock_git), \
+                 patch("rs9.hosted_contract.load_hosted_lanes", return_value={"lanes": [
+                     {"lane": "nix", "system": s, "module": "rs9.hosted_nix"}
+                     for s in ("x86_64-linux", "aarch64-linux")]}), \
                  patch("rs9.adopt_candidate.verify_inventory", return_value=tree), \
                  patch("rs9.collect_candidate.output_directory", return_value=out):
                 with self.assertRaises(ContractError) as caught:
-                    adopt(repo, out, reviewed_parent=parent, reviewed_tree=tree, manifest_sha256=manifest_sha)
+                    adopt(repo, out, reviewed_parent=parent, reviewed_tree=tree, manifest_sha256=manifest_sha,
+                          manager_attestation=attestation, manager_attestation_sha256=attestation_sha)
                 self.assertEqual(caught.exception.code, "ADOPTION_REVIEW")
+                self.assertTrue(added)
 
     def test_tree_calculation_uses_directory_sorting_and_mode(self):
         blob = git_oid("blob", b"data")
