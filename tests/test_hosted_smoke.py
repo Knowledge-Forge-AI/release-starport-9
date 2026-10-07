@@ -50,11 +50,13 @@ class SmokeEnvironmentTests(unittest.TestCase):
             entry = cache / "entries" / ("a" * 64)
             root = entry / "payload/app"
             root.mkdir(parents=True)
+            root.chmod(0o755)
             binary = root / "binary"
             binary.write_bytes(b"changed")
             binary.chmod(0o555)
             manifest = root / "manifest.json"
             manifest.write_bytes(b"{}")
+            manifest.chmod(0o644)
             (root / "link").symlink_to("binary")
             rows = [{"path": "app", "type": "directory", "mode": 0o755},
                     {"path": "app/binary", "type": "file", "mode": 0o755, "size": 8, "sha256": digest(b"original")},
@@ -108,12 +110,14 @@ class SmokeEnvironmentTests(unittest.TestCase):
             work = Path(tmp).resolve()
             root = work / "payload/app"
             root.mkdir(parents=True)
+            root.chmod(0o755)
             (root / "dir").mkdir()
             (root / "dir").chmod(0o700)
             (root / "file.txt").write_bytes(b"hello")
             (root / "file.txt").chmod(0o600)
             manifest = root / "manifest.json"
             manifest.write_bytes(b"{}")
+            manifest.chmod(0o644)
             binary = root / "file.txt"
 
             expected = [
@@ -215,6 +219,8 @@ class SmokeEnvironmentTests(unittest.TestCase):
             work = Path(tmp).resolve()
             root = work / "runtime"
             (root / "bin").mkdir(parents=True)
+            root.chmod(0o755)
+            (root / "bin").chmod(0o755)
             binary = root / "bin/tfsb-studio-service"
             binary.write_bytes(b"binary-content")
             binary.chmod(0o755)
@@ -508,15 +514,21 @@ class SmokeEnvironmentTests(unittest.TestCase):
             work = Path(tmp).resolve()
             root = work / "runtime"
             (root / "bin").mkdir(parents=True)
+            root.chmod(0o755)
+            (root / "bin").chmod(0o755)
             binary = root / "bin/tfsb-studio-service"
             binary.write_bytes(b"studio-binary")
             binary.chmod(0o755)
             payload = root / "lib/sidecar-payload"
             payload.mkdir(parents=True)
+            (root / "lib").chmod(0o755)
+            payload.chmod(0o755)
             manifest_file = payload / "manifest.json"
             manifest_file.write_bytes(b"{}")
+            manifest_file.chmod(0o644)
             data_file = payload / "data.txt"
             data_file.write_bytes(b"original-data-v1")
+            data_file.chmod(0o644)
 
             scratch = work / "scratch"
             scratch.mkdir()
@@ -573,16 +585,22 @@ class SmokeEnvironmentTests(unittest.TestCase):
             work = Path(tmp).resolve()
             root = work / "runtime"
             (root / "bin").mkdir(parents=True)
+            root.chmod(0o755)
+            (root / "bin").chmod(0o755)
             binary = root / "bin/tfsb-studio-service"
             # Binary has corrupted bytes from initial installation/materialization
             binary.write_bytes(b"corrupted-at-install")
             binary.chmod(0o755)
             payload = root / "lib/sidecar-payload"
             payload.mkdir(parents=True)
+            (root / "lib").chmod(0o755)
+            payload.chmod(0o755)
             manifest_file = payload / "manifest.json"
             manifest_file.write_bytes(b"{}")
+            manifest_file.chmod(0o644)
             data_file = payload / "data.txt"
             data_file.write_bytes(b"original-data")
+            data_file.chmod(0o644)
 
             # Expected manifest has original expected bytes for both files
             members = [

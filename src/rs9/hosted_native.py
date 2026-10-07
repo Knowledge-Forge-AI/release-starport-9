@@ -1,6 +1,4 @@
 """Real native package preparation and unprivileged runtime helpers."""
-import hashlib
-import os
 from pathlib import Path
 import re
 from typing import Any
@@ -26,30 +24,9 @@ _COMPILED_EXCLUDES = [re.compile(p) for p in EXCLUDED_INVENTORY_PATTERNS]
 
 def is_excluded_inventory_path(rel_path: str) -> bool:
     """Check if relative file path belongs to documented package manager db/cache."""
-    clean = rel_path.lstrip("/").replace("\\", "/")
-    return any(p.search(clean) is not None for p in _COMPILED_EXCLUDES)
-
-
-def capture_system_inventory(root: Path | str) -> dict[str, str]:
-    """Capture file hash inventory of client installation root, excluding package cache."""
-    root_path = Path(root).resolve()
-    inventory: dict[str, str] = {}
-    if not root_path.exists():
-        return inventory
-    for path in sorted(root_path.rglob("*")):
-        try:
-            rel = path.relative_to(root_path).as_posix()
-        except ValueError:
-            continue
-        if is_excluded_inventory_path(rel):
-            continue
-        if path.is_file() and not path.is_symlink():
-            inventory[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
-        elif path.is_symlink():
-            inventory[rel] = f"symlink:{os.readlink(path)}"
-        elif path.is_dir():
-            inventory[rel] = "dir"
-    return inventory
+    # Inventory paths are already validated relative paths. A backslash is a
+    # filename byte on Linux, not a separator or an exclusion alias.
+    return any(p.search(rel_path) is not None for p in _COMPILED_EXCLUDES)
 
 
 def compare_inventories(

@@ -1,8 +1,20 @@
 # Attended Theme Forge LIVE1 preparation and future publication contract
 
-Status: **Hosted run 5 not qualified; gates-repair candidate pending dispatcher review; production disabled**.
+Status: **CONT8R2 partial diagnostic source candidate; native run 7 pending; production disabled**.
 
-The cumulative candidate addresses run-5 RS9 harness and metadata failures. Exact Linux Nix and RPM failure replay remains unavailable locally and is recorded as unresolved evidence. The dispatcher owns both review checkpoints and finalization. Manager acceptance of the exact reviewed bytes precedes attended adoption. The producer never stages, commits, pushes, or invokes a reviewer.
+CONT8R1 is retained partial work, including all 35 inherited paths and twelve
+terminal corrections. Its terminal tree was not independently rereviewed.
+CONT8R2 prepares a separate reviewed source handoff for non-production B–E
+native diagnostics and a pinned candidate-only PRoot experiment. The existing
+required Linux Nix lanes remain authoritative for the full verdict. Their failure
+means not-qualified; absent or failed evidence is never an allowed-pass alias.
+The dispatcher owns both review checkpoints and finalization. Source providers
+never stage, commit, push, run hosted Actions, or select a reviewer.
+
+See [scoped source evidence](../../evidence/live1/cont8r2-scoped-qualification-verification.json)
+and the [Linux runtime ADR](../../docs/adr/0008-nix-linux-runtime-without-user-namespaces.md).
+The [inherited evidence](../../evidence/live1/cont8r1-evidence-led-repair-verification.json)
+is historical repair input, not hosted run-7 evidence.
 
 `rs9.operator` publication commands remain disabled. Burst is architecture-specific in wheels, pacman, RPM and APT; its complete foreign prebuild inventory is retained. Installed released-loader proofs are required in every Burst runtime lane. Production Linux wheel compatibility remains unproved. No product is omitted to obtain a qualified verdict.
 
@@ -18,39 +30,96 @@ The cumulative candidate addresses run-5 RS9 harness and metadata failures. Exac
 - **Corroboration states**: npm comparison records `blocked` when an unrelated profile failure prevents comparison, and preserves `pass` when a later failure follows completed npm checks. Overall authentication still requires every selected profile to pass. Any closeout amendment requires manager disposition of the exact terminal delta.
 - **Registry availability**: Hosted run 3 passed exact version `0.6.1` packument/tarball transport. Fresh authentication must retain any new `NPM_IDENTITY` or HTTP failure as evidence; never substitute `latest`, another version or registry, or retry failed hosted jobs automatically.
 
-## Source adoption and one new hosted run 6
+## Partial diagnostic adoption and attended run 7
 
-Run `37228170217` is not qualified (`HOSTED_GATES`). Do not rerun it.
-The [repair evidence](../../evidence/live1/hosted5-gates-repair-verification.json)
-records the amended proposal, source verification, and unavailable native replay.
-No runner security setting is changed on an unproved hypothesis. The released
-Nebular payload and verifier semantics remain unchanged. Pages and Foundation3
-continue to require complete native custody.
+The manifest and operator readiness share a closed `readiness` block:
+`source_adoption_scope=partial-diagnostic`, known unqualified Linux Nix A lanes,
+`full_live1_qualification=false`, `published_linux_nix_ready=false`,
+`production_enabled=false`, and `publication_authority=false`. The source
+adoption Boolean means eligibility for one attended diagnostic adoption after
+source checks, exact independent review and manager disposition. It does not
+approve packages or publication. A's unresolved runtime no longer withholds
+B–E native collection. This candidate keeps both source readiness Booleans false.
+The manager can authorize the exact terminal source through an external
+attestation without flipping either Boolean or changing any manifest row.
+This is a source review condition; A remains a required qualification gate.
 
-After dispatcher acceptance, supply the exact accepted tree and candidate-manifest
-SHA-256 as `RS9_REVIEWED_TREE` and `RS9_MANIFEST_SHA256`. The attended operator
-requires parent `a09fcc21c68c292cd526033bb2ecebccf3167b90`, main, remote parity,
-and the complete reviewed product delta. Use a new empty physical packet directory
-below the manager outbox, set `RS9_PACKET_DIR` to it, and require its sibling
-operator log to be absent:
+The dispatcher review covers its bound pre-closeout candidate. Terminal
+amendments are listed in the source verification record and have scoped tests;
+they have no subsequent independent review. The manager must disposition that
+exact delta and the terminal tree/digest before issuing the attestation. The
+provider does not create acceptance evidence or authorize adoption.
 
-~~~sh
-rtk proxy python3 operators/live1/run-hosted6.py \
-  --reviewed-tree "$RS9_REVIEWED_TREE" \
-  --manifest-sha256 "$RS9_MANIFEST_SHA256" \
-  --output "$RS9_PACKET_DIR"
+The manager writes a physical JSON file outside the checkout, at most 16 KiB,
+with exactly these fields and the accepted terminal bindings:
+
+~~~json
+{
+  "schema": "rs9.manager-source-adoption-attestation.v1alpha1",
+  "decision": "accept",
+  "source_adoption_scope": "partial-diagnostic",
+  "reviewed_parent": "<accepted parent commit>",
+  "reviewed_tree": "<accepted cumulative terminal tree>",
+  "manifest_sha256": "<accepted terminal manifest digest>",
+  "full_live1_qualification": false,
+  "production_enabled": false,
+  "publication_authority": false
+}
 ~~~
 
-This stages only reviewed paths, creates a normal commit, fast-forward pushes,
-and waits for exactly one new push event for that commit. It retains every job,
-step, artifact, and full summary; full stdout/stderr goes to the exclusive log.
-Terminal output is bounded to `LOG`, `RC`, and `MANAGER_PACKET`. Stop for manager
-disposition. No rerun, production upload, deploy, signing, native repository
-publication, npm/Homebrew mutation, or Theme Forge release mutation is authorized.
+Supply its SHA-256 as a separate attended input. This digest binds bytes; it is
+not a signature or proof of the manager's identity. Missing, duplicate, extra,
+changed, symlinked, in-checkout or publication-authorizing records fail before
+Git actions. The wrapper and shared adopter check the record, and the adopter
+checks it again immediately before staging. Readiness metadata remains unchanged.
+
+The [operator](run-hosted7.py) was prepared, not executed. After exact manager
+acceptance, supply the reviewed parent, cumulative terminal tree, manifest digest
+and a new empty physical result directory:
+
+~~~sh
+rtk proxy env PYTHONDONTWRITEBYTECODE=1 python3 operators/live1/run-hosted7.py \
+  --reviewed-parent "$RS9_ACCEPTED_PARENT" \
+  --reviewed-tree "$RS9_ACCEPTED_TREE" \
+  --manifest-sha256 "$RS9_ACCEPTED_MANIFEST_SHA256" \
+  --manager-attestation "$RS9_MANAGER_ATTESTATION" \
+  --manager-attestation-sha256 "$RS9_MANAGER_ATTESTATION_SHA256" \
+  --output "$RS9_RUN7_PACKET_DIR"
+~~~
+
+The operator checks main, current remote parent, clean index, complete inventory
+and cumulative `changed_paths`. It stages exactly that set, rechecks the resulting
+tree and normal commit parent, makes one fast-forward push, and collects a NEW
+run for that commit with `event=push` and attempt 1. It stops after collecting
+terminal jobs, artifacts and summary. No automatic retry/rerun, dispatch,
+publication, Pages deployment, production signing, registry or tap writes occur.
+Its exclusive combined log stays in a file; output is `LOG=`, `RC=` and
+`MANAGER_PACKET=`. RC=2 is not a pass; inspect the packet classification and
+per-lane evidence.
+
+Native package/observe jobs retain their independent authenticated-input graph.
+The separate `nix-proot` job has declared experiment artifacts and no authority
+over the original required gates. It does not cancel B–E or join summary's needs.
+An experiment artifact is optional only for a skipped experiment job and must
+be custody/provenance verified when present. A failed experiment leaves its own
+fail/not-run receipt; no execution step uses continue-on-error to produce green.
+A passing experiment cannot qualify the unchanged buildFHSEnv recipe.
+
+`diagnostic_scope` is saved before qualification errors. Source-bound summary
+receipts and individually authenticated artifacts retain pass/fail/missing states
+for every required lane, even if another artifact cannot be collected. The packet
+classifies A-only failure, A plus other gate failures, B–E failure, collection
+failure and timeout distinctly. Full qualification still requires every original
+required job, step and gate plus exact artifact custody. Experimental job failure
+is recorded separately from that verdict; workflow failure remains observable.
+RPM 6 signed-query transcripts, native APT/DNF/Arch inventory baselines and full
+install/probe/remove cleanliness, and all application runtime results are owed
+to run 7. Source unit tests are not those native results.
 
 ## Collection recovery and retained historical operators
 
-The historical `run-hosted5.py` remains for audit only. Do not invoke it.
+The historical `run-hosted5.py` and `run-hosted6.py` remain for audit only.
+Do not invoke them.
 The run-6 wrapper supplies its source `PYTHONPATH` and disables child bytecode writes.
 It preserves existing logs and never advertises a stale packet after preflight failure.
 Collection defaults to two hours, with a six-hour maximum. Event, branch, attempt

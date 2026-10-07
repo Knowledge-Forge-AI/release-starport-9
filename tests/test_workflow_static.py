@@ -64,7 +64,8 @@ def workflow_contract_errors(text, contract):
     """Check the emitted workflow jobs, artifact names and timeouts against source."""
     jobs = _parse_yaml(text)["jobs"]
     errors = []
-    if set(jobs) != set(contract["required_jobs"]):
+    expected_jobs = set(contract["required_jobs"]) | set(contract.get("experiment_jobs", []))
+    if set(jobs) != expected_jobs:
         errors.append("required-jobs")
     matrices = generate_matrix_outputs(contract)
     matrix_lanes = set()
@@ -81,6 +82,17 @@ def workflow_contract_errors(text, contract):
             source = next(l for l in contract["lanes"] if (l["lane"], l["system"]) == (lane, row["system"]))
             if any(row[key] != source[key] for key in ("artifact_name", "timeout_minutes", "runner")):
                 errors.append(name + ":matrix-source")
+    for exp_job in contract.get("experiment_jobs", []):
+        job = jobs.get(exp_job, {})
+        if job.get("timeout-minutes") != "${{ matrix.timeout_minutes }}":
+            errors.append(exp_job + ":timeout")
+        uploads = re.findall(r"(?m)^          name: (.+)$", job.get("text", ""))
+        if uploads != ["${{ matrix.artifact_name }}"]:
+            errors.append(exp_job + ":artifact")
+        for row in json.loads(matrices.get("matrix_experiments", '{"include": []}'))["include"]:
+            source = next((l for l in contract.get("experiments", []) if (l["lane"], l["system"]) == (row.get("lane", exp_job), row["system"])), None)
+            if source and any(row[key] != source[key] for key in ("artifact_name", "timeout_minutes", "runner")):
+                errors.append(exp_job + ":matrix-source")
     expected_matrix = {(l["lane"], l["system"]) for l in contract["lanes"]
                        if l["lane"] in {"wheels", "nix", "pacman", "rpm", "deb"}}
     if matrix_lanes != expected_matrix:
@@ -185,10 +197,37 @@ class WorkflowStaticTests(unittest.TestCase):
         self.assertIn("matrix_wheels", config_outputs)
         self.assertIn("matrix_nix", config_outputs)
         self.assertIn("matrix_native", config_outputs)
+        self.assertIn("matrix_experiments", config_outputs)
 
         for job_name in ("wheels", "nix", "native"):
             matrix_expr = jobs[job_name]["strategy"]["matrix"]
             self.assertIn(f"needs.config.outputs.matrix_{job_name}", str(matrix_expr))
+
+        self.assertIn("needs.config.outputs.matrix_experiments", str(jobs["nix-proot"]["strategy"]["matrix"]))
+
+    def test_nix_proot_job_is_independent(self):
+        doc = _parse_yaml(self.text)
+        jobs = doc.get("jobs", {})
+        self.assertIn("nix-proot", jobs)
+        nix_proot = jobs["nix-proot"]
+        self.assertEqual(set(nix_proot.get("needs", [])), {"config", "authenticate", "pins"})
+        # summary and foundation3 must not depend on nix-proot
+        self.assertNotIn("nix-proot", jobs.get("summary", {}).get("needs", []))
+        self.assertNotIn("nix-proot", jobs.get("foundation3", {}).get("needs", []))
+
+    def test_nix_proot_job_is_strict_experiment_only(self):
+        doc = _parse_yaml(self.text)
+        job = doc["jobs"]["nix-proot"]
+        text = job["text"]
+        self.assertNotIn("continue-on-error", text)
+        self.assertNotIn("if: always()", text)
+        self.assertNotIn("flake check", text)
+        self.assertIn("python3 -m rs9.hosted_pipeline 'nix-proot'", text)
+        self.assertEqual(re.findall(r"(?m)^          name: (.+)$", text), ["${{ matrix.artifact_name }}"])
+        # No other job is gated on the experiment, so a failed experiment cannot block the Q handoff.
+        for name, other in doc["jobs"].items():
+            if name != "nix-proot":
+                self.assertNotIn("nix-proot", other.get("needs", []), name)
 
     def test_summary_aggregates_use_not_cancelled(self):
         doc = _parse_yaml(self.text)

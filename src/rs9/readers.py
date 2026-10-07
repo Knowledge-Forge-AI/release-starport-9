@@ -400,12 +400,20 @@ def _normalized_npm_bin(name, value):
     Reference: npm/npm-normalize-package-bin v3.0.1, lib/index.js.
     Colliding normalized command names remain ambiguous and fail closed.
     """
+    is_list = isinstance(value, list)
     if isinstance(value, str):
-        value = {name: value}
-    elif isinstance(value, list):
+        cmd_name = name.rsplit("/", 1)[-1] if isinstance(name, str) else name
+        value = {cmd_name: value}
+    elif is_list:
         if not all(isinstance(path, str) for path in value):
             raise ContractError("NPM_METADATA", "Unsupported bin array")
-        value = {posixpath.basename(path): path for path in value}
+        value_dict = {}
+        for path in value:
+            cmd = posixpath.basename(path)
+            if cmd in value_dict:
+                raise ContractError("NPM_METADATA", "Duplicate array basename aliases")
+            value_dict[cmd] = path
+        value = value_dict
     elif value is None:
         return {}
     if not isinstance(value, dict):
@@ -414,12 +422,16 @@ def _normalized_npm_bin(name, value):
     for command, target in value.items():
         if not isinstance(command, str) or not isinstance(target, str):
             raise ContractError("NPM_METADATA", "String bin names and targets required")
-        command = posixpath.normpath("/" + posixpath.basename(command.replace("\\", "/").replace(":", "/"))).lstrip("/")
-        target = posixpath.normpath("/" + target.replace("\\", "/").lstrip("/")).lstrip("/")
-        if not command or not target:
+        validate_safe_relative_posix_path(command)
+        if "/" in command or ":" in command:
+            raise ContractError("NPM_METADATA", "Ambiguous bin command alias")
+        if not command:
             raise ContractError("NPM_METADATA", "Empty normalized bin entry")
+        if target.startswith("./"):
+            target = target[2:]
+        validate_safe_relative_posix_path(target)
         if command in result:
-            raise ContractError("NPM_METADATA", "Ambiguous normalized bin entry")
+            raise ContractError("NPM_METADATA", "Duplicate array basename aliases" if is_list else "Ambiguous normalized bin entry")
         result[command] = target
     return result
 

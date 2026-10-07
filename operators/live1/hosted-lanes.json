@@ -348,5 +348,74 @@
     "observe",
     "foundation3",
     "summary"
+  ],
+  "experiment_jobs": [
+    "nix-proot"
+  ],
+  "experiments": [
+    {
+      "lane": "nix-proot",
+      "system": "x86_64-linux",
+      "runner": "ubuntu-24.04",
+      "timeout_minutes": 90,
+      "module": "rs9.hosted_nix_proot",
+      "artifact_name": "experiment-nix-proot-x86_64-linux",
+      "experiment_gates": [
+        "proot-pinned-derivation",
+        "proot-no-userns-ptrace",
+        "proot-executable-self",
+        "proot-descendant-interpreter",
+        "proot-closure-resolution",
+        "proot-args-exit-signals",
+        "proot-in-guest-offline",
+        "proot-webkit-sandbox-state",
+        "proot-verifier-smoke"
+      ],
+      "qualification_authority": false,
+      "custody_required": false,
+      "required_gates": [
+        "proot-pinned-derivation",
+        "proot-no-userns-ptrace",
+        "proot-executable-self",
+        "proot-descendant-interpreter",
+        "proot-closure-resolution",
+        "proot-args-exit-signals",
+        "proot-in-guest-offline",
+        "proot-webkit-sandbox-state",
+        "proot-verifier-smoke"
+      ]
+    },
+    {
+      "lane": "nix-proot",
+      "system": "aarch64-linux",
+      "runner": "ubuntu-24.04-arm",
+      "timeout_minutes": 90,
+      "module": "rs9.hosted_nix_proot",
+      "artifact_name": "experiment-nix-proot-aarch64-linux",
+      "experiment_gates": [
+        "proot-pinned-derivation",
+        "proot-no-userns-ptrace",
+        "proot-executable-self",
+        "proot-descendant-interpreter",
+        "proot-closure-resolution",
+        "proot-args-exit-signals",
+        "proot-in-guest-offline",
+        "proot-webkit-sandbox-state",
+        "proot-verifier-smoke"
+      ],
+      "qualification_authority": false,
+      "custody_required": false,
+      "required_gates": [
+        "proot-pinned-derivation",
+        "proot-no-userns-ptrace",
+        "proot-executable-self",
+        "proot-descendant-interpreter",
+        "proot-closure-resolution",
+        "proot-args-exit-signals",
+        "proot-in-guest-offline",
+        "proot-webkit-sandbox-state",
+        "proot-verifier-smoke"
+      ]
+    }
   ]
 }

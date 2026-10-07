@@ -59,7 +59,7 @@ class HostedContractTests(unittest.TestCase):
     def test_generate_matrix_outputs_partitions(self):
         lanes_doc = load_hosted_lanes(ROOT)
         matrices = generate_matrix_outputs(lanes_doc)
-        for key in ("matrix_wheels", "matrix_nix", "matrix_native", "matrix_candidate", "lanes"):
+        for key in ("matrix_wheels", "matrix_nix", "matrix_native", "matrix_candidate", "matrix_experiments", "lanes"):
             self.assertIn(key, matrices)
             parsed = json.loads(matrices[key])
             self.assertIsInstance(parsed, (dict, list))
@@ -75,6 +75,79 @@ class HostedContractTests(unittest.TestCase):
         self.assertEqual(len(native), 5)
         native_lanes = {n["lane"] for n in native}
         self.assertEqual(native_lanes, {"pacman", "rpm", "deb"})
+
+        experiments = json.loads(matrices["matrix_experiments"])["include"]
+        self.assertEqual(len(experiments), 2)
+        self.assertEqual({e["system"] for e in experiments}, {"x86_64-linux", "aarch64-linux"})
+        for e in experiments:
+            self.assertEqual(e["lane"], "nix-proot")
+            self.assertTrue(e["artifact_name"].startswith("experiment-nix-proot-"))
+
+    def test_experiment_rows_are_source_declared_diagnostic_only(self):
+        doc = json.loads((ROOT / "operators/live1/hosted-lanes.json").read_bytes())
+        rows = doc["experiments"]
+        self.assertEqual({r["system"] for r in rows}, {"x86_64-linux", "aarch64-linux"})
+        self.assertEqual(doc["experiment_jobs"], ["nix-proot"])
+        for row in rows:
+            self.assertIs(row["qualification_authority"], False)
+            self.assertEqual(row["experiment_gates"], row["required_gates"])
+            self.assertEqual(len(set(row["required_gates"])), 9)
+            self.assertIn("proot-in-guest-offline", row["required_gates"])
+        # Experiments never join the required graph or the production lane set.
+        self.assertTrue(set(doc["experiment_jobs"]).isdisjoint(doc["required_jobs"]))
+        self.assertTrue({r["lane"] for r in rows}.isdisjoint({r["lane"] for r in doc["lanes"]}))
+
+    def test_validate_hosted_experiment_diagnostic_contract(self):
+        from rs9.hosted_contract import validate_hosted_experiment_diagnostic, SCHEMA_HOSTED_EXPERIMENT_DIAGNOSTIC
+        valid_receipt = {
+            "schema": SCHEMA_HOSTED_EXPERIMENT_DIAGNOSTIC,
+            "lane": "nix-proot",
+            "system": "x86_64-linux",
+            "production_enabled": False,
+            "publication_authority": False,
+            "qualification_authority": False,
+            "application_qualified": False,
+            "mandatory_gates_satisfied": False,
+            "network": {
+                "runtime_offline_status": "pass",
+            },
+            "gates": [
+                {"name": "proot-in-guest-offline", "status": "pass", "runtime_offline_status": "pass"},
+                {"name": "proot-pinned-derivation", "status": "pass"},
+            ],
+        }
+        self.assertEqual(validate_hosted_experiment_diagnostic(valid_receipt), valid_receipt)
+
+        # A pass gate without the explicit in-guest denial field is not offline proof
+        implicit = dict(valid_receipt, gates=[{"name": "proot-in-guest-offline", "status": "pass"}])
+        with self.assertRaises(ContractError):
+            validate_hosted_experiment_diagnostic(implicit)
+
+        # A failed or not-run gate cannot back a pass either, whatever field it carries
+        for status in ("fail", "not-run"):
+            contradictory = dict(valid_receipt, gates=[
+                {"name": "proot-in-guest-offline", "status": status, "runtime_offline_status": "pass"}])
+            with self.assertRaises(ContractError):
+                validate_hosted_experiment_diagnostic(contradictory)
+
+        # Rejects qualification_authority = True
+        bad_auth = dict(valid_receipt, qualification_authority=True)
+        with self.assertRaises(ContractError):
+            validate_hosted_experiment_diagnostic(bad_auth)
+
+        # Rejects production_enabled = True
+        bad_prod = dict(valid_receipt, production_enabled=True)
+        with self.assertRaises(ContractError):
+            validate_hosted_experiment_diagnostic(bad_prod)
+
+        # Rejects pass-by-absence-of-error for runtime_offline_status
+        fake_offline = {
+            **valid_receipt,
+            "network": {"runtime_offline_status": "pass"},
+            "gates": [{"name": "proot-pinned-derivation", "status": "pass"}],  # missing proot-in-guest-offline pass
+        }
+        with self.assertRaises(ContractError):
+            validate_hosted_experiment_diagnostic(fake_offline)
 
     def test_canonical_release_auth_projection_strips_ephemeral_fields(self):
         auth_run_1 = {

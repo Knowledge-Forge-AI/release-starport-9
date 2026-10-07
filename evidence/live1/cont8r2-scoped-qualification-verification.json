@@ -1,0 +1,811 @@
+{
+  "closeout": {
+    "additional_reporting_paths": [
+      "evidence/live1/cont8r2-scoped-qualification-verification.json",
+      "operators/live1/candidate-manifest.json"
+    ],
+    "dispatcher_finalization": "Not asserted by provider; dispatcher owns Git/publication/archive outcomes.",
+    "disposition": "amend",
+    "exact_final_reporting_hashes": "Bound by final manifest and terminal result; no self-referential evidence hash.",
+    "manager_attestation_issued": false,
+    "manager_source_adoption_authorized": false,
+    "provider_local_actions": "Source edits and tests only; attended operator unexecuted; no staging, commit, push, hosted execution, publication or host/controller configuration.",
+    "python_profile": {
+      "decision": "Task-authorized narrow corrections to existing responsibility; preserve scopes and gates; no dependency or broad refactor.",
+      "decomposition": "Further runtime-module decomposition deferred outside this correction phase.",
+      "fallback_measurement": [
+        {
+          "path": "src/rs9/candidate_readiness.py",
+          "reviewed_lines": 38,
+          "terminal_lines": 92
+        },
+        {
+          "path": "src/rs9/adopt_candidate.py",
+          "reviewed_lines": 264,
+          "terminal_lines": 279
+        },
+        {
+          "path": "src/rs9/build_rpm.py",
+          "reviewed_lines": 647,
+          "terminal_lines": 654
+        },
+        {
+          "path": "src/rs9/hosted_packaging.py",
+          "reviewed_lines": 495,
+          "terminal_lines": 492
+        },
+        {
+          "path": "src/rs9/hosted_pipeline.py",
+          "reviewed_lines": 239,
+          "terminal_lines": 239
+        },
+        {
+          "path": "src/rs9/nix_proot.py",
+          "reviewed_lines": 1083,
+          "terminal_lines": 1183
+        }
+      ],
+      "legacy_exception": "nix_proot already exceeded 1000 physical lines in the reviewed candidate; task authorizes bounded fixes to existing probe contracts. Broader decomposition remains deferred.",
+      "level": "Orange",
+      "rollback": "Restore only terminal corrections from dispatcher-bound reviewed source and refresh cumulative manifest; retain inherited candidate.",
+      "signals": "Attended external-input/Git adapter and bounded process signal control; existing large runtime module."
+    },
+    "rationale": "Resolve source handoff and probe/query defects while keeping all required gates and production boundaries.",
+    "review_findings": [
+      {
+        "disposition": "amend",
+        "id": "MEDIUM-1",
+        "resolution": "External closed manager attestation binds accepted terminal parent/tree/manifest digest and its separately attended SHA256; source readiness remains false. Wrapper and adopter validate it, with a pre-staging recheck. No source Boolean/manifest-row transition or provider-issued acceptance."
+      },
+      {
+        "disposition": "amend",
+        "id": "LOW-2",
+        "resolution": "Guest baseline NNP/seccomp recorded; fields always labelled confounded under candidate PRoot acceleration and checked only for consistency. Enabled WebKit bwrap-parent observation remains mandatory and separately attributed."
+      },
+      {
+        "disposition": "amend",
+        "id": "LOW-3",
+        "resolution": "Outer signal target/delivery scope recorded; isolated process-group control on unobserved delivery or timeout remains diagnostic and never overrides the forwarding failure. No outer-delivery fallback may claim group delivery; responsible layer remains unproven."
+      },
+      {
+        "disposition": "amend",
+        "id": "LOW-4",
+        "resolution": "Gate outside_other memory mappings after explicit kernel anonymous mapping exclusions; validate direct absolute ldd/interpreter lines against closure or pinned foreign interpreter."
+      },
+      {
+        "disposition": "amend",
+        "id": "LOW-5",
+        "resolution": "Production promotion blockers separated from experiment policy failure, so passing experiment gates/offline may report pass while application/qualification authority stay false. Retain collection-failure on experiment custody/integrity failure because aggregate packet integrity is incomplete; required B-E evidence persists."
+      },
+      {
+        "disposition": "amend",
+        "id": "LOW-6",
+        "resolution": "Reject exit-zero requirement-query stderr; isolate builder unsigned-query rpmdb/keyring; require distinct wrong signer before signing and executed wrong-key rejection before pass."
+      }
+    ],
+    "terminal_code_document_deltas": [
+      {
+        "path": "docs/live1-hosted-candidate.md",
+        "reviewed": {
+          "git_blob": "3b96e5bd702c7971982a245cf3035e51a953fece",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "57280d1188415c64bbe2bbb81dd9997825b462c66a680a6e1b5a13e443612780",
+        "terminal_size": 28405
+      },
+      {
+        "path": "operators/live1/RUNBOOK.md",
+        "reviewed": {
+          "git_blob": "b101f135594920ad052dac88d70499302060f4df",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "9be6bac8a436979d2f83540d109043eab5e82076a23b022518e9e2c54279926a",
+        "terminal_size": 19372
+      },
+      {
+        "path": "operators/live1/run-hosted7.py",
+        "reviewed": {
+          "git_blob": "69ca8224c25fe3017096cb18db73b24db9bbf918",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "5aa8918bb320093ec04d9dc47cf650cdde37dad7049198ab779d06678d97444d",
+        "terminal_size": 4650
+      },
+      {
+        "path": "src/rs9/adopt_candidate.py",
+        "reviewed": {
+          "git_blob": "c1b02c2dffc4eae7cd424079b33895fe41077571",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "de73b6b191b52626791173d4ca1b9aea203c0b203baa3054a2797071fb5c6098",
+        "terminal_size": 16532
+      },
+      {
+        "path": "src/rs9/build_rpm.py",
+        "reviewed": {
+          "git_blob": "e87491270d46aeb81e9ab70fa3c8ef96548cce64",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "3a58b713194922d3ad298bcbc0ededfb4bf4b755ce2daa2eff6e6573000f080a",
+        "terminal_size": 25690
+      },
+      {
+        "path": "src/rs9/candidate_readiness.py",
+        "reviewed": {
+          "git_blob": "2dd60e90ee2576abed2a0e9eefbe09f02db44d2b",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "d02481844b0e0a2739124bb0df9e8a85e603f9c3307ae4c14f50f1bcffef3dd4",
+        "terminal_size": 4630
+      },
+      {
+        "path": "src/rs9/hosted_packaging.py",
+        "reviewed": {
+          "git_blob": "2fee227cd3396c0694f60342dd263cd96d21b47f",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "5cde4beb06262d4edaa70630363aa158a88a11a1c039a87f16502996e6d68973",
+        "terminal_size": 29271
+      },
+      {
+        "path": "src/rs9/hosted_pipeline.py",
+        "reviewed": {
+          "git_blob": "811b5030969707b8eb77e953adf9c8e48e0d214f",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "9762d5d4aaef26252ffc6d6ded7a6c270643b64e26560e28cc472d3e1fa582df",
+        "terminal_size": 13804
+      },
+      {
+        "path": "src/rs9/nix_proot.py",
+        "reviewed": {
+          "git_blob": "82fde593720147087f9b8d58274b2e514a045fd6",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "cbbd3f1e2a3ab48620e54193ac0340be1ec216dd416883b49d483ce59efb3909",
+        "terminal_size": 59571
+      },
+      {
+        "path": "tests/test_build_rpm.py",
+        "reviewed": {
+          "git_blob": "02929f8206c202a4cf5c9e1540dc5bf6ac6e5801",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "958e287ca551baaa3e25c9cd20259752235340d11840e397d89ec323f2456270",
+        "terminal_size": 22853
+      },
+      {
+        "path": "tests/test_candidate_adoption.py",
+        "reviewed": {
+          "git_blob": "019aa7128f4da5b7341e69667822b949ae6b6ef1",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "c3e89852807ff2da6c9ec2a25c9cdb7f13f6f15e9b0fcebbf2e36321fc16fb5c",
+        "terminal_size": 14032
+      },
+      {
+        "path": "tests/test_candidate_readiness.py",
+        "reviewed": {
+          "git_blob": "4324b9c37574c65aeea4fcd9ebaabcc47680de7b",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "e6e2da55dc8fd068e8e47f2669878e846366760d607e8bfc248f4716e2aabdb4",
+        "terminal_size": 5190
+      },
+      {
+        "path": "tests/test_diagnostic_collection.py",
+        "reviewed": {
+          "git_blob": "156333ee6273dd48d95b8bf90bab925dde0b0231",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "15e6e6ebdc8851ec7dbcbfe861f2e238346a96d831dd40e9c13b5b9ea8a0f7a0",
+        "terminal_size": 9725
+      },
+      {
+        "path": "tests/test_hosted_nix_proot.py",
+        "reviewed": {
+          "git_blob": "21e5acfb24b74554a4657488517d1fa834ccacff",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "8ca944dae86811bf42fb5cf8f9a263fa91e7cf1b57f429662133d374383e6069",
+        "terminal_size": 19748
+      },
+      {
+        "path": "tests/test_hosted_packaging.py",
+        "reviewed": {
+          "git_blob": "8b316c274add99447d3b39423c75b30f6606a771",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "532e0840b3cf9ad494e21c9ae9fe95ff1152ead6ee73b299762a5f685a474bb4",
+        "terminal_size": 51342
+      },
+      {
+        "path": "tests/test_nix_proot.py",
+        "reviewed": {
+          "git_blob": "22c62f576ed42e5b822064c609bcb5fdb9f5c097",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "8298eca0d573798f0deac528e80a1a460b1de2848b51bf29d82ff33db387eb58",
+        "terminal_size": 59818
+      },
+      {
+        "path": "tests/test_run_hosted7.py",
+        "reviewed": {
+          "git_blob": "7932b072799e67c04d1bc13adc4f58b7087a798a",
+          "mode": "100644"
+        },
+        "terminal_mode": "100644",
+        "terminal_sha256": "5508707ccafd774a1b77815b33d5f955f1fa923cdae1a722f471fe19d30ee9c1",
+        "terminal_size": 5197
+      }
+    ],
+    "worker": {
+      "bounded_scope": [
+        "src/rs9/nix_proot.py",
+        "tests/test_nix_proot.py"
+      ],
+      "cleanup_proven": true,
+      "disposition": "accepted-with-parent-amendments",
+      "kind": "gemini",
+      "status": "used",
+      "substantive_review": false
+    }
+  },
+  "closeout_verification": {
+    "commands": {
+      "cumulative": "rtk proxy env PYTHONPATH=src:tests PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning; child-local umask 022/077, unittest.defaultTestLoader.discover and TextTestRunner",
+      "diff": "rtk git diff --check",
+      "fixture": "Same harness for test_hosted_smoke under child-local umasks 022 and 077",
+      "focused": "Same ResourceWarning-as-error harness with loadTestsFromNames for the twenty-two producer focused modules",
+      "static": "In-memory Python AST/compile, embedded scanner/observer compilation, seven nix-instantiate --parse checks, bounded credential scan, local link existence, full manifest and live semantic parent/required-lane/job/preservation checks"
+    },
+    "cumulative": [
+      {
+        "errors": 0,
+        "failures": 0,
+        "passed": 1205,
+        "resource_warning": "error",
+        "skipped": 14,
+        "tests_run": 1219,
+        "umask": "022"
+      },
+      {
+        "errors": 0,
+        "failures": 0,
+        "passed": 1205,
+        "resource_warning": "error",
+        "skipped": 14,
+        "tests_run": 1219,
+        "umask": "077"
+      }
+    ],
+    "final_reporting_verification": "Required post-refresh inventory/readiness/operator/hygiene checks and diff check are reported in terminal result",
+    "focused_final": {
+      "errors": 0,
+      "failures": 0,
+      "passed": 435,
+      "resource_warning": "error",
+      "skipped": 3,
+      "tests_run": 438,
+      "umask": "022"
+    },
+    "native_evidence": "pending externally; not run locally",
+    "reporting_only_after_terminal_tests": true,
+    "resource_warning": "error",
+    "rtk": "Shell commands prefixed; rtk 0.43.0 resolved and rewrite verified. Metrics tracking database unavailable under sandbox; no environment/configuration change.",
+    "static_checks": {
+      "credential_scan_files": 346,
+      "cumulative_paths": 60,
+      "embedded_scripts_parsed": 2,
+      "inherited_paths_retained": 35,
+      "linux_builds": "pending externally",
+      "local_links_checked": 17,
+      "missing_links": [],
+      "nix_evaluation": "not-run",
+      "nix_files_parsed": 7,
+      "python_apg_fallback_physical_lines": [
+        {
+          "path": "src/rs9/candidate_readiness.py",
+          "reviewed_lines": 38,
+          "terminal_lines": 92
+        },
+        {
+          "path": "src/rs9/adopt_candidate.py",
+          "reviewed_lines": 264,
+          "terminal_lines": 279
+        },
+        {
+          "path": "src/rs9/build_rpm.py",
+          "reviewed_lines": 647,
+          "terminal_lines": 654
+        },
+        {
+          "path": "src/rs9/hosted_packaging.py",
+          "reviewed_lines": 495,
+          "terminal_lines": 492
+        },
+        {
+          "path": "src/rs9/hosted_pipeline.py",
+          "reviewed_lines": 239,
+          "terminal_lines": 239
+        },
+        {
+          "path": "src/rs9/nix_proot.py",
+          "reviewed_lines": 1083,
+          "terminal_lines": 1183
+        }
+      ],
+      "python_files_parsed_compiled": 194,
+      "required_lanes_and_jobs_match_public_parent": true,
+      "unchanged_from_reviewed_source": [
+        "src/rs9/hosted_wheels.py",
+        "src/rs9/hosted_commands.py",
+        "src/rs9/hosted_smoke.py",
+        "src/rs9/hosted_pins.py",
+        "src/rs9/hosted_candidate.py",
+        "src/rs9/compare.py",
+        "nix/nebular.nix",
+        "src/rs9/render.py",
+        "src/rs9/render_live.py",
+        "src/rs9/ingestion.py",
+        "flake.nix",
+        ".github/workflows/rs9-candidate-tests.yml"
+      ]
+    },
+    "status": "terminal-source-checks-pass;reporting-bytes-refreshed",
+    "targeted_fixture_umasks": [
+      {
+        "errors": 0,
+        "failures": 0,
+        "passed": 17,
+        "resource_warning": "error",
+        "skipped": 0,
+        "tests_run": 17,
+        "umask": "022"
+      },
+      {
+        "errors": 0,
+        "failures": 0,
+        "passed": 17,
+        "resource_warning": "error",
+        "skipped": 0,
+        "tests_run": 17,
+        "umask": "077"
+      }
+    ],
+    "unrun": [
+      "Native Linux builds/evaluation and B-E package lifecycle results pending run 7",
+      "External link/network readback not run",
+      "No further independent substantive review"
+    ]
+  },
+  "deferred_native_evidence": [
+    "RPM6 signed keyed/keyless transcripts and signature negatives",
+    "APT amd64/arm64 and DNF/Arch native baselines and clean install/probe/remove",
+    "Homebrew exact native observation",
+    "PRoot both architectures closure/runtime/WebKit/verifier/smoke execution",
+    "legacy A required product gates"
+  ],
+  "experiment": {
+    "application_qualified": false,
+    "attribute": "experiments.<linux-system>.theme-forge-nebular-fusion-proot",
+    "bounds": "closed-closure-path-list,ELF-count,output,observer-process-count,timeouts;overflow-fails;process-groups-terminated",
+    "closure_size_bytes": null,
+    "derivation_do_check": false,
+    "executable_self_limitation": "released-ELF-readback-from-sibling-guest-process-not-proof-of-internal-self-lookup",
+    "hosted_evidence_gaps": [
+      "Nix Linux evaluation/build and collision behavior",
+      "ptrace and path translation without userns on both Linux architectures",
+      "main and SEA internal executable-self/resource compatibility",
+      "native descendant loader/libc/module/helper resolution",
+      "released verifier and unchanged smoke",
+      "argument/exit/SIGTERM forwarding and orphan cleanup",
+      "independent in-guest network denial",
+      "actual enabled WebKit sandbox state"
+    ],
+    "license": "GPL-2.0-or-later-attached-to-upstream",
+    "native_execution": "not-run",
+    "pin_supply_chain": "existing-manager-pinned-nixpkgs-derivation-recursive-source-hash",
+    "platform_behavior": "pending-native-probes",
+    "published_linux_nix_ready": false,
+    "qualification_authority": false,
+    "recipe_blob_verified": "02766094fbf82ab7ee4425a14d480f061cbcdadc",
+    "rollback": "remove-experimental-attribute-adapter-probes-job-and-contract-rows",
+    "sandbox": "never-disabled;actual-WebKit-descendant-NNP-seccomp-bwrap-state-required"
+  },
+  "hosted_run_7": {
+    "attempt_required": 1,
+    "automatic_retry": false,
+    "event_required": "push",
+    "executed": false,
+    "operator": "operators/live1/run-hosted7.py"
+  },
+  "independent_review": {
+    "limitations": [
+      "Reviewer had no shell and did not rerun tests or recompute the delta; kit inbox records were unreadable to reviewer.",
+      "Terminal changes have provider-local verification only; no subsequent substantive review was obtained."
+    ],
+    "owner": "dispatcher",
+    "pre_final": "dispatcher-bound-read-only-reviewed-with-findings",
+    "provider_claims_independent_review": false,
+    "reviewed_manifest_sha256": "7f6d6a89d87c6dfc665b07cdb542472d2dce02f72d1c22a251a34d1fd0c231de",
+    "reviewed_tree": "e123441c6fc5c111abdc59d0d4e427921ef4c179",
+    "scope": "public parent plus all inherited paths and twelve corrections; readiness/gates/trust/inventory/dependency/WebKit/parity/operator",
+    "terminal_amendments_independently_reviewed": false
+  },
+  "kit_evidence": {
+    "all_eight_records_read": true,
+    "inherited_terminal_independently_rereviewed": false,
+    "retained_inherited_paths": 35,
+    "sha256": {
+      "04-final-review.result.json": "8004ed6a2ba4dd46e89a82b3fbe9e3b0717f43761a9284ac4ca05524c2212bdf",
+      "05-closeout.result.json": "36ab2c61b3e1ac39443b8e56a5d065a3119116884f92ae5a7af45e2a7f9c3e09",
+      "MANAGER-DISPOSITION.json": "5ea9d4c1f60ad11b02526db4e58ef61c23c4b237190cbed97875186d3abad797",
+      "REVIEW.md": "f0b25818dc0f25177975cb95edd7535359dc54d8608617820c4584cca7f199e5",
+      "SOURCE-RESULT-SUMMARY.json": "a38290b8e3f0e845a41010355814367a361e3f18a9887633a5e5628c8e076d8c",
+      "pinned-proot-source.json": "478a3230eae72735eb5bb3b5b993458ac8c1a12a107df07e57018f2f287c45eb",
+      "pinned-proot.nix": "a3645e7522a0199c8fae5aafbe2d980476aa32f422b612801d9a435974a1c96f",
+      "source-binding.json": "ea3612735c1d951e615c44819c3f075f60cc8ff9d39852e185db3d4adb1738c9"
+    },
+    "terminal_corrections": 12
+  },
+  "observed_work_stage_delta": {
+    "added_paths": [
+      "evidence/live1/cont8r2-scoped-qualification-verification.json",
+      "nix/nebular-proot-experiment.nix",
+      "src/rs9/candidate_readiness.py",
+      "src/rs9/hosted_nix_proot.py",
+      "src/rs9/nix_proot.py",
+      "tests/test_candidate_readiness.py",
+      "tests/test_diagnostic_collection.py",
+      "tests/test_hosted_nix_proot.py",
+      "tests/test_nix_proot.py",
+      "tests/test_scoped_workflow_graph.py"
+    ],
+    "comparison": "retained-entry-product-tree-evidence",
+    "modified_paths": [
+      ".github/workflows/rs9-candidate-tests.yml",
+      "docs/adr/0008-nix-linux-runtime-without-user-namespaces.md",
+      "docs/live1-hosted-candidate.md",
+      "flake.nix",
+      "operators/live1/RUNBOOK.md",
+      "operators/live1/candidate-manifest.json",
+      "operators/live1/hosted-lanes.json",
+      "operators/live1/readiness.json",
+      "operators/live1/run-hosted7.py",
+      "src/rs9/adopt_candidate.py",
+      "src/rs9/client_inventory.py",
+      "src/rs9/collect_candidate.py",
+      "src/rs9/errors.py",
+      "src/rs9/hosted_contract.py",
+      "src/rs9/hosted_deb.py",
+      "src/rs9/hosted_packaging.py",
+      "src/rs9/hosted_pipeline.py",
+      "src/rs9/hosted_summary.py",
+      "src/rs9/rpm_query.py",
+      "tests/test_candidate_adoption.py",
+      "tests/test_candidate_inventory.py",
+      "tests/test_client_inventory.py",
+      "tests/test_collect_candidate.py",
+      "tests/test_hosted_contract.py",
+      "tests/test_hosted_deb.py",
+      "tests/test_hosted_native.py",
+      "tests/test_hosted_packaging.py",
+      "tests/test_hosted_smoke.py",
+      "tests/test_rpm_query.py",
+      "tests/test_run_hosted7.py",
+      "tests/test_workflow_static.py"
+    ],
+    "path_count": 41,
+    "removed_paths": [],
+    "separate_from_full_cumulative_adoption_scope": true
+  },
+  "original_scope": {
+    "full_live1_qualification": false,
+    "production_enabled": false,
+    "provider_authority": "source-edits-and-tests-only",
+    "publication_authority": false,
+    "published_linux_nix_ready": false,
+    "track_a": "pinned candidate-only Linux PRoot experiment",
+    "track_q": "truthful independently runnable B-E non-production diagnostic handoff"
+  },
+  "plan_findings": [
+    {
+      "disposition": "amend",
+      "id": "HIGH-1",
+      "resolution": "Separate binding-only summary validation; individually source/custody-verified diagnostics persisted before summary qualification or artifact errors."
+    },
+    {
+      "disposition": "amend",
+      "id": "MED-2",
+      "resolution": "Declared experiments optional only for skipped jobs, verified if present; independent custody failures preserve required diagnostics; explicit in-guest offline gate."
+    },
+    {
+      "disposition": "amend",
+      "id": "MED-3",
+      "resolution": "Preserve exact exclusion predicates including embedded/trailing newline; no sampled-prefix proof or overbroad subtree pruning."
+    },
+    {
+      "disposition": "amend",
+      "id": "MED-4",
+      "resolution": "Explicit isolated RPM keyring/database configuration on pre/post queries; retain macros and signed transcripts, real negative checks."
+    },
+    {
+      "disposition": "amend",
+      "id": "MED-5",
+      "resolution": "Inventory frame/schema version, canonical parsing and bounded stats evolve together; old frames rejected."
+    },
+    {
+      "disposition": "amend",
+      "id": "LOW-6",
+      "resolution": "Manifest/readiness block alignment tested through operator preparation_status readback."
+    },
+    {
+      "disposition": "amend",
+      "id": "LOW-7",
+      "resolution": "Experiment output excluded from candidates/checks; builder identity changes and possible legacy flake-check unknown-output warning documented."
+    },
+    {
+      "disposition": "amend",
+      "id": "LOW-8",
+      "resolution": "Guest closure binding count, timings and timeout class retained where measured; no guessed closure measurements."
+    },
+    {
+      "disposition": "amend",
+      "id": "LOW-9",
+      "resolution": "Packet classification distinguishes A-only, A plus other required failures, B-E failure, collection failure and timeout; RC2 remains failure."
+    },
+    {
+      "disposition": "accept",
+      "id": "LOW-10",
+      "resolution": "Supplied recipe and source record read; sha256 a3645e7522a0199c8fae5aafbe2d980476aa32f422b612801d9a435974a1c96f and Git blob 02766094fbf82ab7ee4425a14d480f061cbcdadc matched."
+    }
+  ],
+  "preserved_boundaries": {
+    "deb_format": "uniform xz level6 single-thread with SOURCE_DATE_EPOCH",
+    "homebrew": "inherited authenticated exact identity and formula commit/tree binding",
+    "legacy_linux_nix_required_lanes": "authoritative unchanged",
+    "no_upstream_asset_mutation": true,
+    "wheel_and_darwin_runtime_source": "unchanged from inherited candidate"
+  },
+  "proposal": {
+    "bytes": 20117,
+    "disposition": "amend",
+    "reason": "Incorporate all plan-review findings; retain original required gates, bind partial diagnostics before qualification errors, and require honest native experiment evidence. Adoption readiness remains false until independent source review, rather than flipping before review.",
+    "sha256": "db82e032c8c6779e10fcd1cdfeb567c88c752401ad231e688d62215a69b0439a"
+  },
+  "readiness": {
+    "candidate_adoption_ready": false,
+    "full_live1_qualification": false,
+    "production_enabled": false,
+    "publication_authority": false,
+    "published_linux_nix_ready": false,
+    "reason": "external-manager-attestation-required-for-exact-terminal-source; source-Boolean-remains-false",
+    "source_adoption_scope": "partial-diagnostic"
+  },
+  "references": [
+    "https://rpm.org/docs/6.0.x/man/rpm-config.5",
+    "https://rpm.org/docs/6.0.x/man/rpmkeys.8",
+    "https://proot-me.github.io/"
+  ],
+  "schema": "rs9.cont8r2-scoped-source-verification.v1",
+  "scratch": {
+    "exception": "filesystem permission boundary requires temporary verification state in permitted system tmp instead of configured shared root",
+    "retention": "operator-review-only; sanitized summaries retained here"
+  },
+  "source_candidate": {
+    "base_parent": "515d460919ff22e9c323672aa9e4160278c53d6b",
+    "cumulative_changed_paths": 60,
+    "independent_review_claim": false,
+    "inherited_terminal_corrections": 12,
+    "retained_inherited_paths": 35,
+    "staging_commit_push_or_hosted_execution_performed": false,
+    "tree_and_manifest_digest": "Terminal result binds final full manifest after reporting refresh"
+  },
+  "stage": "implementation_testing-terminal-closeout",
+  "stage_deltas_at_entry": [],
+  "task": "RS9-LIVE1-THEME-FORGE-CONT8R2-SCOPED-QUALIFICATION1",
+  "unresolved_findings": [
+    "Exact manager disposition and external source-adoption attestation are pending; terminal amendments did not receive another independent review.",
+    "Native B-E results, signed RPM6 transcripts/negative checks, both DEB architectures, inventory baselines and install/probe/remove cleanliness, and Homebrew observation remain owed to one new push-bound run 7.",
+    "PRoot closure/platform measurements and all actual executable-self, SEA, descendant, smoke, signal, offline and enabled WebKit runtime evidence remain pending externally.",
+    "Legacy required Linux Nix A remains authoritative and unqualified; full LIVE1 qualification and published Linux Nix readiness remain false."
+  ],
+  "verification": {
+    "baseline_public_parent_umask_077": {
+      "errors": 0,
+      "failures": 3,
+      "fixture_failures": "three disclosed hosted_smoke mode fixtures",
+      "passed": 971,
+      "resource_warning": "error",
+      "skipped": 13,
+      "tests_run": 987
+    },
+    "cumulative": [
+      {
+        "errors": 0,
+        "failed_tests": [],
+        "failures": 0,
+        "passed": 1189,
+        "resource_warning": "error",
+        "skipped": 14,
+        "tests_run": 1203,
+        "umask": "022"
+      },
+      {
+        "errors": 0,
+        "failed_tests": [],
+        "failures": 0,
+        "passed": 1189,
+        "resource_warning": "error",
+        "skipped": 14,
+        "tests_run": 1203,
+        "umask": "077"
+      }
+    ],
+    "fixture_repair": "explicit intended chmod; no host/shell/global umask change",
+    "focused_final": {
+      "errors": 0,
+      "failed_tests": [],
+      "failures": 0,
+      "modules": [
+        "test_rpm_query",
+        "test_hosted_packaging",
+        "test_build_rpm",
+        "test_build_deb",
+        "test_client_inventory",
+        "test_hosted_deb",
+        "test_hosted_native",
+        "test_hosted_observe",
+        "test_candidate_readiness",
+        "test_candidate_inventory",
+        "test_candidate_adoption",
+        "test_collect_candidate",
+        "test_diagnostic_collection",
+        "test_run_hosted7",
+        "test_hosted_summary",
+        "test_workflow_static",
+        "test_scoped_workflow_graph",
+        "test_hosted_contract",
+        "test_nix_proot",
+        "test_hosted_nix_proot",
+        "test_hosted_nix",
+        "test_nix_loader"
+      ],
+      "passed": 419,
+      "resource_warning": "error",
+      "skipped": 3,
+      "tests_run": 422,
+      "umask": "022"
+    },
+    "hygiene": {
+      "credential_scan": "pass-full-inventory",
+      "diff_check": "pass",
+      "embedded_scanner_observer_parsed": true,
+      "manifest": "exact-full-cumulative-product-delta",
+      "private_path_scan": "pass-full-product-hygiene-test",
+      "python_files_parsed_compiled": 194,
+      "reporting_only_after_final_source_tests": true,
+      "required_lanes_and_jobs_match_public_parent": true,
+      "workflow_static_and_graph": "pass"
+    },
+    "local_links": {
+      "changed_markdown_links_checked": 17,
+      "missing": []
+    },
+    "nix_parse": {
+      "evaluation": "not-run",
+      "failed": [],
+      "linux_builds": "not-run",
+      "nix_files_parsed": 7
+    },
+    "parent_focused_rpm": {
+      "failures": 0,
+      "passed": 58,
+      "resource_warning": "error",
+      "skipped": 0,
+      "tests_run": 58
+    },
+    "preservation": {
+      "cumulative_paths": 60,
+      "inherited_paths": 35,
+      "inherited_paths_retained": true,
+      "missing_inherited": [],
+      "preserved_source_checks": [
+        {
+          "comparison": "unchanged-from-entry",
+          "path": "src/rs9/hosted_wheels.py"
+        },
+        {
+          "comparison": "unchanged-from-entry",
+          "path": "src/rs9/hosted_commands.py"
+        },
+        {
+          "comparison": "unchanged-from-entry",
+          "path": "src/rs9/hosted_smoke.py"
+        },
+        {
+          "comparison": "unchanged-from-entry",
+          "path": "src/rs9/hosted_pins.py"
+        },
+        {
+          "comparison": "unchanged-from-entry",
+          "path": "src/rs9/hosted_candidate.py"
+        },
+        {
+          "comparison": "unchanged-from-entry",
+          "path": "src/rs9/compare.py"
+        },
+        {
+          "comparison": "unchanged-from-entry",
+          "path": "nix/nebular.nix"
+        }
+      ],
+      "renderer_ingestion_unchanged_from_entry": [
+        "src/rs9/render.py",
+        "src/rs9/render_live.py",
+        "src/rs9/ingestion.py"
+      ]
+    },
+    "skip_categories": [
+      "host filesystem invalid filename constraint",
+      "sandbox local socket constraint",
+      "GnuPG unavailable",
+      "live captures absent",
+      "official installer archives absent"
+    ],
+    "status": "source-checks-complete-pre-final-candidate",
+    "targeted_fixture_umasks": [
+      {
+        "failures": 0,
+        "passed": 17,
+        "resource_warning": "error",
+        "skipped": 0,
+        "tests_run": 17,
+        "umask": "022"
+      },
+      {
+        "failures": 0,
+        "passed": 17,
+        "resource_warning": "error",
+        "skipped": 0,
+        "tests_run": 17,
+        "umask": "077"
+      }
+    ]
+  },
+  "workers": {
+    "all_attempts_cleanup_proven": true,
+    "dispatcher_checkpoint_satisfied_by_workers": false,
+    "experiment_parent_integration": "Adopted replacement partial source; completed closure roots, collision rejection, portable fixtures, explicit receipt/offline validation, exact closure maps, observed SIGTERM, bounded output/process cleanup and native-only caveats.",
+    "experiment_recovery": "first partial source had unsafe broad binds and unmeasured pass claims; deliberate abandonment, cleanup proven, linked amend replacement",
+    "gemini": "used for RPM/inventory and first experiment attempt",
+    "inventory_parent_integration": "Restored exact inherited newline-aware regex behavior; individual excluded-file hashing avoided without subtree pruning; V2 mandatory closed statistics, structured safe failures, stage counters/maxima and underreported-statistics rejection.",
+    "inventory_recovery": "first transport network failure, cleanup proven, second attempt linked amend",
+    "outcomes": {
+      "inventory-v1": "network-failed-no-meaningful-work-adopted",
+      "inventory-v2": "partial-adopted-and-parent-amended",
+      "proot-v1": "rejected-after-deliberate-abandonment",
+      "proot-v2": "partial-adopted-and-parent-amended",
+      "rpm-v1": "partial-adopted-and-parent-amended"
+    },
+    "rpm_parent_integration": "Corrected per-product metadata, path leakage, unique retained probes, wrong-key fixture validity, effective macro assertion, and nonzero executed negatives after worker completion.",
+    "sonnet": "used for bounded replacement experiment implementation; not independent review"
+  }
+}

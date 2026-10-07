@@ -1,0 +1,453 @@
+{
+  "attended_evidence": {
+    "application_qualification": false,
+    "arch": "Provisioning failed before inventory; original malformed baseline remains unknown.",
+    "collection": "partial-diagnostics",
+    "deb": "arm64 and all default zstd rejected; explicit gzip/xz accepted. Local amd64 packaging failed before archive creation.",
+    "fixture_qualification": false,
+    "read_only_packet_files": {
+      "MANAGER-DISPOSITION.json": "852242b21ad1b18e1955e3dcfafd739b31b8806dc96cdfcae08b2ff6f6ca0379",
+      "REVIEW.md": "fc74d9f5304ecd916127214c8377ffc3526c8d9acb250374958768aa8b926010",
+      "host-diagnostic-evidence.json": "ee01c702bea27f903998567a664f960fdf225cbe7eb64d3cc7073a1bdcedb1ce",
+      "reproduce-inventory-ambiguity.py": "5821b64c9b7ea6f8b146e7923bced5f7c73d418987a0fed69d42c63c7e2bb3af",
+      "source-binding.json": "d1a4d07fa5695c31dc1428eac9eb9f3cb00ef65343200ac9baa199834da772fc"
+    },
+    "rpm": "Legacy tag failure reproduced on both architectures; identity succeeds; querytags is capability evidence only.",
+    "schema": "rs9.cont8-host-diagnostics-review.v1",
+    "sha256": "ee01c702bea27f903998567a664f960fdf225cbe7eb64d3cc7073a1bdcedb1ce"
+  },
+  "candidate_inventory": {
+    "cumulative_changed_paths": 34,
+    "files_excluding_self_manifest": 335,
+    "method": "rs9.candidate_inventory complete candidate_paths/file_inventory/product_delta against public parent; source_tree calculation without index writes",
+    "self_reference": "Exact tree and manifest digest returned externally; not embedded in self-bound artifacts."
+  },
+  "handoff": {
+    "candidate_adoption_ready": false,
+    "operator": "operators/live1/run-hosted7.py",
+    "post_review_product_amendment": "requires-new-exact-manager-disposition",
+    "required_review": "entire-cumulative-delta-against-public-parent-including-inherited-six-path-work",
+    "runbook": "operators/live1/RUNBOOK.md",
+    "status": "prepared-not-executed; adoption-block-retained-pending-exact-manager-scope-and-candidate-disposition"
+  },
+  "observed_stage_deltas_before_production": [],
+  "original_scope": {
+    "areas": [
+      "A-linux-nix-no-userns",
+      "B-rpm-query-protocol",
+      "C-uniform-xz-deb",
+      "D-lossless-client-inventory",
+      "E-homebrew-observation"
+    ],
+    "preserve": [
+      "inherited-six-path-candidate",
+      "serena-operational-state",
+      "release-bytes-and-modes",
+      "pins-authentication",
+      "wheels",
+      "darwin-nix",
+      "repository-signing-tamper-custody",
+      "released-verifier-and-application-smoke"
+    ],
+    "qualification_boundary": "Source and hermetic contracts are separate from native hosted qualification."
+  },
+  "plan_review_findings": [
+    {
+      "action": "Both harness and rendered shadow remain explicitly userns-dependent and unqualified; no divergent replacement is shipped.",
+      "disposition": "accept",
+      "id": 1
+    },
+    {
+      "action": "ADR covers real cache/smoke binds, pinned tools, guest-only libc policy and offline harness isolation; bounded direct-loader and per-library GLIBC evaluation added. PRoot runtime and ptrace token remain conditional on dependency acceptance.",
+      "disposition": "accept",
+      "id": 2
+    },
+    {
+      "action": "RPM expected RELEASE is revision plus actual builder-expanded dist macro.",
+      "disposition": "accept",
+      "id": 3
+    },
+    {
+      "action": "Match inventory exclusion paths exactly, without backslash normalization.",
+      "disposition": "accept",
+      "id": 4
+    },
+    {
+      "action": "Bound scanner source, entries/files/output and host acceptance; disclose symmetric mode comparison.",
+      "disposition": "accept",
+      "id": 5
+    },
+    {
+      "action": "Inspect actual retained capture metadata; distinguish defensive multi-payload selection from live observation and preserve desktop supplemental npm policy.",
+      "disposition": "accept",
+      "id": 6
+    },
+    {
+      "action": "Run exact manager reproducer and retain its actual host-dependent result; test-local transcripts remain labelled fixtures.",
+      "disposition": "accept",
+      "id": 7
+    }
+  ],
+  "primary_references": [
+    "https://rpm.org/docs/6.0.x/manual/signatures_digests.html",
+    "https://raw.githubusercontent.com/rpm-software-management/rpm/master/include/rpm/rpmpgp.h",
+    "https://manpages.debian.org/trixie/dpkg/dpkg-deb.1.en.html",
+    "https://proot-me.github.io/"
+  ],
+  "production_boundary": {
+    "external_reviewer_invoked": false,
+    "hosted_run_6_rerun": false,
+    "hosted_run_7_started": false,
+    "production_enabled": false,
+    "publication_authority": false,
+    "publication_receipts": [],
+    "staged_committed_pushed": false,
+    "theme_forge_release_or_tag_mutated": false
+  },
+  "proposal_binding": {
+    "bytes": 29780,
+    "materialization_kind": "inline_stdout",
+    "profile": "opus-high-plan",
+    "provider": "claude",
+    "relative_path": "plan-material.md",
+    "schema": "agent-phase-plan-material-v1",
+    "sha256": "04bfa8c3bbd6935f892278b1b8564b199f3eccd8f37695c00424e292336dae80"
+  },
+  "proposal_disposition": {
+    "decision": "amend",
+    "entry_identity_policy": "Live semantic checks; prior free-form identities remain evidence rather than reconstructed entry gates.",
+    "original_scope_complete": false,
+    "reason": "Use readable attended evidence for B/C and controlled protocol evidence for D. Correct release suffixes and exact exclusion matching. Do not add an unapproved PRoot dependency or present loader diagnostics as an application runtime. Preserve original scope and explicitly retain A as open."
+  },
+  "remaining_native_qualification": [
+    "linux-nix-x86_64-aarch64-unmodified-app-runtime",
+    "rpm6-real-package-query-signature-lifecycle",
+    "native-amd64-deb-build-and-cross-lane-all-byte-equality",
+    "native-x86_64-arch-before-install-remove-after",
+    "dnf-apt-pages-shared-inventory-lifecycle",
+    "released-native-verifier-application-smoke"
+  ],
+  "repairs": {
+    "A": {
+      "adr": "docs/adr/0008-nix-linux-runtime-without-user-namespaces.md",
+      "blocked_by": "No authorized qualified replacement runtime; PRoot is a proposal requiring dependency review and acceptance.",
+      "dependency_added": false,
+      "diagnostics": [
+        "matching-pinned-loader-libc-closure",
+        "actual-ELF-GLIBC-needs-per-library-provider-definitions",
+        "normal-versus-direct-Python-Node-executable-self",
+        "release-byte-custody-before-after",
+        "no-diagnostic-can-qualify-application"
+      ],
+      "not_run": [
+        "native-Nix-evaluation-build",
+        "unmodified-native-app-and-child-execution",
+        "WebKit-helper-and-sidecar-discovery",
+        "native-signal-offline-smoke"
+      ],
+      "runtime": "existing-Linux-harness-and-shadow-still-userns-dependent-unqualified",
+      "source_status": "evaluated-design-with-diagnostics; replacement-open"
+    },
+    "B": {
+      "custody": "whole-file-SHA256-separate; fixture-signature-check-plus-identity-payload-preservation; native-build-manifest-and-Pages-custody-binding",
+      "digest": "closed-capability-discovery-querytags; compressed-SHA256-only; numeric-algorithm-8",
+      "identity": "four-fields-intended-name-version-expanded-release-architecture",
+      "legacy_stderr_sha256": "7d9d1aa567137d6c38111fd189312572c041a32da954bfa55fa8bf8b3f36ddd8",
+      "native_qualification": false,
+      "schema": "rs9.rpm-candidate.v1alpha2",
+      "source_status": "implemented"
+    },
+    "C": {
+      "dpkg_flags": [
+        "--build",
+        "--root-owner-group",
+        "-Zxz",
+        "-z6",
+        "--uniform-compression",
+        "--threads-max=1"
+      ],
+      "epoch_preserved": true,
+      "format": "closed-three-member-ar; exact-debian-binary-and-uniform-xz",
+      "native_amd64_and_cross_lane_equality_qualified": false,
+      "source_status": "implemented",
+      "unsupported_zstd": "INVALID_DEB/unsupported-control-compression"
+    },
+    "D": {
+      "limits": {
+        "depth": 128,
+        "entries": 200000,
+        "path_bytes": 4096,
+        "single_file_bytes": 536870912,
+        "stdout_bytes": 33554432,
+        "total_file_bytes": 4294967296
+      },
+      "limits_native_capacity_qualified": false,
+      "mode_comparison": "symmetrically-stricter-before-after-gate",
+      "native_arch_qualified": false,
+      "shared_callers": [
+        "APT",
+        "DNF",
+        "pacman",
+        "Pages"
+      ],
+      "source_status": "implemented",
+      "transport": "versioned-canonical-JSON; byte-base64-paths-targets; exact-length-SHA256-framing",
+      "walk": "fd-relative-no-follow-same-device; maintained-prunes-and-exact-exclusions; regular-file-race-checks; no-device-FIFO-read"
+    },
+    "E": {
+      "bin_targets": "one-leading-dot-slash-normalized; unsafe-alias-absolute-traversal-backslash-rejected",
+      "capture_evidence": {
+        "commands": [
+          "tfsb",
+          "tfsb-studio-service"
+        ],
+        "desktop_fixture": "tests/fixtures/nebular-0.6.1/live-observations.json",
+        "desktop_npm": "without accepted supplemental npm files remains unknown; native Darwin Homebrew policy preserved",
+        "fixture": "tests/fixtures/stellar-burst-0.6.1/release-record.json",
+        "multi_payload_change": "defensive; retained real capture does not itself demonstrate extra payloads",
+        "npm_payload_count": 1
+      },
+      "payload_selection": "npm-package-bin/root-package/platform-any/exact-authenticated-command-map; ambiguity-blocks",
+      "read_only_live_metadata": "not-run; no fresh destination exact/noop claim",
+      "source_status": "implemented-including-inherited-repair"
+    }
+  },
+  "schema": "rs9.cont8r1-evidence-led-repair-verification.v1",
+  "stage": "closeout",
+  "status": "terminal-amended-original-scope-blocked",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT8R1-EVIDENCE-LED-REPAIR1",
+  "terminal_closeout": {
+    "cumulative_product_paths": 35,
+    "dispatcher_finalization": "not-claimed; dispatcher owns Git publication and archival outcomes",
+    "disposition": "amend",
+    "entry_binding_check": "Read-only verify_inventory with explicit public parent reproduced dispatcher-bound producer tree before amendments; no Git metadata written.",
+    "independent_review_of_terminal_amendments": false,
+    "manager_acceptance_of_terminal_amendments": "pending-exact-disposition",
+    "outcome": "blocked",
+    "provider_actions": {
+      "committed": false,
+      "controller_or_host_configuration_modified": false,
+      "hosted_run_started": false,
+      "pushed": false,
+      "staged": false
+    },
+    "rationale": "Correct verified Homebrew/inventory defects and loader diagnostic preemption; retain B/C/D/E source repairs and inherited work. A has no authorized replacement runtime, so original five-area scope remains incomplete and adoption stays disabled.",
+    "reviewed_producer_manifest_sha256": "49ff574a8d6d01442a3749bde21cd283b6945716fd43c14945805d06cb7e4761",
+    "reviewed_producer_tree": "7d7b29959235c70f308a824c6aacdf82fe473055",
+    "source_completion": {
+      "A": false,
+      "B": true,
+      "C": true,
+      "D": true,
+      "E": true
+    },
+    "unresolved_concerns": [
+      "A-no-authorized-no-userns-runtime",
+      "exact-manager-disposition-of-terminal-amendments",
+      "native-RPM6-fixture-signed-query-stderr",
+      "native-shared-inventory-capacity",
+      "attended-native-package-and-application-qualification"
+    ],
+    "verification": {
+      "cumulative_unit_suite": {
+        "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest discover -s tests -q",
+        "exit_code": 0,
+        "process_umask": "022",
+        "skipped": 14,
+        "source_bytes": "after-terminal-source-amendments",
+        "status": "pass",
+        "tests": 1079
+      },
+      "externally_pending": "All native hosted package and application gates; no platform qualification claimed.",
+      "focused": {
+        "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_build_deb tests.test_build_rpm tests.test_client_inventory tests.test_hosted_deb tests.test_hosted_native tests.test_hosted_nix tests.test_nix_loader tests.test_hosted_observe tests.test_hosted_packaging tests.test_readers tests.test_repo_apt tests.test_rpm_query tests.test_run_hosted7 tests.test_candidate_inventory -q",
+        "exit_code": 0,
+        "process_umask": "022",
+        "skipped": 4,
+        "status": "pass",
+        "tests": 285
+      },
+      "hygiene": {
+        "bounded_credential_scan_files_including_manifest": 336,
+        "git_diff_check": "pass",
+        "inventory_verification": "complete-cumulative-product-vs-explicit-public-parent",
+        "local_document_targets_checked": 18,
+        "max_file_bytes": 524288,
+        "python_compilation": "in-memory-no-bytecode",
+        "python_parse_compile_files": 186,
+        "real_index_clean": true,
+        "remote_links": "not-run"
+      },
+      "legacy_manager_reproducer": {
+        "backslash": "accepted",
+        "exit_code": 2,
+        "limitation": "Local sha256sum emits no GNU escape marker. This is not the manager GNU reproduction or original Arch baseline; framed and GNU-transcript fixture tests exercise those grammar contracts.",
+        "newline": "rejected",
+        "plain": "accepted",
+        "status": "unexpected-host-checksum-grammar"
+      },
+      "not_run": [
+        "native-Nix-evaluation-build-and-application-runtime",
+        "native-RPM6-fixture-signing-warning-and-lifecycle",
+        "native-amd64-deb-build-and-cross-lane-all-byte-equality",
+        "native-Arch-DNF-APT-Pages-client-lifecycle",
+        "fresh-remote-destination-readbacks",
+        "hosted-run-7"
+      ],
+      "post_suite_changes": "evidence and regenerated candidate manifest only; verify_inventory, credential scan, git diff --check and candidate/operator unit tests rerun against terminal metadata",
+      "regression_before_fix": {
+        "command": "python3 -W error::ResourceWarning -m unittest tests.test_hosted_observe.HostedObserveExecutionTests.test_same_class_npm_command_conflict_blocks_instead_of_unknown tests.test_client_inventory.ClientInventoryAdverseParserTests.test_empty_symlink_target_fails_closed tests.test_client_inventory.ClientInventoryAdverseParserTests.test_nonbyte_or_missing_stderr_receipt_fails_closed -q",
+        "failing_cases": 9,
+        "result": "verified missing identity/stderr/empty-target rejection before source fixes",
+        "tests": 3
+      },
+      "status": "pass-source-contracts-only",
+      "terminal_metadata_contracts": {
+        "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest tests.test_candidate_inventory tests.test_run_hosted7 -q",
+        "exit_code": 0,
+        "skipped": 0,
+        "status": "pass",
+        "tests": 8
+      }
+    },
+    "work_review_findings": {
+      "LOW-3": {
+        "disposition": "defer-native-evidence",
+        "reason": "Keep the closed RPM4-style NOKEY allowlist; no real RPM6 fixture-signed query transcript is available locally. Do not invent a permissive warning grammar. Native RPM6 post-sign readback remains mandatory; unfamiliar stderr fails closed and retains stream hashes."
+      },
+      "LOW-4": {
+        "disposition": "accept-nonblocking",
+        "reason": "Parser-only reads permit plain or distro releases without revision. The actual builder validates macro-expanded release; fixture signing compares the full identity with its bound build manifest, and Pages signing supplies the expected revision. Existing builder/signing regressions pass."
+      },
+      "LOW-5": {
+        "disposition": "amend-and-defer-capacity",
+        "reason": "Reject empty symlink targets and nonbyte/missing stderr receipts; remove unused capture_system_inventory. Preserve exact exclusions and scanner bounds. Excluded package caches still count toward scan limits; capacity and safe pruning require later native evidence, and no residue exclusion is broadened."
+      },
+      "LOW-6": {
+        "disposition": "amend",
+        "reason": "Place runtimeFacts build/readback in the diagnostic failure boundary; malformed or failed output remains an unqualified retained diagnostic. Document enabled WebKitGTK bwrap userns requirement. FHS runtime still runs and remains unqualified."
+      },
+      "LOW-7": {
+        "disposition": "accept-disclosed-limitation",
+        "reason": "Use process-local umask 022 for the explicitly required suite; do not change product modes or test-runner policy. The earlier 077 fixture failures remain recorded."
+      },
+      "MEDIUM-1": {
+        "disposition": "accept-concern-defer-A",
+        "reason": "Linux harness and shadow still require userns. Retain candidate_adoption_ready=false. No partial-run decoupling, new runtime dependency or manager acceptance is inferred. The manager must authorize the replacement or revise scope before exact adoption."
+      },
+      "MEDIUM-2": {
+        "disposition": "amend",
+        "reason": "Same-class npm payloads with missing or conflicting command maps raise OBSERVATION_IDENTITY, even beside a matching payload. Regression exercises execute and confirms no npm readback occurs."
+      }
+    },
+    "worker_usage": {
+      "disposition": "declined",
+      "reason": "Terminal corrections are small and coupled; parent performs integration and final verification. Prior worker evidence is historical and not a dispatcher checkpoint."
+    }
+  },
+  "verification": {
+    "controlled_inventory_tests": {
+      "facility_skips": [
+        "host-filesystem-rejects-invalid-UTF8-filename-creation; byte-parser-test-passes",
+        "sandbox-denies-Unix-socket-creation; socket-record-grammar-test-passes"
+      ],
+      "legacy_transcripts": "test-local-GNU-grammar-fixtures-labelled-substitute",
+      "new_scanner": "actual-stdlib-subprocesses-over-small-temporary-trees; adversarial-parser-and-race-fixtures",
+      "status": "pass"
+    },
+    "cumulative_unit_suite": {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest discover -s tests -q",
+      "first_attempt": {
+        "affected": "unchanged hosted_smoke fixture-mode and causal-drift expectations",
+        "failures": 3,
+        "process_umask": "077",
+        "root_cause": "Fixtures written under 077 acquired 0600 instead of expected 0644; all three pass with process-local 022. Product and test policy unchanged.",
+        "skipped": 14,
+        "status": "failed",
+        "tests": 1075
+      },
+      "process_umask": "022",
+      "skipped": 14,
+      "status": "pass",
+      "tests": 1075
+    },
+    "dispatcher_checkpoints": "Dispatcher post-planning and pre-final reviews supplied; no additional substantive review obtained. Terminal amendments require exact manager disposition.",
+    "focused": {
+      "scope": "A/B/C/D/E, shared lifecycle integration and attended run-7 operator",
+      "skipped": 4,
+      "status": "pass",
+      "tests": 295
+    },
+    "hygiene": {
+      "credential_scan": "rs9.security.scan_for_credentials through cumulative file_inventory",
+      "credential_scan_files_including_manifest": 336,
+      "credential_scan_max_file_bytes": 524288,
+      "git_diff_check": true,
+      "local_document_targets_checked": 18,
+      "nix_static_parse": "pass; evaluation/build not run",
+      "python_compilation": "in-memory; no bytecode written",
+      "python_parse_compile_files": 186,
+      "real_index_clean": true,
+      "status": "pass"
+    },
+    "legacy_manager_reproducer": {
+      "cases": [
+        {
+          "accepted": true,
+          "kind": "ordinary",
+          "stdout_sha256": "7730db967f6a858be165dfbb7e5c38d37e4d5efd3ad292ac8e626f1b3b28874c"
+        },
+        {
+          "accepted": false,
+          "kind": "newline",
+          "stdout_sha256": "50559b1a39ca12fbb4b563c5251fdb7f8e1c3e163b53d3acdc398efe7885e80e"
+        },
+        {
+          "accepted": true,
+          "kind": "backslash",
+          "stdout_sha256": "54dfea9b32081e72e74b96d3625df28511e1b24271bec91765cb8d2dd9367852"
+        }
+      ],
+      "result": "Host checksum implementation does not emit GNU escaping for backslashes: ordinary accepted; newline rejected; backslash accepted. This host result is not the manager GNU reproduction.",
+      "status": "ran-exit-2"
+    },
+    "native_tool_skips": [
+      "GnuPG-unavailable",
+      "dpkg-deb-unavailable"
+    ],
+    "nix_static_parse": {
+      "command": "nix-instantiate --parse nix/nebular.nix",
+      "does_not_prove": "evaluation-build-or-runtime",
+      "status": "pass"
+    },
+    "preserved_source_evidence": {
+      "historical_inherited_evidence": "retained unchanged; cumulative review required",
+      "nix_Darwin_output_script_identical": true,
+      "operational_state": "serena excluded from product inventory and never mutated by this phase",
+      "public_parent": "515d460919ff22e9c323672aa9e4160278c53d6b",
+      "unchanged": [
+        "src/rs9/hosted_wheels.py",
+        "src/rs9/wheel.py",
+        "src/rs9/release_core.py",
+        "src/rs9/security.py",
+        "src/rs9/hosted_smoke.py",
+        "src/rs9/render.py",
+        "src/rs9/compare.py",
+        "tests/golden/shadow/nebular-0.6.1/nix/theme-forge-nebular-fusion.nix"
+      ]
+    },
+    "record_scope": "Historical producer-stage evidence retained; fresh terminal checks are recorded under terminal_closeout.verification.",
+    "workers": {
+      "cleanup_proven": true,
+      "dispositions": {
+        "B": "partial-adopted-with-parent-corrections",
+        "C": "accepted-with-parent-bound",
+        "D": "partial-adopted-with-parent-corrections",
+        "E": "partial-adopted-with-parent-corrections"
+      },
+      "integration": "Parent amended B/D/E and integrated C; worker outputs are not dispatcher checkpoints.",
+      "terminal": "completed",
+      "used": "four-Gemini-bounded-leaf-writers"
+    }
+  }
+}

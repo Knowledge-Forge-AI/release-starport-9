@@ -40,7 +40,7 @@ from rs9.elf import parse_elf
 from rs9.errors import ContractError
 from rs9.profiles import png_size
 from rs9.release_core import ReleaseCapture, digest
-from rs9.repo_apt import AptRepositoryCandidate, validate_apt_repository
+from rs9.repo_apt import AptRepositoryCandidate, MAX_DEB_SIZE, validate_apt_repository
 from rs9.scratch import canonical, physical_directory
 from rs9.security import validate_safe_relative_posix_path
 
@@ -222,6 +222,54 @@ def _stage_native_launcher_and_desktop(
     (icons / f"{project_id}.png").write_bytes(icon)
 
 
+def validate_deb_ar_shape(deb_bytes: bytes) -> None:
+    """Validate closed post-build ar shape: exactly debian-binary=2.0\n, control.tar.xz, data.tar.xz."""
+    if not isinstance(deb_bytes, bytes) or len(deb_bytes) > MAX_DEB_SIZE or not deb_bytes.startswith(b"!<arch>\n"):
+        raise ContractError("INVALID_DEB", "Not a valid ar archive")
+
+    offset = 8
+    total_len = len(deb_bytes)
+    members: list[tuple[str, bytes]] = []
+
+    while offset + 60 <= total_len:
+        name = deb_bytes[offset : offset + 16].decode("ascii", errors="replace").strip().rstrip("/")
+        if deb_bytes[offset + 58 : offset + 60] != b"`\n":
+            raise ContractError("INVALID_DEB", "Malformed ar member header")
+        try:
+            sz = int(deb_bytes[offset + 48 : offset + 58].decode("ascii", errors="replace").strip())
+        except ValueError:
+            raise ContractError("INVALID_DEB", "Malformed member size") from None
+        offset += 60
+        if sz < 0 or offset + sz > total_len:
+            raise ContractError("INVALID_DEB", "Truncated member in deb")
+        data = deb_bytes[offset : offset + sz]
+        offset += sz + (sz % 2)
+        members.append((name, data))
+        if len(members) > 3:
+            raise ContractError("INVALID_DEB", "Candidate deb has excess ar members")
+
+    if offset != total_len:
+        raise ContractError("INVALID_DEB", "Trailing data or malformed member in deb archive")
+
+    if len(members) != 3:
+        raise ContractError("INVALID_DEB", f"Candidate deb must contain exactly 3 members, found {len(members)}")
+
+    if members[0][0] != "debian-binary" or members[0][1] != b"2.0\n":
+        raise ContractError("INVALID_DEB", "First member must be debian-binary with exact content '2.0\\n'")
+
+    if members[1][0] != "control.tar.xz":
+        raise ContractError("INVALID_DEB", f"Second member must be control.tar.xz, found {members[1][0]}")
+
+    if not members[1][1].startswith(b"\xfd7zXZ\x00"):
+        raise ContractError("INVALID_DEB", "control.tar.xz member is not a valid xz stream")
+
+    if members[2][0] != "data.tar.xz":
+        raise ContractError("INVALID_DEB", f"Third member must be data.tar.xz, found {members[2][0]}")
+
+    if not members[2][1].startswith(b"\xfd7zXZ\x00"):
+        raise ContractError("INVALID_DEB", "data.tar.xz member is not a valid xz stream")
+
+
 def build_deb_candidate(
     capture: ReleaseCapture,
     intent: dict[str, Any],
@@ -389,6 +437,10 @@ def build_deb_candidate(
         "dpkg-deb",
         "--build",
         "--root-owner-group",
+        "-Zxz",
+        "-z6",
+        "--uniform-compression",
+        "--threads-max=1",
         str(pkg_root),
         str(output_deb),
     ]
@@ -408,6 +460,7 @@ def build_deb_candidate(
         )
 
     deb_bytes = output_deb.read_bytes()
+    validate_deb_ar_shape(deb_bytes)
     rel_artifact_path = output_deb.relative_to(scratch).as_posix()
     validate_safe_relative_posix_path(rel_artifact_path)
 

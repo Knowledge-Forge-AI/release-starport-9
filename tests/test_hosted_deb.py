@@ -19,6 +19,8 @@ import unittest
 from unittest.mock import patch
 
 from rs9 import hosted_deb as hd
+from rs9 import client_inventory as ci
+import base64
 from rs9.build_native import CommandReceipt, MockCommandRunner
 from rs9.errors import ContractError
 from rs9.hosted_contract import REQUIRED_GATES, validate_execution_result
@@ -37,8 +39,53 @@ DIGEST = "ab" * 32
 AUTH = "d" * 64
 MAINTAINER = "Theme Forge Lead <maintainer@example.com>"
 OS_RELEASE = 'PRETTY_NAME="Ubuntu 26.04 LTS"\nVERSION_ID="26.04"\nVERSION_CODENAME=resolute\nID=ubuntu\n'
-BASE_INVENTORY = b"D ./usr\nD ./etc\nL ./bin -> usr/bin\n" + ("a" * 64 + "  ./etc/hostname\n").encode()
-LEFTOVER = ("b" * 64 + "  ./usr/bin/tfsl\n").encode()
+def inventory_entry(path, kind="file", sha="a" * 64, target="usr/bin"):
+    row = {"path": base64.b64encode(path.encode()).decode(), "kind": kind, "mode": 0o755 if kind == "dir" else 0o777 if kind == "symlink" else 0o644}
+    if kind == "file":
+        row.update(size=0, sha256=sha)
+    elif kind == "symlink":
+        row["target"] = base64.b64encode(target.encode()).decode()
+    return row
+
+
+def inventory_frame(entries):
+    entries = sorted(entries, key=lambda e: base64.b64decode(e["path"]))
+    total_hashed = sum(e.get("size", 0) for e in entries if e.get("kind") == "file")
+    fc = sum(1 for e in entries if e.get("kind") == "file")
+    dc = sum(1 for e in entries if e.get("kind") in ("dir", "mount"))
+    sc = sum(1 for e in entries if e.get("kind") == "symlink")
+    spec_c = len(entries) - fc - dc - sc
+    payload = {
+        "schema": ci.FRAME_SCHEMA,
+        "version": ci.FRAME_VERSION,
+        "entry_count": len(entries),
+        "total_hashed_bytes": total_hashed,
+        "diagnostics": {
+            "counters": {
+                "dir_count": dc,
+                "entries": len(entries),
+                "file_count": fc,
+                "hardlink_count": 0,
+                "special_count": spec_c,
+                "symlink_count": sc,
+                "total_hashed_bytes": total_hashed, "scanned_entries": len(entries), "excluded_files": 0,
+            },
+            "max": {
+                "depth": 1, "directory_entries": len(entries),
+                "file_bytes": max((e.get("size", 0) for e in entries if e.get("kind") == "file"), default=0),
+                "path_bytes": max((len(base64.b64decode(e["path"])) for e in entries), default=0),
+                "symlink_bytes": max((len(base64.b64decode(e["target"])) for e in entries if e.get("kind") == "symlink"), default=0),
+            },
+        },
+        "entries": entries,
+    }
+    return ci.frame_payload(payload)
+
+
+BASE_INVENTORY = [inventory_entry("usr", "dir"), inventory_entry("etc", "dir"),
+                  inventory_entry("bin", "symlink"), inventory_entry("etc/hostname")]
+LEFTOVER = [inventory_entry("usr/bin/tfsl", sha="b" * 64)]
+
 PRODUCTS = hd.REQUIRED_PRODUCTS
 
 
@@ -46,11 +93,12 @@ class ScriptedDocker:
     """Records docker calls and models install, remove, tamper rejection and tool output."""
 
     def __init__(self, system="amd64", *, accept_tampered=False, fail_build=False, dirty_uninstall=False,
-                 fail_install=False, fail_provision=False, os_release=OS_RELEASE, arch_label=None,
-                 inspect_out=None, pull_code=0):
+                 fail_install=False, fail_provision=False, fail_pre_inventory=False, fail_post_inventory=False,
+                 os_release=OS_RELEASE, arch_label=None, inspect_out=None, pull_code=0):
         self.system, self.arch_label = system, arch_label or system
         self.accept_tampered, self.fail_build, self.dirty_uninstall = accept_tampered, fail_build, dirty_uninstall
         self.fail_install, self.fail_provision = fail_install, fail_provision
+        self.fail_pre_inventory, self.fail_post_inventory = fail_pre_inventory, fail_post_inventory
         self.os_release, self.inspect_out, self.pull_code = os_release, inspect_out, pull_code
         self.calls: list[list[str]] = []
         self.containers: dict[str, dict] = {}
@@ -130,9 +178,14 @@ class ScriptedDocker:
             i += 2 if a[i] in ("--user", "-e") else 1
         state, cmd = self.containers[a[i]], a[i + 1:]
         joined = " ".join(cmd)
+        if cmd[:5] == ci.scanner_argv()[:5]:
+            is_post = state.get("installed") or state.get("had_install", False)
+            if not is_post and self.fail_pre_inventory:
+                return self.receipt(a, 1, b"", b"scanner error opening root\n")
+            if is_post and self.fail_post_inventory:
+                return self.receipt(a, 1, b"", b"scanner error opening root\n")
+            return self.receipt(a, out=inventory_frame(BASE_INVENTORY + (LEFTOVER if state["dirty"] else [])))
         if cmd[:2] == ["sh", "-c"]:
-            if cmd[2] == hd.INVENTORY_SCRIPT:
-                return self.receipt(a, out=BASE_INVENTORY + (LEFTOVER if state["dirty"] else b""))
             return self.receipt(a)
         tool = cmd[0]
         if tool == "apt-get":
@@ -149,6 +202,7 @@ class ScriptedDocker:
             if self.fail_install or (state["tampered"] and not self.accept_tampered):
                 return self.receipt(a, 100, b"", b"E: install rejected")
             state["installed"] = True
+            state["had_install"] = True
         elif verb == "remove":
             state["installed"], state["dirty"] = False, self.dirty_uninstall
         elif verb == "query":
@@ -216,7 +270,7 @@ class HermeticFixtureSigner(FixtureSigner):
         pass
 
 
-def fake_sign_rpm(runner, path, fixture):
+def fake_sign_rpm(runner, path, fixture, **kwargs):
     before = digest(path.read_bytes())
     homedir = getattr(fixture, "homedir", None) or ""
     gpg_bin = getattr(fixture, "gpg", "gpg")
@@ -319,17 +373,18 @@ class ContainerRunnerTests(unittest.TestCase):
 
 
 class InventoryTests(unittest.TestCase):
-    SAMPLE = (b"D .\nD ./usr\nL ./bin -> usr/bin\n" + ("a" * 64 + "  ./etc/hostname\n").encode()
-              + b"D ./var/lib/dpkg\n" + ("b" * 64 + "  ./var/lib/dpkg/status\n").encode()
-              + ("c" * 64 + "  ./usr/share/icons/hicolor/icon-theme.cache\n").encode()
-              + b"D ./var/cache/apt\n" + ("d" * 64 + "  ./var/lib/dnf/history.sqlite\n").encode()
-              + ("e" * 64 + "  ./etc/pacman.d/gnupg/pubring.gpg\n").encode())
+    SAMPLE = inventory_frame([
+        inventory_entry("usr", "dir"), inventory_entry("bin", "symlink"), inventory_entry("etc/hostname"),
+        inventory_entry("var/lib/dpkg", "dir"), inventory_entry("var/lib/dpkg/status", sha="b" * 64),
+        inventory_entry("usr/share/icons/hicolor/icon-theme.cache", sha="c" * 64),
+        inventory_entry("var/cache/apt", "dir"), inventory_entry("var/lib/dnf/history.sqlite", sha="d" * 64),
+        inventory_entry("etc/pacman.d/gnupg/pubring.gpg", sha="e" * 64)])
 
     def test_parse_reads_files_dirs_and_symlinks_and_drops_only_documented_state(self):
         apt = hd.parse_inventory(self.SAMPLE, "apt")
-        self.assertEqual(apt["usr"], "dir")
-        self.assertEqual(apt["bin"], "symlink:usr/bin")
-        self.assertEqual(apt["etc/hostname"], "a" * 64)
+        self.assertEqual(apt["usr"], "dir:0755")
+        self.assertEqual(apt["bin"], "symlink:usr/bin:0777")
+        self.assertEqual(apt["etc/hostname"], "a" * 64 + ":0644")
         for excluded in ("var/lib/dpkg", "var/lib/dpkg/status", "var/cache/apt",
                          "usr/share/icons/hicolor/icon-theme.cache", ""):
             self.assertNotIn(excluded, apt)
@@ -520,6 +575,55 @@ class ClientCycleTests(unittest.TestCase):
         self.assertEqual(names["deb-client.theme-forge-stellar-loom.client"], "fail")
         self.assertNotIn("deb-client.theme-forge-stellar-loom.uninstall", names)
         self.assertEqual(evidence["theme-forge-stellar-loom"]["error"], "CLIENT_INSTALL_FAILED")
+
+    def test_pre_inventory_scanner_failure_records_family_stage_and_safe_cause(self):
+        gates, evidence = self.cycle(ScriptedDocker(fail_pre_inventory=True))
+        client_row = next(g for g in gates if g["name"].endswith(".client"))
+        self.assertEqual(client_row["status"], "fail")
+        self.assertEqual(client_row["family"], "apt")
+        self.assertEqual(client_row["stage"], "pre-install")
+        self.assertEqual(client_row["safe_cause"], "INVENTORY_FAILED")
+
+        product_ev = evidence["theme-forge-stellar-loom"]
+        self.assertEqual(product_ev["family"], "apt")
+        self.assertEqual(product_ev["stage"], "pre-install")
+        self.assertEqual(product_ev["safe_cause"], "INVENTORY_FAILED")
+        self.assertEqual(product_ev["error"], "INVENTORY_FAILED")
+
+    def test_post_inventory_scanner_failure_records_family_stage_counters_and_safe_cause(self):
+        gates, evidence = self.cycle(ScriptedDocker(fail_post_inventory=True))
+        client_row = next(g for g in gates if g["name"].endswith(".client"))
+        self.assertEqual(client_row["status"], "fail")
+        self.assertEqual(client_row["family"], "apt")
+        self.assertEqual(client_row["stage"], "post-remove")
+        self.assertEqual(client_row["safe_cause"], "INVENTORY_FAILED")
+        self.assertIn("counters", client_row)
+        self.assertEqual(client_row["counters"], {})
+
+        product_ev = evidence["theme-forge-stellar-loom"]
+        self.assertEqual(product_ev["family"], "apt")
+        self.assertEqual(product_ev["stage"], "post-remove")
+        self.assertEqual(product_ev["safe_cause"], "INVENTORY_FAILED")
+        self.assertIn("counters", product_ev)
+
+    def test_post_inventory_unclean_records_family_stage_counters_and_safe_cause(self):
+        gates, evidence = self.cycle(ScriptedDocker(dirty_uninstall=True))
+        inv_row = next(g for g in gates if g["name"].endswith(".inventory"))
+        self.assertEqual(inv_row["status"], "fail")
+        self.assertEqual(inv_row["family"], "apt")
+        self.assertEqual(inv_row["stage"], "post-remove")
+        self.assertEqual(inv_row["safe_cause"], "unclean-inventory")
+        self.assertIn("counters", inv_row)
+        self.assertEqual(inv_row["counters"]["entries"], len(BASE_INVENTORY) + len(LEFTOVER))
+        self.assertIn("usr/bin/tfsl", inv_row["leftover"])
+        self.assertEqual(inv_row["counts"]["added"], 1)
+
+        product_ev = evidence["theme-forge-stellar-loom"]
+        self.assertFalse(product_ev["inventory_clean"])
+        self.assertEqual(product_ev["family"], "apt")
+        self.assertEqual(product_ev["stage"], "post-remove")
+        self.assertEqual(product_ev["safe_cause"], "unclean-inventory")
+        self.assertIn("counters", product_ev)
 
     def test_probe_failures_and_missing_docker_are_reported_truthfully(self):
         def broken(command, path, **kwargs):
@@ -968,7 +1072,7 @@ class PagesLaneTests(unittest.TestCase):
                    "inputs": self.inputs, "pins": {
                        "pacman": {"container_digest": "docker.io/library/archlinux@sha256:" + DIGEST},
                        "rpm": {"container_digests": {"x86_64": "registry.fedoraproject.org/fedora@sha256:" + DIGEST}}},
-                   "authentication_sha256": AUTH, "captures": [(None, {"project": {"id": self.NATIVE}}, {})],
+                   "authentication_sha256": AUTH, "captures": [(None, {"project": {"id": p}, "version": "1.0.0"}, {}) for p in PRODUCTS],
                    "client": None, "runner": host_runner(docker),
                    "wrong_signing_fixture": FixtureSigner("B" * 40)}
         context.update(extra)

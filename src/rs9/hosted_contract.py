@@ -11,6 +11,7 @@ from rs9.scratch import canonical, physical_directory
 from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
 
 SCHEMA_HOSTED_DIAGNOSTIC = "rs9.hosted-candidate-diagnostic.v1alpha1"
+SCHEMA_HOSTED_EXPERIMENT_DIAGNOSTIC = "rs9.hosted-experiment-diagnostic.v1alpha1"
 SCHEMA_HOSTED_RECEIPTS = "rs9.hosted-candidate-receipts.v1alpha1"
 SCHEMA_HOSTED_SUMMARY = "rs9.hosted-candidate-summary.v1alpha1"
 SCHEMA_HOSTED_LANES = "rs9.hosted-lanes.v1alpha1"
@@ -103,12 +104,21 @@ def load_hosted_lanes(repository: Path) -> dict:
         raise ContractError("LANES_POLICY", "production_enabled must be false")
     if not isinstance(doc.get("lanes"), list):
         raise ContractError("LANES_SCHEMA", "Hosted lanes must be a list")
+    if "experiments" in doc:
+        if not isinstance(doc["experiments"], list):
+            raise ContractError("LANES_SCHEMA", "Hosted experiments must be a list")
+        for exp in doc["experiments"]:
+            if not isinstance(exp, dict) or exp.get("qualification_authority") is not False:
+                raise ContractError("LANES_POLICY", "experiment qualification_authority must be false")
+    if "experiment_jobs" in doc and not isinstance(doc["experiment_jobs"], list):
+        raise ContractError("LANES_SCHEMA", "Hosted experiment_jobs must be a list")
     return doc
 
 
 def generate_matrix_outputs(lanes_doc: dict) -> dict[str, str]:
     """Generate workflow matrix JSON strings for GitHub Actions outputs."""
     lanes = lanes_doc.get("lanes", [])
+    experiments = lanes_doc.get("experiments", [])
     wheels = [
         {"system": l["system"], "runner": l["runner"], "job_name":l["lane"]+"-"+l["system"],
          "timeout_minutes": l["timeout_minutes"], "artifact_name": l["artifact_name"]}
@@ -133,11 +143,17 @@ def generate_matrix_outputs(lanes_doc: dict) -> dict[str, str]:
         for l in lanes
         if l.get("lane") not in {"unit", "summary"}
     ]
+    matrix_experiments = [
+        {"lane": l["lane"], "system": l["system"], "runner": l["runner"], "job_name": l["lane"] + "-" + l["system"],
+         "timeout_minutes": l["timeout_minutes"], "artifact_name": l["artifact_name"]}
+        for l in experiments
+    ]
     return {
         "matrix_wheels": json.dumps({"include": wheels}, separators=(",", ":")),
         "matrix_nix": json.dumps({"include": nix}, separators=(",", ":")),
         "matrix_native": json.dumps({"include": native}, separators=(",", ":")),
         "matrix_candidate": json.dumps({"include": candidate}, separators=(",", ":")),
+        "matrix_experiments": json.dumps({"include": matrix_experiments}, separators=(",", ":")),
         "lanes": json.dumps(lanes, separators=(",", ":")),
     }
 
@@ -385,3 +401,62 @@ def build_hosted_artifact_set(summary: dict) -> dict:
         "publication_authority": False,
         "artifacts": summary.get("artifacts", []),
     }
+
+
+def validate_hosted_experiment_diagnostic(
+    receipt: Any,
+    repository: Path | None = None,
+    commit: str | None = None,
+) -> dict:
+    """Validate experimental hosted diagnostic receipt (rs9.hosted-experiment-diagnostic.v1alpha1).
+
+    Ensures qualification_authority is strictly False, production_enabled is False,
+    and runtime_offline_status cannot claim pass without proot-in-guest-offline gate pass.
+    """
+    if isinstance(receipt, (str, Path)):
+        p = Path(receipt)
+        if p.is_symlink() or not p.is_file() or p.stat().st_size > 1024 * 1024:
+            raise ContractError("EXPERIMENT_RECEIPT", "Bounded physical receipt required")
+        physical_directory(p.parent)
+        raw = p.read_bytes()
+        scan_for_credentials(raw.decode("utf-8"))
+        try:
+            doc = json.loads(raw)
+        except Exception as exc:
+            raise ContractError("EXPERIMENT_RECEIPT", "Malformed experiment receipt JSON") from exc
+    elif isinstance(receipt, dict):
+        doc = receipt
+    else:
+        raise ContractError("EXPERIMENT_RECEIPT", "Experiment receipt must be dict or Path")
+
+    if not isinstance(doc, dict):
+        raise ContractError("EXPERIMENT_RECEIPT", "Experiment receipt must be a JSON object")
+
+    if doc.get("schema") != SCHEMA_HOSTED_EXPERIMENT_DIAGNOSTIC:
+        raise ContractError("EXPERIMENT_RECEIPT", f"Invalid experiment diagnostic schema: {doc.get('schema')}")
+
+    if commit and doc.get("source_commit") and doc.get("source_commit") != commit:
+        raise ContractError("EXPERIMENT_BINDING", "Experiment receipt commit mismatch")
+
+    if doc.get("production_enabled") is not False:
+        raise ContractError("EXPERIMENT_POLICY", "production_enabled must be false")
+    if doc.get("publication_authority") is not False:
+        raise ContractError("EXPERIMENT_POLICY", "publication_authority must be false")
+    if doc.get("qualification_authority") is not False:
+        raise ContractError("EXPERIMENT_POLICY", "qualification_authority must be false")
+    if doc.get("application_qualified") is not False:
+        raise ContractError("EXPERIMENT_POLICY", "application_qualified must be false")
+    if doc.get("mandatory_gates_satisfied") is not False:
+        raise ContractError("EXPERIMENT_POLICY", "mandatory_gates_satisfied must be false")
+
+    # Offline status must NOT be pass-by-absence-of-error
+    network = doc.get("network", {})
+    offline_status = network.get("runtime_offline_status")
+    gates = doc.get("gates", [])
+    offline_gate = next((g for g in gates if g.get("name") == "proot-in-guest-offline"), None)
+    if offline_status == "pass":
+        if (not offline_gate or offline_gate.get("status") != "pass"
+                or offline_gate.get("runtime_offline_status") != "pass"):
+            raise ContractError("EXPERIMENT_POLICY", "runtime_offline_status cannot claim pass without explicit in-guest denial result")
+
+    return doc

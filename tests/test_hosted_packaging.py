@@ -21,6 +21,11 @@ from rs9.pages_candidate import _fixture_public_armor
 from rs9.release_core import digest
 
 
+def wrong_fixture(fixture):
+    return SimpleNamespace(primary_fingerprint=('F' if fixture.primary_fingerprint != 'F' * 40 else 'E') * 40,
+                           public_key_armor='synthetic distinct wrong-key armor')
+
+
 class HostedPackagingTests(unittest.TestCase):
     def setUp(self):
         # These orchestration fixtures contain synthetic captures; released loader
@@ -149,22 +154,180 @@ class HostedPackagingTests(unittest.TestCase):
             def run(self, argv, **kwargs):
                 self.calls.append(argv)
                 cmd = argv[0]
+                if cmd == "rpm":
+                    if "--version" in argv:
+                        return CommandReceipt(argv, 0, b"RPM version 6.0.0\n", b"", executed=True)
+                    if "--querytags" in argv:
+                        return CommandReceipt(argv, 0, b"PAYLOADSHA256\nPAYLOADSHA256ALGO\n", b"", executed=True)
+                    if "--eval" in argv and "_keyring" in argv[-1]:
+                        definitions = dict(a.split(" ", 1) for a in argv if a.startswith(("_keyring ", "_keyringpath ", "_dbpath ")))
+                        raw = "|".join(definitions[k] for k in ("_keyring", "_keyringpath", "_dbpath")) + "\n"
+                        return CommandReceipt(argv, 0, raw.encode(), b"", executed=True)
+                    if "--eval" in argv:
+                        return CommandReceipt(argv, 0, b"1.fc43\n", b"", executed=True)
+                    qf = argv[argv.index("--queryformat") + 1] if "--queryformat" in argv else ""
+                    if "%{PAYLOAD" in qf:
+                        return CommandReceipt(argv, 0, b"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789|8\n", b"", executed=True)
+                    return CommandReceipt(argv, 0, b"sample|1.0.0|1.fc43|x86_64\n", b"", executed=True)
                 if cmd == "rpmsign":
                     # simulate signing by mutating the target file
                     target = Path(argv[-1])
                     target.write_bytes(target.read_bytes() + b"-signed")
                     return CommandReceipt(argv, 0, b"", b"", executed=True)
                 if cmd == "rpmkeys":
-                    return CommandReceipt(argv, 0, b"sample.rpm: digests signatures OK\n", b"", executed=True)
+                    if "--checksig" in argv:
+                        if any("wrong-rpmdb" in a or "empty-rpmdb" in a or ".tampered" in a for a in argv):
+                            return CommandReceipt(argv, 1, b"sample.rpm: digests signatures NOT OK\n", b"", executed=True)
+                        return CommandReceipt(argv, 0, b"sample.rpm: digests signatures OK\n", b"", executed=True)
+                    return CommandReceipt(argv, 0, b"", b"", executed=True)
                 return CommandReceipt(argv, 0, b"", b"", executed=True)
 
         runner = ExecutedRpmRunner()
-        result = sign_rpm(runner, rpm_file, fixture)
+        from rs9.rpm_query import query_rpm_identity, query_rpm_payload_digest
+        identity, _ = query_rpm_identity(runner, rpm_file)
+        payload, _ = query_rpm_payload_digest(runner, rpm_file)
+        expected = {"package_sha256": digest(rpm_file.read_bytes()),
+                    "rpm_identity": identity, "rpm_payload_digest": payload}
+        for bad in ({**expected, "package_sha256": "0" * 64},
+                    {**expected, "rpm_identity": {**identity, "name": "wrong"}},
+                    {**expected, "rpm_payload_digest": {**payload, "scope": "uncompressed-payload"}}):
+            with self.subTest(expected=bad), self.assertRaises(ContractError) as caught:
+                sign_rpm(runner, rpm_file, fixture, expected=bad, wrong_fixture=wrong_fixture(fixture))
+            self.assertEqual(caught.exception.code, "RPM_SIGNING")
+            self.assertEqual(rpm_file.read_bytes(), b"initial-rpm-content")
+        result = sign_rpm(runner, rpm_file, fixture, expected=expected, wrong_fixture=wrong_fixture(fixture))
         self.assertEqual(result["unsigned_sha256"], digest(b"initial-rpm-content"))
         self.assertEqual(result["fixture_signed_sha256"], digest(b"initial-rpm-content-signed"))
+        self.assertNotEqual(result["unsigned_sha256"], result["fixture_signed_sha256"])
         self.assertEqual(result["fixture_fingerprint"], "C" * 40)
         self.assertFalse(result["production"])
+        self.assertEqual(result["rpm_identity"]["name"], "sample")
+        self.assertEqual(result["rpm_identity"]["version"], "1.0.0")
+        self.assertEqual(result["rpm_identity"]["release"], "1.fc43")
+        self.assertEqual(result["rpm_identity"]["arch"], "x86_64")
+        self.assertEqual(result["rpm_payload_digest"]["payload_digest"], "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")
+        self.assertEqual(result["rpm_payload_digest"]["algorithm_numeric"], 8)
+        self.assertTrue(result["identity_preserved"])
+        self.assertTrue(result["payload_digest_preserved"])
         self.assertEqual((fixture_home / FIXTURE_ARMOR).read_bytes(), fixture.public_key_armor.encode("utf-8"))
+
+        # Verify probe record and lane diagnostics retention
+        self.assertIn("probe", result)
+        self.assertEqual(result["probe"]["status"], "pass")
+        self.assertEqual(result["probe"]["checks"]["real_checksig"], "pass")
+        self.assertEqual(result["probe"]["checks"]["wrong_key_rejection"], "pass")
+        self.assertEqual(result["probe"]["checks"]["empty_trust_rejection"], "pass")
+        self.assertEqual(result["probe"]["checks"]["tamper_rejection"], "pass")
+        self.assertTrue(result["probe"]["checks"]["supported_tags"])
+        self.assertTrue(result["probe"]["checks"]["algo8"])
+        self.assertTrue(result["probe"]["checks"]["whole_file_sha_changed"])
+        self.assertTrue(next((fixture_home / "diagnostics").glob("rpm-signed-query-probe-*.json")).is_file())
+
+    def test_sign_rpm_rejects_identity_mutation_after_signing(self):
+        rpm_file = self.root / "sample_mutate_id.rpm"
+        rpm_file.write_bytes(b"initial-rpm-content")
+        fixture_home = self.root / "fixture-home-id"
+        fixture_home.mkdir()
+        fixture = SimpleNamespace(
+            primary_fingerprint="C" * 40,
+            homedir=fixture_home,
+            gpg="gpg",
+            public_key_armor="-----BEGIN PGP PUBLIC KEY BLOCK-----\narmor\n-----END PGP PUBLIC KEY BLOCK-----\n",
+            public_key_binary=b"\x99\x02keyring",
+        )
+        signed_counter = [0]
+
+        class MutatingIdRunner:
+            def run(self, argv, **kwargs):
+                cmd = argv[0]
+                if cmd == "rpm":
+                    if "--version" in argv:
+                        return CommandReceipt(argv, 0, b"RPM version 6.0.0\n", b"", executed=True)
+                    if "--querytags" in argv:
+                        return CommandReceipt(argv, 0, b"PAYLOADSHA256\nPAYLOADSHA256ALGO\n", b"", executed=True)
+                    if "--eval" in argv and "_keyring" in argv[-1]:
+                        definitions = dict(a.split(" ", 1) for a in argv if a.startswith(("_keyring ", "_keyringpath ", "_dbpath ")))
+                        raw = "|".join(definitions[k] for k in ("_keyring", "_keyringpath", "_dbpath")) + "\n"
+                        return CommandReceipt(argv, 0, raw.encode(), b"", executed=True)
+                    if "--eval" in argv:
+                        return CommandReceipt(argv, 0, b"1.fc43\n", b"", executed=True)
+                    qf = argv[argv.index("--queryformat") + 1] if "--queryformat" in argv else ""
+                    if "%{PAYLOAD" in qf:
+                        return CommandReceipt(argv, 0, b"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789|8\n", b"", executed=True)
+                    if signed_counter[0] > 0 and not any("empty-rpmdb" in a for a in argv):
+                        return CommandReceipt(argv, 0, b"mutated-name|1.0.0|1.fc43|x86_64\n", b"", executed=True)
+                    return CommandReceipt(argv, 0, b"sample|1.0.0|1.fc43|x86_64\n", b"", executed=True)
+                if cmd == "rpmsign":
+                    signed_counter[0] += 1
+                    target = Path(argv[-1])
+                    target.write_bytes(target.read_bytes() + b"-signed")
+                    return CommandReceipt(argv, 0, b"", b"", executed=True)
+                if cmd == "rpmkeys":
+                    if "--checksig" in argv:
+                        if any("wrong-rpmdb" in a or "empty-rpmdb" in a or ".tampered" in a for a in argv):
+                            return CommandReceipt(argv, 1, b"sample.rpm: digests signatures NOT OK\n", b"", executed=True)
+                        return CommandReceipt(argv, 0, b"sample.rpm: digests signatures OK\n", b"", executed=True)
+                    return CommandReceipt(argv, 0, b"", b"", executed=True)
+                return CommandReceipt(argv, 0, b"", b"", executed=True)
+
+        with self.assertRaises(ContractError) as caught:
+            sign_rpm(MutatingIdRunner(), rpm_file, fixture, wrong_fixture=wrong_fixture(fixture))
+        self.assertEqual(caught.exception.code, "RPM_SIGNING")
+        self.assertIn("identity changed", caught.exception.message)
+        self.assertTrue(next((fixture_home / "diagnostics").glob("rpm-signed-query-probe-*.json")).is_file())
+
+    def test_sign_rpm_rejects_payload_digest_mutation_after_signing(self):
+        rpm_file = self.root / "sample_mutate_pd.rpm"
+        rpm_file.write_bytes(b"initial-rpm-content")
+        fixture_home = self.root / "fixture-home-pd"
+        fixture_home.mkdir()
+        fixture = SimpleNamespace(
+            primary_fingerprint="C" * 40,
+            homedir=fixture_home,
+            gpg="gpg",
+            public_key_armor="-----BEGIN PGP PUBLIC KEY BLOCK-----\narmor\n-----END PGP PUBLIC KEY BLOCK-----\n",
+            public_key_binary=b"\x99\x02keyring",
+        )
+        signed_counter = [0]
+
+        class MutatingPdRunner:
+            def run(self, argv, **kwargs):
+                cmd = argv[0]
+                if cmd == "rpm":
+                    if "--version" in argv:
+                        return CommandReceipt(argv, 0, b"RPM version 6.0.0\n", b"", executed=True)
+                    if "--querytags" in argv:
+                        return CommandReceipt(argv, 0, b"PAYLOADSHA256\nPAYLOADSHA256ALGO\n", b"", executed=True)
+                    if "--eval" in argv and "_keyring" in argv[-1]:
+                        definitions = dict(a.split(" ", 1) for a in argv if a.startswith(("_keyring ", "_keyringpath ", "_dbpath ")))
+                        raw = "|".join(definitions[k] for k in ("_keyring", "_keyringpath", "_dbpath")) + "\n"
+                        return CommandReceipt(argv, 0, raw.encode(), b"", executed=True)
+                    if "--eval" in argv:
+                        return CommandReceipt(argv, 0, b"1.fc43\n", b"", executed=True)
+                    qf = argv[argv.index("--queryformat") + 1] if "--queryformat" in argv else ""
+                    if "%{PAYLOAD" in qf:
+                        if signed_counter[0] > 0 and not any("empty-rpmdb" in a for a in argv):
+                            return CommandReceipt(argv, 0, b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|8\n", b"", executed=True)
+                        return CommandReceipt(argv, 0, b"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789|8\n", b"", executed=True)
+                    return CommandReceipt(argv, 0, b"sample|1.0.0|1.fc43|x86_64\n", b"", executed=True)
+                if cmd == "rpmsign":
+                    signed_counter[0] += 1
+                    target = Path(argv[-1])
+                    target.write_bytes(target.read_bytes() + b"-signed")
+                    return CommandReceipt(argv, 0, b"", b"", executed=True)
+                if cmd == "rpmkeys":
+                    if "--checksig" in argv:
+                        if any("wrong-rpmdb" in a or "empty-rpmdb" in a or ".tampered" in a for a in argv):
+                            return CommandReceipt(argv, 1, b"sample.rpm: digests signatures NOT OK\n", b"", executed=True)
+                        return CommandReceipt(argv, 0, b"sample.rpm: digests signatures OK\n", b"", executed=True)
+                    return CommandReceipt(argv, 0, b"", b"", executed=True)
+                return CommandReceipt(argv, 0, b"", b"", executed=True)
+
+        with self.assertRaises(ContractError) as caught:
+            sign_rpm(MutatingPdRunner(), rpm_file, fixture, wrong_fixture=wrong_fixture(fixture))
+        self.assertEqual(caught.exception.code, "RPM_SIGNING")
+        self.assertIn("payload digest changed", caught.exception.message)
+        self.assertTrue(next((fixture_home / "diagnostics").glob("rpm-signed-query-probe-*.json")).is_file())
 
     def test_sign_rpm_rejects_synthetic_runner(self):
         rpm_file = self.root / "sample.rpm"
@@ -183,7 +346,7 @@ class HostedPackagingTests(unittest.TestCase):
                 return CommandReceipt(argv, 0, b"", b"", executed=False)
 
         with self.assertRaises(ContractError) as caught:
-            sign_rpm(SyntheticRunner(), rpm_file, fixture)
+            sign_rpm(SyntheticRunner(), rpm_file, fixture, wrong_fixture=wrong_fixture(fixture))
         self.assertEqual(caught.exception.code, "NATIVE_TOOL")
 
     def test_tool_unavailable_unit_regression_uses_runner_available_tools(self):
@@ -513,6 +676,276 @@ class HostedPackagingTests(unittest.TestCase):
         scratch.mkdir()
         neb_capture = SimpleNamespace(source={"package.json": json.dumps({"dependencies": {"vue": "3.0"}})})
         self.assertIsNone(_resolve_offline_npm_archives(neb_capture, "theme-forge-nebular-fusion", scratch, None, None))
+
+    def _base_probe_runner(self):
+        class BaseRpmRunner:
+            def __init__(self):
+                self.calls = []
+
+            def run(self, argv, **kwargs):
+                self.calls.append(argv)
+                cmd = argv[0]
+                if cmd == "rpm":
+                    if "--version" in argv:
+                        return CommandReceipt(argv, 0, b"RPM version 6.0.0\n", b"", executed=True)
+                    if "--querytags" in argv:
+                        return CommandReceipt(argv, 0, b"PAYLOADSHA256\nPAYLOADSHA256ALGO\n", b"", executed=True)
+                    if "--eval" in argv and "_keyring" in argv[-1]:
+                        definitions = dict(a.split(" ", 1) for a in argv if a.startswith(("_keyring ", "_keyringpath ", "_dbpath ")))
+                        raw = "|".join(definitions[k] for k in ("_keyring", "_keyringpath", "_dbpath")) + "\n"
+                        return CommandReceipt(argv, 0, raw.encode(), b"", executed=True)
+                    if "--eval" in argv:
+                        return CommandReceipt(argv, 0, b"1.fc43\n", b"", executed=True)
+                    qf = argv[argv.index("--queryformat") + 1] if "--queryformat" in argv else ""
+                    if "%{PAYLOAD" in qf:
+                        return CommandReceipt(argv, 0, b"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789|8\n", b"", executed=True)
+                    return CommandReceipt(argv, 0, b"sample|1.0.0|1.fc43|x86_64\n", b"", executed=True)
+                if cmd == "rpmsign":
+                    target = Path(argv[-1])
+                    target.write_bytes(target.read_bytes() + b"-signed")
+                    return CommandReceipt(argv, 0, b"", b"", executed=True)
+                if cmd == "rpmkeys":
+                    if "--checksig" in argv:
+                        if any("wrong-rpmdb" in a or "empty-rpmdb" in a or ".tampered" in a for a in argv):
+                            return CommandReceipt(argv, 1, b"sample.rpm: digests signatures NOT OK\n", b"", executed=True)
+                        return CommandReceipt(argv, 0, b"sample.rpm: digests signatures OK\n", b"", executed=True)
+                    return CommandReceipt(argv, 0, b"", b"", executed=True)
+                return CommandReceipt(argv, 0, b"", b"", executed=True)
+        return BaseRpmRunner()
+
+    def test_probe_streams_are_bounded_path_redacted_and_ascii_only(self):
+        from rs9.hosted_custody import diagnostic_bytes
+        from rs9.hosted_packaging import _receipt_summary
+        raw = ("warning: /tmp/space bearing path.rpm: Header RSA/SHA256 NOKEY\n" + "x" * 8000).encode()
+        row = _receipt_summary(CommandReceipt(["rpm", str(self.root)], 0, b"identity\n", raw, executed=True))
+        self.assertNotIn("argv", row)
+        self.assertNotIn("/tmp/", json.dumps(row))
+        self.assertLessEqual(len(row["stderr_text"]), 1024)
+        self.assertEqual(row["stderr_sha256"], digest(raw))
+        nonascii = _receipt_summary(CommandReceipt(["rpm"], 0, b"\xff", b"", executed=True))
+        self.assertEqual(nonascii["stdout_text"], "non-printable-stream-withheld")
+        target = self.root / "diagnostic.json"
+        target.write_text(json.dumps(row))
+        diagnostic_bytes(target)
+
+    def test_unsigned_query_and_bad_macros_retain_native_probe_before_failure(self):
+        for cause in ("unsigned-stderr", "macros"):
+            with self.subTest(cause=cause):
+                work = self.root / cause; work.mkdir()
+                path = work / "sample.rpm"; path.write_bytes(b"fixture-package")
+                fixture = SimpleNamespace(homedir=work, primary_fingerprint="A" * 40,
+                                          public_key_armor="synthetic armor", gpg="gpg")
+                runner = self._base_probe_runner(); actual = runner.run
+                def failure(argv, **kw):
+                    row = actual(argv, **kw)
+                    if cause == "unsigned-stderr" and "-qp" in argv:
+                        return CommandReceipt(argv, 0, row.stdout_bytes, b"error: unknown tag\n", executed=True)
+                    if cause == "macros" and "--eval" in argv and "_keyring" in argv[-1]:
+                        return CommandReceipt(argv, 0, b"openpgp|ambient|ambient\n", b"", executed=True)
+                    return row
+                runner.run = failure
+                with self.assertRaises(ContractError):
+                    sign_rpm(runner, path, fixture, wrong_fixture=wrong_fixture(fixture))
+                record = json.loads(next((work / "diagnostics").glob("rpm-signed-query-probe-*.json")).read_bytes())
+                self.assertEqual(record["status"], "fail")
+                self.assertIn("unsigned_preflight_identity", record["transcripts"])
+
+    def test_sign_rpm_probe_retained_on_checksig_failure(self):
+        """Host probe is written to lane diagnostics even when signature validation fails."""
+        rpm_file = self.root / "sample_probe_fail.rpm"
+        rpm_file.write_bytes(b"initial-rpm-content")
+        fixture_home = self.root / "fixture-home-probe-fail"
+        fixture_home.mkdir()
+        fixture = SimpleNamespace(
+            primary_fingerprint="D" * 40,
+            homedir=fixture_home,
+            gpg="gpg",
+            public_key_armor="-----BEGIN PGP PUBLIC KEY BLOCK-----\narmor\n-----END PGP PUBLIC KEY BLOCK-----\n",
+            public_key_binary=b"\x99\x03keyring",
+        )
+        runner = self._base_probe_runner()
+        # Override rpmkeys to fail checksig on the primary signed path
+        orig_run = runner.run
+        def failing_run(argv, **kw):
+            if argv[0] == "rpmkeys" and "--checksig" in argv and not any("wrong-rpmdb" in a or "empty-rpmdb" in a or ".tampered" in a for a in argv):
+                return CommandReceipt(argv, 1, b"sample.rpm: digests signatures NOT OK\n", b"", executed=True)
+            return orig_run(argv, **kw)
+        runner.run = failing_run
+
+        with self.assertRaises(ContractError) as caught:
+            sign_rpm(runner, rpm_file, fixture, wrong_fixture=wrong_fixture(fixture))
+        self.assertEqual(caught.exception.code, "RPM_SIGNING")
+        self.assertIn("signature validation failed", caught.exception.message)
+
+        # Probe diagnostic must be retained on failure
+        probe_file = next((fixture_home / "diagnostics").glob("rpm-signed-query-probe-*.json"))
+        self.assertTrue(probe_file.is_file())
+        probe_data = json.loads(probe_file.read_bytes())
+        self.assertEqual(probe_data["status"], "fail")
+        self.assertEqual(probe_data["error_code"], "RPM_SIGNING")
+
+    def test_sign_rpm_requires_distinct_wrong_key_before_signing(self):
+        path = self.root / "required-wrong-key.rpm"; path.write_bytes(b"unsigned")
+        fixture = SimpleNamespace(homedir=self.root, primary_fingerprint="A" * 40,
+                                  public_key_armor="synthetic armor", gpg="gpg")
+        for wrong in (None, fixture):
+            runner = self._base_probe_runner()
+            with self.subTest(wrong=wrong is None), self.assertRaises(ContractError) as caught:
+                sign_rpm(runner, path, fixture, wrong_fixture=wrong)
+            self.assertEqual(caught.exception.code, "RPM_SIGNING")
+            self.assertEqual(path.read_bytes(), b"unsigned")
+            self.assertFalse(any(argv[0] == "rpmsign" for argv in runner.calls))
+            record = json.loads(next((self.root / "diagnostics").glob("rpm-signed-query-probe-*.json")).read_bytes())
+            self.assertEqual(record["status"], "fail")
+
+    def test_sign_rpm_wrong_key_acceptance_fails_closed(self):
+        """Signed RPM accepted by wrong key fails closed and records failure in probe."""
+        rpm_file = self.root / "sample_wrong_accept.rpm"
+        rpm_file.write_bytes(b"initial-rpm-content")
+        fixture_home = self.root / "fixture-home-wrong-accept"
+        fixture_home.mkdir()
+        fixture = SimpleNamespace(
+            primary_fingerprint="E" * 40,
+            homedir=fixture_home,
+            gpg="gpg",
+            public_key_armor="-----BEGIN PGP PUBLIC KEY BLOCK-----\narmor\n-----END PGP PUBLIC KEY BLOCK-----\n",
+            public_key_binary=b"\x99\x04keyring",
+        )
+        runner = self._base_probe_runner()
+        orig_run = runner.run
+        def buggy_wrong_key_run(argv, **kw):
+            if argv[0] == "rpmkeys" and "--checksig" in argv and any("wrong-rpmdb" in a for a in argv):
+                return CommandReceipt(argv, 0, b"sample.rpm: digests signatures OK\n", b"", executed=True)
+            return orig_run(argv, **kw)
+        runner.run = buggy_wrong_key_run
+
+        with self.assertRaises(ContractError) as caught:
+            sign_rpm(runner, rpm_file, fixture, wrong_fixture=SimpleNamespace(
+                primary_fingerprint="F" * 40, public_key_armor=fixture.public_key_armor))
+        self.assertEqual(caught.exception.code, "RPM_SIGNING")
+        self.assertIn("wrong key", caught.exception.message)
+
+        probe_file = next((fixture_home / "diagnostics").glob("rpm-signed-query-probe-*.json"))
+        self.assertTrue(probe_file.is_file())
+        probe_data = json.loads(probe_file.read_bytes())
+        self.assertEqual(probe_data["status"], "fail")
+
+    def test_sign_rpm_empty_trust_acceptance_fails_closed(self):
+        """Signed RPM accepted by empty trust db fails closed and records failure in probe."""
+        rpm_file = self.root / "sample_empty_accept.rpm"
+        rpm_file.write_bytes(b"initial-rpm-content")
+        fixture_home = self.root / "fixture-home-empty-accept"
+        fixture_home.mkdir()
+        fixture = SimpleNamespace(
+            primary_fingerprint="E" * 40,
+            homedir=fixture_home,
+            gpg="gpg",
+            public_key_armor="-----BEGIN PGP PUBLIC KEY BLOCK-----\narmor\n-----END PGP PUBLIC KEY BLOCK-----\n",
+            public_key_binary=b"\x99\x04keyring",
+        )
+        runner = self._base_probe_runner()
+        orig_run = runner.run
+        def buggy_empty_run(argv, **kw):
+            if argv[0] == "rpmkeys" and "--checksig" in argv and any("empty-rpmdb" in a for a in argv):
+                return CommandReceipt(argv, 0, b"sample.rpm: digests signatures OK\n", b"", executed=True)
+            return orig_run(argv, **kw)
+        runner.run = buggy_empty_run
+
+        with self.assertRaises(ContractError) as caught:
+            sign_rpm(runner, rpm_file, fixture, wrong_fixture=wrong_fixture(fixture))
+        self.assertEqual(caught.exception.code, "RPM_SIGNING")
+        self.assertIn("empty trust", caught.exception.message)
+
+        probe_file = next((fixture_home / "diagnostics").glob("rpm-signed-query-probe-*.json"))
+        self.assertTrue(probe_file.is_file())
+        probe_data = json.loads(probe_file.read_bytes())
+        self.assertEqual(probe_data["status"], "fail")
+
+    def test_sign_rpm_tamper_acceptance_fails_closed(self):
+        """Tampered RPM accepted by checksig fails closed and records failure in probe."""
+        rpm_file = self.root / "sample_tamper_accept.rpm"
+        rpm_file.write_bytes(b"initial-rpm-content")
+        fixture_home = self.root / "fixture-home-tamper-accept"
+        fixture_home.mkdir()
+        fixture = SimpleNamespace(
+            primary_fingerprint="F" * 40,
+            homedir=fixture_home,
+            gpg="gpg",
+            public_key_armor="-----BEGIN PGP PUBLIC KEY BLOCK-----\narmor\n-----END PGP PUBLIC KEY BLOCK-----\n",
+            public_key_binary=b"\x99\x05keyring",
+        )
+        runner = self._base_probe_runner()
+        orig_run = runner.run
+        def buggy_tamper_run(argv, **kw):
+            if argv[0] == "rpmkeys" and "--checksig" in argv and any(".tampered" in a for a in argv):
+                return CommandReceipt(argv, 0, b"sample.rpm: digests signatures OK\n", b"", executed=True)
+            return orig_run(argv, **kw)
+        runner.run = buggy_tamper_run
+
+        with self.assertRaises(ContractError) as caught:
+            sign_rpm(runner, rpm_file, fixture, wrong_fixture=wrong_fixture(fixture))
+        self.assertEqual(caught.exception.code, "RPM_SIGNING")
+        self.assertIn("Tampered RPM accepted", caught.exception.message)
+
+        probe_file = next((fixture_home / "diagnostics").glob("rpm-signed-query-probe-*.json"))
+        self.assertTrue(probe_file.is_file())
+        probe_data = json.loads(probe_file.read_bytes())
+        self.assertEqual(probe_data["status"], "fail")
+
+    def test_sign_rpm_strict_empty_stderr_query_rejection(self):
+        """Any stderr (such as NOKEY warning) on signed query fails closed."""
+        rpm_file = self.root / "sample_stderr_fail.rpm"
+        rpm_file.write_bytes(b"initial-rpm-content")
+        fixture_home = self.root / "fixture-home-stderr-fail"
+        fixture_home.mkdir()
+        fixture = SimpleNamespace(
+            primary_fingerprint="G" * 40,
+            homedir=fixture_home,
+            gpg="gpg",
+            public_key_armor="-----BEGIN PGP PUBLIC KEY BLOCK-----\narmor\n-----END PGP PUBLIC KEY BLOCK-----\n",
+            public_key_binary=b"\x99\x06keyring",
+        )
+        runner = self._base_probe_runner()
+        orig_run = runner.run
+        def stderr_warning_run(argv, **kw):
+            receipt = orig_run(argv, **kw)
+            # If gating query on signed package with dbpath fixture-rpmdb
+            if argv[0] == "rpm" and "-qp" in argv and any("fixture-rpmdb" in a for a in argv):
+                return CommandReceipt(argv, 0, receipt.stdout_bytes,
+                                      b"warning: Header V4 RSA/SHA256 Signature, key ID abcdef01: NOKEY\n",
+                                      executed=True)
+            return receipt
+        runner.run = stderr_warning_run
+
+        with self.assertRaises(ContractError) as caught:
+            sign_rpm(runner, rpm_file, fixture, wrong_fixture=wrong_fixture(fixture))
+        self.assertEqual(caught.exception.code, "RPM_QUERY_FAILED")
+
+    def test_sign_rpm_isolates_dbpath_and_keyringpath_on_unsigned_and_signed(self):
+        """sign_rpm isolates dbpath and %_keyring/%_keyringpath on both unsigned and signed queries."""
+        rpm_file = self.root / "sample_isolation_verify.rpm"
+        rpm_file.write_bytes(b"initial-rpm-content")
+        fixture_home = self.root / "fixture-home-isolation"
+        fixture_home.mkdir()
+        fixture = SimpleNamespace(
+            primary_fingerprint="H" * 40,
+            homedir=fixture_home,
+            gpg="gpg",
+            public_key_armor="-----BEGIN PGP PUBLIC KEY BLOCK-----\narmor\n-----END PGP PUBLIC KEY BLOCK-----\n",
+            public_key_binary=b"\x99\x07keyring",
+        )
+        runner = self._base_probe_runner()
+        res = sign_rpm(runner, rpm_file, fixture, wrong_fixture=wrong_fixture(fixture))
+        self.assertTrue(res["identity_preserved"])
+
+        # Inspect all calls to 'rpm' and 'rpmkeys'
+        rpm_queries = [call for call in runner.calls if call[0] == "rpm" and "-qp" in call]
+        self.assertGreaterEqual(len(rpm_queries), 4)
+        for call in rpm_queries:
+            self.assertIn("--dbpath", call)
+            self.assertIn("--define", call)
+            self.assertTrue(any("_keyring" in a for a in call))
+            self.assertTrue(any("_keyringpath" in a for a in call))
 
 
 if __name__ == "__main__":

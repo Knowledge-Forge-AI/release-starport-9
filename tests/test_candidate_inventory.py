@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 from rs9.candidate_inventory import MANIFEST, candidate_paths, file_inventory, product_delta, verify_inventory
 from rs9.errors import ContractError
 
-PARENT = "a09fcc21c68c292cd526033bb2ecebccf3167b90"
+PARENT = "515d460919ff22e9c323672aa9e4160278c53d6b"
 
 
 class CandidateInventoryTests(unittest.TestCase):
@@ -97,11 +97,15 @@ class CandidateInventoryTests(unittest.TestCase):
             self.skipTest("public parent object absent in shallow checkout")
         manifest = json.loads((root / MANIFEST).read_bytes())
         self.assertEqual(manifest["parent"], PARENT)
+        from rs9.candidate_readiness import validate_readiness
+        validate_readiness(manifest, require_ready=False)
+        self.assertIs(manifest["publication_authority"], False)
         self.assertEqual(manifest["changed_paths"], product_delta(root, PARENT))
-        self.assertIn("operators/live1/targets.json", manifest["changed_paths"])
+        self.assertIn("src/rs9/hosted_observe.py", manifest["changed_paths"])
         target = next(r for r in manifest["files"] if r["path"] == "operators/live1/targets.json")
         parent_target = subprocess.check_output(["git", "-C", str(root), "show", PARENT + ":operators/live1/targets.json"])
-        self.assertNotEqual(target["sha256"], hashlib.sha256(parent_target).hexdigest())
+        # The accepted source/container pins are preserved in this repair.
+        self.assertEqual(target["sha256"], hashlib.sha256(parent_target).hexdigest())
         self.assertEqual(json.loads((root / target["path"]).read_bytes())["maintainer"],
                          "Knowledge Forge AI <nonproduction@knowledge-forge.invalid>")
         self.assertRegex(verify_inventory(root, manifest, parent=PARENT), r"^[0-9a-f]{40}$")

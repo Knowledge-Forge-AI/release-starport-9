@@ -23,6 +23,7 @@ def safe_details(details):
                     "stderr_matches", "observed_architecture", "observed_name", "observed_version",
                     "userns_policy", "code", "message_sha256"})
     allowed.update({"observed_field_count", "observed_field_tokens", "observed_fields_truncated"})
+    allowed.update({"cause", "limit", "observed", "maximum", "counters", "max"})
     result, dropped = {}, False
     if not isinstance(details, dict):
         return {}
@@ -32,6 +33,29 @@ def safe_details(details):
             continue
         if key not in allowed:
             dropped = True
+            continue
+        if key in {"observed", "maximum"}:
+            if type(value) is int and 0 <= value < 2**64:
+                result[key] = value
+            else:
+                dropped = True
+            continue
+        if key in {"cause", "limit"}:
+            if isinstance(value, str) and re.fullmatch(r"[a-z][a-z0-9-]{0,63}", value):
+                result[key] = value
+            else:
+                dropped = True
+            continue
+        if key in {"counters", "max"}:
+            fields = ({"dir_count", "entries", "file_count", "hardlink_count", "special_count",
+                       "symlink_count", "total_hashed_bytes", "scanned_entries", "excluded_files"}
+                      if key == "counters" else
+                      {"depth", "file_bytes", "path_bytes", "symlink_bytes", "directory_entries"})
+            if (type(value) is dict and set(value) <= fields
+                    and all(type(n) is int and 0 <= n < 2**64 for n in value.values())):
+                result[key] = dict(sorted(value.items()))
+            else:
+                dropped = True
             continue
         if key == "observed_field_count":
             if type(value) is int and 1 <= value <= 1024 ** 3:

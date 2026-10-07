@@ -136,7 +136,8 @@ def summarize(repository, inputs, output):
     return 0 if qualified else 2
 
 
-def validate_summary(summary, repository, commit):
+def validate_summary_binding(summary, repository, commit):
+    """Authenticate source/provenance without treating failed gates as passes."""
     record = json.loads((Path(summary) / "hosted-summary.json").read_bytes()) if not isinstance(summary, dict) else summary
     if record.get("schema") != "rs9.hosted-candidate-summary.v1alpha2":
         raise ContractError("HOSTED_SUMMARY", "Current hosted summary required")
@@ -145,6 +146,17 @@ def validate_summary(summary, repository, commit):
     for key in ("source_commit", "workflow_sha256", "contract_sha256", "builder_source_sha256"):
         if record.get(key) != expected[key]:
             raise ContractError("HOSTED_BINDING", "Summary differs from adopted source")
+    if (record.get("production_enabled") is not False or record.get("publication_authority") is not False
+            or record.get("event") != "push" or record.get("ref") != "refs/heads/main"
+            or record.get("attempt") != 1 or record.get("adoptable") is not True):
+        raise ContractError("HOSTED_BINDING", "Summary differs from non-production push provenance")
+    return record
+
+
+def validate_summary(summary, repository, commit):
+    record = validate_summary_binding(summary, repository, commit)
+    expected = provenance(repository, record.get("release_ingestion_sha256"))
+    expected["source_commit"] = commit
     lanes = required(repository)
     keys = {(l["lane"], l["system"]) for l in lanes}
     receipts = record.get("receipts", [])

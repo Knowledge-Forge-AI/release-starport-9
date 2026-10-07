@@ -1,7 +1,7 @@
 {
-  "adoption_scope": "hosted-candidate-qualification-only",
+  "adoption_scope": "partial-diagnostic",
   "assembled_pages_arm64_client": "deferred; family-arm64-lanes-required",
-  "candidate_adoption_ready": true,
+  "candidate_adoption_ready": false,
   "clean_clients_and_tamper_checks": "not-run",
   "dns_and_tls": "not-a-source-phase-prerequisite",
   "expected_future_trust": {
@@ -24,10 +24,33 @@
   "production_enabled": false,
   "production_ready": false,
   "production_secret_access": false,
+  "publication_authority": false,
   "publication_receipts": "none",
   "pypi_names": "unknown-current-transport-failed",
   "pypi_ownership": "not-attested",
   "pypi_trusted_publishers": "not-attested",
+  "readiness": {
+    "full_live1_qualification": false,
+    "known_unqualified_lanes": [
+      {
+        "lane": "nix",
+        "reason": "linux-nix-userns-runtime-unresolved",
+        "system": "aarch64-linux",
+        "track": "A"
+      },
+      {
+        "lane": "nix",
+        "reason": "linux-nix-userns-runtime-unresolved",
+        "system": "x86_64-linux",
+        "track": "A"
+      }
+    ],
+    "production_enabled": false,
+    "publication_authority": false,
+    "published_linux_nix_ready": false,
+    "schema": "rs9.live1-candidate-readiness.v1alpha1",
+    "source_adoption_scope": "partial-diagnostic"
+  },
   "real_artifact_count": 0,
   "real_foundation3_plan_count": 0,
   "real_qualification_count": 0,
@@ -37,6 +60,6 @@
   "signing_custody": "not-inspected-by-provider",
   "source_qualification": "unit-and-contract-tests-pass;external-builds-deferred-to-hosted",
   "source_reproducibility": "container-and-installer-pins-pending-hosted-readback",
-  "source_review": "dispatcher-pre-final-reviewed-with-findings; terminal-amended",
+  "source_review": "adoption requires exact manager disposition of reviewed tree and manifest digest",
   "stage": "hosted-source-closeout-candidate"
 }
