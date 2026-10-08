@@ -1512,6 +1512,7 @@ class PagesLaneTests(unittest.TestCase):
         source=self.root/'rpm-source';source.mkdir()
         directory=self.inputs/'candidate-rpm-x86_64-linux'
         receipt={'lane':'rpm','system':'x86_64-linux','provenance':{},'runner':{},
+                 'production_enabled': False, 'publication_authority': False,
                  'details':{'rpm_lint_raw':{'fixture':{'status':'fail','clean':False,
                      'tool_receipt':{'exit_code':64},'findings_summary':{'errors':1,'warnings':2,'filtered':8}}},
                      'rpm_lint_policy':{'fixture':{'accepted':True,'status':'accepted'}}}}

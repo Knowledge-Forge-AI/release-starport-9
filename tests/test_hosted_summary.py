@@ -47,6 +47,9 @@ class HostedSummaryTests(unittest.TestCase):
                 "execution_error":None,"policy_blockers":[],"runner":{},"provenance":provenance(ROOT,"a"*64),
                 "production_promotion_blockers": [LINUX_WHEEL_PROMOTION_BLOCKER] if row["lane"] == "wheels" and row["system"].endswith("linux") else [],
                 "gates":[{"name":g,"status":"pass"} for g in row["required_gates"]]}
+            if row["lane"] == "rpm":
+                from tests.rpm_summary_fixtures import add_rpm_annex
+                add_rpm_annex(scratch,receipt,files)
             retain(scratch,self.inputs / row["artifact_name"],files,receipt)
 
     def test_burst_architecture_independent_custody_is_rejected(self):
@@ -174,7 +177,7 @@ class HostedSummaryTests(unittest.TestCase):
                                                 "accepted_findings": [{"code": "non-executable-script"}]}}}
         self.mutate_receipt("rpm", "x86_64-linux", change)
         code, record = self.finish()
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 2)  # Inline, marker-free claims preserve display only.
         view = record["rpm_lint_results"][0]
         self.assertEqual(view["raw_status"], "fail")
         self.assertFalse(view["raw_clean"])
@@ -242,3 +245,11 @@ class HostedSummaryTests(unittest.TestCase):
         self.assertEqual(row["destination_planner_noops"], all_8_noops)
         self.assertEqual(len(row["destination_exact"]), 8)
         self.assertEqual(len(row["destination_satisfied"]), 12)
+
+    def test_historical_marker_free_rpm_evidence_cannot_qualify(self):
+        self.mutate_receipt("rpm", "x86_64-linux", lambda r: r.get("details", {}).pop("rpm_evidence_contract", None))
+        code, row = self.finish()
+        self.assertEqual(code, 2)
+        with self.assertRaises(ContractError) as caught:
+            validate_summary(row, ROOT, "1" * 40)
+        self.assertEqual(caught.exception.code, "HOSTED_NOT_QUALIFIED")

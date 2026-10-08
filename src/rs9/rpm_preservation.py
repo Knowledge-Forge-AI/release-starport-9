@@ -214,10 +214,12 @@ def duplicate_waste_totals(groups):
     return sorted(totals)
 
 
-def _archive_projection(path, expected_sha, install_root, origin):
+def _archive_projection(path, expected_sha, install_root, origin, contract_members=None):
     if digest(Path(path).read_bytes()) != expected_sha:
         raise ContractError('INPUT_CHANGED', 'Authenticated inventory archive identity changed')
     scripts, package = {}, {}
+    contract_contents = {}
+    known_members = set(contract_members) if contract_members else set()
     def visit(name, data, mode):
         if data.startswith(b'#!'):
             line = data.split(b'\n',1)[0]
@@ -226,6 +228,17 @@ def _archive_projection(path, expected_sha, install_root, origin):
             scripts[name] = line.decode('ascii')
         if name.endswith('/package.json') and name.count('/')==1:
             package.update(json.loads(data))
+        destination = install_root + '/' + name.split('/', 1)[-1]
+        if destination in known_members:
+            if len(data) > 256 * 1024:
+                raise ContractError('RPM_INVENTORY_FAILED', 'Authenticated contract member exceeds bound')
+            try:
+                text = data.decode('utf-8')
+            except UnicodeDecodeError:
+                return  # Binary members cannot satisfy the text contract.
+            from rs9.security import scan_for_credentials
+            scan_for_credentials(text)
+            contract_contents[name] = text
     manifest = inspect_archive(path, {}, on_file=visit)
     root = manifest['root']
     expected = {}
@@ -235,11 +248,27 @@ def _archive_projection(path, expected_sha, install_root, origin):
         value = {k:v for k,v in row.items() if k not in ('path',)}
         value.update(path=destination, input_member=row['path'], input_archive_sha256=expected_sha, origin=origin)
         if row['path'] in scripts: value['shebang']=scripts[row['path']]
+        if row['path'] in contract_contents: value['content']=contract_contents[row['path']]
         expected[destination] = value
     return expected, manifest['manifest_sha256'], package
 
 
-def collect_preservation_inventory(runner, rpm_file, capture, ctx, staged_nm, cmds, requires, scratch, dbpath, keyringpath):
+def collect_preservation_inventory(
+    runner,
+    rpm_file,
+    capture,
+    ctx,
+    staged_nm,
+    cmds,
+    requires,
+    scratch,
+    dbpath,
+    keyringpath,
+    *,
+    policy=None,
+    client_runtime=None,
+    caller_evidence=None,
+):
     isolation = rpm_isolation_args(dbpath=dbpath, keyring='rpmdb', keyringpath=keyringpath)
     substage = "rpm-preservation-inventory"
     queries_ledger = []
@@ -481,8 +510,19 @@ def collect_preservation_inventory(runner, rpm_file, capture, ctx, staged_nm, cm
     # Non-query projection stage
     try:
         name = ctx['project_id']
+        named_contracts = set()
+        entry = (policy.get('projects', {}) if isinstance(policy, dict) else {}).get(name, {})
+        named_contracts.update(entry.get('archive_contract_members', []))
+        for code, rules in entry.get('exceptions', {}).items():
+            if code != 'files-duplicated-waste' and isinstance(rules, dict):
+                for rule in rules.values():
+                    if isinstance(rule, dict):
+                        if rule.get('caller_member'):
+                            named_contracts.add(rule['caller_member'])
+                        if rule.get('floor_source', {}).get('member'):
+                            named_contracts.add(rule['floor_source']['member'])
         expected, manifest_sha, package = _archive_projection(
-            ctx['asset_file'], ctx['asset_sha'], '/usr/lib/' + name, 'release'
+            ctx['asset_file'], ctx['asset_sha'], '/usr/lib/' + name, 'release', named_contracts
         )
         if manifest_sha != ctx['payload']['payload_manifest_sha256']:
             raise ContractError('INPUT_CHANGED', 'Authenticated payload member manifest mismatch')
@@ -560,6 +600,7 @@ def collect_preservation_inventory(runner, rpm_file, capture, ctx, staged_nm, cm
         'permitted_directories': sorted(permitted_directories),
         'license_projections': projections,
         'wrappers': wrappers,
+        'contract_members': {p: r['content'] for p, r in expected.items() if 'content' in r},
         'engine_node': package.get('engines', {}).get('node'),
         'requires': list(requires),
         'duplicate_groups': groups,
@@ -567,4 +608,6 @@ def collect_preservation_inventory(runner, rpm_file, capture, ctx, staged_nm, cm
         'possible_duplicate_waste_bytes': duplicate_waste_totals(groups),
         'inventory_diagnostic': success_diag,
         'receipts': queries_ledger,
+        'client_runtime_evidence': client_runtime,
+        'caller_evidence': caller_evidence,
     }, [dump, algo, attrs]

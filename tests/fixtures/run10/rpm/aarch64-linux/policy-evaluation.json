@@ -1,0 +1,1960 @@
+{
+  "accepted": false,
+  "accepted_findings": [],
+  "blockers": [
+    "incomplete-project-policy"
+  ],
+  "calculated_duplicate_waste": null,
+  "duplicate_groups": [],
+  "inputs": {
+    "arch": "aarch64",
+    "asset_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+    "closure_sha256": null,
+    "payload_manifest_sha256": "4c23d945757dadb74d9cadd7af1c3b3d6ef117b74a6e69883ad0cd17bcf1a729",
+    "project_id": "theme-forge-nebular-fusion",
+    "system": "aarch64-linux",
+    "version": "0.6.1"
+  },
+  "inventory_sha256": "618450e21aabee901359943e27929080130cac081411a646355b12c745cc8e11",
+  "member_proofs": [],
+  "observed_duplicate_groups": [
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/aho-corasick-1.1.5/COPYING",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/byteorder-1.5.0/COPYING",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/jiff-0.2.35/COPYING",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/jiff-core-0.1.0/COPYING",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/memchr-2.8.3/COPYING",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/same-file-1.0.6/COPYING",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/walkdir-2.5.0/COPYING"
+      ],
+      "possible_waste_bytes": [
+        756
+      ],
+      "sha256": "01c266bced4a434da0051174d6bee16a4c82cf634e2679b6155d40d75012390f",
+      "size": 126,
+      "waste": 756
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/diagnostics.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/diagnostics.js"
+      ],
+      "possible_waste_bytes": [
+        1146
+      ],
+      "sha256": "0807d8d20810f4dc97e12d2f0adfe3022a6e6869fbfb35fd052bfef3d38078ca",
+      "size": 1146,
+      "waste": 1146
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/schema2-toml.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/schema2-toml.js"
+      ],
+      "possible_waste_bytes": [
+        34384
+      ],
+      "sha256": "08e735b3fa6c7034ed843fd2bb2f381acbcd2c9a7792ca107cb6cd8437e666c6",
+      "size": 34384,
+      "waste": 34384
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/miniz_oxide-0.8.9/LICENSE-ZLIB.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/miniz_oxide-0.9.1/LICENSE-ZLIB.md"
+      ],
+      "possible_waste_bytes": [
+        984
+      ],
+      "sha256": "0a54e647fe54104658b5e563c04c6f9edf251710e47bce692e0bd990a4ddaa39",
+      "size": 984,
+      "waste": 984
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/phf-0.13.1/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/phf_codegen-0.13.1/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/phf_generator-0.13.1/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/phf_macros-0.13.1/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/phf_shared-0.13.1/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        4396
+      ],
+      "sha256": "0ab4d106b6faac07fb6a051815fd1b4d862d730895e2d7d7358c2f13565e7a38",
+      "size": 1099,
+      "waste": 4396
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-plugin-dialog-2.7.2/LICENSE_APACHE-2.0",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-plugin-fs-2.5.1/LICENSE_APACHE-2.0"
+      ],
+      "possible_waste_bytes": [
+        10173
+      ],
+      "sha256": "0cec06e0e55fbc3dc5cee4fca9b607f66cb8f4e4dbcf3b3c013594dd156732e9",
+      "size": 10173,
+      "waste": 10173
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/fdeflate-0.3.7/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/miniz_oxide-0.8.9/LICENSE-APACHE.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/miniz_oxide-0.9.1/LICENSE-APACHE.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/num-conv-0.2.2/LICENSE-Apache",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/pin-project-lite-0.2.17/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/raw-window-handle-0.6.2/LICENSE-APACHE.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-2.11.5/LICENSE_APACHE-2.0",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-build-2.6.3/LICENSE_APACHE-2.0",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-codegen-2.6.3/LICENSE_APACHE-2.0",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-macros-2.6.3/LICENSE_APACHE-2.0",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-plugin-2.6.3/upstream-LICENSE_APACHE-2.0",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-runtime-2.11.3/LICENSE_APACHE-2.0",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-runtime-wry-2.11.4/LICENSE_APACHE-2.0",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-utils-2.9.3/LICENSE_APACHE-2.0",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/time-0.3.55/LICENSE-Apache",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/time-core-0.1.9/LICENSE-Apache",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/time-macros-0.2.32/LICENSE-Apache",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/npm/tauri-apps-api-2.11.1/LICENSE_APACHE-2.0"
+      ],
+      "possible_waste_bytes": [
+        172958
+      ],
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+      "size": 10174,
+      "waste": 172958
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/aho-corasick-1.1.5/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/byteorder-1.5.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/jiff-0.2.35/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/jiff-core-0.1.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/memchr-2.8.3/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/walkdir-2.5.0/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        5405
+      ],
+      "sha256": "0f96a83840e146e43c0ec96a22ec1f392e0680e6c1226e6f3ba87e0740af850f",
+      "size": 1081,
+      "waste": 5405
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/compile.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/compile.js"
+      ],
+      "possible_waste_bytes": [
+        13719
+      ],
+      "sha256": "135c71215a19f2f77b24646f47fb49927144f80118b61849ec902fa5f309db96",
+      "size": 13719,
+      "waste": 13719
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/grammar.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/grammar.js"
+      ],
+      "possible_waste_bytes": [
+        23776
+      ],
+      "sha256": "144f27b46adfb4a139adeb7483820def568b3940a6893194c03f5a71a94babc0",
+      "size": 23776,
+      "waste": 23776
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/schemars-0.8.22/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/schemars-0.9.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/schemars-1.2.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/schemars_derive-0.8.22/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        3204
+      ],
+      "sha256": "1954992a2b32e8a2af24a4c11b726902e344c1934b947a77f04d404908f8db30",
+      "size": 1068,
+      "waste": 3204
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/index.cjs",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/index.cjs"
+      ],
+      "possible_waste_bytes": [
+        22907
+      ],
+      "sha256": "195ca51fc784617d361af3697756a896518e45bec4e35976baec2dffd656cb8f",
+      "size": 22907,
+      "waste": 22907
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/design-evidence/index.d.ts",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/design-evidence/index.js"
+      ],
+      "possible_waste_bytes": [
+        133
+      ],
+      "sha256": "1e5b09b1d29215e6cb4680df385126347f7676abb1ee387c686e77cb631cc279",
+      "size": 133,
+      "waste": 133
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/index.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/index.js"
+      ],
+      "possible_waste_bytes": [
+        572
+      ],
+      "sha256": "20b8e8b8329e08ee6fcbcdf6fadf62505ddb0acc1ca0c1fc7a6018a7f2b9162a",
+      "size": 572,
+      "waste": 572
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unicode-normalization-0.1.25/COPYRIGHT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unicode-segmentation-1.13.3/COPYRIGHT"
+      ],
+      "possible_waste_bytes": [
+        321
+      ],
+      "sha256": "23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d",
+      "size": 321,
+      "waste": 321
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/adler2-2.0.1/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/anyhow-1.0.104/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/camino-1.2.5/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cargo-platform-0.1.9/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cargo_metadata-0.19.2/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/displaydoc-0.2.7/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dtoa-1.0.11/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dyn-clone-1.0.20/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/erased-serde-0.4.10/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/fastrand-2.5.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/itoa-1.0.18/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/once_cell-1.21.4/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/pin-project-lite-0.2.17/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro-crate-1.3.1/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro-crate-2.0.2/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro2-1.0.107/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/quote-1.0.47/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/ref-cast-1.0.27/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/ref-cast-impl-1.0.27/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/semver-1.0.28/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde-1.0.229/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde-untagged-0.1.9/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_core-1.0.229/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_derive-1.0.229/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_derive_internals-0.29.1/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_json-1.0.151/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_repr-0.1.21/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/servo_arc-0.4.3/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/syn-1.0.109/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/syn-2.0.119/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/syn-3.0.4/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/system-deps-6.2.2/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/thiserror-1.0.69/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/thiserror-2.0.20/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/thiserror-impl-1.0.69/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/thiserror-impl-2.0.20/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/typeid-1.0.3/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-char-property-0.9.0/upstream-LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-char-range-0.9.0/upstream-LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-common-0.9.0/upstream-LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-ucd-ident-0.9.0/upstream-LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-ucd-version-0.9.0/upstream-LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unicode-ident-1.0.24/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/x11-2.21.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/x11-dl-2.21.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/zmij-1.0.23/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        46035
+      ],
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+      "size": 1023,
+      "waste": 46035
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/time-0.3.55/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/time-core-0.1.9/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/time-macros-0.2.32/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        2114
+      ],
+      "sha256": "2537228d9a1b44a5dc595241349cae7090b326c8de165aaf89bfddef4a00d0fc",
+      "size": 1057,
+      "waste": 2114
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/defmt-1.1.1/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/defmt-macros-1.1.1/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/defmt-parser-1.0.0/upstream-LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        2106
+      ],
+      "sha256": "2710a622a896bba67356913d4d0492cab5465f61b2ecce6d880aeb483834fb50",
+      "size": 1053,
+      "waste": 2106
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-channel-0.3.34/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-core-0.3.34/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-executor-0.3.34/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-io-0.3.34/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-macro-0.3.34/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-sink-0.3.34/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-task-0.3.34/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-util-0.3.34/LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        76118
+      ],
+      "sha256": "275c491d6d1160553c32fd6127061d7f9606c3ea25abfad6ca3f6ed088785427",
+      "size": 10874,
+      "waste": 76118
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/error.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/error.js"
+      ],
+      "possible_waste_bytes": [
+        2787
+      ],
+      "sha256": "28dbfc2871c0707f97cebb5a8be7e343a9cee58250b5814813d748b90d9e0d3b",
+      "size": 2787,
+      "waste": 2787
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/muda-0.19.3/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tray-icon-0.24.2/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1108
+      ],
+      "sha256": "2ab5537b8c0cb1d475e2145b6a7994b04e7c71e6e5bd836f7f9c47c221a5ad9a",
+      "size": 1108,
+      "waste": 1108
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/constants.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/constants.js"
+      ],
+      "possible_waste_bytes": [
+        3169
+      ],
+      "sha256": "2c3bfd8a6cc25e8be9dd75b4291221db7390dbe022076b41e440665e7dee73d3",
+      "size": 3169,
+      "waste": 3169
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/sax.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/sax.js"
+      ],
+      "possible_waste_bytes": [
+        32465
+      ],
+      "sha256": "324e8a0c7b475c645efcd1736b634733e133150849bff741fa0e2215e7017d02",
+      "size": 32465,
+      "waste": 32465
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/toml-writer.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/toml-writer.js"
+      ],
+      "possible_waste_bytes": [
+        8597
+      ],
+      "sha256": "32773468d5655c38467f3f81fab81602c3f0be2200a56967f62942584072c7fa",
+      "size": 8597,
+      "waste": 8597
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/util.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/util.js"
+      ],
+      "possible_waste_bytes": [
+        3404
+      ],
+      "sha256": "332fda936c5d81a493d1a7dfa574221d27d585657b337e5db466cc26aec26302",
+      "size": 3404,
+      "waste": 3404
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/index.d.ts",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/index.d.ts"
+      ],
+      "possible_waste_bytes": [
+        73605
+      ],
+      "sha256": "342163401aa45f329d6b07a70d878ec9d1dfbf1630ee389ac242309178833baf",
+      "size": 73605,
+      "waste": 73605
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cc-1.4.4/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cfg-if-1.0.4/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/find-msvc-tools-0.1.11/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/pkg-config-0.3.34/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/socket2-0.6.5/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_datetime-0.6.3/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        5285
+      ],
+      "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397",
+      "size": 1057,
+      "waste": 5285
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/layout.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/layout.js"
+      ],
+      "possible_waste_bytes": [
+        18684
+      ],
+      "sha256": "395fdbe3ce06f341bdb5aade341725e6abdf8857e91d5c62baeb475daa207bf0",
+      "size": 18684,
+      "waste": 18684
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dlopen2-0.8.2/upstream-LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dlopen2_derive-0.4.3/upstream-LICENSE"
+      ],
+      "possible_waste_bytes": [
+        1184
+      ],
+      "sha256": "39fa265207450e77c62e90c5594a06c085b655d8374c7ced4bf7894b6bd95dd2",
+      "size": 1184,
+      "waste": 1184
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/errors.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/errors.js"
+      ],
+      "possible_waste_bytes": [
+        6817
+      ],
+      "sha256": "3e97f9c4f0a189346e2621b29c7c5a3899cd7375d1d15cbfbddd044fb781cb9f",
+      "size": 6817,
+      "waste": 6817
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/miniz_oxide-0.8.9/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/miniz_oxide-0.9.1/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        1213
+      ],
+      "sha256": "4108245a1f2df9d4e94df8abed5b4ba0759bb2f9b40a6b939f1be141077ae50b",
+      "size": 1213,
+      "waste": 1213
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/dom-parser.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/dom-parser.js"
+      ],
+      "possible_waste_bytes": [
+        20276
+      ],
+      "sha256": "4188e24b953e2c70b66150306c66547495ad968d040e31dd65f22a7b3485da28",
+      "size": 20276,
+      "waste": 20276
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/index.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/index.js"
+      ],
+      "possible_waste_bytes": [
+        1595
+      ],
+      "sha256": "418c42598a45290498f4350b6b6f531ceeb25e8d4d9a107db2448a1c0b5b784e",
+      "size": 1595,
+      "waste": 1595
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dbus-0.9.12/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/libdbus-sys-0.2.7/LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        11362
+      ],
+      "sha256": "453745410e3be8cf25d56872ea2aec975a78e6c9f217443d0bf908a5bce7c8ff",
+      "size": 11362,
+      "waste": 11362
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/validate.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/validate.js"
+      ],
+      "possible_waste_bytes": [
+        87607
+      ],
+      "sha256": "4c12ff28885c7c04d4c4ee75b20bd3cf267775f7ac84ca0a587d26e8c1c43868",
+      "size": 87607,
+      "waste": 87607
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        1298
+      ],
+      "sha256": "4da724fc305d81606b245b324d4d2586916b9d248b23d82183df753ace0fdf71",
+      "size": 1298,
+      "waste": 1298
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/CHANGELOG.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/CHANGELOG.md"
+      ],
+      "possible_waste_bytes": [
+        69194
+      ],
+      "sha256": "5138fc1f8c15712ed7ede448a53f06fad0c15f1f94b57b4cb74ccfe694329c5a",
+      "size": 69194,
+      "waste": 69194
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro-error-1.0.4/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro-error-attr-1.0.4/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1076
+      ],
+      "sha256": "544b3aed1fd723d0cadea567affdcfe0431e43e18d997a718f9d67256b814fde",
+      "size": 1076,
+      "waste": 1076
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/crossbeam-channel-0.5.16/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/crossbeam-utils-0.8.22/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1099
+      ],
+      "sha256": "5734ed989dfca1f625b40281ee9f4530f91b2411ec01cb748223e7eb87e201ab",
+      "size": 1099,
+      "waste": 1099
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/guard.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/guard.js"
+      ],
+      "possible_waste_bytes": [
+        3600
+      ],
+      "sha256": "592c290897fb4a31fbad6083609cd4bc2b888f2988ec62fd7230b64278955bbd",
+      "size": 3600,
+      "waste": 3600
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/readme.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/readme.md"
+      ],
+      "possible_waste_bytes": [
+        13763
+      ],
+      "sha256": "5ee9af83f442f300bf14d6ba8a79a6708f4f721a68ce79ce6fb701bc9ccd2de7",
+      "size": 13763,
+      "waste": 13763
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/README.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/README.md"
+      ],
+      "possible_waste_bytes": [
+        23654
+      ],
+      "sha256": "6170186cc4c4e3e5b755e5d54939d01a4e2c5a930a650dde0ee0d3eef04cc3a2",
+      "size": 23654,
+      "waste": 23654
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/string_cache-0.9.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/string_cache_codegen-0.6.1/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1067
+      ],
+      "sha256": "62065228e42caebca7e7d7db1204cbb867033de5982ca4009928915e4095f3a3",
+      "size": 1067,
+      "waste": 1067
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/anyhow-1.0.104/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dtoa-1.0.11/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dyn-clone-1.0.20/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/erased-serde-0.4.10/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/itoa-1.0.18/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/libc-0.2.189/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro2-1.0.107/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/quote-1.0.47/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/ref-cast-1.0.27/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/ref-cast-impl-1.0.27/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/semver-1.0.28/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde-1.0.229/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde-untagged-0.1.9/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_core-1.0.229/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_derive-1.0.229/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_derive_internals-0.29.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_json-1.0.151/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_repr-0.1.21/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/syn-2.0.119/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/syn-3.0.4/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/thiserror-1.0.69/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/thiserror-2.0.20/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/thiserror-impl-1.0.69/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/thiserror-impl-2.0.20/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/typeid-1.0.3/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unicode-ident-1.0.24/LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        243075
+      ],
+      "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+      "size": 9723,
+      "waste": 243075
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/root/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/legal/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@knowledge-forge-ai/tfsb-raster-resvg/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-payload/LICENSE",
+        "/usr/share/licenses/theme-forge-nebular-fusion/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        0,
+        206760
+      ],
+      "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+      "size": 34460,
+      "waste": null
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/primitive.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/primitive.js"
+      ],
+      "possible_waste_bytes": [
+        11015
+      ],
+      "sha256": "64418c1b056c86d24053caee06ec44bd48187c061b7ff09c21159f2e0e5dd8f5",
+      "size": 11015,
+      "waste": 11015
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/bitflags-1.3.2/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/bitflags-2.13.1/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/glob-0.3.4/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/log-0.4.34/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/num-traits-0.2.19/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/regex-1.13.1/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/regex-automata-0.4.18/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/regex-syntax-0.8.11/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        7497
+      ],
+      "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb",
+      "size": 1071,
+      "waste": 7497
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-channel-0.3.34/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-core-0.3.34/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-executor-0.3.34/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-io-0.3.34/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-macro-0.3.34/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-sink-0.3.34/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-task-0.3.34/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-util-0.3.34/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        7658
+      ],
+      "sha256": "6652c868f35dfe5e8ef636810a4e576b9d663f3a17fb0f5613ad73583e1b88fd",
+      "size": 1094,
+      "waste": 7658
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/digests.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/digests.js"
+      ],
+      "possible_waste_bytes": [
+        1375
+      ],
+      "sha256": "66f632dd1a092c7b9d424adda85a909069860a52dd79130ac5c800e20baff528",
+      "size": 1375,
+      "waste": 1375
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/import-svg-guard.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/import-svg-guard.js"
+      ],
+      "possible_waste_bytes": [
+        14870
+      ],
+      "sha256": "67eecd5b5959e960d434a4569b7db0577bf7650a61cd40baaac390d6fc6928a0",
+      "size": 14870,
+      "waste": 14870
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dirs-6.0.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dirs-sys-0.5.0/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1069
+      ],
+      "sha256": "6a2e0ade09a7d5f816f11566fee2b151b32235a7fad52b41d49cce96f833c1a9",
+      "size": 1069,
+      "waste": 1069
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dpi-0.1.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tao-0.35.3/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        11323
+      ],
+      "sha256": "6dc0e068dcf3a5bc8e054205b85b7720e1d49265bbc64bf515d2cf79197df69a",
+      "size": 11323,
+      "waste": 11323
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_spanned-0.6.9/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_spanned-1.1.1/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml-0.8.2/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml-0.9.12+spec-1.1.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml-1.1.4+spec-1.1.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_datetime-0.7.5+spec-1.1.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_datetime-1.1.1+spec-1.1.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_edit-0.19.15/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_edit-0.20.2/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_parser-1.1.3+spec-1.1.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_writer-1.1.2+spec-1.1.0/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        10620
+      ],
+      "sha256": "6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6",
+      "size": 1062,
+      "waste": 10620
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_with-3.22.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_with_macros-3.22.0/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1043
+      ],
+      "sha256": "7576269ea71f767b99297934c0b2367532690f8c4badc695edf8e04ab6a1e545",
+      "size": 1043,
+      "waste": 1043
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/transforms.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/transforms.js"
+      ],
+      "possible_waste_bytes": [
+        11231
+      ],
+      "sha256": "78085867466af0aba892a7c2d0af6496cb61352d15e796d23677407b1f7722fd",
+      "size": 11231,
+      "waste": 11231
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/miniz_oxide-0.8.9/LICENSE-MIT.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/miniz_oxide-0.9.1/LICENSE-MIT.md"
+      ],
+      "possible_waste_bytes": [
+        1212
+      ],
+      "sha256": "799e9ca9d179295ef372f25d3769cdda7d25bb2668add6a6a1e22d1e4c678b8d",
+      "size": 1212,
+      "waste": 1212
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/javascriptcore-rs-sys-1.1.1/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/soup3-0.5.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/soup3-sys-0.5.0/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        2208
+      ],
+      "sha256": "7ade43ec5e1a5e43000aa871d290dff4c0e9e2e16b7f6bea2ecf091e3d056d31",
+      "size": 1104,
+      "waste": 2208
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/heck-0.4.1/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/heck-0.5.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unicode-normalization-0.1.25/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unicode-segmentation-1.13.3/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        3213
+      ],
+      "sha256": "7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0",
+      "size": 1071,
+      "waste": 3213
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/aho-corasick-1.1.5/UNLICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/byteorder-1.5.0/UNLICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/jiff-0.2.35/UNLICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/jiff-core-0.1.0/UNLICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/memchr-2.8.3/UNLICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/same-file-1.0.6/UNLICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/walkdir-2.5.0/UNLICENSE"
+      ],
+      "possible_waste_bytes": [
+        7266
+      ],
+      "sha256": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c",
+      "size": 1211,
+      "waste": 7266
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/glyphs/labels.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/glyphs/labels.js"
+      ],
+      "possible_waste_bytes": [
+        6053
+      ],
+      "sha256": "7ed3f88a1616e23c45d2e5293b91857e9f2c32aa4dfd3aa7714bba15bf690c0f",
+      "size": 6053,
+      "waste": 6053
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/bit-set-0.8.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/bit-vec-0.8.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cfg-expr-0.15.8/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/defmt-1.1.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/defmt-macros-1.1.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/defmt-parser-1.0.0/upstream-LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        54250
+      ],
+      "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+      "size": 10850,
+      "waste": 54250
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/extract.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/extract.js"
+      ],
+      "possible_waste_bytes": [
+        3359
+      ],
+      "sha256": "851ddbb4ae8571fda887a03511a6688d9b168c49deceda34243ad77d6f2a39ec",
+      "size": 3359,
+      "waste": 3359
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/html5ever-0.38.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/markup5ever-0.38.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/web_atoms-0.2.6/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        2152
+      ],
+      "sha256": "86dd7f026f916daf7511e39951ad8ea8cf55a8db67ae64060dacf829761c18f3",
+      "size": 1076,
+      "waste": 2152
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/.eslintrc.yml",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/.eslintrc.yml"
+      ],
+      "possible_waste_bytes": [
+        63
+      ],
+      "sha256": "8962d52a0bb86f17e764dfaf160d265eaa969ed3d67da747b59c1df6eb4833c2",
+      "size": 63,
+      "waste": 63
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-plugin-dialog-2.7.2/LICENSE_MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-plugin-fs-2.5.1/LICENSE_MIT"
+      ],
+      "possible_waste_bytes": [
+        1089
+      ],
+      "sha256": "89ff9689dcf9dd53968785d05a26f7898bb169dbfcada8d032b3e68cf0d55607",
+      "size": 1089,
+      "waste": 1089
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/derive_more-2.1.1/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/derive_more-impl-2.1.1/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        1080
+      ],
+      "sha256": "8a35369f3ca263b3c62fbb5032947e53b6bfebc6c8a4d1bb982de1c069f6fba5",
+      "size": 1080,
+      "waste": 1080
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/adler2-2.0.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cargo-platform-0.1.9/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro-crate-1.3.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro-crate-2.0.2/LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        32580
+      ],
+      "sha256": "8ada45cd9f843acf64e4722ae262c622a2b3b3007c7310ef36ac1061a30f6adb",
+      "size": 10860,
+      "waste": 32580
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/atk-0.18.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/atk-sys-0.18.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cairo-rs-0.18.5/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cairo-sys-rs-0.18.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gdk-0.18.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gdk-pixbuf-0.18.5/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gdk-pixbuf-sys-0.18.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gdk-sys-0.18.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gdkwayland-sys-0.18.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gdkx11-0.18.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gdkx11-sys-0.18.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gio-0.18.4/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gio-sys-0.18.1/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/glib-0.18.5/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/glib-macros-0.18.5/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/glib-sys-0.18.1/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gobject-sys-0.18.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gtk-0.18.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gtk-sys-0.18.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gtk3-macros-0.18.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/pango-0.18.3/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/pango-sys-0.18.0/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        21504
+      ],
+      "sha256": "8cf56d10131ce201cf69ab74b111d3ebac1acca3833d7efb39ae357224b70edb",
+      "size": 1024,
+      "waste": 21504
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/dist/types.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/design-evidence/v1-types.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/import-svg-types.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/types.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/schema2-types.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/types.js"
+      ],
+      "possible_waste_bytes": [
+        55
+      ],
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+      "size": 11,
+      "waste": 55
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/primitives.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/primitives.js"
+      ],
+      "possible_waste_bytes": [
+        14262
+      ],
+      "sha256": "8ea0aba048383082c285f449040a3d1d87d0f016c098b9141da23cebfedbe89b",
+      "size": 14262,
+      "waste": 14262
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/darling-0.23.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/darling_core-0.23.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/darling_macro-0.23.0/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        2134
+      ],
+      "sha256": "8ea93490d74a5a1b1af3ff71d786271b3f1e5f0bea79ac16e02ec533cef040d6",
+      "size": 1067,
+      "waste": 2134
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/parse.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/parse.js"
+      ],
+      "possible_waste_bytes": [
+        5754
+      ],
+      "sha256": "92d512a52a44f72b3258e817e4cf3e6d576ffc5059666b9fe27341e7871ecead",
+      "size": 5754,
+      "waste": 5754
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/fflate/esm/browser.d.ts",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/fflate/esm/index.d.mts",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/fflate/lib/browser.d.cts",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/fflate/lib/index.d.ts",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/fflate/lib/node.d.cts"
+      ],
+      "possible_waste_bytes": [
+        213952
+      ],
+      "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+      "size": 53488,
+      "waste": 213952
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/NOTICE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/root/NOTICE",
+        "/usr/share/licenses/theme-forge-nebular-fusion/NOTICE"
+      ],
+      "possible_waste_bytes": [
+        0,
+        604
+      ],
+      "sha256": "9b7be934e0a179a7c48446139334470964057c198d49ec8e149c3101f78778f2",
+      "size": 604,
+      "waste": null
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-2.11.5/LICENSE_MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-build-2.6.3/LICENSE_MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-codegen-2.6.3/LICENSE_MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-macros-2.6.3/LICENSE_MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-plugin-2.6.3/upstream-LICENSE_MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-runtime-2.11.3/LICENSE_MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-runtime-wry-2.11.4/LICENSE_MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-utils-2.9.3/LICENSE_MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/npm/tauri-apps-api-2.11.1/LICENSE_MIT"
+      ],
+      "possible_waste_bytes": [
+        8720
+      ],
+      "sha256": "9dd42ea92cff2ede5cd477cbfcce051b2d0115c0ac7f368ee88cb545055dff1d",
+      "size": 1090,
+      "waste": 8720
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/SECURITY.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/SECURITY.md"
+      ],
+      "possible_waste_bytes": [
+        3980
+      ],
+      "sha256": "a17b482b11a4f3ff0aa20bad116c49472c5ba9417223adf915eb739d194aceea",
+      "size": 3980,
+      "waste": 3980
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/path-canonical.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/path-canonical.js"
+      ],
+      "possible_waste_bytes": [
+        1841
+      ],
+      "sha256": "a58f8a4d97b2cc3263a387a4443f5fbce9a802329606849c1858831f2d8e270e",
+      "size": 1841,
+      "waste": 1841
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/autocfg-1.5.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/base64-0.22.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/bitflags-1.3.2/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/bitflags-2.13.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/bs58-0.5.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/camino-1.2.5/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cc-1.4.4/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cfg-if-1.0.4/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/crossbeam-channel-0.5.16/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/crossbeam-utils-0.8.22/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/displaydoc-0.2.7/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/equivalent-1.0.2/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/fastrand-2.5.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/find-msvc-tools-0.1.11/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/flate2-1.1.10/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/fnv-1.0.7/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/form_urlencoded-1.2.2/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/glob-0.3.4/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/hashbrown-0.12.3/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/hashbrown-0.17.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/heck-0.4.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/heck-0.5.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/html5ever-0.38.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/idna-1.1.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/idna_adapter-1.2.2/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/indexmap-1.9.3/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/indexmap-2.14.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/libappindicator-0.9.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/libappindicator-sys-0.9.0/upstream-LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/lock_api-0.4.14/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/log-0.4.34/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/markup5ever-0.38.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/mime-0.3.17/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/muda-0.19.3/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/num-traits-0.2.19/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/once_cell-1.21.4/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/parking_lot-0.12.5/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/parking_lot_core-0.9.12/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/percent-encoding-2.3.2/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/pkg-config-0.3.34/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/png-0.17.16/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/png-0.18.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/regex-1.13.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/regex-automata-0.4.18/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/regex-syntax-0.8.11/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/rustc_version-0.4.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/scopeguard-1.2.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_with-3.22.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_with_macros-3.22.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/servo_arc-0.4.3/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/smallvec-1.15.2/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/socket2-0.6.5/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/stable_deref_trait-1.2.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/string_cache-0.9.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/string_cache_codegen-0.6.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/syn-1.0.109/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/system-deps-6.2.2/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tendril-0.5.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_datetime-0.6.3/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tray-icon-0.24.2/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-char-property-0.9.0/upstream-LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-char-range-0.9.0/upstream-LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-common-0.9.0/upstream-LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-ucd-ident-0.9.0/upstream-LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-ucd-version-0.9.0/upstream-LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unicode-normalization-0.1.25/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unicode-segmentation-1.13.3/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/url-2.5.8/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/uuid-1.26.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/version_check-0.9.5/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/web_atoms-0.2.6/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/wry-0.55.1/LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        770137
+      ],
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+      "size": 10847,
+      "waste": 770137
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/COMMERCIAL-LICENSE.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/legal/COMMERCIAL-LICENSE.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@knowledge-forge-ai/tfsb-raster-resvg/COMMERCIAL-LICENSE.md"
+      ],
+      "possible_waste_bytes": [
+        1864
+      ],
+      "sha256": "a81bcda7ec57a5c09f1cc6d05de420db7a0053b9496f1762065e083a60e5ede2",
+      "size": 932,
+      "waste": 1864
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/ctor-0.8.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/ctor-proc-macro-0.0.7/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dtor-0.3.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dtor-proc-macro-0.0.6/LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        33972
+      ],
+      "sha256": "a8ad31b1c3f40dca5a84119351b8fa8ddc868edd77fad8a8ebf6d8f2d16fa4ae",
+      "size": 11324,
+      "waste": 33972
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/block-buffer-0.10.4/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cpufeatures-0.2.17/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/crypto-common-0.1.7/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/digest-0.10.7/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/sha2-0.10.9/LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        43396
+      ],
+      "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5",
+      "size": 10849,
+      "waste": 43396
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/stringify.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/stringify.js"
+      ],
+      "possible_waste_bytes": [
+        7272
+      ],
+      "sha256": "a96ec2fa840067eff015a38a18849f1e3b2ff2e9cb9ad52cd9266497ad12b3de",
+      "size": 7272,
+      "waste": 7272
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/getrandom-0.3.4/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/getrandom-0.4.3/LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        10849
+      ],
+      "sha256": "aaff376532ea30a0cd5330b9502ad4a4c8bf769c539c87ffe78819d188a18ebf",
+      "size": 10849,
+      "waste": 10849
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/idna-1.1.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/percent-encoding-2.3.2/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/url-2.5.8/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        2144
+      ],
+      "sha256": "b38f11f6096706e6de553dabe2a7ed142d59b6fa8c97e290c67496154745cdd5",
+      "size": 1072,
+      "waste": 2144
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/package.json",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/package.json"
+      ],
+      "possible_waste_bytes": [
+        2253
+      ],
+      "sha256": "b61c2dd342e0e1abb800302ec62c0b06ae7a07cd9b907c88428ff80100f64c6a",
+      "size": 2253,
+      "waste": 2253
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/index.d.ts",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/index.d.ts"
+      ],
+      "possible_waste_bytes": [
+        2208
+      ],
+      "sha256": "b741d3219913446a93fe07e00dafe9fa3e857fa478e85b483cbf2e11d84521a5",
+      "size": 2208,
+      "waste": 2208
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/ctor-0.8.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/ctor-proc-macro-0.0.7/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dtor-0.3.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dtor-proc-macro-0.0.6/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        3066
+      ],
+      "sha256": "bccaa8b6c09f94e81f06696e179dbe058464bbdfbc823b6d49cada1d71e84ac3",
+      "size": 1022,
+      "waste": 3066
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/dom.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/dom.js"
+      ],
+      "possible_waste_bytes": [
+        133234
+      ],
+      "sha256": "bea9ba89adfec227e9e572ee934a48223a170c5cf96b7087d7e3d3023ac47be3",
+      "size": 133234,
+      "waste": 133234
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/alloc-no-stdlib-2.0.4/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/alloc-stdlib-0.2.4/upstream-LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/brotli-8.0.4/LICENSE.BSD-3-Clause",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/brotli-decompressor-5.0.3/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        4449
+      ],
+      "sha256": "c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae",
+      "size": 1483,
+      "waste": 4449
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/error.d.ts",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/error.d.ts"
+      ],
+      "possible_waste_bytes": [
+        1878
+      ],
+      "sha256": "c5ada15420e52bcc8a451a7c4f2daff318e6d0bf5f8c691b25158555a4508f0e",
+      "size": 1878,
+      "waste": 1878
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/crc32fast-1.5.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/hex-0.4.3/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_spanned-0.6.9/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_spanned-1.1.1/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml-0.8.2/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml-0.9.12+spec-1.1.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml-1.1.4+spec-1.1.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_datetime-0.7.5+spec-1.1.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_datetime-1.1.1+spec-1.1.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_edit-0.19.15/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_edit-0.20.2/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_parser-1.1.3+spec-1.1.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_writer-1.1.2+spec-1.1.0/LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        136296
+      ],
+      "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
+      "size": 11358,
+      "waste": 136296
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serialize-to-javascript-0.1.2/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serialize-to-javascript-impl-0.1.2/LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        11357
+      ],
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "size": 11357,
+      "waste": 11357
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/root/node-LICENSE.txt",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/legal/node-LICENSE.txt"
+      ],
+      "possible_waste_bytes": [
+        145485
+      ],
+      "sha256": "c738ae413cf561f174e34f6961f8ca458aae2369a73640dda6234c629b98bcc4",
+      "size": 145485,
+      "waste": 145485
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/date.d.ts",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/date.d.ts"
+      ],
+      "possible_waste_bytes": [
+        2098
+      ],
+      "sha256": "c7ad3531c131f2b5b246b2d208b75c5403475ad155b7661fa2d673104b806791",
+      "size": 2098,
+      "waste": 2098
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/stringify.d.ts",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/stringify.d.ts"
+      ],
+      "possible_waste_bytes": [
+        1759
+      ],
+      "sha256": "c9a75924aa75b4e60542ff06437b3abd9679ee9f740245080fbe528f05fb8763",
+      "size": 1759,
+      "waste": 1759
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/lock_api-0.4.14/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/parking_lot-0.12.5/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/parking_lot_core-0.9.12/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/rustc_version-0.4.1/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        3213
+      ],
+      "sha256": "c9a75f18b9ab2927829a208fc6aa2cf4e63b8420887ba29cdb265d6619ae82d5",
+      "size": 1071,
+      "waste": 3213
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/winnow-0.5.40/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/winnow-0.7.15/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/winnow-1.0.4/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        2046
+      ],
+      "sha256": "cb5aedb296c5246d1f22e9099f925a65146f9f0d6b4eebba97fd27a6cdbbab2d",
+      "size": 1023,
+      "waste": 2046
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/glyphs/catalog.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/glyphs/catalog.js"
+      ],
+      "possible_waste_bytes": [
+        6466
+      ],
+      "sha256": "cbb47ee1629e73139fcb9dc5b5af5c4947c763a0bf52320d352feb8b28b9d2b7",
+      "size": 6466,
+      "waste": 6466
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/geometry.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/geometry.js"
+      ],
+      "possible_waste_bytes": [
+        14497
+      ],
+      "sha256": "ccc86fd18106c6639bf3abc34d5681c35260bb64983d3187467561876ce8a218",
+      "size": 14497,
+      "waste": 14497
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tinyvec-1.12.0/LICENSE-APACHE.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/utf8_iter-1.0.4/LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        11358
+      ],
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "size": 11358,
+      "waste": 11358
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/schema2-validation.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/schema2-validation.js"
+      ],
+      "possible_waste_bytes": [
+        4978
+      ],
+      "sha256": "d258ec8aeb6a47d70ac037201511f07ca05b6bcac3f0a8945a5619d3e2542243",
+      "size": 4978,
+      "waste": 4978
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dirs-6.0.0/LICENSE-APACHE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dirs-sys-0.5.0/LICENSE-APACHE"
+      ],
+      "possible_waste_bytes": [
+        9694
+      ],
+      "sha256": "d3174ad63e721d4c9dccb8ad4320848992d314369bc46319720b5802c9153fe9",
+      "size": 9694,
+      "waste": 9694
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/NOTICE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/legal/NOTICE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@knowledge-forge-ai/tfsb-raster-resvg/NOTICE"
+      ],
+      "possible_waste_bytes": [
+        1202
+      ],
+      "sha256": "d31e49346c1d4b9ea98ed49b817d48e68c4b9000e1763522da5ffe7f791e3657",
+      "size": 601,
+      "waste": 1202
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/import-svg.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/import-svg.js"
+      ],
+      "possible_waste_bytes": [
+        70221
+      ],
+      "sha256": "d600ad614745f907261d7ea5ff24539fbb4f2b7c0339504ac98ce1dad8f95999",
+      "size": 70221,
+      "waste": 70221
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/conventions.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/conventions.js"
+      ],
+      "possible_waste_bytes": [
+        13399
+      ],
+      "sha256": "da57fbe2b07f5a4aaee9217b49778936c11a1108da1761b2f24f356a900ff124",
+      "size": 13399,
+      "waste": 13399
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/npm/react-19.2.8/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/npm/react-dom-19.2.8/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/npm/scheduler-0.27.0/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        2176
+      ],
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "size": 1088,
+      "waste": 2176
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/atk-0.18.2/COPYRIGHT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cairo-rs-0.18.5/COPYRIGHT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gdk-0.18.2/COPYRIGHT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gdk-pixbuf-0.18.5/COPYRIGHT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gdkx11-0.18.2/COPYRIGHT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gio-0.18.4/COPYRIGHT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/glib-0.18.5/COPYRIGHT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/glib-macros-0.18.5/COPYRIGHT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gtk-0.18.2/COPYRIGHT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/gtk3-macros-0.18.2/COPYRIGHT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/pango-0.18.3/COPYRIGHT"
+      ],
+      "possible_waste_bytes": [
+        6510
+      ],
+      "sha256": "dae402989de65164815b7e2b6bc2b9576285434c3785934c8b6ece0fa055960d",
+      "size": 651,
+      "waste": 6510
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/struct.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/struct.js"
+      ],
+      "possible_waste_bytes": [
+        7009
+      ],
+      "sha256": "dbd94692ef8225459b29232f23e82fd67ad84002349e67458456a09695f063b0",
+      "size": 7009,
+      "waste": 7009
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dbus-0.9.12/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/libdbus-sys-0.2.7/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1107
+      ],
+      "sha256": "de3911c2d98c8bd2d701ee721347053d9b55995a11f9a8c955e44d3ca1b376bf",
+      "size": 1107,
+      "waste": 1107
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/index.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/index.js"
+      ],
+      "possible_waste_bytes": [
+        1883
+      ],
+      "sha256": "ded3ee91f3ce1ef746f6b57459b0c68475658eacb8e88fd18336a5408de009a1",
+      "size": 1883,
+      "waste": 1883
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/canonical.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/canonical.js"
+      ],
+      "possible_waste_bytes": [
+        2802
+      ],
+      "sha256": "dfee79ef254cbcc99cc84e6e4dc1d90c01ed5d5b43b087ef51809ffae30af9b1",
+      "size": 2802,
+      "waste": 2802
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/util.d.ts",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/util.d.ts"
+      ],
+      "possible_waste_bytes": [
+        2130
+      ],
+      "sha256": "e08c5ba5f398c27b34b966b1b8427e7599394927c5397f765b7a085cd7f4541a",
+      "size": 2130,
+      "waste": 2130
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@knowledge-forge-ai/theme-forge-stellar-burst/dist/scene/emit.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/emit.js"
+      ],
+      "possible_waste_bytes": [
+        13404
+      ],
+      "sha256": "e320009e7aafb970c59014eb795bb25dfee705ef6788e12afd9f98433f9443fa",
+      "size": 13404,
+      "waste": 13404
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serialize-to-javascript-0.1.2/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serialize-to-javascript-impl-0.1.2/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1066
+      ],
+      "sha256": "e53a7165e8bc3ced5e5628404b3d2d28ecc14ad720f1c09ba28385d5151ecf93",
+      "size": 1066,
+      "waste": 1066
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/png-0.17.16/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/png-0.18.1/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1048
+      ],
+      "sha256": "eaf40297c75da471f7cda1f3458e8d91b4b2ec866e609527a13acfa93b638652",
+      "size": 1048,
+      "waste": 1048
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/libappindicator-0.9.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/libappindicator-sys-0.9.0/upstream-LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1109
+      ],
+      "sha256": "eb227437252b2a7a9c1fc342c93ade1f3d7ce38cc6dd754f613db07d53ceff0b",
+      "size": 1109,
+      "waste": 1109
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-plugin-dialog-2.7.2/LICENSE.spdx",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-plugin-fs-2.5.1/LICENSE.spdx"
+      ],
+      "possible_waste_bytes": [
+        888
+      ],
+      "sha256": "eb8a6c84630461b352badcab1dbe5d0168c56d377358b2b8c86b51003272d5ef",
+      "size": 888,
+      "waste": 888
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/parse.d.ts",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/parse.d.ts"
+      ],
+      "possible_waste_bytes": [
+        2058
+      ],
+      "sha256": "ebb272a8381742aad17e0445e0872c0496561e4bfa465576a70efdb23117a99f",
+      "size": 2058,
+      "waste": 2058
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/indexmap-1.9.3/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/indexmap-2.14.1/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1049
+      ],
+      "sha256": "ecc269ef87fd38a1d98e30bfac9ba964a9dbd9315c3770fed98d4d7cb5882055",
+      "size": 1049,
+      "waste": 1049
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/entities.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/entities.js"
+      ],
+      "possible_waste_bytes": [
+        44533
+      ],
+      "sha256": "ef333b680379392e8ee120e1cc77e0a8ff99a135e3b365b048f69c0df5f571f9",
+      "size": 44533,
+      "waste": 44533
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/icu_collections-2.3.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/icu_locale_core-2.3.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/icu_normalizer-2.3.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/icu_normalizer_data-2.3.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/icu_properties-2.3.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/icu_properties_data-2.3.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/icu_provider-2.3.1/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/litemap-0.8.3/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/potential_utf-0.1.6/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tinystr-0.8.4/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/writeable-0.6.4/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/yoke-0.8.3/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/yoke-derive-0.8.2/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/zerofrom-0.1.8/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/zerofrom-derive-0.1.7/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/zerotrie-0.2.5/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/zerovec-0.11.8/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/zerovec-derive-0.11.6/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        37315
+      ],
+      "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2",
+      "size": 2195,
+      "waste": 37315
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/bit-set-0.8.0/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/bit-vec-0.8.0/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1071
+      ],
+      "sha256": "f51ac2c59a222f7476ce507ca879960e2b64ea64bb2786eefdbeb7b0b538d1b7",
+      "size": 1071,
+      "waste": 1071
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-char-property-0.9.0/upstream-COPYRIGHT.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-char-range-0.9.0/upstream-COPYRIGHT.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-common-0.9.0/upstream-COPYRIGHT.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-ucd-ident-0.9.0/upstream-COPYRIGHT.md",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-ucd-version-0.9.0/upstream-COPYRIGHT.md"
+      ],
+      "possible_waste_bytes": [
+        2432
+      ],
+      "sha256": "f5c342c49f3ac804f3e8e7bb62a8040a44c50d47bb36902b1abd13f66a1adf8b",
+      "size": 608,
+      "waste": 2432
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/package.json",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/package.json"
+      ],
+      "possible_waste_bytes": [
+        1548
+      ],
+      "sha256": "fa2995d429c856669968d6281c14e6be93a40cd404dad43aa2e4599608f20bdc",
+      "size": 1548,
+      "waste": 1548
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        1499
+      ],
+      "sha256": "fa5659948374d4f555594f47f6da073b40dc503e921aeeece30df4362b3051a5",
+      "size": 1499,
+      "waste": 1499
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cssparser-0.36.0/LICENSE",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cssparser-macros-0.6.1/LICENSE"
+      ],
+      "possible_waste_bytes": [
+        16726
+      ],
+      "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85",
+      "size": 16726,
+      "waste": 16726
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/smol-toml/dist/date.js",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/smol-toml/dist/date.js"
+      ],
+      "possible_waste_bytes": [
+        4942
+      ],
+      "sha256": "fcc8fcce1a3e8660ac572fb827c20e49d269ad50686c085bb72c3c50771323d5",
+      "size": 4942,
+      "waste": 4942
+    },
+    {
+      "members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/hashbrown-0.12.3/LICENSE-MIT",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/hashbrown-0.17.1/LICENSE-MIT"
+      ],
+      "possible_waste_bytes": [
+        1060
+      ],
+      "sha256": "ff8f68cb076caf8cefe7a6430d4ac086ce6af2ca8ce2c4e5a2004d4552ef52a2",
+      "size": 1060,
+      "waste": 1060
+    }
+  ],
+  "observed_error_members": [
+    {
+      "code": "non-executable-script",
+      "input_archive_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+      "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs",
+      "mode": 420,
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs",
+      "preserved": true,
+      "sha256": "35b7a9c9b0ca863a11819759168150bd0f7d3900bb1cade7666d0414afc6ae2d",
+      "shebang": "#!/usr/bin/env node"
+    },
+    {
+      "code": "non-executable-script",
+      "input_archive_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+      "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts",
+      "mode": 420,
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts",
+      "preserved": true,
+      "sha256": "5c32ef46b90997fc6de2a43c40a92643d025b64f1ed7c360e1cd40997528797b",
+      "shebang": "#!/usr/bin/env node"
+    },
+    {
+      "code": "non-executable-script",
+      "input_archive_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+      "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js",
+      "mode": 420,
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js",
+      "preserved": true,
+      "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+      "shebang": "#!/usr/bin/env node"
+    },
+    {
+      "code": "non-executable-script",
+      "input_archive_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+      "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts",
+      "mode": 420,
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts",
+      "preserved": true,
+      "sha256": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012",
+      "shebang": "#!/usr/bin/env node"
+    },
+    {
+      "code": "non-executable-script",
+      "input_archive_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+      "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js",
+      "mode": 420,
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js",
+      "preserved": true,
+      "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+      "shebang": "#!/usr/bin/env node"
+    },
+    {
+      "code": "non-executable-script",
+      "input_archive_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+      "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs",
+      "mode": 420,
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs",
+      "preserved": true,
+      "sha256": "2085c3abd23821962a0d3f0e8b6d452a4e020c393bbf132e094aa153f3c8a12e",
+      "shebang": "#!/usr/bin/env node"
+    },
+    {
+      "code": "env-script-interpreter",
+      "input_archive_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+      "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js",
+      "mode": 493,
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js",
+      "preserved": true,
+      "sha256": "b58052712f9426a7669fe7f719aa20c30e19fa4c4d8be6e6a9de41e5b2a081d4",
+      "shebang": "#!/usr/bin/env node"
+    },
+    {
+      "code": "env-script-interpreter",
+      "input_archive_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+      "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js",
+      "mode": 493,
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js",
+      "preserved": true,
+      "sha256": "6f4196e9a8eb744308a38328d396329901ca7619d8155fb15acfba26257ab316",
+      "shebang": "#!/usr/bin/env node"
+    }
+  ],
+  "policy_sha256": "3a7066bd9d614eb69f2cd5922e6b86e89e8caad41edce291349412f6a4fe770b",
+  "raw_exit_code": 64,
+  "raw_lint_status": "fail",
+  "schema": "rs9.rpm-lint-policy-evaluation.v1",
+  "status": "blocked"
+}

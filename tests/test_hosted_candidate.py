@@ -69,6 +69,9 @@ class HostedExecutionTests(unittest.TestCase):
                         self.assertEqual(run_lane(ROOT, scratch, base / (lane + "-out"), lane, row["system"],
                                                   client=SimpleNamespace(receipts=[]), inputs=inputs), 0)
                     self.assertEqual(snapshot(inputs), input_identity)
+                    if lane == "rpm":
+                        receipt = json.loads((base / (lane + "-out") / (lane + "-" + row["system"] + ".json")).read_bytes())
+                        self.assertEqual(receipt["details"]["rpm_evidence_contract"], "rs9.rpm-evidence-contract.v2")
                     self.assertEqual(snapshot(scratch / "capture"), snapshots["capture"])
                     if lane != "authenticate":
                         self.assertEqual(calls, [scratch / "lane-work"])
@@ -96,6 +99,21 @@ class HostedExecutionTests(unittest.TestCase):
             self.assertEqual(receipt["execution_error"],"FETCH_FAILED")
             self.assertTrue(all(g["status"]=="fail" for g in receipt["gates"]))
             self.assertFalse(receipt["publication_authority"])
+
+    def test_rpm_prebuild_failure_emits_current_contract_and_all_stage_gates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch, output = Path(tmp).resolve() / "work", Path(tmp).resolve() / "out"
+            scratch.mkdir()
+            with patch("rs9.hosted_pipeline.validate_host"), \
+                 patch("rs9.hosted_pipeline._inputs", return_value={}), \
+                 patch("rs9.hosted_pipeline.capture_generation", side_effect=ContractError("FETCH_FAILED", "Controlled unavailable capture")), \
+                 patch("rs9.hosted_pipeline.runner_facts", return_value={}):
+                self.assertEqual(run_lane(ROOT, scratch, output, "rpm", "x86_64-linux", client=object()), 2)
+            receipt = json.loads((output / "rpm-x86_64-linux.json").read_bytes())
+            self.assertEqual(receipt["details"]["rpm_evidence_contract"], "rs9.rpm-evidence-contract.v2")
+            gates = {g["name"]:g["status"] for g in receipt["gates"]}
+            for name in ("rpm-package-build", "rpm-client-preparation", "rpm-derivation-record", "rpm-manifest-record", "rpm-policy-custody"):
+                self.assertEqual(gates[name], "fail")
 
     def test_unknown_lane_and_dirty_scratch_fail_before_network(self):
         with tempfile.TemporaryDirectory() as tmp:

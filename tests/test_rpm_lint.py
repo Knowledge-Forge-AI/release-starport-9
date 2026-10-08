@@ -1021,7 +1021,6 @@ class RpmLintIntegratedExecutionTests(unittest.TestCase):
     def test_custody_diagnostic_bytes_large_parsed_evidence_and_blocked_policy(self):
         from rs9.hosted_custody import diagnostic_bytes
         from rs9.rpm_lint_policy import evaluate_policy
-        import uuid
 
         # Generate large stream >64KiB with 900 warnings and 15 errors
         warning_lines = [f"theme-forge-stellar-burst.x86_64: W: warn-{i % 25:03d} detail warning message {i:04d}\n" for i in range(900)]
@@ -1064,58 +1063,52 @@ class RpmLintIntegratedExecutionTests(unittest.TestCase):
         self.assertEqual(ev["status"], "fail")
         self.assertEqual(len(ev["error_records"]), 15)
 
-        # Diagnostic JSON written to /private/tmp
-        run_id = uuid.uuid4().hex[:8]
-        tmp_dir = Path("/private/tmp")
-        diag_path = tmp_dir / f"test-rpmlint-diag-{run_id}.json"
-        pretty_path = tmp_dir / f"test-rpmlint-pretty-{run_id}.json"
-        policy_path = tmp_dir / f"test-policy-diag-{run_id}.json"
+        # All writes use the class-owned, existing temporary directory.
+        tmp_dir = self.root / "diagnostics"
+        tmp_dir.mkdir()
+        diag_path = tmp_dir / "rpmlint-diag.json"
+        pretty_path = tmp_dir / "rpmlint-pretty.json"
+        policy_path = tmp_dir / "policy-diag.json"
+        for path in (diag_path, pretty_path, policy_path):
+            self.assertTrue(path.is_relative_to(self.root))
 
-        try:
-            # 1. canonical serialization passes diagnostic_bytes
-            diag_path.write_bytes(canonical(ev))
-            self.assertLessEqual(diag_path.stat().st_size, 64 * 1024)
-            data_canonical = diagnostic_bytes(diag_path)
-            self.assertEqual(data_canonical, canonical(ev))
+        # 1. canonical serialization passes diagnostic_bytes
+        diag_path.write_bytes(canonical(ev))
+        self.assertLessEqual(diag_path.stat().st_size, 64 * 1024)
+        data_canonical = diagnostic_bytes(diag_path)
+        self.assertEqual(data_canonical, canonical(ev))
 
-            # 2. pretty JSON (indent=2) passes diagnostic_bytes
-            pretty_bytes = (json.dumps(ev, indent=2) + "\n").encode("utf-8")
-            pretty_path.write_bytes(pretty_bytes)
-            self.assertLessEqual(pretty_path.stat().st_size, 64 * 1024)
-            data_pretty = diagnostic_bytes(pretty_path)
-            self.assertEqual(data_pretty, pretty_bytes)
+        # 2. pretty JSON (indent=2) passes diagnostic_bytes
+        pretty_bytes = (json.dumps(ev, indent=2) + "\n").encode("utf-8")
+        pretty_path.write_bytes(pretty_bytes)
+        self.assertLessEqual(pretty_path.stat().st_size, 64 * 1024)
+        data_pretty = diagnostic_bytes(pretty_path)
+        self.assertEqual(data_pretty, pretty_bytes)
 
-            # 3. Blocked policy evaluation passes diagnostic_bytes
-            inputs = {
-                "project_id": "theme-forge-stellar-burst",
-                "version": "0.6.1",
-                "arch": "x86_64",
-                "system": "x86_64-linux",
-            }
-            policy_eval = evaluate_policy(ev, inventory={}, inputs=inputs)
-            self.assertFalse(policy_eval["accepted"])
-            self.assertEqual(policy_eval["status"], "blocked")
-            self.assertEqual(policy_eval["raw_lint_status"], "fail")
-            self.assertIn("incomplete-preservation-inventory", policy_eval["blockers"])
+        # 3. Blocked policy evaluation passes diagnostic_bytes
+        inputs = {
+            "project_id": "theme-forge-stellar-burst",
+            "version": "0.6.1",
+            "arch": "x86_64",
+            "system": "x86_64-linux",
+        }
+        policy_eval = evaluate_policy(ev, inventory={}, inputs=inputs)
+        self.assertFalse(policy_eval["accepted"])
+        self.assertEqual(policy_eval["status"], "blocked")
+        self.assertEqual(policy_eval["raw_lint_status"], "fail")
+        self.assertIn("incomplete-preservation-inventory", policy_eval["blockers"])
 
-            policy_bytes = canonical(policy_eval)
-            policy_path.write_bytes(policy_bytes)
-            self.assertLessEqual(policy_path.stat().st_size, 64 * 1024)
-            data_policy = diagnostic_bytes(policy_path)
-            self.assertEqual(data_policy, policy_bytes)
+        policy_bytes = canonical(policy_eval)
+        policy_path.write_bytes(policy_bytes)
+        self.assertLessEqual(policy_path.stat().st_size, 64 * 1024)
+        data_policy = diagnostic_bytes(policy_path)
+        self.assertEqual(data_policy, policy_bytes)
 
-            # Neither identity nor acceptance was altered to fit size caps
-            self.assertEqual(policy_eval["accepted"], False)
-            self.assertEqual(ev["clean"], False)
-            self.assertEqual(ev["status"], "fail")
-            self.assertEqual(len(ev["error_records"]), 15)
-        finally:
-            for p in (diag_path, pretty_path, policy_path):
-                try:
-                    if p.exists():
-                        p.unlink()
-                except OSError:
-                    pass
+        # Neither identity nor acceptance was altered to fit size caps
+        self.assertEqual(policy_eval["accepted"], False)
+        self.assertEqual(ev["clean"], False)
+        self.assertEqual(ev["status"], "fail")
+        self.assertEqual(len(ev["error_records"]), 15)
 
 
 if __name__ == "__main__":

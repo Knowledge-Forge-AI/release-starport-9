@@ -1,0 +1,464 @@
+{
+  "schema": "rs9.nebular-caller-source-readback.v1",
+  "status": "authenticated-source-relations",
+  "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+  "tag_tree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b",
+  "transport": "GitHub connector exact-ref file readback; SHA1 Git blob and SHA256 recomputed",
+  "native_execution_claimed": false,
+  "binary_release_download": "not-run: connector rejects binary downloads; command network unavailable",
+  "fresh_candidate_collection_path": "execute -> collect_caller_sources -> tagged_files; preservation collector extracts manifest from authenticated release archive before policy",
+  "files": {
+    "authenticated-inputs/loom-binding.json": {
+      "blob": "0de9cd248ff80d001f2d5a824b0b3c6e6d5f0c76",
+      "sha256": "968969f5eae4fe821805cad1af8c85c2be694d7372accb04d5d0211ee99d7b3d",
+      "size": 2496
+    },
+    "authenticated-inputs/manifest.json": {
+      "blob": "00abc80ce6927f53dd07846a729d60df3cfe258d",
+      "sha256": "c266500e778320cc9e99349d8d13a99d92583eda3f823016b85d0238a47f6ebc",
+      "size": 2992
+    },
+    "authenticated-inputs/stellar-binding.json": {
+      "blob": "233c00ec675efc13938dded45390e0555d377752",
+      "sha256": "ee497158fee5190eb9b8e67cb9a536c6298a08574fbcb66eabd4c110794962ff",
+      "size": 6631
+    },
+    "protocol/theme-lab-v2/payload-binding.json": {
+      "blob": "68c538b462270b0681077c68233743e110a4d13f",
+      "sha256": "f7424a65b6e3cdf43feb2f15c8c4a1579bfcb6553ee67ebf4360741a55226018",
+      "size": 55841
+    },
+    "src-tauri/loom-adapter/theme-adapter.mjs": {
+      "blob": "7fcc9eeeab6d962788659f9c751eb0ab854fa9c9",
+      "sha256": "35b7a9c9b0ca863a11819759168150bd0f7d3900bb1cade7666d0414afc6ae2d",
+      "size": 6453
+    },
+    "src-tauri/solar-sail-adapter/solar-sail-adapter.mjs": {
+      "blob": "c1f1469724f80031873e62b98c6fcaa107798b8d",
+      "sha256": "2085c3abd23821962a0d3f0e8b6d452a4e020c393bbf132e094aa153f3c8a12e",
+      "size": 10998
+    },
+    "src-tauri/src/app_theme/runner.rs": {
+      "blob": "21cc8c084cbb25a3f7603e5ed61df6dd23505bc4",
+      "sha256": "864c4689e0831ed4ea8e8cc675fdb75163536fc28e030e1f5a0e7177e0624f4f",
+      "size": 19035
+    },
+    "src-tauri/src/sidecar/artifact.rs": {
+      "blob": "5f81805a823fe682d4df589fd598b2a0a5644625",
+      "sha256": "b30b2ac17f22577534d2700dddd2e674fed6d48c3c3334d35630d7a8d74b4050",
+      "size": 53187
+    },
+    "src-tauri/src/sidecar/process.rs": {
+      "blob": "594916c451722524be7b2c5c296e1283ea22bd3a",
+      "sha256": "71cfc25d009fa21851510c771dc97f6fa6bb271cc18fdb076420f29e19d52277",
+      "size": 13132
+    },
+    "src-tauri/src/sidecar/scene_artifact.rs": {
+      "blob": "9d8c33948f9155ab764b81bf3a2a872f1b44344c",
+      "sha256": "1d59f320ec3dfcaa50865af3d2df83efe8990c53834f0b8bb5a31c9e65306089",
+      "size": 8107
+    },
+    "src-tauri/src/theme_lab/runner.rs": {
+      "blob": "180f88e797f3755a3b157c37511d66e828f99320",
+      "sha256": "63ecf0e3582638742e592a2bb3847582e081a7f50eaf4d22338db95fc576eb82",
+      "size": 32460
+    },
+    "src-tauri/src/platform.rs": {
+      "blob": "7e22505a105335837eb8e4c57f46355815e2396f",
+      "sha256": "9ae8772be82a57f3d15c1df40581ebb5bd9c0c52bfc1300d59c03b548b621809",
+      "size": 10419
+    },
+    "src-tauri/src/lib.rs": {
+      "blob": "c95262e90d206778f5f58dea3a358732ee03e3fa",
+      "sha256": "b8f7a51ff11606a65162545a20b5d12bbbf76f9a94c2c849ed2fea9992e13b57",
+      "size": 20378
+    },
+    "src-tauri/tauri.conf.json": {
+      "blob": "9bfcaee943475b36d04bffa1a1d22bf92da4222c",
+      "sha256": "8421ddc3414c95258dc7a1d131121b141b0cf965805062f62429e7847ad1951d",
+      "size": 1530
+    },
+    "src-tauri/build.rs": {
+      "blob": "66392f6cfcf803f73701916023024789b19c238a",
+      "sha256": "91fa78fd6c097847733522a8b4fee42e0ee7d58c169cc0f6a6393398f5cb6419",
+      "size": 8992
+    },
+    "src-tauri/Cargo.toml": {
+      "blob": "39005325fb71fc9b535bcdee6e79537e688fb761",
+      "sha256": "92cdd31067282e3c2c9ef1bce89fd706b0f975750282a8552a5705a129bb0f4c",
+      "size": 1177
+    },
+    "tools/sidecar-common.mjs": {
+      "blob": "bb2d8bcbe9dbec8e3b7770f55484403ecc5419d8",
+      "sha256": "67d45471554906b989ea6d01bfae93dba88b247090307201da14f2db9f8db3c1",
+      "size": 67256
+    },
+    "tools/sidecar-verify.mjs": {
+      "blob": "a456da327097d26bec9a41fdfaf288af57f38657",
+      "sha256": "fba7f292b3c01ed062f4727e0c22912bc269b6ca76fca8328fb5329c098aac77",
+      "size": 1906
+    },
+    "tools/node-runtime-authority.mjs": {
+      "blob": "7a3e6afd79f472f81de5ce7b4509e78cb3649df8",
+      "sha256": "5bef23e0fea39c9a08177a3c33d380b96a043a9c0045823b4d88d2986ddf55ec",
+      "size": 34288
+    }
+  },
+  "members": {
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts": {
+      "role": "typescript-declaration-data",
+      "proof_claim": "authenticated source relationship and exact fresh release preservation; no native execution result",
+      "system_node_required": false,
+      "basis": {}
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts": {
+      "role": "typescript-declaration-data",
+      "proof_claim": "authenticated source relationship and exact fresh release preservation; no native execution result",
+      "system_node_required": false,
+      "basis": {}
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js": {
+      "role": "embedded-runtime-invocation",
+      "proof_claim": "authenticated source relationship and exact fresh release preservation; no native execution result",
+      "system_node_required": false,
+      "basis": {
+        "src-tauri/src/sidecar/process.rs": [
+          "verified.revalidate_for_spawn()?;",
+          "verified.payload.join(\"dist/service-protocol/server-cli.js\")",
+          "Command::new(&verified.binary)",
+          ".arg(&entrypoint)"
+        ]
+      }
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js": {
+      "role": "retained-sidecar-source",
+      "proof_claim": "authenticated source relationship and exact fresh release preservation; no native execution result",
+      "system_node_required": false,
+      "basis": {
+        "tools/sidecar-common.mjs": [
+          "manifest.json"
+        ]
+      }
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs": {
+      "role": "embedded-runtime-invocation",
+      "proof_claim": "authenticated source relationship and exact fresh release preservation; no native execution result",
+      "system_node_required": false,
+      "basis": {
+        "src-tauri/src/platform.rs": [
+          "parent.join(\"tfsb-studio-service\")",
+          "if packaged || !cfg!(debug_assertions) {",
+          "packaged_runtime(executable)"
+        ],
+        "src-tauri/src/theme_lab/runner.rs": [
+          "crate::platform::select_runtime(",
+          "resource_dir.join(\"loom-adapter\").join(\"theme-adapter.mjs\")",
+          "Command::new(&self.node_binary)",
+          ".arg(script_path)"
+        ]
+      }
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs": {
+      "role": "embedded-runtime-invocation",
+      "proof_claim": "authenticated source relationship and exact fresh release preservation; no native execution result",
+      "system_node_required": false,
+      "basis": {
+        "src-tauri/src/platform.rs": [
+          "parent.join(\"tfsb-studio-service\")",
+          "if packaged || !cfg!(debug_assertions) {",
+          "packaged_runtime(executable)"
+        ],
+        "src-tauri/src/app_theme/runner.rs": [
+          "crate::platform::select_runtime(",
+          "resource.join(\"solar-sail-adapter/solar-sail-adapter.mjs\")",
+          "Command::new(&self.node_binary)",
+          ".arg(&self.adapter_path)"
+        ]
+      }
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js": {
+      "role": "embedded-runtime-invocation",
+      "proof_claim": "authenticated source relationship and exact fresh release preservation; no native execution result",
+      "system_node_required": false,
+      "basis": {
+        "src-tauri/src/platform.rs": [
+          "parent.join(\"tfsb-studio-service\")",
+          "if packaged || !cfg!(debug_assertions) {",
+          "packaged_runtime(executable)"
+        ],
+        "src-tauri/src/theme_lab/runner.rs": [
+          "crate::platform::select_runtime(",
+          "self.execute_process(request, &self.batch_adapter)",
+          "Command::new(&self.node_binary)",
+          ".arg(script_path)"
+        ]
+      }
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js": {
+      "role": "retained-loom-source",
+      "proof_claim": "authenticated source relationship and exact fresh release preservation; no native execution result",
+      "system_node_required": false,
+      "basis": {
+        "protocol/theme-lab-v2/payload-binding.json": [
+          "\"path\": \"bin/tfsl.js\""
+        ]
+      }
+    }
+  },
+  "excerpts": [
+    {
+      "path": "src-tauri/src/sidecar/process.rs",
+      "offset": 5415,
+      "length": 512,
+      "sha256": "dc45de233826be77a786e087e4c6d89cab748632eefadaf791047d39c506ca14",
+      "text": "verified.revalidate_for_spawn()?;\n    let entrypoint = verified.payload.join(\"dist/service-protocol/server-cli.js\");\n    let child = Command::new(&verified.binary)\n        .arg(&entrypoint)\n        .current_dir(&verified.payload)\n        .env_clear()\n        .env(\"LANG\", \"C\")\n        .env(\"LC_ALL\", \"C\")\n        .env(\"TZ\", \"UTC\")\n        .env(\"TMPDIR\", temp)\n        .stdin(Stdio::piped())\n        .stdout(Stdio::piped())\n        .stderr(Stdio::piped())\n        .spawn()?;\n    session_from_child(child)\n}\n\n#[cfg"
+    },
+    {
+      "path": "src-tauri/src/sidecar/process.rs",
+      "offset": 5470,
+      "length": 512,
+      "sha256": "d0b18e0670365de3c47231b10e1866fa07e58f7de6d88354d728803bbad28a47",
+      "text": "verified.payload.join(\"dist/service-protocol/server-cli.js\");\n    let child = Command::new(&verified.binary)\n        .arg(&entrypoint)\n        .current_dir(&verified.payload)\n        .env_clear()\n        .env(\"LANG\", \"C\")\n        .env(\"LC_ALL\", \"C\")\n        .env(\"TZ\", \"UTC\")\n        .env(\"TMPDIR\", temp)\n        .stdin(Stdio::piped())\n        .stdout(Stdio::piped())\n        .stderr(Stdio::piped())\n        .spawn()?;\n    session_from_child(child)\n}\n\n#[cfg(test)]\npub(crate) fn spawn_test_process(executable: &P"
+    },
+    {
+      "path": "src-tauri/src/sidecar/process.rs",
+      "offset": 5548,
+      "length": 512,
+      "sha256": "ecc0c98ba374d44b4a0d9eed88140f64beb015cba908ab6f19a9475c548891f9",
+      "text": "Command::new(&verified.binary)\n        .arg(&entrypoint)\n        .current_dir(&verified.payload)\n        .env_clear()\n        .env(\"LANG\", \"C\")\n        .env(\"LC_ALL\", \"C\")\n        .env(\"TZ\", \"UTC\")\n        .env(\"TMPDIR\", temp)\n        .stdin(Stdio::piped())\n        .stdout(Stdio::piped())\n        .stderr(Stdio::piped())\n        .spawn()?;\n    session_from_child(child)\n}\n\n#[cfg(test)]\npub(crate) fn spawn_test_process(executable: &Path, mode: &str) -> std::io::Result<ProcessSession> {\n    let child = Command:"
+    },
+    {
+      "path": "src-tauri/src/sidecar/process.rs",
+      "offset": 5587,
+      "length": 512,
+      "sha256": "f7edd8fa9912d2d4b2a20c963f6835da0a739aed3f0564b8abe4470a49324978",
+      "text": ".arg(&entrypoint)\n        .current_dir(&verified.payload)\n        .env_clear()\n        .env(\"LANG\", \"C\")\n        .env(\"LC_ALL\", \"C\")\n        .env(\"TZ\", \"UTC\")\n        .env(\"TMPDIR\", temp)\n        .stdin(Stdio::piped())\n        .stdout(Stdio::piped())\n        .stderr(Stdio::piped())\n        .spawn()?;\n    session_from_child(child)\n}\n\n#[cfg(test)]\npub(crate) fn spawn_test_process(executable: &Path, mode: &str) -> std::io::Result<ProcessSession> {\n    let child = Command::new(executable)\n        .env_clear()\n "
+    },
+    {
+      "path": "tools/sidecar-common.mjs",
+      "offset": 9251,
+      "length": 512,
+      "sha256": "69e06cc68cb129de564a9564e934d0aa288c46fe3b764b5c6755d2ae7963f328",
+      "text": "manifest.json\") continue;\n        if (files.length >= MAX_FILES) throw new Error(\"payload exceeds its file-count limit\");\n        const { info, bytes } = await readRegular(path);\n        files.push({ path: relativePath, size: info.size, mode: info.mode & 0o777, sha256: sha256(bytes) });\n      } else throw new Error(\"payload contains a special file\");\n    }\n  }\n  await visit(payloadRoot);\n  files.sort((left, right) => asciiCompare(left.path, right.path));\n  const bytes = files.reduce((sum, file) => sum + fil"
+    },
+    {
+      "path": "src-tauri/src/platform.rs",
+      "offset": 2011,
+      "length": 512,
+      "sha256": "e69e644dc286cb161d84b1c8fd0a1691e7f15cf8748862d60645198fe560db9f",
+      "text": "parent.join(\"tfsb-studio-service\"))\n        .unwrap_or_else(|| PathBuf::from(\"/nonexistent/tfsb-studio-service\"))\n}\n\npub(crate) fn development_runtime(root: &Path, executable: &Path) -> PathBuf {\n    if let Some(parent) = executable.parent() {\n        let sibling = parent.join(\"tfsb-studio-service\");\n        if sibling.is_file() {\n            return sibling;\n        }\n    }\n    prepared_runtime(root)\n}\n\npub(crate) fn select_runtime(root: &Path, executable: &Path, packaged: bool) -> PathBuf {\n    if packaged"
+    },
+    {
+      "path": "src-tauri/src/platform.rs",
+      "offset": 2512,
+      "length": 512,
+      "sha256": "988d65981ffae950d6bc99ef26e267bb7507a54191f671e6267c418911e50665",
+      "text": "if packaged || !cfg!(debug_assertions) {\n        packaged_runtime(executable)\n    } else {\n        development_runtime(root, executable)\n    }\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n    use std::fs::{self, OpenOptions};\n    use std::io;\n    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink};\n    use std::time::{SystemTime, UNIX_EPOCH};\n\n    struct TempDirGuard {\n        path: PathBuf,\n    }\n\n    impl TempDirGuard {\n        fn new(prefix: &str) -> Self {\n            let nanos = SystemTim"
+    },
+    {
+      "path": "src-tauri/src/platform.rs",
+      "offset": 2561,
+      "length": 512,
+      "sha256": "2e46c4bbea1ef4f210e7f2892c9589077a3d16a28f6bb3b4238f39e9680bfef1",
+      "text": "packaged_runtime(executable)\n    } else {\n        development_runtime(root, executable)\n    }\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n    use std::fs::{self, OpenOptions};\n    use std::io;\n    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink};\n    use std::time::{SystemTime, UNIX_EPOCH};\n\n    struct TempDirGuard {\n        path: PathBuf,\n    }\n\n    impl TempDirGuard {\n        fn new(prefix: &str) -> Self {\n            let nanos = SystemTime::now()\n                .duration_since(UNIX_EPO"
+    },
+    {
+      "path": "src-tauri/src/theme_lab/runner.rs",
+      "offset": 4386,
+      "length": 512,
+      "sha256": "84cdb6687671fe1d69ec95ee3c73838b4ea2df10a58e8766466a79ea36dd9d2b",
+      "text": "crate::platform::select_runtime(\n            Path::new(env!(\"CARGO_MANIFEST_DIR\")),\n            current_exe,\n            packaged,\n        );\n        if packaged || !cfg!(debug_assertions) {\n            let bundled_adapter = if resource_dir.join(\"bin\").join(\"tfsl-batch.js\").is_file() {\n                resource_dir.join(\"bin\").join(\"tfsl-batch.js\")\n            } else {\n                resource_dir\n                    .join(\"loom-payload\")\n                    .join(\"bin\")\n                    .join(\"tfsl-batch"
+    },
+    {
+      "path": "src-tauri/src/theme_lab/runner.rs",
+      "offset": 4948,
+      "length": 512,
+      "sha256": "a8e9646823cca79df95ba7d981237a5461e63dc997ace7ddea1edc0c06bc9c2c",
+      "text": "resource_dir.join(\"loom-adapter\").join(\"theme-adapter.mjs\");\n            Self {\n                node_binary,\n                batch_adapter: bundled_adapter,\n                v2_adapter: Some(bundled_v2),\n                controller: Arc::new(ExecutionController::default()),\n                authenticate_payload: true,\n            }\n        } else {\n            let root = Path::new(env!(\"CARGO_MANIFEST_DIR\"));\n\n            let bundled_adapter = if resource_dir.join(\"bin\").join(\"tfsl-batch.js\").is_file() {\n     "
+    },
+    {
+      "path": "src-tauri/src/theme_lab/runner.rs",
+      "offset": 12384,
+      "length": 512,
+      "sha256": "85661e69684e6d5956422a9969df8c55aa797edbd85de465eb81b5d18004610d",
+      "text": "Command::new(&self.node_binary)\n            .arg(script_path)\n            .env_clear()\n            .env(\"NODE_ENV\", \"production\")\n            .env(\"LANG\", \"C\")\n            .env(\"LC_ALL\", \"C\")\n            .stdin(Stdio::piped())\n            .stdout(Stdio::piped())\n            .stderr(Stdio::piped())\n            .spawn()\n            .map_err(|_| StudioCommandError::new(StudioReasonCode::SidecarCrashed))?;\n\n        let mut guard = ChildProcessGuard {\n            child: &mut child,\n            reaped: false,\n   "
+    },
+    {
+      "path": "src-tauri/src/theme_lab/runner.rs",
+      "offset": 12428,
+      "length": 512,
+      "sha256": "02470fb35e0fbbba02df757975e7311eacfb125b45f366a409e9927ca680f61e",
+      "text": ".arg(script_path)\n            .env_clear()\n            .env(\"NODE_ENV\", \"production\")\n            .env(\"LANG\", \"C\")\n            .env(\"LC_ALL\", \"C\")\n            .stdin(Stdio::piped())\n            .stdout(Stdio::piped())\n            .stderr(Stdio::piped())\n            .spawn()\n            .map_err(|_| StudioCommandError::new(StudioReasonCode::SidecarCrashed))?;\n\n        let mut guard = ChildProcessGuard {\n            child: &mut child,\n            reaped: false,\n        };\n\n        // Worker thread for writin"
+    },
+    {
+      "path": "src-tauri/src/platform.rs",
+      "offset": 2011,
+      "length": 512,
+      "sha256": "e69e644dc286cb161d84b1c8fd0a1691e7f15cf8748862d60645198fe560db9f",
+      "text": "parent.join(\"tfsb-studio-service\"))\n        .unwrap_or_else(|| PathBuf::from(\"/nonexistent/tfsb-studio-service\"))\n}\n\npub(crate) fn development_runtime(root: &Path, executable: &Path) -> PathBuf {\n    if let Some(parent) = executable.parent() {\n        let sibling = parent.join(\"tfsb-studio-service\");\n        if sibling.is_file() {\n            return sibling;\n        }\n    }\n    prepared_runtime(root)\n}\n\npub(crate) fn select_runtime(root: &Path, executable: &Path, packaged: bool) -> PathBuf {\n    if packaged"
+    },
+    {
+      "path": "src-tauri/src/platform.rs",
+      "offset": 2512,
+      "length": 512,
+      "sha256": "988d65981ffae950d6bc99ef26e267bb7507a54191f671e6267c418911e50665",
+      "text": "if packaged || !cfg!(debug_assertions) {\n        packaged_runtime(executable)\n    } else {\n        development_runtime(root, executable)\n    }\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n    use std::fs::{self, OpenOptions};\n    use std::io;\n    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink};\n    use std::time::{SystemTime, UNIX_EPOCH};\n\n    struct TempDirGuard {\n        path: PathBuf,\n    }\n\n    impl TempDirGuard {\n        fn new(prefix: &str) -> Self {\n            let nanos = SystemTim"
+    },
+    {
+      "path": "src-tauri/src/platform.rs",
+      "offset": 2561,
+      "length": 512,
+      "sha256": "2e46c4bbea1ef4f210e7f2892c9589077a3d16a28f6bb3b4238f39e9680bfef1",
+      "text": "packaged_runtime(executable)\n    } else {\n        development_runtime(root, executable)\n    }\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n    use std::fs::{self, OpenOptions};\n    use std::io;\n    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink};\n    use std::time::{SystemTime, UNIX_EPOCH};\n\n    struct TempDirGuard {\n        path: PathBuf,\n    }\n\n    impl TempDirGuard {\n        fn new(prefix: &str) -> Self {\n            let nanos = SystemTime::now()\n                .duration_since(UNIX_EPO"
+    },
+    {
+      "path": "src-tauri/src/app_theme/runner.rs",
+      "offset": 4315,
+      "length": 512,
+      "sha256": "a5455c39e86a2b7838558737ca333ecb8056466d7efd81792a5ff2795e09192a",
+      "text": "crate::platform::select_runtime(\n            Path::new(env!(\"CARGO_MANIFEST_DIR\")),\n            executable,\n            packaged,\n        );\n        if packaged || !cfg!(debug_assertions) {\n            let adapter_path = resource.join(\"solar-sail-adapter/solar-sail-adapter.mjs\");\n            Self {\n                node_binary,\n                adapter_path,\n                controller: Arc::new(ExecutionController::default()),\n                authenticate_payload: true,\n            }\n        } else {\n        "
+    },
+    {
+      "path": "src-tauri/src/app_theme/runner.rs",
+      "offset": 4536,
+      "length": 512,
+      "sha256": "e20e3f9db4bbb7615fae99a62ab24c002a91a2e65536c9afd42e4d4a98674b4b",
+      "text": "resource.join(\"solar-sail-adapter/solar-sail-adapter.mjs\");\n            Self {\n                node_binary,\n                adapter_path,\n                controller: Arc::new(ExecutionController::default()),\n                authenticate_payload: true,\n            }\n        } else {\n            let root = Path::new(env!(\"CARGO_MANIFEST_DIR\"));\n\n            let adapter_path = if resource\n                .join(\"solar-sail-adapter/solar-sail-adapter.mjs\")\n                .is_file()\n            {\n               "
+    },
+    {
+      "path": "src-tauri/src/app_theme/runner.rs",
+      "offset": 9451,
+      "length": 512,
+      "sha256": "84d30a16b4b9d79db6e1f1bf202b6efec0ac41a1f564ef4b332e87a7d6f24c35",
+      "text": "Command::new(&self.node_binary)\n            .arg(&self.adapter_path)\n            .env_clear()\n            .env(\"NODE_ENV\", \"production\")\n            .env(\"LANG\", \"C\")\n            .env(\"LC_ALL\", \"C\")\n            .stdin(Stdio::piped())\n            .stdout(Stdio::piped())\n            .stderr(Stdio::piped())\n            .spawn()\n            .map_err(|_| StudioCommandError::new(StudioReasonCode::SidecarCrashed))?;\n\n        let mut guard = ChildProcessGuard {\n            child: &mut child,\n            reaped: fal"
+    },
+    {
+      "path": "src-tauri/src/app_theme/runner.rs",
+      "offset": 9495,
+      "length": 512,
+      "sha256": "1212e8622d06c43a1259cc15220223176afb79b95c9cb2faf29cf3cff7ae8332",
+      "text": ".arg(&self.adapter_path)\n            .env_clear()\n            .env(\"NODE_ENV\", \"production\")\n            .env(\"LANG\", \"C\")\n            .env(\"LC_ALL\", \"C\")\n            .stdin(Stdio::piped())\n            .stdout(Stdio::piped())\n            .stderr(Stdio::piped())\n            .spawn()\n            .map_err(|_| StudioCommandError::new(StudioReasonCode::SidecarCrashed))?;\n\n        let mut guard = ChildProcessGuard {\n            child: &mut child,\n            reaped: false,\n        };\n\n        // Worker thread for"
+    },
+    {
+      "path": "src-tauri/src/platform.rs",
+      "offset": 2011,
+      "length": 512,
+      "sha256": "e69e644dc286cb161d84b1c8fd0a1691e7f15cf8748862d60645198fe560db9f",
+      "text": "parent.join(\"tfsb-studio-service\"))\n        .unwrap_or_else(|| PathBuf::from(\"/nonexistent/tfsb-studio-service\"))\n}\n\npub(crate) fn development_runtime(root: &Path, executable: &Path) -> PathBuf {\n    if let Some(parent) = executable.parent() {\n        let sibling = parent.join(\"tfsb-studio-service\");\n        if sibling.is_file() {\n            return sibling;\n        }\n    }\n    prepared_runtime(root)\n}\n\npub(crate) fn select_runtime(root: &Path, executable: &Path, packaged: bool) -> PathBuf {\n    if packaged"
+    },
+    {
+      "path": "src-tauri/src/platform.rs",
+      "offset": 2512,
+      "length": 512,
+      "sha256": "988d65981ffae950d6bc99ef26e267bb7507a54191f671e6267c418911e50665",
+      "text": "if packaged || !cfg!(debug_assertions) {\n        packaged_runtime(executable)\n    } else {\n        development_runtime(root, executable)\n    }\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n    use std::fs::{self, OpenOptions};\n    use std::io;\n    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink};\n    use std::time::{SystemTime, UNIX_EPOCH};\n\n    struct TempDirGuard {\n        path: PathBuf,\n    }\n\n    impl TempDirGuard {\n        fn new(prefix: &str) -> Self {\n            let nanos = SystemTim"
+    },
+    {
+      "path": "src-tauri/src/platform.rs",
+      "offset": 2561,
+      "length": 512,
+      "sha256": "2e46c4bbea1ef4f210e7f2892c9589077a3d16a28f6bb3b4238f39e9680bfef1",
+      "text": "packaged_runtime(executable)\n    } else {\n        development_runtime(root, executable)\n    }\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n    use std::fs::{self, OpenOptions};\n    use std::io;\n    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink};\n    use std::time::{SystemTime, UNIX_EPOCH};\n\n    struct TempDirGuard {\n        path: PathBuf,\n    }\n\n    impl TempDirGuard {\n        fn new(prefix: &str) -> Self {\n            let nanos = SystemTime::now()\n                .duration_since(UNIX_EPO"
+    },
+    {
+      "path": "src-tauri/src/theme_lab/runner.rs",
+      "offset": 4386,
+      "length": 512,
+      "sha256": "84cdb6687671fe1d69ec95ee3c73838b4ea2df10a58e8766466a79ea36dd9d2b",
+      "text": "crate::platform::select_runtime(\n            Path::new(env!(\"CARGO_MANIFEST_DIR\")),\n            current_exe,\n            packaged,\n        );\n        if packaged || !cfg!(debug_assertions) {\n            let bundled_adapter = if resource_dir.join(\"bin\").join(\"tfsl-batch.js\").is_file() {\n                resource_dir.join(\"bin\").join(\"tfsl-batch.js\")\n            } else {\n                resource_dir\n                    .join(\"loom-payload\")\n                    .join(\"bin\")\n                    .join(\"tfsl-batch"
+    },
+    {
+      "path": "src-tauri/src/theme_lab/runner.rs",
+      "offset": 7366,
+      "length": 512,
+      "sha256": "2cc1d5c4633964f93b6bb40b58f9d7c67f59f7d12ea7bc405cade0541fc2d2ab",
+      "text": "self.execute_process(request, &self.batch_adapter)\n    }\n\n    pub fn execute_v2(\n        &self,\n        request: &BatchSubprocessRequest,\n    ) -> StudioResult<BatchSubprocessResponse> {\n        let v2_adapter = self\n            .v2_adapter\n            .as_ref()\n            .ok_or_else(|| StudioCommandError::new(StudioReasonCode::SidecarArtifactUnavailable))?;\n        crate::sidecar::scene_artifact::authenticate_theme_adapter(v2_adapter)?;\n        self.execute_process(request, v2_adapter)\n    }\n\n    fn exec"
+    },
+    {
+      "path": "src-tauri/src/theme_lab/runner.rs",
+      "offset": 12384,
+      "length": 512,
+      "sha256": "85661e69684e6d5956422a9969df8c55aa797edbd85de465eb81b5d18004610d",
+      "text": "Command::new(&self.node_binary)\n            .arg(script_path)\n            .env_clear()\n            .env(\"NODE_ENV\", \"production\")\n            .env(\"LANG\", \"C\")\n            .env(\"LC_ALL\", \"C\")\n            .stdin(Stdio::piped())\n            .stdout(Stdio::piped())\n            .stderr(Stdio::piped())\n            .spawn()\n            .map_err(|_| StudioCommandError::new(StudioReasonCode::SidecarCrashed))?;\n\n        let mut guard = ChildProcessGuard {\n            child: &mut child,\n            reaped: false,\n   "
+    },
+    {
+      "path": "src-tauri/src/theme_lab/runner.rs",
+      "offset": 12428,
+      "length": 512,
+      "sha256": "02470fb35e0fbbba02df757975e7311eacfb125b45f366a409e9927ca680f61e",
+      "text": ".arg(script_path)\n            .env_clear()\n            .env(\"NODE_ENV\", \"production\")\n            .env(\"LANG\", \"C\")\n            .env(\"LC_ALL\", \"C\")\n            .stdin(Stdio::piped())\n            .stdout(Stdio::piped())\n            .stderr(Stdio::piped())\n            .spawn()\n            .map_err(|_| StudioCommandError::new(StudioReasonCode::SidecarCrashed))?;\n\n        let mut guard = ChildProcessGuard {\n            child: &mut child,\n            reaped: false,\n        };\n\n        // Worker thread for writin"
+    },
+    {
+      "path": "protocol/theme-lab-v2/payload-binding.json",
+      "offset": 1090,
+      "length": 512,
+      "sha256": "47e6c37c2a3e9244c2a283ffc58b63778b04e40ec8e4e35e39b7024995ceebfe",
+      "text": "\"path\": \"bin/tfsl.js\",\n      \"bytes\": 131,\n      \"sha256\": \"6f4196e9a8eb744308a38328d396329901ca7619d8155fb15acfba26257ab316\"\n    },\n    {\n      \"path\": \"dist/adapters/starlight-v0-42.d.ts\",\n      \"bytes\": 200,\n      \"sha256\": \"031120836b4bef2d2e132376cda85f71fe7e95b3d276ede7bd510d49d06f4cd3\"\n    },\n    {\n      \"path\": \"dist/adapters/starlight-v0-42.d.ts.map\",\n      \"bytes\": 263,\n      \"sha256\": \"3fd9883478e098f1a72345e3aa99fe8ab9d4945ac4276b3097648463755f30a6\"\n    },\n    {\n      \"path\": \"dist/adapters/star"
+    }
+  ],
+  "authenticated_composition_archives": [
+    {
+      "path": "authenticated-inputs/loom-tarball/knowledge-forge-ai-theme-forge-stellar-loom-0.4.0.tgz",
+      "blob": "56f193e9a2226b5741eedcc8a67fa76cc6129dc5",
+      "sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+      "size": 273462
+    },
+    {
+      "path": "authenticated-inputs/core-tarball/knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+      "blob": "3f4d45a105995a1cf233eae9857621217f5e9993",
+      "sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+      "size": 644313
+    }
+  ],
+  "authenticated_member_readback": {
+    "loom:package/bin/tfsl.js": {
+      "input_archive_sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+      "input_member": "package/bin/tfsl.js",
+      "sha256": "6f4196e9a8eb744308a38328d396329901ca7619d8155fb15acfba26257ab316",
+      "size": 131,
+      "mode": 493
+    },
+    "loom:package/bin/tfsl-batch.js": {
+      "input_archive_sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+      "input_member": "package/bin/tfsl-batch.js",
+      "sha256": "b58052712f9426a7669fe7f719aa20c30e19fa4c4d8be6e6a9de41e5b2a081d4",
+      "size": 125,
+      "mode": 493
+    },
+    "loom:package/package.json": {
+      "input_archive_sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+      "input_member": "package/package.json",
+      "sha256": "aa3da0ab662e4205a357224e8deda8cabdec9ca6e504853cee1a8aaa989c48ad",
+      "size": 1822,
+      "mode": 420
+    },
+    "burst:package/dist/cli.js": {
+      "input_archive_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+      "input_member": "package/dist/cli.js",
+      "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+      "size": 74258,
+      "mode": 420
+    },
+    "burst:package/dist/service-protocol/server-cli.js": {
+      "input_archive_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+      "input_member": "package/dist/service-protocol/server-cli.js",
+      "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+      "size": 298,
+      "mode": 420
+    },
+    "burst:package/dist/cli.d.ts": {
+      "input_archive_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+      "input_member": "package/dist/cli.d.ts",
+      "sha256": "5c32ef46b90997fc6de2a43c40a92643d025b64f1ed7c360e1cd40997528797b",
+      "size": 292,
+      "mode": 420
+    },
+    "burst:package/dist/service-protocol/server-cli.d.ts": {
+      "input_archive_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+      "input_member": "package/dist/service-protocol/server-cli.d.ts",
+      "sha256": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012",
+      "size": 31,
+      "mode": 420
+    }
+  }
+}

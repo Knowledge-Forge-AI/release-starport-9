@@ -327,16 +327,22 @@ def diagnostic_scope(repository, output, packet, contract, reported=None):
                         gates = dict(lane, required_gates=lane.get("experiment_gates", []) if experimental else lane["required_gates"])
                         blockers = gate_blockers(gates, receipt)
                         if lane["lane"] == "rpm":
-                            from rs9.hosted_summary import promotion_blockers, rpm_lint_results
+                            from rs9.hosted_summary import promotion_blockers, rpm_lint_results, validate_rpm_policy_custody
                             promotion_blockers(lane, receipt)
+                            try:
+                                validate_rpm_policy_custody(directory, manifest, receipt)
+                            except (ContractError, KeyError, TypeError, ValueError, OSError) as error:
+                                code = error.code if isinstance(error, ContractError) else "invalid"
+                                blockers.append(f"rpm-policy-custody-invalid:{code}")
                             row["rpm_lint_results"] = rpm_lint_results([receipt])
                         if receipt.get("execution_error") or receipt.get("policy_blockers"):
                             blockers.append("receipt-execution-or-policy-failed")
                         if experimental and receipt.get("network", {}).get("runtime_offline_status") != "pass":
                             blockers.append("experiment-offline-unproven")
                         row.update(status="fail" if blockers else "pass", integrity="verified", reasons=blockers[:64])
-                    except (ContractError, KeyError, TypeError, ValueError, OSError):
-                        row["reasons"] = ["receipt-binding-or-integrity-failed"]
+                    except (ContractError, KeyError, TypeError, ValueError, OSError) as error:
+                        code = error.code if isinstance(error, ContractError) else "invalid"
+                        row["reasons"] = ["receipt-binding-or-integrity-failed:" + code]
                 else:
                     row["reasons"] = ["artifact-custody-failed"]
             if not experimental:

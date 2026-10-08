@@ -1,4 +1,6 @@
 """Unit tests for rs9.hosted_packaging."""
+from tests.rpm_summary_fixtures import witnessed_build_double
+
 
 import json
 from pathlib import Path
@@ -1058,7 +1060,7 @@ class HostedPackagingTests(unittest.TestCase):
              patch("rs9.hosted_packaging.checked", return_value=CommandReceipt(["tool"], 0, b"", b"", executed=True)), \
              patch("rs9.hosted_packaging.container_tool_facts", return_value={"rpm": "v6"}), \
              patch("rs9.hosted_packaging._resolve_offline_npm_archives", return_value=None), \
-             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=mock_build):
+             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=witnessed_build_double(mock_build)):
             from rs9.hosted_packaging import execute
             result = execute(context)
             details = result["details"]["product_failures"]["theme-forge-nebular-fusion"]
@@ -1272,7 +1274,7 @@ class HostedPackagingTests(unittest.TestCase):
              patch("rs9.hosted_packaging.checked", return_value=CommandReceipt(["tool"], 0, b"", b"", executed=True)), \
              patch("rs9.hosted_packaging.container_tool_facts", return_value={"rpm": "v6"}), \
              patch("rs9.hosted_packaging._resolve_offline_npm_archives", return_value=None), \
-             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=mock_build):
+             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=witnessed_build_double(mock_build)):
             from rs9.hosted_packaging import execute
             # Must execute without AttributeError: 'CommandReceipt' object has no attribute 'argv'
             res = execute(context)
@@ -1288,7 +1290,7 @@ class HostedPackagingTests(unittest.TestCase):
         quarantine_dir = lane_scratch / "quarantine"
         quarantined = quarantine_dir / "theme-forge-nebular-fusion-1.0.0-1.fc43.x86_64.rpm"
         self.assertTrue(quarantined.is_file())
-        self.assertNotIn(quarantined, res["artifacts"])
+        self.assertIn(quarantined, res["artifacts"])
         self.assertFalse((lane_scratch / "unsigned-custody").exists())
 
     def test_multi_product_retention_records_all_failures_and_quarantine(self):
@@ -1386,7 +1388,7 @@ class HostedPackagingTests(unittest.TestCase):
              patch("rs9.hosted_packaging.checked", return_value=CommandReceipt(["tool"], 0, b"", b"", executed=True)), \
              patch("rs9.hosted_packaging.container_tool_facts", return_value={"rpm": "v6"}), \
              patch("rs9.hosted_packaging._resolve_offline_npm_archives", return_value=None), \
-             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=mock_build):
+             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=witnessed_build_double(mock_build)):
             from rs9.hosted_packaging import execute
             res = execute(context)
 
@@ -1495,7 +1497,7 @@ class HostedPackagingTests(unittest.TestCase):
              patch("rs9.hosted_packaging.container_tool_facts", return_value={"rpm": "v6"}), \
              patch("rs9.hosted_packaging._resolve_offline_npm_archives", return_value=None), \
              patch("shutil.copyfile", side_effect=fail_quarantine), \
-             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=mock_build):
+             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=witnessed_build_double(mock_build)):
             from rs9.hosted_packaging import execute
             res = execute(context)
 

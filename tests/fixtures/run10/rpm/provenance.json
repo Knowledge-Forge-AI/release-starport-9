@@ -1,0 +1,35 @@
+{
+  "schema": "rs9.run10-rpm-fixture-provenance.v1",
+  "run_id": 37802815634,
+  "large_packages_independently_downloaded": false,
+  "files": [
+    {
+      "system": "x86_64-linux",
+      "path": "tests/fixtures/run10/rpm/x86_64-linux/policy-evaluation.json",
+      "sha256": "5050f78e06b365d2ecbcbca907f8ede515552c34ad540a67c2d6f53b38c11acf",
+      "size": 108675,
+      "scope": "retained-run10-manager-packet-not-native-reexecution"
+    },
+    {
+      "system": "x86_64-linux",
+      "path": "tests/fixtures/run10/rpm/x86_64-linux/raw-lint.json",
+      "sha256": "fb8484bd8544cef7a485611d2ef2df3a6f1b5bfa86047cba83e58cbedd9b20d9",
+      "size": 42348,
+      "scope": "retained-run10-manager-packet-not-native-reexecution"
+    },
+    {
+      "system": "aarch64-linux",
+      "path": "tests/fixtures/run10/rpm/aarch64-linux/policy-evaluation.json",
+      "sha256": "83176b073b55cddbda4f78e0e4b02b23131c4759460f6d19a3a5101c11f7d2ba",
+      "size": 108677,
+      "scope": "retained-run10-manager-packet-not-native-reexecution"
+    },
+    {
+      "system": "aarch64-linux",
+      "path": "tests/fixtures/run10/rpm/aarch64-linux/raw-lint.json",
+      "sha256": "37efd4e396adf1e34901bfd785681f37ed3bda22b3df287abce3ffee4f96901a",
+      "size": 42482,
+      "scope": "retained-run10-manager-packet-not-native-reexecution"
+    }
+  ]
+}

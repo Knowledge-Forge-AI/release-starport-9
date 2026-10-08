@@ -39,8 +39,17 @@ class ScopedGraphTests(unittest.TestCase):
                     for name in row['required_gates']]
                 migrated += 1
         self.assertIn(migrated, (0, 2))  # zero after this exact candidate is adopted
+        added = {'rpm-client-preparation', 'rpm-derivation-record', 'rpm-manifest-record', 'rpm-policy-custody'}
+        normalized = json.loads(json.dumps(current))
+        for row in normalized['lanes']:
+            if row['lane'] == 'rpm':
+                self.assertTrue(added.issubset(row['required_gates']))
+                row['required_gates'] = [g for g in row['required_gates'] if g not in added]
         self.assertEqual(sum('rpm-lint-policy-accepted' in row.get('required_gates',[]) for row in current['lanes']), 2)
-        self.assertEqual(current["lanes"], original["lanes"])
+        for row in original['lanes']:
+            if row['lane'] == 'rpm':
+                row['required_gates'] = [g for g in row['required_gates'] if g not in added]
+        self.assertEqual(normalized["lanes"], original["lanes"])
         self.assertEqual(current["required_jobs"], original["required_jobs"])
         self.assertEqual(current["experiment_jobs"], ["nix-proot"])
         self.assertTrue(all(row["qualification_authority"] is False for row in current["experiments"]))

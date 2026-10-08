@@ -1,0 +1,712 @@
+{
+  "authority": {
+    "external_reviewer_invoked": false,
+    "git_committed": false,
+    "git_pushed": false,
+    "git_staged": false,
+    "hosted_adoption_executed": false,
+    "review_checkpoints": "dispatcher-owned"
+  },
+  "changed_paths": [
+    "docs/README.md",
+    "docs/live1-native-client-cont12.md",
+    "evidence/live1/cont12-hosted10-rpm-policy-verification.json",
+    "operators/live1/candidate-manifest.json",
+    "operators/live1/rpm-lint-policy.json",
+    "operators/live1/run-hosted11.py",
+    "src/rs9/build_rpm.py",
+    "src/rs9/collect_candidate.py",
+    "src/rs9/errors.py",
+    "src/rs9/hosted_deb.py",
+    "src/rs9/hosted_foundation3.py",
+    "src/rs9/hosted_packaging.py",
+    "src/rs9/hosted_summary.py",
+    "src/rs9/records.py",
+    "src/rs9/rpm_evidence.py",
+    "src/rs9/rpm_lint_policy.py",
+    "src/rs9/rpm_preservation.py",
+    "tests/fixtures/run10/rpm/aarch64-linux/policy-evaluation.json",
+    "tests/fixtures/run10/rpm/aarch64-linux/raw-lint.json",
+    "tests/fixtures/run10/rpm/provenance.json",
+    "tests/fixtures/run10/rpm/x86_64-linux/policy-evaluation.json",
+    "tests/fixtures/run10/rpm/x86_64-linux/raw-lint.json",
+    "tests/test_build_rpm.py",
+    "tests/test_records_boundary.py",
+    "tests/test_rpm_derivation_custody.py",
+    "tests/test_rpm_evidence.py",
+    "tests/test_rpm_failure_integration.py",
+    "tests/test_rpm_lint.py",
+    "tests/test_rpm_lint_policy.py",
+    "tests/test_rpm_policy_custody.py",
+    "tests/test_run_hosted11.py"
+  ],
+  "closeout": {
+    "additional_review_requested": false,
+    "amended_paths": [
+      "docs/live1-native-client-cont12.md",
+      "evidence/live1/cont12-hosted10-rpm-policy-verification.json",
+      "operators/live1/candidate-manifest.json"
+    ],
+    "dispatch_archive_or_receipt_issued": false,
+    "full_suite_repeated": false,
+    "native_qualification_run": false,
+    "ordinary_linux_execution_observed": false,
+    "scope": "reporting-only",
+    "source_policy_and_tests_amended": false,
+    "workers": "declined; bounded reporting closeout handled locally"
+  },
+  "handoff": {
+    "binding_location": "terminal-result-final-tree-and-manifest-sha256-after-reporting-corrections-no-recursive-self-hash",
+    "canonical_dispatch_zip_and_receipt": "pending-dispatcher-owned-closeout-outputs; not-produced-or-observed-by-terminal-provider",
+    "external_partial_diagnostic_attestation_required": true,
+    "manager_acceptance_required": true,
+    "manager_must_disposition_work_review_findings": true,
+    "manifest": "operators/live1/candidate-manifest.json",
+    "new_push_triggered_workflows_authorized_after_acceptance": 1,
+    "operator": "operators/live1/run-hosted11.py",
+    "scope_if_six_callers_stay_blocked": "repaired-record-and-complete-diagnostic-custody-observation-no-DNF-for-any-product; current-pipeline-cannot-supply-client-proof-even-with-callers",
+    "source_adoption_executed": false
+  },
+  "hosted_run10": {
+    "apt_amd64_gates_pass": 41,
+    "apt_arm64_gates_pass": 41,
+    "large_packages_independently_downloaded_by_manager": false,
+    "pacman_gates_pass": 40,
+    "qualified": false,
+    "run_id": 37802815634,
+    "unit_errors": 1,
+    "unit_regression": true,
+    "unit_skipped": 17,
+    "unit_tests_run": 1457,
+    "workflow_repeated": false
+  },
+  "observed_stage_deltas": [
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "docs/README.md",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "docs/live1-native-client-cont12.md",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "evidence/live1/cont12-hosted10-rpm-policy-verification.json",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "operators/live1/candidate-manifest.json",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "operators/live1/rpm-lint-policy.json",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "operators/live1/run-hosted11.py",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "src/rs9/build_rpm.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "src/rs9/collect_candidate.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "src/rs9/errors.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "src/rs9/hosted_deb.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "src/rs9/hosted_foundation3.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "src/rs9/hosted_packaging.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "src/rs9/hosted_summary.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "src/rs9/records.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "src/rs9/rpm_evidence.py",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "src/rs9/rpm_lint_policy.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "src/rs9/rpm_preservation.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/fixtures/run10/rpm/aarch64-linux/policy-evaluation.json",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/fixtures/run10/rpm/aarch64-linux/raw-lint.json",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/fixtures/run10/rpm/provenance.json",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/fixtures/run10/rpm/x86_64-linux/policy-evaluation.json",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/fixtures/run10/rpm/x86_64-linux/raw-lint.json",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/test_build_rpm.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/test_records_boundary.py",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/test_rpm_derivation_custody.py",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/test_rpm_evidence.py",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/test_rpm_failure_integration.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/test_rpm_lint.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/test_rpm_lint_policy.py",
+      "status": "modified"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/test_rpm_policy_custody.py",
+      "status": "added"
+    },
+    {
+      "disposition": "retained-in-cumulative-candidate",
+      "path": "tests/test_run_hosted11.py",
+      "status": "added"
+    }
+  ],
+  "plan_review_disposition": [
+    {
+      "action": "Preserve all-four gating; any blocked Nebular rule prevents DNF for every product.",
+      "disposition": "accept",
+      "finding": 1
+    },
+    {
+      "action": "Reproduce accepted Burst native and Loom/Solar Sail noarch shapes; inspect all downstream boundary failures.",
+      "disposition": "accept",
+      "finding": 2
+    },
+    {
+      "action": "Keep rpm_lint_results backward-compatible; validate custody in collector, summary, Foundation 3 and Pages.",
+      "disposition": "accept",
+      "finding": 3
+    },
+    {
+      "action": "Typed package-member encoding for three legitimate scanner matches; generic scanners unchanged.",
+      "disposition": "accept",
+      "finding": 4
+    },
+    {
+      "action": "Unversioned nodejs Requires cannot use builder version as client evidence; retain missing client predicate.",
+      "disposition": "accept",
+      "finding": 5
+    },
+    {
+      "action": "Explicit disjoint rule discriminators; exact possible totals derived from fixed group set.",
+      "disposition": "accept",
+      "finding": 6
+    },
+    {
+      "action": "Complete policy hash references replace repeated evaluations; historical raw receipt alias retained for compatibility.",
+      "disposition": "amend",
+      "finding": 7
+    }
+  ],
+  "preservation": {
+    "ignored_root_scratch_excluded_from_inventory": true,
+    "ignored_root_scratch_present": true,
+    "provider_git_mutations": false,
+    "real_index_has_staged_changes": false,
+    "serena_preserved": true
+  },
+  "proposal": {
+    "bytes": 23443,
+    "disposition": "amend",
+    "relative_path": "plan-material.md",
+    "sha256": "eebca710c2e59c742dae89e1090783e271196500dfc3a32945ed83d202bc7938"
+  },
+  "public_parent": "ce0c428331f61336530088d328e1b537fea287fb",
+  "readiness": {
+    "full_live1_qualification": false,
+    "production_enabled": false,
+    "publication_authority": false,
+    "published_linux_nix_ready": false
+  },
+  "schema": "rs9.cont12-source-verification.v1",
+  "source_scope": "existing-LIVE1-generation-source-repair",
+  "status": "terminal-reporting-closeout-with-deferred-product-findings",
+  "terminal_disposition": "amend",
+  "terminal_rationale": "Correct reporting against the dispatcher work review; preserve reviewed executable source, policy and tests, and defer substantive corrections for manager disposition under the reporting-only closeout boundary.",
+  "unresolved": [
+    "Linux Nix NIX_FHS_USERNS",
+    "PRoot remains experiment",
+    "Pages TLS unknown",
+    "Darwin wheel offline isolation NOT-RUN",
+    "Native DNF and RPM custody qualification pending",
+    "Six authenticated Nebular caller contracts unavailable",
+    "Pinned DNF client Node RPM and runtime floor observations unavailable",
+    "Ordinary Linux without /private/tmp execution unavailable",
+    "Manager acceptance of final reporting-amended candidate pending",
+    "Circular Node/client proof prerequisite and missing per-system client-image policy pins",
+    "Real Nebular native-service/sidecar caller proof model incomplete",
+    "Caller-content missing-evidence token mismatch",
+    "Aggregate downstream boundary gate attribution and gate regression coverage",
+    "Production raw-evidence reference verification absent",
+    "Current-builder required chunk-summary enforcement absent"
+  ],
+  "verification": {
+    "changed_python_AST_and_compile": {
+      "bytecode_written": false,
+      "files": 21,
+      "result": "PASS"
+    },
+    "closeout_focused_command": "PYTHONPATH=src:tests PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest test_rpm_lint.RpmLintIntegratedExecutionTests test_records_boundary test_rpm_derivation_custody test_rpm_evidence test_rpm_lint_policy test_rpm_policy_custody test_run_hosted11 -q",
+    "closeout_focused_runs": [
+      {
+        "discovered": 69,
+        "elapsed_seconds": 4.238,
+        "errors": 0,
+        "failures": 0,
+        "result": "PASS",
+        "tests_run": 69,
+        "umask": "022",
+        "unittest_reported_skips": 0,
+        "wp1_integration_skipped": false
+      },
+      {
+        "discovered": 69,
+        "elapsed_seconds": 4.169,
+        "errors": 0,
+        "failures": 0,
+        "result": "PASS",
+        "tests_run": 69,
+        "umask": "077",
+        "unittest_reported_skips": 0,
+        "wp1_integration_skipped": false
+      }
+    ],
+    "closeout_initial_invocation": {
+      "cause": "module-style invocation omitted tests from the import path that discovery normally supplies",
+      "errors": 2,
+      "resolution": "reran with PYTHONPATH=src:tests under both umasks; no source amendment or skip",
+      "result": "FAILED",
+      "tests_run": 69
+    },
+    "closeout_reporting_checks": {
+      "changed_python_AST_and_compile": {
+        "bytecode_written": false,
+        "files": 21,
+        "result": "PASS"
+      },
+      "diff_check": {
+        "command": "git diff --check",
+        "result": "PASS"
+      },
+      "hygiene": {
+        "command": "PYTHONPATH=src:tests PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest test_hygiene -q",
+        "errors": 0,
+        "failures": 0,
+        "result": "PASS",
+        "tests_run": 4,
+        "unittest_reported_skips": 0
+      },
+      "readiness_flags": {
+        "all_false": true,
+        "result": "PASS"
+      },
+      "relative_links": {
+        "links_checked": 41,
+        "result": "PASS"
+      }
+    },
+    "credential_and_private_host_path_scan": "PASS",
+    "diff_check": "PASS",
+    "exact_candidate_inventory": "PASS-refreshed-after-report-and-manifest-write",
+    "external_native_tools_unavailable": [
+      "GnuPG",
+      "rpmbuild",
+      "rpm",
+      "rpmlint",
+      "dpkg-deb",
+      "dpkg-shlibdeps",
+      "makepkg",
+      "repo-add",
+      "Linux-runtime",
+      "Docker-daemon"
+    ],
+    "full_command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning -m unittest discover -s tests -q",
+    "full_cumulative_runs": [
+      {
+        "decorated_class_skipped_tests": 8,
+        "decorated_skipped_classes": 4,
+        "discovered": 1499,
+        "elapsed_seconds": 60.084,
+        "errors": 0,
+        "failures": 0,
+        "individual_test_skips": 5,
+        "result": "PASS",
+        "setup_class_skip_events": 1,
+        "setup_class_tests_not_run": 10,
+        "tests_run": 1489,
+        "umask": "022",
+        "unittest_reported_skips": 14
+      },
+      {
+        "decorated_class_skipped_tests": 8,
+        "decorated_skipped_classes": 4,
+        "discovered": 1499,
+        "elapsed_seconds": 60.112,
+        "errors": 0,
+        "failures": 0,
+        "individual_test_skips": 5,
+        "result": "PASS",
+        "setup_class_skip_events": 1,
+        "setup_class_tests_not_run": 10,
+        "tests_run": 1489,
+        "umask": "077",
+        "unittest_reported_skips": 14
+      }
+    ],
+    "full_cumulative_runs_evidence_owner": "pre-final-producer-verification-record; terminal closeout did not repeat these full-suite runs",
+    "initial_full_run_hygiene_failure": "corrected-adverse-path-constructed-at-runtime-no-test-skip-or-scanner-relaxation",
+    "preserved_regressions": [
+      "APT-untampered-positive-control-and-signature-NODATA",
+      "pacman-trust-negatives",
+      "auth-wheels-Darwin-Nix-readback",
+      "real-adoption-and-collection-fixture-integration"
+    ],
+    "relative_links": "PASS",
+    "skip_reasons": [
+      "host-filesystem-invalid-UTF8-names",
+      "sandbox-local-socket-unavailable",
+      "GnuPG-unavailable",
+      "live-release-capture-directory-not-supplied",
+      "official-Nix-archive-directory-not-locatable"
+    ],
+    "source_focused_tests": "PASS",
+    "wp1_integration_skipped": false
+  },
+  "work_review": {
+    "accepted_scope": [
+      "WP1-portable-owned-scratch-source-change",
+      "WP2-typed-durable-record-boundary-source-change",
+      "WP4-bounded-complete-policy-custody-source-change",
+      "external-manager-attestation-handoff-source-change"
+    ],
+    "additional_substantive_review_obtained": false,
+    "outcome": "reviewed_with_findings",
+    "owner": "dispatcher",
+    "partial_scope": [
+      "WP3-real-caller-support-and-client-proof-provisioning-incomplete"
+    ],
+    "reviewed_manifest_sha256": "deab7caadd511b1a9eb65f21b361b6aecc83397c4126bab244bf7bbdd3975789",
+    "reviewed_tree": "cd52fd59068f77e503b86f5d28fdc38879db7045"
+  },
+  "work_review_disposition": [
+    {
+      "action": "Report circular Node/client evidence prerequisite, absent inventory.client_runtime_evidence and missing policy client_image pin. Missing authenticated caller contracts alone do not describe the complete gap.",
+      "deferral_authority": "Task scope requires reporting-only closeout and renewed manager review for a terminal product amendment.",
+      "disposition": "accept",
+      "finding": 1,
+      "product_amended_after_review": false,
+      "resolution": "product-correction-deferred"
+    },
+    {
+      "action": "Report that synthetic JSON-pointer contracts do not establish the real tfsb-studio-service plus sidecar-payload/manifest.json invocation structure, and generic archive projection hard-codes Nebular loom engine metadata.",
+      "deferral_authority": "Task scope requires reporting-only closeout and renewed manager review for a terminal product amendment.",
+      "disposition": "accept",
+      "finding": 2,
+      "product_amended_after_review": false,
+      "resolution": "product-correction-deferred"
+    },
+    {
+      "action": "Retain fails-closed behavior and report caller-content-unproven versus caller-content-or-identity-unproven token mismatch.",
+      "deferral_authority": "Task scope requires reporting-only closeout and renewed manager review for a terminal product amendment.",
+      "disposition": "accept",
+      "finding": 3,
+      "product_amended_after_review": false,
+      "resolution": "product-correction-deferred"
+    },
+    {
+      "action": "Report aggregate rpm-package-build misattribution for derivation, manifest and custody boundaries; retained per-product construction identities and causal details remain necessary.",
+      "deferral_authority": "Task scope requires reporting-only closeout and renewed manager review for a terminal product amendment.",
+      "disposition": "accept",
+      "finding": 4,
+      "product_amended_after_review": false,
+      "resolution": "product-correction-deferred"
+    },
+    {
+      "action": "Report raw-evidence hash/size binding by construction only; no production consumer invokes validate_durable_lint against the selected retained raw object.",
+      "deferral_authority": "Task scope requires reporting-only closeout and renewed manager review for a terminal product amendment.",
+      "disposition": "accept",
+      "finding": 5,
+      "product_amended_after_review": false,
+      "resolution": "consumer-hardening-deferred"
+    },
+    {
+      "action": "Report marker-free inline historical evaluation compatibility; source-aware required-summary enforcement remains pending manager-reviewed hardening.",
+      "deferral_authority": "Task scope requires reporting-only closeout and renewed manager review for a terminal product amendment.",
+      "disposition": "accept",
+      "finding": 6,
+      "product_amended_after_review": false,
+      "resolution": "consumer-hardening-deferred"
+    }
+  ],
+  "workers": {
+    "bounded_jobs": 3,
+    "dispatcher_checkpoint_substitution": false,
+    "kind": "gemini",
+    "parent_dispositions": [
+      "partial-read-only-evidence",
+      "partial-WP2-scaffolding-adopted-and-amended",
+      "partial-WP3-scaffolding-adopted-and-amended"
+    ],
+    "parent_fresh_verification": true,
+    "recursive_delegation": false,
+    "terminal_cleanup_proven": true,
+    "used": true
+  },
+  "wp1": {
+    "focused_class_tests_run_per_umask": 15,
+    "integration_test_skipped": false,
+    "local_system": "Darwin",
+    "ordinary_linux_without_private_tmp": "unavailable-no-linux-runtime",
+    "owned_temporary_directory": true,
+    "umasks": [
+      "022",
+      "077"
+    ]
+  },
+  "wp2": {
+    "actual_accepted_policy_reproductions": [
+      "theme-forge-stellar-burst:x86_64",
+      "theme-forge-stellar-loom:noarch",
+      "theme-forge-solar-sail:noarch"
+    ],
+    "actual_command_receipts": true,
+    "derivation_bytes_over_64_KiB": true,
+    "downstream_boundary_tool_blame": "explicit-cause-or-none",
+    "former_embedding_replayed_at_real_derivation_constructor": true,
+    "full_error_records_preserved": true,
+    "generic_record_validation_relaxed": false,
+    "later_boundary_regressions": [
+      "rpm-derivation-record",
+      "rpm-manifest-write",
+      "rpm-policy-custody",
+      "createrepo"
+    ],
+    "machine_stream_bytes_over_64_KiB": true,
+    "manager_nebular_proxy_first_field": "$.evidence.rpmlint.findings[14].message",
+    "native_run10_cli_failure_field": "unknown-traceback-not-retained",
+    "observed_first_field": "$.evidence.rpmlint.findings[1].message",
+    "observed_rule": "INVALID_STRING",
+    "raw_clean": false,
+    "raw_exit_code": 64,
+    "reference_contract": "exact-canonical-raw-evidence-sha256-size-and-object",
+    "typed_optional_empty_message": "null-only-when-arguments-sha256-binds-empty-bytes"
+  },
+  "wp3": {
+    "all_four_gating_preserved": true,
+    "allowed_systems": [
+      "x86_64-linux",
+      "aarch64-linux"
+    ],
+    "client_runtime_pipeline": "unreachable-before-policy-acceptance; preservation inventory never supplies client_runtime_evidence and policy pins have no client_image",
+    "declaration_predicates": 2,
+    "dependency_changes": false,
+    "exact_duplicate_group_count": 128,
+    "exact_script_identities": 8,
+    "fresh_release_archive_inspection": "unavailable-network-fetch-failed-no-authenticated-local-archive",
+    "individual_blocked_rules": [
+      {
+        "additional_unestablished_predicates": [
+          "real-caller-structure-support",
+          "node-runtime-floor-unobserved",
+          "client-image-pin-absent"
+        ],
+        "code": "non-executable-script",
+        "missing_predicate": "caller-contract-unproven",
+        "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs"
+      },
+      {
+        "additional_unestablished_predicates": [
+          "real-caller-structure-support",
+          "node-runtime-floor-unobserved",
+          "client-image-pin-absent"
+        ],
+        "code": "non-executable-script",
+        "missing_predicate": "caller-contract-unproven",
+        "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js"
+      },
+      {
+        "additional_unestablished_predicates": [
+          "real-caller-structure-support",
+          "node-runtime-floor-unobserved",
+          "client-image-pin-absent"
+        ],
+        "code": "non-executable-script",
+        "missing_predicate": "caller-contract-unproven",
+        "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js"
+      },
+      {
+        "additional_unestablished_predicates": [
+          "real-caller-structure-support",
+          "node-runtime-floor-unobserved",
+          "client-image-pin-absent"
+        ],
+        "code": "non-executable-script",
+        "missing_predicate": "caller-contract-unproven",
+        "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs"
+      },
+      {
+        "additional_unestablished_predicates": [
+          "real-caller-structure-support",
+          "node-runtime-floor-unobserved",
+          "client-image-pin-absent"
+        ],
+        "code": "env-script-interpreter",
+        "missing_predicate": "caller-contract-unproven",
+        "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js"
+      },
+      {
+        "additional_unestablished_predicates": [
+          "real-caller-structure-support",
+          "node-runtime-floor-unobserved",
+          "client-image-pin-absent"
+        ],
+        "code": "env-script-interpreter",
+        "missing_predicate": "caller-contract-unproven",
+        "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js"
+      }
+    ],
+    "native_policy_acceptance_claimed": false,
+    "node_client_proof": "pinned-client-image-and-installed-nodejs-RPM-query-receipt-plus-sha-bound-loom-engine-floor",
+    "private_caller_proof": "only-authenticated-preserved-text-contract-no-binary-string-or-invented-wrapper",
+    "real_internal_invocation_support": "incomplete; only synthetic JSON-pointer contracts tested, not native-service/sidecar structure",
+    "run11_expected_DNF_if_current_rules_remain_blocked": "not-run-for-all-four-products",
+    "source_fixture_complete_error_records": 9,
+    "source_phase_complete": false,
+    "synthetic_proofs": "source-contract-tests-only-not-native-RPM-or-client-attestation",
+    "version": "0.6.1"
+  },
+  "wp4": {
+    "collector_and_manager_zip_selected_complete_chunks": true,
+    "counterexamples": [
+      "missing",
+      "changed",
+      "swapped",
+      "duplicated",
+      "surplus",
+      "cross-system",
+      "boolean-part",
+      "forged-summary",
+      "historical-schema-downgrade"
+    ],
+    "evaluations_truncated": false,
+    "global_diagnostic_limit_bytes": 65536,
+    "historical_consumer_compatibility": true,
+    "limits_raised": false,
+    "observed_evaluations": [
+      {
+        "chunks": 9,
+        "complete_error_records": 9,
+        "derived_waste_totals": [
+          3128775,
+          3129379,
+          3335535,
+          3336139
+        ],
+        "duplicate_groups": 128,
+        "evaluation_bytes": 108675,
+        "evaluation_sha256": "5050f78e06b365d2ecbcbca907f8ede515552c34ad540a67c2d6f53b38c11acf",
+        "largest_chunk_bytes": 49023,
+        "raw_clean": false,
+        "raw_exit_code": 64,
+        "summary_bytes": 3343,
+        "system": "x86_64-linux"
+      },
+      {
+        "chunks": 9,
+        "complete_error_records": 9,
+        "derived_waste_totals": [
+          3128775,
+          3129379,
+          3335535,
+          3336139
+        ],
+        "duplicate_groups": 128,
+        "evaluation_bytes": 108677,
+        "evaluation_sha256": "83176b073b55cddbda4f78e0e4b02b23131c4759460f6d19a3a5101c11f7d2ba",
+        "largest_chunk_bytes": 49024,
+        "raw_clean": false,
+        "raw_exit_code": 64,
+        "summary_bytes": 3347,
+        "system": "aarch64-linux"
+      }
+    ],
+    "per_chunk_limit_bytes": 49152,
+    "typed_package_path_encoding": "three-legitimate-package-member-scanner-matches-no-host-path-or-credential-exemption"
+  }
+}

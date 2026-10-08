@@ -309,6 +309,9 @@ def build_rpm_candidate(
     offline_npm_archives: Mapping[str, str | Path] | None = None,
     runner: CommandRunner | None = None,
     builder_system: str | None = None,
+    policy: Mapping[str, Any] | None = None,
+    client_runtime: Mapping[str, Any] | None = None,
+    caller_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build Fedora 43 RPM candidate package using real rpmbuild, rpmlint, and createrepo."""
     scratch = validate_scratch_root(scratch_dir)
@@ -458,6 +461,14 @@ def build_rpm_candidate(
         protected_packages = set(script_packages) | {"glibc"}
         removable_targets = (dt_needed_packages & REDUNDANT_NEBULAR_REQUIRES) - protected_packages
         fedora_packages_for_spec = fedora_packages - removable_targets
+        if "nodejs" in fedora_packages_for_spec:
+            # Keep executable Loom shebang Requires, bound to authenticated metadata.
+            from rs9.nebular_callers import release_runtime_floor
+            from rs9.rpm_lint_policy import load_policy
+            current_policy = policy if policy is not None else load_policy()
+            floor = release_runtime_floor(ctx["asset_file"], current_policy["projects"][project_id])
+            fedora_packages_for_spec.remove("nodejs")
+            fedora_packages_for_spec.add("nodejs " + floor)
 
         derived_deps = sorted(fedora_packages_for_spec)
         policy_dependencies = sorted(fedora_packages)
@@ -632,6 +643,39 @@ def build_rpm_candidate(
         dbpath=query_db, keyring="rpmdb", keyringpath=query_keyring,
     )
 
+    construction_witness = {
+        "schema": "rs9.rpm-construction-witness.v1",
+        "rpmbuild_receipt": {
+            "executed": rpmbuild_receipt.executed,
+            "exit_code": rpmbuild_receipt.exit_code,
+            "tool": "rpmbuild",
+            "stdout_sha256": rpmbuild_receipt.stdout_sha256,
+            "stderr_sha256": rpmbuild_receipt.stderr_sha256,
+            "command_sha256": digest(canonical(rpmbuild_receipt.command)),
+        },
+        "rpm_identity": rpm_identity,
+        "rpm_payload_digest": rpm_payload_digest,
+        "package_sha256": digest(rpm_bytes),
+        "package_size": len(rpm_bytes),
+        "spec_sha256": digest(spec_bytes),
+    }
+
+    def _attach_witness(exc: ContractError) -> ContractError:
+        exc.construction_witness = construction_witness
+        exc.package_artifact = str(dest_rpm)
+        exc.package_path = str(dest_rpm)
+        exc.package_sha256 = digest(rpm_bytes)
+        if hasattr(exc, "details") and isinstance(exc.details, dict):
+            exc.details["construction_witness"] = construction_witness
+        return exc
+
+    def _post_construction_run(command):
+        try:
+            return r.run(command, cwd=scratch)
+        except (ContractError, OSError) as cause:
+            error = cause if isinstance(cause, ContractError) else ContractError("BUILD_FAILED", "Post-construction tool unavailable")
+            raise _attach_witness(error) from cause
+
     # Capture RPM requires for ALL products (node interpreter enforcement), not native only.
     rpm_requires_cmd = [
         "rpm",
@@ -640,14 +684,17 @@ def build_rpm_candidate(
         "--requires",
         str(dest_rpm),
     ]
-    rpm_requires_receipt = r.run(rpm_requires_cmd, cwd=scratch)
-    actual_rpm_requires = _capability_records(rpm_requires_receipt, "rpm-requires")
+    rpm_requires_receipt = _post_construction_run(rpm_requires_cmd)
+    try:
+        actual_rpm_requires = _capability_records(rpm_requires_receipt, "rpm-requires")
+    except ContractError as err:
+        raise _attach_witness(err)
 
     # Node interpreter enforcement for pure JS CLI
     if is_pure_js_cli:
         has_node = "nodejs >= 22" in actual_rpm_requires
         if not has_node:
-            raise ContractError("DEPENDENCY_DERIVATION", "Pure JS CLI package requires missing nodejs interpreter")
+            raise _attach_witness(ContractError("DEPENDENCY_DERIVATION", "Pure JS CLI package requires missing nodejs interpreter"))
 
     # Add rpm --provides readback and coverage evidence
     rpm_provides_cmd = [
@@ -657,8 +704,11 @@ def build_rpm_candidate(
         "--provides",
         str(dest_rpm),
     ]
-    rpm_provides_receipt = r.run(rpm_provides_cmd, cwd=scratch)
-    actual_rpm_provides = _capability_records(rpm_provides_receipt, "rpm-provides")
+    rpm_provides_receipt = _post_construction_run(rpm_provides_cmd)
+    try:
+        actual_rpm_provides = _capability_records(rpm_provides_receipt, "rpm-provides")
+    except ContractError as err:
+        raise _attach_witness(err)
     self_provides_count = len(actual_rpm_provides)
 
     if is_native:
@@ -667,7 +717,7 @@ def build_rpm_candidate(
         if is_native_node_cli:
             allowed_sonames = set(system_sonames)
             if not "nodejs >= 22" in actual_rpm_requires:
-                raise ContractError("DEPENDENCY_DERIVATION", "Native Node CLI RPM requires missing nodejs interpreter")
+                raise _attach_witness(ContractError("DEPENDENCY_DERIVATION", "Native Node CLI RPM requires missing nodejs interpreter"))
             for requirement in derived_deps:
                 base = requirement.split("(", 1)[0]
                 if not (base in allowed_sonames or base == "rtld"
@@ -675,7 +725,7 @@ def build_rpm_candidate(
                         or requirement in {"/bin/sh", "/usr/bin/env"}
                         or re.fullmatch(r"nodejs(?:\s*(?:>=|=)\s*[0-9][0-9.]*)?", requirement)
                         or requirement in policy_dependencies):
-                    raise ContractError("DEPENDENCY_DERIVATION", "RPM requirement lies outside the target prebuild closure")
+                    raise _attach_witness(ContractError("DEPENDENCY_DERIVATION", "RPM requirement lies outside the target prebuild closure"))
 
         if is_native:
             # Verify DT_NEEDED capability coverage for target ELFs only
@@ -695,20 +745,32 @@ def build_rpm_candidate(
                 err.receipt = rpm_requires_receipt
                 err.requires_receipt = rpm_requires_receipt
                 err.provides_receipt = rpm_provides_receipt
-                raise err
+                raise _attach_witness(err)
 
     # Execute raw rpmlint with structured evidence
-    rpmlint_evidence, rpmlint_receipts = execute_rpmlint(
-        runner=r,
-        spec_path=spec_path,
-        rpm_path=dest_rpm,
-        product=project_id,
-        rpm_identity=rpm_identity,
-        rpm_payload_digest=rpm_payload_digest,
-        cwd=scratch,
-        allow_policy=True,
-    )
+    try:
+        rpmlint_evidence, rpmlint_receipts = execute_rpmlint(
+            runner=r,
+            spec_path=spec_path,
+            rpm_path=dest_rpm,
+            product=project_id,
+            rpm_identity=rpm_identity,
+            rpm_payload_digest=rpm_payload_digest,
+            cwd=scratch,
+            allow_policy=True,
+        )
+    except ContractError as err:
+        raise _attach_witness(err)
     rpmlint_receipt = rpmlint_receipts[0]
+
+    # Resolve policy at builder seam if not provided
+    resolved_policy = policy
+    if resolved_policy is None:
+        try:
+            from rs9.rpm_lint_policy import load_policy
+            resolved_policy = load_policy()
+        except Exception:
+            resolved_policy = None
 
     # Collect preservation inventory
     staged_nm_for_inventory = None if is_native_desktop else (rpm_topdir / "staged_node_modules")
@@ -724,6 +786,9 @@ def build_rpm_candidate(
             scratch=scratch,
             dbpath=query_db,
             keyringpath=query_keyring,
+            policy=resolved_policy,
+            client_runtime=client_runtime,
+            caller_evidence=caller_evidence,
         )
 
     except (ContractError, ValueError, OSError) as cause:
@@ -749,10 +814,15 @@ def build_rpm_candidate(
         err.rpmlint_policy = {"schema":"rs9.rpm-lint-policy-evaluation.v1","accepted":False,
                              "status":"blocked","blockers":["incomplete-preservation-inventory"],
                              "accepted_findings":[],"raw_lint_status":rpmlint_evidence["status"],
-                             "raw_exit_code":rpmlint_receipt.exit_code}
+                             "raw_exit_code":rpmlint_receipt.exit_code,
+                             "inputs": {"project_id": project_id, "version": version,
+                                        "arch": matched_arch, "system": system,
+                                        "asset_sha256": ctx["asset_sha"],
+                                        "payload_manifest_sha256": ctx["payload"].get("payload_manifest_sha256"),
+                                        "closure_sha256": closure_sha if not is_native_desktop else None}}
         err.package_path, err.spec_path = str(dest_rpm), str(spec_path)
         err.package_sha256, err.spec_sha256 = digest(rpm_bytes), digest(spec_path.read_bytes())
-        raise err from cause
+        raise _attach_witness(err) from cause
 
     # Evaluate policy
     policy_inputs = {
@@ -768,6 +838,7 @@ def build_rpm_candidate(
         raw_evidence=rpmlint_evidence,
         inventory=inventory,
         inputs=policy_inputs,
+        policy=resolved_policy,
     )
 
     # Check policy acceptance
@@ -807,7 +878,7 @@ def build_rpm_candidate(
         err.spec_path = str(spec_path)
         err.spec_sha256 = rpmlint_evidence.get("spec_sha256", "")
         err.package_sha256 = rpmlint_evidence.get("package_sha256", "")
-        raise err
+        raise _attach_witness(err)
 
     # Execute createrepo gzip --no-database (atomic: reached ONLY after policy acceptance!)
     createrepo_cmd = [
@@ -819,12 +890,27 @@ def build_rpm_candidate(
         "sha256",
         str(scratch / "repo"),
     ]
-    createrepo_receipt = r.run(createrepo_cmd, cwd=scratch)
+    createrepo_receipt = _post_construction_run(createrepo_cmd)
     if createrepo_receipt.exit_code != 0:
-        raise ContractError(
+        details = {
+            "substage": "createrepo",
+            "tool": "createrepo",
+            "exit_code": createrepo_receipt.exit_code,
+            "stdout_sha256": createrepo_receipt.stdout_sha256,
+            "stderr_sha256": createrepo_receipt.stderr_sha256,
+            "product": project_id,
+        }
+        err = ContractError(
             "BUILD_FAILED",
-            f"{createrepo_bin} failed with exit code {createrepo_receipt.exit_code}: {createrepo_receipt.stderr_text}",
+            "Candidate local repository indexing failed",
+            details=details,
         )
+        err.receipt = createrepo_receipt
+        err.causal_receipt = createrepo_receipt
+        err.rpmlint_evidence, err.rpmlint_policy = rpmlint_evidence, policy_evidence
+        err.package_path, err.spec_path = str(dest_rpm), str(spec_path)
+        err.package_sha256, err.spec_sha256 = digest(rpm_bytes), digest(spec_path.read_bytes())
+        raise _attach_witness(err)
 
     rel_artifact_path = dest_rpm.relative_to(scratch).as_posix()
     validate_safe_relative_posix_path(rel_artifact_path)
@@ -834,86 +920,132 @@ def build_rpm_candidate(
         extra_tools.append(rpm_requires_receipt)
     extra_tools.extend([rpm_provides_receipt, *inventory_receipts, rpmlint_receipt, createrepo_receipt])
 
-    extra_ev: dict[str, Any] = {
-        "rpm_identity": rpm_identity,
-        "rpm_payload_digest": rpm_payload_digest,
-        "rpmlint_status": rpmlint_evidence["status"],
-        "rpmlint_exit_code": rpmlint_receipt.exit_code,
-        "rpmlint": rpmlint_evidence,
-        "rpmlint_policy": policy_evidence,
-        "createrepo_flags": ["--no-database", "gzip"],
-        "native_preservation": {
-            "strip": False,
-            "debug": False,
-            "mangle_shebangs": False,
-            "build_id": False,
-        },
-        "rpm_query_evidence": {
-            "requires": actual_rpm_requires,
-            "provides": actual_rpm_provides,
-            "self_provides_count": self_provides_count,
-        },
-    }
-    if is_native:
-        extra_ev["policy_dependencies"] = policy_dependencies
-        extra_ev["elf_dependencies"] = {
-            "objects": elf_objects,
-            "system_sonames": sorted(system_sonames),
-            "derived_packages": derived_deps,
-            "covered_sonames": sorted(system_sonames),
-            "self_provides_count": self_provides_count,
-            "coverage": "complete",
-            "redundant_named_requires_removed": sorted(removable_targets) if is_native_desktop else [],
-            "rpm6_elf_generator_scope": "all-matching-ELF-including-mode-0644",
+    boundary_substage = "rpm-derivation-record"
+    try:
+        from rs9.rpm_evidence import durable_lint_projection, policy_summary
+        durable_lint = durable_lint_projection(rpmlint_evidence)
+        durable_policy = policy_summary(policy_evidence)
+
+        extra_ev: dict[str, Any] = {
+            "rpm_identity": rpm_identity,
+            "rpm_payload_digest": rpm_payload_digest,
+            "rpmlint_status": rpmlint_evidence["status"],
+            "rpmlint_exit_code": rpmlint_receipt.exit_code,
+            "rpmlint": durable_lint,
+            "rpmlint_policy": durable_policy,
+            "createrepo_flags": ["--no-database", "gzip"],
+            "native_preservation": {
+                "strip": False,
+                "debug": False,
+                "mangle_shebangs": False,
+                "build_id": False,
+            },
+            "rpm_query_evidence": {
+                "requires": actual_rpm_requires,
+                "provides": actual_rpm_provides,
+                "self_provides_count": self_provides_count,
+            },
+            "construction_witness": construction_witness,
         }
-        extra_ev["rpm_provides_coverage"] = {
-            "status": "covered",
-            "required_sonames": sorted(system_sonames),
-            "self_provides_count": self_provides_count,
+        if is_native:
+            extra_ev["policy_dependencies"] = policy_dependencies
+            extra_ev["elf_dependencies"] = {
+                "objects": elf_objects,
+                "system_sonames": sorted(system_sonames),
+                "derived_packages": derived_deps,
+                "covered_sonames": sorted(system_sonames),
+                "self_provides_count": self_provides_count,
+                "coverage": "complete",
+                "redundant_named_requires_removed": sorted(removable_targets) if is_native_desktop else [],
+                "rpm6_elf_generator_scope": "all-matching-ELF-including-mode-0644",
+            }
+            extra_ev["rpm_provides_coverage"] = {
+                "status": "covered",
+                "required_sonames": sorted(system_sonames),
+                "self_provides_count": self_provides_count,
+            }
+
+        derivation = create_derivation_record(
+            artifact_relpath=rel_artifact_path,
+            artifact_bytes=rpm_bytes,
+            tool_receipt=rpmbuild_receipt,
+            capture=capture,
+            intent=intent,
+            adapter="rpm",
+            arch=matched_arch,
+            distro=distro,
+            project_id=project_id,
+            version=version,
+            derived_dependencies=derived_deps,
+            extra_tools=extra_tools,
+            extra_evidence=extra_ev,
+            dependency_classification=dependency_classification,
+        )
+
+        manifest = {
+            "schema": "rs9.rpm-candidate.v1alpha2",
+            "status": "unsigned-candidate",
+            "qualification": "unqualified-candidate",
+            "can_publish": False,
+            "adapter": "rpm",
+            "package_class": ctx["product_class"],
+            "project": project_id,
+            "version": version,
+            "revision": revision,
+            "architecture": matched_arch,
+            "distro": distro,
+            "package_file": rel_artifact_path,
+            "package_sha256": digest(rpm_bytes),
+            "package_size": len(rpm_bytes),
+            "spec_file": spec_path.name,
+            "spec_sha256": digest(spec_path.read_bytes()),
+            "dependencies": derived_deps,
+            "dependency_classification": dependency_classification,
+            "rpm_identity": rpm_identity,
+            "rpm_payload_digest": rpm_payload_digest,
+            "rpmlint": rpmlint_evidence,
+            "rpmlint_policy": durable_policy,
+            "construction_witness": construction_witness,
+            "derivation": derivation,
         }
 
-    derivation = create_derivation_record(
-        artifact_relpath=rel_artifact_path,
-        artifact_bytes=rpm_bytes,
-        tool_receipt=rpmbuild_receipt,
-        capture=capture,
-        intent=intent,
-        adapter="rpm",
-        arch=matched_arch,
-        distro=distro,
-        project_id=project_id,
-        version=version,
-        derived_dependencies=derived_deps,
-        extra_tools=extra_tools,
-        extra_evidence=extra_ev,
-        dependency_classification=dependency_classification,
-    )
-
-    manifest = {
-        "schema": "rs9.rpm-candidate.v1alpha2",
-        "status": "unsigned-candidate",
-        "qualification": "unqualified-candidate",
-        "can_publish": False,
-        "adapter": "rpm",
-        "package_class": ctx["product_class"],
-        "project": project_id,
-        "version": version,
-        "revision": revision,
-        "architecture": matched_arch,
-        "distro": distro,
-        "package_file": rel_artifact_path,
-        "package_sha256": digest(rpm_bytes),
-        "package_size": len(rpm_bytes),
-        "dependencies": derived_deps,
-        "dependency_classification": dependency_classification,
-        "rpm_identity": rpm_identity,
-        "rpm_payload_digest": rpm_payload_digest,
-        "rpmlint": rpmlint_evidence,
-        "rpmlint_policy": policy_evidence,
-        "derivation": derivation,
-    }
-
-    (scratch / "rpm-manifest.json").write_bytes(canonical(manifest))
+        boundary_substage = "rpm-manifest-write"
+        (scratch / "rpm-manifest.json").write_bytes(canonical(manifest))
+    except (ContractError, ValueError, TypeError, OSError) as cause:
+        cause_field_path = getattr(cause, "field_path", None)
+        cause_rule = getattr(cause, "rule", None) or getattr(cause, "code", "RECORD_BOUNDARY")
+        cause_code = getattr(cause, "code", "RECORD_ERROR")
+        details = {
+            "substage": boundary_substage,
+            "product": project_id,
+            "reason_token": "record-boundary-failure",
+            "diagnostic_token": "record-boundary-failure",
+            "underlying_code": cause_code,
+            "field_path": cause_field_path or "$",
+            "rule": cause_rule,
+            "package_sha256": digest(rpm_bytes),
+            "spec_sha256": digest(spec_path.read_bytes()),
+        }
+        err = ContractError(
+            "RPM_DERIVATION_RECORD" if boundary_substage == "rpm-derivation-record" else "RPM_MANIFEST_RECORD",
+            "Candidate RPM durable record boundary failed",
+            details=details,
+        )
+        err.receipt = None
+        err.causal_receipt = None
+        err.field_path = cause_field_path
+        err.rule = cause_rule
+        err.substage = boundary_substage
+        err.rpmlint_evidence = rpmlint_evidence
+        err.rpmlint_policy = policy_evidence
+        err.package_path = str(dest_rpm)
+        err.package_sha256 = digest(rpm_bytes)
+        err.spec_path = str(spec_path)
+        err.spec_sha256 = digest(spec_path.read_bytes())
+        err.createrepo_receipt = createrepo_receipt
+        err.rpmlint_receipt = rpmlint_receipt
+        err.completed_records = ["derivation"] if boundary_substage == "rpm-manifest-write" else []
+        raise _attach_witness(err) from cause
 
     return {
         "manifest": manifest,
@@ -929,6 +1061,8 @@ def build_rpm_candidate(
             rpmlint_receipt,
             createrepo_receipt,
         ],
+        "policy_evaluation": policy_evidence,
+        "construction_witness": construction_witness,
     }
 
 

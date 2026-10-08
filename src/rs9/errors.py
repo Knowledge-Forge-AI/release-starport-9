@@ -25,6 +25,7 @@ def safe_details(details):
     allowed.update({"observed_field_count", "observed_field_tokens", "observed_fields_truncated"})
     allowed.update({"cause", "limit", "observed", "maximum", "counters", "max"})
     allowed.update({"elapsed_ms", "deadline_seconds"})
+    allowed.update({"field_path", "rule", "package_sha256", "spec_sha256"})
     result, dropped = {}, False
     if not isinstance(details, dict):
         return {}
@@ -34,6 +35,15 @@ def safe_details(details):
             continue
         if key not in allowed:
             dropped = True
+            continue
+        if key == "field_path":
+            # JSON pointer components name logical fields, never host locations.
+            if (isinstance(value, str) and len(value) <= 1024
+                    and re.fullmatch(r"(?:/[A-Za-z0-9_.~<>-]+)*|\$(?:\.[A-Za-z0-9_<>-]+|\[[0-9]+\])*", value)
+                    and not re.search(r"/(?:Users|home|root|private|tmp)/", value)):
+                result[key] = value
+            else:
+                dropped = True
             continue
         if key == "elapsed_ms":
             if type(value) is int and 0 <= value <= 86400 * 1000 * 7:

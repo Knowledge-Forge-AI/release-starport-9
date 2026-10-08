@@ -76,27 +76,76 @@ def closed(value, fields, required=None):
     return value
 
 
-def sanitized(value, depth=0):
-    if depth > 12:
-        raise ContractError("RECORD_LIMIT", "Record nesting bound exceeded")
-    if isinstance(value, str):
-        validate_sanitized_string(value)
-    elif isinstance(value, dict):
-        if len(value) > 256:
-            raise ContractError("RECORD_LIMIT", "Record field bound exceeded")
-        for key, item in value.items():
-            validate_sanitized_string(key)
-            sanitized(item, depth + 1)
-    elif isinstance(value, list):
-        if len(value) > 20000:
-            raise ContractError("RECORD_LIMIT", "Record list bound exceeded")
-        for item in value:
-            sanitized(item, depth + 1)
-    elif value is not None and type(value) not in (int, bool):
-        raise ContractError("RECORD_TYPE", "Only deterministic JSON primitives are supported")
-    if depth == 0 and len(canonical(value)) > 512 * 1024:
-        raise ContractError("RECORD_LIMIT", "Durable record exceeds byte bound")
+def _logical_key(path, key):
+    # Diagnostics never echo a rejected or ambiguous dictionary key.
+    token = key if isinstance(key, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", key) else "<key>"
+    return (path + "." + token)[:1024]
+
+
+def _annotate(error, path):
+    if not hasattr(error, "field_path"):
+        error.field_path = path
+        error.rule = error.code
+        error.details.update(field_path=path, rule=error.code)
+    return error
+
+
+def sanitized(value, depth=0, path="$"):
+    try:
+        if depth > 12:
+            raise ContractError("RECORD_LIMIT", "Record nesting bound exceeded")
+        if isinstance(value, str):
+            validate_sanitized_string(value)
+        elif isinstance(value, dict):
+            if len(value) > 256:
+                raise ContractError("RECORD_LIMIT", "Record field bound exceeded")
+            for key, item in value.items():
+                key_path = _logical_key(path, key)
+                try:
+                    validate_sanitized_string(key)
+                except ContractError as error:
+                    raise _annotate(error, path + ".<key>")
+                sanitized(item, depth + 1, key_path)
+        elif isinstance(value, list):
+            if len(value) > 20000:
+                raise ContractError("RECORD_LIMIT", "Record list bound exceeded")
+            for i, item in enumerate(value):
+                sanitized(item, depth + 1, path + "[" + str(i) + "]")
+        elif value is not None and type(value) not in (int, bool):
+            raise ContractError("RECORD_TYPE", "Only deterministic JSON primitives are supported")
+        if depth == 0 and len(canonical(value)) > 512 * 1024:
+            raise ContractError("RECORD_LIMIT", "Durable record exceeds byte bound")
+    except ContractError as error:
+        raise _annotate(error, path)
     return value
+
+
+def record_boundary_failures(value, path="$", depth=0):
+    """Bounded field/rule audit with the same acceptance rules as snapshot."""
+    failures = []
+    def walk(item, location, level):
+        if len(failures) >= 256:
+            return
+        if isinstance(item, dict) and len(item) <= 256 and level <= 12:
+            for key, child in item.items():
+                try:
+                    validate_sanitized_string(key)
+                except ContractError as error:
+                    failures.append({"field_path": location + ".<key>", "rule": error.code, "message": error.message})
+                    continue
+                walk(child, _logical_key(location, key), level + 1)
+        elif isinstance(item, list) and len(item) <= 20000 and level <= 12:
+            for i, child in enumerate(item):
+                walk(child, location + "[" + str(i) + "]", level + 1)
+        else:
+            try:
+                sanitized(item, level, location)
+            except ContractError as error:
+                failures.append({"field_path": error.field_path, "rule": error.code, "message": error.message})
+    walk(value, path, depth)
+    if depth == 0 and len(canonical(value)) > 512 * 1024:
+        failures.append({"field_path": path, "rule": "RECORD_LIMIT", "message": "Durable record exceeds byte bound"})
+    return failures
 
 
 def snapshot(value):

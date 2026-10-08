@@ -17,6 +17,7 @@ from rs9.pages_candidate import _fixture_public_armor
 from rs9.rpm_query import query_rpm_identity, query_rpm_payload_digest, query_rpm_package, IDENTITY_QUERYFORMAT, rpm_isolation_args
 from rs9.scratch import canonical
 from rs9.signing_fixture import SigningFixture
+from rs9.rpm_client_runtime import prepare_client, verify_client_image
 
 FIXTURE_ARMOR = "rs9-candidate-fixture-NONPRODUCTION.asc"
 FIXTURE_KEYRING = "rs9-candidate-fixture-NONPRODUCTION.gpg"
@@ -318,6 +319,65 @@ def write_keys(directory, fixture):
         "fingerprint": fixture.primary_fingerprint, "purpose": "NON-PRODUCTION CANDIDATE TEST ONLY"}))
 
 
+def verify_construction_witness(witness, package, product):
+    """A typed failure or an existing file alone is never a build witness."""
+    if not isinstance(witness, dict) or witness.get("schema") != "rs9.rpm-construction-witness.v1":
+        return False
+    build = witness.get("rpmbuild_receipt", {})
+    identity = witness.get("rpm_identity", {})
+    payload = witness.get("rpm_payload_digest", {})
+    if not all(isinstance(value, dict) for value in (build, identity, payload)):
+        return False
+    def hash_value(value):
+        return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+    if (build.get("executed") is not True or build.get("exit_code") != 0
+            or build.get("tool") != "rpmbuild" or identity.get("name") != product
+            or not all(isinstance(identity.get(k), str) and identity[k] for k in ("version", "release", "arch"))
+            or not isinstance(payload, dict) or payload.get("payload_digest_algo") != "sha256"
+            or not hash_value(payload.get("payload_digest"))
+            or not all(hash_value(build.get(k)) for k in ("stdout_sha256", "stderr_sha256", "command_sha256"))
+            or not hash_value(witness.get("spec_sha256"))):
+        return False
+    try:
+        path = Path(package)
+        return (not path.is_symlink() and path.is_file() and path.stat().st_size == witness.get("package_size")
+                and digest(path.read_bytes()) == witness.get("package_sha256"))
+    except (OSError, TypeError):
+        return False
+
+
+def rpm_stage_gates(required_products, constructed, completed, failures):
+    """Fold separately witnessed construction and completed durable boundaries."""
+    stages = [("rpm-package-build", "construction"), ("rpm-derivation-record", "derivation"),
+              ("rpm-manifest-record", "manifest"), ("rpm-policy-custody", "custody")]
+    causal = {"RPM_DERIVATION_RECORD": "derivation", "RPM_MANIFEST_RECORD": "manifest", "RPM_POLICY_CUSTODY": "custody"}
+    rows = []
+    for name, stage in stages:
+        passed = constructed if stage == "construction" else completed.get(stage, set())
+        direct = {p: f["code"] for p, f in failures.items() if causal.get(f["code"]) == stage}
+        status = "pass" if set(passed) == set(required_products) and len(required_products) == 4 else "fail" if stage == "construction" or direct else "not-run"
+        row = {"name": name, "status": status}
+        if status != "pass":
+            row["products"] = sorted(set(required_products) - set(passed))
+            if direct:
+                row.update(causal_substage=stage, product_codes=direct)
+        rows.append(row)
+    return rows
+
+
+def caller_diagnostic(evidence):
+    """Retain source identities separately from the full verified caller input."""
+    if not isinstance(evidence, dict):
+        return None
+    return {"schema": evidence.get("schema", "rs9.nebular-caller-sources.v1"),
+            "status": evidence.get("status"), "reason": evidence.get("reason"),
+            "tag_commit": evidence.get("tag_commit"), "tag_tree": evidence.get("tag_tree"),
+            "evidence_sha256": digest(canonical(evidence)),
+            "files": {path: {k: row[k] for k in ("path", "blob", "sha256", "size") if k in row}
+                      for path, row in evidence.get("files", {}).items()},
+            "missing_items": evidence.get("missing_items", [])}
+
+
 def execute(context):
     # Import lazily: the APT/Pages module shares these native client primitives.
     from rs9.hosted_deb import (ContainerRunner, RecordingRunner, provision_image, client_cycle,
@@ -337,17 +397,48 @@ def execute(context):
     gates = [{"name": family + "-container-environment", "status": "pass"}]
     client_tag = "rs9-" + family + "-client:" + uuid.uuid4().hex[:12]
     artifacts, identities = [], []
+    client_runtime, caller_evidence, preservation_policy = None, None, None
     try:
         provision_image(host, "pacman" if family == "pacman" else "dnf", environment["image_ref"],
                         platform, tag, [*tools, *environment["preprovisioned_packages"], *client_tools])
         # A persistent passwd identity and HOME are needed by makepkg; builders are not root.
         checked(host, ["docker", "run", "--rm", "--network", "none", tag, "true"], substage="builder-check")
+        if family == "rpm":
+            # Dependency preparation precedes all candidate builds and policy decisions.
+            # It does not install, sign or qualify any candidate product.
+            client_runtime = prepare_client(host, environment, arch=arch, system=system, tag=client_tag)
+            from rs9.rpm_client_runtime import bind_engine_floors
+            client_runtime = bind_engine_floors(client_runtime, context["captures"])
+            diagnostics = scratch / "diagnostics"
+            diagnostics.mkdir(exist_ok=True)
+            runtime_path = diagnostics / ("rpm-client-runtime-" + system + ".json")
+            runtime_path.write_bytes(canonical(client_runtime))
+            artifacts.append(runtime_path)
+            from rs9.rpm_lint_policy import load_policy
+            try:
+                preservation_policy = load_policy(repository / "operators/live1/rpm-lint-policy.json")
+            except (ContractError, OSError):
+                preservation_policy = {}  # Explicit invalid input cannot confer acceptance.
+            nebular = next((capture for capture, intent, _ in context["captures"]
+                            if intent["project"]["id"] == "theme-forge-nebular-fusion"), None)
+            if nebular is not None:
+                from rs9.nebular_callers import collect_caller_sources
+                try:
+                    caller_evidence = collect_caller_sources(nebular, context["client"], scratch / "caller-sources",
+                                                            preservation_policy.get("projects", {}).get("theme-forge-nebular-fusion", {}))
+                except (ContractError, OSError, AttributeError, TypeError) as cause:
+                    caller_evidence = {"status": "unavailable", "reason": getattr(cause, "code", "CALLER_SOURCE_UNAVAILABLE")}
+                caller_path = diagnostics / ("nebular-caller-sources-" + system + ".json")
+                caller_path.write_bytes(canonical(caller_diagnostic(caller_evidence)))
+                artifacts.append(caller_path)
         builder = RecordingRunner(ContainerRunner(host, tag, platform=platform,
                     mounts=[(str(scratch), str(scratch), True)], user=str(os.getuid()) + ":" + str(os.getgid())))
         environment["tools"] = container_tool_facts(builder, ["python3", "node", "gpg", *(["pacman", "makepkg", "repo-add"] if family == "pacman" else ["rpm", "rpmbuild", "rpmsign", "createrepo_c"])])
         unsigned = scratch / "unsigned"
         unsigned.mkdir()
         products, errors, failures, product_metadata = {}, {}, {}, {}
+        construction_witnesses = {}
+        completed_records = {"derivation": set(), "manifest": set(), "custody": set()}
         lint_evidence, lint_policy = {}, {}
         for capture, intent, _ in context["captures"]:
             pid = intent["project"]["id"]
@@ -361,30 +452,60 @@ def execute(context):
                 target = ("any" if family == "pacman" else "noarch") if is_pure_js_cli(pid) else arch
                 result = build(capture, intent, target, work,
                                offline_npm_archives=npm, runner=builder,
-                               **({"builder_system": system} if family == "rpm" else {}))
+                               **({"builder_system": system, "policy": preservation_policy,
+                                   "client_runtime": client_runtime, "caller_evidence": caller_evidence}
+                                  if family == "rpm" else {}))
                 path = result["package_path"] if family == "pacman" else result["rpm_path"]
                 dest = unsigned / path.name
                 shutil.copyfile(path, dest)
+                if family == "rpm":
+                    witness = result.get("construction_witness")
+                    if verify_construction_witness(witness, dest, pid):
+                        construction_witnesses[pid] = witness
+                    completed_records["derivation"].add(pid)
+                    completed_records["manifest"].add(pid)
                 products[pid] = dest
                 product_metadata[pid] = {"package_class": get_product_class(pid), "architecture": target,
                                          "package_file": dest.name, "sha256": digest(dest.read_bytes())}
                 if family == "rpm":
                     lint_evidence[pid] = result["manifest"].get("rpmlint", {})
-                    lint_policy[pid] = result["manifest"].get("rpmlint_policy", {})
+                    from rs9.rpm_evidence import write_policy_evidence
+                    evaluation = result.get("policy_evaluation", result["manifest"].get("rpmlint_policy", {}))
+                    lint_policy[pid] = {}
+                    if evaluation:
+                        try:
+                            lint_policy[pid], policy_paths = write_policy_evidence(scratch / "diagnostics", evaluation)
+                        except (ContractError, OSError) as cause:
+                            error = ContractError("RPM_POLICY_CUSTODY", "Candidate policy evidence retention failed",
+                                details={"substage": "rpm-policy-custody", "product": pid,
+                                         "underlying_code": cause.code if isinstance(cause, ContractError) else "PACKAGE_FILESYSTEM",
+                                         "field_path": getattr(cause, "field_path", "$"),
+                                         "rule": getattr(cause, "rule", getattr(cause, "code", "PACKAGE_FILESYSTEM"))})
+                            error.causal_receipt = None
+                            error.rpmlint_evidence, error.rpmlint_policy = lint_evidence[pid], evaluation
+                            error.package_path, error.package_sha256 = str(dest), digest(dest.read_bytes())
+                            error.spec_sha256 = lint_evidence[pid].get("spec_sha256")
+                            error.construction_witness = result.get("construction_witness")
+                            error.completed_records = ["derivation", "manifest"]
+                            raise error from cause
+                        artifacts.extend(policy_paths)
+                        completed_records["custody"].add(pid)
                     diagnostics = scratch / "diagnostics"
                     diagnostics.mkdir(exist_ok=True)
-                    for stem, evidence in (("rpmlint", lint_evidence[pid]),
-                                           ("rpm-lint-policy", lint_policy[pid])):
-                        diagnostic = diagnostics / f"{stem}-{pid}.json"
-                        diagnostic.write_bytes(canonical(evidence))
-                        artifacts.append(diagnostic)
+                    diagnostic = diagnostics / f"rpmlint-{pid}.json"
+                    diagnostic.write_bytes(canonical(lint_evidence[pid]))
+                    artifacts.append(diagnostic)
                     product_metadata[pid].update(rpm_identity=result["manifest"]["rpm_identity"],
                         rpm_payload_digest=result["manifest"]["rpm_payload_digest"])
                 artifacts += [dest, work / ("pacman-manifest.json" if family == "pacman" else "rpm-manifest.json")]
             except (ContractError, OSError) as error:
                 errors[pid] = error.code if isinstance(error, ContractError) else "PACKAGE_FILESYSTEM"
                 receipts = builder.receipts[mark:]
-                if errors[pid] == "RPM_INVENTORY_FAILED":
+                if hasattr(error, "causal_receipt"):
+                    failed = error.causal_receipt
+                elif isinstance(error, ContractError) and error.details.get("substage"):
+                    failed = getattr(error, "receipt", None)
+                elif errors[pid] == "RPM_INVENTORY_FAILED":
                     failed = getattr(error, "receipt", None)
                 elif errors[pid] == "RPMLINT_FAILED":
                     failed = (getattr(error, "receipt", None) or
@@ -401,6 +522,29 @@ def execute(context):
                 if isinstance(error, ContractError):
                     details.update(error.details)
                 failures[pid] = {"code": errors[pid], **safe_details(details)}
+                if family == "rpm":
+                    witness = getattr(error, "construction_witness", None)
+                    pkg = getattr(error, "package_path", None)
+                    secondary = failures[pid].setdefault("diagnostics", {})
+                    if witness is not None:
+                        try:
+                            quarantine = scratch / "quarantine"
+                            quarantine.mkdir(exist_ok=True)
+                            retained = quarantine / Path(pkg).name
+                            shutil.copyfile(pkg, retained)
+                            if verify_construction_witness(witness, retained, pid):
+                                construction_witnesses[pid] = witness
+                                failures[pid]["construction_witness"] = witness
+                                failures[pid]["quarantine_sha256"] = witness["package_sha256"]
+                                secondary["construction"] = "verified-retained"
+                                artifacts.append(retained)
+                            else:
+                                secondary["construction"] = "invalid-witness"
+                        except (OSError, TypeError):
+                            secondary["construction"] = "retention-failed"
+                    for stage in getattr(error, "completed_records", []):
+                        if stage in completed_records:
+                            completed_records[stage].add(pid)
                 inventory_diagnostic = getattr(error, "inventory_diagnostic", None)
                 if family == "rpm" and inventory_diagnostic is not None:
                     secondary = failures[pid].setdefault("diagnostics", {})
@@ -436,6 +580,8 @@ def execute(context):
                             quarantine.mkdir(exist_ok=True)
                             quarantined = quarantine / Path(pkg_path).name
                             shutil.copyfile(pkg_path, quarantined)
+                            if quarantined not in artifacts:
+                                artifacts.append(quarantined)
                             secondary["quarantine"] = "retained"
                             failures[pid]["quarantine_sha256"] = digest(quarantined.read_bytes())
                         else:
@@ -477,29 +623,22 @@ def execute(context):
                         policy = (getattr(error, "rpmlint_policy", None)
                                   or error.details.get("rpmlint_policy"))
                         if policy is not None:
-                            lint_policy[pid] = policy
-                            diagnostics = scratch / "diagnostics"
-                            diagnostics.mkdir(exist_ok=True)
-                            diagnostic = diagnostics / f"rpm-lint-policy-{pid}.json"
-                            diagnostic.write_bytes(canonical(policy))
-                            artifacts.append(diagnostic)
+                            from rs9.rpm_evidence import write_policy_evidence
+                            lint_policy[pid], policy_paths = write_policy_evidence(scratch / "diagnostics", policy)
+                            artifacts.extend(policy_paths)
                             secondary["policy"] = "retained"
                         else:
                             secondary["policy"] = "unavailable"
-                    except OSError:
+                    except (OSError, ContractError) as secondary_error:
                         secondary["policy"] = "failed"
+                        secondary["policy_error"] = secondary_error.code if isinstance(secondary_error, ContractError) else "PACKAGE_FILESYSTEM"
         if family == "rpm":
-            constructed_lint_failures = {
-                pid for pid, code in errors.items()
-                if code == "RPMLINT_FAILED"
-                and failures[pid]["identities"]["package_sha256"]
-            }
-            build_failures = {k: v for k, v in errors.items() if k not in constructed_lint_failures}
-            total_built = len(products) + len(constructed_lint_failures)
-            build_pass = (total_built == 4 and not build_failures)
+            required_products = [intent["project"]["id"] for _, intent, _ in context["captures"]]
+            build_failures = set(required_products) - set(construction_witnesses)
             lint_pass = (len(products) == 4 and not errors and len(lint_policy) == 4
                          and all(p.get("accepted") is True for p in lint_policy.values()))
-            gates.append({"name": "rpm-package-build", "status": "pass" if build_pass else "fail"})
+            record_gates = rpm_stage_gates(required_products, construction_witnesses, completed_records, failures)
+            gates.extend(record_gates)
             gates.append({"name": "rpm-lint-policy-accepted", "status": "pass" if lint_pass else "fail"})
         else:
             gates.append({"name": family + "-package-build", "status": "pass" if len(products) == 4 and not errors else "fail"})
@@ -514,10 +653,23 @@ def execute(context):
             except OSError:
                 for failure in failures.values():
                     failure.setdefault("diagnostics", {})["lane_record"] = "failed"
-        if family == "rpm" and (errors or not lint_pass):
+        if family == "rpm":
+            preparation_pass = client_runtime.get("status") == "pass"
+            gates.append({"name": "rpm-client-preparation", "status": "pass" if preparation_pass else "fail",
+                          "reason": client_runtime.get("reason")})
+            if preparation_pass and lint_pass:
+                try:
+                    verify_client_image(host, client_tag, client_runtime, environment=environment, arch=arch, system=system)
+                except ContractError as cause:
+                    preparation_pass = False
+                    gates[-1].update(status="fail", reason=cause.code, causal_substage="client-image-verification")
+        if family == "rpm" and (errors or not lint_pass or not preparation_pass or any(g["status"] != "pass" for g in record_gates)):
             # Retained package identities prove construction independently of lint.
             # Either failure stops custody, indexing/signing and DNF.
-            reason = "blocked-by:rpm-package-build" if build_failures else "blocked-by:rpm-lint-policy-accepted"
+            failed_record = next((g["name"] for g in record_gates if g["status"] == "fail"), None)
+            reason = ("blocked-by:" + failed_record if failed_record else
+                      "blocked-by:rpm-lint-policy-accepted" if not lint_pass else
+                      "blocked-by:rpm-client-preparation" if not preparation_pass else "blocked-by:rpm-policy-custody")
             gates.extend({"name":n,"status":"not-run","reason":reason}
                          for n in ("rpm-repository-indexing","rpm-client-qualification",
                                    "burst-native-addon-target","burst-native-addon-load"))
@@ -527,6 +679,10 @@ def execute(context):
                     "production_promotion_blockers": ["rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"]
                         if any(p.get("accepted_findings") for p in lint_policy.values()) else [],
                     "details":{"environment":environment,"build_errors":errors,"product_failures":failures,
+                               "rpm_evidence_contract": "rs9.rpm-evidence-contract.v2",
+                               "client_runtime_evidence": client_runtime,
+                               "caller_source_evidence": caller_diagnostic(caller_evidence),
+                               "construction_witnesses": construction_witnesses,
                                "lint_evidence":lint_evidence, "rpm_lint_raw":lint_evidence,
                                "rpm_lint_policy":lint_policy,
                                "diagnostic_scope":"candidate-only-build-and-lint-failures"}}
@@ -601,16 +757,23 @@ def execute(context):
             from rs9.hosted_smoke import prepare_smoke
             neb = next(c for c,i,_ in context["captures"] if i["project"]["id"] == "theme-forge-nebular-fusion")
             prepared = prepare_smoke(neb, context["captures"], context["client"], scratch / "application-smoke")
-            provision_image(host, "pacman" if family == "pacman" else "dnf", environment["image_ref"],
-                            platform, client_tag, [*environment["preprovisioned_packages"], *client_tools])
+            if family == "rpm":
+                client_image = verify_client_image(host, client_tag, client_runtime,
+                                                   environment=environment, arch=arch, system=system)
+            else:
+                provision_image(host, "pacman", environment["image_ref"], platform, client_tag,
+                                [*environment["preprovisioned_packages"], *client_tools])
+                client_image = client_tag
             spec = spec_for(dirs)
-            rows, evidence = client_cycle(host, spec, image=client_tag, platform=platform,
+            rows, evidence = client_cycle(host, spec, image=client_image, platform=platform,
                        products=list(products), repository=repository, prefix=family + "-client", smoke=prepared, system=system,
                        burst_record=_burst_release_record(context["captures"], system),
                        burst_scratch=scratch / "burst-native-probe")
             (scratch / "tamper").mkdir()
+            if family == "rpm":
+                verify_client_image(host, client_tag, client_runtime, environment=environment, arch=arch, system=system)
             rows += tamper_cycle(host, spec_for, "dnf" if family == "rpm" else "pacman", dirs,
-                    image=client_tag, platform=platform, product=list(products)[0], work=scratch / "tamper", wrong_signer=wrong, arch=arch,
+                    image=client_image, platform=platform, product=list(products)[0], work=scratch / "tamper", wrong_signer=wrong, arch=arch,
                     kinds=("package","index","signature","wrongkey"), prefix=family+"-trust",
                     positive_control=evidence.get(list(products)[0],{}).get("positive_control"))
             gates.extend(rows)
@@ -623,6 +786,27 @@ def execute(context):
                 "rpm_identities": identities, "products": product_metadata, "client": evidence, "build_errors": errors}))
             artifacts.append(manifest)
             artifacts.extend(sorted((scratch / "diagnostics").glob("rpm-signed-query-probe-*.json")))
+    except ContractError as error:
+        if family != "rpm" or error.code not in {"CLIENT_IMAGE_DRIFT", "CLIENT_IMAGE_IDENTITY"}:
+            raise
+        for gate in gates:
+            if gate["name"] == "rpm-client-preparation":
+                gate.update(status="fail", reason=error.code, causal_substage="client-image-verification")
+        present = {g["name"] for g in gates}
+        for name in ("rpm-client-qualification", "burst-native-addon-target", "burst-native-addon-load",
+                     *["rpm-trust.tamper." + kind for kind in ("package", "index", "signature", "wrongkey")]):
+            if name not in present:
+                gates.append({"name": name, "status": "not-run", "reason": "blocked-by:" + error.code})
+        diagnostic = scratch / "diagnostics/client-image-verification.json"
+        diagnostic.write_bytes(canonical({"status": "fail", "code": error.code, "system": system}))
+        artifacts.append(diagnostic)
+        return {"gates": gates, "artifacts": artifacts,
+                "production_promotion_blockers": ["rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"]
+                    if any(p.get("accepted_findings") for p in lint_policy.values()) else [],
+                "details": {"environment": environment, "rpm_evidence_contract": "rs9.rpm-evidence-contract.v2",
+                            "rpm_lint_raw": lint_evidence, "rpm_lint_policy": lint_policy,
+                            "construction_witnesses": construction_witnesses,
+                            "client_runtime_evidence": client_runtime, "client_image_verification": error.code}}
     finally:
         try:
             host.run(["docker", "rmi", "-f", tag, client_tag])
@@ -631,7 +815,10 @@ def execute(context):
     details = {"environment": environment}
     promotion = []
     if family == "rpm":
-        details.update(rpm_lint_raw=lint_evidence, rpm_lint_policy=lint_policy)
+        details.update(rpm_lint_raw=lint_evidence, rpm_lint_policy=lint_policy,
+                       rpm_evidence_contract="rs9.rpm-evidence-contract.v2",
+                       client_runtime_evidence=client_runtime, caller_source_evidence=caller_diagnostic(caller_evidence),
+                       construction_witnesses=construction_witnesses)
         if any(p.get("accepted_findings") for p in lint_policy.values()):
             promotion.append("rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified")
     if errors:

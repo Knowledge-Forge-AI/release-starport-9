@@ -1761,7 +1761,11 @@ def execute_pages(context: dict[str, Any]) -> dict[str, Any]:
                 for path in inputs.rglob("artifact-manifest.json"):
                     retained = verify_set(path.parent)
                     if retained["lane"] == "rpm":
-                        rpm_receipts.append(json.loads((path.parent / ("rpm-" + retained["system"] + ".json")).read_bytes()))
+                        receipt = json.loads((path.parent / ("rpm-" + retained["system"] + ".json")).read_bytes())
+                        rpm_receipts.append(receipt)
+                        details["rpm_lint_results"] = rpm_lint_results(rpm_receipts)
+                        from rs9.hosted_summary import validate_rpm_policy_custody
+                        validate_rpm_policy_custody(path.parent, retained, receipt)
             details["rpm_lint_results"] = rpm_lint_results(rpm_receipts)
             bundles = _gather_custody(inputs, auth, (context.get("binding") or {}).get("source_commit"))
         except (ContractError, OSError, ValueError, KeyError, TypeError, AttributeError) as err:

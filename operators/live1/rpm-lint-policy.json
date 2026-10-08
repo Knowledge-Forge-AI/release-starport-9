@@ -207,10 +207,9 @@
       "project_id": "nebular-fusion",
       "package_name": "theme-forge-nebular-fusion",
       "version": "0.6.1",
-      "status": "incomplete",
-      "blocking": true,
-      "block_reason": "Incomplete run 9 evidence: 100/154 rows retained, only 8/15 errors recorded. Unwaived errors present (5 explicit-lib-dependency, 1 no-changelogname-tag). Complete paths cannot be derived from truncated evidence.",
-      "next_native_authority": "Fresh native candidate rpmbuild and rpmlint execution with complete error recording and packaging changelog/dependency fixes.",
+      "status": "authorized",
+      "blocking": false,
+      "next_native_authority": "Fresh candidate must revalidate source, binary and complete sidecar manifest preservation; native execution remains unqualified.",
       "allowed_architectures": [
         "x86_64",
         "aarch64"
@@ -231,7 +230,265 @@
           }
         ]
       },
-      "exceptions": {}
+      "exceptions": {
+        "non-executable-script": {
+          "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs": {
+            "discriminator": "per-system-script",
+            "intent": "internal-interpreter-mediated",
+            "role": "embedded-runtime-invocation",
+            "caller_structure": {
+              "kind": "embedded-runtime-invocation",
+              "runtime_member": "/usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+              "manifest_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json"
+            },
+            "public_launcher": false,
+            "systems": {
+              "x86_64-linux": {
+                "asset_sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs",
+                "sha256": "35b7a9c9b0ca863a11819759168150bd0f7d3900bb1cade7666d0414afc6ae2d",
+                "mode": "0644",
+                "shebang": "/usr/bin/env node"
+              },
+              "aarch64-linux": {
+                "asset_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs",
+                "sha256": "35b7a9c9b0ca863a11819759168150bd0f7d3900bb1cade7666d0414afc6ae2d",
+                "mode": "0644",
+                "shebang": "/usr/bin/env node"
+              }
+            }
+          },
+          "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts": {
+            "discriminator": "per-system-script",
+            "intent": "typescript-declaration-data",
+            "role": "typescript-declaration-data",
+            "caller_structure": {
+              "kind": "typescript-declaration-data"
+            },
+            "public_launcher": false,
+            "systems": {
+              "x86_64-linux": {
+                "asset_sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts",
+                "sha256": "5c32ef46b90997fc6de2a43c40a92643d025b64f1ed7c360e1cd40997528797b",
+                "mode": "0644",
+                "shebang": "/usr/bin/env node"
+              },
+              "aarch64-linux": {
+                "asset_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts",
+                "sha256": "5c32ef46b90997fc6de2a43c40a92643d025b64f1ed7c360e1cd40997528797b",
+                "mode": "0644",
+                "shebang": "/usr/bin/env node"
+              }
+            }
+          },
+          "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js": {
+            "discriminator": "per-system-script",
+            "intent": "internal-retained-source",
+            "role": "retained-sidecar-source",
+            "caller_structure": {
+              "kind": "retained-sidecar-source",
+              "runtime_member": "/usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+              "manifest_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json"
+            },
+            "public_launcher": false,
+            "systems": {
+              "x86_64-linux": {
+                "asset_sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js",
+                "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+                "mode": "0644",
+                "shebang": "/usr/bin/env node"
+              },
+              "aarch64-linux": {
+                "asset_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js",
+                "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+                "mode": "0644",
+                "shebang": "/usr/bin/env node"
+              }
+            }
+          },
+          "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts": {
+            "discriminator": "per-system-script",
+            "intent": "typescript-declaration-data",
+            "role": "typescript-declaration-data",
+            "caller_structure": {
+              "kind": "typescript-declaration-data"
+            },
+            "public_launcher": false,
+            "systems": {
+              "x86_64-linux": {
+                "asset_sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts",
+                "sha256": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012",
+                "mode": "0644",
+                "shebang": "/usr/bin/env node"
+              },
+              "aarch64-linux": {
+                "asset_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts",
+                "sha256": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012",
+                "mode": "0644",
+                "shebang": "/usr/bin/env node"
+              }
+            }
+          },
+          "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js": {
+            "discriminator": "per-system-script",
+            "intent": "internal-interpreter-mediated",
+            "role": "embedded-runtime-invocation",
+            "caller_structure": {
+              "kind": "embedded-runtime-invocation",
+              "runtime_member": "/usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+              "manifest_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json"
+            },
+            "public_launcher": false,
+            "systems": {
+              "x86_64-linux": {
+                "asset_sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js",
+                "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+                "mode": "0644",
+                "shebang": "/usr/bin/env node"
+              },
+              "aarch64-linux": {
+                "asset_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js",
+                "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+                "mode": "0644",
+                "shebang": "/usr/bin/env node"
+              }
+            }
+          },
+          "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs": {
+            "discriminator": "per-system-script",
+            "intent": "internal-interpreter-mediated",
+            "role": "embedded-runtime-invocation",
+            "caller_structure": {
+              "kind": "embedded-runtime-invocation",
+              "runtime_member": "/usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+              "manifest_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json"
+            },
+            "public_launcher": false,
+            "systems": {
+              "x86_64-linux": {
+                "asset_sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs",
+                "sha256": "2085c3abd23821962a0d3f0e8b6d452a4e020c393bbf132e094aa153f3c8a12e",
+                "mode": "0644",
+                "shebang": "/usr/bin/env node"
+              },
+              "aarch64-linux": {
+                "asset_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs",
+                "sha256": "2085c3abd23821962a0d3f0e8b6d452a4e020c393bbf132e094aa153f3c8a12e",
+                "mode": "0644",
+                "shebang": "/usr/bin/env node"
+              }
+            }
+          }
+        },
+        "env-script-interpreter": {
+          "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js": {
+            "discriminator": "per-system-script",
+            "intent": "internal-interpreter-mediated",
+            "role": "embedded-runtime-invocation",
+            "caller_structure": {
+              "kind": "embedded-runtime-invocation",
+              "runtime_member": "/usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+              "manifest_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json"
+            },
+            "public_launcher": false,
+            "systems": {
+              "x86_64-linux": {
+                "asset_sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js",
+                "sha256": "b58052712f9426a7669fe7f719aa20c30e19fa4c4d8be6e6a9de41e5b2a081d4",
+                "mode": "0755",
+                "shebang": "/usr/bin/env node"
+              },
+              "aarch64-linux": {
+                "asset_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js",
+                "sha256": "b58052712f9426a7669fe7f719aa20c30e19fa4c4d8be6e6a9de41e5b2a081d4",
+                "mode": "0755",
+                "shebang": "/usr/bin/env node"
+              }
+            }
+          },
+          "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js": {
+            "discriminator": "per-system-script",
+            "intent": "internal-retained-source",
+            "role": "retained-loom-source",
+            "caller_structure": {
+              "kind": "retained-loom-source",
+              "runtime_member": "/usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+              "manifest_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json"
+            },
+            "public_launcher": false,
+            "systems": {
+              "x86_64-linux": {
+                "asset_sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js",
+                "sha256": "6f4196e9a8eb744308a38328d396329901ca7619d8155fb15acfba26257ab316",
+                "mode": "0755",
+                "shebang": "/usr/bin/env node"
+              },
+              "aarch64-linux": {
+                "asset_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+                "input_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js",
+                "sha256": "6f4196e9a8eb744308a38328d396329901ca7619d8155fb15acfba26257ab316",
+                "mode": "0755",
+                "shebang": "/usr/bin/env node"
+              }
+            }
+          }
+        },
+        "files-duplicated-waste": {
+          "discriminator": "exact-duplicate-set",
+          "systems": {
+            "x86_64-linux": {
+              "schema": "fixed-group-set",
+              "group_count": 128,
+              "group_set_sha256": "742d14c3bd7b9f8b2cf07b346c8d0960c924e351625fe15b7f19d2153a86a324",
+              "possible_waste_totals": [
+                3128775,
+                3129379,
+                3335535,
+                3336139
+              ],
+              "asset_sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d"
+            },
+            "aarch64-linux": {
+              "schema": "fixed-group-set",
+              "group_count": 128,
+              "group_set_sha256": "742d14c3bd7b9f8b2cf07b346c8d0960c924e351625fe15b7f19d2153a86a324",
+              "possible_waste_totals": [
+                3128775,
+                3129379,
+                3335535,
+                3336139
+              ],
+              "asset_sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f"
+            }
+          },
+          "justification": "Preserved upstream duplicate files within nebular release payload matching release capture",
+          "group_authority": "complete preserved authenticated asset inventories plus LICENSE/NOTICE projections"
+        }
+      },
+      "archive_contract_members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/package.json"
+      ],
+      "runtime_requires_contract": {
+        "member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/package.json",
+        "sha256": "aa3da0ab662e4205a357224e8deda8cabdec9ca6e504853cee1a8aaa989c48ad",
+        "pointer": "/engines/node",
+        "reason": "Retain executable Loom shebang capability; packaged native callers use embedded runtime."
+      }
     }
   }
 }
