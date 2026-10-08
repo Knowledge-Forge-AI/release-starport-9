@@ -1,5 +1,7 @@
 """Strict RPM architecture, name, version evidence, query parsing, and derivation tests."""
 from pathlib import Path
+from unittest.mock import patch
+from tests.rpm_fixtures import inventory_response, fixture_policy
 import re
 import tempfile
 import unittest
@@ -17,6 +19,220 @@ from tests.test_build_native import create_cli_fixture
 
 
 class BuildRpmTests(unittest.TestCase):
+    def test_complete_capability_readback_and_bounded_coverage_diagnostic(self):
+        from rs9.build_rpm import _capability_records, _coverage_diagnostic, RPM_CAPABILITY_MAX_BYTES
+        from rs9.hosted_custody import diagnostic_bytes
+        from rs9.scratch import canonical
+        rows = ['rpmlib(CompressedFileNames) <= 3.0.4-1'] * 2000 + [' nodejs >= 22 ']
+        raw = ('\n'.join(rows) + '\n').encode('ascii')
+        receipt = CommandReceipt(['rpm', '--requires'], 0, raw, b'')
+        self.assertGreater(len(raw), 65536)
+        self.assertEqual(len(receipt.stdout_text), 65536)
+        expected = [row.strip() for row in rows]
+        self.assertEqual(_capability_records(receipt, 'rpm-requires'), expected)
+        self.assertEqual(receipt.stdout_sha256, digest(raw))
+        report = _coverage_diagnostic(['libmissing.so.1'], ['libmissing.so.1'], expected, expected,
+                                      'theme-forge-stellar-loom')
+        self.assertEqual(report['actual_requires_count'], len(expected))
+        self.assertEqual(report['actual_requires_sha256'], digest(canonical(expected)))
+        self.assertEqual(len(report['actual_requires']), 32)
+        path = self.root / 'coverage.json'; path.write_bytes(canonical(report))
+        self.assertEqual(diagnostic_bytes(path), canonical(report))
+        for bad in (raw + b'bad\x00record\n', raw[:-1], raw + b'\xff\n', raw + b'\n',
+                    b'x' * (RPM_CAPABILITY_MAX_BYTES + 1)):
+            causal = CommandReceipt(['rpm', '--provides'], 0, bad, b'')
+            with self.subTest(size=len(bad)), self.assertRaises(ContractError) as caught:
+                _capability_records(causal, 'rpm-provides')
+            self.assertIs(caught.exception.receipt, causal)
+
+    def test_builder_uses_full_capability_stream_and_preserves_late_failure(self):
+        capture, intent, npm = create_cli_fixture(self.root / 'capability-stream')
+        runner = self._setup_runner()
+        original = runner.handlers['rpm']
+        rows = ['rpmlib(CompressedFileNames) <= 3.0.4-1'] * 2000 + ['nodejs >= 22']
+        raw = ('\n'.join(rows) + '\n').encode()
+        mode = ['valid']
+        seen = []
+        def query(argv, **kwargs):
+            if '--requires' in argv:
+                r = CommandReceipt(argv, 0, raw if mode[0] == 'valid' else raw + b'bad\xff\n', b'')
+                seen.append(r)
+                return r
+            return original(argv, **kwargs)
+        runner.handlers['rpm'] = query
+        result = build_rpm_candidate(capture, intent, 'noarch', self.scratch,
+                                     offline_npm_archives=npm, runner=runner)
+        self.assertEqual(result['derivation_record']['evidence']['rpm_query_evidence']['requires'], rows)
+        mode[0] = 'invalid'; scratch = self.root / 'capability-invalid'; scratch.mkdir()
+        with self.assertRaises(ContractError) as caught:
+            build_rpm_candidate(capture, intent, 'noarch', scratch, offline_npm_archives=npm, runner=runner)
+        self.assertEqual(caught.exception.code, 'DEPENDENCY_DERIVATION')
+        self.assertIs(caught.exception.receipt, seen[-1])
+
+    def test_late_inventory_corruption_retains_raw_lint_and_causal_query(self):
+        capture, intent, npm = create_cli_fixture(self.root / 'large-inventory',
+            extra_asset_entries=[(f'data/member-{i:04d}.txt', f'row-{i}'.encode()) for i in range(1200)])
+        runner = self._setup_runner()
+        original = runner.handlers['rpm']
+        seen = []
+        def query(argv, **kwargs):
+            receipt = original(argv, **kwargs)
+            if '--dump' in argv:
+                self.assertGreater(len(receipt.stdout_bytes), 65536)
+                receipt = CommandReceipt(argv, 0, receipt.stdout_bytes + b'corrupt trailing record\n', b'')
+                seen.append(receipt)
+            return receipt
+        runner.handlers['rpm'] = query
+        name = intent['project']['id']
+        raw_lint = (name + '.noarch: E: env-script-interpreter /usr/lib/' + name +
+                    '/bin/run.js /usr/bin/env node\n1 packages and 1 specfiles checked; 1 errors, 0 warnings, 0 filtered.\n').encode()
+        runner.handlers['rpmlint'] = lambda argv, **kw: CommandReceipt(argv,
+            0 if '--version' in argv else 64, b'2.8.0\n' if '--version' in argv else raw_lint, b'')
+        with self.assertRaises(ContractError) as caught:
+            build_rpm_candidate(capture, intent, 'noarch', self.scratch, offline_npm_archives=npm, runner=runner)
+        error = caught.exception
+        self.assertEqual(error.code, 'RPM_INVENTORY_FAILED')
+        self.assertIs(error.receipt, seen[0])
+        self.assertEqual(error.details['tool'], 'rpm')
+        self.assertEqual(error.details['stdout_sha256'], seen[0].stdout_sha256)
+        self.assertEqual(error.rpmlint_evidence['tool_receipt']['stdout_sha256'], digest(raw_lint))
+        self.assertEqual(error.rpmlint_policy['raw_exit_code'], 64)
+        self.assertFalse(error.rpmlint_policy['accepted'])
+        self.assertIsNotNone(error.inventory_diagnostic)
+
+    def test_inventory_runner_failure_keeps_original_code_and_stream_hashes(self):
+        capture, intent, npm = create_cli_fixture(self.root / 'query-execution')
+        for code in ('TOOL_TIMEOUT', 'TOOL_EXECUTION'):
+            with self.subTest(code=code):
+                runner = self._setup_runner()
+                original = runner.handlers['rpm']
+                cause = ContractError(code, 'Controlled inventory runner failure', details={
+                    'tool':'rpm', 'substage':'tool-execution',
+                    'stdout_sha256':digest(b'partial query'), 'stderr_sha256':digest(b'query stderr')})
+                def query(argv, **kwargs):
+                    if '--dump' in argv: raise cause
+                    return original(argv, **kwargs)
+                runner.handlers['rpm'] = query
+                work = self.scratch / code; work.mkdir()
+                with self.assertRaises(ContractError) as caught:
+                    build_rpm_candidate(capture, intent, 'noarch', work, offline_npm_archives=npm, runner=runner)
+                error = caught.exception
+                self.assertEqual(error.code, 'RPM_INVENTORY_FAILED')
+                self.assertEqual(error.details['underlying_code'], code)
+                self.assertEqual(error.details['reason_token'], 'query-execution-failed')
+                self.assertEqual(error.details['diagnostic_token'], 'dump')
+                self.assertEqual(error.details['tool'], 'rpm')
+                self.assertEqual(error.details['stdout_sha256'], digest(b'partial query'))
+                self.assertEqual(error.details['stderr_sha256'], digest(b'query stderr'))
+                self.assertIsNone(error.receipt)
+                self.assertIsNotNone(error.rpmlint_receipt)
+                self.assertFalse(error.rpmlint_policy['accepted'])
+                self.assertEqual(error.inventory_diagnostic['queries'][0]['status'], 'fail')
+
+    def test_invalid_attribute_path_is_attributed_to_attribute_query(self):
+        capture, intent, npm = create_cli_fixture(self.root / 'attribute-path')
+        runner = self._setup_runner()
+        original = runner.handlers['rpm']
+        seen = []
+        def query(argv, **kwargs):
+            receipt = original(argv, **kwargs)
+            if '--queryformat' in argv and '%{FILENAMES}' in argv[argv.index('--queryformat') + 1]:
+                receipt = CommandReceipt(argv, 0, receipt.stdout_bytes + b'/usr/../invalid|1|0|0\n', b'')
+                seen.append(receipt)
+            return receipt
+        runner.handlers['rpm'] = query
+        with self.assertRaises(ContractError) as caught:
+            build_rpm_candidate(capture, intent, 'noarch', self.scratch, offline_npm_archives=npm, runner=runner)
+        error = caught.exception
+        self.assertEqual(error.details['reason_token'], 'malformed-attrs-path')
+        self.assertEqual(error.details['diagnostic_token'], 'stdout')
+        self.assertEqual(error.details['underlying_code'], 'RPM_INVENTORY_FAILED')
+        self.assertEqual(error.details['stdout_sha256'], seen[0].stdout_sha256)
+        self.assertIs(error.receipt, seen[0])
+        self.assertEqual(error.inventory_diagnostic['queries'][-1]['query'], 'attrs')
+        self.assertIsNotNone(error.rpmlint_evidence)
+
+    def test_changelog_is_deterministic_authenticated_utc_and_matches_spec_evr(self):
+        from rs9.build_rpm import _format_rpm_changelog, _get_rpm_maintainer
+        identity = _get_rpm_maintainer()
+        for timestamp, expected in (("2026-09-29T23:59:59Z", "Tue Sep 29 2026"),
+                                    ("2026-09-30T00:00:00Z", "Wed Sep 30 2026")):
+            entry = _format_rpm_changelog(timestamp, "0.6.1", 1, identity)
+            self.assertIn(expected, entry)
+            self.assertIn("nonproduction@knowledge-forge.invalid", entry)
+            self.assertIn("0.6.1-1\n", entry)
+            self.assertNotIn("%{", entry)
+            self.assertEqual(entry, _format_rpm_changelog(timestamp, "0.6.1", 1, identity))
+        for value in (None, "invalidZ", "2026-09-30", "2026-09-30Z", "2026-09-30T12:00:00-04:00"):
+            with self.assertRaises(ContractError) as caught:
+                _format_rpm_changelog(value, "0.6.1", 1, identity)
+            self.assertEqual(caught.exception.code, "CHANGELOG_DATE")
+
+    def test_generated_soname_requires_and_self_provides_cover_only_exact_names(self):
+        from rs9.build_rpm import is_soname_covered, REDUNDANT_NEBULAR_REQUIRES
+        self.assertEqual(REDUNDANT_NEBULAR_REQUIRES,
+                         {"dbus-libs", "glib2", "libgcc", "libstdc++", "libsoup3"})
+        self.assertTrue(is_soname_covered("liblocal.so.1", [], ["liblocal.so.1()(64bit)"]))
+        self.assertTrue(is_soname_covered("libc.so.6", ["libc.so.6(GLIBC_2.34)(64bit)"], []))
+        self.assertFalse(is_soname_covered("liblocal.so.1", ["liblocal.so.10()(64bit)", "named-library"], []))
+
+    def test_nebular_removal_targets_match_retained_specs_and_generated_capabilities(self):
+        import json
+        from rs9.build_rpm import REDUNDANT_NEBULAR_REQUIRES, is_soname_covered
+        from rs9.dependencies import LIBRARIES
+        sonames = ("libdbus-1.so.3", "libglib-2.0.so.0", "libgobject-2.0.so.0", "libgio-2.0.so.0",
+                   "libgcc_s.so.1", "libstdc++.so.6", "libsoup-3.0.so.0")
+        self.assertEqual({LIBRARIES[s][1] for s in sonames}, REDUNDANT_NEBULAR_REQUIRES)
+        for arch in ("x86_64-linux", "aarch64-linux"):
+            path = Path(__file__).parent / "fixtures/run9/rpm" / arch / "theme-forge-nebular-fusion.spec.json"
+            spec = json.loads(path.read_bytes())["spec"]
+            requires = set(re.findall(r"^Requires: (.+)$", spec, re.M))
+            self.assertTrue(REDUNDANT_NEBULAR_REQUIRES <= requires)
+            for soname in sonames:
+                self.assertFalse(is_soname_covered(soname, list(requires), []))
+                self.assertTrue(is_soname_covered(soname, [soname + "()(64bit)"], []))
+
+    def test_raw_exit64_and_actual_preservation_policy_pass_remain_distinct_in_builder(self):
+        capture, intent, npm = create_cli_fixture(self.root / "preservation")
+        runner = self._setup_runner()
+        name = intent['project']['id']
+        def lint(argv, **kwargs):
+            if '--version' in argv:
+                return CommandReceipt(argv,0,b'2.8.0\n',b'')
+            return CommandReceipt(argv,64,(name+'.noarch: E: env-script-interpreter /usr/lib/'+name+
+                '/bin/run.js /usr/bin/env node\n1 packages and 1 specfiles checked; 1 errors, 0 warnings, 0 filtered.\n').encode(),b'',executed=True)
+        runner.handlers['rpmlint'] = lint
+        def policy():
+            result = fixture_policy(self.root)
+            result['projects'][name]['exceptions'] = {'env-script-interpreter': {
+                '/usr/lib/'+name+'/bin/run.js': {'launcher':'/usr/bin/tfsl'}}}
+            return result
+        with patch('rs9.rpm_lint_policy.load_policy',side_effect=policy):
+            result = build_rpm_candidate(capture,intent,'noarch',self.scratch,offline_npm_archives=npm,runner=runner,
+                                         builder_system='aarch64-linux')
+        self.assertEqual(result['manifest']['rpmlint']['status'],'fail')
+        self.assertEqual(result['manifest']['rpmlint']['tool_receipt']['exit_code'],64)
+        self.assertTrue(result['manifest']['rpmlint_policy']['accepted'])
+        self.assertEqual(result['manifest']['rpmlint_policy']['inputs']['system'],'aarch64-linux')
+        self.assertFalse(result['manifest']['can_publish'])
+
+    def test_inventory_or_absent_policy_failure_preserves_raw_and_stops_before_createrepo(self):
+        for cause in ('inventory','policy'):
+            capture,intent,npm=create_cli_fixture(self.root/cause)
+            scratch=self.root/(cause+'-work');scratch.mkdir()
+            runner=self._setup_runner()
+            original=runner.handlers['rpm']
+            if cause=='inventory':
+                runner.handlers['rpm']=lambda argv,**kw: CommandReceipt(argv,1,b'',b'failed') if '--dump' in argv else original(argv,**kw)
+                manager=patch('rs9.rpm_lint_policy.load_policy',side_effect=lambda:fixture_policy(self.root))
+            else:
+                manager=patch('rs9.rpm_lint_policy.load_policy',side_effect=ContractError('INVALID_POLICY','Missing policy'))
+            with manager, self.assertRaises(ContractError) as caught:
+                build_rpm_candidate(capture,intent,'noarch',scratch,offline_npm_archives=npm,runner=runner)
+            self.assertEqual(caught.exception.rpmlint_evidence['status'],'pass')
+            self.assertFalse(caught.exception.rpmlint_policy['accepted'])
+            self.assertFalse(any(c['argv'][0].startswith('createrepo') for c in runner.calls))
+
     def test_exact_query_architecture_vocabulary_and_rejection_of_banners_and_filenames(self):
         from rs9.build_native import CommandReceipt
         for arch in ("noarch", "x86_64", "aarch64"):
@@ -92,6 +308,9 @@ class BuildRpmTests(unittest.TestCase):
         self.root = Path(self.tmp.name).resolve()
         self.scratch = self.root / "scratch"
         self.scratch.mkdir()
+        policy_patch = patch("rs9.rpm_lint_policy.load_policy", side_effect=lambda: fixture_policy(self.root))
+        policy_patch.start()
+        self.addCleanup(policy_patch.stop)
 
     def _setup_runner(
         self,
@@ -111,6 +330,8 @@ class BuildRpmTests(unittest.TestCase):
             return CommandReceipt(argv, 0, b"built\n", b"")
 
         def rpm_query_handler(argv, cwd=None, env=None):
+            response = inventory_response(argv,cwd)
+            if response is not None: return response
             if "--requires" in argv:
                 return CommandReceipt(argv, 0, b"nodejs >= 22\nrpmlib(CompressedFileNames) <= 3.0.4-1\n", b"")
             if query_exit:
@@ -128,19 +349,19 @@ class BuildRpmTests(unittest.TestCase):
 
         def rpmlint_handler(argv, cwd=None, env=None):
             if "--version" in argv:
-                return CommandReceipt(argv, 0, b"rpmlint version 2.5.0\n", b"")
+                return CommandReceipt(argv, 0, b"2.8.0\n", b"", executed=True)
             if rpmlint_exit:
                 return CommandReceipt(
                     argv,
                     rpmlint_exit,
                     f"{name}.{arch}: E: explicit-lib-dependency nodejs\n1 packages and 1 specfiles checked; 1 errors, 0 warnings, 0 filtered.\n".encode(),
-                    b"error\n",
+                    b"error\n", executed=True,
                 )
             return CommandReceipt(
                 argv,
                 0,
                 b"1 packages and 1 specfiles checked; 0 errors, 0 warnings, 0 filtered.\n",
-                b"",
+                b"", executed=True,
             )
 
         def createrepo_handler(argv, cwd=None, env=None):

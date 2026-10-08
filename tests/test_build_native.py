@@ -37,6 +37,7 @@ from rs9.errors import ContractError, safe_details
 from rs9.profiles import selection_for_intent
 from rs9.release_core import authenticate_release, digest
 from rs9.scratch import canonical
+from tests.rpm_fixtures import inventory_response, fixture_policy
 from tests.publication_fixtures import authorize_fixture_configuration
 from tests.shadow_fixtures import fixture_evidence, tar_bytes
 
@@ -105,6 +106,7 @@ def create_cli_fixture(
         "version": version,
         "license": "AGPL-3.0-or-later",
         "bin": commands,
+        "engines": {"node": ">=22"},
         "dependencies": {"min-dep": "1.0.0"},
     }
     lock_source = {
@@ -136,6 +138,8 @@ def create_cli_fixture(
     asset_name = f"{product}-{version}.tgz"
     asset_entries = [
         ("package/package.json", raw_pkg, 0o644, tarfile.REGTYPE, ""),
+        ("package/LICENSE", b"AGPL License\n", 0o644, tarfile.REGTYPE, ""),
+        ("package/NOTICE", b"Theme Forge Notice\n", 0o644, tarfile.REGTYPE, ""),
         ("package/package-lock.json", raw_lock, 0o644, tarfile.REGTYPE, ""),
         *[("package/" + path, b"#!/usr/bin/env node\n", 0o755, tarfile.REGTYPE, "") for path in commands.values()],
     ]
@@ -162,7 +166,7 @@ def create_cli_fixture(
         {"id": i + 1, "name": name, "size": len(b), "digest": "sha256:" + digest(b), "state": "uploaded"}
         for i, (name, b) in enumerate(sorted(all_files.items()))
     ]
-    (root / "api/release.json").write_bytes(canonical({"id": 101, "tag_name": tag, "target_commitish": "a" * 40, "draft": False, "prerelease": False, "assets": rel_assets}))
+    (root / "api/release.json").write_bytes(canonical({"id": 101, "published_at": "2026-09-30T12:00:00Z", "tag_name": tag, "target_commitish": "a" * 40, "draft": False, "prerelease": False, "assets": rel_assets}))
 
     intent = {
         "project": {"repository": repo, "id": product, "summary": "Synthetic CLI project candidate"},
@@ -194,6 +198,10 @@ class BuildNativeCommonTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name).resolve()
+
+        policy_patch = patch("rs9.rpm_lint_policy.load_policy", side_effect=lambda: fixture_policy(self.root))
+        policy_patch.start()
+        self.addCleanup(policy_patch.stop)
 
     def test_scratch_validation_rejects_non_empty_and_symlinks(self):
         scratch = self.root / "scratch"
@@ -376,6 +384,8 @@ class BuildNativeCommonTests(unittest.TestCase):
             return CommandReceipt(argv, 0, b"rpmbuild ok\n", b"")
 
         def rpm_handler(argv, cwd=None, env=None):
+            response = inventory_response(argv,cwd)
+            if response is not None: return response
             if "--requires" in argv:
                 return CommandReceipt(argv, 0, b"nodejs >= 22\n", b"")
             if "--querytags" in argv:
@@ -394,7 +404,8 @@ class BuildNativeCommonTests(unittest.TestCase):
             return CommandReceipt(argv, 0, b"createrepo ok\n", b"")
 
         def rpmlint_handler(argv, cwd=None, env=None):
-            return CommandReceipt(argv, 0, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings.\n", b"")
+            if "--version" in argv: return CommandReceipt(argv,0,b"2.8.0\n",b"", executed=True)
+            return CommandReceipt(argv, 0, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings.\n", b"", executed=True)
 
         runner = MockCommandRunner(
             available_tools={
@@ -527,6 +538,9 @@ class BuildNativeCommonTests(unittest.TestCase):
             return CommandReceipt(argv, 0, b"rpmbuild success\n", b"")
 
         def rpm_query_handler(argv, cwd=None, env=None):
+            if "--requires" in argv: return CommandReceipt(argv,0,b"nodejs >= 22\n",b"")
+            response = inventory_response(argv,cwd)
+            if response is not None: return response
             if "--querytags" in argv:
                 return CommandReceipt(argv, 0, b"PAYLOADSHA256\nPAYLOADSHA256ALGO\n", b"")
             if "--eval" in argv:
@@ -538,7 +552,8 @@ class BuildNativeCommonTests(unittest.TestCase):
             return CommandReceipt(argv, 0, out, b"")
 
         def rpmlint_handler(argv, cwd=None, env=None):
-            return CommandReceipt(argv, 0, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings.\n", b"")
+            if "--version" in argv: return CommandReceipt(argv,0,b"2.8.0\n",b"", executed=True)
+            return CommandReceipt(argv, 0, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings.\n", b"", executed=True)
 
         def createrepo_handler(argv, cwd=None, env=None):
             self.assertIn("--no-database", argv)
@@ -578,7 +593,7 @@ class BuildNativeCommonTests(unittest.TestCase):
         self.assertEqual(manifest["rpm_identity"]["name"], "theme-forge-stellar-loom")
         self.assertEqual(manifest["rpm_payload_digest"]["payload_digest_algo"], "sha256")
         self.assertEqual(manifest["rpm_payload_digest"]["payload_digest"], "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")
-        self.assertEqual(len(derivation["tool_receipts"]), 7)
+        self.assertEqual(len(derivation["tool_receipts"]), 12)
         self.assertFalse(derivation["can_publish"])
         self.assertEqual(derivation["dependency_classification"], "reviewed-policy")
         self.assertEqual(derivation["evidence"]["native_preservation"]["strip"], False)
@@ -801,9 +816,20 @@ class BuildNativeCommonTests(unittest.TestCase):
         self.assertIn("libc.so.6", derivation["evidence"]["dt_needed_evidence"]["system_sonames"])
 
     def test_rpm_builder_native_nebular_elf_and_rpm_query(self):
+        from tests.elf_builder import build_elf
+        from rs9.build_rpm import REDUNDANT_NEBULAR_REQUIRES
+        removed_sonames = ['libdbus-1.so.3', 'libglib-2.0.so.0', 'libgobject-2.0.so.0',
+                           'libgio-2.0.so.0', 'libgcc_s.so.1', 'libstdc++.so.6', 'libsoup-3.0.so.0']
+        missing_soname = [None]
         neb_dir = self.root / "neb_rpm"
         neb_dir.mkdir()
-        intent = fixture_evidence(neb_dir)
+        intent = fixture_evidence(neb_dir, extra_linux=[
+            ('theme-forge-nebular-fusion/lib/dependency-fixture.so',
+             build_elf(machine='x86_64', needed=removed_sonames), 0o644, tarfile.REGTYPE, '')])
+        release_path = neb_dir/'api/release.json'
+        release_doc = json.loads(release_path.read_bytes())
+        release_doc['published_at'] = '2026-09-30T12:00:00Z'
+        release_path.write_bytes(canonical(release_doc))
         capture = authenticate_release(selection_for_intent(intent), neb_dir)
         authorize_fixture_configuration(neb_dir, intent, capture)
 
@@ -815,6 +841,9 @@ class BuildNativeCommonTests(unittest.TestCase):
             spec_content = spec_file.read_text("utf-8")
             self.assertIn("ExclusiveArch: x86_64", spec_content)
             self.assertIn("Requires: glibc", spec_content)
+            self.assertIn("Requires: bash", spec_content)
+            for package in REDUNDANT_NEBULAR_REQUIRES:
+                self.assertNotIn('Requires: '+package+'\n', spec_content)
 
             rpm_dir = Path(cwd) / "RPMS" / "x86_64"
             rpm_dir.mkdir(parents=True, exist_ok=True)
@@ -822,8 +851,12 @@ class BuildNativeCommonTests(unittest.TestCase):
             return CommandReceipt(argv, 0, b"rpmbuild success\n", b"")
 
         def rpm_handler(argv, cwd=None, env=None):
+            response = inventory_response(argv,cwd)
+            if response is not None: return response
             if "--requires" in argv:
-                out = b"libc.so.6()(64bit)\nrtld(GNU_HASH)\n"
+                sonames = ['libc.so.6', *removed_sonames]
+                out = ('\n'.join(s+'()(64bit)' for s in sonames if s!=missing_soname[0])+
+                       '\nrtld(GNU_HASH)\n').encode()
                 return CommandReceipt(argv, 0, out, b"")
             if "--querytags" in argv:
                 return CommandReceipt(argv, 0, b"PAYLOADSHA256\nPAYLOADSHA256ALGO\n", b"")
@@ -836,8 +869,9 @@ class BuildNativeCommonTests(unittest.TestCase):
             return CommandReceipt(argv, 0, out, b"")
 
         def rpmlint_handler(argv, cwd=None, env=None):
+            if "--version" in argv: return CommandReceipt(argv,0,b"2.8.0\n",b"", executed=True)
             # Synthetic complete rpmlint summary; native execution remains separate.
-            return CommandReceipt(argv, 0, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings, 0 filtered, 0 badness; has taken 0.1 s\n", b"")
+            return CommandReceipt(argv, 0, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings, 0 filtered, 0 badness; has taken 0.1 s\n", b"", executed=True)
 
         def createrepo_handler(argv, cwd=None, env=None):
             repodata = Path(argv[-1]) / "repodata"
@@ -873,9 +907,18 @@ class BuildNativeCommonTests(unittest.TestCase):
         self.assertEqual(manifest["dependency_classification"], "native-tool-derived")
         self.assertIn("libc.so.6()(64bit)", manifest["dependencies"])
         self.assertIn("glibc", derivation["evidence"]["policy_dependencies"])
-        self.assertEqual(len(derivation["tool_receipts"]), 8)
+        self.assertEqual(len(derivation["tool_receipts"]), 12)
         self.assertIn("rpm_query_evidence", derivation["evidence"])
         self.assertIn("libc.so.6()(64bit)", derivation["evidence"]["rpm_query_evidence"]["requires"])
+        for soname in removed_sonames:
+            missing_soname[0] = soname
+            other = self.root / ('missing-' + soname); other.mkdir()
+            before = len(runner.calls)
+            with self.assertRaises(ContractError) as caught:
+                build_rpm_candidate(capture, intent, 'x86_64', other, runner=runner)
+            self.assertEqual(caught.exception.code, 'DEPENDENCY_DERIVATION')
+            self.assertEqual(caught.exception.dependency_coverage['missing_dependencies'], [soname])
+            self.assertFalse(any(c['argv'][0] in ('rpmlint','createrepo_c') for c in runner.calls[before:]))
 
     def test_pacman_root_execution_refused(self):
         capture, intent, offline_npm = create_cli_fixture(self.root / "root_test")

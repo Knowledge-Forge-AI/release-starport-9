@@ -14,11 +14,15 @@ import re
 from typing import Any, Mapping, Sequence
 
 from rs9.build_native import CommandReceipt
+from rs9.errors import ContractError
+
+from rs9.machine_stream import machine_text
 
 
 REASON_CATEGORIES = (
     "COMMAND_SUCCESS",
     "SIGNATURE_REJECTED",
+    "SIGNED_ENVELOPE_INVALID",
     "KEY_MISMATCH",
     "INDEX_HASH_MISMATCH",
     "PACKAGE_HASH_MISMATCH",
@@ -49,6 +53,7 @@ QUALIFYING_TAMPER_CATEGORIES: dict[str, set[str]] = {
     },
     "signature": {
         "SIGNATURE_REJECTED",
+        "SIGNED_ENVELOPE_INVALID",
     },
     "wrongkey": {"KEY_MISMATCH"},
 }
@@ -112,6 +117,8 @@ def classify_rejection(
     *,
     stage: str | None = None,
     family: str = "apt",
+    source_uri: str | None = None,
+    distribution: str | None = None,
 ) -> str:
     """Classify command outcome into a bounded reason category."""
     if receipt is None:
@@ -138,11 +145,20 @@ def classify_rejection(
     # A transport or missing-package failure cannot qualify a trust negative,
     # even when the stream also contains a generic signature message.
     if any(s in combined for s in ("network is unreachable", "could not connect",
-                                   "cannot assign requested address", "could not resolve host")):
+                                   "cannot assign requested address", "could not resolve host",
+                                   "temporary failure resolving", "name or service not known",
+                                   "connection refused", "connection timed out", "network down",
+                                   "<html", "<!doctype", "captive portal", "302 found", "403 forbidden",
+                                   "401 unauthorized", "500 internal server error", "http/1.")):
         return "NETWORK_UNAVAILABLE"
     if any(s in combined for s in ("unable to locate package", "no installation candidate",
                                    "target not found:", "no match for argument:")):
         return "PACKAGE_NOT_FOUND"
+
+    # Narrow causal invalid-envelope acceptance: resolute InRelease invalid envelope at apt refresh exit 100
+    if _is_signed_envelope_invalid(receipt, stage=stage, family=family,
+                                   source_uri=source_uri, distribution=distribution):
+        return "SIGNED_ENVELOPE_INVALID"
 
     # Family-specific wording must precede generic corruption fallbacks. These
     # are diagnostic categories; the positive control and failing stage still
@@ -191,6 +207,84 @@ def classify_rejection(
     return "UNCLASSIFIED_FAILURE"
 
 
+def _is_signed_envelope_invalid(
+    receipt: CommandReceipt,
+    *,
+    stage: str | None = None,
+    family: str = "apt",
+    source_uri: str | None = None,
+    distribution: str | None = None,
+) -> bool:
+    """Repair only exact local file: resolute InRelease invalid envelope at apt refresh exit 100."""
+    if (family != "apt" or stage != "refresh" or receipt.exit_code != 100
+            or source_uri != "file:/srv/rs9/apt" or distribution != "resolute"):
+        return False
+
+    if len(receipt.stdout_bytes) + len(receipt.stderr_bytes) > 1024 * 1024:
+        return False
+
+    if receipt.stdout_bytes and not receipt.stdout_bytes.endswith(b"\n"):
+        return False
+    if receipt.stderr_bytes and not receipt.stderr_bytes.endswith(b"\n"):
+        return False
+
+    try:
+        stdout_text = machine_text(
+            receipt,
+            stream="stdout",
+            limit=1024 * 1024,
+            code="STREAM_LIMIT_EXCEEDED",
+            substage="refresh-stream",
+            encoding="utf-8",
+        )
+        stderr_text = machine_text(
+            receipt,
+            stream="stderr",
+            limit=1024 * 1024,
+            code="STREAM_LIMIT_EXCEEDED",
+            substage="refresh-stream",
+            encoding="utf-8",
+        )
+    except (ContractError, UnicodeDecodeError):
+        return False
+
+    stream_text = stderr_text + stdout_text
+    combined = stream_text.lower()
+
+    # Reject HTTP / HTTPS / captive portal HTML content
+    if any(h in combined for h in ("http://", "https://", "<html", "<!doctype", "captive portal", "login required", "302 found", "403 forbidden", "401 unauthorized", "http/1.")):
+        return False
+
+    # Explicit local file source and resolute InRelease distribution context required
+    if "resolute" not in combined or "inrelease" not in combined:
+        return False
+    if not re.search(r"file:(?:/|\[path\])", combined):
+        return False
+
+    lines = [line.strip() for line in stream_text.splitlines() if line.strip()]
+    if not lines:
+        return False
+
+    expected = (f"e: openpgp signature verification failed: {source_uri} {distribution} "
+                "inrelease: signed file isn't valid, got 'nodata'")
+    suffix = " (does the network require authentication?)"
+    location = re.escape(source_uri + " " + distribution + " InRelease")
+    progress = re.compile(r"(?:Get|Hit|Ign|Err):[0-9]+ " + location + r"(?: \[[0-9,]+ B\])?", re.I)
+    continuation = re.compile(r"signed file isn't valid, got 'nodata'(?: \(does the network require authentication\?\))?(?: \[[0-9,]+ B\])?", re.I)
+    has_qualifying = False
+    for line in lines:
+        if line.lower() in {expected, expected + suffix}:
+            has_qualifying = True
+        elif (progress.fullmatch(line)
+              or line.lower() in {"reading package lists...", "reading package lists... done"}
+              or continuation.fullmatch(line)):
+            continue
+        else:
+            return False
+
+    return has_qualifying
+
+
 def record_command_diagnostics(
     *,
     stage: str,
@@ -201,10 +295,12 @@ def record_command_diagnostics(
     repo_identity: str | None = None,
     public_fingerprint: str | None = None,
     verification: Mapping[str, Any] | None = None,
-    extra: Mapping[str, Any] | None = None,
+    source_uri: str | None = None,
+    distribution: str | None = None,
 ) -> dict[str, Any]:
     """Bounded, sanitized diagnostics recording command execution evidence."""
-    category = classify_rejection(receipt, stage=stage, family=family)
+    category = classify_rejection(receipt, stage=stage, family=family,
+                                  source_uri=source_uri, distribution=distribution)
     out: dict[str, Any] = {
         "stage": stage,
         "family": family,
@@ -219,6 +315,34 @@ def record_command_diagnostics(
         out["stdout_bytes"] = len(receipt.stdout_bytes)
         out["stderr_bytes"] = len(receipt.stderr_bytes)
         out["safe_sample"] = safe_sample(receipt.stderr_text or receipt.stdout_text)
+        stream_shapes = {}
+        for name, raw_bytes in (("stdout", receipt.stdout_bytes), ("stderr", receipt.stderr_bytes)):
+            raw_len = len(raw_bytes)
+            is_strict_utf8 = True
+            try:
+                decoded = raw_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                is_strict_utf8 = False
+                decoded = getattr(receipt, f"{name}_text", "")
+
+            raw_lines = decoded.splitlines()
+            line_count = len(raw_lines)
+            preview_lines = [safe_sample(line, 512) for line in raw_lines[:64]]
+
+            complete = (
+                raw_len <= 65536
+                and is_strict_utf8
+                and line_count <= 64
+                and all(len(line) <= 512 for line in raw_lines)
+                and all(all(c in "\n\r\t" or 32 <= ord(c) < 127 for c in line) for line in raw_lines)
+                and not any(p in {"non-printable-stream-withheld", "credential-stream-withheld"} for p in preview_lines)
+            )
+            stream_shapes[name] = {
+                "lines": preview_lines,
+                "line_count": line_count,
+                "complete": complete,
+            }
+        out["stream_shapes"] = stream_shapes
     else:
         out["exit_code"] = None
         out["stdout_sha256"] = None
@@ -226,6 +350,11 @@ def record_command_diagnostics(
         out["stdout_bytes"] = 0
         out["stderr_bytes"] = 0
         out["safe_sample"] = ""
+
+    if category == "SIGNED_ENVELOPE_INVALID":
+        out["distribution"] = "resolute"
+        out["source_context"] = "file"
+        out["target_envelope"] = "InRelease"
 
     if repo_identity:
         out["repo_identity"] = str(repo_identity)[:256]
@@ -410,6 +539,9 @@ def qualify_tamper_rejection(
     install_rcpt: CommandReceipt | None,
     query_rcpt: CommandReceipt | None,
     family: str = "apt",
+    *,
+    configure_rcpt: CommandReceipt | None = None,
+    signature_context: Mapping[str, Any] | None = None,
 ) -> tuple[bool, str, str | None, dict[str, Any]]:
     """Causally qualify rejection for the tamper kind; wrong reasons cannot pass."""
     # 1. Did installation succeed? If installed, rejection failed.
@@ -421,6 +553,13 @@ def qualify_tamper_rejection(
 
     if installed:
         return False, "COMMAND_SUCCESS", "tampered-content-accepted", {}
+
+    if configure_rcpt is not None and configure_rcpt.exit_code != 0:
+        category = classify_rejection(configure_rcpt, stage="configure", family=family)
+        sample = safe_sample((configure_rcpt.stderr_text if configure_rcpt else "") or (configure_rcpt.stdout_text if configure_rcpt else ""))
+        return False, category, f"wrong-stage-failure:configure-failed-during-tamper:{category}", {
+            "failed_stage": "configure", "sample": sample, "exit_code": configure_rcpt.exit_code,
+        }
 
     allowed = set(QUALIFYING_TAMPER_CATEGORIES.get(kind, set()))
     if kind == "package" and family in {"pacman", "dnf"}:
@@ -444,10 +583,33 @@ def qualify_tamper_rejection(
     if kind in ("signature", "wrongkey"):
         if refresh_rcpt is not None and refresh_rcpt.exit_code == 0:
             return False, "COMMAND_SUCCESS", f"bypassed-{kind}-verification-on-refresh", {}
-        category = classify_rejection(refresh_rcpt, stage="refresh", family=family)
+        context = signature_context or {}
+        category = classify_rejection(refresh_rcpt, stage="refresh", family=family,
+                                      source_uri=context.get("source_uri"),
+                                      distribution=context.get("distribution"))
         sample = safe_sample((refresh_rcpt.stderr_text if refresh_rcpt else "") or (refresh_rcpt.stdout_text if refresh_rcpt else ""))
         if category in allowed:
-            return True, category, None, {"qualifying_stage": "refresh", "sample": sample}
+            qual_diag: dict[str, Any] = {"qualifying_stage": "refresh", "sample": sample}
+            if category == "SIGNED_ENVELOPE_INVALID":
+                if (kind != "signature" or context.get("mutation_verified") is not True
+                        or context.get("network_disconnected") is not True
+                        or context.get("positive_control_valid") is not True
+                        or any(r is None or r.executed is not True
+                               for r in (configure_rcpt, refresh_rcpt, install_rcpt, query_rcpt))
+                        or configure_rcpt.exit_code != 0
+                        or install_rcpt.exit_code != 100 or query_rcpt.exit_code != 1):
+                    return False, category, "invalid-envelope-proof-incomplete", qual_diag
+                environment_categories = {"PERMISSION_DENIED", "COMMAND_NOT_FOUND", "NETWORK_UNAVAILABLE",
+                                          "SOURCE_CONFIG_ERROR", "SANDBOX_UNREADABLE"}
+                if any(classify_rejection(r, stage=stage, family=family) in environment_categories
+                       for r, stage in ((install_rcpt, "install"), (query_rcpt, "query"))):
+                    return False, category, "invalid-envelope-downstream-environment-failure", qual_diag
+                qual_diag.update({
+                    "distribution": "resolute",
+                    "source_context": "file",
+                    "target_envelope": "InRelease",
+                })
+            return True, category, None, qual_diag
         return False, category, f"wrong-tamper-rejection-reason:{category}", {"qualifying_stage": "refresh", "sample": sample}
 
     # For kind == "index", either refresh or install can reject with index corruption/hash mismatch.

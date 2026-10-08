@@ -10,6 +10,7 @@ from rs9.product_classes import get_product_class, supported_architectures, extr
 from rs9.scratch import canonical
 
 LINUX_WHEEL_PROMOTION_BLOCKER = "linux-wheel-production-promotion-compatibility-unproven"
+RPM_POLICY_PROMOTION_BLOCKER = "rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"
 
 
 def validate_product_architectures(lane, files):
@@ -43,7 +44,47 @@ def promotion_blockers(lane, receipt):
     if (lane["lane"] == "wheels" and lane["system"].endswith("linux")
             and LINUX_WHEEL_PROMOTION_BLOCKER not in values):
         raise ContractError("HOSTED_POLICY", "Linux candidate wheels must retain the production compatibility blocker")
+    if lane["lane"] == "rpm":
+        policies = receipt.get("details", {}).get("rpm_lint_policy", {})
+        if (any(p.get("accepted_findings") for p in policies.values())
+                and RPM_POLICY_PROMOTION_BLOCKER not in values):
+            raise ContractError("HOSTED_POLICY", "RPM preservation exceptions must retain promotion limits")
     return values
+
+
+def rpm_lint_results(receipts):
+    """Display raw failure independently of current candidate policy acceptance."""
+    results = []
+    for receipt in receipts:
+        if receipt.get("lane") != "rpm":
+            continue
+        details = receipt.get("details", {})
+        raw = details.get("rpm_lint_raw", {})
+        policy = details.get("rpm_lint_policy", {})
+        for product in sorted(set(raw) | set(policy)):
+            evidence = raw.get(product, {})
+            results.append({"system": receipt["system"], "product": product,
+                            "raw_status": evidence.get("status", "unavailable"),
+                            "raw_clean": evidence.get("clean"),
+                            "raw_exit_code": evidence.get("tool_receipt", {}).get("exit_code"),
+                            "raw_counts": evidence.get("findings_summary", {}),
+                            "policy": policy.get(product, {"accepted": False, "status": "unavailable"})})
+    return results
+
+
+def validate_rpm_policy_source(repository, receipt):
+    """Bind retained policy evaluations to the source file in builder provenance."""
+    if receipt.get('lane') != 'rpm':
+        return
+    policies = receipt.get('details', {}).get('rpm_lint_policy', {})
+    if not isinstance(policies, dict):
+        raise ContractError('HOSTED_POLICY', 'Malformed RPM policy evaluations')
+    if not policies:
+        return  # Historical/absent results remain subject to required-gate checks.
+    from rs9.rpm_lint_policy import load_policy
+    expected = hashlib.sha256(canonical(load_policy(repository / 'operators/live1/rpm-lint-policy.json'))).hexdigest()
+    if any(not isinstance(p, dict) or p.get('policy_sha256') != expected for p in policies.values()):
+        raise ContractError('HOSTED_POLICY', 'RPM policy evaluation differs from reviewed source')
 
 
 def contract(repository):
@@ -104,6 +145,7 @@ def summarize(repository, inputs, output):
             if receipt.get("execution_error"):
                 reasons.append(lane["artifact_name"] + ":execution-failed")
             reasons.extend(receipt.get("policy_blockers", []))
+            validate_rpm_policy_source(repository, receipt)
             promotion.extend(promotion_blockers(lane, receipt))
         except (ContractError, OSError, ValueError, KeyError) as error:
             reasons.append(lane["artifact_name"] + ":" + (error.code if isinstance(error, ContractError) else "missing-or-invalid-artifact"))
@@ -137,6 +179,7 @@ def summarize(repository, inputs, output):
               "destination_planner_noops": planner_noops,
               "destination_satisfied": satisfied_observations,
               "destination_exact": exact_observations}
+    record["rpm_lint_results"] = rpm_lint_results(receipts)
     record["job_conclusions"] = {key: row.get("result") for key, row in jobs.items()}
     raw = canonical(record)
     if len(raw) > 16 * 1024 ** 2:
@@ -181,6 +224,7 @@ def validate_summary(summary, repository, commit):
             raise ContractError("HOSTED_GATES", "Missing gate or mixed receipt provenance")
         if row.get("execution_error") or row.get("policy_blockers") or row.get("production_enabled") is not False:
             raise ContractError("HOSTED_GATES", "Receipt has unresolved failures or publication authority")
+        validate_rpm_policy_source(repository, row)
         promotion_blockers(lane, row)
         manifest = next(m for m in manifests if (m["lane"],m["system"]) == (row["lane"],row["system"]))
         validate_product_architectures(lane, manifest.get("files", []))

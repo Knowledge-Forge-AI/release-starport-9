@@ -31,6 +31,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import stat
 import time
 from pathlib import Path
 import re
@@ -993,6 +994,119 @@ def _product_files(directory: Path, pattern: str, product: str) -> list[Path]:
     return found
 
 
+def verify_signature_tamper_mutation(
+    original_tree: Path,
+    tampered_tree: Path,
+    *,
+    distribution: str = "resolute",
+) -> dict[str, Any]:
+    """Verify exact signature tamper mutation:
+    - Same length and exactly one changed armored signature byte in InRelease and Release.gpg.
+    - Otherwise, repository trees are identical in relative paths, file types, modes, and contents.
+    """
+    orig_base = physical_directory(original_tree)
+    tamp_base = physical_directory(tampered_tree)
+
+    orig_entries = {p.relative_to(orig_base): p for p in orig_base.rglob("*")}
+    tamp_entries = {p.relative_to(tamp_base): p for p in tamp_base.rglob("*")}
+
+    if set(orig_entries.keys()) != set(tamp_entries.keys()):
+        missing = [p.as_posix() for p in (set(orig_entries.keys()) - set(tamp_entries.keys()))]
+        extra = [p.as_posix() for p in (set(tamp_entries.keys()) - set(orig_entries.keys()))]
+        reason = f"extra-files:{extra[0]}" if extra else f"missing-files:{missing[0]}" if missing else "path-mismatch"
+        raise ContractError(
+            "INVALID_TAMPER_MUTATION",
+            f"Tampered tree path structure differs from original: {reason}",
+            details={
+                "substage": "verify-signature-mutation",
+                "reason": reason,
+            },
+        )
+
+    expected_sig_files = {
+        Path(f"dists/{distribution}/InRelease"),
+        Path(f"dists/{distribution}/Release.gpg"),
+    }
+
+    for sig_file in expected_sig_files:
+        if sig_file not in orig_entries:
+            raise ContractError(
+                "INVALID_TAMPER_MUTATION",
+                f"Missing expected signature file in repository: {sig_file.as_posix()}",
+                details={"path": sig_file.as_posix()},
+            )
+
+    mutations = []
+    for rel_path, orig_p in sorted(orig_entries.items()):
+        tamp_p = tamp_entries[rel_path]
+        st_orig = orig_p.lstat()
+        st_tamp = tamp_p.lstat()
+
+        if stat.S_IFMT(st_orig.st_mode) != stat.S_IFMT(st_tamp.st_mode):
+            raise ContractError(
+                "INVALID_TAMPER_MUTATION",
+                f"File type mismatch for {rel_path.as_posix()}",
+                details={"path": rel_path.as_posix()},
+            )
+        if stat.S_IMODE(st_orig.st_mode) != stat.S_IMODE(st_tamp.st_mode):
+            raise ContractError(
+                "INVALID_TAMPER_MUTATION",
+                f"File mode mismatch for {rel_path.as_posix()}",
+                details={"path": rel_path.as_posix(), "orig_mode": oct(st_orig.st_mode), "tamp_mode": oct(st_tamp.st_mode)},
+            )
+
+        if stat.S_ISDIR(st_orig.st_mode):
+            continue
+        if not stat.S_ISREG(st_orig.st_mode):
+            raise ContractError("INVALID_TAMPER_MUTATION", "Nonregular repository member")
+
+        orig_bytes = orig_p.read_bytes()
+        tamp_bytes = tamp_p.read_bytes()
+
+        if rel_path in expected_sig_files:
+            if len(orig_bytes) != len(tamp_bytes):
+                raise ContractError(
+                    "INVALID_TAMPER_MUTATION",
+                    f"Signature tamper length mismatch for {rel_path.as_posix()}: {len(tamp_bytes)} vs {len(orig_bytes)}",
+                    details={"path": rel_path.as_posix(), "orig_len": len(orig_bytes), "tamp_len": len(tamp_bytes)},
+                )
+            diff_indices = [i for i, (b1, b2) in enumerate(zip(orig_bytes, tamp_bytes)) if b1 != b2]
+            if len(diff_indices) != 1:
+                raise ContractError(
+                    "INVALID_TAMPER_MUTATION",
+                    f"Expected exactly 1 changed byte in {rel_path.as_posix()}, found {len(diff_indices)}",
+                    details={"path": rel_path.as_posix(), "diff_count": len(diff_indices)},
+                )
+            diff_idx = diff_indices[0]
+            lines = orig_bytes.split(b"\n")
+            ends = [i for i, line in enumerate(lines) if line == b"-----END PGP SIGNATURE-----"]
+            if len(ends) != 1:
+                raise ContractError("INVALID_TAMPER_MUTATION", "Ambiguous signature armor")
+            target = next((i for i in range(ends[0] - 1, -1, -1)
+                           if lines[i] and not lines[i].startswith((b"=", b"-"))
+                           and len(lines[i]) > 6), None)
+            if target is None or not re.fullmatch(rb"[A-Za-z0-9+/]+={0,2}", lines[target]):
+                raise ContractError("INVALID_TAMPER_MUTATION", "Missing base64 signature body")
+            expected_offset = sum(len(line) + 1 for line in lines[:target]) + 5
+            expected_byte = ord("A") if orig_bytes[expected_offset] != ord("A") else ord("B")
+            if diff_idx != expected_offset or tamp_bytes[diff_idx] != expected_byte:
+                raise ContractError("INVALID_TAMPER_MUTATION", "Mutation differs from controlled signature operation")
+            mutations.append({"path": rel_path.as_posix(), "length": len(orig_bytes),
+                              "offset": diff_idx, "control_sha256": digest(orig_bytes),
+                              "tampered_sha256": digest(tamp_bytes)})
+        else:
+            if orig_bytes != tamp_bytes:
+                raise ContractError(
+                    "INVALID_TAMPER_MUTATION",
+                    f"Unexpected byte mutation in untargeted file: {rel_path.as_posix()}",
+                    details={"path": rel_path.as_posix()},
+                )
+
+    return {"verified": True, "files": mutations,
+            "control_tree_sha256": digest(json.dumps(_tree_inventory(orig_base), sort_keys=True).encode()),
+            "tampered_tree_sha256": digest(json.dumps(_tree_inventory(tamp_base), sort_keys=True).encode())}
+
+
 def tamper_family_copy(
     family: str, kind: str, dirs: Mapping[str, Path], dest: Path, *, arch: str, wrong_signer: Any, product: str
 ) -> dict[str, Path]:
@@ -1011,6 +1125,8 @@ def tamper_family_copy(
         if modes_report.get("status") != "pass":
             raise ContractError("MODE_MISMATCH", "APT tamper copy public tree mode verification failed",
                                 details={"substage": "apt-tamper", "reason": "public-mode-mismatch"})
+        if kind == "signature":
+            verify_signature_tamper_mutation(dirs["apt"], copy, distribution="resolute")
         out["apt"] = copy
     elif family == "dnf":
         copy = dest / "rpm"
@@ -1086,7 +1202,15 @@ def tamper_cycle(
             tampered = tamper_family_copy(family, kind, dirs, copy_root, arch=arch, wrong_signer=wrong_signer,
                                           product=product)
             spec = spec_for(tampered)
+            signature_context = None
+            mutation = None
+            if family == "apt" and kind == "signature":
+                mutation = verify_signature_tamper_mutation(dirs["apt"], tampered["apt"])
+                signature_context = {"source_uri": "file:/srv/rs9/apt", "distribution": "resolute",
+                                     "mutation_verified": mutation["verified"],
+                                     "positive_control_valid": control_ok, "network_disconnected": False}
             with ClientContainer(host, image, platform, spec["mounts"], family) as client:
+                cfg_rcpt = None
                 for command in spec["configure"]:
                     cfg_rcpt = client.exec(command)
                     raw_negative_receipts.append({
@@ -1095,6 +1219,16 @@ def tamper_cycle(
                     })
                     if cfg_rcpt.exit_code != 0:
                         raise ContractError("CLIENT_CONFIGURE_FAILED", "Client repository trust setup failed")
+                if signature_context is not None:
+                    socket_probe = client.exec([
+                        "python3", "-c",
+                        "import socket\nwith socket.socket() as s:\n s.settimeout(2);assert s.connect_ex(('1.1.1.1',443))!=0"
+                    ], user=CLIENT_USER)
+                    raw_negative_receipts.append(record_command_diagnostics(
+                        stage="runtime-offline", family=family, product=product, arch=arch, receipt=socket_probe))
+                    signature_context["network_disconnected"] = socket_probe.executed is True and socket_probe.exit_code == 0
+                    if socket_probe.exit_code != 0:
+                        raise ContractError("NETWORK_DENIAL", "Disconnected client still has runtime egress")
                 refresh_rcpt = client.exec(spec["refresh"])  # may fail first; installation must still never succeed
                 raw_negative_receipts.append({
                     "stage": "refresh", "exit_code": refresh_rcpt.exit_code,
@@ -1115,8 +1249,15 @@ def tamper_cycle(
                 })
 
             is_qualified, category, qual_reason, qual_diag = qualify_tamper_rejection(
-                kind, refresh_rcpt, install, present, family=family
+                kind, refresh_rcpt, install, present, family=family, configure_rcpt=cfg_rcpt, signature_context=signature_context
             )
+            if signature_context is not None:
+                raw_negative_receipts[ next(i for i, r in enumerate(raw_negative_receipts) if r["stage"] == "refresh") ].update(
+                    record_command_diagnostics(stage="refresh", family=family, product=product, arch=arch,
+                                               receipt=refresh_rcpt, source_uri=signature_context["source_uri"],
+                                               distribution=signature_context["distribution"]))
+                qual_diag.update(signature_mutation=mutation,
+                                 network_disconnected=signature_context["network_disconnected"])
             if qual_reason == "tampered-content-accepted":
                 row = _gate(label, "fail", "tampered-content-accepted",
                             rejection_category=category,
@@ -1602,6 +1743,10 @@ def execute_pages(context: dict[str, Any]) -> dict[str, Any]:
     gates: list[dict[str, Any]] = []
     artifacts: list[Path] = []
     details: dict[str, Any] = {"family": "pages", "system": context.get("system", "generation"), "host": PAGES_HOST}
+    from rs9.hosted_custody import verify_set
+    from rs9.hosted_summary import rpm_lint_results
+    details["rpm_lint_results"] = []
+    details["required_candidate_lint_gate"] = "rpm-lint-policy-accepted"
     images: list[str] = []
     closers: list[Any] = []  # fixtures created here (never caller-supplied ones)
 
@@ -1611,14 +1756,22 @@ def execute_pages(context: dict[str, Any]) -> dict[str, Any]:
     try:
         needed = [("deb", "amd64"), ("deb", "arm64"), ("rpm", "x86_64-linux"), ("rpm", "aarch64-linux"), ("pacman", "x86_64-linux")]
         try:
+            rpm_receipts = []
+            if inputs is not None:
+                for path in inputs.rglob("artifact-manifest.json"):
+                    retained = verify_set(path.parent)
+                    if retained["lane"] == "rpm":
+                        rpm_receipts.append(json.loads((path.parent / ("rpm-" + retained["system"] + ".json")).read_bytes()))
+            details["rpm_lint_results"] = rpm_lint_results(rpm_receipts)
             bundles = _gather_custody(inputs, auth, (context.get("binding") or {}).get("source_commit"))
-        except ContractError as err:
-            if err.code == "CUSTODY_ARCHITECTURE":
-                gates.extend(_gate(name, "fail", err.code) for name in PAGES_GATES)
+        except (ContractError, OSError, ValueError, KeyError, TypeError, AttributeError) as err:
+            reason = err.code if isinstance(err, ContractError) else "malformed-custody"
+            if reason == "CUSTODY_ARCHITECTURE":
+                gates.extend(_gate(name, "fail", reason) for name in PAGES_GATES)
             else:
-                block(PAGES_GATES, f"custody-invalid:{err.code}")
+                block(PAGES_GATES, f"custody-invalid:{reason}")
             bundles, needed = {}, []
-            details["custody_error"] = err.code
+            details["custody_error"] = reason
         missing = [f"{family}-{system}" for family, system in needed if (family, system) not in bundles]
         if needed and missing:
             block(PAGES_GATES, "custody-missing:" + ",".join(missing))

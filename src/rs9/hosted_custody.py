@@ -59,7 +59,8 @@ def file_identity(path):
 def builder_identity(repository):
     paths = sorted([*repository.glob("src/rs9/*.py"), *repository.glob("nix/**/*"),
                     repository / "flake.nix", repository / "operators/live1/targets.json",
-                    repository / "operators/live1/command-contracts.json"])
+                    repository / "operators/live1/command-contracts.json",
+                    repository / "operators/live1/rpm-lint-policy.json"])
     rows = [{"path": p.relative_to(repository).as_posix(), **file_identity(p)} for p in paths if p.is_file()]
     return hashlib.sha256(canonical(rows)).hexdigest()
 

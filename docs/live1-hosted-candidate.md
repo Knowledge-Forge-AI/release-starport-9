@@ -1,5 +1,9 @@
 # LIVE1 hosted candidate source
 
+Current continuation: [CONT11 APT and RPM source candidate](live1-native-client-cont11.md).
+Future RPM lanes require `rpm-lint-policy-accepted`; raw rpmlint failure remains
+separate evidence. Earlier continuation records below retain their historical scope.
+
 Status: **CONT8R2 scoped source candidate; hosted run 7 and full LIVE1 qualification pending; publication disabled**.
 
 Proposal disposition: **amend**, exact 20,117-byte proposal SHA-256

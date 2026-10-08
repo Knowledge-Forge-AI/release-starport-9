@@ -35,7 +35,17 @@ from rs9.signing_fixture import SigningFixture, find_gpg_binary
 from tests.test_build_native import create_cli_fixture
 from tests.test_pages import make_rpm, zstd_raw_frame
 from tests.test_pages_candidate import TRUTHFUL_ARMOR_PUBLIC_KEY
-from tests.test_repo_apt import FixtureSigner, build_minimal_deb
+from tests.test_repo_apt import FixtureSigner as DigestFixtureSigner, build_minimal_deb
+
+
+class FixtureSigner(DigestFixtureSigner):
+    """Source-only digest double with a real-shaped base64 armor body."""
+
+    def detach_sign(self, data, *, armor=True):
+        signature = self._signature(data)
+        body = base64.b64encode(bytes.fromhex(signature)).decode()
+        return (f"-----BEGIN PGP SIGNATURE-----\nKEY:{self.primary_fingerprint}\n"
+                f"SIG:{signature}\n\n{body}\n-----END PGP SIGNATURE-----\n").encode()
 
 TRUTHFUL_BINARY_PUBLIC_KEY = bytes([0xC0 | 6, 2, 10, 20])
 DIGEST = "ab" * 32
@@ -929,6 +939,236 @@ class TamperTests(unittest.TestCase):
             self.assertEqual(g["status"], "fail")
             self.assertIn("COMMAND_NOT_FOUND", g["reason"])
 
+    def test_verify_signature_tamper_mutation_positive_and_negatives(self):
+        source = self.apt_tree()
+        dest = self.root / "tamper-mut-positive"
+        dest.mkdir()
+        dirs = hd.tamper_family_copy("apt", "signature", {"apt": source}, dest, arch="amd64",
+                                     wrong_signer=self.wrong, product="theme-forge-solar-sail")
+        tampered_tree = dirs["apt"]
+        # Positive: passes verification
+        hd.verify_signature_tamper_mutation(source, tampered_tree, distribution="resolute")
+
+        orig_inrel = (source / "dists/resolute/InRelease").read_bytes()
+        tamp_inrel = (tampered_tree / "dists/resolute/InRelease").read_bytes()
+        self.assertEqual(len(orig_inrel), len(tamp_inrel))
+        diffs = [i for i, (b1, b2) in enumerate(zip(orig_inrel, tamp_inrel)) if b1 != b2]
+        self.assertEqual(len(diffs), 1)
+
+        orig_gpg = (source / "dists/resolute/Release.gpg").read_bytes()
+        tamp_gpg = (tampered_tree / "dists/resolute/Release.gpg").read_bytes()
+        self.assertEqual(len(orig_gpg), len(tamp_gpg))
+        diffs_gpg = [i for i, (b1, b2) in enumerate(zip(orig_gpg, tamp_gpg)) if b1 != b2]
+        self.assertEqual(len(diffs_gpg), 1)
+
+        # Negative 1: Two bytes changed in InRelease armored block
+        bad_tree1 = self.root / "bad1"
+        shutil.copytree(tampered_tree, bad_tree1)
+        inrel_p = bad_tree1 / "dists/resolute/InRelease"
+        data = bytearray(inrel_p.read_bytes())
+        sig_start = data.find(b"-----BEGIN PGP SIGNATURE-----")
+        target_pos = sig_start + 50
+        if target_pos == diffs[0]:
+            target_pos += 1
+        data[target_pos] = (data[target_pos] + 1) % 256
+        inrel_p.write_bytes(bytes(data))
+        with self.assertRaises(ContractError) as ctx:
+            hd.verify_signature_tamper_mutation(source, bad_tree1, distribution="resolute")
+        self.assertEqual(ctx.exception.code, "INVALID_TAMPER_MUTATION")
+        self.assertIn("Expected exactly 1 changed byte", str(ctx.exception))
+
+        # Negative 2: Length changed in InRelease
+        bad_tree2 = self.root / "bad2"
+        shutil.copytree(tampered_tree, bad_tree2)
+        inrel_p = bad_tree2 / "dists/resolute/InRelease"
+        inrel_p.write_bytes(inrel_p.read_bytes() + b"\n")
+        with self.assertRaises(ContractError) as ctx:
+            hd.verify_signature_tamper_mutation(source, bad_tree2, distribution="resolute")
+        self.assertEqual(ctx.exception.code, "INVALID_TAMPER_MUTATION")
+        self.assertIn("length mismatch", str(ctx.exception))
+
+        # Negative 3: Byte changed outside armored signature block in InRelease
+        bad_tree3 = self.root / "bad3"
+        shutil.copytree(source, bad_tree3)
+        inrel_p = bad_tree3 / "dists/resolute/InRelease"
+        data = bytearray(inrel_p.read_bytes())
+        data[5] = (data[5] + 1) % 256
+        inrel_p.write_bytes(bytes(data))
+        (bad_tree3 / "dists/resolute/Release.gpg").write_bytes(tamp_gpg)
+        with self.assertRaises(ContractError) as ctx:
+            hd.verify_signature_tamper_mutation(source, bad_tree3, distribution="resolute")
+        self.assertEqual(ctx.exception.code, "INVALID_TAMPER_MUTATION")
+        self.assertIn("controlled signature operation", str(ctx.exception))
+
+        # Negative 4: Two bytes changed in Release.gpg
+        bad_tree4 = self.root / "bad4"
+        shutil.copytree(tampered_tree, bad_tree4)
+        gpg_p = bad_tree4 / "dists/resolute/Release.gpg"
+        data = bytearray(gpg_p.read_bytes())
+        sig_start = data.find(b"-----BEGIN PGP SIGNATURE-----")
+        target_pos = sig_start + 40
+        if target_pos == diffs_gpg[0]:
+            target_pos += 1
+        data[target_pos] = (data[target_pos] + 1) % 256
+        gpg_p.write_bytes(bytes(data))
+        with self.assertRaises(ContractError) as ctx:
+            hd.verify_signature_tamper_mutation(source, bad_tree4, distribution="resolute")
+        self.assertEqual(ctx.exception.code, "INVALID_TAMPER_MUTATION")
+        self.assertIn("Release.gpg", str(ctx.exception))
+
+        # Negative 5: Extra file added
+        bad_tree5 = self.root / "bad5"
+        shutil.copytree(tampered_tree, bad_tree5)
+        (bad_tree5 / "extra.txt").write_bytes(b"extra")
+        with self.assertRaises(ContractError) as ctx:
+            hd.verify_signature_tamper_mutation(source, bad_tree5, distribution="resolute")
+        self.assertEqual(ctx.exception.code, "INVALID_TAMPER_MUTATION")
+        self.assertIn("extra-files:extra.txt", ctx.exception.details["reason"])
+
+        # Negative 6: Missing file
+        bad_tree6 = self.root / "bad6"
+        shutil.copytree(tampered_tree, bad_tree6)
+        (bad_tree6 / "dists/resolute/Release").unlink()
+        with self.assertRaises(ContractError) as ctx:
+            hd.verify_signature_tamper_mutation(source, bad_tree6, distribution="resolute")
+        self.assertEqual(ctx.exception.code, "INVALID_TAMPER_MUTATION")
+        self.assertIn("missing-files:dists/resolute/Release", ctx.exception.details["reason"])
+
+        # Negative 7: Untargeted file mutated
+        bad_tree7 = self.root / "bad7"
+        shutil.copytree(tampered_tree, bad_tree7)
+        rel_p = bad_tree7 / "dists/resolute/Release"
+        rel_p.write_bytes(rel_p.read_bytes() + b"\n")
+        with self.assertRaises(ContractError) as ctx:
+            hd.verify_signature_tamper_mutation(source, bad_tree7, distribution="resolute")
+        self.assertEqual(ctx.exception.code, "INVALID_TAMPER_MUTATION")
+        self.assertIn("Unexpected byte mutation in untargeted file", str(ctx.exception))
+
+        # Negative 8: File mode mismatch
+        bad_tree8 = self.root / "bad8"
+        shutil.copytree(tampered_tree, bad_tree8)
+        inrel_p = bad_tree8 / "dists/resolute/InRelease"
+        inrel_p.chmod(0o777)
+        with self.assertRaises(ContractError) as ctx:
+            hd.verify_signature_tamper_mutation(source, bad_tree8, distribution="resolute")
+        self.assertEqual(ctx.exception.code, "INVALID_TAMPER_MUTATION")
+        self.assertIn("File mode mismatch", str(ctx.exception))
+
+    def test_apt_tamper_network_none_and_socket_denial_probe(self):
+        class DockerWithFailedSocketDenial(ScriptedDocker):
+            def _exec(self, a):
+                if any("connect_ex" in arg for arg in a):
+                    return CommandReceipt(a, 1, b"", b"AssertionError: connection succeeded", tool_name="python3", executed=True)
+                return super()._exec(a)
+
+        # 1. Failed socket denial probe fails closed with NETWORK_DENIAL
+        docker_failed = DockerWithFailedSocketDenial()
+        with tempfile.TemporaryDirectory() as td:
+            with patch.object(self, "root", Path(td).resolve()):
+                gates_failed = self.cycle(docker_failed, kinds=("signature",))
+        self.assertEqual(len(gates_failed), 1)
+        self.assertEqual(gates_failed[0]["status"], "fail")
+        self.assertIn("NETWORK_DENIAL", gates_failed[0]["reason"])
+
+        # 2. Normal docker runs with --network none and passes socket denial probe
+        docker_normal = ScriptedDocker()
+        with tempfile.TemporaryDirectory() as td:
+            with patch.object(self, "root", Path(td).resolve()):
+                self.cycle(docker_normal, kinds=("signature",))
+        run_calls = [c for c in docker_normal.calls if c[1] == "run" and "-d" in c]
+        self.assertTrue(run_calls)
+        for call in run_calls:
+            self.assertIn("--network", call)
+            net_idx = call.index("--network")
+            self.assertEqual(call[net_idx + 1], "none")
+        probe_calls = [c for c in docker_normal.calls if c[1] == "exec" and any("connect_ex" in arg for arg in c)]
+        self.assertTrue(probe_calls)
+
+    def test_run9_retained_apt_signature_tamper_cycle_replay(self):
+        lane_path = Path(__file__).resolve().parent / "fixtures/run9/apt/lane-records.json"
+        lane_doc = json.loads(lane_path.read_text())
+        raw_stderr = lane_doc["raw_stderr"]
+        raw_stderr_bytes = raw_stderr.encode("ascii")
+        self.assertEqual(hashlib.sha256(raw_stderr_bytes).hexdigest(), lane_doc["raw_stderr_sha256"])
+        refresh_stdout_bytes = b"Hit:1 file:/srv/rs9/apt resolute InRelease\n"
+
+        class Run9ReplayDocker(ScriptedDocker):
+            def __init__(self, stderr_bytes, stdout_bytes):
+                super().__init__()
+                self.stderr_bytes = stderr_bytes
+                self.stdout_bytes = stdout_bytes
+
+            def _exec(self, a):
+                i = 2
+                while not a[i].startswith("rs9-client-"):
+                    i += 2 if a[i] in ("--user", "-e") else 1
+                state, cmd = self.containers[a[i]], a[i + 1:]
+                if cmd[0] == "python3":
+                    return CommandReceipt(a, 0, b"", b"", tool_name="python3", executed=True)
+                if cmd[:2] == ["sh", "-c"]:
+                    return CommandReceipt(a, 0, b"", b"", tool_name="sh", executed=True)
+                if cmd[0] == "apt-get" and "update" in " ".join(cmd):
+                    return CommandReceipt(a, 100, self.stdout_bytes, self.stderr_bytes, tool_name="apt-get", executed=True)
+                if cmd[0] == "apt-get" and "install" in " ".join(cmd):
+                    return CommandReceipt(a, 100, b"", b"E: Package 'theme-forge-solar-sail' has no installation candidate\n", tool_name="apt-get", executed=True)
+                if cmd[0] == "dpkg-query":
+                    return CommandReceipt(a, 1, b"", b"dpkg-query: no packages found\n", tool_name="dpkg-query", executed=True)
+                return super()._exec(a)
+
+        for arch in ("amd64", "arm64"):
+            with self.subTest(arch=arch):
+                source = self.apt_tree()
+                work = self.root / f"work-run9-{arch}"
+                work.mkdir()
+                keyring = self.root / f"key-{arch}.gpg"
+                keyring.write_bytes(b"key")
+                spec = hd.apt_spec(source, keyring, arch)
+                ctrl_data = lane_doc["positive_controls"][arch]
+                positive_control = hd.build_positive_control(
+                    family="apt",
+                    image="img",
+                    platform=ctrl_data["platform"],
+                    product="theme-forge-solar-sail",
+                    success=True,
+                    setup_sha256=hd.trust_identity(spec),
+                    receipts={
+                        stage: [CommandReceipt([stage], 0, b"", b"", executed=True)]
+                        for stage in ("configure", "refresh", "install", "query")
+                    },
+                )
+                docker = Run9ReplayDocker(raw_stderr_bytes, refresh_stdout_bytes)
+                host = hd.RecordingRunner(host_runner(docker, ExecutedMock))
+                gates = hd.tamper_cycle(
+                    host,
+                    lambda dirs: hd.apt_spec(dirs["apt"], keyring, arch),
+                    "apt",
+                    {"apt": source},
+                    image="img",
+                    platform=ctrl_data["platform"],
+                    product="theme-forge-solar-sail",
+                    work=work,
+                    arch=arch,
+                    wrong_signer=self.wrong,
+                    kinds=("signature",),
+                    prefix="deb-client",
+                    positive_control=positive_control,
+                )
+                self.assertEqual(len(gates), 1)
+                gate = gates[0]
+                self.assertEqual(gate["name"], "deb-client.tamper.signature")
+                self.assertEqual(gate["status"], "pass")
+                self.assertIsNone(gate.get("reason"))
+                self.assertEqual(gate["rejection_category"], "SIGNED_ENVELOPE_INVALID")
+                self.assertEqual(gate["qualifying_stage"], "refresh")
+                self.assertEqual(gate["distribution"], "resolute")
+                self.assertEqual(gate["source_context"], "file")
+                self.assertEqual(gate["target_envelope"], "InRelease")
+                self.assertEqual(gate["sample"], lane_doc["sanitized_sample"])
+                self.assertEqual(
+                    hashlib.sha256(gate["sample"].encode("ascii")).hexdigest(),
+                    lane_doc["sanitized_sample_sha256"],
+                )
+
 
 class DebLaneTests(unittest.TestCase):
     def setUp(self):
@@ -1266,6 +1506,28 @@ class PagesLaneTests(unittest.TestCase):
         result = hd.execute(self.context(None, inputs=None))
         self.assertEqual({g["status"] for g in result["gates"]}, {"not-run"})
         self.assertTrue((self.scratch / result["details"]["manifest_path"]).is_file())
+
+    def test_pages_retains_raw_lint_and_policy_view_and_blocks_invalid_annex(self):
+        from rs9.hosted_custody import retain
+        source=self.root/'rpm-source';source.mkdir()
+        directory=self.inputs/'candidate-rpm-x86_64-linux'
+        receipt={'lane':'rpm','system':'x86_64-linux','provenance':{},'runner':{},
+                 'details':{'rpm_lint_raw':{'fixture':{'status':'fail','clean':False,
+                     'tool_receipt':{'exit_code':64},'findings_summary':{'errors':1,'warnings':2,'filtered':8}}},
+                     'rpm_lint_policy':{'fixture':{'accepted':True,'status':'accepted'}}}}
+        retain(source,directory,[],receipt)
+        result=hd.execute_pages(self.context(None))
+        self.assertEqual(result['details']['required_candidate_lint_gate'],'rpm-lint-policy-accepted')
+        view=result['details']['rpm_lint_results'][0]
+        self.assertEqual(view['raw_exit_code'],64)
+        self.assertEqual(view['raw_status'],'fail')
+        self.assertFalse(view['raw_clean'])
+        self.assertTrue(view['policy']['accepted'])
+        (directory/'artifact-manifest.json').write_bytes(b'{invalid')
+        other=self.root/'pages-invalid';other.mkdir()
+        result=hd.execute_pages(self.context(None,scratch=other))
+        self.assertEqual({g['reason'] for g in result['gates']},{'custody-invalid:malformed-custody'})
+        self.assertTrue((other/result['details']['manifest_path']).is_file())
 
     def test_pages_with_custody_and_unavailable_package_tools_is_not_run(self):
         self.all_bundles()

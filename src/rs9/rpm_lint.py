@@ -13,6 +13,7 @@ WP-RPM structured rpmlint evidence:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import re
 from typing import Any, Mapping, Sequence
@@ -24,12 +25,47 @@ from rs9.scratch import canonical
 from rs9.security import scan_for_credentials, TOKEN_PATTERNS
 from rs9.rpm_query import _safe_observed_token, RPM_EXPECTED_ARCHITECTURES
 
+from rs9.machine_stream import machine_records, machine_text, raise_stream_error
+
 RPMLINT_EVIDENCE_SCHEMA = "rs9.rpmlint-evidence.v1alpha1"
 MAX_FINDINGS = 100
 MAX_MESSAGE_CHARS = 512
 MAX_HEADER_CHARS = 256
 MAX_HEADERS = 16
 MAX_STREAM_BYTES = 512 * 1024
+RPMLINT_IDENTITY_MAX_BYTES = 1024
+
+
+def _tool_identity_record(receipt, *, package=False):
+    """Read one ASCII identity record; diagnostic previews never supply identity."""
+    if receipt.stderr_bytes:
+        raise_stream_error(code='RPMLINT_FAILED', message='Tool identity query returned stderr',
+            reason_token='stderr-not-empty', receipt=receipt, stream='stderr',
+            substage='rpmlint-tool-identity')
+    records = machine_records(receipt, limit=RPMLINT_IDENTITY_MAX_BYTES,
+        code='RPMLINT_FAILED', substage='rpmlint-tool-identity', encoding='ascii')
+    pattern = (r'rpmlint\|[A-Za-z0-9._+~-]{1,64}\|[A-Za-z0-9._+~-]{1,64}\|[A-Za-z0-9_]{1,32}'
+               if package else r'(?:rpmlint )?[0-9]+(?:\.[0-9]+)+(?:[-+][A-Za-z0-9._-]+)?')
+    if len(records) != 1 or not re.fullmatch(pattern, records[0], re.ASCII):
+        raise_stream_error(code='RPMLINT_FAILED', message='Malformed tool identity record',
+            reason_token='malformed-identity', receipt=receipt, stream='stdout',
+            substage='rpmlint-tool-identity')
+    scan_for_credentials(records[0])
+    return records[0]
+
+
+def _tool_identity_evidence(receipt, *, package=False):
+    identity = {'exit_code': receipt.exit_code,
+                'stdout_sha256': receipt.stdout_sha256, 'stderr_sha256': receipt.stderr_sha256,
+                'stdout_length': len(receipt.stdout_bytes), 'stderr_length': len(receipt.stderr_bytes)}
+    if receipt.exit_code != 0:
+        identity.update(version='query-failed', reason_token='process-nonzero')
+        return identity
+    try:
+        identity['version'] = _tool_identity_record(receipt, package=package)
+    except ContractError as error:
+        identity.update(version='query-invalid', reason_token=error.details.get('reason_token', 'unsafe-identity'))
+    return identity
 
 SUMMARY_REGEX = re.compile(
     r"^(?P<packages>\d+) packages? and (?P<specfiles>\d+) specfiles? checked; "
@@ -41,6 +77,46 @@ FINDING_REGEX = re.compile(
     r"^(?P<target>[^\s:]+?)(?::(?P<line>\d+))?:\s*(?:\[(?P<bracket_level>[EWI])\]|(?P<plain_level>[EWI]|ERROR|WARNING|INFO))\s*:\s*(?P<check>[A-Za-z0-9_.%+-]+)(?:\s+(?P<message>.*))?$"
 )
 MAX_GROUPS = 128
+MAX_ERROR_RECORDS = 256
+
+
+def _parse_error_record(
+    target: str,
+    code: str,
+    raw_message: str,
+    line_no: int | None = None,
+) -> dict[str, Any]:
+    """Parse complete structured error record before 128-char message truncation."""
+    raw = raw_message or ""
+    tokens = raw.split()
+    complete = (len(raw) <= 4096 and len(target) <= 128 and len(code) <= 64
+                and all(32 <= ord(c) < 127 for c in raw))
+    record = {"target": target, "code": code, "level": "E",
+              "message": sanitize_text(raw, 512), "arguments_sha256": digest(raw.encode()),
+              "arguments_complete": complete}
+    if line_no is not None: record["line"] = line_no
+    if code in {"non-executable-script", "env-script-interpreter"}:
+        path = tokens[0] if tokens else ""
+        if path.startswith("package:usr/"): path = "/" + path[len("package:"):]
+        from rs9.rpm_preservation import package_path
+        try: record["path"] = package_path(path)
+        except ContractError: record["arguments_complete"] = False
+        offset = 1
+        if code == "non-executable-script":
+            if len(tokens)>1 and re.fullmatch("[0-7]{3,4}",tokens[1]): record["mode"] = tokens[1]
+            else: record["arguments_complete"] = False
+            offset = 2
+        interpreter = " ".join(tokens[offset:]).replace("package:usr/", "/usr/")
+        if len(interpreter) <= 256 and re.fullmatch(r"/(?:usr/)?bin/[A-Za-z0-9_./+-]+(?: [A-Za-z0-9_./+-]+)*",interpreter):
+            record["interpreter"] = interpreter
+        else: record["arguments_complete"] = False
+    elif code == "files-duplicated-waste":
+        if len(tokens)==1 and tokens[0].isdigit() and len(tokens[0])<=20: record["waste_bytes"] = int(tokens[0])
+        else: record["arguments_complete"] = False
+    elif code == "explicit-lib-dependency":
+        if len(tokens)==1 and re.fullmatch(r"[A-Za-z0-9_.+-]{1,128}",tokens[0]): record["dependency"] = tokens[0]
+        else: record["arguments_complete"] = False
+    return record
 
 
 def sanitize_text(text, max_chars=MAX_MESSAGE_CHARS):
@@ -70,7 +146,6 @@ def _sanitize_target(raw_target: str) -> str:
     raw_target = raw_target.strip()
     if raw_target == "(none)":
         return "(none)"
-    # Strip any directory path prefix (e.g. /tmp/xyz/SPECS/foo.spec -> foo.spec)
     name = Path(raw_target).name
     if re.fullmatch(r"[A-Za-z0-9_.+-]+", name) and len(name) <= 128:
         return name
@@ -82,76 +157,154 @@ def parse_rpmlint_output(stdout_text, exit_code=0, *, strict=True):
 
     Upstream Lint._print_header/_run defines the decorated session and summary;
     unknown nonempty lines are hashed and fail closed rather than hiding findings.
+    Parses complete structured error_records from raw lines before capping.
+    Warnings are dropped first when bounding findings; missing/overflow errors never hidden.
     """
-    findings, headers, groups, unparsed, unparsed_samples = [], [], {}, [], []
+    error_findings, warning_findings, info_findings = [], [], []
+    error_records = []
+    error_overflow = False
+    headers, groups, unparsed, unparsed_samples = [], {}, [], []
     try:
         scan_for_credentials(stdout_text)
         sample_stream_safe = True
     except ContractError:
         sample_stream_safe = False
-    counts = {'E':0,'W':0,'I':0}
+    counts = {"E": 0, "W": 0, "I": 0}
     summary, summary_count, config = None, 0, False
-    truncated = len(stdout_text.encode('utf-8',errors='replace')) > MAX_STREAM_BYTES
-    for raw in stdout_text[:MAX_STREAM_BYTES].splitlines():
+    truncated = len(stdout_text.encode('utf-8')) > MAX_STREAM_BYTES
+    replacement_detected = '\ufffd' in stdout_text
+    lines = stdout_text[:MAX_STREAM_BYTES].split('\n')
+
+    for raw in lines:
         line = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", raw).strip()
-        if not line: continue
-        decorated = line.strip('= ').strip()
-        match=SUMMARY_REGEX.fullmatch(decorated)
-        if match:
-            summary_count+=1
-            summary={k:int(v or 0) for k,v in match.groupdict().items()}
-            config=False
+        if not line:
             continue
-        match=FINDING_REGEX.fullmatch(line)
+        if summary_count > 0:
+            unparsed.append(digest(raw.encode("utf-8", errors="replace")))
+            if len(unparsed_samples) < 8:
+                unparsed_samples.append({
+                    "sha256": unparsed[-1],
+                    "sample": sanitize_text(raw, 128) if sample_stream_safe else "[CREDENTIAL_STREAM_WITHHELD]",
+                })
+            continue
+
+        decorated = line.strip("= ").strip()
+        match = SUMMARY_REGEX.fullmatch(decorated)
         if match:
-            config=False
-            values=match.groupdict()
-            level=values['bracket_level'] or values['plain_level']
-            level={'ERROR':'E','WARNING':'W','INFO':'I'}.get(level,level)
-            counts[level]+=1
-            code=values['check']
-            code=code if len(code)<=64 and sanitize_text(code)==code else digest(code.encode())
-            target=_sanitize_target(values['target'])
-            if sanitize_text(target)!=target: target=digest(target.encode())
-            finding={'target':target,'level':level,'check':code,'message':sanitize_text(values['message'] or '',128)}
-            if values['line']: finding['line']=min(int(values['line']),2**31-1)
-            if len(findings)<MAX_FINDINGS:findings.append(finding)
-            key=(level,code)
-            if key not in groups and len(groups)<MAX_GROUPS:
-                groups[key]={'severity':level,'code':code,'count':0,'samples':[]}
+            summary_count += 1
+            summary = {k: int(v or 0) for k, v in match.groupdict().items()}
+            config = False
+            continue
+        match = FINDING_REGEX.fullmatch(line)
+        if match:
+            config = False
+            values = match.groupdict()
+            level = values["bracket_level"] or values["plain_level"]
+            level = {"ERROR": "E", "WARNING": "W", "INFO": "I"}.get(level, level)
+            counts[level] += 1
+            code = values["check"]
+            code = code if len(code) <= 64 and sanitize_text(code) == code else digest(code.encode())
+            target = _sanitize_target(values["target"])
+            if sanitize_text(target) != target:
+                target = digest(target.encode())
+            finding = {"target": target, "level": level, "check": code, "message": sanitize_text(values["message"] or "", 128)}
+            line_no = None
+            if values["line"]:
+                line_no = min(int(values["line"]), 2**31 - 1)
+                finding["line"] = line_no
+
+            if level == "E":
+                if len(error_records) < MAX_ERROR_RECORDS:
+                    rec = _parse_error_record(target, code, values["message"] or "", line_no)
+                    error_records.append(rec)
+                    if not rec["arguments_complete"]:
+                        error_overflow = True
+                else:
+                    error_overflow = True
+                error_findings.append(finding)
+            elif level == "W":
+                warning_findings.append(finding)
+            else:
+                info_findings.append(finding)
+
+            key = (level, code)
+            if key not in groups and len(groups) < MAX_GROUPS:
+                groups[key] = {"severity": level, "code": code, "count": 0, "samples": []}
             if key in groups:
-                groups[key]['count']+=1
-                if len(groups[key]['samples'])<3:groups[key]['samples'].append(finding)
-            else:truncated=True
+                groups[key]["count"] += 1
+                if len(groups[key]["samples"]) < 3:
+                    groups[key]["samples"].append(finding)
+            else:
+                truncated = True
             continue
-        if (decorated == 'rpmlint session starts'
-                or re.fullmatch(r'rpmlint(?::| version)? [0-9]+(?:\.[0-9]+)+(?:[-+][A-Za-z0-9.]+)?', decorated)
-                or re.fullmatch(r'rpmlint \([A-Za-z0-9 ._-]{1,64}\)', decorated)
-                or line.startswith(('Loaded configuration','Loading configuration','Checking:', 'checks:', 'rpmlintrc:'))
-                or line=='configuration:' or re.fullmatch(r'Badness [0-9]+ exceeds threshold [0-9]+, aborting\.',line.strip('- '))):
-            config=line=='configuration:'
-            if len(headers)<MAX_HEADERS:headers.append(sanitize_text(line,MAX_HEADER_CHARS))
+        if (decorated == "rpmlint session starts"
+                or re.fullmatch(r"rpmlint(?::| version)? [0-9]+(?:\.[0-9]+)+(?:[-+][A-Za-z0-9.]+)?", decorated)
+                or re.fullmatch(r"rpmlint \([A-Za-z0-9 ._-]{1,64}\)", decorated)
+                or line.startswith(("Loaded configuration", "Loading configuration", "Checking:", "checks:", "rpmlintrc:"))
+                or line == "configuration:" or re.fullmatch(r"Badness [0-9]+ exceeds threshold [0-9]+, aborting\.", line.strip("- "))):
+            config = line == "configuration:"
+            if len(headers) < MAX_HEADERS:
+                headers.append(sanitize_text(line, MAX_HEADER_CHARS))
             continue
-        if config and raw.startswith((' ','\t')) and line.startswith('/'):
-            if len(headers)<MAX_HEADERS:headers.append('[CONFIG_PATH]')
+        if config and raw.startswith((" ", "\t")) and line.startswith("/"):
+            if len(headers) < MAX_HEADERS:
+                headers.append("[CONFIG_PATH]")
             continue
-        unparsed.append(digest(raw.encode()))
+        unparsed.append(digest(raw.encode("utf-8", errors="replace")))
         if len(unparsed_samples) < 8:
             unparsed_samples.append({
-                'sha256': unparsed[-1],
-                'sample': sanitize_text(raw, 128) if sample_stream_safe else '[CREDENTIAL_STREAM_WITHHELD]',
+                "sha256": unparsed[-1],
+                "sample": sanitize_text(raw, 128) if sample_stream_safe else "[CREDENTIAL_STREAM_WITHHELD]",
             })
-    reason=('empty-output' if not stdout_text.strip() else 'malformed-output' if not summary or summary_count!=1 or unparsed or truncated
-            else 'count-mismatch' if counts['E']!=summary['errors'] or counts['W']!=summary['warnings'] else None)
-    parsed={'findings':findings,'groups':[groups[k] for k in sorted(groups)],
-            'findings_truncated':sum(counts.values())>len(findings),'summary':summary,
-            'session_headers':headers,'counts':counts,'parse_complete':reason is None,
-            'unparsed_count':len(unparsed),'unparsed_sha256':digest(canonical(unparsed)),
-            'unparsed_samples':unparsed_samples,
-            'reason_token':reason}
+
+    if replacement_detected and len(unparsed_samples) < 8:
+        rep_hash = digest(b"[REPLACEMENT_CHARACTER]")
+        unparsed.append(rep_hash)
+        unparsed_samples.append({
+            "sha256": rep_hash,
+            "sample": "[REPLACEMENT_CHARACTER_DETECTED]",
+        })
+
+    # Prioritize errors into findings; warnings are dropped first when bounding
+    findings = list(error_findings[:MAX_FINDINGS])
+    remaining_slots = MAX_FINDINGS - len(findings)
+    if remaining_slots > 0:
+        findings.extend(warning_findings[:remaining_slots])
+        remaining_slots = MAX_FINDINGS - len(findings)
+        if remaining_slots > 0:
+            findings.extend(info_findings[:remaining_slots])
+
+    reason = (
+        "empty-output" if not stdout_text.strip()
+        else "error-overflow" if error_overflow
+        else "malformed-output" if (
+            not summary
+            or summary_count != 1
+            or unparsed
+            or truncated
+            or replacement_detected
+        )
+        else "count-mismatch" if counts["E"] != summary["errors"] or counts["W"] != summary["warnings"]
+        else None
+    )
+    parsed = {
+        "findings": findings,
+        "groups": [groups[k] for k in sorted(groups)],
+        "findings_truncated": sum(counts.values()) > len(findings),
+        "summary": summary,
+        "session_headers": headers,
+        "counts": counts,
+        "parse_complete": reason is None,
+        "unparsed_count": len(unparsed),
+        "unparsed_sha256": digest(canonical(unparsed)),
+        "unparsed_samples": unparsed_samples,
+        "reason_token": reason,
+        "error_records": error_records,
+        "error_overflow": error_overflow,
+    }
     if strict and reason:
-        error=ContractError('RPMLINT_FAILED','rpmlint output incomplete or malformed',details={'reason_token':reason})
-        error.parsed=parsed
+        error = ContractError("RPMLINT_FAILED", "rpmlint output incomplete or malformed", details={"reason_token": reason})
+        error.parsed = parsed
         raise error
     return parsed
 
@@ -209,7 +362,97 @@ def build_rpmlint_evidence(
     except OSError:
         pass
 
-    parsed = parse_rpmlint_output(receipt.stdout_text, exit_code=receipt.exit_code, strict=False)
+    stdout_raw = getattr(receipt, "stdout_bytes", b"")
+    stderr_raw = getattr(receipt, "stderr_bytes", b"")
+    stdout_hash = getattr(receipt, "stdout_sha256", digest(stdout_raw))
+    stderr_hash = getattr(receipt, "stderr_sha256", digest(stderr_raw))
+
+    reader_error = None
+    reason_token = None
+    try:
+        stdout_text = machine_text(
+            receipt,
+            stream="stdout",
+            limit=MAX_STREAM_BYTES,
+            code="RPMLINT_FAILED",
+            substage="rpmlint",
+            encoding="utf-8",
+        )
+    except ContractError as err:
+        reader_error = err
+        reason_token = err.details.get("reason_token", "malformed-output")
+        stdout_text = None
+
+    if reader_error is None and stdout_raw and not stdout_raw.endswith(b"\n"):
+        reason_token = "malformed-output"
+        reader_error = ContractError(
+            "RPMLINT_FAILED",
+            "rpmlint stream missing newline framing",
+            details={"reason_token": reason_token},
+        )
+
+    if reader_error is not None:
+        unparsed_samples = [{
+            "sha256": stdout_hash,
+            "sample": f"[NON_ACCEPTANCE_STREAM_ERROR:{reason_token}]",
+        }]
+        evidence: dict[str, Any] = {
+            "schema": RPMLINT_EVIDENCE_SCHEMA,
+            "product": product,
+            "package_file": rpm_path.name,
+            "package_sha256": package_sha256,
+            "spec_file": spec_path.name,
+            "spec_sha256": spec_sha256,
+            "clean": False,
+            "status": "fail",
+            "reason_token": reason_token,
+            "tool_receipt": {
+                "tool": "rpmlint",
+                "executed": getattr(receipt, "executed", False),
+                "command": ["rpmlint", spec_path.name, rpm_path.name],
+                "command_sha256": digest(canonical(list(getattr(receipt, "command", [])))),
+                "exit_code": getattr(receipt, "exit_code", -1),
+                "stdout_sha256": stdout_hash,
+                "stderr_sha256": stderr_hash,
+                "stdout_bytes": len(stdout_raw),
+                "stderr_bytes": len(stderr_raw),
+            },
+            "session_headers": [],
+            "effective_configuration": {
+                "listing_sha256": digest(canonical([])),
+                "session_header_sha256": digest(canonical([])),
+                "filtered_count": 0,
+                "invocation": "default-tool-config-no-added-filters",
+            },
+            "findings": [],
+            "findings_truncated": False,
+            "groups": [],
+            "parse_complete": False,
+            "unparsed_count": 1,
+            "unparsed_sha256": digest(canonical([stdout_hash])),
+            "unparsed_samples": unparsed_samples,
+            "error_records": [],
+            "error_overflow": False,
+            "architecture": (rpm_identity or {}).get("arch"),
+            "arguments": [spec_path.name, rpm_path.name],
+            "counts": {"E": 0, "W": 0, "I": 0},
+            "findings_summary": None,
+            "diagnostic_samples": [f"[NON_ACCEPTANCE_STREAM_ERROR:{reason_token}]"],
+        }
+        if rpm_identity is not None:
+            evidence["rpm_identity"] = {
+                "name": rpm_identity.get("name", product),
+                "version": rpm_identity.get("version", ""),
+                "release": rpm_identity.get("release", ""),
+                "arch": rpm_identity.get("arch", ""),
+            }
+        if rpm_payload_digest is not None:
+            evidence["rpm_payload_digest"] = dict(rpm_payload_digest)
+        if tool_version_info is not None:
+            evidence["tool_version"] = tool_version_info
+        return evidence
+
+    parsed = parse_rpmlint_output(stdout_text, exit_code=receipt.exit_code, strict=False)
     if parsed["parse_complete"] and (parsed["summary"]["packages"] != 1 or parsed["summary"]["specfiles"] != 1):
         parsed.update(parse_complete=False, reason_token="input-count-mismatch")
     summary = parsed["summary"] or {
@@ -227,6 +470,9 @@ def build_rpmlint_evidence(
     if not parsed["parse_complete"]:
         is_clean, reason_token = False, parsed["reason_token"]
 
+    if receipt.stderr_bytes:
+        is_clean, reason_token = False, "unexpected-stderr"
+
     # Preserve supported 4-field identity: name, version, release, arch
     identity_record = None
     if rpm_identity is not None:
@@ -240,6 +486,12 @@ def build_rpmlint_evidence(
     # Preserve payload hash
     payload_record = dict(rpm_payload_digest) if rpm_payload_digest is not None else None
 
+    config_listing = [
+        line.strip()
+        for line in stdout_text.splitlines()
+        if line.startswith((" ", "\t")) and line.strip().startswith("/")
+    ]
+
     evidence: dict[str, Any] = {
         "schema": RPMLINT_EVIDENCE_SCHEMA,
         "product": product,
@@ -252,6 +504,9 @@ def build_rpmlint_evidence(
         "reason_token": reason_token,
         "tool_receipt": {
             "tool": "rpmlint",
+            "executed": receipt.executed,
+            "command": ["rpmlint", spec_path.name, rpm_path.name],
+            "command_sha256": digest(canonical(list(receipt.command))),
             "exit_code": receipt.exit_code,
             "stdout_sha256": receipt.stdout_sha256,
             "stderr_sha256": receipt.stderr_sha256,
@@ -259,13 +514,24 @@ def build_rpmlint_evidence(
             "stderr_bytes": len(receipt.stderr_bytes),
         },
         "session_headers": session_headers,
+        "effective_configuration": {
+            "listing_sha256": digest(canonical(config_listing)),
+            "session_header_sha256": digest(canonical(session_headers)),
+            "filtered_count": summary["filtered"],
+            "invocation": "default-tool-config-no-added-filters",
+        },
         "findings": findings,
         "findings_truncated": findings_truncated,
-        "groups": parsed["groups"], "parse_complete": parsed["parse_complete"],
-        "unparsed_count": parsed["unparsed_count"], "unparsed_sha256": parsed["unparsed_sha256"],
+        "groups": parsed["groups"],
+        "parse_complete": parsed["parse_complete"],
+        "unparsed_count": parsed["unparsed_count"],
+        "unparsed_sha256": parsed["unparsed_sha256"],
         "unparsed_samples": parsed["unparsed_samples"],
+        "error_records": parsed.get("error_records", []),
+        "error_overflow": parsed.get("error_overflow", False),
         "architecture": (rpm_identity or {}).get("arch"),
         "arguments": [spec_path.name, rpm_path.name],
+        "counts": parsed["counts"],
         "findings_summary": {
             "packages": summary["packages"],
             "specfiles": summary["specfiles"],
@@ -283,13 +549,40 @@ def build_rpmlint_evidence(
     if tool_version_info is not None:
         evidence["tool_version"] = tool_version_info
 
+    def _evidence_exceeds_cap(ev: dict[str, Any]) -> bool:
+        if len(canonical(ev)) > 60 * 1024:
+            return True
+        if len(json.dumps(ev, indent=2).encode("utf-8")) > 64 * 1024:
+            return True
+        return False
+
     # Preserve all severity/code counts while bounding samples and headers.
-    if len(canonical(evidence)) > 60 * 1024:
-        evidence['findings']=[{k:v for k,v in f.items() if k!='message'} for f in evidence['findings']]
-        for g in evidence['groups']:g['samples']=[]
-        evidence['diagnostic_truncated']=True
-    if len(canonical(evidence)) > 60 * 1024:
-        raise ContractError('RPMLINT_FAILED','Lint evidence exceeded bound')
+    # Warnings are dropped first, never hiding error records.
+    if _evidence_exceeds_cap(evidence):
+        evidence["findings"] = [
+            f if f.get("level") == "E" else {k: v for k, v in f.items() if k != "message"}
+            for f in evidence["findings"]
+        ]
+        for g in evidence["groups"]:
+            if g.get("severity") != "E":
+                g["samples"] = []
+        evidence["diagnostic_truncated"] = True
+
+    if _evidence_exceeds_cap(evidence):
+        evidence["findings"] = [f for f in evidence["findings"] if f.get("level") == "E"]
+        for g in evidence["groups"]:
+            g["samples"] = []
+        evidence["diagnostic_truncated"] = True
+
+    if _evidence_exceeds_cap(evidence):
+        evidence["error_overflow"] = True
+        evidence["parse_complete"] = False
+        evidence["reason_token"] = "evidence-size-exceeded"
+        error = ContractError("RPMLINT_FAILED", "Lint evidence exceeded bound", details={"reason_token": "evidence-size-exceeded"})
+        error.evidence = {k: v for k, v in evidence.items() if k not in ("findings", "groups", "error_records")}
+        error.evidence["error_records_sha256"] = digest(canonical(evidence["error_records"]))
+        error.evidence["error_record_count"] = len(evidence["error_records"])
+        raise error
     scan_for_credentials(canonical(evidence).decode())
     return evidence
 
@@ -304,6 +597,7 @@ def execute_rpmlint(
     rpm_payload_digest: Mapping[str, Any] | None = None,
     cwd: str | Path | None = None,
     allow_warnings: bool = True,
+    allow_policy: bool = False,
 ) -> tuple[dict[str, Any], list[CommandReceipt]]:
     """Execute real rpmlint against spec and candidate package, building structured evidence.
 
@@ -417,27 +711,13 @@ def execute_rpmlint(
     }
     try:
         v_receipt = runner.run(["rpmlint", "--version"], cwd=cwd)
-        if v_receipt.exit_code == 0:
-            version_info["version"] = sanitize_text(v_receipt.stdout_text.strip(), 128)
-            version_info["stdout_sha256"] = v_receipt.stdout_sha256
-            version_info["stderr_sha256"] = v_receipt.stderr_sha256
-            version_info["exit_code"] = 0
-        else:
-            version_info["version"] = "query-failed"
-            version_info["exit_code"] = v_receipt.exit_code
-            version_info["stdout_sha256"] = v_receipt.stdout_sha256
-            version_info["stderr_sha256"] = v_receipt.stderr_sha256
+        version_info.update(_tool_identity_evidence(v_receipt))
     except Exception:
         version_info["version"] = "query-unavailable"
 
     try:
         package_version = runner.run(["rpm", "-q", "--qf", "%{NAME}|%{VERSION}|%{RELEASE}|%{ARCH}\\n", "rpmlint"], cwd=cwd)
-        version_info["package_query"] = {
-            "exit_code": package_version.exit_code,
-            "stdout_sha256": package_version.stdout_sha256,
-            "stderr_sha256": package_version.stderr_sha256,
-            "version": sanitize_text(package_version.stdout_text, 128) if package_version.exit_code == 0 else "query-failed",
-        }
+        version_info["package_query"] = _tool_identity_evidence(package_version, package=True)
     except Exception:
         version_info["package_query"] = {"status": "unavailable"}
 
@@ -453,8 +733,30 @@ def execute_rpmlint(
 
     # 5. Check cleanliness
     if not evidence["clean"]:
+        if allow_policy:
+            is_recognized_lint_result = (
+                evidence.get("parse_complete", False)
+                and evidence.get("unparsed_count", -1) == 0
+                and not evidence.get("error_overflow", False)
+                and evidence.get("reason_token") in ("lint-errors", "lint-exit64", "lint-warnings")
+                and evidence.get("findings_summary") is not None
+                and receipt.exit_code == (64 if evidence["findings_summary"].get("errors") else 0)
+                and not receipt.stderr_bytes
+                and bool(evidence.get("spec_sha256"))
+                and bool(evidence.get("package_sha256"))
+                and evidence["findings_summary"].get("packages") == 1
+                and evidence["findings_summary"].get("specfiles") == 1
+                and evidence["findings_summary"].get("errors") == len(evidence.get("error_records", []))
+            )
+            if is_recognized_lint_result:
+                return evidence, [receipt]
+
         findings = evidence["findings"]
-        primary_check = findings[0]["check"] if findings else evidence["reason_token"]
+        primary_check = (
+            evidence.get("error_records", [{}])[0].get("code")
+            if evidence.get("error_records")
+            else (findings[0]["check"] if findings else evidence["reason_token"])
+        )
         details = {
             "substage": "rpmlint",
             "tool": "rpmlint",
@@ -475,6 +777,7 @@ def execute_rpmlint(
         )
         err.receipt = receipt
         err.evidence = evidence
+        err.rpmlint_evidence = evidence
         err.package_path = str(rpm_path)
         err.spec_path = str(spec_path)
         err.spec_sha256 = evidence["spec_sha256"]

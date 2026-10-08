@@ -1,0 +1,1442 @@
+{
+  "aarch64-linux": {
+    "nebular-fusion": {
+      "exit_code": 64,
+      "findings_truncated": true,
+      "groups": [
+        {
+          "code": "env-script-interpreter",
+          "count": 2,
+          "samples": [
+            {
+              "check": "env-script-interpreter",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js package:usr/bin/env nod",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            },
+            {
+              "check": "env-script-interpreter",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js package:usr/bin/env node",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "explicit-lib-dependency",
+          "count": 5,
+          "samples": [
+            {
+              "check": "explicit-lib-dependency",
+              "level": "E",
+              "message": "dbus-libs",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            },
+            {
+              "check": "explicit-lib-dependency",
+              "level": "E",
+              "message": "glib2",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            },
+            {
+              "check": "explicit-lib-dependency",
+              "level": "E",
+              "message": "libgcc",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "files-duplicated-waste",
+          "count": 1,
+          "samples": [
+            {
+              "check": "files-duplicated-waste",
+              "level": "E",
+              "message": "3128775",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "no-changelogname-tag",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-changelogname-tag",
+              "level": "E",
+              "message": "",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "non-executable-script",
+          "count": 6,
+          "samples": [
+            {
+              "check": "non-executable-script",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs 644 package:usr/bin/env",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            },
+            {
+              "check": "non-executable-script",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts 644 package:usr/bin/env ",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            },
+            {
+              "check": "non-executable-script",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js 644 package:usr/bin/env no",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "binary-or-shlib-calls-gethostbyname",
+          "count": 1,
+          "samples": [
+            {
+              "check": "binary-or-shlib-calls-gethostbyname",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "crypto-policy-non-compliance-openssl",
+          "count": 1,
+          "samples": [
+            {
+              "check": "crypto-policy-non-compliance-openssl",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service SSL_CTX_set_cipher_list",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "desktopfile-without-binary",
+          "count": 1,
+          "samples": [
+            {
+              "check": "desktopfile-without-binary",
+              "level": "W",
+              "message": "package:usr/share/applications/theme-forge-nebular-fusion.desktop tfnf",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "files-duplicate",
+          "count": 126,
+          "samples": [
+            {
+              "check": "files-duplicate",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/types.js package:usr/lib/theme-fo",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            },
+            {
+              "check": "files-duplicate",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro-crate-2.0.2/LICENSE-",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            },
+            {
+              "check": "files-duplicate",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/zmij-1.0.23/LICENSE-MIT package",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "hidden-file-or-dir",
+          "count": 2,
+          "samples": [
+            {
+              "check": "hidden-file-or-dir",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/.eslintr",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            },
+            {
+              "check": "hidden-file-or-dir",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/.eslin",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "invalid-url",
+          "count": 1,
+          "samples": [
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source0: theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+              "target": "theme-forge-nebular-fusion.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-%check-section",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-%check-section",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-nebular-fusion.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-documentation",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-documentation",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-manual-page-for-binary",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-manual-page-for-binary",
+              "level": "W",
+              "message": "tfnf",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "position-independent-executable-suggested",
+          "count": 1,
+          "samples": [
+            {
+              "check": "position-independent-executable-suggested",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "unstripped-binary-or-object",
+          "count": 3,
+          "samples": [
+            {
+              "check": "unstripped-binary-or-object",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            },
+            {
+              "check": "unstripped-binary-or-object",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            },
+            {
+              "check": "unstripped-binary-or-object",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/native/directory-snapshot/prebuilds/li",
+              "target": "theme-forge-nebular-fusion.aarch64"
+            }
+          ],
+          "severity": "W"
+        }
+      ],
+      "parse_complete": true,
+      "retained_error_rows": 8,
+      "retained_finding_rows": 100,
+      "summary": {
+        "errors": 15,
+        "filtered": 8,
+        "information": 0,
+        "packages": 1,
+        "specfiles": 1,
+        "warnings": 139
+      },
+      "tool_version": "2.8.0"
+    },
+    "solar-sail": {
+      "exit_code": 64,
+      "findings_truncated": false,
+      "groups": [
+        {
+          "code": "env-script-interpreter",
+          "count": 1,
+          "samples": [
+            {
+              "check": "env-script-interpreter",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-solar-sail/bin/tfss.js package:usr/bin/env node",
+              "target": "theme-forge-solar-sail.noarch"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "no-changelogname-tag",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-changelogname-tag",
+              "level": "E",
+              "message": "",
+              "target": "theme-forge-solar-sail.noarch"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "invalid-url",
+          "count": 2,
+          "samples": [
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source3: npm-closure.tar.gz",
+              "target": "theme-forge-solar-sail.spec"
+            },
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source0: knowledge-forge-ai-theme-forge-solar-sail-0.2.1.tgz",
+              "target": "theme-forge-solar-sail.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-%check-section",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-%check-section",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-solar-sail.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-documentation",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-documentation",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-solar-sail.noarch"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-manual-page-for-binary",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-manual-page-for-binary",
+              "level": "W",
+              "message": "tfss",
+              "target": "theme-forge-solar-sail.noarch"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "only-non-binary-in-usr-lib",
+          "count": 1,
+          "samples": [
+            {
+              "check": "only-non-binary-in-usr-lib",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-solar-sail.noarch"
+            }
+          ],
+          "severity": "W"
+        }
+      ],
+      "parse_complete": true,
+      "retained_error_rows": 2,
+      "retained_finding_rows": 8,
+      "summary": {
+        "errors": 2,
+        "filtered": 8,
+        "information": 0,
+        "packages": 1,
+        "specfiles": 1,
+        "warnings": 6
+      },
+      "tool_version": "2.8.0"
+    },
+    "stellar-burst": {
+      "exit_code": 64,
+      "findings_truncated": false,
+      "groups": [
+        {
+          "code": "files-duplicated-waste",
+          "count": 1,
+          "samples": [
+            {
+              "check": "files-duplicated-waste",
+              "level": "E",
+              "message": "214129",
+              "target": "theme-forge-stellar-burst.aarch64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "no-changelogname-tag",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-changelogname-tag",
+              "level": "E",
+              "message": "",
+              "target": "theme-forge-stellar-burst.aarch64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "non-executable-script",
+          "count": 4,
+          "samples": [
+            {
+              "check": "non-executable-script",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-stellar-burst/dist/cli.d.ts 644 package:usr/bin/env node",
+              "target": "theme-forge-stellar-burst.aarch64"
+            },
+            {
+              "check": "non-executable-script",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-stellar-burst/dist/cli.js 644 package:usr/bin/env node",
+              "target": "theme-forge-stellar-burst.aarch64"
+            },
+            {
+              "check": "non-executable-script",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.d.ts 644 package:usr/bin/env node",
+              "target": "theme-forge-stellar-burst.aarch64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "files-duplicate",
+          "count": 3,
+          "samples": [
+            {
+              "check": "files-duplicate",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-stellar-burst/dist/design-evidence/index.js package:usr/lib/theme-forge-stellar-burst/dist/design-ev",
+              "target": "theme-forge-stellar-burst.aarch64"
+            },
+            {
+              "check": "files-duplicate",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-stellar-burst/dist/types.js package:usr/lib/theme-forge-stellar-burst/dist/design-evidence/v1-types.",
+              "target": "theme-forge-stellar-burst.aarch64"
+            },
+            {
+              "check": "files-duplicate",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-stellar-burst/node_modules/fflate/lib/node.d.cts package:usr/lib/theme-forge-stellar-burst/node_modu",
+              "target": "theme-forge-stellar-burst.aarch64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "hidden-file-or-dir",
+          "count": 1,
+          "samples": [
+            {
+              "check": "hidden-file-or-dir",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-stellar-burst/node_modules/@xmldom/xmldom/lib/.eslintrc.yml",
+              "target": "theme-forge-stellar-burst.aarch64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "invalid-url",
+          "count": 2,
+          "samples": [
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source3: npm-closure.tar.gz",
+              "target": "theme-forge-stellar-burst.spec"
+            },
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source0: knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+              "target": "theme-forge-stellar-burst.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-%check-section",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-%check-section",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-stellar-burst.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-documentation",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-documentation",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-stellar-burst.aarch64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-manual-page-for-binary",
+          "count": 2,
+          "samples": [
+            {
+              "check": "no-manual-page-for-binary",
+              "level": "W",
+              "message": "tfsb",
+              "target": "theme-forge-stellar-burst.aarch64"
+            },
+            {
+              "check": "no-manual-page-for-binary",
+              "level": "W",
+              "message": "tfsb-studio-service",
+              "target": "theme-forge-stellar-burst.aarch64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "unstripped-binary-or-object",
+          "count": 2,
+          "samples": [
+            {
+              "check": "unstripped-binary-or-object",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-stellar-burst/native/directory-snapshot/prebuilds/linux-arm64-gnu/native-addon-posix-openat-v1.node",
+              "target": "theme-forge-stellar-burst.aarch64"
+            },
+            {
+              "check": "unstripped-binary-or-object",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-stellar-burst/native/directory-snapshot/prebuilds/linux-x64-gnu/native-addon-posix-openat-v1.node",
+              "target": "theme-forge-stellar-burst.aarch64"
+            }
+          ],
+          "severity": "W"
+        }
+      ],
+      "parse_complete": true,
+      "retained_error_rows": 6,
+      "retained_finding_rows": 18,
+      "summary": {
+        "errors": 6,
+        "filtered": 8,
+        "information": 0,
+        "packages": 1,
+        "specfiles": 1,
+        "warnings": 12
+      },
+      "tool_version": "2.8.0"
+    },
+    "stellar-loom": {
+      "exit_code": 64,
+      "findings_truncated": false,
+      "groups": [
+        {
+          "code": "env-script-interpreter",
+          "count": 2,
+          "samples": [
+            {
+              "check": "env-script-interpreter",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js package:usr/bin/env node",
+              "target": "theme-forge-stellar-loom.noarch"
+            },
+            {
+              "check": "env-script-interpreter",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-stellar-loom/bin/tfsl.js package:usr/bin/env node",
+              "target": "theme-forge-stellar-loom.noarch"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "no-changelogname-tag",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-changelogname-tag",
+              "level": "E",
+              "message": "",
+              "target": "theme-forge-stellar-loom.noarch"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "invalid-url",
+          "count": 2,
+          "samples": [
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source3: npm-closure.tar.gz",
+              "target": "theme-forge-stellar-loom.spec"
+            },
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source0: knowledge-forge-ai-theme-forge-stellar-loom-0.4.0.tgz",
+              "target": "theme-forge-stellar-loom.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-%check-section",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-%check-section",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-stellar-loom.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-documentation",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-documentation",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-stellar-loom.noarch"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-manual-page-for-binary",
+          "count": 2,
+          "samples": [
+            {
+              "check": "no-manual-page-for-binary",
+              "level": "W",
+              "message": "tfsl",
+              "target": "theme-forge-stellar-loom.noarch"
+            },
+            {
+              "check": "no-manual-page-for-binary",
+              "level": "W",
+              "message": "tfsl-batch",
+              "target": "theme-forge-stellar-loom.noarch"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "only-non-binary-in-usr-lib",
+          "count": 1,
+          "samples": [
+            {
+              "check": "only-non-binary-in-usr-lib",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-stellar-loom.noarch"
+            }
+          ],
+          "severity": "W"
+        }
+      ],
+      "parse_complete": true,
+      "retained_error_rows": 3,
+      "retained_finding_rows": 10,
+      "summary": {
+        "errors": 3,
+        "filtered": 8,
+        "information": 0,
+        "packages": 1,
+        "specfiles": 1,
+        "warnings": 7
+      },
+      "tool_version": "2.8.0"
+    }
+  },
+  "x86_64-linux": {
+    "nebular-fusion": {
+      "exit_code": 64,
+      "findings_truncated": true,
+      "groups": [
+        {
+          "code": "env-script-interpreter",
+          "count": 2,
+          "samples": [
+            {
+              "check": "env-script-interpreter",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js package:usr/bin/env nod",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            },
+            {
+              "check": "env-script-interpreter",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js package:usr/bin/env node",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "explicit-lib-dependency",
+          "count": 5,
+          "samples": [
+            {
+              "check": "explicit-lib-dependency",
+              "level": "E",
+              "message": "dbus-libs",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            },
+            {
+              "check": "explicit-lib-dependency",
+              "level": "E",
+              "message": "glib2",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            },
+            {
+              "check": "explicit-lib-dependency",
+              "level": "E",
+              "message": "libgcc",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "files-duplicated-waste",
+          "count": 1,
+          "samples": [
+            {
+              "check": "files-duplicated-waste",
+              "level": "E",
+              "message": "3128775",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "no-changelogname-tag",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-changelogname-tag",
+              "level": "E",
+              "message": "",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "non-executable-script",
+          "count": 6,
+          "samples": [
+            {
+              "check": "non-executable-script",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs 644 package:usr/bin/env",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            },
+            {
+              "check": "non-executable-script",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts 644 package:usr/bin/env ",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            },
+            {
+              "check": "non-executable-script",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js 644 package:usr/bin/env no",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "binary-or-shlib-calls-gethostbyname",
+          "count": 1,
+          "samples": [
+            {
+              "check": "binary-or-shlib-calls-gethostbyname",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "crypto-policy-non-compliance-openssl",
+          "count": 1,
+          "samples": [
+            {
+              "check": "crypto-policy-non-compliance-openssl",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service SSL_CTX_set_cipher_list",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "desktopfile-without-binary",
+          "count": 1,
+          "samples": [
+            {
+              "check": "desktopfile-without-binary",
+              "level": "W",
+              "message": "package:usr/share/applications/theme-forge-nebular-fusion.desktop tfnf",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "files-duplicate",
+          "count": 126,
+          "samples": [
+            {
+              "check": "files-duplicate",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/types.js package:usr/lib/theme-fo",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            },
+            {
+              "check": "files-duplicate",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro-crate-2.0.2/LICENSE-",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            },
+            {
+              "check": "files-duplicate",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/zmij-1.0.23/LICENSE-MIT package",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "hidden-file-or-dir",
+          "count": 2,
+          "samples": [
+            {
+              "check": "hidden-file-or-dir",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/.eslintr",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            },
+            {
+              "check": "hidden-file-or-dir",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/.eslin",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "invalid-url",
+          "count": 1,
+          "samples": [
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source0: theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+              "target": "theme-forge-nebular-fusion.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-%check-section",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-%check-section",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-nebular-fusion.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-documentation",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-documentation",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-manual-page-for-binary",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-manual-page-for-binary",
+              "level": "W",
+              "message": "tfnf",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "position-independent-executable-suggested",
+          "count": 1,
+          "samples": [
+            {
+              "check": "position-independent-executable-suggested",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "unstripped-binary-or-object",
+          "count": 3,
+          "samples": [
+            {
+              "check": "unstripped-binary-or-object",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            },
+            {
+              "check": "unstripped-binary-or-object",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            },
+            {
+              "check": "unstripped-binary-or-object",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/native/directory-snapshot/prebuilds/li",
+              "target": "theme-forge-nebular-fusion.x86_64"
+            }
+          ],
+          "severity": "W"
+        }
+      ],
+      "parse_complete": true,
+      "retained_error_rows": 8,
+      "retained_finding_rows": 100,
+      "summary": {
+        "errors": 15,
+        "filtered": 8,
+        "information": 0,
+        "packages": 1,
+        "specfiles": 1,
+        "warnings": 139
+      },
+      "tool_version": "2.8.0"
+    },
+    "solar-sail": {
+      "exit_code": 64,
+      "findings_truncated": false,
+      "groups": [
+        {
+          "code": "env-script-interpreter",
+          "count": 1,
+          "samples": [
+            {
+              "check": "env-script-interpreter",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-solar-sail/bin/tfss.js package:usr/bin/env node",
+              "target": "theme-forge-solar-sail.noarch"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "no-changelogname-tag",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-changelogname-tag",
+              "level": "E",
+              "message": "",
+              "target": "theme-forge-solar-sail.noarch"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "invalid-url",
+          "count": 2,
+          "samples": [
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source3: npm-closure.tar.gz",
+              "target": "theme-forge-solar-sail.spec"
+            },
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source0: knowledge-forge-ai-theme-forge-solar-sail-0.2.1.tgz",
+              "target": "theme-forge-solar-sail.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-%check-section",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-%check-section",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-solar-sail.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-documentation",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-documentation",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-solar-sail.noarch"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-manual-page-for-binary",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-manual-page-for-binary",
+              "level": "W",
+              "message": "tfss",
+              "target": "theme-forge-solar-sail.noarch"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "only-non-binary-in-usr-lib",
+          "count": 1,
+          "samples": [
+            {
+              "check": "only-non-binary-in-usr-lib",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-solar-sail.noarch"
+            }
+          ],
+          "severity": "W"
+        }
+      ],
+      "parse_complete": true,
+      "retained_error_rows": 2,
+      "retained_finding_rows": 8,
+      "summary": {
+        "errors": 2,
+        "filtered": 8,
+        "information": 0,
+        "packages": 1,
+        "specfiles": 1,
+        "warnings": 6
+      },
+      "tool_version": "2.8.0"
+    },
+    "stellar-burst": {
+      "exit_code": 64,
+      "findings_truncated": false,
+      "groups": [
+        {
+          "code": "files-duplicated-waste",
+          "count": 1,
+          "samples": [
+            {
+              "check": "files-duplicated-waste",
+              "level": "E",
+              "message": "214129",
+              "target": "theme-forge-stellar-burst.x86_64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "no-changelogname-tag",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-changelogname-tag",
+              "level": "E",
+              "message": "",
+              "target": "theme-forge-stellar-burst.x86_64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "non-executable-script",
+          "count": 4,
+          "samples": [
+            {
+              "check": "non-executable-script",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-stellar-burst/dist/cli.d.ts 644 package:usr/bin/env node",
+              "target": "theme-forge-stellar-burst.x86_64"
+            },
+            {
+              "check": "non-executable-script",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-stellar-burst/dist/cli.js 644 package:usr/bin/env node",
+              "target": "theme-forge-stellar-burst.x86_64"
+            },
+            {
+              "check": "non-executable-script",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.d.ts 644 package:usr/bin/env node",
+              "target": "theme-forge-stellar-burst.x86_64"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "files-duplicate",
+          "count": 3,
+          "samples": [
+            {
+              "check": "files-duplicate",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-stellar-burst/dist/design-evidence/index.js package:usr/lib/theme-forge-stellar-burst/dist/design-ev",
+              "target": "theme-forge-stellar-burst.x86_64"
+            },
+            {
+              "check": "files-duplicate",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-stellar-burst/dist/types.js package:usr/lib/theme-forge-stellar-burst/dist/design-evidence/v1-types.",
+              "target": "theme-forge-stellar-burst.x86_64"
+            },
+            {
+              "check": "files-duplicate",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-stellar-burst/node_modules/fflate/lib/node.d.cts package:usr/lib/theme-forge-stellar-burst/node_modu",
+              "target": "theme-forge-stellar-burst.x86_64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "hidden-file-or-dir",
+          "count": 1,
+          "samples": [
+            {
+              "check": "hidden-file-or-dir",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-stellar-burst/node_modules/@xmldom/xmldom/lib/.eslintrc.yml",
+              "target": "theme-forge-stellar-burst.x86_64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "invalid-url",
+          "count": 2,
+          "samples": [
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source3: npm-closure.tar.gz",
+              "target": "theme-forge-stellar-burst.spec"
+            },
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source0: knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+              "target": "theme-forge-stellar-burst.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-%check-section",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-%check-section",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-stellar-burst.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-documentation",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-documentation",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-stellar-burst.x86_64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-manual-page-for-binary",
+          "count": 2,
+          "samples": [
+            {
+              "check": "no-manual-page-for-binary",
+              "level": "W",
+              "message": "tfsb",
+              "target": "theme-forge-stellar-burst.x86_64"
+            },
+            {
+              "check": "no-manual-page-for-binary",
+              "level": "W",
+              "message": "tfsb-studio-service",
+              "target": "theme-forge-stellar-burst.x86_64"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "unstripped-binary-or-object",
+          "count": 2,
+          "samples": [
+            {
+              "check": "unstripped-binary-or-object",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-stellar-burst/native/directory-snapshot/prebuilds/linux-arm64-gnu/native-addon-posix-openat-v1.node",
+              "target": "theme-forge-stellar-burst.x86_64"
+            },
+            {
+              "check": "unstripped-binary-or-object",
+              "level": "W",
+              "message": "package:usr/lib/theme-forge-stellar-burst/native/directory-snapshot/prebuilds/linux-x64-gnu/native-addon-posix-openat-v1.node",
+              "target": "theme-forge-stellar-burst.x86_64"
+            }
+          ],
+          "severity": "W"
+        }
+      ],
+      "parse_complete": true,
+      "retained_error_rows": 6,
+      "retained_finding_rows": 18,
+      "summary": {
+        "errors": 6,
+        "filtered": 8,
+        "information": 0,
+        "packages": 1,
+        "specfiles": 1,
+        "warnings": 12
+      },
+      "tool_version": "2.8.0"
+    },
+    "stellar-loom": {
+      "exit_code": 64,
+      "findings_truncated": false,
+      "groups": [
+        {
+          "code": "env-script-interpreter",
+          "count": 2,
+          "samples": [
+            {
+              "check": "env-script-interpreter",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js package:usr/bin/env node",
+              "target": "theme-forge-stellar-loom.noarch"
+            },
+            {
+              "check": "env-script-interpreter",
+              "level": "E",
+              "message": "package:usr/lib/theme-forge-stellar-loom/bin/tfsl.js package:usr/bin/env node",
+              "target": "theme-forge-stellar-loom.noarch"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "no-changelogname-tag",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-changelogname-tag",
+              "level": "E",
+              "message": "",
+              "target": "theme-forge-stellar-loom.noarch"
+            }
+          ],
+          "severity": "E"
+        },
+        {
+          "code": "invalid-url",
+          "count": 2,
+          "samples": [
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source3: npm-closure.tar.gz",
+              "target": "theme-forge-stellar-loom.spec"
+            },
+            {
+              "check": "invalid-url",
+              "level": "W",
+              "message": "Source0: knowledge-forge-ai-theme-forge-stellar-loom-0.4.0.tgz",
+              "target": "theme-forge-stellar-loom.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-%check-section",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-%check-section",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-stellar-loom.spec"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-documentation",
+          "count": 1,
+          "samples": [
+            {
+              "check": "no-documentation",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-stellar-loom.noarch"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "no-manual-page-for-binary",
+          "count": 2,
+          "samples": [
+            {
+              "check": "no-manual-page-for-binary",
+              "level": "W",
+              "message": "tfsl",
+              "target": "theme-forge-stellar-loom.noarch"
+            },
+            {
+              "check": "no-manual-page-for-binary",
+              "level": "W",
+              "message": "tfsl-batch",
+              "target": "theme-forge-stellar-loom.noarch"
+            }
+          ],
+          "severity": "W"
+        },
+        {
+          "code": "only-non-binary-in-usr-lib",
+          "count": 1,
+          "samples": [
+            {
+              "check": "only-non-binary-in-usr-lib",
+              "level": "W",
+              "message": "",
+              "target": "theme-forge-stellar-loom.noarch"
+            }
+          ],
+          "severity": "W"
+        }
+      ],
+      "parse_complete": true,
+      "retained_error_rows": 3,
+      "retained_finding_rows": 10,
+      "summary": {
+        "errors": 3,
+        "filtered": 8,
+        "information": 0,
+        "packages": 1,
+        "specfiles": 1,
+        "warnings": 7
+      },
+      "tool_version": "2.8.0"
+    }
+  }
+}

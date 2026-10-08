@@ -156,6 +156,7 @@ class HostedPackagingTests(unittest.TestCase):
         class ExecutedRpmRunner:
             def __init__(self):
                 self.calls = []
+                self.checksig_bytes = b"sample.rpm: digests signatures OK\n"
 
             def run(self, argv, **kwargs):
                 self.calls.append(argv)
@@ -184,7 +185,7 @@ class HostedPackagingTests(unittest.TestCase):
                     if "--checksig" in argv:
                         if any("wrong-rpmdb" in a or "empty-rpmdb" in a or ".tampered" in a for a in argv):
                             return CommandReceipt(argv, 1, b"sample.rpm: digests signatures NOT OK\n", b"", executed=True)
-                        return CommandReceipt(argv, 0, b"sample.rpm: digests signatures OK\n", b"", executed=True)
+                        return CommandReceipt(argv, 0, self.checksig_bytes, b"", executed=True)
                     return CommandReceipt(argv, 0, b"", b"", executed=True)
                 return CommandReceipt(argv, 0, b"", b"", executed=True)
 
@@ -228,6 +229,13 @@ class HostedPackagingTests(unittest.TestCase):
         self.assertTrue(result["probe"]["checks"]["algo8"])
         self.assertTrue(result["probe"]["checks"]["whole_file_sha_changed"])
         self.assertTrue(next((fixture_home / "diagnostics").glob("rpm-signed-query-probe-*.json")).is_file())
+        suffix = b": digests signatures OK\n"
+        for raw in (b'x' * (65536 - len(suffix)) + suffix + b'bad trailing data\n',
+                    b'sample.rpm' + suffix + b'\xff\n', b'sample.rpm' + suffix[:-1]):
+            runner.checksig_bytes = raw
+            with self.subTest(size=len(raw)), self.assertRaises(ContractError) as caught:
+                sign_rpm(runner, rpm_file, fixture, wrong_fixture=wrong_fixture(fixture))
+            self.assertEqual(caught.exception.code, 'RPM_SIGNING')
 
     def test_sign_rpm_rejects_identity_mutation_after_signing(self):
         rpm_file = self.root / "sample_mutate_id.rpm"
@@ -1060,7 +1068,7 @@ class HostedPackagingTests(unittest.TestCase):
             self.assertIn("explicit-lib-dependency", details["observed_field_tokens"])
             gates_by_name = {g["name"]:g["status"] for g in result["gates"]}
             self.assertEqual(gates_by_name["rpm-package-build"],"pass")
-            self.assertEqual(gates_by_name["rpm-rpmlint-clean"],"fail")
+            self.assertEqual(gates_by_name["rpm-lint-policy-accepted"],"fail")
             self.assertEqual(gates_by_name["rpm-client-qualification"],"not-run")
 
             # 1. Gate split verified in build-errors.json
@@ -1069,7 +1077,7 @@ class HostedPackagingTests(unittest.TestCase):
             diag_data = json.loads(diag_file.read_bytes())
             gates_by_name = {g["name"]: g["status"] for g in diag_data.get("gates", [])}
             self.assertEqual(gates_by_name.get("rpm-package-build"), "pass")
-            self.assertEqual(gates_by_name.get("rpm-rpmlint-clean"), "fail")
+            self.assertEqual(gates_by_name.get("rpm-lint-policy-accepted"), "fail")
 
             # 2. Custody blocked verified: unsigned-custody was NEVER created
             self.assertFalse((lane_scratch / "unsigned-custody").exists())
@@ -1099,7 +1107,7 @@ class HostedPackagingTests(unittest.TestCase):
             self.assertEqual(uploaded.read_bytes(), retained_spec.read_bytes())
 
     def test_rpm_gate_split_build_fails_when_rpmbuild_fails(self):
-        """When an actual build failure occurs (BUILD_FAILED): package-build gate fails, rpmlint-clean gate fails."""
+        """When an actual build failure occurs (BUILD_FAILED): package-build gate fails, lint-policy-accepted gate fails."""
         outer = self.root / "orchestration-rpm-build-fail"
         outer.mkdir()
         lane_scratch = outer / "lane-work"
@@ -1149,7 +1157,7 @@ class HostedPackagingTests(unittest.TestCase):
             diag_data = json.loads(diag_file.read_bytes())
             gates_by_name = {g["name"]: g["status"] for g in diag_data.get("gates", [])}
             self.assertEqual(gates_by_name.get("rpm-package-build"), "fail")
-            self.assertEqual(gates_by_name.get("rpm-rpmlint-clean"), "fail")
+            self.assertEqual(gates_by_name.get("rpm-lint-policy-accepted"), "fail")
             self.assertFalse((lane_scratch / "unsigned-custody").exists())
 
 
@@ -1273,7 +1281,7 @@ class HostedPackagingTests(unittest.TestCase):
         self.assertEqual(res["details"]["build_errors"]["theme-forge-nebular-fusion"], "RPMLINT_FAILED")
         gates = {g["name"]: g["status"] for g in res["gates"]}
         self.assertEqual(gates["rpm-package-build"], "pass")
-        self.assertEqual(gates["rpm-rpmlint-clean"], "fail")
+        self.assertEqual(gates["rpm-lint-policy-accepted"], "fail")
         self.assertEqual(gates["rpm-repository-indexing"], "not-run")
 
         # Quarantined failed RPM excluded from publishable artifacts
@@ -1394,7 +1402,7 @@ class HostedPackagingTests(unittest.TestCase):
         # Gate split: package-build pass (all 4 constructed), rpmlint-clean fail
         gates = {g["name"]: g["status"] for g in res["gates"]}
         self.assertEqual(gates["rpm-package-build"], "pass")
-        self.assertEqual(gates["rpm-rpmlint-clean"], "fail")
+        self.assertEqual(gates["rpm-lint-policy-accepted"], "fail")
 
         # Custody bundle never created
         self.assertFalse((lane_scratch / "unsigned-custody").exists())

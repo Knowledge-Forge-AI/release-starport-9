@@ -1,4 +1,4 @@
-"""Diagnostic graph independence cannot alter the original qualification gates."""
+"""Preserve the graph with only the explicitly authorized RPM gate migration."""
 import json
 from pathlib import Path
 import subprocess
@@ -31,6 +31,15 @@ class ScopedGraphTests(unittest.TestCase):
             self.skipTest("public parent object absent in shallow hosted checkout")
         original = json.loads(result.stdout)
         current = json.loads((ROOT / "operators/live1/hosted-lanes.json").read_bytes())
+        migrated = 0
+        for row in original['lanes']:
+            if row['lane'] == 'rpm' and 'rpm-rpmlint-clean' in row['required_gates']:
+                row['required_gates'] = [
+                    'rpm-lint-policy-accepted' if name == 'rpm-rpmlint-clean' else name
+                    for name in row['required_gates']]
+                migrated += 1
+        self.assertIn(migrated, (0, 2))  # zero after this exact candidate is adopted
+        self.assertEqual(sum('rpm-lint-policy-accepted' in row.get('required_gates',[]) for row in current['lanes']), 2)
         self.assertEqual(current["lanes"], original["lanes"])
         self.assertEqual(current["required_jobs"], original["required_jobs"])
         self.assertEqual(current["experiment_jobs"], ["nix-proot"])

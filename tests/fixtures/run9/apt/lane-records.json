@@ -1,0 +1,96 @@
+{
+  "positive_controls": {
+    "amd64": {
+      "family": "apt",
+      "image_sha256": "0f83c77f5b7c08f787b6c7f44e8b1436ed186ce1005d88c5f99966f86a12a6d3",
+      "platform": "linux/amd64",
+      "product": "theme-forge-stellar-burst",
+      "setup_sha256": "1dfa183b881b63fc036b96451150f079216d45c385d0bb60c83573cb3f485faf",
+      "stages": {
+        "configure": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "install": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "ebc2d7bd9c73a6e20b75969c88ceaf857bc5a19b011ef78c6489178cba65bef9",
+            "stdout_sha256": "ad4e1d11909f37971e5a5ce7d7c8bbeecf49dc31b9934fbcaa612bfe167928bf"
+          }
+        ],
+        "query": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_sha256": "7ebcecf6e094ed60ae8478f2fb38acdb45aec0c4fd3d57e791e4ca3c63df153a"
+          }
+        ],
+        "refresh": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_sha256": "6bd923b3b2dc249bf22f57b860f8eb1be96b53cdf0dd975fa9695107eafebcba"
+          }
+        ]
+      },
+      "success": true
+    },
+    "arm64": {
+      "family": "apt",
+      "image_sha256": "ff7225daf7be067c7d8ca7756230774fe4cf344f4e9cb44de0e4dbc0c7ceea6c",
+      "platform": "linux/arm64",
+      "product": "theme-forge-stellar-burst",
+      "setup_sha256": "c44a7c19f73011b8d3ecf7833541b87d98755318aacb1e19b66a2696770f645e",
+      "stages": {
+        "configure": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "install": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "01291f3add6c3cdf8c357078e121d763ead56a0b60dc489283340208cf988e47",
+            "stdout_sha256": "fe3caede8466f8673da91ee96408593838b90eaf82ad861114be643aacc902a4"
+          }
+        ],
+        "query": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_sha256": "4717c88f76a69c1d1d8805ff0e08451269265748d4d8e243d61adeb8f0d5ed06"
+          }
+        ],
+        "refresh": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_sha256": "5e7e355beeb56d649ea4ee67c953c1b55dc06ef1d8583df97aeaa379930bd692"
+          }
+        ]
+      },
+      "success": true
+    }
+  },
+  "raw_stderr": "E: OpenPGP signature verification failed: file:/srv/rs9/apt resolute InRelease: Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n",
+  "raw_stderr_sha256": "37390e5b7ae15abe2dc1c021291a40fe55391bc395847a95c9ba94c45ae8247f",
+  "refresh_stdout_sha256": "854b0b21ffc20fdc5c0ae47d27edcf977ab5c500a2d0390bb9c429ca9f45ba1c",
+  "run_id": 37712447239,
+  "sanitized_sample": "E: OpenPGP signature verification failed: file:[PATH] resolute InRelease: Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n",
+  "sanitized_sample_sha256": "5a713ec83cd43eebc2cb66237e8286e1530b255070aa7839b738e6b74ffa5d22",
+  "schema": "rs9.apt-run9-lane-records.v1",
+  "source_commit": "dbf94dd5e506987a9316baaef837a38dd88e1f48"
+}

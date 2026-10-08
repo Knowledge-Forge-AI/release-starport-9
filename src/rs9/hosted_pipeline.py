@@ -144,6 +144,10 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
             record["gates"] = result["gates"]
             files.extend(result["artifacts"])
             record["details"] = result.get("details", {})
+            promotion = result.get("production_promotion_blockers", [])
+            if not isinstance(promotion, list) or any(not isinstance(v, str) for v in promotion):
+                raise ContractError("HOSTED_POLICY", "Malformed production promotion blockers")
+            record["production_promotion_blockers"].extend(promotion)
             if lane == "nix" and not pins.get("nix", {}).get("installer_sha256_by_system", {}).get(system):
                 record["policy_blockers"].append("nix-installer-run-resolved-not-source-reproducible")
             if lane == "pins" and not result["details"]["pins"]["all_source_pinned"]:

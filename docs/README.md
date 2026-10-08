@@ -53,3 +53,4 @@ Theme Forge LIVE1 is pending / not live. See the [candidate disposition](live1-c
 Ecosystem-specific operator and adapter documentation will be added as individual publication channels are qualified and adopted.
 
 - [CONT10 native-client repairs](live1-native-client-cont10.md) — Public APT modes, RPM lint custody, pacman trust classification and bounded preparation diagnostics.
+- [CONT11 APT and RPM source candidate](live1-native-client-cont11.md) — Controlled invalid-envelope classification, RPM preservation policy and pending run-10 handoff.

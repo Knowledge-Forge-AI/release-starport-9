@@ -1,0 +1,237 @@
+{
+  "schema": "rs9.rpm-lint-policy.v1",
+  "policy_authority": "RS9 manager disposition run 9 (37712447239)",
+  "source_commit": "dbf94dd5e506987a9316baaef837a38dd88e1f48",
+  "scope": "Current-generation self-published RPM candidates; not Fedora official-repository acceptance and not production authorization",
+  "production_enabled": false,
+  "publication_authority": false,
+  "permitted_preservation_exception_classes": [
+    "env-script-interpreter",
+    "non-executable-script",
+    "files-duplicated-waste"
+  ],
+  "unwaivable_error_classes": [
+    "no-changelogname-tag",
+    "explicit-lib-dependency"
+  ],
+  "tool_constraints": {
+    "tool": "rpmlint",
+    "version": "2.8.0",
+    "package_version": "2.8.0-2.fc43",
+    "allowed_exit_codes": [
+      0,
+      64
+    ],
+    "filtered_count": 8
+  },
+  "projects": {
+    "theme-forge-stellar-burst": {
+      "project_id": "stellar-burst",
+      "package_name": "theme-forge-stellar-burst",
+      "version": "0.6.1",
+      "status": "authorized",
+      "blocking": false,
+      "allowed_architectures": [
+        "x86_64",
+        "aarch64"
+      ],
+      "allowed_systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ],
+      "authenticated_inputs": {
+        "asset_name": "knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+        "asset_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+        "closure_name": "npm-closure.tar.gz",
+        "closure_sha256": "025a79114c1cb898d8a6733224d1d575fe0b504a8a8c6e46d8ebeccc8575f8d9"
+      },
+      "engine_constraints": {
+        "engine": "node",
+        "requires_spec_dependency": "nodejs >= 22",
+        "interpreter": "/usr/bin/env node"
+      },
+      "launchers": {
+        "tfsb": {
+          "path": "/usr/bin/tfsb",
+          "target": "/usr/lib/theme-forge-stellar-burst/dist/cli.js",
+          "mode": "0755",
+          "type": "node_wrapper"
+        },
+        "tfsb-studio-service": {
+          "path": "/usr/bin/tfsb-studio-service",
+          "target": "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.js",
+          "mode": "0755",
+          "type": "node_wrapper"
+        }
+      },
+      "exceptions": {
+        "non-executable-script": {
+          "/usr/lib/theme-forge-stellar-burst/dist/cli.d.ts": {
+            "mode": "0644",
+            "shebang": "/usr/bin/env node",
+            "intent": "typescript-declaration-data",
+            "public_launcher": false,
+            "justification": "TypeScript declaration file preserved with upstream package mode 0644; not directly executed"
+          },
+          "/usr/lib/theme-forge-stellar-burst/dist/cli.js": {
+            "mode": "0644",
+            "shebang": "/usr/bin/env node",
+            "intent": "private-implementation-node-wrapper",
+            "launcher": "/usr/bin/tfsb",
+            "public_launcher": false,
+            "justification": "Private CLI entrypoint invoked through maintained node wrapper /usr/bin/tfsb; preserved upstream mode 0644"
+          },
+          "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.d.ts": {
+            "mode": "0644",
+            "shebang": "/usr/bin/env node",
+            "intent": "typescript-declaration-data",
+            "public_launcher": false,
+            "justification": "TypeScript declaration file preserved with upstream package mode 0644; not directly executed"
+          },
+          "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.js": {
+            "mode": "0644",
+            "shebang": "/usr/bin/env node",
+            "intent": "private-implementation-node-wrapper",
+            "launcher": "/usr/bin/tfsb-studio-service",
+            "public_launcher": false,
+            "justification": "Private studio-service entrypoint invoked through maintained node wrapper /usr/bin/tfsb-studio-service; preserved upstream mode 0644"
+          }
+        },
+        "files-duplicated-waste": {
+          "justification": "Preserved upstream duplicate files within npm closure matching release capture (dist/design-evidence/index.js, dist/types.js, fflate node.d.cts)",
+          "expected_waste_bytes": 214129,
+          "group_authority": "complete preserved authenticated asset and closure inventories plus LICENSE/NOTICE projections"
+        }
+      },
+      "payload_manifest_binding": "recomputed complete member manifest from the exact authenticated asset"
+    },
+    "theme-forge-stellar-loom": {
+      "project_id": "stellar-loom",
+      "package_name": "theme-forge-stellar-loom",
+      "version": "0.4.0",
+      "status": "authorized",
+      "blocking": false,
+      "allowed_architectures": [
+        "noarch"
+      ],
+      "allowed_systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ],
+      "authenticated_inputs": {
+        "asset_name": "knowledge-forge-ai-theme-forge-stellar-loom-0.4.0.tgz",
+        "asset_sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+        "closure_sha256": "185af30352aae06502642cb5d7ab93f92e7934de9be26d2e8e9fe0a178e0bfa1"
+      },
+      "engine_constraints": {
+        "engine": "node",
+        "requires_spec_dependency": "nodejs >= 22",
+        "interpreter": "/usr/bin/env node"
+      },
+      "launchers": {
+        "tfsl": {
+          "path": "/usr/bin/tfsl",
+          "target": "/usr/lib/theme-forge-stellar-loom/bin/tfsl.js",
+          "mode": "0755",
+          "type": "node_wrapper"
+        },
+        "tfsl-batch": {
+          "path": "/usr/bin/tfsl-batch",
+          "target": "/usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js",
+          "mode": "0755",
+          "type": "node_wrapper"
+        }
+      },
+      "exceptions": {
+        "env-script-interpreter": {
+          "/usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js": {
+            "interpreter": "node",
+            "shebang": "/usr/bin/env node",
+            "launcher": "/usr/bin/tfsl-batch",
+            "justification": "Preserved upstream launcher script using /usr/bin/env node; Node 22 runtime enforced via spec Requires"
+          },
+          "/usr/lib/theme-forge-stellar-loom/bin/tfsl.js": {
+            "interpreter": "node",
+            "shebang": "/usr/bin/env node",
+            "launcher": "/usr/bin/tfsl",
+            "justification": "Preserved upstream launcher script using /usr/bin/env node; Node 22 runtime enforced via spec Requires"
+          }
+        }
+      },
+      "payload_manifest_binding": "recomputed complete member manifest from the exact authenticated asset"
+    },
+    "theme-forge-solar-sail": {
+      "project_id": "solar-sail",
+      "package_name": "theme-forge-solar-sail",
+      "version": "0.2.1",
+      "status": "authorized",
+      "blocking": false,
+      "allowed_architectures": [
+        "noarch"
+      ],
+      "allowed_systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ],
+      "authenticated_inputs": {
+        "asset_name": "knowledge-forge-ai-theme-forge-solar-sail-0.2.1.tgz",
+        "asset_sha256": "ebc4f21d1e61dbc0ac4e87ce81f7ecec4f97d7c15562356e429d4c1a4e9aa5a0",
+        "closure_sha256": "185af30352aae06502642cb5d7ab93f92e7934de9be26d2e8e9fe0a178e0bfa1"
+      },
+      "engine_constraints": {
+        "engine": "node",
+        "requires_spec_dependency": "nodejs >= 22",
+        "interpreter": "/usr/bin/env node"
+      },
+      "launchers": {
+        "tfss": {
+          "path": "/usr/bin/tfss",
+          "target": "/usr/lib/theme-forge-solar-sail/bin/tfss.js",
+          "mode": "0755",
+          "type": "node_wrapper"
+        }
+      },
+      "exceptions": {
+        "env-script-interpreter": {
+          "/usr/lib/theme-forge-solar-sail/bin/tfss.js": {
+            "interpreter": "node",
+            "shebang": "/usr/bin/env node",
+            "launcher": "/usr/bin/tfss",
+            "justification": "Preserved upstream launcher script using /usr/bin/env node; Node 22 runtime enforced via spec Requires"
+          }
+        }
+      },
+      "payload_manifest_binding": "recomputed complete member manifest from the exact authenticated asset"
+    },
+    "theme-forge-nebular-fusion": {
+      "project_id": "nebular-fusion",
+      "package_name": "theme-forge-nebular-fusion",
+      "version": "0.6.1",
+      "status": "incomplete",
+      "blocking": true,
+      "block_reason": "Incomplete run 9 evidence: 100/154 rows retained, only 8/15 errors recorded. Unwaived errors present (5 explicit-lib-dependency, 1 no-changelogname-tag). Complete paths cannot be derived from truncated evidence.",
+      "next_native_authority": "Fresh native candidate rpmbuild and rpmlint execution with complete error recording and packaging changelog/dependency fixes.",
+      "allowed_architectures": [
+        "x86_64",
+        "aarch64"
+      ],
+      "allowed_systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ],
+      "authenticated_inputs": {
+        "assets": [
+          {
+            "name": "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d"
+          },
+          {
+            "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f"
+          }
+        ]
+      },
+      "exceptions": {}
+    }
+  }
+}
