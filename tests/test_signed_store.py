@@ -3,11 +3,13 @@
 import json
 import os
 from pathlib import Path
+import stat
 import tempfile
 import unittest
 
 from rs9.errors import ContractError
-from rs9.signed_store import SignedStore, _digest
+from rs9.scratch import verify_public_tree_modes
+from rs9.signed_store import SignedStore, _digest, _safe_write_file
 
 
 class SignedStoreTests(unittest.TestCase):
@@ -704,6 +706,63 @@ class SignedStoreTests(unittest.TestCase):
             with self.subTest(gen=bad_gen):
                 with self.assertRaises(ContractError):
                     SignedStore(self.root, generation=bad_gen, trust_config=self.synthetic_trust)
+
+    def test_safe_write_file_modes_and_defaults(self):
+        for mask in (0o022, 0o077):
+            with self.subTest(umask=oct(mask)):
+                orig = os.umask(mask)
+                try:
+                    with tempfile.TemporaryDirectory() as td:
+                        work = Path(td).resolve()
+                        priv_file = work / "private.dat"
+                        _safe_write_file(priv_file, b"private data")
+                        self.assertEqual(stat.S_IMODE(priv_file.stat().st_mode), 0o600)
+
+                        pub_file = work / "public.dat"
+                        _safe_write_file(pub_file, b"public data", mode=0o644)
+                        self.assertEqual(stat.S_IMODE(pub_file.stat().st_mode), 0o644)
+                finally:
+                    os.umask(orig)
+
+    def test_signed_store_private_controls_and_directories(self):
+        for mask in (0o022, 0o077):
+            with self.subTest(umask=oct(mask)):
+                orig = os.umask(mask)
+                try:
+                    with tempfile.TemporaryDirectory() as td:
+                        store_root = Path(td).resolve() / "private_store"
+                        store = SignedStore(store_root, generation="gen-priv", trust_config=self.synthetic_trust)
+                        rec = store.retain(
+                            "dists/stable/Release.gpg",
+                            self.signed,
+                            self.unsigned,
+                            self.issuer,
+                            self.evidence,
+                            validator=self.dummy_validator,
+                        )
+
+                        # Preserve baseline directory creation policy, with private file contents
+                        self.assertEqual(stat.S_IMODE(store.root.stat().st_mode), 0o777 & ~mask)
+                        self.assertEqual(stat.S_IMODE(store.objects_dir.stat().st_mode), 0o777 & ~mask)
+                        self.assertEqual(stat.S_IMODE(store.records_dir.stat().st_mode), 0o777 & ~mask)
+                        self.assertEqual(stat.S_IMODE(store.generations_dir.stat().st_mode), 0o777 & ~mask)
+                        gen_dir = store.generations_dir / "gen-priv"
+                        self.assertEqual(stat.S_IMODE(gen_dir.stat().st_mode), 0o777 & ~mask)
+
+                        # Verify lock file and stored objects are 0o600
+                        self.assertEqual(stat.S_IMODE(store.lock_file.stat().st_mode), 0o600)
+                        obj_file = store.objects_dir / rec["signed_sha256"]
+                        self.assertEqual(stat.S_IMODE(obj_file.stat().st_mode), 0o600)
+                        man_file = gen_dir / "manifest.json"
+                        self.assertEqual(stat.S_IMODE(man_file.stat().st_mode), 0o600)
+
+                        # Public tree verification must fail on private signed store
+                        verification = verify_public_tree_modes(store.root)
+                        self.assertEqual(verification["status"], "fail")
+                        self.assertGreater(verification["counts"]["file_mode"], 0)
+                        self.assertEqual(verification["counts"]["directory_mode"] > 0, mask == 0o077)
+                finally:
+                    os.umask(orig)
 
 
 if __name__ == "__main__":

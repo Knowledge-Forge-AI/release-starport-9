@@ -28,8 +28,10 @@ command seam yields ``not-run``. Missing tools, digests, maintainers or custody 
 
 from __future__ import annotations
 
+import copy
 import json
 import os
+import time
 from pathlib import Path
 import re
 import shutil
@@ -54,7 +56,7 @@ from rs9.build_native import (
     SubprocessRunner,
     validate_scratch_root,
 )
-from rs9.errors import ContractError
+from rs9.errors import ContractError, safe_details
 from rs9.hosted_native import compare_inventories, execute_probes, is_excluded_inventory_path
 from rs9.hosted_native import provision as provision_native
 from rs9.npm_deps import resolve_offline_npm_archives
@@ -223,6 +225,8 @@ class ContainerRunner(CommandRunner):
             raise ContractError("INVALID_ARGUMENT", "Command argv cannot be empty")
         try:
             outer = self.host.run(self.docker_argv(argv, cwd, env))
+        except NativePrerequisiteUnavailable:
+            raise
         except ContractError as error:
             raise error.with_details(tool=Path(argv[0]).name, substage="container-tool") from None
         return CommandReceipt(
@@ -257,6 +261,132 @@ def parse_inventory(stdout: bytes, family: str) -> dict[str, str]:
 # --------------------------------------------------------------------------- containers
 
 
+def _record_receipt(recorder, host, receipt):
+    if recorder is not None and recorder is not host and hasattr(recorder, "receipts"):
+        recorder.receipts.append(receipt)
+
+
+def _preparation_rows(recorder):
+    if recorder is None:
+        return None
+    if isinstance(recorder, list):
+        return recorder
+    if not hasattr(recorder, "preparation"):
+        recorder.preparation = []
+    return recorder.preparation
+
+
+def _timeout_runner(host):
+    current = host
+    while hasattr(current, "inner") or hasattr(current, "host"):
+        current = current.inner if hasattr(current, "inner") else current.host
+    return current if isinstance(current, SubprocessRunner) else None
+
+
+def _bounded_runner(host, limit):
+    """Copy runner wrappers, preserving receipt sinks without changing shared deadlines."""
+    if isinstance(host, SubprocessRunner):
+        bounded = copy.copy(host)
+        bounded.timeout = limit if host.timeout is None else min(host.timeout, limit)
+        return bounded
+    link = "inner" if hasattr(host, "inner") else "host" if hasattr(host, "host") else None
+    if link is None:
+        return host
+    bounded = copy.copy(host)
+    setattr(bounded, link, _bounded_runner(getattr(host, link), limit))
+    return bounded
+
+
+def _prep_step(host, recorder, substage, argv, *, timeout_limit=None, **kwargs):
+    """Retain every preparation boundary, including failures before a receipt exists."""
+    rows = _preparation_rows(recorder)
+    command_host = _bounded_runner(host, timeout_limit) if timeout_limit is not None else host
+    timed = _timeout_runner(command_host)
+    deadline = getattr(timed, "timeout", None)
+    row = {"stage": "container-preparation", "substage": substage,
+           "tool": Path(argv[0]).name, "deadline_seconds": int(deadline) if deadline is not None else None}
+    start = time.monotonic()
+    try:
+        receipt = command_host.run(argv, **kwargs)
+    except ContractError as error:
+        details = {"stage": "container-preparation", "substage": substage,
+                   "tool": Path(argv[0]).name,
+                   "elapsed_ms": max(0, int((time.monotonic() - start) * 1000)),
+                   **error.details}
+        details.update(stage="container-preparation", substage=substage)
+        row.update(safe_details(details), outcome="timeout" if error.code == "TOOL_TIMEOUT" else "error",
+                   code=error.code, exit_code=None)
+        if rows is not None:
+            rows.append(row)
+        if isinstance(error, NativePrerequisiteUnavailable):
+            raise
+        raise error.with_details(**details) from None
+    except OSError:
+        row.update(outcome="error", code="TOOL_EXECUTION", exit_code=None,
+                   elapsed_ms=max(0,int((time.monotonic()-start)*1000)))
+        if rows is not None:
+            rows.append(row)
+        raise ContractError("TOOL_EXECUTION", "Preparation command could not execute",
+                            details=safe_details(row)) from None
+    row.update(outcome="completed" if receipt.exit_code == 0 else "error", exit_code=receipt.exit_code,
+               elapsed_ms=max(0, int((time.monotonic() - start) * 1000)),
+               stdout_sha256=receipt.stdout_sha256, stderr_sha256=receipt.stderr_sha256,
+               executed=receipt.executed)
+    if rows is not None:
+        rows.append(row)
+    _record_receipt(recorder, host, receipt)
+    return receipt
+
+
+def _cleanup_step(host, recorder, argv, substage="cleanup"):
+    # A finite command deadline for exact phase-owned cleanup, never a retry.
+    try:
+        return "complete" if _prep_step(host, recorder, substage, argv, timeout_limit=30).exit_code == 0 else "failed"
+    except (ContractError, OSError):
+        return "failed"
+
+
+class _PreparationTools(CommandRunner):
+    def __init__(self, inner, recorder):
+        self.inner, self.recorder = inner, recorder
+    def which(self, name):
+        if not re.fullmatch(r"[A-Za-z0-9_.+-]+", name):
+            raise ContractError("INVALID_ARGUMENT", "Unsafe tool name")
+        receipt = self.run(["sh", "-c", f"command -v {name}"])
+        located = receipt.stdout_text.strip()
+        return located if receipt.exit_code == 0 and located else None
+    def run(self, argv, **kwargs):
+        if not isinstance(self.inner, ContainerRunner):
+            return _prep_step(self.inner, self.recorder, "container-tool", argv, **kwargs)
+        name = f"rs9-tool-{uuid.uuid4().hex[:12]}"
+        command = self.inner.docker_argv(argv, **kwargs)
+        command.remove("--rm")
+        command[2:2] = ["--name", name]
+        try:
+            outer = _prep_step(self.inner.host, self.recorder, "container-tool", command)
+        except BaseException as error:
+            cleanup = _cleanup_step(self.inner.host, self.recorder, ["docker", "rm", "-f", name])
+            if isinstance(error, ContractError) and not isinstance(error, NativePrerequisiteUnavailable):
+                raise error.with_details(cleanup=cleanup) from None
+            raise
+        cleanup = _cleanup_step(self.inner.host, self.recorder, ["docker", "rm", "-f", name])
+        if cleanup != "complete":
+            raise ContractError("CONTAINER_CLEANUP", "Preparation tool container cleanup failed",
+                                details={"stage": "container-preparation", "substage": "cleanup", "cleanup": cleanup})
+        return CommandReceipt(list(argv), outer.exit_code, outer.stdout_bytes, outer.stderr_bytes,
+                              tool_name=argv[0], tool_path=f"container:{self.inner.image}", executed=outer.executed)
+
+
+def _verify_public_tree_modes(root):
+    from rs9.repo_apt import verify_public_tree_modes
+    return verify_public_tree_modes(root)
+
+
+def _write_public_keyring(path, data):
+    from rs9.signed_store import _safe_write_file
+    _safe_write_file(path, data, mode=0o644)
+
+
 def _digest_from_inspect(text: str) -> tuple[str | None, str | None]:
     parts = text.strip().split("|")
     reference = parts[0] if parts else ""
@@ -264,7 +394,12 @@ def _digest_from_inspect(text: str) -> tuple[str | None, str | None]:
     return (reference.split("@", 1)[1] if "@sha256:" in reference else None), arch
 
 
-def prepare_environment(host: CommandRunner, system: str, pins: Mapping[str, Any]) -> dict[str, Any]:
+def prepare_environment(
+    host: CommandRunner,
+    system: str,
+    pins: Mapping[str, Any],
+    recorder: Any = None,
+) -> dict[str, Any]:
     """Pull the Ubuntu 26.04 base (pinned digest or run-resolved) and verify what actually runs."""
     cfg = (pins or {}).get("deb", {}) or {}
     pin = (cfg.get("container_digests", {}) or {}).get(system) or cfg.get("image")
@@ -276,12 +411,22 @@ def prepare_environment(host: CommandRunner, system: str, pins: Mapping[str, Any
     else:
         reference = str(pin) if pin else "ubuntu:26.04"
     platform = DEB_PLATFORMS[system]
-    pulled = host.run(["docker", "pull", "--platform", platform, reference])
+    try:
+        pulled = _prep_step(host, recorder, "pull", ["docker", "pull", "--platform", platform, reference])
+    except NativePrerequisiteUnavailable:
+        raise
+    except ContractError as err:
+        raise err.with_details(substage="pull", tool="docker") from None
     if pulled.exit_code != 0:
         raise ContractError("CONTAINER_PULL_FAILED", f"docker pull failed with exit code {pulled.exit_code}",
                             details={"substage": "pull", "tool": "docker", "exit_code": pulled.exit_code,
                                      "stdout_sha256": pulled.stdout_sha256, "stderr_sha256": pulled.stderr_sha256})
-    inspected = host.run(["docker", "image", "inspect", "--format", "{{index .RepoDigests 0}}|{{.Architecture}}", reference])
+    try:
+        inspected = _prep_step(host, recorder, "inspect", ["docker", "image", "inspect", "--format", "{{index .RepoDigests 0}}|{{.Architecture}}", reference])
+    except NativePrerequisiteUnavailable:
+        raise
+    except ContractError as err:
+        raise err.with_details(substage="inspect", tool="docker") from None
     resolved, image_arch = _digest_from_inspect(inspected.stdout_text)
     if inspected.exit_code != 0 or not resolved:
         raise ContractError("CONTAINER_DIGEST_UNRESOLVED", "Container image digest could not be resolved",
@@ -295,22 +440,41 @@ def prepare_environment(host: CommandRunner, system: str, pins: Mapping[str, Any
                             details={"substage": "architecture", "tool": "docker", "exit_code": inspected.exit_code,
                                      "stdout_sha256": inspected.stdout_sha256, "stderr_sha256": inspected.stderr_sha256})
     pinned_ref = f"ubuntu@{resolved}"
-    release = host.run(["docker", "run", "--rm", "--platform", platform, "--network", "none", pinned_ref,
-                        "sh", "-c", "cat /etc/os-release && dpkg --print-architecture"])
-    fields = dict(
-        line.split("=", 1) for line in release.stdout_text.splitlines() if "=" in line and not line.startswith("#")
-    )
-    lines = [line for line in release.stdout_text.splitlines() if line.strip()]
-    version_id = fields.get("VERSION_ID", "").strip('"')
-    codename = fields.get("VERSION_CODENAME", "").strip('"')
-    if release.exit_code != 0 or version_id != "26.04" or codename != "resolute":
-        raise ContractError("UNSUPPORTED_PLATFORM", "Container is not Ubuntu 26.04 resolute",
-                            details={"substage": "distro", "tool": "cat", "exit_code": release.exit_code,
-                                     "stdout_sha256": release.stdout_sha256, "stderr_sha256": release.stderr_sha256})
-    if not lines or lines[-1].strip() != system:
-        raise ContractError("INVALID_ARCHITECTURE", "Container dpkg architecture differs from the lane system",
-                            details={"substage": "architecture", "tool": "dpkg", "exit_code": release.exit_code,
-                                     "stdout_sha256": release.stdout_sha256, "stderr_sha256": release.stderr_sha256})
+    probe_name = f"rs9-release-probe-{uuid.uuid4().hex[:12]}"
+    try:
+        try:
+            release = _prep_step(host, recorder, "release-probe", ["docker", "run", "--name", probe_name, "--platform", platform, "--network", "none", pinned_ref,
+                                "sh", "-c", "cat /etc/os-release && dpkg --print-architecture"])
+        except NativePrerequisiteUnavailable:
+            raise
+        except ContractError as err:
+            raise err.with_details(substage="release-probe", tool="docker") from None
+        fields = dict(
+            line.split("=", 1) for line in release.stdout_text.splitlines() if "=" in line and not line.startswith("#")
+        )
+        lines = [line for line in release.stdout_text.splitlines() if line.strip()]
+        version_id = fields.get("VERSION_ID", "").strip('"')
+        codename = fields.get("VERSION_CODENAME", "").strip('"')
+        if release.exit_code != 0 or version_id != "26.04" or codename != "resolute":
+            raise ContractError("UNSUPPORTED_PLATFORM", "Container is not Ubuntu 26.04 resolute",
+                                details={"substage": "distro", "tool": "cat", "exit_code": release.exit_code,
+                                         "stdout_sha256": release.stdout_sha256, "stderr_sha256": release.stderr_sha256})
+        if not lines or lines[-1].strip() != system:
+            raise ContractError("INVALID_ARCHITECTURE", "Container dpkg architecture differs from the lane system",
+                                details={"substage": "architecture", "tool": "dpkg", "exit_code": release.exit_code,
+                                         "stdout_sha256": release.stdout_sha256, "stderr_sha256": release.stderr_sha256})
+    except BaseException as exc:
+        cleanup = _cleanup_step(host, recorder, ["docker", "rm", "-f", probe_name])
+        if isinstance(exc, NativePrerequisiteUnavailable):
+            raise
+        if isinstance(exc, ContractError):
+            raise exc.with_details(cleanup=cleanup) from None
+        raise
+    else:
+        cleanup = _cleanup_step(host, recorder, ["docker", "rm", "-f", probe_name])
+        if cleanup != "complete":
+            raise ContractError("CONTAINER_CLEANUP", "Preparation container cleanup failed",
+                                details={"stage":"container-preparation", "substage":"cleanup", "cleanup":cleanup})
     source_pinned = pin_digest is not None and (pins.get("pin_provenance") or {}).get("deb." + system, "source-pinned") == "source-pinned"
     return {
         "image_ref": pinned_ref,
@@ -332,7 +496,14 @@ PROVISION_COMMANDS = {
 
 
 def provision_image(
-    host: CommandRunner, family: str, base_ref: str, platform: str, tag: str, packages: Sequence[str]
+    host: CommandRunner,
+    family: str,
+    base_ref: str,
+    platform: str,
+    tag: str,
+    packages: Sequence[str],
+    recorder: Any = None,
+    substage_prefix: str = "",
 ) -> str:
     """Network-enabled one-time provisioning, committed to a local image used offline afterwards."""
     for package in packages:
@@ -344,22 +515,41 @@ def provision_image(
         script += " && pacman -Fy --noconfirm"
     if os.getuid() > 0:
         script += " && (getent passwd " + str(os.getuid()) + " || useradd -m -u " + str(os.getuid()) + " rs9builder)"
+    prov_substage = f"{substage_prefix}provision" if substage_prefix else "provision"
+    commit_substage = f"{substage_prefix}commit" if substage_prefix else "commit"
     try:
-        run = host.run(["docker", "run", "--name", name, "--platform", platform, base_ref, "sh", "-c", script])
+        try:
+            run = _prep_step(host, recorder, prov_substage, ["docker", "run", "--name", name, "--platform", platform, base_ref, "sh", "-c", script])
+        except NativePrerequisiteUnavailable:
+            raise
+        except ContractError as err:
+            raise err.with_details(substage=prov_substage) from None
         if run.exit_code != 0:
             raise ContractError("PROVISION_FAILED", f"{family} provisioning failed with exit code {run.exit_code}",
-                                details={"substage": "provision", "tool": family, "exit_code": run.exit_code,
+                                details={"substage": prov_substage, "tool": family, "exit_code": run.exit_code,
                                          "stdout_sha256": run.stdout_sha256, "stderr_sha256": run.stderr_sha256})
-        commit = host.run(["docker", "commit", name, tag])
+        try:
+            commit = _prep_step(host, recorder, commit_substage, ["docker", "commit", name, tag])
+        except NativePrerequisiteUnavailable:
+            raise
+        except ContractError as err:
+            raise err.with_details(substage=commit_substage, tool="docker") from None
         if commit.exit_code != 0:
             raise ContractError("PROVISION_FAILED", "Provisioned image commit failed",
-                                details={"substage": "commit", "tool": "docker", "exit_code": commit.exit_code,
+                                details={"substage": commit_substage, "tool": "docker", "exit_code": commit.exit_code,
                                          "stdout_sha256": commit.stdout_sha256, "stderr_sha256": commit.stderr_sha256})
-    finally:
-        try:
-            host.run(["docker", "rm", "-f", name])
-        except ContractError:
-            pass
+    except BaseException as exc:
+        cleanup = _cleanup_step(host, recorder, ["docker", "rm", "-f", name])
+        if isinstance(exc, NativePrerequisiteUnavailable):
+            raise
+        if isinstance(exc, ContractError):
+            raise exc.with_details(cleanup=cleanup) from None
+        raise
+    else:
+        cleanup = _cleanup_step(host, recorder, ["docker", "rm", "-f", name])
+        if cleanup != "complete":
+            raise ContractError("CONTAINER_CLEANUP", "Preparation container cleanup failed",
+                                details={"stage":"container-preparation", "substage":"cleanup", "cleanup":cleanup})
     return tag
 
 
@@ -594,7 +784,7 @@ def client_cycle(
                 before = client.inventory("pre-install")
                 product_evidence["inventory_stats"] = {"pre-install": getattr(client, "last_diagnostics", {})}
                 if family == "apt":
-                    product_evidence["guest_trust_probe"] = probe_guest_trust(
+                    probe = probe_guest_trust(
                         client,
                         keyring_path=CLIENT_KEYRING_PATH,
                         repo_root=f"{SERVER_ROOT}/apt",
@@ -602,6 +792,14 @@ def client_cycle(
                         expected_key_sha256=spec.get("expected_key_sha256"),
                         public_fingerprint=spec.get("public_fingerprint"),
                     )
+                    product_evidence["guest_trust_probe"] = probe
+                    from rs9.apt_diagnostics import apt_readability
+                    readability = apt_readability(probe, executed=host.real_since(mark),
+                        repo_root=f"{SERVER_ROOT}/apt", keyring_path=CLIENT_KEYRING_PATH,
+                        arch="arm64" if platform=="linux/arm64" else "amd64")
+                    product_evidence["apt_readability"] = readability
+                    if isinstance(probe, dict):
+                        probe["apt_readability"] = readability
                 current_stage = "refresh"
                 refresh_rcpt = client.exec(spec["refresh"])
                 product_evidence["refresh"] = record_command_diagnostics(
@@ -809,6 +1007,10 @@ def tamper_family_copy(
         copy = dest / "apt"
         shutil.copytree(dirs["apt"], copy)
         tamper_apt_repository(copy, kind, arch=arch, wrong_signer=wrong_signer, package=product)
+        modes_report = _verify_public_tree_modes(copy)
+        if modes_report.get("status") != "pass":
+            raise ContractError("MODE_MISMATCH", "APT tamper copy public tree mode verification failed",
+                                details={"substage": "apt-tamper", "reason": "public-mode-mismatch"})
         out["apt"] = copy
     elif family == "dnf":
         copy = dest / "rpm"
@@ -1100,7 +1302,8 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
     platform = DEB_PLATFORMS[system]
     gates: list[dict[str, Any]] = []
     artifacts: list[Path] = []
-    details: dict[str, Any] = {"family": "deb", "system": system, "required_products": list(required)}
+    details: dict[str, Any] = {"family": "deb", "system": system, "required_products": list(required),
+                               "container_preparation": []}
     images: list[str] = []
     fixture: Any = None
     owns_fixture = wrong_owned = False
@@ -1116,23 +1319,26 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
         env: dict[str, Any] | None = None
         builder: ContainerRunner | None = None
         try:
-            env = prepare_environment(host, system, pins)
+            env = prepare_environment(host, system, pins, recorder=details["container_preparation"])
             libs = tuple((pins.get("deb", {}) or {}).get("build_packages") or DEFAULT_NATIVE_LIBRARY_PACKAGES)
             builder_tag = f"rs9-deb-builder-{system}:{uuid.uuid4().hex[:8]}"
-            provision_image(host, "apt", env["image_ref"], platform, builder_tag, [*BUILD_TOOL_PACKAGES, *libs])
             images.append(builder_tag)
+            provision_image(host, "apt", env["image_ref"], platform, builder_tag, [*BUILD_TOOL_PACKAGES, *libs], recorder=details["container_preparation"], substage_prefix="build-")
             builder = ContainerRunner(host, builder_tag, platform=platform,
                                       mounts=[(str(scratch), str(scratch), True)], user=_user())
             from rs9.hosted_native import container_tool_facts
-            env["tools"] = container_tool_facts(builder, ["dpkg-deb", "dpkg-shlibdeps", "dpkg-query", "ldd"])
+            env["tools"] = container_tool_facts(_PreparationTools(builder, details["container_preparation"]), ["dpkg-deb", "dpkg-shlibdeps", "dpkg-query", "ldd"])
             status, reason = _status(True, host.real_since(mark))
             gates.append(_gate("deb-container-environment", status,
                                reason or ("run-resolved-digest" if env["unpinned"] else None)))
             details["container"] = env
         except (ContractError, NativePrerequisiteUnavailable) as err:
             blocked = "deb-container-environment"
+            err_details = safe_details(err.details) if isinstance(err, ContractError) and err.details else {}
             gates.append(_gate(blocked, "not-run" if isinstance(err, NativePrerequisiteUnavailable) else "fail",
-                               _family_error(err)))
+                               _family_error(err), details=err_details,
+                               **{k:v for k,v in err_details.items() if k not in {"name","status","reason"}}))
+            details["environment_failure"] = {"code":err.code, "details":err_details}
 
         maintainer = context.get("maintainer", _targets_maintainer(repository))
         if blocked is None and not maintainer:
@@ -1205,6 +1411,11 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
                     repo.build_indices()
                     signed = repo.sign_with_fixture(fixture)
                     verified = verify_apt_signatures(apt_root, fixture)
+                    modes_report = _verify_public_tree_modes(apt_root)
+                    details["apt_public_modes"] = modes_report
+                    if modes_report.get("status") != "pass":
+                        raise ContractError("MODE_MISMATCH", "APT repository public tree mode verification failed",
+                                            details={"substage": "apt-repository", "reason": "public-mode-mismatch"})
                     tree = _tree_inventory(apt_root)
                     merkle = merkle_inventory(tree)
                     details["apt_repository"] = {
@@ -1238,11 +1449,11 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
                         if name not in names:
                             names.append(name)
                 client_tag = f"rs9-deb-client-{system}:{uuid.uuid4().hex[:8]}"
-                provision_image(host, "apt", env["image_ref"], platform, client_tag, [*names, "python3", "xvfb", "dbus-x11"])
                 images.append(client_tag)
+                provision_image(host, "apt", env["image_ref"], platform, client_tag, [*names, "python3", "xvfb", "dbus-x11"], recorder=details["container_preparation"], substage_prefix="client-")
                 keyring = scratch / "client-keyring" / "rs9-nonproduction.gpg"
                 keyring.parent.mkdir()
-                keyring.write_bytes(fixture.public_key_binary)
+                _write_public_keyring(keyring, fixture.public_key_binary)
                 apt_dir = scratch / "apt"
                 from rs9.hosted_smoke import prepare_smoke
                 neb = next((c for c,i,_ in context["captures"] if i["project"]["id"] == NATIVE_PRODUCT),None)
@@ -1264,8 +1475,11 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
                     wrong_signer=wrong_signer, kinds=TAMPER_KINDS_ALL, prefix="deb-client",
                     positive_control=evidence.get(required[0], {}).get("positive_control")))
             except (ContractError, NativePrerequisiteUnavailable) as err:
+                err_details = safe_details(err.details) if isinstance(err, ContractError) and err.details else {}
                 rows.append(_gate("deb-client.setup", "not-run" if isinstance(err, NativePrerequisiteUnavailable) else "fail",
-                                  _family_error(err)))
+                                  _family_error(err), details=err_details,
+                                  **{k:v for k,v in err_details.items() if k not in {"name","status","reason"}}))
+                details["client_setup_failure"] = {"code":err.code, "details":err_details}
             gates.extend(rows)
             gates.extend(burst_client_gates(rows))
             aggregate = _fold(rows)
@@ -1285,10 +1499,7 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
             details["custody"] = {"merkle_root": custody["merkle"]["root"], "directory": custody_dir.relative_to(scratch).as_posix()}
     finally:
         for tag in images:
-            try:
-                host.run(["docker", "rmi", "-f", tag])
-            except (ContractError, NativePrerequisiteUnavailable):
-                pass
+            _cleanup_step(host, details["container_preparation"], ["docker", "rmi", "-f", tag], "image-cleanup")
         for owned, closer in ((owns_fixture, fixture), (wrong_owned, wrong_signer)):
             if owned and closer is not None:
                 closer.close()
@@ -1464,6 +1675,11 @@ def _assemble_and_test_pages(
         repo.build_indices()
         repo.sign_with_fixture(fixture)
         verify_apt_signatures(apt_root, fixture)
+        modes_report = _verify_public_tree_modes(apt_root)
+        details["apt_staging_public_modes"] = modes_report
+        if modes_report.get("status") != "pass":
+            raise ContractError("MODE_MISMATCH", "Pages APT repository public tree mode verification failed",
+                                details={"substage": "pages-apt-staging", "reason": "public-mode-mismatch"})
 
         files: dict[str, bytes | str] = dict(render_install_docs())
         # RPM and pacman metadata is rebuilt by the family tools in their own containers.
@@ -1471,7 +1687,8 @@ def _assemble_and_test_pages(
         pacman_image = provision_native("pacman", "x86_64-linux", pins, runner=host)
         rpm_tag = f"rs9-pages-fedora:{uuid.uuid4().hex[:8]}"
         provision_image(host, "dnf", rpm_image["image_ref"], "linux/amd64", rpm_tag,
-                        ["createrepo_c", "rpm-sign", "gnupg2", "python3", "xorg-x11-server-Xvfb", "dbus-daemon", "findutils", *rpm_image["preprovisioned_packages"]])
+                        ["createrepo_c", "rpm-sign", "gnupg2", "python3", "xorg-x11-server-Xvfb", "dbus-daemon", "findutils", *rpm_image["preprovisioned_packages"]],
+                        recorder=host, substage_prefix="build-")
         images.append(rpm_tag)
         rpm_signing_identities = []
         wrong_rpm, wrong_rpm_owned = _new_wrong_signer(context)
@@ -1527,6 +1744,12 @@ def _assemble_and_test_pages(
         tree.mkdir()
         candidate = assemble_pages_candidate(
             tree, files=files, cname=PAGES_HOST, signing_fixture=fixture, apt_repo=repo, exact_inventory=inventory)
+        if (tree / "apt").exists():
+            pages_apt_modes = _verify_public_tree_modes(tree / "apt")
+            details["pages_apt_public_modes"] = pages_apt_modes
+            if pages_apt_modes.get("status") != "pass":
+                raise ContractError("MODE_MISMATCH", "Pages candidate APT projection public tree mode verification failed",
+                                    details={"substage": "pages-apt-projection", "reason": "public-mode-mismatch"})
         status, reason = _status(True, real and host.real_since(mark))
         gates.append(_gate("pages-repository-objects", status, reason))
         # Exact custody bytes survive into the assembled tree, and the tree on disk is the Merkle inventory.
@@ -1592,23 +1815,26 @@ def _pages_client_tests(
         wrong_signer, wrong_owned = _new_wrong_signer(context)
         if wrong_owned:
             closers.append(wrong_signer)
-        env = prepare_environment(host, "amd64", pins)
+        env = prepare_environment(host, "amd64", pins, recorder=details.setdefault("container_preparation", []))
         deb_names: list[str] = []
         for bundle in (bundles[("deb", "amd64")],):
             for path in bundle["packages"].values():
                 deb_names += [n for n in _dependency_names(path.read_bytes()) if n not in deb_names]
         apt_tag = f"rs9-pages-apt:{uuid.uuid4().hex[:8]}"
-        provision_image(host, "apt", env["image_ref"], "linux/amd64", apt_tag, [*deb_names, "python3", "xvfb", "dbus-x11"])
+        provision_image(host, "apt", env["image_ref"], "linux/amd64", apt_tag, [*deb_names, "python3", "xvfb", "dbus-x11"], recorder=host, substage_prefix="client-")
         images.append(apt_tag)
         pacman_image = provision_native("pacman", "x86_64-linux", pins, runner=host)
         pac_tag = f"rs9-pages-arch:{uuid.uuid4().hex[:8]}"
         provision_image(host, "pacman", pacman_image["image_ref"], "linux/amd64", pac_tag,
-                        [*pacman_image["preprovisioned_packages"], "python", "xorg-server-xvfb", "dbus"])
+                        [*pacman_image["preprovisioned_packages"], "python", "xorg-server-xvfb", "dbus"], recorder=host, substage_prefix="client-")
         images.append(pac_tag)
     except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
         status = "not-run" if isinstance(err, NativePrerequisiteUnavailable) else "fail"
         reason = _family_error(err)
-        gates.append(_gate("pages-client.setup", status, reason))
+        err_details = safe_details(err.details) if isinstance(err, ContractError) and err.details else {}
+        gates.append(_gate("pages-client.setup", status, reason, details=err_details,
+                           **{k:v for k,v in err_details.items() if k not in {"name","status","reason"}}))
+        details["environment_failure"] = {"code":err.code if isinstance(err,ContractError) else "TOOL_EXECUTION", "details":err_details}
         for gate_name in ("pages-client.apt", "pages-client.dnf", "pages-client.pacman"):
             gates.append(_gate(gate_name, status, reason))
         return

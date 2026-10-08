@@ -13,7 +13,7 @@ from rs9.build_native import CommandReceipt
 
 class FakeReceipt(CommandReceipt):
     def __init__(self, code: int = 0, out: bytes = b"", err: bytes = b"", argv: list[str] | None = None):
-        super().__init__(argv or ["cmd"], code, out, err, tool_name="fake")
+        super().__init__(argv or ["cmd"], code, out, err, tool_name="fake", executed=True)
 
 
 class FakeClient:
@@ -31,13 +31,117 @@ class FakeClient:
 
 
 class AptDiagnosticsTests(unittest.TestCase):
+    def test_apt_readability_requires_complete_executed_guest_observations(self):
+        import copy
+        repo = '/srv/rs9/apt'
+        targets = [repo, '/etc/apt/keyrings/rs9-nonproduction.gpg',
+                   *[repo + '/dists/resolute/' + name for name in
+                     ('InRelease', 'Release', 'Release.gpg',
+                      'main/binary-amd64/Packages', 'main/binary-amd64/Packages.xz',
+                      'main/binary-amd64/Packages.gz')]]
+        rows = []
+        for name in targets:
+            path = Path(name)
+            ancestors = [{'path': str(p), 'type': 'directory' if p != path or name == repo else 'file',
+                          'readable': True, 'traversable': True}
+                         for p in (path, *path.parents)]
+            rows.append({'target': name, 'ancestors': ancestors})
+        probe = {'status': 'probed', 'users': {'_apt': {'apt_user_present': True, 'targets': rows}}}
+        self.assertEqual(ad.apt_readability(probe, executed=True), 'pass')
+        self.assertEqual(ad.apt_readability(probe, executed=False), 'not-run')
+        for mutation in ('missing-user', 'missing-target', 'empty-ancestors', 'missing-ancestor'):
+            broken = copy.deepcopy(probe)
+            user = broken['users']['_apt']
+            if mutation == 'missing-user':
+                user['apt_user_present'] = False
+            elif mutation == 'missing-target':
+                user['targets'].pop()
+            elif mutation == 'empty-ancestors':
+                user['targets'][0]['ancestors'] = []
+            else:
+                user['targets'][-1]['ancestors'].pop()
+            self.assertEqual(ad.apt_readability(broken, executed=True), 'not-run', mutation)
+        for mutation in ('unreadable-file', 'untraversable-parent', 'symlink'):
+            broken = copy.deepcopy(probe)
+            leaf = broken['users']['_apt']['targets'][-1]['ancestors'][0]
+            if mutation == 'unreadable-file':
+                leaf['readable'] = False
+                leaf['error'] = 'permission-denied'
+            elif mutation == 'symlink':
+                leaf['type'] = 'symlink'
+            else:
+                broken['users']['_apt']['targets'][-1]['ancestors'][1]['traversable'] = False
+            self.assertEqual(ad.apt_readability(broken, executed=True), 'fail', mutation)
+
+    def test_exact_run8_pacman_wrongkey_and_signature_samples(self):
+        # Manifest-selected run-8 stderr; a replay is source evidence only.
+        fingerprint = "6F3F25BA5FD8853E81F8FF50D3C6424FD7907037"
+        wrongkey = (f'error: rs9: key "{fingerprint}" is unknown\n'
+                    f'error: key "{fingerprint}" could not be looked up remotely\n'
+                    'error: failed to synchronize all databases (invalid or corrupted database (PGP signature))\n')
+        import hashlib
+        self.assertEqual(hashlib.sha256(wrongkey.encode()).hexdigest(),
+                         "51733456b7771e5c221be5f6fcf2c687a7c6be7fe197691a0d849109e38c34a2")
+        signature = ('error: rs9: signature from "RS9 NON-PRODUCTION CANDIDATE FIXTURE <nonproduction@invalid>" is invalid\n'
+                     'error: failed to synchronize all databases (invalid or corrupted database (PGP signature))\n')
+        for text in (wrongkey, wrongkey.lower()):
+            receipt = CommandReceipt(['pacman', '-Sy'], 1, b'', text.encode(), executed=True)
+            self.assertEqual(ad.classify_rejection(receipt, family='pacman'), 'KEY_MISMATCH')
+            self.assertTrue(ad.qualify_tamper_rejection('wrongkey', receipt, FakeReceipt(1),
+                                                       FakeReceipt(1), family='pacman')[0])
+            self.assertFalse(ad.qualify_tamper_rejection('signature', receipt, FakeReceipt(1),
+                                                        FakeReceipt(1), family='pacman')[0])
+        receipt = CommandReceipt(['pacman', '-Sy'], 1, b'', signature.encode(), executed=True)
+        self.assertEqual(ad.classify_rejection(receipt, family='pacman'), 'SIGNATURE_REJECTED')
+        self.assertTrue(ad.qualify_tamper_rejection('signature', receipt, FakeReceipt(1),
+                                                   FakeReceipt(1), family='pacman')[0])
+        self.assertFalse(ad.qualify_tamper_rejection('wrongkey', receipt, FakeReceipt(1),
+                                                    FakeReceipt(1), family='pacman')[0])
+
+    def test_pacman_malformed_key_and_unrelated_causes_cannot_qualify_wrongkey(self):
+        generic = 'invalid or corrupted database (PGP signature)'
+        for text in ('error: rs9: key "not-hex" is unknown\n' + generic,
+                     'error: rs9: key "1234" is unknown\n' + generic,
+                     'error: key "' + 'A'*40 + '" could not be looked up remotely\n' + generic,
+                     'error: unknown key "not-hex"\n' + generic,
+                     'signature from "Fixture" is unknown trust\n' + generic,
+                     'Permission denied\n' + generic,
+                     'Network is unreachable\n' + generic,
+                     'target not found: fixture\n' + generic):
+            self.assertFalse(ad.qualify_tamper_rejection('wrongkey', FakeReceipt(1, err=text.encode()),
+                             FakeReceipt(1), FakeReceipt(1), family='pacman')[0], text)
+        for cause, category in [('Permission denied', 'PERMISSION_DENIED'),
+                                ('Could not connect', 'NETWORK_UNAVAILABLE'),
+                                ('target not found: fixture', 'PACKAGE_NOT_FOUND')]:
+            text = cause + '\nerror: rs9: key "' + 'A'*40 + '" is unknown\n' + generic
+            self.assertEqual(ad.classify_rejection(FakeReceipt(1, err=text.encode()), family='pacman'), category)
+
+    def test_successful_install_is_accepted_even_when_query_fails(self):
+        for kind in ('package', 'index', 'signature', 'wrongkey'):
+            result = ad.qualify_tamper_rejection(kind, FakeReceipt(1, err=b'unknown key'),
+                                                FakeReceipt(0), FakeReceipt(1), family='pacman')
+            self.assertFalse(result[0])
+            self.assertEqual(result[2], 'tampered-content-accepted')
+
+    def test_modes_or_unexecuted_receipts_cannot_create_positive_control(self):
+        for executed in (False, True):
+            receipts = {s: CommandReceipt(['fixture', s], 0, b'', b'', executed=executed)
+                        for s in ('configure', 'refresh', 'install', 'query')}
+            ctrl = ad.build_positive_control(family='pacman', image='img', platform='linux/amd64',
+                        product='fixture', setup_sha256='a'*64, success=True, receipts=receipts)
+            ok, _ = ad.validate_positive_control(ctrl, family='pacman', image='img', platform='linux/amd64',
+                                                 product='fixture', setup_sha256='a'*64)
+            self.assertEqual(ok, executed)
+        self.assertFalse(ad.validate_positive_control({'status':'pass', 'mode':0o644},
+                            family='apt', image='img', platform='linux/amd64', product='fixture')[0])
+
     def test_family_specific_tamper_wording_and_stages(self):
         # Representative diagnostic fixtures, not captured native qualification.
         rows = [
             ('apt', 'wrongkey', 'Missing key ABCDEF, which is needed to verify signature.', 'KEY_MISMATCH'),
             ('pacman', 'signature', 'signature from "Fixture" is invalid', 'SIGNATURE_REJECTED'),
             ('pacman', 'signature', 'invalid or corrupted database (PGP signature)', 'SIGNATURE_REJECTED'),
-            ('pacman', 'wrongkey', 'signature from "Fixture" is unknown trust', 'KEY_MISMATCH'),
+            ('pacman', 'wrongkey', 'error: rs9: key "' + 'A'*40 + '" is unknown', 'KEY_MISMATCH'),
             ('dnf', 'signature', 'repomd.xml GPG signature verification error: Bad GPG signature', 'SIGNATURE_REJECTED'),
             ('dnf', 'wrongkey', 'Signing key not found', 'KEY_MISMATCH'),
             ('dnf', 'wrongkey', 'Public key is not installed', 'KEY_MISMATCH'),

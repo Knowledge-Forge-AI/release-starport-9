@@ -195,8 +195,19 @@ def build_rpmlint_evidence(
     spec_path = Path(spec_path)
     rpm_path = Path(rpm_path)
 
-    spec_sha256 = digest(spec_path.read_bytes()) if spec_path.is_file() else ""
-    package_sha256 = digest(rpm_path.read_bytes()) if rpm_path.is_file() else ""
+    spec_sha256 = ""
+    try:
+        if spec_path.is_file():
+            spec_sha256 = digest(spec_path.read_bytes())
+    except OSError:
+        pass
+
+    package_sha256 = ""
+    try:
+        if rpm_path.is_file():
+            package_sha256 = digest(rpm_path.read_bytes())
+    except OSError:
+        pass
 
     parsed = parse_rpmlint_output(receipt.stdout_text, exit_code=receipt.exit_code, strict=False)
     if parsed["parse_complete"] and (parsed["summary"]["packages"] != 1 or parsed["summary"]["specfiles"] != 1):
@@ -303,61 +314,144 @@ def execute_rpmlint(
     spec_path = Path(spec_path)
     rpm_path = Path(rpm_path)
 
-    # 1. Query tool version if available, but version query failure must NOT replace blamed lint receipt
-    version_info: dict[str, Any] | None = None
+    # 1. Retain package and spec hashes before version/rpm probes or secondary fs operations
+    spec_sha256 = ""
     try:
-        v_receipt = runner.run(["rpmlint", "--version"], cwd=cwd)
-        if v_receipt.exit_code == 0:
-            version_info = {
-                "version": sanitize_text(v_receipt.stdout_text.strip(), 128),
-                "stdout_sha256": v_receipt.stdout_sha256,
-                "exit_code": 0,
-            }
-        else:
-            version_info = {
-                "version": "query-failed",
-                "exit_code": v_receipt.exit_code,
-                "stdout_sha256": v_receipt.stdout_sha256,
-            }
-    except Exception:
-        version_info = {"version": "query-unavailable"}
+        if spec_path.is_file():
+            spec_sha256 = digest(spec_path.read_bytes())
+    except OSError:
+        pass
 
+    package_sha256 = ""
     try:
-        package_version = runner.run(['rpm','-q','--qf','%{NAME}|%{VERSION}|%{RELEASE}|%{ARCH}\\n','rpmlint'],cwd=cwd)
-        version_info['package_query']={'exit_code':package_version.exit_code,
-            'stdout_sha256':package_version.stdout_sha256,'stderr_sha256':package_version.stderr_sha256,
-            'version':sanitize_text(package_version.stdout_text,128) if package_version.exit_code==0 else 'query-failed'}
-    except (ContractError,OSError):
-        version_info['package_query']={'status':'unavailable'}
+        if rpm_path.is_file():
+            package_sha256 = digest(rpm_path.read_bytes())
+    except OSError:
+        pass
 
-    # 2. Execute rpmlint
+    # 2. Execute causal rpmlint command FIRST
     rpmlint_cmd = ["rpmlint", str(spec_path), str(rpm_path)]
     receipt = runner.run(rpmlint_cmd, cwd=cwd)
 
-    version_info['tool_identity_sha256']=digest((receipt.tool_path or receipt.tool_name or 'rpmlint').encode())
-    version_info['tool']='rpmlint'
-
-    # 3. Build evidence (handles parsing, sanitization, count validation)
+    # 4. Build structured evidence (handles parsing, sanitization, count validation)
     try:
-        evidence = build_rpmlint_evidence(receipt,spec_path,rpm_path,product,rpm_identity=rpm_identity,
-            rpm_payload_digest=rpm_payload_digest,tool_version_info=version_info,allow_warnings=allow_warnings)
+        evidence = build_rpmlint_evidence(
+            receipt,
+            spec_path,
+            rpm_path,
+            product,
+            rpm_identity=rpm_identity,
+            rpm_payload_digest=rpm_payload_digest,
+            tool_version_info=None,
+            allow_warnings=allow_warnings,
+        )
     except ContractError as error:
         # Collection failure is still a lint failure with quarantinable bytes.
         err = ContractError("RPMLINT_FAILED", "Candidate RPM lint evidence collection failed", details={
             **error.details, "substage": "rpmlint", "tool": "rpmlint", "product": product,
             "exit_code": receipt.exit_code, "stdout_sha256": receipt.stdout_sha256,
-            "stderr_sha256": receipt.stderr_sha256})
+            "stderr_sha256": receipt.stderr_sha256,
+        })
+        err.receipt = receipt
         err.package_path, err.spec_path = str(rpm_path), str(spec_path)
         for name, path in (("package", rpm_path), ("spec", spec_path)):
             try:
-                value = digest(path.read_bytes())
+                value = digest(path.read_bytes()) if path.is_file() else ""
             except OSError:
                 value = ""
             setattr(err, name + "_sha256", value)
-        raise err from None
-    (Path(cwd) if cwd else spec_path.parent).joinpath('rpmlint-findings.json').write_bytes(canonical(evidence))
 
-    # 4. Check cleanliness
+        ev = getattr(error, "evidence", None)
+        if ev is None:
+            ev = {
+                "schema": RPMLINT_EVIDENCE_SCHEMA,
+                "product": product,
+                "package_file": rpm_path.name,
+                "package_sha256": package_sha256,
+                "spec_file": spec_path.name,
+                "spec_sha256": spec_sha256,
+                "clean": False,
+                "status": "fail",
+                "reason_token": error.details.get("reason_token", "collection-failed"),
+                "tool_receipt": {
+                    "tool": "rpmlint",
+                    "exit_code": receipt.exit_code,
+                    "stdout_sha256": receipt.stdout_sha256,
+                    "stderr_sha256": receipt.stderr_sha256,
+                    "stdout_bytes": len(receipt.stdout_bytes),
+                    "stderr_bytes": len(receipt.stderr_bytes),
+                },
+                "session_headers": getattr(error, "parsed", {}).get("session_headers", []) if hasattr(error, "parsed") else [],
+                "findings": getattr(error, "parsed", {}).get("findings", []) if hasattr(error, "parsed") else [],
+                "groups": getattr(error, "parsed", {}).get("groups", []) if hasattr(error, "parsed") else [],
+                "findings_truncated": False,
+                "parse_complete": False,
+                "evidence_status": "collection-failed",
+                "findings_summary": None,
+                "collection_error": error.code,
+            }
+        err.evidence = ev
+
+        # Secondary fs operations cannot replace original lint error
+        try:
+            findings_dir = Path(cwd) if cwd else spec_path.parent
+            findings_dir.mkdir(parents=True, exist_ok=True)
+            (findings_dir / "rpmlint-findings.json").write_bytes(canonical(ev))
+        except OSError:
+            ev["local_findings_write"] = "failed"
+
+        raise err from None
+
+    # Freeze the identities observed before diagnostic probes.
+    evidence["spec_sha256"] = spec_sha256
+    evidence["package_sha256"] = package_sha256
+    evidence["identity_status"] = {"spec": "available" if spec_sha256 else "unavailable",
+                                   "package": "available" if package_sha256 else "unavailable"}
+    if evidence["clean"] and (not spec_sha256 or not package_sha256):
+        evidence.update(clean=False, status="fail", reason_token="input-identity-unavailable")
+
+    # 3. Query tool/package versions; failures must NOT replace causal lint receipt
+    version_info: dict[str, Any] = {
+        "tool": "rpmlint",
+        "tool_identity_sha256": digest((receipt.tool_path or receipt.tool_name or "rpmlint").encode()),
+    }
+    try:
+        v_receipt = runner.run(["rpmlint", "--version"], cwd=cwd)
+        if v_receipt.exit_code == 0:
+            version_info["version"] = sanitize_text(v_receipt.stdout_text.strip(), 128)
+            version_info["stdout_sha256"] = v_receipt.stdout_sha256
+            version_info["stderr_sha256"] = v_receipt.stderr_sha256
+            version_info["exit_code"] = 0
+        else:
+            version_info["version"] = "query-failed"
+            version_info["exit_code"] = v_receipt.exit_code
+            version_info["stdout_sha256"] = v_receipt.stdout_sha256
+            version_info["stderr_sha256"] = v_receipt.stderr_sha256
+    except Exception:
+        version_info["version"] = "query-unavailable"
+
+    try:
+        package_version = runner.run(["rpm", "-q", "--qf", "%{NAME}|%{VERSION}|%{RELEASE}|%{ARCH}\\n", "rpmlint"], cwd=cwd)
+        version_info["package_query"] = {
+            "exit_code": package_version.exit_code,
+            "stdout_sha256": package_version.stdout_sha256,
+            "stderr_sha256": package_version.stderr_sha256,
+            "version": sanitize_text(package_version.stdout_text, 128) if package_version.exit_code == 0 else "query-failed",
+        }
+    except Exception:
+        version_info["package_query"] = {"status": "unavailable"}
+
+    evidence["tool_version"] = version_info
+
+    # Secondary fs operations cannot replace original lint error
+    try:
+        findings_dir = Path(cwd) if cwd else spec_path.parent
+        findings_dir.mkdir(parents=True, exist_ok=True)
+        (findings_dir / "rpmlint-findings.json").write_bytes(canonical(evidence))
+    except OSError:
+        evidence["local_findings_write"] = "failed"
+
+    # 5. Check cleanliness
     if not evidence["clean"]:
         findings = evidence["findings"]
         primary_check = findings[0]["check"] if findings else evidence["reason_token"]
@@ -379,6 +473,7 @@ def execute_rpmlint(
             f"Candidate RPM did not pass rpmlint: {primary_check}",
             details=details,
         )
+        err.receipt = receipt
         err.evidence = evidence
         err.package_path = str(rpm_path)
         err.spec_path = str(spec_path)

@@ -24,6 +24,7 @@ def safe_details(details):
                     "userns_policy", "code", "message_sha256"})
     allowed.update({"observed_field_count", "observed_field_tokens", "observed_fields_truncated"})
     allowed.update({"cause", "limit", "observed", "maximum", "counters", "max"})
+    allowed.update({"elapsed_ms", "deadline_seconds"})
     result, dropped = {}, False
     if not isinstance(details, dict):
         return {}
@@ -33,6 +34,18 @@ def safe_details(details):
             continue
         if key not in allowed:
             dropped = True
+            continue
+        if key == "elapsed_ms":
+            if type(value) is int and 0 <= value <= 86400 * 1000 * 7:
+                result[key] = value
+            else:
+                dropped = True
+            continue
+        if key == "deadline_seconds":
+            if type(value) is int and 0 <= value <= 86400 * 7:
+                result[key] = value
+            else:
+                dropped = True
             continue
         if key in {"observed", "maximum"}:
             if type(value) is int and 0 <= value < 2**64:

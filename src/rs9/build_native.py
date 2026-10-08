@@ -27,6 +27,7 @@ import shutil
 import stat
 import subprocess
 import tarfile
+import time
 from typing import Any, Mapping
 
 from rs9.archives import inspect_archive
@@ -205,6 +206,7 @@ class SubprocessRunner(CommandRunner):
         if env:
             cmd_env.update(env)
 
+        start_time = time.monotonic()
         try:
             proc = subprocess.run(
                 argv,
@@ -215,13 +217,33 @@ class SubprocessRunner(CommandRunner):
                 timeout=self.timeout,
             )
         except subprocess.TimeoutExpired as error:
-            raise ContractError("TOOL_TIMEOUT", "Native tool exceeded its bounded execution time",
-                details={"substage": "tool-execution", "tool": Path(tool).name,
-                         "stdout_sha256": digest(error.stdout or b""),
-                         "stderr_sha256": digest(error.stderr or b"")}) from None
+            elapsed_ms = max(0, int(round((time.monotonic() - start_time) * 1000)))
+            deadline = error.timeout if error.timeout is not None else self.timeout
+            deadline_seconds = int(round(deadline)) if isinstance(deadline, (int, float)) else None
+            out = error.stdout if error.stdout is not None else error.output
+            err = error.stderr
+            out_b = out if isinstance(out, (bytes, bytearray)) else (out.encode() if isinstance(out, str) else b"")
+            err_b = err if isinstance(err, (bytes, bytearray)) else (err.encode() if isinstance(err, str) else b"")
+            details = {
+                "substage": "tool-execution",
+                "tool": Path(tool).name,
+                "stdout_sha256": digest(out_b),
+                "stderr_sha256": digest(err_b),
+                "elapsed_ms": elapsed_ms,
+            }
+            if deadline_seconds is not None:
+                details["deadline_seconds"] = deadline_seconds
+            raise ContractError(
+                "TOOL_TIMEOUT",
+                "Native tool exceeded its bounded execution time",
+                details=details,
+            ) from None
         except OSError:
-            raise ContractError("TOOL_EXECUTION", "Native tool could not be executed",
-                details={"substage": "tool-execution", "tool": Path(tool).name}) from None
+            raise ContractError(
+                "TOOL_EXECUTION",
+                "Native tool could not be executed",
+                details={"substage": "tool-execution", "tool": Path(tool).name},
+            ) from None
         return CommandReceipt(
             argv,
             proc.returncode,

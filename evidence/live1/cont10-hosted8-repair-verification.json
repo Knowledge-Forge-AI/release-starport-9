@@ -1,0 +1,507 @@
+{
+  "schema": "rs9.cont10-source-verification.v1",
+  "stage": "closeout",
+  "status": "terminal-amended-source-qualified-native-pending",
+  "parent": "ab4b01d612ad2e2645ab649fc5fcf1e5c5d851eb",
+  "original_scope": [
+    "public APT permissions without byte or trust changes",
+    "lossless RPM lint diagnostics and quarantine",
+    "closed pacman wrong-key classification with bound positive controls",
+    "bounded preparation timeout attribution",
+    "source qualification and prepared attended run-9 handoff"
+  ],
+  "proposal_disposition": "amend",
+  "proposal_bytes": 19669,
+  "proposal_sha256": "89dd2b304635e1db6f90d2f40f3de54abfd3fedbeed1f3250c161eae74129a6b",
+  "observed_stage_deltas": [],
+  "advisory_findings_disposition": [
+    {
+      "finding": 1,
+      "disposition": "amend",
+      "resolution": "Normalized observed fixed pacman 40-hex diagnostic; unknown-trust generic fallback excluded for pacman. Actual invalid-signature sample supersedes speculative corrupted-issuer identity sets."
+    },
+    {
+      "finding": 2,
+      "disposition": "amend",
+      "resolution": "Canonical causal RPM evidence outside safe_details capacity. Typed preparation timing and sanitized gate detail objects."
+    },
+    {
+      "finding": 3,
+      "disposition": "amend",
+      "resolution": "Optional recorder preserves shared signatures; container-tool lookup/version boundaries recorded. Exact phase-owned tool containers and bounded cleanup."
+    },
+    {
+      "finding": 4,
+      "disposition": "accept",
+      "resolution": "Existing operational inventory and adoption handle root scratch and Serena. No manager escalation or deletion."
+    },
+    {
+      "finding": 5,
+      "disposition": "amend",
+      "resolution": "Causal receipt attached directly and evidence parsed before guarded probes. Real lint backend reproduces parent AttributeError through read-only parent source."
+    },
+    {
+      "finding": 6,
+      "disposition": "accept",
+      "resolution": "Descriptor-relative owned directory modes cover pool, compressed indexes, by-hash, tamper rewrites and second Pages staging projection."
+    },
+    {
+      "finding": 7,
+      "disposition": "accept",
+      "resolution": "Evidence kit read and selected identities verified before repair; no invented lint stream or historical timeout substage."
+    }
+  ],
+  "production_enabled": false,
+  "publication_authority": false,
+  "native_qualification": false,
+  "historical_run": {
+    "run_id": 37681402170,
+    "attempt": 1,
+    "event": "push",
+    "qualification": "not-qualified",
+    "reason": "HOSTED_GATES",
+    "adoption_and_collection_preserved": true,
+    "rerun": false
+  },
+  "evidence": {
+    "selected_identities_verified": 12,
+    "source": "supplied manager evidence kit",
+    "pacman_wrongkey_stderr_sha256": "51733456b7771e5c221be5f6fcf2c687a7c6be7fe197691a0d849109e38c34a2",
+    "actual_rpm_lint_stream_retained": false,
+    "amd64_historical_timeout_substage": "unknown",
+    "rpm_parent_reproduction": {
+      "schema": "rs9.cont10-parent-rpm-reproduction.v1",
+      "parent": "ab4b01d612ad2e2645ab649fc5fcf1e5c5d851eb",
+      "source_sha256": "147327012cb7abc1736c138771cc924726f8212ce9878183e764766fb09e86e6",
+      "actual_receipt_api": true,
+      "actual_rpmlint_backend": true,
+      "fixture_transport_only": true,
+      "native_qualification": false,
+      "reproduced": true,
+      "exception_type": "AttributeError",
+      "missing_receipt_field": "argv",
+      "causal_source_line": 373
+    },
+    "public_parent_byte_comparison": {
+      "schema": "rs9.cont10-public-parent-byte-comparison.v1",
+      "parent": "ab4b01d612ad2e2645ab649fc5fcf1e5c5d851eb",
+      "source_sha256": "ee38579beddd0823ca3c0fba5447e72defa467e6def1e63c0d065a9c566b615d",
+      "fixture_signer_only": true,
+      "native_qualification": false,
+      "runs": [
+        {
+          "umask": "022",
+          "public_files": 20,
+          "parent_bytes_identical": true,
+          "file_hashes_identical": true,
+          "public_modes": "pass"
+        },
+        {
+          "umask": "077",
+          "public_files": 20,
+          "parent_bytes_identical": true,
+          "file_hashes_identical": true,
+          "public_modes": "pass"
+        }
+      ]
+    }
+  },
+  "skip_reasons": [
+    {
+      "test": "test_raw_invalid_utf8_path_roundtrip_where_supported (tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported)",
+      "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them"
+    },
+    {
+      "test": "test_socket_and_arbitrary_symlink_targets_are_never_read (tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read)",
+      "reason": "sandbox denies local socket creation; socket record grammar tested separately"
+    },
+    {
+      "test": "test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family (tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family)",
+      "reason": "GnuPG binary not available"
+    },
+    {
+      "test": "test_captured_reference_tree_and_byte_comparison (tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison)",
+      "reason": "live capture directory not supplied"
+    },
+    {
+      "test": "test_captured_release_bytes_and_deterministic_goldens (tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens)",
+      "reason": "live capture directory not supplied"
+    },
+    {
+      "test": "test_reference_semantic_facts_detect_material_recipe_drift (tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift)",
+      "reason": "live capture directory not supplied"
+    },
+    {
+      "test": "test_both_real_release_captures_replay_through_same_core (tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core)",
+      "reason": "both live capture directories required"
+    },
+    {
+      "test": "test_reauthenticate_live_bytes_and_deterministic_records (tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records)",
+      "reason": "live capture directory not supplied"
+    },
+    {
+      "test": "test_aarch64_darwin (tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin)",
+      "reason": "official archive directory not locatable"
+    },
+    {
+      "test": "test_aarch64_linux (tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux)",
+      "reason": "official archive directory not locatable"
+    },
+    {
+      "test": "test_x86_64_linux (tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux)",
+      "reason": "official archive directory not locatable"
+    },
+    {
+      "test": "test_construct_candidate_signed_tree_with_fixture (tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture)",
+      "reason": "GnuPG binary not available"
+    },
+    {
+      "test": "test_real_gnupg_fixture_signs_and_rejects_every_tamper (tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper)",
+      "reason": "GnuPG binary not available"
+    },
+    {
+      "test": "setUpClass (tests.test_signing_fixture.SigningFixtureTests)",
+      "reason": "GnuPG binary not available in environment"
+    }
+  ],
+  "counting_note": "1373 discovered cases: 1350 successes, 13 individual skips and 10 cases omitted by one skipped signing class. unittest testsRun is 1363; skip events are 14.",
+  "initial_nonqualifying_attempts": [
+    {
+      "log": ".scratch/cont10-hosted8-repair/logs/cumulative-022-attempt1.log",
+      "tests_run": 794,
+      "failures": 1,
+      "errors": 42,
+      "cause": "scratch runner omitted repository root; stale previous-phase changed-path assertion"
+    },
+    {
+      "log": ".scratch/cont10-hosted8-repair/logs/cumulative-022-attempt2.log",
+      "tests_run": 1359,
+      "failures": 0,
+      "errors": 4,
+      "cause": "existing test helper imports require tests directory on process import path"
+    }
+  ],
+  "workers": {
+    "disposition": "used",
+    "kind": "gemini",
+    "observed_invocations": 3,
+    "native_luna_invocations": 0,
+    "sonnet_invocations": 0,
+    "cleanup_proven": true,
+    "results": "partial worker results adopted with parent corrections and fresh cumulative verification",
+    "dispatcher_checkpoint_credit": false
+  },
+  "preserved_contracts": [
+    "private atomic-write default 0600 and private store byte retention",
+    "signing fixture source unchanged; real GnuPG tests explicitly unavailable",
+    "original image/platform/product/setup positive controls and executed commands",
+    "normal pacman/Nebular/Burst guest-smoke and wheel/authentication/observation source regressions",
+    "required Linux Nix A lanes; PRoot experimental; Pages unknown remains unknown",
+    "root scratch and Serena operational exclusion; external manager attestation authority"
+  ],
+  "pending_native": [
+    "actual _apt readable/traversable probes and untampered refresh/install",
+    "real RPM lint findings and clean qualification on both lanes",
+    "Debian amd64 preparation substage diagnosis",
+    "one new manager-approved diagnostic hosted run"
+  ],
+  "deferred": [
+    "Linux Nix A redesign",
+    "Pages TLS remediation"
+  ],
+  "remote_verification": {
+    "branch": "main",
+    "local_head_and_cached_origin_main": "match parent",
+    "live_remote": "unavailable: DNS resolution",
+    "operator_live_preflight_required": true
+  },
+  "non_production_boundary": {
+    "source_repository_staged": false,
+    "source_repository_committed": false,
+    "pushed": false,
+    "hosted_run_executed": false,
+    "external_reviewer_invoked": false,
+    "readiness_and_production_flags_preserved_false": true
+  },
+  "handoff": {
+    "operator": "operators/live1/run-hosted9.py",
+    "status": "prepared-not-executed",
+    "manifest": "operators/live1/candidate-manifest.json",
+    "manager_acceptance": "required external exact attestation",
+    "final_tree_and_manifest_digest": "supplied separately after reporting writes to avoid self-reference",
+    "collect_only": "preserves original not-before, run and commit identities"
+  },
+  "dispatcher_pre_final": "reviewed_with_findings",
+  "final_verification": "provider-local terminal source qualification; native pending externally",
+  "required_independent_review_lenses": [
+    "output modes and private-store isolation",
+    "RPM diagnostics custody",
+    "wrong-key classification",
+    "original positive controls",
+    "timeout attribution",
+    "non-production boundary",
+    "source-adoption and scratch contract"
+  ],
+  "implementation_tests": [
+    {
+      "umask": "022",
+      "tests_run": 1359,
+      "discovered_tests": 1369,
+      "passed": 1346,
+      "failures": 0,
+      "errors": 0,
+      "skipped_tests": 13,
+      "skipped_classes": 1,
+      "class_skipped_tests": 10,
+      "skipped_total": 23,
+      "skip_events": 14,
+      "expected_failures": 0,
+      "unexpected_successes": 0,
+      "elapsed_seconds": 46.136,
+      "resource_warning": "error",
+      "successful": true,
+      "log": ".scratch/cont10-hosted8-repair/logs/cumulative-022.log",
+      "log_sha256": "f0e8560abb01e0257d19f7a7379f9da741977982d5a1231366bbeae426dddaf8",
+      "command": "PYTHONPATH=src:.:tests PYTHONDONTWRITEBYTECODE=1 python3 .scratch/cont10-hosted8-repair/run_suite.py 022",
+      "runner": "unittest discovery; direct addSuccess counting; process-local umask"
+    },
+    {
+      "umask": "077",
+      "tests_run": 1359,
+      "discovered_tests": 1369,
+      "passed": 1346,
+      "failures": 0,
+      "errors": 0,
+      "skipped_tests": 13,
+      "skipped_classes": 1,
+      "class_skipped_tests": 10,
+      "skipped_total": 23,
+      "skip_events": 14,
+      "expected_failures": 0,
+      "unexpected_successes": 0,
+      "elapsed_seconds": 44.388,
+      "resource_warning": "error",
+      "successful": true,
+      "log": ".scratch/cont10-hosted8-repair/logs/cumulative-077.log",
+      "log_sha256": "801a46aefa227958c2ea530772c286c7e7859d268e6541969adba05de819b978",
+      "command": "PYTHONPATH=src:.:tests PYTHONDONTWRITEBYTECODE=1 python3 .scratch/cont10-hosted8-repair/run_suite.py 077",
+      "runner": "unittest discovery; direct addSuccess counting; process-local umask"
+    }
+  ],
+  "implementation_tested_source": {
+    "files": 224,
+    "inventory_sha256": "1f5e04d6f390f2caf429f767fbb8c62e249339ac42d3bff881b17a3b161f2ec1",
+    "scope": "Python source/tests/operators, workflows, Nix and operator configuration; excludes self-referential manifest and reporting-only documents"
+  },
+  "implementation_static_checks": {
+    "schema": "rs9.cont10-static-checks.v1",
+    "python_parsed": 208,
+    "changed_python_compiled": 26,
+    "credential_scanned": 366,
+    "relative_links_checked": 267,
+    "missing_relative_links": [],
+    "diff_check_exit": 0,
+    "index_unchanged": true,
+    "protected_source_unchanged": {
+      ".github/workflows/rs9-candidate-tests.yml": true,
+      "operators/live1/targets.json": true,
+      "flake.nix": true,
+      "src/rs9/signing_fixture.py": true,
+      "src/rs9/hosted_smoke.py": true,
+      "src/rs9/hosted_container_smoke.py": true,
+      "src/rs9/hosted_observe.py": true,
+      "src/rs9/candidate_readiness.py": true,
+      "src/rs9/candidate_inventory.py": true
+    },
+    "readiness_false": true,
+    "production_false": true,
+    "publication_false": true,
+    "successful": true
+  },
+  "implementation_reporting_readback": {
+    "scope": "updated manifest, hygiene and workflow static checks",
+    "tests_run": 25,
+    "passed": 25,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "log": ".scratch/cont10-hosted8-repair/logs/reporting-readback.log"
+  },
+  "tests": [
+    {
+      "umask": "022",
+      "tests_run": 1363,
+      "discovered_tests": 1373,
+      "passed": 1350,
+      "failures": 0,
+      "errors": 0,
+      "skipped_tests": 13,
+      "skipped_classes": 1,
+      "class_skipped_tests": 10,
+      "skipped_total": 23,
+      "skip_events": 14,
+      "expected_failures": 0,
+      "unexpected_successes": 0,
+      "elapsed_seconds": 45.893,
+      "resource_warning": "error",
+      "successful": true,
+      "log": ".scratch/cont10-hosted8-repair/closeout-20261007/logs/cumulative-022-final.log",
+      "log_sha256": "c5b95b05bb7ebd15c464882adace1ce29bba7a976aed1803caee8c139a66d410",
+      "command": "rtk env PYTHONPATH=src:.:tests PYTHONDONTWRITEBYTECODE=1 python3 .scratch/cont10-hosted8-repair/run_suite.py 022 .scratch/cont10-hosted8-repair/closeout-20261007/tests-022-final.json",
+      "runner": "unittest discovery; direct addSuccess counting; process-local umask"
+    },
+    {
+      "umask": "077",
+      "tests_run": 1363,
+      "discovered_tests": 1373,
+      "passed": 1350,
+      "failures": 0,
+      "errors": 0,
+      "skipped_tests": 13,
+      "skipped_classes": 1,
+      "class_skipped_tests": 10,
+      "skipped_total": 23,
+      "skip_events": 14,
+      "expected_failures": 0,
+      "unexpected_successes": 0,
+      "elapsed_seconds": 46.995,
+      "resource_warning": "error",
+      "successful": true,
+      "log": ".scratch/cont10-hosted8-repair/closeout-20261007/logs/cumulative-077-final.log",
+      "log_sha256": "fae9ddc0705f053e4b22d7cc4669b6be0cb0e24243eaa87915c936b0e6107281",
+      "command": "rtk env PYTHONPATH=src:.:tests PYTHONDONTWRITEBYTECODE=1 python3 .scratch/cont10-hosted8-repair/run_suite.py 077 .scratch/cont10-hosted8-repair/closeout-20261007/tests-077-final.json",
+      "runner": "unittest discovery; direct addSuccess counting; process-local umask"
+    }
+  ],
+  "tested_source": {
+    "files": 224,
+    "inventory_sha256": "dfef7e226ccc89b0ea145174a7e4822bec5e17e5193320caf9e27c457b1fecfa",
+    "scope": "Python source/tests/operators, workflows, Nix and operator configuration; excludes self-referential manifest and reporting-only documents"
+  },
+  "terminal_closeout": {
+    "disposition": "amend",
+    "rationale": "Accept the reviewed repair contracts and apply all five bounded advisory corrections or evidence improvements",
+    "reviewed_candidate_tree": "2e6cc63861f0d9263bccfd4a01a46a7ab8544e5e",
+    "reviewed_manifest_sha256": "da670452729bc3faf8f01b2547b050bfd3ac2fc0f30f84715792e7935c837344",
+    "prior_test_source_verified_before_changes": true,
+    "findings": [
+      {
+        "finding": "A",
+        "disposition": "amend",
+        "resolution": "Construction credit requires retained causal package_sha256; unavailable identities fail construction without masking lint"
+      },
+      {
+        "finding": "B",
+        "disposition": "amend",
+        "resolution": "Cleanup copies the runner chain for a local capped deadline; None and nested cleanup preserve ordinary deadlines and receipt sinks"
+      },
+      {
+        "finding": "C",
+        "disposition": "amend",
+        "resolution": "Four mode-error sites use constant messages and bounded substage/reason details"
+      },
+      {
+        "finding": "D",
+        "disposition": "amend",
+        "resolution": "Index directories are created only through the confined public writer; linked dists cannot create outside directories"
+      },
+      {
+        "finding": "E",
+        "disposition": "amend",
+        "resolution": "Real post-commit inventory continuation accepts reviewed bytes and rejects drift before collection; time and operational state preserved"
+      }
+    ],
+    "terminal_delta_paths": [
+      "docs/live1-native-client-cont10.md",
+      "evidence/live1/cont10-hosted8-repair-verification.json",
+      "operators/live1/candidate-manifest.json",
+      "src/rs9/hosted_deb.py",
+      "src/rs9/hosted_packaging.py",
+      "src/rs9/repo_apt.py",
+      "tests/test_hosted_deb.py",
+      "tests/test_hosted_packaging.py",
+      "tests/test_preparation_diagnostics.py",
+      "tests/test_repo_apt.py",
+      "tests/test_rpm_failure_integration.py",
+      "tests/test_run_hosted9.py"
+    ],
+    "terminal_delta_binding": "Final cumulative tree and manifest digest supplied separately in terminal handoff",
+    "required_review_lenses": "All seven accepted by dispatcher pre-final review",
+    "review_limitations": "Reviewer could not read evidence kit; no reviewer tests or digest recomputation",
+    "additional_review_obtained": false,
+    "focused_feedback": {
+      "tests_run": 170,
+      "passed": 168,
+      "skipped": 2,
+      "failures": 0,
+      "errors": 0,
+      "resource_warning": "error",
+      "log": ".scratch/cont10-hosted8-repair/closeout-20261007/logs/focused-corrections.log"
+    },
+    "nonqualifying_cumulative_attempt": {
+      "umask": "022",
+      "tests_run": 1363,
+      "passed": 1350,
+      "failures": 0,
+      "errors": 1,
+      "skipped_total": 22,
+      "cause": "Long scratch temporary path exceeded Unix-socket path capacity; harness corrected without product edits",
+      "log": ".scratch/cont10-hosted8-repair/closeout-20261007/logs/cumulative-022.log"
+    },
+    "preserved_operational_state": {
+      "entries_checked": 138,
+      "bytes_and_modes_unchanged": true,
+      "new_logs": "ignored task closeout subdirectory only",
+      "temporary_path_exception": "Inherited platform temporary directory used for Unix-socket path limits"
+    },
+    "workers": {
+      "disposition": "declined",
+      "reason": "Small coupled terminal advisory corrections handled locally"
+    },
+    "manager_attestation": "External exact manager acceptance remains required for run-9 adoption",
+    "hosted_run_9_executed": false,
+    "provider_git_mutations": false,
+    "native_qualification": false,
+    "unresolved_concerns": "Native APT readback, real RPM lint and amd64 substage evidence pending externally; Linux Nix A and Pages TLS deferred",
+    "dispatcher_finalization": "Owned and reported separately by dispatcher"
+  },
+  "static_checks": {
+    "schema": "rs9.cont10-static-checks.v1",
+    "python_parsed": 208,
+    "changed_python_compiled": 26,
+    "credential_scanned": 366,
+    "relative_links_checked": 267,
+    "missing_relative_links": [],
+    "diff_check_exit": 0,
+    "index_unchanged": true,
+    "protected_source_unchanged": {
+      ".github/workflows/rs9-candidate-tests.yml": true,
+      "operators/live1/targets.json": true,
+      "flake.nix": true,
+      "src/rs9/signing_fixture.py": true,
+      "src/rs9/hosted_smoke.py": true,
+      "src/rs9/hosted_container_smoke.py": true,
+      "src/rs9/hosted_observe.py": true,
+      "src/rs9/candidate_readiness.py": true,
+      "src/rs9/candidate_inventory.py": true
+    },
+    "readiness_false": true,
+    "production_false": true,
+    "publication_false": true,
+    "successful": true
+  },
+  "reporting_readback": {
+    "scope": "final reporting/manifest, hygiene and workflow static contracts",
+    "discovered_tests": 27,
+    "tests_run": 27,
+    "passed": 27,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "resource_warning": "error",
+    "umask": "077",
+    "successful": true,
+    "log": ".scratch/cont10-hosted8-repair/closeout-20261007/logs/reporting-readback.log",
+    "command": "rtk env PYTHONPATH=src:.:tests PYTHONDONTWRITEBYTECODE=1 python3 .scratch/cont10-hosted8-repair/closeout-20261007/reporting_readback.py"
+  }
+}

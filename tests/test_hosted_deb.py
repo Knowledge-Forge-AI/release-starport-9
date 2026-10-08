@@ -10,9 +10,12 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
+import stat
+import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -219,7 +222,7 @@ class ScriptedDocker:
                     'index': b'E: Failed to fetch InRelease Hash Sum mismatch'},
                 'pacman': {
                     'signature': b'invalid or corrupted database (PGP signature)',
-                    'wrongkey': b'signature from "Fixture" is unknown trust',
+                    'wrongkey': b'error: rs9: key "6F3F25BA5FD8853E81F8FF50D3C6424FD7907037" is unknown',
                     'index': b'invalid or corrupted database'},
                 'dnf': {
                     'signature': b'repomd.xml: Bad GPG signature',
@@ -1540,6 +1543,292 @@ class RpmCustodyTests(unittest.TestCase):
         archives = hd._offline_npm_archives(burst_capture, "theme-forge-stellar-burst", inputs, None, scratch)
         self.assertIsNotNone(archives)
         self.assertIn("node_modules/min-dep", archives)
+
+
+class TimeoutRunner(MockCommandRunner):
+    """Simulates real execution with TimeoutExpired on specific tool boundaries."""
+
+    def __init__(self, timeout_on_substage: str = "", *, elapsed_ms: int = 1500, deadline: int = 30):
+        super().__init__(available_tools={"docker": "/usr/bin/docker"})
+        self.timeout_on_substage = timeout_on_substage
+        self.elapsed_ms = elapsed_ms
+        self.deadline = deadline
+        self.recorded_calls: list[list[str]] = []
+
+    def run(self, argv, *, cwd=None, env=None):
+        self.recorded_calls.append(list(argv))
+        verb = argv[1] if len(argv) > 1 else ""
+        if verb == "pull" and self.timeout_on_substage == "pull":
+            raise ContractError("TOOL_TIMEOUT", "docker pull exceeded deadline",
+                                details={"tool": "docker", "stdout_sha256": digest(b""), "stderr_sha256": digest(b"pull-timeout"),
+                                         "elapsed_ms": self.elapsed_ms, "deadline_seconds": self.deadline})
+        if verb == "image" and self.timeout_on_substage == "inspect":
+            raise ContractError("TOOL_TIMEOUT", "docker image inspect exceeded deadline",
+                                details={"tool": "docker", "stdout_sha256": digest(b""), "stderr_sha256": digest(b"inspect-timeout"),
+                                         "elapsed_ms": self.elapsed_ms, "deadline_seconds": self.deadline})
+        if verb == "run" and self.timeout_on_substage == "release-probe" and any("os-release" in a for a in argv):
+            raise ContractError("TOOL_TIMEOUT", "docker run release-probe exceeded deadline",
+                                details={"tool": "docker", "stdout_sha256": digest(b""), "stderr_sha256": digest(b"probe-timeout"),
+                                         "elapsed_ms": self.elapsed_ms, "deadline_seconds": self.deadline})
+        if verb == "run" and self.timeout_on_substage == "provision" and any("rs9-prov" in a for a in argv):
+            raise ContractError("TOOL_TIMEOUT", "docker run provision exceeded deadline",
+                                details={"tool": "apt", "stdout_sha256": digest(b""), "stderr_sha256": digest(b"prov-timeout"),
+                                         "elapsed_ms": self.elapsed_ms, "deadline_seconds": self.deadline})
+        if verb == "commit" and self.timeout_on_substage == "commit":
+            raise ContractError("TOOL_TIMEOUT", "docker commit exceeded deadline",
+                                details={"tool": "docker", "stdout_sha256": digest(b""), "stderr_sha256": digest(b"commit-timeout"),
+                                         "elapsed_ms": self.elapsed_ms, "deadline_seconds": self.deadline})
+        # Default success responses
+        if verb == "pull":
+            return CommandReceipt(argv, 0, b"", b"", tool_name="docker", executed=True)
+        if verb == "image":
+            return CommandReceipt(argv, 0, f"ubuntu@sha256:{DIGEST}|amd64".encode(), b"", tool_name="docker", executed=True)
+        if verb == "run" and any("os-release" in a for a in argv):
+            return CommandReceipt(argv, 0, (OS_RELEASE + "amd64\n").encode(), b"", tool_name="docker", executed=True)
+        if verb == "run":
+            return CommandReceipt(argv, 0, b"", b"", tool_name="docker", executed=True)
+        if verb == "commit":
+            return CommandReceipt(argv, 0, b"", b"", tool_name="docker", executed=True)
+        if verb == "rm":
+            return CommandReceipt(argv, 0, b"", b"", tool_name="docker", executed=True)
+        return CommandReceipt(argv, 0, b"", b"", tool_name="docker", executed=True)
+
+
+class PreparationDiagnosticsAndTimeoutTests(unittest.TestCase):
+    def test_prepare_environment_pull_timeout_preserves_substage_and_details(self):
+        runner = TimeoutRunner("pull", elapsed_ms=1200, deadline=300)
+        with self.assertRaises(ContractError) as caught:
+            hd.prepare_environment(runner, "amd64", {})
+        err = caught.exception
+        self.assertEqual(err.code, "TOOL_TIMEOUT")
+        self.assertEqual(err.details["substage"], "pull")
+        self.assertEqual(err.details["tool"], "docker")
+        self.assertEqual(err.details["elapsed_ms"], 1200)
+        self.assertEqual(err.details["deadline_seconds"], 300)
+        self.assertIn("stderr_sha256", err.details)
+
+    def test_prepare_environment_inspect_timeout_preserves_substage_and_details(self):
+        runner = TimeoutRunner("inspect", elapsed_ms=1300, deadline=300)
+        with self.assertRaises(ContractError) as caught:
+            hd.prepare_environment(runner, "amd64", {})
+        err = caught.exception
+        self.assertEqual(err.code, "TOOL_TIMEOUT")
+        self.assertEqual(err.details["substage"], "inspect")
+        self.assertEqual(err.details["tool"], "docker")
+        self.assertEqual(err.details["elapsed_ms"], 1300)
+
+    def test_prepare_environment_release_probe_timeout_exact_cleanup(self):
+        runner = TimeoutRunner("release-probe", elapsed_ms=2500, deadline=60)
+        with self.assertRaises(ContractError) as caught:
+            hd.prepare_environment(runner, "amd64", {})
+        err = caught.exception
+        self.assertEqual(err.code, "TOOL_TIMEOUT")
+        self.assertEqual(err.details["substage"], "release-probe")
+        self.assertEqual(err.details["tool"], "docker")
+        self.assertEqual(err.details["cleanup"], "complete")
+        self.assertEqual(err.details["elapsed_ms"], 2500)
+        self.assertEqual(err.details["deadline_seconds"], 60)
+        # Check that rm -f was called on the exact probe container name
+        rm_calls = [call for call in runner.recorded_calls if len(call) >= 4 and call[1:3] == ["rm", "-f"]]
+        self.assertEqual(len(rm_calls), 1)
+        probe_name = rm_calls[0][3]
+        self.assertTrue(probe_name.startswith("rs9-release-probe-"))
+
+    def test_provision_image_build_and_client_timeout_and_cleanup(self):
+        # Build provision timeout
+        runner_prov = TimeoutRunner("provision", elapsed_ms=3100, deadline=120)
+        with self.assertRaises(ContractError) as caught_prov:
+            hd.provision_image(runner_prov, "apt", "ref", "linux/amd64", "tag:v1", ["dpkg-dev"], substage_prefix="build-")
+        err_prov = caught_prov.exception
+        self.assertEqual(err_prov.code, "TOOL_TIMEOUT")
+        self.assertEqual(err_prov.details["substage"], "build-provision")
+        self.assertEqual(err_prov.details["tool"], "apt")
+        self.assertEqual(err_prov.details["cleanup"], "complete")
+        self.assertEqual(err_prov.details["elapsed_ms"], 3100)
+        rm_prov = [c for c in runner_prov.recorded_calls if len(c) >= 4 and c[1:3] == ["rm", "-f"]]
+        self.assertEqual(len(rm_prov), 1)
+        self.assertTrue(rm_prov[0][3].startswith("rs9-prov-"))
+
+        # Client commit timeout
+        runner_commit = TimeoutRunner("commit", elapsed_ms=2100, deadline=60)
+        with self.assertRaises(ContractError) as caught_commit:
+            hd.provision_image(runner_commit, "apt", "ref", "linux/amd64", "tag:v2", ["dpkg-dev"], substage_prefix="client-")
+        err_commit = caught_commit.exception
+        self.assertEqual(err_commit.code, "TOOL_TIMEOUT")
+        self.assertEqual(err_commit.details["substage"], "client-commit")
+        self.assertEqual(err_commit.details["tool"], "docker")
+        self.assertEqual(err_commit.details["cleanup"], "complete")
+        self.assertEqual(err_commit.details["elapsed_ms"], 2100)
+
+    def test_prepare_environment_and_provision_image_optional_recorder(self):
+        runner = TimeoutRunner()
+        recording = hd.RecordingRunner(runner)
+        # With recorder=recording
+        env = hd.prepare_environment(runner, "amd64", {}, recorder=recording)
+        self.assertIn("image_ref", env)
+        self.assertGreater(len(recording.receipts), 0)
+
+        # Without recorder (shared callers unchanged)
+        env2 = hd.prepare_environment(runner, "amd64", {})
+        self.assertIn("image_ref", env2)
+
+        # Provision with and without recorder
+        tag1 = hd.provision_image(runner, "apt", env["image_ref"], "linux/amd64", "tag:1", ["dpkg-dev"], recorder=recording)
+        self.assertEqual(tag1, "tag:1")
+        tag2 = hd.provision_image(runner, "apt", env["image_ref"], "linux/amd64", "tag:2", ["dpkg-dev"])
+        self.assertEqual(tag2, "tag:2")
+
+    def test_execute_deb_environment_failure_gates_safe_details_and_downstream_not_run(self):
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td).resolve()
+            scratch = work / "scratch"
+            scratch.mkdir()
+            runner = TimeoutRunner("release-probe", elapsed_ms=4500, deadline=600)
+            context = {
+                "repository": work,
+                "scratch": scratch,
+                "system": "amd64",
+                "pins": {},
+                "runner": runner,
+            }
+            res = hd.execute_deb(context)
+            gates = {g["name"]: g for g in res["gates"]}
+            env_gate = gates["deb-container-environment"]
+            self.assertEqual(env_gate["status"], "fail")
+            self.assertEqual(env_gate["reason"], "TOOL_TIMEOUT")
+            self.assertEqual(env_gate["substage"], "release-probe")
+            self.assertEqual(env_gate["tool"], "docker")
+            self.assertEqual(env_gate["cleanup"], "complete")
+            self.assertEqual(env_gate["elapsed_ms"], 4500)
+            self.assertEqual(env_gate["deadline_seconds"], 600)
+
+            # Downstream gates remain not-run
+            for blocked_gate in ("deb-package-build", "deb-shlibdeps-closure", "deb-apt-repository-indexing", "deb-client-qualification"):
+                self.assertEqual(gates[blocked_gate]["status"], "not-run")
+                self.assertEqual(gates[blocked_gate]["reason"], "blocked-by:deb-container-environment")
+
+
+class Repair1PublicModesAndAptReadabilityTests(unittest.TestCase):
+    def test_verify_public_tree_modes_detects_bad_permissions(self):
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td).resolve()
+            repo_root = work / "bad_repo"
+            repo_root.mkdir()
+            repo_root.chmod(0o700)
+            bad_file = repo_root / "test.txt"
+            bad_file.write_bytes(b"bad")
+            bad_file.chmod(0o600)
+
+            res = hd._verify_public_tree_modes(repo_root)
+            self.assertEqual(res["status"], "fail")
+
+            # With standard permissions
+            repo_root.chmod(0o755)
+            bad_file.chmod(0o644)
+            res_pass = hd._verify_public_tree_modes(repo_root)
+            self.assertEqual(res_pass["status"], "pass")
+
+    def test_tamper_family_copy_verifies_public_tree_modes_and_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td).resolve()
+            apt_dir = work / "orig_apt"
+            apt_dir.mkdir(mode=0o755)
+            (apt_dir / "Packages").write_bytes(b"Package: test\n")
+            (apt_dir / "Packages").chmod(0o644)
+
+            # Mock tamper_apt_repository to not error
+            with patch("rs9.hosted_deb.tamper_apt_repository"):
+                # Pass case: modes intact
+                out = hd.tamper_family_copy("apt", "package", {"apt": apt_dir}, work / "dest1", arch="amd64", wrong_signer=None, product="test")
+                self.assertTrue(out["apt"].exists())
+
+                # Fail case: tamper corrupts modes
+                with patch("rs9.hosted_deb._verify_public_tree_modes", return_value={
+                        "status": "fail", "reason": "mode-error", "samples": ["private-mode-sample"]}):
+                    with self.assertRaises(ContractError) as caught:
+                        hd.tamper_family_copy("apt", "package", {"apt": apt_dir}, work / "dest2", arch="amd64", wrong_signer=None, product="test")
+                    self.assertEqual(caught.exception.code, "MODE_MISMATCH")
+                    self.assertNotIn("private-mode-sample",str(caught.exception))
+                    self.assertEqual(caught.exception.details["substage"],"apt-tamper")
+                    self.assertEqual(caught.exception.details["reason"],"public-mode-mismatch")
+
+    def test_public_keyring_written_0644_independent_of_process_umask(self):
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td).resolve()
+            keyring_path = work / "client-keyrings" / "rs9-key.gpg"
+            orig = os.umask(0o077)
+            try:
+                hd._write_public_keyring(keyring_path, b"keyring-data")
+                mode = stat.S_IMODE(keyring_path.stat().st_mode)
+                self.assertEqual(mode, 0o644)
+            finally:
+                os.umask(orig)
+
+    def test_apt_readability_stays_not_run_under_synthetic_command_seam(self):
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td).resolve()
+            docker = ScriptedDocker()
+            runner = hd.RecordingRunner(host_runner(docker))
+            gates, evidence = hd.client_cycle(
+                runner, hd.apt_spec(work / "apt", work / "key.gpg", "amd64"),
+                image="img", platform="linux/amd64", products=("theme-forge-stellar-loom",),
+                repository=work, prefix="deb-client",
+            )
+            loom_ev = evidence["theme-forge-stellar-loom"]
+            self.assertEqual(loom_ev.get("apt_readability"), "not-run")
+
+    def test_apt_readability_evaluates_pass_and_fail_on_executed_probe(self):
+        class MockExecClient:
+            def __init__(self, make_doc):
+                self.make_doc = make_doc
+                self.unprivileged_prefix = []
+                self.name = "test-client"
+                self.family = "apt"
+            def exec(self, argv, *, user=None):
+                if argv[0] == "python3" and len(argv) > 2 and argv[1] == "-c":
+                    doc = self.make_doc(argv[3:])
+                    return CommandReceipt(argv, 0, json.dumps(doc).encode(), b"", tool_name="python3", executed=True)
+                if argv[0] == "gpgv":
+                    return CommandReceipt(argv, 0, b"[GNUPG:] VALIDSIG AAAA 0\n", b"", tool_name="gpgv", executed=True)
+                return CommandReceipt(argv, 0, b"", b"", tool_name="test", executed=True)
+            def inventory(self, stage=None):
+                return {}
+
+        def make_pass_doc(targets):
+            return {
+                "apt_user_present": True,
+                "targets": [{
+                    "target": t,
+                    "ancestors": [
+                        {"path": t, "type": "file" if "." in t else "directory",
+                         "mode": 0o644 if "." in t else 0o755, "owner": "root", "readable": True,
+                         "traversable": True if "." not in t else None},
+                    ]
+                } for t in targets],
+                "verifiers": {"apt-get": {"version": "apt 3.0.0"}},
+            }
+
+        def make_fail_doc(targets):
+            doc = make_pass_doc(targets)
+            doc["targets"][0]["ancestors"][0]["readable"] = False
+            return doc
+
+        probe_pass = hd.probe_guest_trust(MockExecClient(make_pass_doc), repo_root="/srv/rs9/apt")
+        self.assertEqual(probe_pass["status"], "probed")
+        apt_user = probe_pass.get("users", {}).get("_apt", {})
+        apt_targets = apt_user.get("targets", [])
+        self.assertGreater(len(apt_targets), 0)
+        all_readable = all(a.get("readable") is True for t in apt_targets for a in t.get("ancestors", []) if a.get("path") == t.get("target"))
+        all_traversable = all(a.get("traversable") is True for t in apt_targets for a in t.get("ancestors", []) if a.get("type") == "directory")
+        self.assertTrue(all_readable and all_traversable)
+
+        probe_fail = hd.probe_guest_trust(MockExecClient(make_fail_doc), repo_root="/srv/rs9/apt")
+        self.assertEqual(probe_fail["status"], "probed")
+        apt_user_f = probe_fail.get("users", {}).get("_apt", {})
+        apt_targets_f = apt_user_f.get("targets", [])
+        self.assertGreater(len(apt_targets_f), 0)
+        all_readable_f = all(a.get("readable") is True for t in apt_targets_f for a in t.get("ancestors", []) if a.get("path") == t.get("target"))
+        self.assertFalse(all_readable_f)
 
 
 if __name__ == "__main__":

@@ -178,19 +178,37 @@ def _safe_read_file(path: Path, max_bytes: int = 512 * 1024 * 1024) -> bytes:
         raise ContractError("IO_ERROR", "Failed reading file") from None
 
 
-def _safe_write_file(target: Path, content: bytes) -> None:
+def _safe_write_file(target: Path, content: bytes, *, mode: int | None = None) -> None:
     _check_no_symlinks(target.parent)
     target.parent.mkdir(parents=True, exist_ok=True)
     _check_no_symlinks(target.parent)
 
+    target_mode = 0o600 if mode is None else mode
     temp_prefix = f".tmp_{target.name}_"
+    temp_path = None
+    stream = None
+    fd = None
     try:
         fd, temp_path = tempfile.mkstemp(prefix=temp_prefix, dir=str(target.parent))
-        with os.fdopen(fd, "wb") as f:
-            f.write(content)
+        os.fchmod(fd, target_mode)
+        stream = os.fdopen(fd, "wb")
+        stream.write(content)
+        stream.close()
+        stream = None
+        fd = None
         os.replace(temp_path, str(target))
     except Exception:
-        if "temp_path" in locals() and os.path.exists(temp_path):
+        if stream is not None:
+            try:
+                stream.close()
+            except OSError:
+                pass
+        elif fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+        if temp_path is not None and os.path.exists(temp_path):
             try:
                 os.unlink(temp_path)
             except OSError:

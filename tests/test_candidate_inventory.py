@@ -101,7 +101,8 @@ class CandidateInventoryTests(unittest.TestCase):
         validate_readiness(manifest, require_ready=False)
         self.assertIs(manifest["publication_authority"], False)
         self.assertEqual(manifest["changed_paths"], product_delta(root, parent))
-        self.assertIn("src/rs9/hosted_observe.py", manifest["changed_paths"])
+        self.assertIn(MANIFEST, manifest["changed_paths"])
+        self.assertTrue(set(manifest["changed_paths"]) - {MANIFEST})
         target = next(r for r in manifest["files"] if r["path"] == "operators/live1/targets.json")
         parent_target = subprocess.check_output(["git", "-C", str(root), "show", parent + ":operators/live1/targets.json"])
         # The accepted source/container pins are preserved in this repair.

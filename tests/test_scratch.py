@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import math
 import json
+import os
 from pathlib import Path
+import stat
 import tempfile
 import unittest
 
 from rs9.errors import ContractError
-from rs9.scratch import ConfinedWriter, canonical, physical_directory, validate_safe_json
+from rs9.scratch import ConfinedWriter, canonical, physical_directory, validate_safe_json, verify_public_tree_modes
 
 
 class FakeReleaseCapture:
@@ -163,6 +165,147 @@ class PhysicalDirectoryAndWriterTests(unittest.TestCase):
             with ConfinedWriter(tmp_path) as writer:
                 writer.write("nested/sub/file.txt", b"hello world")
             self.assertEqual((tmp_path / "nested/sub/file.txt").read_bytes(), b"hello world")
+
+    def test_confined_writer_modes_independent_of_umask(self):
+        for test_mask in (0o022, 0o077):
+            with self.subTest(umask=oct(test_mask)):
+                orig_mask = os.umask(test_mask)
+                try:
+                    with tempfile.TemporaryDirectory() as tmp:
+                        tmp_path = Path(tmp).resolve()
+                        with ConfinedWriter(tmp_path, file_mode=0o644, dir_mode=0o755) as writer:
+                            writer.write("a/b/c/file.txt", b"data")
+                        file_st = (tmp_path / "a/b/c/file.txt").stat()
+                        dir_st = (tmp_path / "a/b/c").stat()
+                        self.assertEqual(stat.S_IMODE(file_st.st_mode), 0o644)
+                        self.assertEqual(stat.S_IMODE(dir_st.st_mode), 0o755)
+                        self.assertEqual(stat.S_IMODE((tmp_path / "a/b").stat().st_mode), 0o755)
+                        self.assertEqual(stat.S_IMODE((tmp_path / "a").stat().st_mode), 0o755)
+                finally:
+                    os.umask(orig_mask)
+
+    def test_default_writer_keeps_ambient_umask_contract(self):
+        for mask in (0o022,0o077):
+            previous=os.umask(mask)
+            try:
+                with tempfile.TemporaryDirectory() as tmp:
+                    root=Path(tmp).resolve()
+                    with ConfinedWriter(root) as writer:
+                        writer.write("private/file.txt",b"fixture")
+                    self.assertEqual(stat.S_IMODE((root/"private").stat().st_mode),0o755 & ~mask)
+                    self.assertEqual(stat.S_IMODE((root/"private/file.txt").stat().st_mode),0o644 & ~mask)
+            finally:
+                os.umask(previous)
+
+    def test_confined_writer_custom_modes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp).resolve()
+            with ConfinedWriter(tmp_path, file_mode=0o600, dir_mode=0o700) as writer:
+                writer.write("sub/secret.txt", b"secret data")
+            self.assertEqual(stat.S_IMODE((tmp_path / "sub/secret.txt").stat().st_mode), 0o600)
+            self.assertEqual(stat.S_IMODE((tmp_path / "sub").stat().st_mode), 0o700)
+
+
+class VerifyPublicTreeModesTests(unittest.TestCase):
+    def test_verify_public_tree_modes_passes_for_standard_tree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve() / "public_root"
+            root.mkdir()
+            root.chmod(0o755)
+            (root / "dir1").mkdir()
+            (root / "dir1").chmod(0o755)
+            (root / "dir1/file.txt").write_bytes(b"content")
+            (root / "dir1/file.txt").chmod(0o644)
+
+            res = verify_public_tree_modes(root)
+            self.assertEqual(res["status"], "pass")
+            self.assertEqual(res["counts"]["file_mode"], 0)
+            self.assertEqual(res["counts"]["directory_mode"], 0)
+            self.assertEqual(res["counts"]["dir_mode"], 0)
+            self.assertEqual(res["counts"]["symlink"], 0)
+            self.assertEqual(res["counts"]["special"], 0)
+            self.assertEqual(res["counts"]["total_files"], 1)
+            self.assertEqual(res["counts"]["total_directories"], 2)
+            self.assertEqual(res["mismatch_samples"]["file_mode"], [])
+            self.assertEqual(res["mismatch_samples"]["directory_mode"], [])
+
+    def test_verify_public_tree_modes_detects_mode_mismatches_and_bounds_samples(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve() / "bad_root"
+            root.mkdir()
+            root.chmod(0o700)  # Bad dir mode
+            sub = root / "sub"
+            sub.mkdir()
+            sub.chmod(0o750)  # Bad dir mode
+
+            # Create 15 files with bad mode 0o600 to test sample bounding to 10
+            for i in range(15):
+                f = sub / f"file_{i}.txt"
+                f.write_bytes(b"test")
+                f.chmod(0o600)
+
+            res = verify_public_tree_modes(root)
+            self.assertEqual(res["status"], "fail")
+            self.assertEqual(res["counts"]["file_mode"], 15)
+            self.assertEqual(res["counts"]["directory_mode"], 2)
+            self.assertEqual(res["counts"]["dir_mode"], 2)
+            self.assertEqual(len(res["mismatch_samples"]["file_mode"]), 10)
+            self.assertEqual(len(res["mismatch_samples"]["directory_mode"]), 2)
+            self.assertEqual(res["mismatch_samples"]["file_mode"][0]["expected_mode"], 0o644)
+            self.assertEqual(res["mismatch_samples"]["file_mode"][0]["actual_mode"], 0o600)
+
+    def test_verify_public_tree_modes_refuses_symlink_root_and_in_tree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            real_dir = Path(tmp).resolve() / "real"
+            real_dir.mkdir()
+            real_dir.chmod(0o755)
+            link_dir = Path(tmp).resolve() / "link"
+            link_dir.symlink_to(real_dir)
+
+            # Symlink root returns fail by default
+            res = verify_public_tree_modes(link_dir)
+            self.assertEqual(res["status"], "fail")
+            self.assertEqual(res["counts"]["symlink"], 1)
+
+            # raise_on_error raises ContractError
+            with self.assertRaises(ContractError) as ctx:
+                verify_public_tree_modes(link_dir, raise_on_error=True)
+            self.assertEqual(ctx.exception.code, "SYMLINK_REJECTED")
+
+            # Symlink inside tree
+            target_file = real_dir / "target.txt"
+            target_file.write_bytes(b"data")
+            target_file.chmod(0o644)
+            sym = real_dir / "link.txt"
+            sym.symlink_to(target_file)
+
+            res2 = verify_public_tree_modes(real_dir)
+            self.assertEqual(res2["status"], "fail")
+            self.assertGreaterEqual(res2["counts"]["symlink"], 1)
+
+            with self.assertRaises(ContractError) as ctx2:
+                verify_public_tree_modes(real_dir, raise_on_error=True)
+            self.assertEqual(ctx2.exception.code, "SYMLINK_REJECTED")
+
+    def test_verify_public_tree_modes_refuses_special_objects(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve() / "special_root"
+            root.mkdir()
+            root.chmod(0o755)
+            fifo = root / "test_fifo"
+            try:
+                os.mkfifo(str(fifo))
+            except (AttributeError, OSError):
+                self.skipTest("os.mkfifo not supported on this platform")
+
+            res = verify_public_tree_modes(root)
+            self.assertEqual(res["status"], "fail")
+            self.assertEqual(res["counts"]["special"], 1)
+            self.assertEqual(res["mismatch_samples"]["special"][0]["type"], "fifo")
+
+            with self.assertRaises(ContractError) as ctx:
+                verify_public_tree_modes(root, raise_on_error=True)
+            self.assertEqual(ctx.exception.code, "INVALID_FILE")
 
 
 if __name__ == "__main__":

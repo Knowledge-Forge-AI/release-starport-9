@@ -51,3 +51,5 @@ Theme Forge LIVE1 is pending / not live. See the [candidate disposition](live1-c
 - [Foundation 2 inventory](foundation2-inventory.md) — File and test delta inventory.
 
 Ecosystem-specific operator and adapter documentation will be added as individual publication channels are qualified and adopted.
+
+- [CONT10 native-client repairs](live1-native-client-cont10.md) — Public APT modes, RPM lint custody, pacman trust classification and bounded preparation diagnostics.

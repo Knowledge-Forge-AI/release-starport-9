@@ -242,8 +242,8 @@ def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256
     commit = git("rev-parse", "HEAD")
     if git("rev-parse", "HEAD^{tree}") != reviewed_tree or git("rev-parse", "HEAD^") != reviewed_parent:
         raise ContractError("ADOPTION_REVIEW", "Commit hook changed candidate; stop before push")
-    started = datetime.now(timezone.utc).replace(microsecond=0)
     git("push", "origin", "HEAD:main")
+    started = datetime.now(timezone.utc).replace(microsecond=0)
     packet = collect(root, output, commit=commit, started_at=started, timeout=timeout)
     packet["reviewed_tree"] = reviewed_tree
     if manager_attestation is not None:
