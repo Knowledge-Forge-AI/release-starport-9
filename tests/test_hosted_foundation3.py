@@ -106,6 +106,7 @@ class HostedFoundation3Tests(unittest.TestCase):
         source=self.root/'rpm-source';source.mkdir()
         inputs=self.root/'rpm-inputs';inputs.mkdir()
         receipt={'lane':'rpm','system':'x86_64-linux','provenance':{},'runner':{},
+                 'production_enabled': False, 'publication_authority': False,
                  'details':{'rpm_lint_raw':{'fixture':{'status':'fail','clean':False,
                      'tool_receipt':{'exit_code':64},'findings_summary':{'errors':1}}},
                      'rpm_lint_policy':{'fixture':{'accepted':True,'status':'accepted'}}}}

@@ -71,6 +71,7 @@ def verify_candidate_files(root):
 def execute(context):
     inputs = context.get("inputs")
     artifacts, records, missing = [], [], []
+    custody_error = None
     if not inputs or not Path(inputs).is_dir():
         missing.append("candidate-custody-inputs")
     for capture, intent, profile in context["captures"]:
@@ -131,10 +132,26 @@ def execute(context):
     # structure/privacy verification in-process. Client verdicts stay an annex.
     native_sets = []
     if inputs:
-        native_sets = [(p.parent,verify_set(p.parent)) for p in Path(inputs).rglob("artifact-manifest.json")]
+        for path in Path(inputs).rglob("artifact-manifest.json"):
+            try:
+                native_sets.append((path.parent, verify_set(path.parent)))
+            except (ContractError, OSError, ValueError, KeyError) as error:
+                custody_error = error.code if isinstance(error, ContractError) else "CUSTODY_SCHEMA"
+                missing.append("native-custody-invalid:" + custody_error)
     from rs9.hosted_summary import rpm_lint_results
     rpm_receipts = [json.loads((directory / ("rpm-" + manifest["system"] + ".json")).read_bytes())
                     for directory, manifest in native_sets if manifest["lane"] == "rpm"]
+    from rs9.hosted_summary import validate_rpm_policy_custody
+    for directory, manifest in native_sets:
+        if manifest["lane"] == "rpm":
+            receipt = next((r for r in rpm_receipts if r["system"] == manifest["system"]), None)
+            if receipt is not None:
+                try:
+                    validate_rpm_policy_custody(directory, manifest, receipt)
+                except (ContractError, OSError, ValueError, KeyError) as err:
+                    custody_code = err.code if isinstance(err, ContractError) else "RPM_POLICY_CUSTODY"
+                    custody_error = custody_code
+                    missing.append(f"rpm-custody-invalid:{custody_code}")
     for family, adapter in (("deb","debian"),("rpm","rpm"),("pacman","pacman")):
         for capture,intent,profile in context["captures"]:
             product = intent["project"]["id"]
@@ -211,9 +228,11 @@ def execute(context):
     path = context["scratch"] / "foundation3.json"
     path.write_bytes(canonical(doc))
     artifacts.append(path)
+    details = {"missing_inputs": missing, "records": records, "production_receipt_count": 0}
+    if custody_error:
+        details["custody_error"] = custody_error
     return {"gates": [{"name": "foundation3-plan-assembly", "status": "pass" if not missing else "fail",
                        "reason": "fresh-in-process-verification" if not missing else "missing-custody-inputs"},
                       {"name": "publication-readiness-evaluation", "status": "pass",
                        "reason": "evaluated-as-disabled-attended-gates-unsatisfied"}],
-            "artifacts": artifacts, "details": {"missing_inputs": missing, "records": records,
-            "production_receipt_count": 0}}
+            "artifacts": artifacts, "details": details}

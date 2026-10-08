@@ -47,21 +47,34 @@ def complete_case(name='theme-forge-stellar-loom', arch='noarch', system='x86_64
                                        input_archive_sha256=asset,origin=origin,shebang=body.split(b'\n')[0].decode() if body.startswith(b'#!') else None)
     for code,rules in entry['exceptions'].items():
         if code=='files-duplicated-waste':
-            body=b'x'*rules['expected_waste_bytes']
+            waste = rules.get('expected_waste_bytes')
+            if waste is None and 'possible_waste_totals' in rules:
+                waste = rules['possible_waste_totals'][0]
+            body=b'x'*(waste or 100)
             for suffix in ('a.dat','b.dat'): add_file('/usr/lib/'+name+'/duplicates/'+suffix,body)
             records.append(dict(code=code,target=name+'.'+arch,waste_bytes=len(body)))
             continue
         for path,rule in rules.items():
-            mode=int(rule.get('mode','0755'),8)
-            add_file(path,b'#!/usr/bin/env node\n'+path.encode()+b'\n',mode)
-            record=dict(code=code,target=name+'.'+arch,path=path,interpreter='/usr/bin/env node')
-            if code=='non-executable-script': record['mode']=format(mode,'o')
-            records.append(record)
-            if rule.get('launcher'):
-                launcher=rule['launcher']
-                body=('#!/bin/sh\nexec node "'+path+'" "$@"\n').encode()
-                add_file(launcher,body,0o755,'maintained-launcher')
-                inventory['wrappers'][launcher]=dict(target=path,sha256=digest(body),mode=0o755,type='file')
+            if rule.get('discriminator') == 'per-system-script':
+                sys_rule = rule.get('systems', {}).get(system, next(iter(rule.get('systems', {}).values())))
+                mode = int(sys_rule.get('mode', '0755'), 8) if isinstance(sys_rule.get('mode'), str) else sys_rule.get('mode', 0o755)
+                shebang = sys_rule.get('shebang', '/usr/bin/env node')
+                body = ('#!' + shebang + '\n' + path + '\n').encode()
+                add_file(path, body, mode)
+                record = dict(code=code, target=name+'.'+arch, path=path, interpreter=shebang)
+                if code == 'non-executable-script': record['mode'] = format(mode, 'o')
+                records.append(record)
+            else:
+                mode=int(rule.get('mode','0755'),8)
+                add_file(path,b'#!/usr/bin/env node\n'+path.encode()+b'\n',mode)
+                record=dict(code=code,target=name+'.'+arch,path=path,interpreter='/usr/bin/env node')
+                if code=='non-executable-script': record['mode']=format(mode,'o')
+                records.append(record)
+                if rule.get('launcher'):
+                    launcher=rule['launcher']
+                    body=('#!/bin/sh\nexec node "'+path+'" "$@"\n').encode()
+                    add_file(launcher,body,0o755,'maintained-launcher')
+                    inventory['wrappers'][launcher]=dict(target=path,sha256=digest(body),mode=0o755,type='file')
     for inode,(path,row) in enumerate(inventory['expected'].items(),1):
         inventory['files'][path]=dict(row,owner='root',group='root',inode=inode,device=1,flags=0)
     return raw_from_records(records),inventory,inputs,policy
@@ -206,13 +219,14 @@ class CandidatePolicyTests(unittest.TestCase):
                 inventory['files']['/usr/share/licenses/unreviewed/LICENSE']=dict(next(iter(inventory['files'].values())))
             self.assertFalse(evaluate_policy(raw,inventory,inputs,policy)['accepted'])
 
-    def test_no_exceptions_raw_clean_and_nebular_incomplete_are_distinct(self):
+    def test_no_exceptions_raw_clean_and_nebular_unproved_rules_are_distinct(self):
         raw,inventory,inputs,policy=complete_case()
         raw=raw_from_records([])
         result=evaluate_policy(raw,inventory,inputs,policy)
         self.assertTrue(result['accepted']);self.assertEqual(result['status'],'accepted-no-exceptions')
         raw,inventory,inputs,policy=complete_case('theme-forge-nebular-fusion','x86_64')
-        self.assertIn('incomplete-project-policy',evaluate_policy(raw,inventory,inputs,policy)['blockers'])
+        self.assertFalse(evaluate_policy(raw,inventory,inputs,policy)['accepted'])
+        self.assertTrue(evaluate_policy(raw,inventory,inputs,policy)['blockers'])
 
 
 class RealRun9EvidenceTests(unittest.TestCase):
@@ -301,3 +315,356 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(duplicate_groups(files)[1],0)
         files['/usr/lib/pkg/a']['flags']=64
         self.assertEqual(len(duplicate_groups(files)[0][0]['members']),2)
+
+
+FIXTURES_RUN10 = Path(__file__).parent / 'fixtures/run10/rpm'
+
+
+def run10_fixture_case(system='x86_64-linux'):
+    pe_file = FIXTURES_RUN10 / system / 'policy-evaluation.json'
+    rl_file = FIXTURES_RUN10 / system / 'raw-lint.json'
+    pe = json.loads(pe_file.read_text())
+    rl = json.loads(rl_file.read_text())
+
+    raw = dict(
+        error_records=copy.deepcopy(rl['error_records']),
+        parse_complete=not rl.get('error_overflow', False),
+        unparsed_count=0,
+        error_overflow=rl.get('error_overflow', False),
+        clean=rl.get('clean', False),
+        status='fail',
+        package_sha256='f' * 64,
+        findings_summary=dict(
+            errors=rl['counts']['E'],
+            warnings=rl['counts']['W'],
+            filtered=rl['effective_configuration']['filtered_count'],
+            packages=1,
+            specfiles=1,
+        ),
+        tool_receipt=dict(exit_code=64, stderr_bytes=0, executed=True),
+        tool_version=dict(exit_code=0, version='2.8.0', package_query=dict(exit_code=0, version='rpmlint|2.8.0|2.fc43|noarch')),
+    )
+
+    inputs = copy.deepcopy(pe['inputs'])
+    files = {}
+    expected = {}
+    for idx, em in enumerate(pe['observed_error_members'], 1):
+        p = em['path']
+        files[p] = dict(
+            path=p, type='file', size=100, mode=em['mode'], sha256=em['sha256'],
+            owner='root', group='root', inode=1000 + idx, device=1, flags=0
+        )
+        expected[p] = dict(
+            path=p, type='file', size=100, mode=em['mode'], sha256=em['sha256'],
+            shebang=em['shebang'], input_member=em['input_member'],
+            input_archive_sha256=em['input_archive_sha256'], origin='release'
+        )
+
+    inode = 2000
+    for g in pe['observed_duplicate_groups']:
+        sha = g['sha256']
+        size = g['size']
+        for m in g['members']:
+            if m not in files:
+                inode += 1
+                files[m] = dict(
+                    path=m, type='file', size=size, mode=0o644, sha256=sha,
+                    owner='root', group='root', inode=inode, device=1, flags=0
+                )
+                expected[m] = dict(
+                    path=m, type='file', size=size, mode=0o644, sha256=sha,
+                    shebang=None, input_member='package/' + m.split('/theme-forge-nebular-fusion/', 1)[-1],
+                    input_archive_sha256=inputs['asset_sha256'], origin='release'
+                )
+
+    inventory = dict(
+        schema=INVENTORY_SCHEMA,
+        complete=True,
+        package_sha256='f' * 64,
+        files=files,
+        expected=expected,
+        wrappers={},
+        permitted_directories=[],
+        engine_node='>=22.0.0',
+        requires=['nodejs >= 22'],
+        contract_members={},
+        loom_engine_node='>=22',
+        **{k: inputs[k] for k in ('project_id', 'version', 'arch', 'system', 'asset_sha256', 'payload_manifest_sha256', 'closure_sha256')}
+    )
+    return raw, inventory, inputs, pe, rl
+
+
+class NebularPreservationPolicyTests(unittest.TestCase):
+    def test_run10_fixture_provenance_and_files(self):
+        prov = json.loads((FIXTURES_RUN10 / 'provenance.json').read_bytes())
+        self.assertEqual(prov['schema'], 'rs9.run10-rpm-fixture-provenance.v1')
+        self.assertEqual(prov['run_id'], 37802815634)
+        self.assertFalse(prov['large_packages_independently_downloaded'])
+        self.assertEqual(len(prov['files']), 4)
+        for row in prov['files']:
+            p = Path(__file__).parent.parent / row['path']
+            data = p.read_bytes()
+            self.assertEqual(len(data), row['size'])
+            self.assertEqual(digest(data), row['sha256'])
+
+    def test_both_systems_all_nine_records_evaluated_and_six_callers_blocked(self):
+        expected_callers = [
+            'env-script-interpreter:/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js:caller-content-or-identity-unproven',
+            'env-script-interpreter:/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js:caller-content-or-identity-unproven',
+            'non-executable-script:/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs:caller-content-or-identity-unproven',
+            'non-executable-script:/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js:caller-content-or-identity-unproven',
+            'non-executable-script:/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js:caller-content-or-identity-unproven',
+            'non-executable-script:/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs:caller-content-or-identity-unproven',
+        ]
+        policy = load_policy()
+        for system in ('x86_64-linux', 'aarch64-linux'):
+            with self.subTest(system=system):
+                raw, inventory, inputs, pe, rl = run10_fixture_case(system)
+                self.assertEqual(len(raw['error_records']), 9)
+                self.assertEqual(raw['findings_summary']['filtered'], 8)
+                self.assertEqual(raw['findings_summary']['errors'], 9)
+                self.assertEqual(raw['tool_receipt']['exit_code'], 64)
+                self.assertFalse(raw['clean'])
+
+                result = evaluate_policy(raw, inventory, inputs, policy)
+                self.assertFalse(result['accepted'])
+                self.assertEqual(result['status'], 'blocked')
+                self.assertEqual(result['raw_exit_code'], 64)
+                self.assertEqual(result['raw_lint_status'], 'fail')
+
+                # Two .d.ts rules and complete duplicate group rule evaluate full predicates
+                self.assertEqual(len(result['accepted_findings']), 3)
+                self.assertEqual(len(result['member_proofs']), 2)
+                self.assertEqual(len(result['duplicate_groups']), 128)
+
+                # Exactly the 6 caller rules blocked as caller-content-or-identity-unproven
+                self.assertEqual(result['rule_blockers'], expected_callers)
+                self.assertEqual(sorted(result['blockers']), sorted(expected_callers))
+
+                # Verify member proofs are the two .d.ts files
+                proof_paths = {p['path'] for p in result['member_proofs']}
+                self.assertEqual(proof_paths, {
+                    '/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts',
+                    '/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts',
+                })
+                for proof in result['member_proofs']:
+                    self.assertEqual(proof['intent'], 'typescript-declaration-data')
+                    self.assertEqual(proof['mode'], 0o644)
+
+    def test_eight_identity_pins_fail_closed_across_both_systems(self):
+        policy = load_policy()
+        entry = policy['projects']['theme-forge-nebular-fusion']
+        for system in ('x86_64-linux', 'aarch64-linux'):
+            raw, inventory, inputs, pe, rl = run10_fixture_case(system)
+            for em in pe['observed_error_members']:
+                path = em['path']
+                code = em['code']
+                with self.subTest(system=system, path=path):
+                    # 1. Mutate pin asset_sha256
+                    p1 = copy.deepcopy(policy)
+                    p1['projects']['theme-forge-nebular-fusion']['exceptions'][code][path]['systems'][system]['asset_sha256'] = '0' * 64
+                    res1 = evaluate_policy(raw, inventory, inputs, p1)
+                    self.assertFalse(res1['accepted'])
+                    self.assertIn(f'{code}:{path}:asset-sha-mismatch', res1['rule_blockers'])
+
+                    # 2. Mutate pin input_member
+                    p2 = copy.deepcopy(policy)
+                    p2['projects']['theme-forge-nebular-fusion']['exceptions'][code][path]['systems'][system]['input_member'] = 'wrong/member.js'
+                    res2 = evaluate_policy(raw, inventory, inputs, p2)
+                    self.assertFalse(res2['accepted'])
+                    self.assertIn(f'{code}:{path}:input-member-mismatch', res2['rule_blockers'])
+
+                    # 3. Mutate pin sha256
+                    p3 = copy.deepcopy(policy)
+                    p3['projects']['theme-forge-nebular-fusion']['exceptions'][code][path]['systems'][system]['sha256'] = '0' * 64
+                    res3 = evaluate_policy(raw, inventory, inputs, p3)
+                    self.assertFalse(res3['accepted'])
+                    self.assertIn(f'{code}:{path}:member-sha-mismatch', res3['rule_blockers'])
+
+                    # 4. Mutate pin mode
+                    p4 = copy.deepcopy(policy)
+                    p4['projects']['theme-forge-nebular-fusion']['exceptions'][code][path]['systems'][system]['mode'] = '0777'
+                    res4 = evaluate_policy(raw, inventory, inputs, p4)
+                    self.assertFalse(res4['accepted'])
+                    self.assertTrue(any(res4['rule_blockers']))
+
+                    # 5. Mutate pin shebang
+                    p5 = copy.deepcopy(policy)
+                    p5['projects']['theme-forge-nebular-fusion']['exceptions'][code][path]['systems'][system]['shebang'] = '/bin/bash'
+                    res5 = evaluate_policy(raw, inventory, inputs, p5)
+                    self.assertFalse(res5['accepted'])
+                    self.assertIn(f'{code}:{path}:shebang-mismatch', res5['rule_blockers'])
+
+    def test_dts_rules_predicates_and_rejections(self):
+        policy = load_policy()
+        raw, inventory, inputs, pe, rl = run10_fixture_case('x86_64-linux')
+        dts_path = '/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts'
+
+        # 1. Executable mode on .d.ts fails predicate
+        inv_exec = copy.deepcopy(inventory)
+        inv_exec['files'][dts_path]['mode'] = 0o755
+        inv_exec['expected'][dts_path]['mode'] = 0o755
+        res = evaluate_policy(raw, inv_exec, inputs, policy)
+        self.assertFalse(res['accepted'])
+        self.assertNotIn(dts_path, [p['path'] for p in res['member_proofs']])
+
+        # 2. Public launcher on .d.ts fails
+        p_launch = copy.deepcopy(policy)
+        p_launch['projects']['theme-forge-nebular-fusion']['exceptions']['non-executable-script'][dts_path]['public_launcher'] = True
+        with self.assertRaises(ContractError):
+            from rs9.rpm_lint_policy import _validate_policy
+            _validate_policy(p_launch)
+        res = evaluate_policy(raw, inventory, inputs, p_launch)
+        self.assertFalse(res['accepted'])
+        self.assertIn('malformed-or-unavailable-policy-evidence', res['blockers'])
+
+        # 3. Non .d.ts with typescript-declaration-data fails
+        p_js = copy.deepcopy(policy)
+        js_path = '/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js'
+        p_js['projects']['theme-forge-nebular-fusion']['exceptions']['non-executable-script'][js_path]['intent'] = 'typescript-declaration-data'
+        with self.assertRaises(ContractError):
+            _validate_policy(p_js)
+        res = evaluate_policy(raw, inventory, inputs, p_js)
+        self.assertFalse(res['accepted'])
+        self.assertIn('malformed-or-unavailable-policy-evidence', res['blockers'])
+
+    def test_real_source_caller_contract_and_forged_source_rejected(self):
+        from tests.test_nebular_callers import attach_caller_fixture
+        raw, inventory, inputs, _, _ = run10_fixture_case("x86_64-linux")
+        attach_caller_fixture(inventory, inputs)
+        result = evaluate_policy(raw, inventory, inputs, load_policy())
+        self.assertTrue(result["accepted"], result["blockers"])
+        self.assertFalse(raw["clean"])
+        self.assertEqual(len(result["member_proofs"]), 8)
+        self.assertEqual(len(result["duplicate_groups"]), 128)
+        changed = copy.deepcopy(inventory)
+        changed["caller_evidence"]["files"]["src-tauri/src/sidecar/process.rs"]["content"] = "verified content"
+        self.assertFalse(evaluate_policy(raw, changed, inputs, load_policy())["accepted"])
+
+    def test_duplicate_128_group_equality_and_representative_ambiguity(self):
+        raw, inventory, inputs, pe, rl = run10_fixture_case('x86_64-linux')
+        policy = load_policy()
+        dup_rule = policy['projects']['theme-forge-nebular-fusion']['exceptions']['files-duplicated-waste']['systems']['x86_64-linux']
+
+        self.assertEqual(dup_rule['group_count'], 128)
+        self.assertEqual(dup_rule['group_set_sha256'], '742d14c3bd7b9f8b2cf07b346c8d0960c924e351625fe15b7f19d2153a86a324')
+        expected_totals = [3128775, 3129379, 3335535, 3336139]
+        self.assertEqual(dup_rule['possible_waste_totals'], expected_totals)
+
+        # All 4 representative totals recomputed from SAME actual==expected 128 groups are accepted
+        dup_rec_idx = next(i for i, r in enumerate(raw['error_records']) if r['code'] == 'files-duplicated-waste')
+        for total in expected_totals:
+            with self.subTest(waste_total=total):
+                raw_copy = copy.deepcopy(raw)
+                raw_copy['error_records'][dup_rec_idx]['waste_bytes'] = total
+                res = evaluate_policy(raw_copy, inventory, inputs, policy)
+                self.assertEqual(len(res['duplicate_groups']), 128)
+                self.assertNotIn('duplicate-preservation-unproven', res['blockers'])
+
+        # Unrepresented waste total fails
+        raw_bad = copy.deepcopy(raw)
+        raw_bad['error_records'][dup_rec_idx]['waste_bytes'] = 3128776
+        res_bad = evaluate_policy(raw_bad, inventory, inputs, policy)
+        self.assertIn('duplicate-preservation-unproven', res_bad['blockers'])
+        self.assertEqual(res_bad['duplicate_groups'], [])
+
+        # Policy declared totals not equal to recomputed totals fails
+        p_wrong_totals = copy.deepcopy(policy)
+        p_wrong_totals['projects']['theme-forge-nebular-fusion']['exceptions']['files-duplicated-waste']['systems']['x86_64-linux']['possible_waste_totals'] = [3128775]
+        res_wt = evaluate_policy(raw, inventory, inputs, p_wrong_totals)
+        self.assertIn('duplicate-preservation-unproven', res_wt['blockers'])
+
+        # Policy group count mismatch fails
+        p_wrong_count = copy.deepcopy(policy)
+        p_wrong_count['projects']['theme-forge-nebular-fusion']['exceptions']['files-duplicated-waste']['systems']['x86_64-linux']['group_count'] = 127
+        res_wc = evaluate_policy(raw, inventory, inputs, p_wrong_count)
+        self.assertIn('duplicate-preservation-unproven', res_wc['blockers'])
+
+        # Policy group set sha mismatch fails
+        p_wrong_sha = copy.deepcopy(policy)
+        p_wrong_sha['projects']['theme-forge-nebular-fusion']['exceptions']['files-duplicated-waste']['systems']['x86_64-linux']['group_set_sha256'] = '0' * 64
+        res_ws = evaluate_policy(raw, inventory, inputs, p_wrong_sha)
+        self.assertIn('duplicate-preservation-unproven', res_ws['blockers'])
+
+        # Hardlinks (shared inode) fail closed
+        inv_hardlink = copy.deepcopy(inventory)
+        first_group = pe['observed_duplicate_groups'][0]['members']
+        inv_hardlink['files'][first_group[1]]['inode'] = inv_hardlink['files'][first_group[0]]['inode']
+        res_hl = evaluate_policy(raw, inv_hardlink, inputs, policy)
+        self.assertIn('duplicate-preservation-unproven', res_hl['blockers'])
+
+    def test_discriminator_and_schema_validation_rejections(self):
+        policy = load_policy()
+
+        # Reject glob in exception path keys
+        p_glob = copy.deepcopy(policy)
+        p_glob['projects']['theme-forge-nebular-fusion']['exceptions']['non-executable-script']['/usr/lib/theme-forge-nebular-fusion/*'] = {}
+        with self.assertRaises(ContractError):
+            from rs9.rpm_lint_policy import _validate_policy
+            _validate_policy(p_glob)
+
+        # Reject unknown discriminator
+        p_bad_disc = copy.deepcopy(policy)
+        dts = '/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts'
+        p_bad_disc['projects']['theme-forge-nebular-fusion']['exceptions']['non-executable-script'][dts]['discriminator'] = 'unknown-pattern'
+        with self.assertRaises(ContractError):
+            _validate_policy(p_bad_disc)
+
+        # Reject noarch for per-system-script
+        p_noarch = copy.deepcopy(policy)
+        p_noarch['projects']['theme-forge-nebular-fusion']['allowed_architectures'] = ['noarch']
+        with self.assertRaises(ContractError):
+            _validate_policy(p_noarch)
+
+    def test_parser_filtered8_and_record_count_fail_closed(self):
+        policy = load_policy()
+        raw, inventory, inputs, pe, rl = run10_fixture_case('x86_64-linux')
+
+        # Filter count != 8 fails closed
+        for bad_filter in (7, 9, 0, None):
+            with self.subTest(bad_filter=bad_filter):
+                r = copy.deepcopy(raw)
+                r['findings_summary']['filtered'] = bad_filter
+                res = evaluate_policy(r, inventory, inputs, policy)
+                self.assertFalse(res['accepted'])
+                self.assertIn('malformed-counts' if bad_filter is None else
+                              'configuration-filtered-count-mismatch', res['blockers'])
+
+        # Missing error record fails closed
+        r_missing = copy.deepcopy(raw)
+        r_missing['error_records'] = r_missing['error_records'][:-1]
+        res_missing = evaluate_policy(r_missing, inventory, inputs, policy)
+        self.assertFalse(res_missing['accepted'])
+
+        # Extra error record fails closed
+        r_extra = copy.deepcopy(raw)
+        r_extra['error_records'].append(dict(r_extra['error_records'][0], path='/usr/bin/extra-script.js'))
+        r_extra['findings_summary']['errors'] = len(r_extra['error_records'])
+        res_extra = evaluate_policy(r_extra, inventory, inputs, policy)
+        self.assertFalse(res_extra['accepted'])
+
+        # Duplicate error record fails closed
+        r_dup = copy.deepcopy(raw)
+        r_dup['error_records'].append(copy.deepcopy(r_dup['error_records'][0]))
+        r_dup['findings_summary']['errors'] = len(r_dup['error_records'])
+        res_dup = evaluate_policy(r_dup, inventory, inputs, policy)
+        self.assertFalse(res_dup['accepted'])
+
+        # Unknown error code fails closed
+        r_unk = copy.deepcopy(raw)
+        r_unk['error_records'][0]['code'] = 'unknown-error-code'
+        res_unk = evaluate_policy(r_unk, inventory, inputs, policy)
+        self.assertFalse(res_unk['accepted'])
+
+        # Incomplete parser flags fail closed
+        r_inc = copy.deepcopy(raw)
+        r_inc['parse_complete'] = False
+        self.assertFalse(evaluate_policy(r_inc, inventory, inputs, policy)['accepted'])
+
+        r_ovf = copy.deepcopy(raw)
+        r_ovf['error_overflow'] = True
+        self.assertFalse(evaluate_policy(r_ovf, inventory, inputs, policy)['accepted'])
+
+        r_unp = copy.deepcopy(raw)
+        r_unp['unparsed_count'] = 1
+        self.assertFalse(evaluate_policy(r_unp, inventory, inputs, policy)['accepted'])

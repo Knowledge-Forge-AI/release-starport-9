@@ -1,0 +1,63 @@
+{
+  "loom:package/bin/tfsl.js": {
+    "input_archive_sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+    "input_member": "package/bin/tfsl.js",
+    "sha256": "6f4196e9a8eb744308a38328d396329901ca7619d8155fb15acfba26257ab316",
+    "size": 131,
+    "mode": 493,
+    "content": "#!/usr/bin/env node\nimport { runCli } from \"../dist/cli-catalog.js\";\n\nconst code = await runCli(process.argv);\nprocess.exit(code);\n"
+  },
+  "loom:package/bin/tfsl-batch.js": {
+    "input_archive_sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+    "input_member": "package/bin/tfsl-batch.js",
+    "sha256": "b58052712f9426a7669fe7f719aa20c30e19fa4c4d8be6e6a9de41e5b2a081d4",
+    "size": 125,
+    "mode": 493,
+    "content": "#!/usr/bin/env node\nimport { runBatch } from \"../dist/batch-catalog.js\";\n\nconst code = await runBatch();\nprocess.exit(code);\n"
+  },
+  "loom:package/package.json": {
+    "input_archive_sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+    "input_member": "package/package.json",
+    "sha256": "aa3da0ab662e4205a357224e8deda8cabdec9ca6e504853cee1a8aaa989c48ad",
+    "size": 1822,
+    "mode": 420,
+    "content": "{\n  \"name\": \"@knowledge-forge-ai/theme-forge-stellar-loom\",\n  \"version\": \"0.4.0\",\n  \"description\": \"Starlight theme-builder backend, library, and CLI\",\n  \"private\": false,\n  \"publishConfig\": {\n    \"access\": \"public\",\n    \"registry\": \"https://registry.npmjs.org/\"\n  },\n  \"repository\": {\n    \"type\": \"git\",\n    \"url\": \"git+https://github.com/Knowledge-Forge-AI/theme-forge-stellar-loom.git\"\n  },\n  \"homepage\": \"https://github.com/Knowledge-Forge-AI/theme-forge-stellar-loom#readme\",\n  \"bugs\": {\n    \"url\": \"https://github.com/Knowledge-Forge-AI/theme-forge-stellar-loom/issues\"\n  },\n  \"type\": \"module\",\n  \"license\": \"AGPL-3.0-or-later\",\n  \"engines\": {\n    \"node\": \">=22\"\n  },\n  \"exports\": {\n    \".\": {\n      \"types\": \"./dist/index-catalog.d.ts\",\n      \"import\": \"./dist/index-catalog.js\"\n    },\n    \"./batch\": {\n      \"types\": \"./dist/batch-catalog.d.ts\",\n      \"import\": \"./dist/batch-catalog.js\"\n    },\n    \"./cli\": {\n      \"types\": \"./dist/cli-catalog.d.ts\",\n      \"import\": \"./dist/cli-catalog.js\"\n    },\n    \"./protocol/*\": \"./protocol/*\"\n  },\n  \"bin\": {\n    \"tfsl\": \"./bin/tfsl.js\",\n    \"tfsl-batch\": \"./bin/tfsl-batch.js\"\n  },\n  \"files\": [\n    \"dist\",\n    \"bin\",\n    \"examples\",\n    \"protocol\",\n    \"LICENSE\",\n    \"NOTICE\",\n    \"COMMERCIAL-LICENSE.md\",\n    \"README.md\"\n  ],\n  \"scripts\": {\n    \"build\": \"tsc -p tsconfig.build.json\",\n    \"typecheck\": \"tsc -p tsconfig.json\",\n    \"test\": \"vitest run\",\n    \"test:smoke\": \"node tools/smoke-packed-consumer.mjs\",\n    \"test:smoke-plugin\": \"node tools/smoke-generated-plugin.mjs\",\n    \"test:smoke-reading\": \"node tools/smoke-reading-consumer.mjs\",\n    \"test:smoke-code\": \"node tools/smoke-code.mjs\"\n  },\n  \"devDependencies\": {\n    \"@playwright/test\": \"1.62.1\",\n    \"@types/node\": \"22.20.1\",\n    \"playwright\": \"1.62.1\",\n    \"typescript\": \"7.0.2\",\n    \"vitest\": \"4.1.11\"\n  }\n}\n"
+  },
+  "burst:package/dist/cli.js": {
+    "input_archive_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+    "input_member": "package/dist/cli.js",
+    "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+    "size": 74258,
+    "mode": 420,
+    "excerpt": {
+      "offset": 0,
+      "length": 512,
+      "sha256": "5a39bd8ecba5bea9067529fd60fa2c4ce30eaf959a51af5e9dc1d24f422b0347",
+      "text": "#!/usr/bin/env node\nimport { realpathSync } from \"node:fs\";\nimport { lstat } from \"node:fs/promises\";\nimport { relative, resolve, sep } from \"node:path\";\nimport { pathToFileURL } from \"node:url\";\nimport { parseArgs } from \"node:util\";\nimport { buildProject } from \"./build.js\";\nimport { createAnalyzeEnvelope, executeCompleteAnalysis, renderAnalyzeHuman } from \"./analyze.js\";\nimport { planAnalyzeDetails, publishAnalyzeDetails } from \"./analyze-details.js\";\nimport { inspectAnalyzeInput } from \"./analyze-source"
+    }
+  },
+  "burst:package/dist/service-protocol/server-cli.js": {
+    "input_archive_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+    "input_member": "package/dist/service-protocol/server-cli.js",
+    "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+    "size": 298,
+    "mode": 420,
+    "content": "#!/usr/bin/env node\nimport { StudioServer } from \"./server.js\";\nconst server = new StudioServer({\n    input: process.stdin,\n    output: process.stdout,\n    error: process.stderr,\n    onExitCode: (code) => {\n        process.exitCode = code;\n        process.stdin.pause();\n    },\n});\nserver.start();\n"
+  },
+  "burst:package/dist/cli.d.ts": {
+    "input_archive_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+    "input_member": "package/dist/cli.d.ts",
+    "sha256": "5c32ef46b90997fc6de2a43c40a92643d025b64f1ed7c360e1cd40997528797b",
+    "size": 292,
+    "mode": 420,
+    "content": "#!/usr/bin/env node\nexport declare const HUMAN_DISPLAY_THRESHOLD = 50;\ninterface CliIo {\n    readonly stdout: (text: string) => void;\n    readonly stderr: (text: string) => void;\n}\nexport declare function runCli(argv: readonly string[], cwd?: string, io?: CliIo): Promise<number>;\nexport {};\n"
+  },
+  "burst:package/dist/service-protocol/server-cli.d.ts": {
+    "input_archive_sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+    "input_member": "package/dist/service-protocol/server-cli.d.ts",
+    "sha256": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012",
+    "size": 31,
+    "mode": 420,
+    "content": "#!/usr/bin/env node\nexport {};\n"
+  }
+}

@@ -1,0 +1,843 @@
+{
+  "schema": "rs9.cont12r1-source-verification.v1",
+  "stage": "implementation_testing",
+  "observed_at": "2026-10-08T20:40:30Z",
+  "status": "terminal-amended-source-verified-with-external-open-items",
+  "original_scope": "CONT12R1 WP1, WP2 and WP3 source corrections; preserve inherited CONT12 candidate",
+  "proposal": {
+    "disposition": "amend",
+    "bytes": 23380,
+    "sha256": "8b62aad67a95db5200908ac5e94f7126ca5b3eebad55ad762088dcd6769b987f",
+    "review_findings": 8,
+    "review_disposition": "all eight accepted as implementation constraints; documented separately from original scope",
+    "observed_entry_stage_deltas": []
+  },
+  "required_evidence": {
+    "kit_read": "complete",
+    "review_closeout_reconciled": true,
+    "inherited_patch_paths": 31,
+    "replay_class": "controlled hypothetical dependency replay; no real caller or native qualification",
+    "run10_per_system_error_members": 8,
+    "run10_duplicate_groups": 128,
+    "complete_run10_evaluations_read": true
+  },
+  "cont12_findings": [
+    {
+      "finding": 1,
+      "status": "source-corrected",
+      "correction": "Pre-policy client preparation and offline owner/Node probes; authenticated engine bindings flow explicitly through execute, builder, collector and evaluator; image/profile/architecture drift blocks later DNF.",
+      "tests": [
+        "test_rpm_client_runtime",
+        "test_rpm_orchestration"
+      ]
+    },
+    {
+      "finding": 2,
+      "status": "authenticated-source-roles-supported-real-release-manifest-compatibility-unverified",
+      "correction": "Six private script roles use exact v0.6.1 source/build relations and fresh binary/payload/manifest preservation; explicit product contracts select bounded text and engine floors. Embedded caller roles do not acquire a system-Node proof prerequisite.",
+      "tests": [
+        "test_nebular_callers",
+        "test_rpm_lint_policy",
+        "test_build_rpm"
+      ]
+    },
+    {
+      "finding": 3,
+      "status": "source-corrected",
+      "correction": "Canonical caller-content-or-identity-unproven token retains content-absent or identity-mismatch cause through chunk custody.",
+      "tests": [
+        "test_rpm_lint_policy",
+        "test_rpm_policy_custody"
+      ]
+    },
+    {
+      "finding": 4,
+      "status": "source-corrected",
+      "correction": "Verified construction witness and retained package survive later derivation, manifest and custody failures; separate causal gates block downstream qualification. Failed retention or a file without a verified witness cannot grant build success.",
+      "tests": [
+        "test_rpm_stage_gates",
+        "test_rpm_orchestration",
+        "test_hosted_packaging"
+      ]
+    },
+    {
+      "finding": 5,
+      "status": "source-corrected",
+      "correction": "Collector, summary, Foundation3 and Pages resolve manifest-selected raw objects and enforce schema/hash/size/product/package/source/lane/system plus reconstructed projection equality. Specific diagnostics survive downstream rejection.",
+      "tests": [
+        "test_rpm_consumer_custody",
+        "test_rpm_derivation_custody",
+        "test_diagnostic_collection"
+      ]
+    },
+    {
+      "finding": 6,
+      "status": "source-corrected",
+      "correction": "Current receipts emit rs9.rpm-evidence-contract.v2 and require complete chunk summaries. Explicit historical parsing grants no new qualification authority.",
+      "tests": [
+        "test_rpm_policy_custody",
+        "test_rpm_consumer_custody",
+        "test_hosted_summary"
+      ]
+    }
+  ],
+  "verification": {
+    "focused": {
+      "run": 269,
+      "pass": 268,
+      "skipped": 1,
+      "failures": 0,
+      "errors": 0
+    },
+    "complete_merged_unit_suites": [
+      {
+        "schema": "rs9.cont12r1-unit-observation.v1",
+        "umask": "022",
+        "discovered": 1534,
+        "run": 1524,
+        "pass": 1511,
+        "failures": 0,
+        "errors": 0,
+        "reported_skip_events": 14,
+        "skipped_tests_in_run": 13,
+        "class_level_omissions": [
+          {
+            "class": "test_signing_fixture.SigningFixtureTests",
+            "omitted_tests": 10,
+            "reason": "GnuPG binary not available in environment"
+          }
+        ],
+        "omitted_tests": 10,
+        "skips": [
+          {
+            "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported",
+            "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them"
+          },
+          {
+            "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read",
+            "reason": "sandbox denies local socket creation; socket record grammar tested separately"
+          },
+          {
+            "test": "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+            "reason": "GnuPG binary not available"
+          },
+          {
+            "test": "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+            "reason": "both live capture directories required"
+          },
+          {
+            "test": "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_darwin",
+            "reason": "official archive directory not locatable"
+          },
+          {
+            "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_linux",
+            "reason": "official archive directory not locatable"
+          },
+          {
+            "test": "test_nix_installer.OfficialArchiveTests.test_x86_64_linux",
+            "reason": "official archive directory not locatable"
+          },
+          {
+            "test": "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+            "reason": "GnuPG binary not available"
+          },
+          {
+            "test": "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+            "reason": "GnuPG binary not available"
+          },
+          {
+            "test": "setUpClass (test_signing_fixture.SigningFixtureTests)",
+            "reason": "GnuPG binary not available in environment"
+          }
+        ]
+      },
+      {
+        "schema": "rs9.cont12r1-unit-observation.v1",
+        "umask": "077",
+        "discovered": 1534,
+        "run": 1524,
+        "pass": 1511,
+        "failures": 0,
+        "errors": 0,
+        "reported_skip_events": 14,
+        "skipped_tests_in_run": 13,
+        "class_level_omissions": [
+          {
+            "class": "test_signing_fixture.SigningFixtureTests",
+            "omitted_tests": 10,
+            "reason": "GnuPG binary not available in environment"
+          }
+        ],
+        "omitted_tests": 10,
+        "skips": [
+          {
+            "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported",
+            "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them"
+          },
+          {
+            "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read",
+            "reason": "sandbox denies local socket creation; socket record grammar tested separately"
+          },
+          {
+            "test": "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+            "reason": "GnuPG binary not available"
+          },
+          {
+            "test": "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+            "reason": "both live capture directories required"
+          },
+          {
+            "test": "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+            "reason": "live capture directory not supplied"
+          },
+          {
+            "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_darwin",
+            "reason": "official archive directory not locatable"
+          },
+          {
+            "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_linux",
+            "reason": "official archive directory not locatable"
+          },
+          {
+            "test": "test_nix_installer.OfficialArchiveTests.test_x86_64_linux",
+            "reason": "official archive directory not locatable"
+          },
+          {
+            "test": "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+            "reason": "GnuPG binary not available"
+          },
+          {
+            "test": "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+            "reason": "GnuPG binary not available"
+          },
+          {
+            "test": "setUpClass (test_signing_fixture.SigningFixtureTests)",
+            "reason": "GnuPG binary not available in environment"
+          }
+        ]
+      }
+    ],
+    "resource_warning": "error",
+    "bytecode_mutation": false,
+    "umask_scope": "process-local",
+    "portable_custody_direct": {
+      "test": "test_rpm_derivation_custody.RpmDerivationCustodyTests.test_three_accepted_raw_fail_shapes_complete_derivation_manifest_and_custody",
+      "run": 1,
+      "product_subcases": 3,
+      "pass": 1,
+      "skipped": 0
+    },
+    "static_checks": {
+      "python_parse": "pass",
+      "parsed_files": 37,
+      "diff_check": "pass",
+      "local_links": "pass",
+      "links_checked": 44,
+      "scoped_privacy": "pass",
+      "documents_checked": 3,
+      "source_excerpt_hashes": "pass",
+      "source_excerpts_checked": 27,
+      "changed_paths": 53
+    },
+    "large_object_checks": "Full machine streams and policy objects above 64 KiB; byte-exact chunk rehydration and failures beyond preview/chunk boundaries; production consumer adversarial cases.",
+    "external_tool_mode": "Explicit external-command doubles in source tests; no native tool qualification claimed."
+  },
+  "caller_evidence": {
+    "status": "authenticated-source-relations-and-fresh-release-preservation-contract",
+    "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+    "tag_tree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b",
+    "authenticated_source_blobs_read": 47,
+    "contract_source_files": 19,
+    "contract_source_bytes": 357278,
+    "bounded_excerpts": 27,
+    "authenticated_composition_archives_read": 2,
+    "private_script_classifications": 6,
+    "declaration_data_rules": 2,
+    "duplicate_group_contract": 128,
+    "proof_claim": "Source-authenticated invocation or retention relation plus exact fresh release binary/payload preservation. No newly observed native execution or reproducible-build proof.",
+    "fresh_collection_route": "hosted_packaging.execute -> nebular_callers.collect_caller_sources -> authenticated tagged_files; preservation inventory projects required release members before evaluation.",
+    "unavailable_native_evidence": "Fresh Linux release-asset binary download and native client execution were not performed; connector does not support binary release downloads and command networking was unavailable.",
+    "independent_native_collection_route": "Existing bounded hosted_smoke released-runtime verifier and ordinary prepared-image client cycle, after manager acceptance.",
+    "release_manifest_compatibility": "unverified against real release bytes; explicit handoff prerequisite"
+  },
+  "workers": {
+    "status": "used",
+    "kinds": [
+      "gemini"
+    ],
+    "bounded_jobs": 2,
+    "disposition": "partial output adopted after parent integration and verification; invalid source pins discarded and replaced with authenticated readback; no worker output used as a dispatcher checkpoint",
+    "terminal_cleanup_proven": true,
+    "active_writers": 0
+  },
+  "candidate": {
+    "parent": "ce0c428331f61336530088d328e1b537fea287fb",
+    "inherited_changed_paths": [
+      "docs/README.md",
+      "docs/live1-native-client-cont12.md",
+      "evidence/live1/cont12-hosted10-rpm-policy-verification.json",
+      "operators/live1/candidate-manifest.json",
+      "operators/live1/rpm-lint-policy.json",
+      "operators/live1/run-hosted11.py",
+      "src/rs9/build_rpm.py",
+      "src/rs9/collect_candidate.py",
+      "src/rs9/errors.py",
+      "src/rs9/hosted_deb.py",
+      "src/rs9/hosted_foundation3.py",
+      "src/rs9/hosted_packaging.py",
+      "src/rs9/hosted_summary.py",
+      "src/rs9/records.py",
+      "src/rs9/rpm_evidence.py",
+      "src/rs9/rpm_lint_policy.py",
+      "src/rs9/rpm_preservation.py",
+      "tests/fixtures/run10/rpm/aarch64-linux/policy-evaluation.json",
+      "tests/fixtures/run10/rpm/aarch64-linux/raw-lint.json",
+      "tests/fixtures/run10/rpm/provenance.json",
+      "tests/fixtures/run10/rpm/x86_64-linux/policy-evaluation.json",
+      "tests/fixtures/run10/rpm/x86_64-linux/raw-lint.json",
+      "tests/test_build_rpm.py",
+      "tests/test_records_boundary.py",
+      "tests/test_rpm_derivation_custody.py",
+      "tests/test_rpm_evidence.py",
+      "tests/test_rpm_failure_integration.py",
+      "tests/test_rpm_lint.py",
+      "tests/test_rpm_lint_policy.py",
+      "tests/test_rpm_policy_custody.py",
+      "tests/test_run_hosted11.py"
+    ],
+    "recovery_additional_paths": [
+      "docs/live1-native-client-cont12r1.md",
+      "evidence/live1/cont12r1-nebular-caller-sources.json",
+      "evidence/live1/cont12r1-verification.json",
+      "operators/live1/hosted-lanes.json",
+      "src/rs9/hosted_pipeline.py",
+      "src/rs9/nebular_callers.py",
+      "src/rs9/rpm_client_runtime.py",
+      "tests/fixtures/nebular-0.6.1/caller-payload-members.json",
+      "tests/fixtures/nebular-0.6.1/caller-sources.json",
+      "tests/rpm_summary_fixtures.py",
+      "tests/test_diagnostic_collection.py",
+      "tests/test_hosted_candidate.py",
+      "tests/test_hosted_deb.py",
+      "tests/test_hosted_foundation3.py",
+      "tests/test_hosted_packaging.py",
+      "tests/test_hosted_summary.py",
+      "tests/test_nebular_callers.py",
+      "tests/test_rpm_client_runtime.py",
+      "tests/test_rpm_consumer_custody.py",
+      "tests/test_rpm_orchestration.py",
+      "tests/test_rpm_stage_gates.py",
+      "tests/test_scoped_workflow_graph.py"
+    ],
+    "cumulative_changed_paths": [
+      "docs/README.md",
+      "docs/live1-native-client-cont12.md",
+      "docs/live1-native-client-cont12r1.md",
+      "evidence/live1/cont12-hosted10-rpm-policy-verification.json",
+      "evidence/live1/cont12r1-nebular-caller-sources.json",
+      "evidence/live1/cont12r1-verification.json",
+      "operators/live1/candidate-manifest.json",
+      "operators/live1/hosted-lanes.json",
+      "operators/live1/rpm-lint-policy.json",
+      "operators/live1/run-hosted11.py",
+      "src/rs9/build_rpm.py",
+      "src/rs9/collect_candidate.py",
+      "src/rs9/errors.py",
+      "src/rs9/hosted_deb.py",
+      "src/rs9/hosted_foundation3.py",
+      "src/rs9/hosted_packaging.py",
+      "src/rs9/hosted_pipeline.py",
+      "src/rs9/hosted_summary.py",
+      "src/rs9/nebular_callers.py",
+      "src/rs9/records.py",
+      "src/rs9/rpm_client_runtime.py",
+      "src/rs9/rpm_evidence.py",
+      "src/rs9/rpm_lint_policy.py",
+      "src/rs9/rpm_preservation.py",
+      "tests/fixtures/nebular-0.6.1/caller-payload-members.json",
+      "tests/fixtures/nebular-0.6.1/caller-sources.json",
+      "tests/fixtures/run10/rpm/aarch64-linux/policy-evaluation.json",
+      "tests/fixtures/run10/rpm/aarch64-linux/raw-lint.json",
+      "tests/fixtures/run10/rpm/provenance.json",
+      "tests/fixtures/run10/rpm/x86_64-linux/policy-evaluation.json",
+      "tests/fixtures/run10/rpm/x86_64-linux/raw-lint.json",
+      "tests/rpm_summary_fixtures.py",
+      "tests/test_build_rpm.py",
+      "tests/test_diagnostic_collection.py",
+      "tests/test_hosted_candidate.py",
+      "tests/test_hosted_deb.py",
+      "tests/test_hosted_foundation3.py",
+      "tests/test_hosted_packaging.py",
+      "tests/test_hosted_summary.py",
+      "tests/test_nebular_callers.py",
+      "tests/test_records_boundary.py",
+      "tests/test_rpm_client_runtime.py",
+      "tests/test_rpm_consumer_custody.py",
+      "tests/test_rpm_derivation_custody.py",
+      "tests/test_rpm_evidence.py",
+      "tests/test_rpm_failure_integration.py",
+      "tests/test_rpm_lint.py",
+      "tests/test_rpm_lint_policy.py",
+      "tests/test_rpm_orchestration.py",
+      "tests/test_rpm_policy_custody.py",
+      "tests/test_rpm_stage_gates.py",
+      "tests/test_run_hosted11.py",
+      "tests/test_scoped_workflow_graph.py"
+    ],
+    "cumulative_changed_path_count": 53,
+    "complete_inventory_files_excluding_manifest": 426,
+    "identity_binding": "Terminal tree and manifest SHA256 are emitted outside the candidate to avoid a self-referential identity.",
+    "adoption_ready": false,
+    "production_ready": false
+  },
+  "preserved_state": {
+    "real_index": "unchanged exact SHA256",
+    "head": "unchanged public parent",
+    "ignored_root_scratch": {
+      "status": "unchanged content inventory",
+      "files": 163
+    },
+    "serena": {
+      "status": "unchanged content inventory",
+      "files": 3
+    },
+    "remote": {
+      "configuration": "unmodified during stage; authorized repository URL",
+      "tracking_main": "public parent",
+      "authenticated_live_main": "ce0c428331f61336530088d328e1b537fea287fb",
+      "transport": "GitHub connector git/ref/heads/main"
+    }
+  },
+  "preservation_constraints": {
+    "portable_owned_temp_test_assertions_preserved": true,
+    "machine_streams_separate_from_display_preview": true,
+    "raw_lint": "FAIL retained separately from candidate-preservation policy",
+    "generic_durable_validation": "strict; nullable empty message restricted to typed RPM projection and matching empty-argument digest",
+    "release_versions_license_authority_authenticated_payloads": "unchanged",
+    "apt_pacman_regressions": "covered by complete merged suite",
+    "manager_attestation": "external validation retained"
+  },
+  "dispatcher_review": "pre-final reviewed_with_findings advisory; terminal corrections authorized by closeout envelope; no additional substantive review",
+  "final_verification": "Final source tests passed under both process-local umasks; reporting/manifest bytes refreshed afterward and checked separately without rerunning executable source gates.",
+  "handoff": {
+    "status": "held-for-real-release-manifest-comparison-and-later-manager-acceptance",
+    "operator": "operators/live1/run-hosted11.py",
+    "invoked": false,
+    "new_nonproduction_hosted_runs": 0,
+    "required_bindings": [
+      "authenticated existing v0.6.1 sidecar manifest compatibility for both Linux assets",
+      "reviewed parent",
+      "terminal source tree",
+      "manifest SHA256",
+      "external manager attestation",
+      "clean real index",
+      "unchanged remote",
+      "existing empty physical packet directory",
+      "original not-before collection timestamp"
+    ],
+    "automatic_rerun": false
+  },
+  "deferred_qualification": {
+    "required_linux_nix": "unqualified",
+    "native_rpm_dnf": "unqualified",
+    "pages_custody_tls": "unqualified",
+    "darwin_wheel_offline_isolation": "NOT-RUN",
+    "linux_wheel_production_compatibility": "unresolved",
+    "proot": "experimental"
+  },
+  "production_enabled": false,
+  "publication_authority": false,
+  "native_execution_claimed": false,
+  "staged_committed_pushed": false,
+  "external_reviewer_invoked": false,
+  "closeout": {
+    "stage": "closeout",
+    "disposition": "amend",
+    "rationale": "Correct the actionable rule, stage-gate and consumer findings while retaining inherited source work; name unavailable real-release evidence without claiming native success.",
+    "bound_producer_tree": "08c369c96fa18929df8bf02de0c323e04e063b97",
+    "work_review": "reviewed_with_findings advisory",
+    "additional_substantive_review": false,
+    "terminal_amendments_independently_reviewed": false,
+    "findings": [
+      {
+        "id": 1,
+        "disposition": "defer",
+        "missing_item": "Authenticated sidecar-payload/manifest.json from both existing v0.6.1 Linux release assets; compare actual runtime and full payload file set with the production predicate.",
+        "scope_observation": "No sidecar-payload/manifest.json found in repository scratch or required kit. Unit manifest inputs are external payload doubles.",
+        "collection_route": "Existing capture_generation authenticates tag and asset hashes; rpm_preservation._archive_projection checks the archive hash and extracts only declared bounded text, independently of a built RPM or accepted policy. collect_preservation_inventory and verify_nebular_caller then enforce fresh candidate preservation.",
+        "handoff_prerequisite": true,
+        "authenticated_release_assets": [
+          {
+            "name": "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d"
+          },
+          {
+            "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "disposition": "amend",
+        "corrections": [
+          "Role/intent consistency enforced with explicit retained-source intent",
+          "Hypothetical JSON-pointer caller proof removed and current policy rejects those contracts",
+          "Preserved executable Loom runtime Requires floor binds to prepared-client probe independently of native caller role"
+        ]
+      },
+      {
+        "id": 3,
+        "disposition": "amend",
+        "corrections": [
+          "Builder completed derivation key agrees with execute",
+          "Quarantine package bytes selected in returned artifacts and hosted retention",
+          "Real execute/builder/pipeline boundary regressions verify retention and completed stages"
+        ]
+      },
+      {
+        "id": 4,
+        "disposition": "amend",
+        "corrections": [
+          "Execute -> builder -> policy -> hosted pipeline -> retention -> all four consumers tested through production interfaces",
+          "Missing raw architecture rejected with RPM_RAW_EVIDENCE_SYSTEM",
+          "Historical diagnostic parsing accurately documented"
+        ],
+        "deferred": "Native Docker cleanup/platform warnings/multiple-owner observations; external command doubles do not qualify native behavior"
+      }
+    ],
+    "verification": {
+      "status": "passed-source-checks-external-open-items",
+      "focused": {
+        "schema": "rs9.cont12r1-unit-observation.v1",
+        "umask": "022",
+        "discovered": 351,
+        "run": 351,
+        "pass": 350,
+        "failures": 0,
+        "errors": 0,
+        "reported_skip_events": 1,
+        "skipped_tests_in_run": 1,
+        "class_level_omissions": [],
+        "omitted_tests": 0,
+        "skips": [
+          {
+            "test": "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+            "reason": "GnuPG binary not available"
+          }
+        ]
+      },
+      "focused_modules": [
+        "test_nebular_callers",
+        "test_rpm_client_runtime",
+        "test_rpm_orchestration",
+        "test_rpm_consumer_custody",
+        "test_rpm_stage_gates",
+        "test_rpm_derivation_custody",
+        "test_rpm_policy_custody",
+        "test_rpm_evidence",
+        "test_rpm_inventory_stream",
+        "test_rpm_failure_integration",
+        "test_build_rpm",
+        "test_rpm_lint_policy",
+        "test_hosted_packaging",
+        "test_hosted_candidate",
+        "test_hosted_summary",
+        "test_diagnostic_collection",
+        "test_hosted_foundation3",
+        "test_hosted_deb",
+        "test_scoped_workflow_graph",
+        "test_records_boundary",
+        "test_rpm_lint"
+      ],
+      "complete_merged_unit_suites": [
+        {
+          "schema": "rs9.cont12r1-unit-observation.v1",
+          "umask": "022",
+          "discovered": 1540,
+          "run": 1530,
+          "pass": 1517,
+          "failures": 0,
+          "errors": 0,
+          "reported_skip_events": 14,
+          "skipped_tests_in_run": 13,
+          "class_level_omissions": [
+            {
+              "class": "test_signing_fixture.SigningFixtureTests",
+              "omitted_tests": 10,
+              "reason": "GnuPG binary not available in environment"
+            }
+          ],
+          "omitted_tests": 10,
+          "skips": [
+            {
+              "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported",
+              "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them"
+            },
+            {
+              "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read",
+              "reason": "sandbox denies local socket creation; socket record grammar tested separately"
+            },
+            {
+              "test": "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+              "reason": "GnuPG binary not available"
+            },
+            {
+              "test": "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+              "reason": "live capture directory not supplied"
+            },
+            {
+              "test": "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+              "reason": "live capture directory not supplied"
+            },
+            {
+              "test": "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+              "reason": "live capture directory not supplied"
+            },
+            {
+              "test": "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+              "reason": "both live capture directories required"
+            },
+            {
+              "test": "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+              "reason": "live capture directory not supplied"
+            },
+            {
+              "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_darwin",
+              "reason": "official archive directory not locatable"
+            },
+            {
+              "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_linux",
+              "reason": "official archive directory not locatable"
+            },
+            {
+              "test": "test_nix_installer.OfficialArchiveTests.test_x86_64_linux",
+              "reason": "official archive directory not locatable"
+            },
+            {
+              "test": "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+              "reason": "GnuPG binary not available"
+            },
+            {
+              "test": "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+              "reason": "GnuPG binary not available"
+            }
+          ]
+        },
+        {
+          "schema": "rs9.cont12r1-unit-observation.v1",
+          "umask": "077",
+          "discovered": 1540,
+          "run": 1530,
+          "pass": 1517,
+          "failures": 0,
+          "errors": 0,
+          "reported_skip_events": 14,
+          "skipped_tests_in_run": 13,
+          "class_level_omissions": [
+            {
+              "class": "test_signing_fixture.SigningFixtureTests",
+              "omitted_tests": 10,
+              "reason": "GnuPG binary not available in environment"
+            }
+          ],
+          "omitted_tests": 10,
+          "skips": [
+            {
+              "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported",
+              "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them"
+            },
+            {
+              "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read",
+              "reason": "sandbox denies local socket creation; socket record grammar tested separately"
+            },
+            {
+              "test": "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+              "reason": "GnuPG binary not available"
+            },
+            {
+              "test": "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+              "reason": "live capture directory not supplied"
+            },
+            {
+              "test": "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+              "reason": "live capture directory not supplied"
+            },
+            {
+              "test": "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+              "reason": "live capture directory not supplied"
+            },
+            {
+              "test": "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+              "reason": "both live capture directories required"
+            },
+            {
+              "test": "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+              "reason": "live capture directory not supplied"
+            },
+            {
+              "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_darwin",
+              "reason": "official archive directory not locatable"
+            },
+            {
+              "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_linux",
+              "reason": "official archive directory not locatable"
+            },
+            {
+              "test": "test_nix_installer.OfficialArchiveTests.test_x86_64_linux",
+              "reason": "official archive directory not locatable"
+            },
+            {
+              "test": "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+              "reason": "GnuPG binary not available"
+            },
+            {
+              "test": "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+              "reason": "GnuPG binary not available"
+            }
+          ]
+        }
+      ],
+      "runner": "unittest.TestLoader discovery and TextTestRunner with process-local os.umask; PYTHONDONTWRITEBYTECODE=1; PYTHONPATH=src:tests; python3 -W error::ResourceWarning",
+      "resource_warning": "error",
+      "bytecode_mutation": false,
+      "umask_scope": "process-local",
+      "portable_custody_direct": {
+        "test": "tests.test_rpm_derivation_custody.RpmDerivationCustodyTests.test_three_accepted_raw_fail_shapes_complete_derivation_manifest_and_custody",
+        "run": 1,
+        "pass": 1,
+        "skipped": 0,
+        "product_subcases": 3
+      },
+      "static_checks": {
+        "python_parse": "pass",
+        "parsed_files": 37,
+        "diff_whitespace_all_changed_paths": "pass",
+        "local_links": "pass",
+        "links_checked": 48,
+        "documents_checked": 3,
+        "credentials_scan": "pass",
+        "selected_source_hashes": "pass",
+        "source_files": 19,
+        "changed_paths": 53,
+        "inventory_files": 426,
+        "readiness": false
+      },
+      "hygiene_tests": {
+        "run": 4,
+        "pass": 4,
+        "skipped": 0
+      },
+      "large_object_checks": "Full machine streams and policy objects above 64 KiB, byte-exact chunk rehydration, failures beyond previews/chunk boundaries and production consumer adversarial cases are covered by the focused and full suites.",
+      "production_flow": "New test crosses actual execute, builder, evaluator, run_lane, retention and all four consumers. External authentication/commands are doubles. One-product fixture remains unqualified.",
+      "post_suite_changes": "Only docs, verification evidence and inventory manifest; task-scoped artifact checks rerun after those updates.",
+      "limitations": [
+        "Real sidecar manifest comparison not performed",
+        "Native Docker/RPM/DNF or ordinary Linux qualification not performed",
+        "No new external network collection",
+        "No additional substantive review",
+        "No hosted operator invocation"
+      ]
+    },
+    "initial_full_suite_attempts": [
+      {
+        "umask": "022",
+        "discovered": 1540,
+        "run": 1530,
+        "pass": 1514,
+        "failures": 1,
+        "errors": 2,
+        "skipped_tests_in_run": 13,
+        "class_level_omitted_tests": 10,
+        "causes": [
+          "Stale candidate inventory after terminal source edits (two checks)",
+          "Obsolete assertion excluding quarantine from returned artifacts"
+        ]
+      },
+      {
+        "umask": "077",
+        "discovered": 1540,
+        "run": 1530,
+        "pass": 1514,
+        "failures": 1,
+        "errors": 2,
+        "skipped_tests_in_run": 13,
+        "class_level_omitted_tests": 10,
+        "causes": [
+          "Stale candidate inventory after terminal source edits (two checks)",
+          "Obsolete assertion excluding quarantine from returned artifacts"
+        ]
+      }
+    ],
+    "workers": {
+      "status": "declined",
+      "reason": "The bounded terminal fixes and verification share the same producer data flow; direct parent work used."
+    },
+    "native_qualification": "not performed",
+    "provider_git_mutation": false,
+    "hosted_operator_invoked": false,
+    "observed_at": "2026-10-08T21:03:41.787657+00:00",
+    "terminal_changed_product_paths": [
+      "docs/live1-native-client-cont12r1.md",
+      "evidence/live1/cont12r1-verification.json",
+      "operators/live1/candidate-manifest.json",
+      "operators/live1/rpm-lint-policy.json",
+      "src/rs9/build_rpm.py",
+      "src/rs9/hosted_packaging.py",
+      "src/rs9/hosted_pipeline.py",
+      "src/rs9/hosted_summary.py",
+      "src/rs9/nebular_callers.py",
+      "src/rs9/rpm_client_runtime.py",
+      "src/rs9/rpm_evidence.py",
+      "src/rs9/rpm_lint_policy.py",
+      "tests/test_hosted_packaging.py",
+      "tests/test_nebular_callers.py",
+      "tests/test_rpm_client_runtime.py",
+      "tests/test_rpm_consumer_custody.py",
+      "tests/test_rpm_failure_integration.py",
+      "tests/test_rpm_orchestration.py"
+    ],
+    "preserved_state": {
+      "real_index_unchanged": true,
+      "head_unchanged": true,
+      "remote_configuration_unchanged": true,
+      "tracking_main_at_parent": true,
+      "operational_content_unchanged": {
+        ".scratch": true,
+        ".serena": true,
+        ".pytest_cache": true
+      }
+    },
+    "live_remote_reauthentication": "not repeated in closeout; producer observation retained separately"
+  },
+  "verification_scope": "Top-level verification records the producer pre-final state; fresh terminal observations are under closeout.verification.",
+  "preserved_state_scope": "Producer observations retained; closeout.preserved_state records terminal local comparisons. Live remote authentication was not repeated during closeout."
+}

@@ -7,6 +7,13 @@ from pathlib import Path
 from rs9.errors import ContractError
 from rs9.hosted_custody import provenance, verify_set
 from rs9.product_classes import get_product_class, supported_architectures, extract_package_arch
+from rs9.rpm_evidence import (
+    CURRENT_RPM_EVIDENCE_CONTRACT,
+    is_current_rpm_evidence_contract,
+    verify_raw_custody,
+    verify_rpm_custody,
+    verify_policy_custody,
+)
 from rs9.scratch import canonical
 
 LINUX_WHEEL_PROMOTION_BLOCKER = "linux-wheel-production-promotion-compatibility-unproven"
@@ -63,13 +70,27 @@ def rpm_lint_results(receipts):
         policy = details.get("rpm_lint_policy", {})
         for product in sorted(set(raw) | set(policy)):
             evidence = raw.get(product, {})
+            client_gates = [g for g in receipt.get("gates", [])
+                            if g.get("name") == "rpm-client-qualification"]
             results.append({"system": receipt["system"], "product": product,
                             "raw_status": evidence.get("status", "unavailable"),
                             "raw_clean": evidence.get("clean"),
                             "raw_exit_code": evidence.get("tool_receipt", {}).get("exit_code"),
                             "raw_counts": evidence.get("findings_summary", {}),
-                            "policy": policy.get(product, {"accepted": False, "status": "unavailable"})})
+                            "policy": policy.get(product, {"accepted": False, "status": "unavailable"}),
+                            "downstream_dnf": client_gates[0] if len(client_gates) == 1 else {"status": "unavailable"}})
     return results
+
+
+def validate_rpm_policy_custody(directory, manifest, receipt):
+    """Verify current summary/raw custody; historical parsing is an explicit diagnostic path."""
+    return verify_rpm_custody(directory, manifest, receipt)
+
+
+def validate_rpm_custody(directory, manifest, receipt):
+    """Consumer API: verify RPM policy and raw custody references."""
+    from rs9.rpm_evidence import verify_rpm_custody
+    return verify_rpm_custody(directory, manifest, receipt)
 
 
 def validate_rpm_policy_source(repository, receipt):
@@ -145,8 +166,9 @@ def summarize(repository, inputs, output):
             if receipt.get("execution_error"):
                 reasons.append(lane["artifact_name"] + ":execution-failed")
             reasons.extend(receipt.get("policy_blockers", []))
-            validate_rpm_policy_source(repository, receipt)
             promotion.extend(promotion_blockers(lane, receipt))
+            validate_rpm_policy_source(repository, receipt)
+            validate_rpm_policy_custody(directory, manifest, receipt)
         except (ContractError, OSError, ValueError, KeyError) as error:
             reasons.append(lane["artifact_name"] + ":" + (error.code if isinstance(error, ContractError) else "missing-or-invalid-artifact"))
     if len(auth_values) != 1 or None in auth_values:
@@ -224,6 +246,10 @@ def validate_summary(summary, repository, commit):
             raise ContractError("HOSTED_GATES", "Missing gate or mixed receipt provenance")
         if row.get("execution_error") or row.get("policy_blockers") or row.get("production_enabled") is not False:
             raise ContractError("HOSTED_GATES", "Receipt has unresolved failures or publication authority")
+        if row.get("lane") == "rpm":
+            details = row.get("details", {})
+            if details.get("rpm_evidence_contract") != CURRENT_RPM_EVIDENCE_CONTRACT:
+                raise ContractError("HOSTED_NOT_QUALIFIED", "Historical marker-free RPM evidence cannot acquire new qualification")
         validate_rpm_policy_source(repository, row)
         promotion_blockers(lane, row)
         manifest = next(m for m in manifests if (m["lane"],m["system"]) == (row["lane"],row["system"]))

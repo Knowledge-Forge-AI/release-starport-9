@@ -308,7 +308,7 @@ class BuildRpmTests(unittest.TestCase):
         self.root = Path(self.tmp.name).resolve()
         self.scratch = self.root / "scratch"
         self.scratch.mkdir()
-        policy_patch = patch("rs9.rpm_lint_policy.load_policy", side_effect=lambda: fixture_policy(self.root))
+        policy_patch = patch("rs9.rpm_lint_policy.load_policy", side_effect=lambda *a, **kw: fixture_policy(self.root))
         policy_patch.start()
         self.addCleanup(policy_patch.stop)
 
@@ -327,7 +327,7 @@ class BuildRpmTests(unittest.TestCase):
             rpm_dir = Path(cwd) / "RPMS" / arch
             rpm_dir.mkdir(parents=True, exist_ok=True)
             (rpm_dir / f"{name}-{version}-1.fc43.{arch}.rpm").write_bytes(b"rpm-payload")
-            return CommandReceipt(argv, 0, b"built\n", b"")
+            return CommandReceipt(argv, 0, b"built\n", b"", executed=True)
 
         def rpm_query_handler(argv, cwd=None, env=None):
             response = inventory_response(argv,cwd)
@@ -651,6 +651,200 @@ class BuildRpmTests(unittest.TestCase):
         self.assertEqual(manifest["rpm_identity"]["arch"], "aarch64")
         self.assertEqual(manifest["rpm_payload_digest"]["payload_digest_algo"], "sha256")
         self.assertEqual(manifest["schema"], "rs9.rpm-candidate.v1alpha2")
+
+    def test_burst_native_accepted_with_empty_messages_x86_64_and_aarch64(self):
+        from rs9.scratch import canonical
+        for arch in ("x86_64", "aarch64"):
+            with self.subTest(arch=arch):
+                capture, intent, offline_npm = self._make_burst_fixture(arch)
+                scratch = self.scratch / f"burst_empty_msg_{arch}"
+                scratch.mkdir()
+                runner = self._setup_runner(arch=arch, name="theme-forge-stellar-burst", version="0.6.1")
+
+                # Realistic raw lint with empty message findings
+                lint_stdout = (
+                    f"theme-forge-stellar-burst.spec: W: no-%check-section\n"
+                    f"theme-forge-stellar-burst.{arch}: W: no-documentation\n"
+                    f"1 packages and 1 specfiles checked; 0 errors, 2 warnings, 0 filtered.\n"
+                ).encode("ascii")
+
+                def custom_lint(argv, cwd=None, env=None):
+                    if "--version" in argv:
+                        return CommandReceipt(argv, 0, b"2.8.0\n", b"", executed=True)
+                    return CommandReceipt(argv, 0, lint_stdout, b"", executed=True)
+
+                runner.handlers["rpmlint"] = custom_lint
+
+                result = build_rpm_candidate(
+                    capture, intent, arch, scratch,
+                    offline_npm_archives=offline_npm, runner=runner,
+                )
+
+                manifest = result["manifest"]
+                derivation = result["derivation_record"]
+
+                # 1. Manifest rpmlint retains raw lint with empty message strings intact
+                raw_lint = manifest["rpmlint"]
+                self.assertEqual(raw_lint["findings"][0]["check"], "no-%check-section")
+                self.assertEqual(raw_lint["findings"][0]["message"], "")
+                self.assertEqual(raw_lint["findings"][1]["check"], "no-documentation")
+                self.assertEqual(raw_lint["findings"][1]["message"], "")
+                self.assertTrue(raw_lint["clean"])
+                self.assertEqual(raw_lint["status"], "pass")
+
+                # 2. Derivation rpmlint contains durable projection where empty messages are None
+                durable_lint = derivation["evidence"]["rpmlint"]
+                self.assertEqual(durable_lint["schema"], "rs9.durable-lint-projection.v1")
+                self.assertNotIn("findings", durable_lint)
+                self.assertEqual(durable_lint["raw_evidence"]["sha256"], digest(canonical(raw_lint)))
+
+                # 3. Derivation rpmlint_policy contains compact summary
+                summary = derivation["evidence"]["rpmlint_policy"]
+                self.assertEqual(summary["schema"], "rs9.rpm-lint-policy-summary.v1")
+                self.assertEqual(summary["product"], "theme-forge-stellar-burst")
+                self.assertGreater(summary["chunk_count"], 0)
+
+                # 4. Derivation passes records.sanitized
+                from rs9.records import sanitized
+                sanitized(derivation)
+
+    def test_loom_and_solar_sail_noarch_accepted_with_empty_messages(self):
+        for product in ("theme-forge-stellar-loom", "theme-forge-solar-sail"):
+            with self.subTest(product=product):
+                fixture_dir = self.root / f"fixture_empty_msg_{product}"
+                capture, intent, npm = create_cli_fixture(fixture_dir, product=product)
+                scratch = self.scratch / f"scratch_empty_msg_{product}"
+                scratch.mkdir()
+                version = intent["version"]
+                runner = self._setup_runner(arch="noarch", name=product, version=version)
+
+                lint_stdout = (
+                    f"{product}.spec: W: no-%check-section\n"
+                    f"{product}.noarch: W: no-documentation\n"
+                    f"1 packages and 1 specfiles checked; 0 errors, 2 warnings, 0 filtered.\n"
+                ).encode("ascii")
+
+                def custom_lint(argv, cwd=None, env=None):
+                    if "--version" in argv:
+                        return CommandReceipt(argv, 0, b"2.8.0\n", b"", executed=True)
+                    return CommandReceipt(argv, 0, lint_stdout, b"", executed=True)
+
+                runner.handlers["rpmlint"] = custom_lint
+
+                result = build_rpm_candidate(
+                    capture, intent, "noarch", scratch,
+                    offline_npm_archives=npm, runner=runner,
+                )
+
+                manifest = result["manifest"]
+                derivation = result["derivation_record"]
+
+                # Raw retains empty message strings
+                self.assertEqual(manifest["rpmlint"]["findings"][0]["message"], "")
+                self.assertEqual(manifest["rpmlint"]["findings"][1]["message"], "")
+
+                # Durable projection has None
+                self.assertNotIn("findings", derivation["evidence"]["rpmlint"])
+
+                from rs9.records import sanitized
+                sanitized(derivation)
+
+    def test_createrepo_failure_has_distinct_substage_and_receipt(self):
+        fixture_dir = self.root / "fixture_createrepo"
+        capture, intent, npm = create_cli_fixture(fixture_dir)
+        scratch = self.scratch / "scratch_createrepo"
+        scratch.mkdir()
+        runner = self._setup_runner(createrepo_exit=1)
+
+        with self.assertRaises(ContractError) as caught:
+            build_rpm_candidate(
+                capture, intent, "noarch", scratch,
+                offline_npm_archives=npm, runner=runner,
+            )
+        err = caught.exception
+        self.assertEqual(err.code, "BUILD_FAILED")
+        self.assertEqual(err.details.get("substage"), "createrepo")
+        self.assertEqual(err.details.get("tool"), "createrepo")
+        self.assertIsNotNone(err.receipt)
+        self.assertEqual(err.receipt.exit_code, 1)
+        self.assertIs(err.causal_receipt, err.receipt)
+        self.assertIsNotNone(getattr(err, "construction_witness", None))
+        self.assertEqual(err.construction_witness["schema"], "rs9.rpm-construction-witness.v1")
+        self.assertEqual(err.package_artifact, err.package_path)
+        self.assertEqual(err.details.get("construction_witness")["schema"], "rs9.rpm-construction-witness.v1")
+
+    def test_record_boundary_failure_wrapped_preserving_field_rule_and_no_receipt(self):
+        fixture_dir = self.root / "fixture_boundary"
+        capture, intent, npm = create_cli_fixture(fixture_dir)
+        scratch = self.scratch / "scratch_boundary"
+        scratch.mkdir()
+        runner = self._setup_runner()
+
+        # Mock create_derivation_record to simulate an adverse field error
+        from rs9.records import ContractError as RecContractError
+        def fail_derivation(**kwargs):
+            e = RecContractError("INVALID_STRING", "A bounded nonempty string is required")
+            e.field_path = "$.evidence.custom_field"
+            e.rule = "INVALID_STRING"
+            raise e
+
+        with patch("rs9.build_rpm.create_derivation_record", side_effect=fail_derivation):
+            with self.assertRaises(ContractError) as caught:
+                build_rpm_candidate(
+                    capture, intent, "noarch", scratch,
+                    offline_npm_archives=npm, runner=runner,
+                )
+            err = caught.exception
+            self.assertEqual(err.code, "RPM_DERIVATION_RECORD")
+            self.assertIsNone(err.receipt)
+            self.assertIsNone(err.causal_receipt)
+            self.assertEqual(getattr(err, "field_path", None), "$.evidence.custom_field")
+            self.assertEqual(getattr(err, "rule", None), "INVALID_STRING")
+            self.assertEqual(getattr(err, "substage", None), "rpm-derivation-record")
+            self.assertIsNotNone(getattr(err, "rpmlint_evidence", None))
+            self.assertIsNotNone(getattr(err, "rpmlint_policy", None))
+            self.assertTrue(Path(err.package_path).is_file())
+            self.assertEqual(err.package_sha256, digest(Path(err.package_path).read_bytes()))
+            self.assertIsNotNone(getattr(err, "construction_witness", None))
+            self.assertEqual(err.construction_witness["schema"], "rs9.rpm-construction-witness.v1")
+            self.assertEqual(err.package_artifact, err.package_path)
+
+    def test_construction_witness_attached_on_success_and_failure(self):
+        fixture_dir = self.root / "fixture_witness"
+        capture, intent, npm = create_cli_fixture(fixture_dir)
+        scratch = self.scratch / "scratch_witness_ok"
+        scratch.mkdir()
+        runner = self._setup_runner()
+
+        result = build_rpm_candidate(
+            capture, intent, "noarch", scratch,
+            offline_npm_archives=npm, runner=runner,
+        )
+        witness = result["construction_witness"]
+        self.assertEqual(witness["schema"], "rs9.rpm-construction-witness.v1")
+        self.assertTrue(witness["rpmbuild_receipt"]["executed"])
+        self.assertEqual(witness["rpmbuild_receipt"]["exit_code"], 0)
+        self.assertEqual(witness["rpmbuild_receipt"]["tool"], "rpmbuild")
+        self.assertEqual(witness["rpm_identity"]["name"], intent["project"]["id"])
+        self.assertEqual(witness["package_sha256"], digest(result["rpm_path"].read_bytes()))
+        self.assertEqual(witness["package_size"], len(result["rpm_path"].read_bytes()))
+        self.assertEqual(result["manifest"]["construction_witness"], witness)
+
+        # On failure (rpmlint exit = 1)
+        fail_scratch = self.scratch / "scratch_witness_fail"
+        fail_scratch.mkdir()
+        fail_runner = self._setup_runner(rpmlint_exit=1)
+        with self.assertRaises(ContractError) as caught:
+            build_rpm_candidate(
+                capture, intent, "noarch", fail_scratch,
+                offline_npm_archives=npm, runner=fail_runner,
+            )
+        err = caught.exception
+        self.assertIsNotNone(err.construction_witness)
+        self.assertEqual(err.construction_witness["schema"], "rs9.rpm-construction-witness.v1")
+        self.assertEqual(err.package_artifact, err.package_path)
+        self.assertEqual(err.package_sha256, digest(Path(err.package_path).read_bytes()))
+        self.assertIn("construction_witness", err.details)
 
 
 if __name__ == "__main__":

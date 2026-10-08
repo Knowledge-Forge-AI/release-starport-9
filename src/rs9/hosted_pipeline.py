@@ -87,6 +87,10 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
               "production_promotion_blockers": ["experimental-proot-runtime-unqualified-for-production"] if is_experiment else [],
               "runner": runner_facts(),
               "fixture": {"used": False, "production": False}}
+    if lane == "rpm":
+        # Every current-source receipt carries this marker, including failures
+        # before the package builder is reached.
+        record["details"] = {"rpm_evidence_contract": "rs9.rpm-evidence-contract.v2"}
     if is_experiment:
         record["experiment_jobs"] = list(c.get("experiment_jobs", ["nix-proot"]))
         record["mandatory_gates_satisfied"] = False
@@ -144,6 +148,8 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
             record["gates"] = result["gates"]
             files.extend(result["artifacts"])
             record["details"] = result.get("details", {})
+            if lane == "rpm":
+                record["details"]["rpm_evidence_contract"] = "rs9.rpm-evidence-contract.v2"
             promotion = result.get("production_promotion_blockers", [])
             if not isinstance(promotion, list) or any(not isinstance(v, str) for v in promotion):
                 raise ContractError("HOSTED_POLICY", "Malformed production promotion blockers")
@@ -208,7 +214,7 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
         files.append(fixture_identity)
     # Preserve completed package bytes after a later verifier fails. Never retain
     # fixture homedirs, raw transport payloads, or private fixture keys.
-    for folder in ("retained", "unsigned", "unsigned-custody", "custody-deb", "diagnostics", "pages-client/diagnostics"):
+    for folder in ("retained", "unsigned", "unsigned-custody", "quarantine", "custody-deb", "diagnostics", "pages-client/diagnostics"):
         files.extend(p for p in (lane_scratch / folder).rglob("*") if p.is_file() and not p.is_symlink())
     retain(scratch, receipts, files, record)
     return 2 if record["execution_error"] else 0

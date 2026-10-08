@@ -1,0 +1,1039 @@
+{
+  "architecture": "x86_64",
+  "arguments": [
+    "theme-forge-nebular-fusion.spec",
+    "theme-forge-nebular-fusion-0.6.1-1.fc43.x86_64.rpm"
+  ],
+  "clean": false,
+  "counts": {
+    "E": 9,
+    "I": 0,
+    "W": 139
+  },
+  "effective_configuration": {
+    "filtered_count": 8,
+    "invocation": "default-tool-config-no-added-filters",
+    "listing_sha256": "d7970ce0b844e71731d12cd215384df251caf5643c13618fe2c6a7fbbf88b828",
+    "session_header_sha256": "81448ae7753336dcd6deb5312dfde15ac0221cdf44a840ccfeb52e0c82f502d5"
+  },
+  "error_overflow": false,
+  "error_records": [
+    {
+      "arguments_complete": true,
+      "arguments_sha256": "8243d5621f94fae2d19c350e250ca34645255dc5ad2a7f84840a1739480c0f1b",
+      "code": "non-executable-script",
+      "interpreter": "/usr/bin/env node",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs 644 package:usr/bin/env node",
+      "mode": "644",
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "arguments_complete": true,
+      "arguments_sha256": "1268b5043423553ad7841a6ecdbca8ede7e6c41c569cf40ccc4972e33f65c06a",
+      "code": "non-executable-script",
+      "interpreter": "/usr/bin/env node",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts 644 package:usr/bin/env node",
+      "mode": "644",
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "arguments_complete": true,
+      "arguments_sha256": "c5f302723cf25206e14fcf6c363700ef2981aa38e99c58bff0720d873506a64c",
+      "code": "non-executable-script",
+      "interpreter": "/usr/bin/env node",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js 644 package:usr/bin/env node",
+      "mode": "644",
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "arguments_complete": true,
+      "arguments_sha256": "1dd05e241e2073b273000f938ebe10b16e6a1fc4f8d05ed17e83d3f2e74acf4d",
+      "code": "non-executable-script",
+      "interpreter": "/usr/bin/env node",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts 644 package:usr/bin/env node",
+      "mode": "644",
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "arguments_complete": true,
+      "arguments_sha256": "6793bd643a3d8e685bab9cb5919ac42632704dbd19d361e975a942a95e78e6f2",
+      "code": "non-executable-script",
+      "interpreter": "/usr/bin/env node",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js 644 package:usr/bin/env node",
+      "mode": "644",
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "arguments_complete": true,
+      "arguments_sha256": "4342a16a3f105ce96d68ba523f2aed8ccddf66c53f767912583e1027ee9672f0",
+      "code": "non-executable-script",
+      "interpreter": "/usr/bin/env node",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs 644 package:usr/bin/env node",
+      "mode": "644",
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "arguments_complete": true,
+      "arguments_sha256": "65ac4db7eb0e632bf31969c255dfbbc2322084879c7f408968ffec8ec72bca9a",
+      "code": "files-duplicated-waste",
+      "level": "E",
+      "message": "3128775",
+      "target": "theme-forge-nebular-fusion.x86_64",
+      "waste_bytes": 3128775
+    },
+    {
+      "arguments_complete": true,
+      "arguments_sha256": "15ee6e2eb42f5515e1a89f6a87195afe0736c20ff6f49c180b25f31e36967575",
+      "code": "env-script-interpreter",
+      "interpreter": "/usr/bin/env node",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js package:usr/bin/env node",
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "arguments_complete": true,
+      "arguments_sha256": "7f8da6bfa25212cb8596bf112ba10013811a616842dbaf0806c44478a651ec01",
+      "code": "env-script-interpreter",
+      "interpreter": "/usr/bin/env node",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js package:usr/bin/env node",
+      "path": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    }
+  ],
+  "findings": [
+    {
+      "check": "non-executable-script",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs 644 package:usr/bin/env",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "non-executable-script",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts 644 package:usr/bin/env ",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "non-executable-script",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js 644 package:usr/bin/env no",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "non-executable-script",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts ",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "non-executable-script",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js 64",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "non-executable-script",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs 644 package:",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicated-waste",
+      "level": "E",
+      "message": "3128775",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "env-script-interpreter",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js package:usr/bin/env nod",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "env-script-interpreter",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js package:usr/bin/env node",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "unstripped-binary-or-object",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "unstripped-binary-or-object",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "unstripped-binary-or-object",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/native/directory-snapshot/prebuilds/li",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "position-independent-executable-suggested",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "no-manual-page-for-binary",
+      "level": "W",
+      "message": "tfnf",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "no-documentation",
+      "level": "W",
+      "message": "",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "no-%check-section",
+      "level": "W",
+      "message": "",
+      "target": "theme-forge-nebular-fusion.spec"
+    },
+    {
+      "check": "invalid-url",
+      "level": "W",
+      "message": "Source0: theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+      "target": "theme-forge-nebular-fusion.spec"
+    },
+    {
+      "check": "hidden-file-or-dir",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/.eslintr",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "hidden-file-or-dir",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/.eslin",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/types.js package:usr/lib/theme-fo",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro-crate-2.0.2/LICENSE-",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/zmij-1.0.23/LICENSE-MIT package",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/walkdir-2.5.0/COPYING package:u",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/walkdir-2.5.0/LICENSE-MIT packa",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/walkdir-2.5.0/UNLICENSE package",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/brotli-decompressor-5.0.3/LICEN",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unicode-ident-1.0.24/LICENSE-AP",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/pango-0.18.3/COPYRIGHT package:",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/pango-sys-0.18.0/LICENSE packag",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/wry-0.55.1/LICENSE-APACHE packa",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/defmt-parser-1.0.0/upstream-LIC",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/bit-vec-0.8.0/LICENSE-MIT packa",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/regex-syntax-0.8.11/LICENSE-MIT",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/sha2-0.10.9/LICENSE-APACHE pack",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_datetime-0.6.3/LICENSE-MIT",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_writer-1.1.2+spec-1.1.0/LI",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/crossbeam-utils-0.8.22/LICENSE-",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/cssparser-macros-0.6.1/LICENSE ",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dtor-proc-macro-0.0.6/LICENSE-A",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dtor-proc-macro-0.0.6/LICENSE-M",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/darling_macro-0.23.0/LICENSE pa",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/libdbus-sys-0.2.7/LICENSE-APACH",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/libdbus-sys-0.2.7/LICENSE-MIT p",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/defmt-parser-1.0.0/upstream-LIC",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/derive_more-impl-2.1.1/LICENSE ",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dirs-sys-0.5.0/LICENSE-APACHE p",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dirs-sys-0.5.0/LICENSE-MIT pack",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/dlopen2_derive-0.4.3/upstream-L",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tao-0.35.3/LICENSE package:usr/",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/npm/tauri-apps-api-2.11.1/LICENSE_APAC",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-util-0.3.34/LICENSE-APA",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/futures-util-0.3.34/LICENSE-MIT",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/getrandom-0.4.3/LICENSE-APACHE ",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/hashbrown-0.17.1/LICENSE-MIT pa",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unicode-segmentation-1.13.3/LIC",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/web_atoms-0.2.6/LICENSE-MIT pac",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/zerovec-derive-0.11.6/LICENSE p",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/url-2.5.8/LICENSE-MIT package:u",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/indexmap-2.14.1/LICENSE-MIT pac",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/soup3-sys-0.5.0/LICENSE package",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/libappindicator-sys-0.9.0/upstr",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/rustc_version-0.4.1/LICENSE-MIT",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/miniz_oxide-0.9.1/LICENSE packa",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/miniz_oxide-0.9.1/LICENSE-MIT.m",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/miniz_oxide-0.9.1/LICENSE-ZLIB.",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tray-icon-0.24.2/LICENSE-MIT pa",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/phf_shared-0.13.1/LICENSE packa",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/png-0.18.1/LICENSE-MIT package:",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro-error-attr-1.0.4/LIC",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/schemars_derive-0.8.22/LICENSE ",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/toml_writer-1.1.2+spec-1.1.0/LI",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serde_with_macros-3.22.0/LICENS",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serialize-to-javascript-impl-0.",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/serialize-to-javascript-impl-0.",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/string_cache_codegen-0.6.1/LICE",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/npm/tauri-apps-api-2.11.1/LICENSE_MIT ",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-plugin-fs-2.5.1/LICENSE.s",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-plugin-fs-2.5.1/LICENSE_A",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/tauri-plugin-fs-2.5.1/LICENSE_M",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/time-macros-0.2.32/LICENSE-MIT ",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/utf8_iter-1.0.4/LICENSE-APACHE ",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unic-ucd-version-0.9.0/upstream",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/unicode-segmentation-1.13.3/COP",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/winnow-1.0.4/LICENSE-MIT packag",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/npm/scheduler-0.27.0/LICENSE package:u",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/legal/node-LICENSE.txt package:usr/lib",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@knowledge-forge-ai/tfsb-",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@knowledge-forge-ai/tfsb-",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/diagnostics.js package:usr/lib/th",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/digests.js package:usr/lib/theme-",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/primitives.js package:usr/lib/the",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/canonical.js package:usr/li",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/compile.js package:usr/lib/",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/constants.js package:usr/li",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/emit.js package:usr/lib/the",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/geometry.js package:usr/lib",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/glyphs/catalog.js package:u",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/glyphs/labels.js package:us",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/guard.js package:usr/lib/th",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    },
+    {
+      "check": "files-duplicate",
+      "level": "W",
+      "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/scene/import-svg-guard.js package",
+      "target": "theme-forge-nebular-fusion.x86_64"
+    }
+  ],
+  "findings_summary": {
+    "errors": 9,
+    "filtered": 8,
+    "information": 0,
+    "packages": 1,
+    "specfiles": 1,
+    "warnings": 139
+  },
+  "findings_truncated": true,
+  "groups": [
+    {
+      "code": "env-script-interpreter",
+      "count": 2,
+      "samples": [
+        {
+          "check": "env-script-interpreter",
+          "level": "E",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js package:usr/bin/env nod",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        },
+        {
+          "check": "env-script-interpreter",
+          "level": "E",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js package:usr/bin/env node",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        }
+      ],
+      "severity": "E"
+    },
+    {
+      "code": "files-duplicated-waste",
+      "count": 1,
+      "samples": [
+        {
+          "check": "files-duplicated-waste",
+          "level": "E",
+          "message": "3128775",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        }
+      ],
+      "severity": "E"
+    },
+    {
+      "code": "non-executable-script",
+      "count": 6,
+      "samples": [
+        {
+          "check": "non-executable-script",
+          "level": "E",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs 644 package:usr/bin/env",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        },
+        {
+          "check": "non-executable-script",
+          "level": "E",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts 644 package:usr/bin/env ",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        },
+        {
+          "check": "non-executable-script",
+          "level": "E",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js 644 package:usr/bin/env no",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        }
+      ],
+      "severity": "E"
+    },
+    {
+      "code": "binary-or-shlib-calls-gethostbyname",
+      "count": 1,
+      "samples": [
+        {
+          "check": "binary-or-shlib-calls-gethostbyname",
+          "level": "W",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "crypto-policy-non-compliance-openssl",
+      "count": 1,
+      "samples": [
+        {
+          "check": "crypto-policy-non-compliance-openssl",
+          "level": "W",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service SSL_CTX_set_cipher_list",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "desktopfile-without-binary",
+      "count": 1,
+      "samples": [
+        {
+          "check": "desktopfile-without-binary",
+          "level": "W",
+          "message": "package:usr/share/applications/theme-forge-nebular-fusion.desktop tfnf",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "files-duplicate",
+      "count": 126,
+      "samples": [
+        {
+          "check": "files-duplicate",
+          "level": "W",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/types.js package:usr/lib/theme-fo",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        },
+        {
+          "check": "files-duplicate",
+          "level": "W",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/proc-macro-crate-2.0.2/LICENSE-",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        },
+        {
+          "check": "files-duplicate",
+          "level": "W",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/release-notices/crates/zmij-1.0.23/LICENSE-MIT package",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "hidden-file-or-dir",
+      "count": 2,
+      "samples": [
+        {
+          "check": "hidden-file-or-dir",
+          "level": "W",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/scene-payload/node_modules/@xmldom/xmldom/lib/.eslintr",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        },
+        {
+          "check": "hidden-file-or-dir",
+          "level": "W",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/node_modules/@xmldom/xmldom/lib/.eslin",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "invalid-url",
+      "count": 1,
+      "samples": [
+        {
+          "check": "invalid-url",
+          "level": "W",
+          "message": "Source0: theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+          "target": "theme-forge-nebular-fusion.spec"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "no-%check-section",
+      "count": 1,
+      "samples": [
+        {
+          "check": "no-%check-section",
+          "level": "W",
+          "message": "",
+          "target": "theme-forge-nebular-fusion.spec"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "no-documentation",
+      "count": 1,
+      "samples": [
+        {
+          "check": "no-documentation",
+          "level": "W",
+          "message": "",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "no-manual-page-for-binary",
+      "count": 1,
+      "samples": [
+        {
+          "check": "no-manual-page-for-binary",
+          "level": "W",
+          "message": "tfnf",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "position-independent-executable-suggested",
+      "count": 1,
+      "samples": [
+        {
+          "check": "position-independent-executable-suggested",
+          "level": "W",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "unstripped-binary-or-object",
+      "count": 3,
+      "samples": [
+        {
+          "check": "unstripped-binary-or-object",
+          "level": "W",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        },
+        {
+          "check": "unstripped-binary-or-object",
+          "level": "W",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        },
+        {
+          "check": "unstripped-binary-or-object",
+          "level": "W",
+          "message": "package:usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/native/directory-snapshot/prebuilds/li",
+          "target": "theme-forge-nebular-fusion.x86_64"
+        }
+      ],
+      "severity": "W"
+    }
+  ],
+  "identity_status": {
+    "package": "available",
+    "spec": "available"
+  },
+  "package_file": "theme-forge-nebular-fusion-0.6.1-1.fc43.x86_64.rpm",
+  "package_sha256": "a5787930ed2fcb5cd39b39e6e4e13d716f37fd0fc4beab367b8adaa3c18af3da",
+  "parse_complete": true,
+  "product": "theme-forge-nebular-fusion",
+  "reason_token": "lint-errors",
+  "rpm_identity": {
+    "arch": "x86_64",
+    "name": "theme-forge-nebular-fusion",
+    "release": "1.fc43",
+    "version": "0.6.1"
+  },
+  "rpm_payload_digest": {
+    "algo_tag": "PAYLOADSHA256ALGO",
+    "algorithm": "sha256",
+    "algorithm_numeric": 8,
+    "capability": "rpm6",
+    "digest": "578d1ecfbe1b5fc328d8fb6f8b4ab71cc97be43cbc60d980821584738b8e117d",
+    "payload_digest": "578d1ecfbe1b5fc328d8fb6f8b4ab71cc97be43cbc60d980821584738b8e117d",
+    "payload_digest_algo": "sha256",
+    "querytags_sha256": "4ea0771d2bcf05e86b8ab9e4bb84502072a0cbb35244d943662296e37860af35",
+    "scope": "compressed-payload",
+    "tag": "PAYLOADSHA256"
+  },
+  "schema": "rs9.rpmlint-evidence.v1alpha1",
+  "session_headers": [
+    "============================ rpmlint session starts ============================",
+    "rpmlint: 2.8.0",
+    "configuration:",
+    "[CONFIG_PATH]",
+    "[CONFIG_PATH]",
+    "[CONFIG_PATH]",
+    "[CONFIG_PATH]",
+    "[CONFIG_PATH]",
+    "[CONFIG_PATH]",
+    "checks: 32, packages: 2"
+  ],
+  "spec_file": "theme-forge-nebular-fusion.spec",
+  "spec_sha256": "aaf3453e2acbc7de51361ea2d4fd66662c96ec4ad6bc57fc05a7475324f26380",
+  "status": "fail",
+  "tool_receipt": {
+    "command": [
+      "rpmlint",
+      "theme-forge-nebular-fusion.spec",
+      "theme-forge-nebular-fusion-0.6.1-1.fc43.x86_64.rpm"
+    ],
+    "command_sha256": "684a5f15088136808eac2fa665659d08e1311ad28c351e71457288a4c52461a5",
+    "executed": true,
+    "exit_code": 64,
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_bytes": 55195,
+    "stdout_sha256": "0c373899e3e6e723eecad991e16dcd0f23549f27ddffd7ca67cdeaa87bd8f66d",
+    "tool": "rpmlint"
+  },
+  "tool_version": {
+    "exit_code": 0,
+    "package_query": {
+      "exit_code": 0,
+      "stderr_length": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_length": 28,
+      "stdout_sha256": "cf549ae7e9ea58b8e92884a6c88b4c1968295b2e1a6af2313a9798f3f463bd73",
+      "version": "rpmlint|2.8.0|2.fc43|noarch"
+    },
+    "stderr_length": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_length": 6,
+    "stdout_sha256": "dceb827995520dae388b7283c5bc7847ef58a16e8013318c3bb436feeb5dc51e",
+    "tool": "rpmlint",
+    "tool_identity_sha256": "068d7eca1f1b621ba4b59678570e9750fbd030ad2fb3e002911d48fb5632d411",
+    "version": "2.8.0"
+  },
+  "unparsed_count": 0,
+  "unparsed_samples": [],
+  "unparsed_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+}

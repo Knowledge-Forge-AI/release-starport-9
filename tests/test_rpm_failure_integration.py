@@ -1,4 +1,6 @@
 """Actual hosted handler plus lint backend with real receipts; fixture execution only."""
+from tests.rpm_summary_fixtures import witnessed_build_double
+
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
@@ -18,7 +20,7 @@ ERROR = b"fixture.x86_64: E: fixture-check fixture-message\n1 packages and 1 spe
 
 
 class RpmFailureIntegrationTests(unittest.TestCase):
-    def run_lane(self, root, outcomes, *, version="success", missing=(), secondary_fail=False, injected_errors=None):
+    def run_lane(self, root, outcomes, *, version="success", missing=(), secondary_fail=False, injected_errors=None, injected_results=None):
         scratch = root/"lane-work"
         scratch.mkdir()
         context = {"family":"rpm", "system":"x86_64-linux", "repository":root,
@@ -48,6 +50,10 @@ class RpmFailureIntegrationTests(unittest.TestCase):
             pid=intent["project"]["id"]
             if injected_errors and pid in injected_errors:
                 raise injected_errors[pid]
+            if injected_results and pid in injected_results:
+                result = injected_results[pid]
+                runner.receipts.extend(result['receipts'])
+                return result
             if outcomes[pid] == "build-failure":raise ContractError("BUILD_FAILED","fixture-construction-failure")
             rpm=work/(pid+".rpm");spec=work/(pid+".spec")
             if "rpm" not in missing:rpm.write_bytes(b"fixture-rpm")
@@ -64,7 +70,7 @@ class RpmFailureIntegrationTests(unittest.TestCase):
              patch("rs9.hosted_deb.provision_image"),patch.object(hosted,"checked"), \
              patch.object(hosted,"container_tool_facts",return_value={}), \
              patch.object(hosted,"_resolve_offline_npm_archives",return_value=None), \
-             patch.object(hosted,"build_rpm_candidate",side_effect=build), \
+             patch.object(hosted,"build_rpm_candidate",side_effect=witnessed_build_double(build)), \
              patch("rs9.hosted_deb.ContainerRunner.run",backend), \
              patch.object(hosted.shutil,"copyfile",side_effect=copy):
             result=hosted.execute(context)
@@ -151,7 +157,7 @@ class RpmFailureIntegrationTests(unittest.TestCase):
                         self.assertEqual(evidence["package_sha256"],digest(b"fixture-rpm"))
                         self.assertEqual(evidence["spec_sha256"],digest(b"Name: fixture\n"))
                         self.assertEqual(failures[pid]["quarantine_sha256"],digest(b"fixture-rpm"))
-                        self.assertNotIn(scratch/"quarantine"/(pid+".rpm"),result["artifacts"])
+                        self.assertIn(scratch/"quarantine"/(pid+".rpm"),result["artifacts"])
                     gates={r["name"]:r["status"] for r in result["gates"]}
                     self.assertEqual(gates["rpm-package-build"],"pass")
                     self.assertEqual(gates["rpm-lint-policy-accepted"],"fail")
@@ -172,10 +178,9 @@ class RpmFailureIntegrationTests(unittest.TestCase):
                         self.assertIn(failure["diagnostics"]["quarantine"],("failed","unavailable"))
                     gates={row["name"]:row for row in result["gates"]}
                     self.assertEqual(gates["rpm-package-build"]["status"],
-                                     "fail" if "rpm" in missing else "pass")
+                                     "fail")  # Construction cannot be reverified after failed retention.
                     self.assertEqual(gates["rpm-repository-indexing"]["reason"],
-                                     "blocked-by:rpm-package-build" if "rpm" in missing
-                                     else "blocked-by:rpm-lint-policy-accepted")
+                                     "blocked-by:rpm-package-build")
 
     def test_mixed_construction_and_lint_failures_retain_all_products(self):
         with tempfile.TemporaryDirectory() as tmp:

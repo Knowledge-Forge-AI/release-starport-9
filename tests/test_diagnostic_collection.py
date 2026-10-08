@@ -147,12 +147,14 @@ class DiagnosticCollectionTests(unittest.TestCase):
         self.assertEqual(packet["validation"]["status"], "fail")
 
     def test_rpm_policy_gate_migration_and_raw_evidence_survive_real_collection(self):
-        for name, expected in (("rpm-lint-policy-accepted", "pass"), ("rpm-rpmlint-clean", "fail")):
+        for name, expected in (("rpm-lint-policy-accepted", "fail"), ("rpm-rpmlint-clean", "fail")):
             with self.subTest(name=name):
                 packet = self.attempt(rpm_gate=name)
                 rpm = next(r for r in packet["diagnostic_scope"]["required_lanes"] if r["lane"] == "rpm")
                 self.assertEqual(rpm["status"], expected)
                 self.assertEqual(rpm["rpm_lint_results"][0]["raw_status"], "fail")
                 self.assertEqual(rpm["rpm_lint_results"][0]["raw_exit_code"], 64)
-                if expected == "fail":
+                if name == "rpm-rpmlint-clean":
                     self.assertIn("missing-or-duplicate-gate:rpm-lint-policy-accepted", rpm["reasons"])
+                else:
+                    self.assertTrue(any("RPM_POLICY_CUSTODY" in r for r in rpm["reasons"]))
