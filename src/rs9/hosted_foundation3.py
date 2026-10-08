@@ -132,6 +132,9 @@ def execute(context):
     native_sets = []
     if inputs:
         native_sets = [(p.parent,verify_set(p.parent)) for p in Path(inputs).rglob("artifact-manifest.json")]
+    from rs9.hosted_summary import rpm_lint_results
+    rpm_receipts = [json.loads((directory / ("rpm-" + manifest["system"] + ".json")).read_bytes())
+                    for directory, manifest in native_sets if manifest["lane"] == "rpm"]
     for family, adapter in (("deb","debian"),("rpm","rpm"),("pacman","pacman")):
         for capture,intent,profile in context["captures"]:
             product = intent["project"]["id"]
@@ -177,6 +180,8 @@ def execute(context):
                     "unsigned_packages": rows,
                     "architecture_set": sorted(expected_archs),
                     **policy,
+                    **({"rpm_lint_results": [r for r in rpm_lint_results(rpm_receipts) if r["product"] == product],
+                        "required_candidate_lint_gate": "rpm-lint-policy-accepted"} if family == "rpm" else {}),
                 },
                 implementation={"id":"rs9-hosted-candidate","version":"v1alpha1"},source_version="LIVE1-CONT2",
                 revision_scheme={"deb":"apt-revision","rpm":"rpm-release","pacman":"pkgrel"}[family])
@@ -202,6 +207,7 @@ def execute(context):
     doc = {"schema": "rs9.hosted-foundation3.v1alpha1", "production_enabled": False,
            "attended_gates_satisfied": False, "qualification_records": records, "missing_inputs": missing,
            "hosted_evidence_annex": annex, "production_receipts": []}
+    doc["rpm_lint_results"] = rpm_lint_results(rpm_receipts)
     path = context["scratch"] / "foundation3.json"
     path.write_bytes(canonical(doc))
     artifacts.append(path)

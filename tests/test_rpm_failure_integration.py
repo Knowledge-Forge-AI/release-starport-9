@@ -18,7 +18,7 @@ ERROR = b"fixture.x86_64: E: fixture-check fixture-message\n1 packages and 1 spe
 
 
 class RpmFailureIntegrationTests(unittest.TestCase):
-    def run_lane(self, root, outcomes, *, version="success", missing=(), secondary_fail=False):
+    def run_lane(self, root, outcomes, *, version="success", missing=(), secondary_fail=False, injected_errors=None):
         scratch = root/"lane-work"
         scratch.mkdir()
         context = {"family":"rpm", "system":"x86_64-linux", "repository":root,
@@ -46,6 +46,8 @@ class RpmFailureIntegrationTests(unittest.TestCase):
             return r
         def build(capture,intent,arch,work,*,runner,**kwargs):
             pid=intent["project"]["id"]
+            if injected_errors and pid in injected_errors:
+                raise injected_errors[pid]
             if outcomes[pid] == "build-failure":raise ContractError("BUILD_FAILED","fixture-construction-failure")
             rpm=work/(pid+".rpm");spec=work/(pid+".spec")
             if "rpm" not in missing:rpm.write_bytes(b"fixture-rpm")
@@ -67,6 +69,65 @@ class RpmFailureIntegrationTests(unittest.TestCase):
              patch.object(hosted.shutil,"copyfile",side_effect=copy):
             result=hosted.execute(context)
         return result, scratch, receipts
+
+    def test_actual_inventory_failure_custody_keeps_lint_and_causal_receipt(self):
+        from tests.test_build_rpm import BuildRpmTests
+        from tests.test_build_native import create_cli_fixture
+        from rs9.build_rpm import build_rpm_candidate
+        from rs9.hosted_custody import diagnostic_bytes
+        from rs9.security import scan_for_credentials
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            capture, intent, npm = create_cli_fixture(root / 'input',
+                extra_asset_entries=[(f'data/member-{i:04d}.txt', f'row-{i}'.encode()) for i in range(1200)])
+            work = root / 'builder'; work.mkdir()
+            runner = BuildRpmTests()._setup_runner()
+            original = runner.handlers['rpm']
+            queried = []
+            def query(argv, **kwargs):
+                receipt = original(argv, **kwargs)
+                if '--dump' in argv:
+                    self.assertGreater(len(receipt.stdout_bytes), 65536)
+                    receipt = CommandReceipt(argv, 0, receipt.stdout_bytes + b'bad final record\n', b'')
+                    queried.append(receipt)
+                return receipt
+            runner.handlers['rpm'] = query
+            pid = intent['project']['id']
+            lint_bytes = (pid + '.noarch: E: env-script-interpreter /usr/lib/' + pid +
+                '/bin/run.js /usr/bin/env node\n1 packages and 1 specfiles checked; 1 errors, 0 warnings, 0 filtered.\n').encode()
+            runner.handlers['rpmlint'] = lambda argv, **kw: CommandReceipt(argv,
+                0 if '--version' in argv else 64, b'2.8.0\n' if '--version' in argv else lint_bytes, b'')
+            with self.assertRaises(ContractError) as caught:
+                build_rpm_candidate(capture, intent, 'noarch', work, offline_npm_archives=npm, runner=runner)
+            error = caught.exception
+            result, scratch, _ = self.run_lane(root, {p:(1, ERROR) for p in PRODUCTS}, injected_errors={pid:error})
+            failure = result['details']['product_failures'][pid]
+            self.assertEqual(failure['code'], 'RPM_INVENTORY_FAILED')
+            self.assertEqual(failure['tool'], 'rpm')
+            self.assertEqual(failure['exit_code'], 0)
+            self.assertEqual(failure['stdout_sha256'], queried[0].stdout_sha256)
+            inventory = scratch / 'diagnostics' / f'rpm-inventory-{pid}.json'
+            lint = scratch / 'diagnostics' / f'rpmlint-{pid}.json'
+            policy = scratch / 'diagnostics' / f'rpm-lint-policy-{pid}.json'
+            for path in (inventory, lint, policy):
+                self.assertIn(path, result['artifacts'])
+                scan_for_credentials(diagnostic_bytes(path).decode())
+            inventory_bytes = inventory.read_bytes()
+            self.assertLessEqual(len(inventory_bytes), 16 * 1024)
+            self.assertNotIn(b'/usr/', inventory_bytes)
+            self.assertNotIn(str(root).encode(), inventory_bytes)
+            self.assertEqual(json.loads(lint.read_bytes())['tool_receipt']['stdout_sha256'], digest(lint_bytes))
+            self.assertEqual(json.loads(policy.read_bytes())['raw_exit_code'], 64)
+            # A projection failure has no query cause; preceding failed lint must not be blamed.
+            error.receipt = None
+            for key in ('tool', 'exit_code', 'stdout_sha256', 'stderr_sha256'):
+                error.details.pop(key, None)
+            other = root / 'projection'; other.mkdir()
+            projection, _, _ = self.run_lane(other, {p:(1, ERROR) for p in PRODUCTS}, injected_errors={pid:error})
+            no_query = projection['details']['product_failures'][pid]
+            self.assertNotIn('tool', no_query)
+            self.assertNotIn('stdout_sha256', no_query)
 
     def test_real_lint_failure_matrix_preserves_cause_and_quarantine(self):
         cases=[(0,CLEAN),(0,ERROR),(1,ERROR),(64,CLEAN),(1,b"malformed\n"),
@@ -93,7 +154,7 @@ class RpmFailureIntegrationTests(unittest.TestCase):
                         self.assertNotIn(scratch/"quarantine"/(pid+".rpm"),result["artifacts"])
                     gates={r["name"]:r["status"] for r in result["gates"]}
                     self.assertEqual(gates["rpm-package-build"],"pass")
-                    self.assertEqual(gates["rpm-rpmlint-clean"],"fail")
+                    self.assertEqual(gates["rpm-lint-policy-accepted"],"fail")
                     self.assertFalse((scratch/"unsigned-custody").exists())
 
     def test_missing_context_and_secondary_failures_do_not_replace_lint(self):
@@ -114,7 +175,7 @@ class RpmFailureIntegrationTests(unittest.TestCase):
                                      "fail" if "rpm" in missing else "pass")
                     self.assertEqual(gates["rpm-repository-indexing"]["reason"],
                                      "blocked-by:rpm-package-build" if "rpm" in missing
-                                     else "blocked-by:rpm-rpmlint-clean")
+                                     else "blocked-by:rpm-lint-policy-accepted")
 
     def test_mixed_construction_and_lint_failures_retain_all_products(self):
         with tempfile.TemporaryDirectory() as tmp:

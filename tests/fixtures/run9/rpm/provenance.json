@@ -1,0 +1,86 @@
+{
+  "files": {
+    "aarch64-linux/build-errors.json": {
+      "bytes": 5985,
+      "sha256": "fa7c528ed41714e8459eb73931090f1af9f9c669fda3cc5bafe7cea05500ca23"
+    },
+    "aarch64-linux/rpmlint-theme-forge-nebular-fusion.json": {
+      "bytes": 37497,
+      "sha256": "b8a057b238a7beb368e35df29adcfac30f309affc783663341f0a988794c9b5d"
+    },
+    "aarch64-linux/rpmlint-theme-forge-solar-sail.json": {
+      "bytes": 6509,
+      "sha256": "c6fedfdc5b3c06dc4fddce1c6ed13c3d6bf074e2e66d320f88cd6e37a7b0cc25"
+    },
+    "aarch64-linux/rpmlint-theme-forge-stellar-burst.json": {
+      "bytes": 11915,
+      "sha256": "bed2190d22bb622f613766f493ed56d6c2b83129fd7b7b77d06d168282b8a248"
+    },
+    "aarch64-linux/rpmlint-theme-forge-stellar-loom.json": {
+      "bytes": 7381,
+      "sha256": "49febb4822c307995a362b8046c964669116879d7718707dfd3365a1735665cf"
+    },
+    "aarch64-linux/theme-forge-nebular-fusion.spec.json": {
+      "bytes": 2443,
+      "sha256": "d2bbaf5bf4e80b3e2295a45687d1c5381be137803598a3bc967a4c1147d5bb1f"
+    },
+    "aarch64-linux/theme-forge-solar-sail.spec.json": {
+      "bytes": 1757,
+      "sha256": "20560d69f351fbae9d8b643099cc61a77ddbfeb40b5a9c6f2a7a7c353203ad42"
+    },
+    "aarch64-linux/theme-forge-stellar-burst.spec.json": {
+      "bytes": 2963,
+      "sha256": "c7266cc9a53e3365e1c42dac2df964e24a54d518cea05f2118b1fd5140192916"
+    },
+    "aarch64-linux/theme-forge-stellar-loom.spec.json": {
+      "bytes": 1982,
+      "sha256": "bfb3333415deca990415dbaaf07250d9d7ff7647dc6c2aa1ee00d484f6f44e0e"
+    },
+    "rpm-findings-summary.json": {
+      "bytes": 45527,
+      "sha256": "434bfb1a285f01e1452321c22779e2adeaf64a609b3a27d045ea6a7bb669a60f"
+    },
+    "x86_64-linux/build-errors.json": {
+      "bytes": 5980,
+      "sha256": "60f331bf5f807268c6f930433fd00180f34dec6d0c311067740ea716323129ee"
+    },
+    "x86_64-linux/rpmlint-theme-forge-nebular-fusion.json": {
+      "bytes": 37369,
+      "sha256": "9f48927578aa51a90d0a529c35dd7156aadc17b1225a09c5af22d6fc6a605f7b"
+    },
+    "x86_64-linux/rpmlint-theme-forge-solar-sail.json": {
+      "bytes": 6509,
+      "sha256": "a0feaf07bdcf4335b961b019f0f90528c7682940660d22f4ef8b1040edc25d10"
+    },
+    "x86_64-linux/rpmlint-theme-forge-stellar-burst.json": {
+      "bytes": 11882,
+      "sha256": "8aea347d23a7c97ac754856d671ba50fb80b8db63d931faf7c5c947f9d56af46"
+    },
+    "x86_64-linux/rpmlint-theme-forge-stellar-loom.json": {
+      "bytes": 7381,
+      "sha256": "aff2f4bdc04e00ea0fc2c05bbe640a6231c91d98d189c93cb6bebec7653e7e59"
+    },
+    "x86_64-linux/theme-forge-nebular-fusion.spec.json": {
+      "bytes": 2398,
+      "sha256": "6a7fe15f1c9dd8d8e0a05856639c0e693829fab4ff5b820493ee9bd684483977"
+    },
+    "x86_64-linux/theme-forge-solar-sail.spec.json": {
+      "bytes": 1756,
+      "sha256": "1e7ecf31e59b5d9c96e845e97b5ae11ab2aad8fb6a0b0f7bb48ad8c46f65a965"
+    },
+    "x86_64-linux/theme-forge-stellar-burst.spec.json": {
+      "bytes": 2965,
+      "sha256": "d2f516779b13943c15b39b03feaabd495a4ec1706f4f67e1181ff0255e72f3b7"
+    },
+    "x86_64-linux/theme-forge-stellar-loom.spec.json": {
+      "bytes": 1981,
+      "sha256": "6dd3f9be8f53bf1cfa6c82017020c75f3d40f10c7904760d3de886e7fa186801"
+    }
+  },
+  "run_id": 37712447239,
+  "schema": "rs9.run9-rpm-fixtures-provenance.v1",
+  "source_commit": "dbf94dd5e506987a9316baaef837a38dd88e1f48",
+  "source_tree": "d0b8b587d9f064410e454e33b1ecfd6571ab95e3",
+  "source_upload": "RS9-CONT10-HOSTED9-RESULT.zip",
+  "source_upload_sha256": "e9171b215c49a64161843c412ccd0f3a8995e7a3194717e006b4940b521ff58d"
+}

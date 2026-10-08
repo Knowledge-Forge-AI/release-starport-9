@@ -101,6 +101,25 @@ class HostedFoundation3Tests(unittest.TestCase):
         self.assertEqual(result["gates"][0]["status"], "fail")
         self.assertEqual(result["gates"][0]["reason"], "missing-custody-inputs")
 
+    def test_foundation_annex_retains_raw_failure_and_separate_policy(self):
+        from rs9.hosted_custody import retain
+        source=self.root/'rpm-source';source.mkdir()
+        inputs=self.root/'rpm-inputs';inputs.mkdir()
+        receipt={'lane':'rpm','system':'x86_64-linux','provenance':{},'runner':{},
+                 'details':{'rpm_lint_raw':{'fixture':{'status':'fail','clean':False,
+                     'tool_receipt':{'exit_code':64},'findings_summary':{'errors':1}}},
+                     'rpm_lint_policy':{'fixture':{'accepted':True,'status':'accepted'}}}}
+        retain(source,inputs/'candidate-rpm-x86_64-linux',[],receipt)
+        capture,intent,profile=self._make_loom_capture()
+        result=execute({'inputs':inputs,'scratch':self.scratch,'captures':[(capture,intent,profile)]})
+        doc=json.loads((self.scratch/'foundation3.json').read_bytes())
+        view=doc['rpm_lint_results'][0]
+        self.assertEqual(view['raw_exit_code'],64)
+        self.assertFalse(view['raw_clean'])
+        self.assertTrue(view['policy']['accepted'])
+        self.assertEqual(result['gates'][0]['status'],'fail')
+        self.assertFalse(doc['production_enabled'])
+
     def test_missing_wheel_custody_per_product(self):
         inputs_dir = self.root / "inputs"
         inputs_dir.mkdir()

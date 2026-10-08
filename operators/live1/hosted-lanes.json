@@ -195,7 +195,7 @@
       "required_gates": [
         "rpm-container-environment",
         "rpm-package-build",
-        "rpm-rpmlint-clean",
+        "rpm-lint-policy-accepted",
         "rpm-repository-indexing",
         "rpm-client-qualification",
         "burst-native-addon-target",
@@ -220,7 +220,7 @@
       "required_gates": [
         "rpm-container-environment",
         "rpm-package-build",
-        "rpm-rpmlint-clean",
+        "rpm-lint-policy-accepted",
         "rpm-repository-indexing",
         "rpm-client-qualification",
         "burst-native-addon-target",

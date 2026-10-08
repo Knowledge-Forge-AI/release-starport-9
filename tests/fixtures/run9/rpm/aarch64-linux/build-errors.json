@@ -1,0 +1,159 @@
+{
+  "errors": {
+    "theme-forge-nebular-fusion": "RPMLINT_FAILED",
+    "theme-forge-solar-sail": "RPMLINT_FAILED",
+    "theme-forge-stellar-burst": "RPMLINT_FAILED",
+    "theme-forge-stellar-loom": "RPMLINT_FAILED"
+  },
+  "family": "rpm",
+  "gates": [
+    {
+      "name": "rpm-container-environment",
+      "status": "pass"
+    },
+    {
+      "name": "rpm-package-build",
+      "status": "pass"
+    },
+    {
+      "name": "rpm-rpmlint-clean",
+      "status": "fail"
+    }
+  ],
+  "product_failures": {
+    "theme-forge-nebular-fusion": {
+      "code": "RPMLINT_FAILED",
+      "diagnostic_token": "unstripped-binary-or-object",
+      "diagnostics": {
+        "findings": "retained",
+        "quarantine": "retained",
+        "spec": "retained"
+      },
+      "exit_code": 64,
+      "family": "rpm",
+      "identities": {
+        "package_sha256": "4f1d20d284f3e7985d08e27bd3f409e2a8b3a816f36d3da944b096d5942c861f",
+        "spec_sha256": "228a48174870effeb3068e78a296bd8cba0c46d405af26282b12d1639dc828ea"
+      },
+      "observed_field_count": 100,
+      "observed_field_tokens": [
+        "unstripped-binary-or-object",
+        "unstripped-binary-or-object",
+        "unstripped-binary-or-object",
+        "position-independent-executable-suggested",
+        "non-executable-script",
+        "non-executable-script"
+      ],
+      "product": "theme-forge-nebular-fusion",
+      "quarantine_sha256": "4f1d20d284f3e7985d08e27bd3f409e2a8b3a816f36d3da944b096d5942c861f",
+      "reason_token": "lint-errors",
+      "sha256": "4f1d20d284f3e7985d08e27bd3f409e2a8b3a816f36d3da944b096d5942c861f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "26e5dff39305b60cda91e023f024a3079ac1a240bc7ae1bbd9dab536076ca9e2",
+      "substage": "rpmlint",
+      "system": "aarch64-linux",
+      "tool": "rpmlint"
+    },
+    "theme-forge-solar-sail": {
+      "code": "RPMLINT_FAILED",
+      "diagnostic_token": "only-non-binary-in-usr-lib",
+      "diagnostics": {
+        "findings": "retained",
+        "quarantine": "retained",
+        "spec": "retained"
+      },
+      "exit_code": 64,
+      "family": "rpm",
+      "identities": {
+        "package_sha256": "b584a929e409c9062751e662c62f31ab1d722bd97b2354d08ca6d2aa9676152c",
+        "spec_sha256": "75952af0cafb868e590d257e5b256be44abbb47dd55deb620232703a1e79f1d5"
+      },
+      "observed_field_count": 8,
+      "observed_field_tokens": [
+        "only-non-binary-in-usr-lib",
+        "no-manual-page-for-binary",
+        "no-documentation",
+        "no-changelogname-tag",
+        "835304951bc231d301d01600cc10e18fcb6b8e918cba41472bdc9543c9cf8c66",
+        "invalid-url"
+      ],
+      "product": "theme-forge-solar-sail",
+      "quarantine_sha256": "b584a929e409c9062751e662c62f31ab1d722bd97b2354d08ca6d2aa9676152c",
+      "reason_token": "lint-errors",
+      "sha256": "b584a929e409c9062751e662c62f31ab1d722bd97b2354d08ca6d2aa9676152c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "4b383cb7e65dfef41dbd53f1708c3cfd5f6a812d45c2242c26483049b43bc34e",
+      "substage": "rpmlint",
+      "system": "aarch64-linux",
+      "tool": "rpmlint"
+    },
+    "theme-forge-stellar-burst": {
+      "code": "RPMLINT_FAILED",
+      "diagnostic_token": "unstripped-binary-or-object",
+      "diagnostics": {
+        "findings": "retained",
+        "quarantine": "retained",
+        "spec": "retained"
+      },
+      "exit_code": 64,
+      "family": "rpm",
+      "identities": {
+        "package_sha256": "49c7af02357ee5b2be8b6bf87f3fb37e86466ab8276ec4f9f8768b8b0377d5b5",
+        "spec_sha256": "5d27050c273fe9a60676065be2b6ffb7bc4c3d669d051a483a2c912c8a2d5d8c"
+      },
+      "observed_field_count": 18,
+      "observed_field_tokens": [
+        "unstripped-binary-or-object",
+        "unstripped-binary-or-object",
+        "non-executable-script",
+        "non-executable-script",
+        "non-executable-script",
+        "non-executable-script"
+      ],
+      "product": "theme-forge-stellar-burst",
+      "quarantine_sha256": "49c7af02357ee5b2be8b6bf87f3fb37e86466ab8276ec4f9f8768b8b0377d5b5",
+      "reason_token": "lint-errors",
+      "sha256": "49c7af02357ee5b2be8b6bf87f3fb37e86466ab8276ec4f9f8768b8b0377d5b5",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "7ee790294bc8e3c30dc97df7936601985e44fd1a49a05b65d3ba666f9f07b5b5",
+      "substage": "rpmlint",
+      "system": "aarch64-linux",
+      "tool": "rpmlint"
+    },
+    "theme-forge-stellar-loom": {
+      "code": "RPMLINT_FAILED",
+      "diagnostic_token": "only-non-binary-in-usr-lib",
+      "diagnostics": {
+        "findings": "retained",
+        "quarantine": "retained",
+        "spec": "retained"
+      },
+      "exit_code": 64,
+      "family": "rpm",
+      "identities": {
+        "package_sha256": "db8c0a967ee5e8682011741e756bdd469d7a464e993e8d3fcf8049cac637c235",
+        "spec_sha256": "790e0262306a88ef11c4114af9dc4b0831a5dde37f804773cd4cdf92c8c83874"
+      },
+      "observed_field_count": 10,
+      "observed_field_tokens": [
+        "only-non-binary-in-usr-lib",
+        "no-manual-page-for-binary",
+        "no-manual-page-for-binary",
+        "no-documentation",
+        "no-changelogname-tag",
+        "835304951bc231d301d01600cc10e18fcb6b8e918cba41472bdc9543c9cf8c66"
+      ],
+      "product": "theme-forge-stellar-loom",
+      "quarantine_sha256": "db8c0a967ee5e8682011741e756bdd469d7a464e993e8d3fcf8049cac637c235",
+      "reason_token": "lint-errors",
+      "sha256": "db8c0a967ee5e8682011741e756bdd469d7a464e993e8d3fcf8049cac637c235",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "fb34c8d7374123201a92f76210f77f527817d04aa59f85a0767e2172807dcc01",
+      "substage": "rpmlint",
+      "system": "aarch64-linux",
+      "tool": "rpmlint"
+    }
+  },
+  "schema": "rs9.build-errors.v1alpha1",
+  "system": "aarch64-linux"
+}

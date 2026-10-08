@@ -24,7 +24,7 @@ def archive(files):
 
 class DiagnosticCollectionTests(unittest.TestCase):
     def attempt(self, *, a_fail=True, tamper_experiment=False, bad_summary=False,
-                experiment_skipped=False, experiment_pass=False, q_fail=False, surplus=False):
+                experiment_skipped=False, experiment_pass=False, q_fail=False, surplus=False, rpm_gate=None):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td).resolve(); out = root / "out"; out.mkdir()
             for path, content in ((".github/workflows/rs9-candidate-tests.yml", "jobs: {}"),
@@ -34,9 +34,15 @@ class DiagnosticCollectionTests(unittest.TestCase):
             lanes = [{"lane": lane, "system": system, "module": "rs9.hosted_" + lane,
                       "artifact_name": "candidate-" + lane + "-" + system, "required_gates": ["runtime"]}
                      for lane, system in (("deb", "amd64"), ("nix", "x86_64-linux"))]
+            if rpm_gate is not None:
+                lanes.append({"lane": "rpm", "system": "x86_64-linux", "module": "rs9.hosted_packaging",
+                              "artifact_name": "candidate-rpm-x86_64-linux",
+                              "required_gates": ["rpm-lint-policy-accepted"]})
             exp = {"lane": "nix-proot", "system": "x86_64-linux", "module": "rs9.hosted_nix_proot",
                    "artifact_name": "experiment-nix-proot-x86_64-linux", "experiment_gates": ["runtime"], "qualification_authority": False}
             contract = {"schema": "rs9.hosted-lanes.v1alpha1", "production_enabled": False, "lanes": lanes, "experiments": [exp], "required_jobs": ["config", "unit", "deb", "nix", "summary"]}
+            if rpm_gate is not None:
+                contract["required_jobs"].append("rpm")
             (root / "operators/live1/hosted-lanes.json").write_bytes(canonical(contract))
             commit = "a" * 40
             prov = provenance(root, "b" * 64)
@@ -53,6 +59,11 @@ class DiagnosticCollectionTests(unittest.TestCase):
                        "provenance": prov, "network": {"runtime_offline_status": "not-run" if experimental and not experiment_pass else "pass"},
                        "policy_blockers": [], "production_promotion_blockers": ["experimental-unqualified"] if experimental else [],
                        "gates": [{"name": "runtime", "status": "fail" if failed else "pass"}]}
+                if lane["lane"] == "rpm":
+                    row["gates"] = [{"name": rpm_gate, "status": "pass"}]
+                    row["details"] = {"rpm_lint_raw": {"fixture": {"status": "fail", "clean": False,
+                        "tool_receipt": {"exit_code": 64}, "findings_summary": {"errors": 1, "filtered": 8}}},
+                        "rpm_lint_policy": {"fixture": {"accepted": True, "accepted_findings": []}}}
                 if experimental and experiment_pass:
                     row["gates"].append({"name": "proot-in-guest-offline", "status": "pass",
                                          "runtime_offline_status": "pass"})
@@ -83,7 +94,7 @@ class DiagnosticCollectionTests(unittest.TestCase):
                      "conclusion": "skipped" if n.startswith("nix-proot") and experiment_skipped else
                         "failure" if n.startswith("nix-proot") and not experiment_pass or n == "nix-x86_64-linux" and a_fail else "success",
                      "steps": [{"conclusion": "failure" if n.startswith("nix-proot") and not experiment_pass else "success"}]}
-                    for i, n in enumerate(["deb-amd64", "nix-x86_64-linux", "config", "unit", "summary", "nix-proot-x86_64-linux"], 1)]
+                    for i, n in enumerate(["deb-amd64", "nix-x86_64-linux", "config", "unit", "summary", "nix-proot-x86_64-linux"] + (["rpm-x86_64-linux"] if rpm_gate is not None else []), 1)]
             def runner(_, argv):
                 endpoint = argv[-1]
                 if "/jobs?" in endpoint: return json.dumps({"total_count": len(jobs), "jobs": jobs})
@@ -134,3 +145,14 @@ class DiagnosticCollectionTests(unittest.TestCase):
             self.assertFalse(packet["diagnostic_scope"]["published_linux_nix_ready"])
         packet = self.attempt(a_fail=False, surplus=True)
         self.assertEqual(packet["validation"]["status"], "fail")
+
+    def test_rpm_policy_gate_migration_and_raw_evidence_survive_real_collection(self):
+        for name, expected in (("rpm-lint-policy-accepted", "pass"), ("rpm-rpmlint-clean", "fail")):
+            with self.subTest(name=name):
+                packet = self.attempt(rpm_gate=name)
+                rpm = next(r for r in packet["diagnostic_scope"]["required_lanes"] if r["lane"] == "rpm")
+                self.assertEqual(rpm["status"], expected)
+                self.assertEqual(rpm["rpm_lint_results"][0]["raw_status"], "fail")
+                self.assertEqual(rpm["rpm_lint_results"][0]["raw_exit_code"], 64)
+                if expected == "fail":
+                    self.assertIn("missing-or-duplicate-gate:rpm-lint-policy-accepted", rpm["reasons"])

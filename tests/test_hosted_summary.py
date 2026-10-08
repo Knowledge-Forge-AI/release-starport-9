@@ -154,6 +154,52 @@ class HostedSummaryTests(unittest.TestCase):
             validate_summary(row, ROOT, "1" * 40)
         self.assertEqual(caught.exception.code, "HOSTED_POLICY")
 
+    def test_old_rpm_clean_receipt_cannot_satisfy_current_policy_gate(self):
+        from rs9.hosted_summary import gate_blockers
+        lane = next(r for r in required(ROOT) if r["lane"] == "rpm")
+        receipt = {"gates": [{"name": g.replace("rpm-lint-policy-accepted", "rpm-rpmlint-clean"),
+                              "status": "pass"} for g in lane["required_gates"]]}
+        self.assertIn("missing-or-duplicate-gate:rpm-lint-policy-accepted", gate_blockers(lane, receipt))
+
+    def test_raw_failure_and_accepted_policy_are_displayed_separately(self):
+        import hashlib
+        from rs9.rpm_lint_policy import load_policy
+        from rs9.hosted_summary import RPM_POLICY_PROMOTION_BLOCKER
+        def change(r):
+            r["production_promotion_blockers"] = [RPM_POLICY_PROMOTION_BLOCKER]
+            r["details"] = {"rpm_lint_raw": {"fixture": {"clean": False, "status": "fail",
+                "tool_receipt": {"exit_code": 64}, "findings_summary": {"errors": 1, "warnings": 2, "filtered": 8}}},
+                "rpm_lint_policy": {"fixture": {"accepted": True, "status": "accepted",
+                                                "policy_sha256": hashlib.sha256(canonical(load_policy())).hexdigest(),
+                                                "accepted_findings": [{"code": "non-executable-script"}]}}}
+        self.mutate_receipt("rpm", "x86_64-linux", change)
+        code, record = self.finish()
+        self.assertEqual(code, 0)
+        view = record["rpm_lint_results"][0]
+        self.assertEqual(view["raw_status"], "fail")
+        self.assertFalse(view["raw_clean"])
+        self.assertEqual(view["raw_exit_code"], 64)
+        self.assertEqual(view["raw_counts"]["filtered"], 8)
+        self.assertTrue(view["policy"]["accepted"])
+        self.assertIn(RPM_POLICY_PROMOTION_BLOCKER, record["production_promotion_blockers"])
+        self.mutate_receipt("rpm", "x86_64-linux", lambda r: r.update(production_promotion_blockers=[]))
+        self.assertEqual(self.finish()[0], 2)
+
+    def test_policy_source_bytes_change_builder_identity_and_digest_mismatch_blocks(self):
+        from rs9.hosted_custody import builder_identity
+        repo=self.root/'policy-source';(repo/'operators/live1').mkdir(parents=True)
+        path=repo/'operators/live1/rpm-lint-policy.json'
+        path.write_bytes(b'{"candidate":1}\n')
+        before=builder_identity(repo)
+        path.write_bytes(b'{"candidate":2}\n')
+        self.assertNotEqual(before,builder_identity(repo))
+        for value in (None,'0'*64):
+            self.mutate_receipt('rpm','x86_64-linux',lambda r:r.update(details={
+                'rpm_lint_policy':{'fixture':{'accepted':True,'policy_sha256':value}}}))
+            code,row=self.finish()
+            self.assertEqual(code,2)
+            self.assertIn('candidate-rpm-x86_64-linux:HOSTED_POLICY',row['blocking_reasons'])
+
     def test_destination_details_surfaced_in_summary_independently_of_pages_unknown(self):
         """WP-DEST: per-destination satisfied/exact/noops surfaced in summary while aggregate is blocked for unknown Pages."""
         npm_noops = ["theme-forge-stellar-burst", "theme-forge-stellar-loom", "theme-forge-solar-sail", "theme-forge-nebular-fusion"]

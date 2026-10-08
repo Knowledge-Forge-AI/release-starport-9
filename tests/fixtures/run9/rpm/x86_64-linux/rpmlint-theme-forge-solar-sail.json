@@ -1,0 +1,234 @@
+{
+  "architecture": "noarch",
+  "arguments": [
+    "theme-forge-solar-sail.spec",
+    "theme-forge-solar-sail-0.2.1-1.fc43.noarch.rpm"
+  ],
+  "clean": false,
+  "findings": [
+    {
+      "check": "only-non-binary-in-usr-lib",
+      "level": "W",
+      "message": "",
+      "target": "theme-forge-solar-sail.noarch"
+    },
+    {
+      "check": "no-manual-page-for-binary",
+      "level": "W",
+      "message": "tfss",
+      "target": "theme-forge-solar-sail.noarch"
+    },
+    {
+      "check": "no-documentation",
+      "level": "W",
+      "message": "",
+      "target": "theme-forge-solar-sail.noarch"
+    },
+    {
+      "check": "no-changelogname-tag",
+      "level": "E",
+      "message": "",
+      "target": "theme-forge-solar-sail.noarch"
+    },
+    {
+      "check": "no-%check-section",
+      "level": "W",
+      "message": "",
+      "target": "theme-forge-solar-sail.spec"
+    },
+    {
+      "check": "invalid-url",
+      "level": "W",
+      "message": "Source3: npm-closure.tar.gz",
+      "target": "theme-forge-solar-sail.spec"
+    },
+    {
+      "check": "invalid-url",
+      "level": "W",
+      "message": "Source0: knowledge-forge-ai-theme-forge-solar-sail-0.2.1.tgz",
+      "target": "theme-forge-solar-sail.spec"
+    },
+    {
+      "check": "env-script-interpreter",
+      "level": "E",
+      "message": "package:usr/lib/theme-forge-solar-sail/bin/tfss.js package:usr/bin/env node",
+      "target": "theme-forge-solar-sail.noarch"
+    }
+  ],
+  "findings_summary": {
+    "errors": 2,
+    "filtered": 8,
+    "information": 0,
+    "packages": 1,
+    "specfiles": 1,
+    "warnings": 6
+  },
+  "findings_truncated": false,
+  "groups": [
+    {
+      "code": "env-script-interpreter",
+      "count": 1,
+      "samples": [
+        {
+          "check": "env-script-interpreter",
+          "level": "E",
+          "message": "package:usr/lib/theme-forge-solar-sail/bin/tfss.js package:usr/bin/env node",
+          "target": "theme-forge-solar-sail.noarch"
+        }
+      ],
+      "severity": "E"
+    },
+    {
+      "code": "no-changelogname-tag",
+      "count": 1,
+      "samples": [
+        {
+          "check": "no-changelogname-tag",
+          "level": "E",
+          "message": "",
+          "target": "theme-forge-solar-sail.noarch"
+        }
+      ],
+      "severity": "E"
+    },
+    {
+      "code": "invalid-url",
+      "count": 2,
+      "samples": [
+        {
+          "check": "invalid-url",
+          "level": "W",
+          "message": "Source3: npm-closure.tar.gz",
+          "target": "theme-forge-solar-sail.spec"
+        },
+        {
+          "check": "invalid-url",
+          "level": "W",
+          "message": "Source0: knowledge-forge-ai-theme-forge-solar-sail-0.2.1.tgz",
+          "target": "theme-forge-solar-sail.spec"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "no-%check-section",
+      "count": 1,
+      "samples": [
+        {
+          "check": "no-%check-section",
+          "level": "W",
+          "message": "",
+          "target": "theme-forge-solar-sail.spec"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "no-documentation",
+      "count": 1,
+      "samples": [
+        {
+          "check": "no-documentation",
+          "level": "W",
+          "message": "",
+          "target": "theme-forge-solar-sail.noarch"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "no-manual-page-for-binary",
+      "count": 1,
+      "samples": [
+        {
+          "check": "no-manual-page-for-binary",
+          "level": "W",
+          "message": "tfss",
+          "target": "theme-forge-solar-sail.noarch"
+        }
+      ],
+      "severity": "W"
+    },
+    {
+      "code": "only-non-binary-in-usr-lib",
+      "count": 1,
+      "samples": [
+        {
+          "check": "only-non-binary-in-usr-lib",
+          "level": "W",
+          "message": "",
+          "target": "theme-forge-solar-sail.noarch"
+        }
+      ],
+      "severity": "W"
+    }
+  ],
+  "identity_status": {
+    "package": "available",
+    "spec": "available"
+  },
+  "package_file": "theme-forge-solar-sail-0.2.1-1.fc43.noarch.rpm",
+  "package_sha256": "7c6bc0f4d3214efde8bba158a1135c42c44e81739ced3e0bb2a7b3d9cc6e2477",
+  "parse_complete": true,
+  "product": "theme-forge-solar-sail",
+  "reason_token": "lint-errors",
+  "rpm_identity": {
+    "arch": "noarch",
+    "name": "theme-forge-solar-sail",
+    "release": "1.fc43",
+    "version": "0.2.1"
+  },
+  "rpm_payload_digest": {
+    "algo_tag": "PAYLOADSHA256ALGO",
+    "algorithm": "sha256",
+    "algorithm_numeric": 8,
+    "capability": "rpm6",
+    "digest": "82244dc781b093a609fc56e7cc828022b98279c2c0f71617e6c3a2475c72d60a",
+    "payload_digest": "82244dc781b093a609fc56e7cc828022b98279c2c0f71617e6c3a2475c72d60a",
+    "payload_digest_algo": "sha256",
+    "querytags_sha256": "4ea0771d2bcf05e86b8ab9e4bb84502072a0cbb35244d943662296e37860af35",
+    "scope": "compressed-payload",
+    "tag": "PAYLOADSHA256"
+  },
+  "schema": "rs9.rpmlint-evidence.v1alpha1",
+  "session_headers": [
+    "============================ rpmlint session starts ============================",
+    "rpmlint: 2.8.0",
+    "configuration:",
+    "[CONFIG_PATH]",
+    "[CONFIG_PATH]",
+    "[CONFIG_PATH]",
+    "[CONFIG_PATH]",
+    "[CONFIG_PATH]",
+    "[CONFIG_PATH]",
+    "checks: 32, packages: 2"
+  ],
+  "spec_file": "theme-forge-solar-sail.spec",
+  "spec_sha256": "75952af0cafb868e590d257e5b256be44abbb47dd55deb620232703a1e79f1d5",
+  "status": "fail",
+  "tool_receipt": {
+    "exit_code": 64,
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_bytes": 1076,
+    "stdout_sha256": "4b383cb7e65dfef41dbd53f1708c3cfd5f6a812d45c2242c26483049b43bc34e",
+    "tool": "rpmlint"
+  },
+  "tool_version": {
+    "exit_code": 0,
+    "package_query": {
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "cf549ae7e9ea58b8e92884a6c88b4c1968295b2e1a6af2313a9798f3f463bd73",
+      "version": "rpmlint|2.8.0|2.fc43|noarch"
+    },
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_sha256": "dceb827995520dae388b7283c5bc7847ef58a16e8013318c3bb436feeb5dc51e",
+    "tool": "rpmlint",
+    "tool_identity_sha256": "96788ba940eea8dbcbc845ca3f9c1d9c82bc6cf4d53d45d25c588c8c4f442609",
+    "version": "2.8.0"
+  },
+  "unparsed_count": 0,
+  "unparsed_samples": [],
+  "unparsed_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+}

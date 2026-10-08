@@ -415,3 +415,591 @@ class AptDiagnosticsTests(unittest.TestCase):
             self.assertFalse(ok)
         ok,*rest=ad.qualify_tamper_rejection('index',FakeReceipt(0),FakeReceipt(100,err=b'Hash Sum mismatch'),FakeReceipt(1))
         self.assertFalse(ok)
+
+    def test_exact_run9_retained_signature_samples_reproduce_and_qualify(self):
+        import hashlib
+        fixture_path = Path(__file__).resolve().parent / "fixtures/run9/apt/apt-signature-samples.json"
+        doc = json.loads(fixture_path.read_text())
+        lane_path = Path(__file__).resolve().parent / "fixtures/run9/apt/lane-records.json"
+        lane_doc = json.loads(lane_path.read_text())
+
+        expected_sample_sha = "5a713ec83cd43eebc2cb66237e8286e1530b255070aa7839b738e6b74ffa5d22"
+        expected_stderr_sha = "37390e5b7ae15abe2dc1c021291a40fe55391bc395847a95c9ba94c45ae8247f"
+
+        raw_stderr = lane_doc["raw_stderr"]
+        self.assertEqual(hashlib.sha256(raw_stderr.encode()).hexdigest(), expected_stderr_sha)
+
+        for arch, row in doc["architectures"].items():
+            with self.subTest(arch=arch):
+                sample = row["sample"]
+                self.assertEqual(hashlib.sha256(sample.encode()).hexdigest(), expected_sample_sha)
+
+                # Receipts matching recorded hashes
+                receipt_raw = CommandReceipt(["apt-get", "update"], 100, b"", raw_stderr.encode(), executed=True)
+                self.assertEqual(receipt_raw.stderr_sha256, expected_stderr_sha)
+                receipt_sanitized = CommandReceipt(["apt-get", "update"], 100, b"", sample.encode(), executed=True)
+
+                # Raw reconstruction matches retained stderr; redacted samples alone cannot earn credit.
+                self.assertEqual(ad.classify_rejection(receipt_raw, stage="refresh", family="apt", source_uri="file:/srv/rs9/apt", distribution="resolute"), "SIGNED_ENVELOPE_INVALID")
+                self.assertEqual(ad.classify_rejection(receipt_sanitized, stage="refresh", family="apt"), "UNCLASSIFIED_FAILURE")
+
+                # Bounded command diagnostics capture context consistently
+                diag = ad.record_command_diagnostics(
+                    stage="refresh", family="apt", product="theme-forge-stellar-burst", arch=arch, receipt=receipt_raw, source_uri="file:/srv/rs9/apt", distribution="resolute"
+                )
+                self.assertEqual(diag["reason_category"], "SIGNED_ENVELOPE_INVALID")
+                self.assertEqual(diag["distribution"], "resolute")
+                self.assertEqual(diag["source_context"], "file")
+                self.assertEqual(diag["target_envelope"], "InRelease")
+                self.assertEqual(diag["safe_sample"], sample)
+
+                # Causal tamper qualification succeeds with exact qualifying stage and context
+                ok, cat, reason, qual_diag = ad.qualify_tamper_rejection(
+                    "signature", receipt_raw, FakeReceipt(100), FakeReceipt(1), family="apt", configure_rcpt=FakeReceipt(0),
+                    signature_context={"source_uri":"file:/srv/rs9/apt", "distribution":"resolute",
+                                       "mutation_verified":True, "network_disconnected":True, "positive_control_valid":True}
+                )
+                self.assertTrue(ok)
+                self.assertEqual(cat, "SIGNED_ENVELOPE_INVALID")
+                self.assertIsNone(reason)
+                self.assertEqual(qual_diag["qualifying_stage"], "refresh")
+                self.assertEqual(qual_diag["distribution"], "resolute")
+                self.assertEqual(qual_diag["source_context"], "file")
+                self.assertEqual(qual_diag["target_envelope"], "InRelease")
+                self.assertEqual(qual_diag["sample"], sample)
+
+        # Verify stdout byte availability limitation and exact SHA256 binding
+        expected_stdout_sha = lane_doc["refresh_stdout_sha256"]
+        self.assertEqual(expected_stdout_sha, "854b0b21ffc20fdc5c0ae47d27edcf977ab5c500a2d0390bb9c429ca9f45ba1c")
+        # Retained evidence fixtures explicitly do not contain raw stdout bytes (original_stdout_reconstructed is false in evidence).
+        # We perform a controlled reconstruction matching the recorded refresh_stdout_sha256.
+        reconstructed_stdout = (
+            "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+            "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+            "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+            "  Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+            "Reading package lists...\n"
+        )
+        self.assertEqual(hashlib.sha256(reconstructed_stdout.encode()).hexdigest(), expected_stdout_sha)
+
+        receipt_with_stdout = CommandReceipt(["apt-get", "update"], 100, reconstructed_stdout.encode(), raw_stderr.encode(), executed=True)
+        self.assertEqual(receipt_with_stdout.stdout_sha256, expected_stdout_sha)
+        self.assertEqual(receipt_with_stdout.stderr_sha256, expected_stderr_sha)
+        self.assertEqual(
+            ad.classify_rejection(receipt_with_stdout, stage="refresh", family="apt", source_uri="file:/srv/rs9/apt", distribution="resolute"),
+            "SIGNED_ENVELOPE_INVALID",
+        )
+        diag_with_stdout = ad.record_command_diagnostics(
+            stage="refresh", family="apt", product="theme-forge-stellar-burst", arch="amd64", receipt=receipt_with_stdout,
+            source_uri="file:/srv/rs9/apt", distribution="resolute"
+        )
+        self.assertEqual(diag_with_stdout["reason_category"], "SIGNED_ENVELOPE_INVALID")
+        self.assertEqual(diag_with_stdout["stdout_sha256"], expected_stdout_sha)
+        self.assertTrue(diag_with_stdout["stream_shapes"]["stdout"]["complete"])
+        self.assertEqual(diag_with_stdout["stream_shapes"]["stdout"]["line_count"], 5)
+        self.assertTrue(diag_with_stdout["stream_shapes"]["stderr"]["complete"])
+        self.assertEqual(diag_with_stdout["stream_shapes"]["stderr"]["line_count"], 1)
+
+        ok, cat, reason, qual_diag = ad.qualify_tamper_rejection(
+            "signature", receipt_with_stdout, FakeReceipt(100), FakeReceipt(1), family="apt", configure_rcpt=FakeReceipt(0),
+            signature_context={"source_uri": "file:/srv/rs9/apt", "distribution": "resolute",
+                               "mutation_verified": True, "network_disconnected": True, "positive_control_valid": True}
+        )
+        self.assertTrue(ok)
+        self.assertEqual(cat, "SIGNED_ENVELOPE_INVALID")
+        self.assertIsNone(reason)
+        self.assertEqual(qual_diag["qualifying_stage"], "refresh")
+
+    def test_signed_envelope_invalid_table_driven_negatives_and_precedence(self):
+        valid_stderr = (
+            "E: OpenPGP signature verification failed: file:/srv/rs9/apt resolute InRelease: "
+            "Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+        )
+        cases = [
+            # 1. Bare NODATA without OpenPGP signature envelope context
+            ("bare_nodata", "E: Got 'NODATA' from repository", "refresh", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 2. HTTP URL instead of local file:
+            ("http_source", valid_stderr.replace("file:/srv/rs9/apt", "http://archive.ubuntu.com/apt"), "refresh", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 3. HTTPS URL
+            ("https_source", valid_stderr.replace("file:/srv/rs9/apt", "https://archive.ubuntu.com/apt"), "refresh", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 4. Captive portal HTML in stream
+            ("captive_portal_html", valid_stderr + "<html><title>Hotspot Login</title></html>\n", "refresh", "apt", 100, "NETWORK_UNAVAILABLE"),
+            # 5. Captive portal phrase
+            ("captive_portal_text", valid_stderr + "captive portal authentication required\n", "refresh", "apt", 100, "NETWORK_UNAVAILABLE"),
+            # 6. HTTP 302 Found
+            ("http_redirect", valid_stderr + "HTTP/1.1 302 Found\n", "refresh", "apt", 100, "NETWORK_UNAVAILABLE"),
+            # 7. Mixed permission error
+            ("mixed_permission", "E: Could not open lock file - Permission denied\n" + valid_stderr, "refresh", "apt", 100, "PERMISSION_DENIED"),
+            # 8. Mixed network unreachable
+            ("mixed_network", "Err:1 ... Could not connect - Network is unreachable\n" + valid_stderr, "refresh", "apt", 100, "NETWORK_UNAVAILABLE"),
+            # 9. Mixed DNS resolution failure
+            ("mixed_dns", "Err:1 ... Temporary failure resolving 'archive.ubuntu.com'\n" + valid_stderr, "refresh", "apt", 100, "NETWORK_UNAVAILABLE"),
+            # 10. Mixed tool missing
+            ("mixed_tool", "sh: 1: gpgv: command not found\n" + valid_stderr, "refresh", "apt", 127, "COMMAND_NOT_FOUND"),
+            # 11. Mixed package missing
+            ("mixed_package", "E: Unable to locate package theme-forge-stellar-burst\n" + valid_stderr, "refresh", "apt", 100, "PACKAGE_NOT_FOUND"),
+            # 12. Mixed source config error
+            ("mixed_config", "E: Malformed entry 1 in sources file\n" + valid_stderr, "refresh", "apt", 100, "SOURCE_CONFIG_ERROR"),
+            # 13. Other E: error line in stream
+            ("other_e_error", valid_stderr + "E: Failed to fetch file:/srv/rs9/apt resolute InRelease Hash Sum mismatch\n", "refresh", "apt", 100, "INDEX_HASH_MISMATCH"),
+            # 14. Other Err: error line in stream
+            ("other_err_error", valid_stderr + "Err:1 file:/srv/rs9/apt resolute InRelease Sub-process returned an error code\n", "refresh", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 15. Wrong distribution (noble instead of resolute)
+            ("wrong_dist", valid_stderr.replace("resolute", "noble"), "refresh", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 16. Wrong envelope file (Release instead of InRelease)
+            ("wrong_file", valid_stderr.replace("InRelease", "Release"), "refresh", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 17. Wrong stage (install instead of refresh)
+            ("wrong_stage", valid_stderr, "install", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 18. Wrong family (pacman)
+            ("wrong_family_pacman", valid_stderr, "refresh", "pacman", 100, "UNCLASSIFIED_FAILURE"),
+            # 19. Exit 0 is not a rejection
+            ("exit_zero", valid_stderr, "refresh", "apt", 0, "COMMAND_SUCCESS"),
+            # 20. Exit != 100
+            ("exit_one", valid_stderr, "refresh", "apt", 1, "UNCLASSIFIED_FAILURE"),
+        ]
+        for name, text, stage, family, code, expected in cases:
+            with self.subTest(case=name):
+                rcpt = CommandReceipt(["tool"], code, b"", text.encode(), executed=True)
+                category = ad.classify_rejection(rcpt, stage=stage, family=family, source_uri="file:/srv/rs9/apt", distribution="resolute")
+                self.assertEqual(category, expected)
+                if expected != "SIGNED_ENVELOPE_INVALID":
+                    if stage == "install":
+                        ok, cat, reason, diag = ad.qualify_tamper_rejection(
+                            "signature", FakeReceipt(0), rcpt, FakeReceipt(1), family=family
+                        )
+                    else:
+                        ok, cat, reason, diag = ad.qualify_tamper_rejection(
+                            "signature", rcpt, FakeReceipt(100), FakeReceipt(1), family=family
+                        )
+                    self.assertFalse(ok)
+
+    def test_causal_tamper_qualification_requirements(self):
+        valid_stderr = (
+            "E: OpenPGP signature verification failed: file:/srv/rs9/apt resolute InRelease: "
+            "Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+        )
+        refresh_fail = CommandReceipt(["apt-get", "update"], 100, b"", valid_stderr.encode(), executed=True)
+
+        # 1. Successful install means tamper accepted -> fails closed
+        for install_rcpt, query_rcpt in [(FakeReceipt(0), FakeReceipt(1)), (FakeReceipt(100), FakeReceipt(0))]:
+            ok, cat, reason, _ = ad.qualify_tamper_rejection("signature", refresh_fail, install_rcpt, query_rcpt, family="apt")
+            self.assertFalse(ok)
+            self.assertEqual(reason, "tampered-content-accepted")
+
+        # 2. Refresh succeeding on signature tamper -> bypassed verification
+        ok, cat, reason, _ = ad.qualify_tamper_rejection("signature", FakeReceipt(0), FakeReceipt(100), FakeReceipt(1), family="apt")
+        self.assertFalse(ok)
+        self.assertEqual(reason, "bypassed-signature-verification-on-refresh")
+
+        # 3. Configure failing during tamper -> wrong stage failure
+        cfg_fail = CommandReceipt(["cfg"], 1, b"", b"E: Malformed entry in sources", executed=True)
+        ok, cat, reason, diag = ad.qualify_tamper_rejection("signature", refresh_fail, FakeReceipt(100), FakeReceipt(1), family="apt", configure_rcpt=cfg_fail)
+        self.assertFalse(ok)
+        self.assertEqual(diag.get("failed_stage"), "configure")
+
+        # 4. Positive control validation requirements
+        lane_doc = json.loads((Path(__file__).resolve().parent / "fixtures/run9/apt/lane-records.json").read_text())
+        for arch, ctrl in lane_doc["positive_controls"].items():
+            # Image mismatch fails validation
+            ok, err = ad.validate_positive_control(
+                ctrl, family=ctrl["family"], image="other-image", platform=ctrl["platform"], product=ctrl["product"],
+                setup_sha256=ctrl["setup_sha256"]
+            )
+            self.assertFalse(ok)
+            self.assertEqual(err, "positive-control-binding-mismatch")
+
+            # Platform mismatch fails validation
+            ok, err = ad.validate_positive_control(
+                ctrl, family=ctrl["family"], image="img", platform="other/platform", product=ctrl["product"],
+                setup_sha256=ctrl["setup_sha256"]
+            )
+            self.assertFalse(ok)
+            self.assertEqual(err, "positive-control-binding-mismatch")
+
+            # Setup mismatch fails validation
+            ok, err = ad.validate_positive_control(
+                ctrl, family=ctrl["family"], image="img", platform=ctrl["platform"], product=ctrl["product"],
+                setup_sha256="wrong-setup-sha"
+            )
+            self.assertFalse(ok)
+            self.assertEqual(err, "positive-control-binding-mismatch")
+
+    def test_controlled_realistic_stdout_variations_and_regressions(self):
+        valid_stderr = (
+            "E: OpenPGP signature verification failed: file:/srv/rs9/apt resolute InRelease: "
+            "Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+        )
+        variations = [
+            (
+                "standard_single_get_with_size",
+                "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+                "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+                "  Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+                "Reading package lists...\n"
+            ),
+            (
+                "dual_get_with_size_as_in_run9",
+                "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+                "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+                "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+                "  Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+                "Reading package lists...\n"
+            ),
+            (
+                "get_without_size",
+                "Get:1 file:/srv/rs9/apt resolute InRelease\n"
+                "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+                "  Signed file isn't valid, got 'NODATA'\n"
+                "Reading package lists...\n"
+            ),
+            (
+                "err_with_size",
+                "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+                "Err:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+                "  Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+                "Reading package lists...\n"
+            ),
+            (
+                "continuation_with_size",
+                "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+                "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+                "  Signed file isn't valid, got 'NODATA' [1041 B]\n"
+                "Reading package lists...\n"
+            ),
+            (
+                "continuation_with_suffix_and_size",
+                "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+                "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+                "  Signed file isn't valid, got 'NODATA' (does the network require authentication?) [1041 B]\n"
+                "Reading package lists...\n"
+            ),
+            (
+                "comma_formatted_size",
+                "Get:1 file:/srv/rs9/apt resolute InRelease [1,041 B]\n"
+                "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+                "  Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+                "Reading package lists...\n"
+            ),
+            (
+                "hit_progress_line",
+                "Hit:1 file:/srv/rs9/apt resolute InRelease\n"
+                "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+                "  Signed file isn't valid, got 'NODATA'\n"
+                "Reading package lists...\n"
+            ),
+            (
+                "ign_progress_line",
+                "Ign:1 file:/srv/rs9/apt resolute InRelease\n"
+                "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+                "  Signed file isn't valid, got 'NODATA'\n"
+                "Reading package lists...\n"
+            ),
+            (
+                "continuation_without_suffix",
+                "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+                "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+                "  Signed file isn't valid, got 'NODATA'\n"
+                "Reading package lists...\n"
+            ),
+            (
+                "reading_package_lists_done",
+                "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+                "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+                "  Signed file isn't valid, got 'NODATA'\n"
+                "Reading package lists... Done\n"
+            ),
+            (
+                "without_reading_package_lists",
+                "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+                "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+                "  Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+            ),
+        ]
+        for name, stdout_text in variations:
+            with self.subTest(variation=name):
+                rcpt = CommandReceipt(["apt-get", "update"], 100, stdout_text.encode(), valid_stderr.encode(), executed=True)
+                category = ad.classify_rejection(rcpt, stage="refresh", family="apt", source_uri="file:/srv/rs9/apt", distribution="resolute")
+                self.assertEqual(category, "SIGNED_ENVELOPE_INVALID")
+
+                diag = ad.record_command_diagnostics(
+                    stage="refresh", family="apt", product="theme-forge-stellar-burst", arch="amd64", receipt=rcpt,
+                    source_uri="file:/srv/rs9/apt", distribution="resolute"
+                )
+                self.assertEqual(diag["reason_category"], "SIGNED_ENVELOPE_INVALID")
+                self.assertEqual(diag["distribution"], "resolute")
+                self.assertEqual(diag["source_context"], "file")
+                self.assertEqual(diag["target_envelope"], "InRelease")
+                self.assertTrue(diag["stream_shapes"]["stdout"]["complete"])
+                self.assertEqual(diag["stream_shapes"]["stdout"]["line_count"], len(stdout_text.splitlines()))
+
+                ok, cat, reason, qual_diag = ad.qualify_tamper_rejection(
+                    "signature", rcpt, FakeReceipt(100), FakeReceipt(1), family="apt", configure_rcpt=FakeReceipt(0),
+                    signature_context={"source_uri": "file:/srv/rs9/apt", "distribution": "resolute",
+                                       "mutation_verified": True, "network_disconnected": True, "positive_control_valid": True}
+                )
+                self.assertTrue(ok)
+                self.assertEqual(cat, "SIGNED_ENVELOPE_INVALID")
+                self.assertIsNone(reason)
+                self.assertEqual(qual_diag["qualifying_stage"], "refresh")
+                self.assertEqual(qual_diag["distribution"], "resolute")
+                self.assertEqual(qual_diag["source_context"], "file")
+                self.assertEqual(qual_diag["target_envelope"], "InRelease")
+
+    def test_nonempty_stdout_table_driven_negatives_and_blocking_exclusions(self):
+        valid_stderr = (
+            "E: OpenPGP signature verification failed: file:/srv/rs9/apt resolute InRelease: "
+            "Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+        )
+        normal_stdout = (
+            "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+            "Err:1 file:/srv/rs9/apt resolute InRelease\n"
+            "  Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+            "Reading package lists...\n"
+        )
+        cases = [
+            # 1. Ambiguous NODATA in stdout without envelope context
+            ("bare_nodata_in_stdout", "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\nE: Got 'NODATA' from repository\n", "refresh", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 2. HTTP URL in stdout instead of local file:
+            ("http_source_in_stdout", normal_stdout.replace("file:/srv/rs9/apt", "http://archive.ubuntu.com/apt"), "refresh", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 3. HTTPS URL in stdout
+            ("https_source_in_stdout", normal_stdout.replace("file:/srv/rs9/apt", "https://archive.ubuntu.com/apt"), "refresh", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 4. Captive portal HTML in stdout
+            ("captive_portal_html_in_stdout", normal_stdout + "<html><title>Hotspot Login</title></html>\n", "refresh", "apt", 100, "NETWORK_UNAVAILABLE"),
+            # 5. Captive portal text in stdout
+            ("captive_portal_text_in_stdout", normal_stdout + "captive portal authentication required\n", "refresh", "apt", 100, "NETWORK_UNAVAILABLE"),
+            # 6. HTTP 302 Found in stdout
+            ("http_redirect_in_stdout", normal_stdout + "HTTP/1.1 302 Found\n", "refresh", "apt", 100, "NETWORK_UNAVAILABLE"),
+            # 7. HTTP 403 Forbidden in stdout
+            ("http_forbidden_in_stdout", normal_stdout + "HTTP/1.1 403 Forbidden\n", "refresh", "apt", 100, "NETWORK_UNAVAILABLE"),
+            # 8. Mixed permission error in stdout
+            ("mixed_permission_in_stdout", "E: Could not open lock file - Permission denied\n" + normal_stdout, "refresh", "apt", 100, "PERMISSION_DENIED"),
+            # 9. Mixed network unreachable in stdout
+            ("mixed_network_in_stdout", "Err:1 ... Could not connect - Network is unreachable\n" + normal_stdout, "refresh", "apt", 100, "NETWORK_UNAVAILABLE"),
+            # 10. Mixed DNS resolution failure in stdout
+            ("mixed_dns_in_stdout", "Err:1 ... Temporary failure resolving 'archive.ubuntu.com'\n" + normal_stdout, "refresh", "apt", 100, "NETWORK_UNAVAILABLE"),
+            # 11. Mixed tool missing in stdout (exit 127)
+            ("mixed_tool_in_stdout", "sh: 1: gpgv: command not found\n" + normal_stdout, "refresh", "apt", 127, "COMMAND_NOT_FOUND"),
+            # 12. Mixed package missing in stdout
+            ("mixed_package_in_stdout", "E: Unable to locate package theme-forge-stellar-burst\n" + normal_stdout, "refresh", "apt", 100, "PACKAGE_NOT_FOUND"),
+            # 13. Mixed source config error in stdout
+            ("mixed_config_in_stdout", "E: Malformed entry 1 in sources file\n" + normal_stdout, "refresh", "apt", 100, "SOURCE_CONFIG_ERROR"),
+            # 14. Other E: error line in stdout
+            ("other_e_error_in_stdout", normal_stdout + "E: Failed to fetch file:/srv/rs9/apt resolute InRelease Hash Sum mismatch\n", "refresh", "apt", 100, "INDEX_HASH_MISMATCH"),
+            # 15. Other Err: error line in stdout
+            ("other_err_error_in_stdout", normal_stdout + "Err:1 file:/srv/rs9/apt resolute InRelease Sub-process returned an error code\n", "refresh", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 16. Unrelated repository error in stdout
+            ("unrelated_repo_err_in_stdout", normal_stdout + "Err:2 http://security.ubuntu.com resolute InRelease Connection refused\n", "refresh", "apt", 100, "NETWORK_UNAVAILABLE"),
+            # 17. Wrong distribution in stdout
+            ("wrong_dist_in_stdout", normal_stdout.replace("resolute", "noble"), "refresh", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 18. Wrong envelope file in stdout
+            ("wrong_file_in_stdout", normal_stdout.replace("InRelease", "Release"), "refresh", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 19. Wrong stage (install instead of refresh) with nonempty stdout
+            ("wrong_stage_with_stdout", normal_stdout, "install", "apt", 100, "UNCLASSIFIED_FAILURE"),
+            # 20. Wrong family (pacman) with nonempty stdout
+            ("wrong_family_with_stdout", normal_stdout, "refresh", "pacman", 100, "UNCLASSIFIED_FAILURE"),
+            # 21. Exit 0 is not a rejection
+            ("exit_zero_with_stdout", normal_stdout, "refresh", "apt", 0, "COMMAND_SUCCESS"),
+            # 22. Exit != 100 with nonempty stdout
+            ("exit_one_with_stdout", normal_stdout, "refresh", "apt", 1, "UNCLASSIFIED_FAILURE"),
+        ]
+        for name, stdout_text, stage, family, code, expected in cases:
+            with self.subTest(case=name):
+                rcpt = CommandReceipt(["apt-get", "update"], code, stdout_text.encode(), valid_stderr.encode(), executed=True)
+                category = ad.classify_rejection(rcpt, stage=stage, family=family, source_uri="file:/srv/rs9/apt", distribution="resolute")
+                self.assertEqual(category, expected)
+                if expected != "SIGNED_ENVELOPE_INVALID":
+                    if stage == "install":
+                        ok, cat, reason, diag = ad.qualify_tamper_rejection(
+                            "signature", FakeReceipt(0), rcpt, FakeReceipt(1), family=family
+                        )
+                    else:
+                        ok, cat, reason, diag = ad.qualify_tamper_rejection(
+                            "signature", rcpt, FakeReceipt(100), FakeReceipt(1), family=family
+                        )
+                    self.assertFalse(ok)
+
+    def test_full_stream_envelope_allowlist_large_stream_credit(self):
+        # Many allowlisted progress lines with full streams > 64KiB + qualifying line earns credit
+        progress_line = b"Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+        # 1500 lines * 51 bytes = 76,500 bytes (> 64KiB = 65,536 bytes)
+        stdout_bytes = progress_line * 1500
+        self.assertGreater(len(stdout_bytes), 65536)
+        valid_stderr = (
+            b"E: OpenPGP signature verification failed: file:/srv/rs9/apt resolute InRelease: "
+            b"Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+        )
+        rcpt = CommandReceipt(["apt-get", "update"], 100, stdout_bytes, valid_stderr, executed=True)
+
+        # Classification succeeds on full stream
+        self.assertEqual(
+            ad.classify_rejection(rcpt, stage="refresh", family="apt", source_uri="file:/srv/rs9/apt", distribution="resolute"),
+            "SIGNED_ENVELOPE_INVALID",
+        )
+
+        # Causal tamper qualification succeeds
+        ok, cat, reason, qual_diag = ad.qualify_tamper_rejection(
+            "signature", rcpt, FakeReceipt(100), FakeReceipt(1), family="apt", configure_rcpt=FakeReceipt(0),
+            signature_context={"source_uri": "file:/srv/rs9/apt", "distribution": "resolute",
+                               "mutation_verified": True, "network_disconnected": True, "positive_control_valid": True}
+        )
+        self.assertTrue(ok)
+        self.assertEqual(cat, "SIGNED_ENVELOPE_INVALID")
+        self.assertIsNone(reason)
+        self.assertEqual(qual_diag["qualifying_stage"], "refresh")
+
+        # Diagnostics: raw > 64KiB means stdout completeness metadata is truthful False, stderr is True
+        diag = ad.record_command_diagnostics(
+            stage="refresh", family="apt", product="theme-forge-stellar-burst", arch="amd64", receipt=rcpt,
+            source_uri="file:/srv/rs9/apt", distribution="resolute"
+        )
+        self.assertEqual(diag["reason_category"], "SIGNED_ENVELOPE_INVALID")
+        self.assertFalse(diag["stream_shapes"]["stdout"]["complete"])
+        self.assertEqual(diag["stream_shapes"]["stdout"]["line_count"], 1500)
+        self.assertTrue(diag["stream_shapes"]["stderr"]["complete"])
+        self.assertEqual(diag["stream_shapes"]["stderr"]["line_count"], 1)
+
+    def test_full_stream_envelope_late_bad_lines_no_credit(self):
+        # Late network/HTTP/context bad line beyond 64KiB gets no credit
+        progress_line = b"Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+        base_stdout = progress_line * 1500  # > 64KiB
+        valid_stderr = (
+            b"E: OpenPGP signature verification failed: file:/srv/rs9/apt resolute InRelease: "
+            b"Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+        )
+        bad_suffixes = [
+            (b"Err:2 http://archive.ubuntu.com resolute InRelease Could not connect - Network is unreachable\n", "late_network"),
+            (b"HTTP/1.1 500 Internal Server Error\n", "late_http"),
+            (b"<html><title>504 Gateway Timeout</title></html>\n", "late_html"),
+            (b"E: Malformed entry in sources file\n", "late_context_error"),
+            (b"corrupt trailing late content\n", "late_corrupt_content"),
+        ]
+        for bad_line, name in bad_suffixes:
+            with self.subTest(case=name):
+                rcpt = CommandReceipt(["apt-get", "update"], 100, base_stdout + bad_line, valid_stderr, executed=True)
+                cat = ad.classify_rejection(rcpt, stage="refresh", family="apt", source_uri="file:/srv/rs9/apt", distribution="resolute")
+                self.assertNotEqual(cat, "SIGNED_ENVELOPE_INVALID", f"Case {name} must not earn SIGNED_ENVELOPE_INVALID credit")
+                ok, _, reason, _ = ad.qualify_tamper_rejection(
+                    "signature", rcpt, FakeReceipt(100), FakeReceipt(1), family="apt", configure_rcpt=FakeReceipt(0),
+                    signature_context={"source_uri": "file:/srv/rs9/apt", "distribution": "resolute",
+                                       "mutation_verified": True, "network_disconnected": True, "positive_control_valid": True}
+                )
+                self.assertFalse(ok, f"Case {name} must fail tamper qualification")
+
+    def test_full_stream_envelope_invalid_utf8_and_incomplete_framing(self):
+        # Invalid UTF8 and incomplete framing cannot receive credit
+        valid_stdout = b"Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+        valid_stderr = (
+            b"E: OpenPGP signature verification failed: file:/srv/rs9/apt resolute InRelease: "
+            b"Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+        )
+        # 3a. Invalid UTF-8 in stdout
+        rcpt_bad_utf8_out = CommandReceipt(["apt-get", "update"], 100, b"\xff\xfe\x80\x81\n", valid_stderr, executed=True)
+        self.assertNotEqual(
+            ad.classify_rejection(rcpt_bad_utf8_out, stage="refresh", family="apt", source_uri="file:/srv/rs9/apt", distribution="resolute"),
+            "SIGNED_ENVELOPE_INVALID",
+        )
+        self.assertFalse(ad.qualify_tamper_rejection(
+            "signature", rcpt_bad_utf8_out, FakeReceipt(100), FakeReceipt(1), family="apt", configure_rcpt=FakeReceipt(0),
+            signature_context={"source_uri": "file:/srv/rs9/apt", "distribution": "resolute",
+                               "mutation_verified": True, "network_disconnected": True, "positive_control_valid": True}
+        )[0])
+
+        # 3b. Invalid UTF-8 in stderr
+        rcpt_bad_utf8_err = CommandReceipt(["apt-get", "update"], 100, valid_stdout, b"\xff\xfe" + valid_stderr, executed=True)
+        self.assertNotEqual(
+            ad.classify_rejection(rcpt_bad_utf8_err, stage="refresh", family="apt", source_uri="file:/srv/rs9/apt", distribution="resolute"),
+            "SIGNED_ENVELOPE_INVALID",
+        )
+        self.assertFalse(ad.qualify_tamper_rejection(
+            "signature", rcpt_bad_utf8_err, FakeReceipt(100), FakeReceipt(1), family="apt", configure_rcpt=FakeReceipt(0),
+            signature_context={"source_uri": "file:/srv/rs9/apt", "distribution": "resolute",
+                               "mutation_verified": True, "network_disconnected": True, "positive_control_valid": True}
+        )[0])
+
+        # 3c. Incomplete framing: stdout missing trailing newline
+        rcpt_no_nl_out = CommandReceipt(["apt-get", "update"], 100, valid_stdout.rstrip(b"\n"), valid_stderr, executed=True)
+        self.assertNotEqual(
+            ad.classify_rejection(rcpt_no_nl_out, stage="refresh", family="apt", source_uri="file:/srv/rs9/apt", distribution="resolute"),
+            "SIGNED_ENVELOPE_INVALID",
+        )
+        self.assertFalse(ad.qualify_tamper_rejection(
+            "signature", rcpt_no_nl_out, FakeReceipt(100), FakeReceipt(1), family="apt", configure_rcpt=FakeReceipt(0),
+            signature_context={"source_uri": "file:/srv/rs9/apt", "distribution": "resolute",
+                               "mutation_verified": True, "network_disconnected": True, "positive_control_valid": True}
+        )[0])
+
+        # 3d. Incomplete framing: stderr missing trailing newline
+        rcpt_no_nl_err = CommandReceipt(["apt-get", "update"], 100, valid_stdout, valid_stderr.rstrip(b"\n"), executed=True)
+        self.assertNotEqual(
+            ad.classify_rejection(rcpt_no_nl_err, stage="refresh", family="apt", source_uri="file:/srv/rs9/apt", distribution="resolute"),
+            "SIGNED_ENVELOPE_INVALID",
+        )
+        self.assertFalse(ad.qualify_tamper_rejection(
+            "signature", rcpt_no_nl_err, FakeReceipt(100), FakeReceipt(1), family="apt", configure_rcpt=FakeReceipt(0),
+            signature_context={"source_uri": "file:/srv/rs9/apt", "distribution": "resolute",
+                               "mutation_verified": True, "network_disconnected": True, "positive_control_valid": True}
+        )[0])
+
+    def test_record_command_diagnostics_multibyte_preview_false_completeness(self):
+        # 4. Multibyte preview false completeness prevention
+        # Raw bytes <= 65536, lines <= 64, line <= 512, strict UTF-8 valid, but contains non-ASCII multibyte char
+        multibyte_stdout = "Get:1 file:/srv/rs9/apt resolute InRelease [1041 B] \u2014 valid\n".encode("utf-8")
+        valid_stderr = (
+            b"E: OpenPGP signature verification failed: file:/srv/rs9/apt resolute InRelease: "
+            b"Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+        )
+        rcpt = CommandReceipt(["apt-get", "update"], 100, multibyte_stdout, valid_stderr, executed=True)
+        self.assertLessEqual(len(rcpt.stdout_bytes), 65536)
+
+        diag = ad.record_command_diagnostics(
+            stage="refresh", family="apt", product="theme-forge-stellar-burst", arch="amd64", receipt=rcpt,
+            source_uri="file:/srv/rs9/apt", distribution="resolute"
+        )
+        # Safe sample replaces multibyte with "non-printable-stream-withheld"
+        self.assertEqual(diag["stream_shapes"]["stdout"]["lines"], ["non-printable-stream-withheld"])
+        # Complete MUST be False because safe preview withheld the content rather than showing exact preview
+        self.assertFalse(diag["stream_shapes"]["stdout"]["complete"])
+        # stderr has valid ASCII and ends with newline, so stderr is complete
+        self.assertTrue(diag["stream_shapes"]["stderr"]["complete"])
+
+    def test_machine_text_contract_error_returns_false(self):
+        # Catches ContractError from machine_text -> returns False
+        valid_stdout = b"Get:1 file:/srv/rs9/apt resolute InRelease [1041 B]\n"
+        valid_stderr = (
+            b"E: OpenPGP signature verification failed: file:/srv/rs9/apt resolute InRelease: "
+            b"Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+        )
+        rcpt = CommandReceipt(["apt-get", "update"], 100, valid_stdout, valid_stderr, executed=True)
+        from unittest.mock import patch
+        from rs9.errors import ContractError
+        with patch("rs9.apt_diagnostics.machine_text", side_effect=ContractError("STREAM_LIMIT_EXCEEDED", "error")):
+            self.assertEqual(
+                ad.classify_rejection(rcpt, stage="refresh", family="apt", source_uri="file:/srv/rs9/apt", distribution="resolute"),
+                "UNCLASSIFIED_FAILURE",
+            )
+
+
+class EnvelopeContextTests(unittest.TestCase):
+    def test_missing_or_wrong_context_and_mixed_stdout_cannot_qualify(self):
+        message = b"E: OpenPGP signature verification failed: file:/srv/rs9/apt resolute InRelease: Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n"
+        for context in ({}, {"source_uri":"file:/srv/other", "distribution":"resolute"}, {"source_uri":"file:/srv/rs9/apt", "distribution":"noble"}):
+            self.assertEqual(ad.classify_rejection(FakeReceipt(100,err=message),stage="refresh",**context),"UNCLASSIFIED_FAILURE")
+        context={"source_uri":"file:/srv/rs9/apt","distribution":"resolute"}
+        for stdout in (b"E: unrelated failure",b"Err:1 unrelated source"):
+            self.assertEqual(ad.classify_rejection(FakeReceipt(100,out=stdout,err=message),stage="refresh",**context),"UNCLASSIFIED_FAILURE")
+        proof=dict(context,mutation_verified=True,network_disconnected=True,positive_control_valid=True)
+        for key in ("mutation_verified","network_disconnected","positive_control_valid"):
+            broken=dict(proof,**{key:False})
+            self.assertFalse(ad.qualify_tamper_rejection("signature",FakeReceipt(100,err=message),FakeReceipt(100),FakeReceipt(1),configure_rcpt=FakeReceipt(0),signature_context=broken)[0])
+        for install,query in ((FakeReceipt(127),FakeReceipt(1)),(FakeReceipt(100),FakeReceipt(127)),
+                              (FakeReceipt(100,err=b'Permission denied'),FakeReceipt(1)),
+                              (FakeReceipt(100),FakeReceipt(1,err=b'command not found')),
+                              (FakeReceipt(100,err=b'Could not connect'),FakeReceipt(1))):
+            self.assertFalse(ad.qualify_tamper_rejection("signature",FakeReceipt(100,err=message),install,query,
+                             configure_rcpt=FakeReceipt(0),signature_context=proof)[0])
+        rcpt=FakeReceipt(100,err=message)
+        rcpt.executed=False
+        self.assertFalse(ad.qualify_tamper_rejection("signature",rcpt,FakeReceipt(100),FakeReceipt(1),configure_rcpt=FakeReceipt(0),signature_context=proof)[0])
+        diagnostics=ad.record_command_diagnostics(stage="refresh",family="apt",product="p",arch="amd64",receipt=FakeReceipt(100,err=message),**context)
+        self.assertTrue(diagnostics['stream_shapes']['stderr']['complete'])
+        self.assertEqual(diagnostics['stream_shapes']['stderr']['line_count'],1)

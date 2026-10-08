@@ -212,8 +212,11 @@ def sign_rpm(runner, path, fixture, *, expected=None, wrong_fixture=None, diagno
         if not result.executed:
             raise ContractError("NATIVE_TOOL", "Actual native command failed: rpmkeys",
                                 details={"substage": "rpm-checksig", "tool": "rpmkeys"})
-        if (result.exit_code != 0 or result.stderr_bytes
-                or re.search(r": digests signatures OK\n?\Z", result.stdout_text) is None):
+        from rs9.machine_stream import machine_records
+        checksig_lines = machine_records(result, limit=4096, code="RPM_SIGNING",
+                                         substage="rpm-checksig", encoding="utf-8")
+        if (result.exit_code != 0 or result.stderr_bytes or len(checksig_lines) != 1
+                or re.search(r": digests signatures OK\Z", checksig_lines[0]) is None):
             raise ContractError("RPM_SIGNING", "Fixture RPM signature validation failed",
                                 details={"substage": "rpm-checksig", "tool": "rpmkeys",
                                          "exit_code": result.exit_code,
@@ -345,7 +348,7 @@ def execute(context):
         unsigned = scratch / "unsigned"
         unsigned.mkdir()
         products, errors, failures, product_metadata = {}, {}, {}, {}
-        lint_evidence = {}
+        lint_evidence, lint_policy = {}, {}
         for capture, intent, _ in context["captures"]:
             pid = intent["project"]["id"]
             work = scratch / "build" / pid
@@ -357,7 +360,8 @@ def execute(context):
                 from rs9.product_classes import is_pure_js_cli, get_product_class
                 target = ("any" if family == "pacman" else "noarch") if is_pure_js_cli(pid) else arch
                 result = build(capture, intent, target, work,
-                               offline_npm_archives=npm, runner=builder)
+                               offline_npm_archives=npm, runner=builder,
+                               **({"builder_system": system} if family == "rpm" else {}))
                 path = result["package_path"] if family == "pacman" else result["rpm_path"]
                 dest = unsigned / path.name
                 shutil.copyfile(path, dest)
@@ -365,16 +369,29 @@ def execute(context):
                 product_metadata[pid] = {"package_class": get_product_class(pid), "architecture": target,
                                          "package_file": dest.name, "sha256": digest(dest.read_bytes())}
                 if family == "rpm":
+                    lint_evidence[pid] = result["manifest"].get("rpmlint", {})
+                    lint_policy[pid] = result["manifest"].get("rpmlint_policy", {})
+                    diagnostics = scratch / "diagnostics"
+                    diagnostics.mkdir(exist_ok=True)
+                    for stem, evidence in (("rpmlint", lint_evidence[pid]),
+                                           ("rpm-lint-policy", lint_policy[pid])):
+                        diagnostic = diagnostics / f"{stem}-{pid}.json"
+                        diagnostic.write_bytes(canonical(evidence))
+                        artifacts.append(diagnostic)
                     product_metadata[pid].update(rpm_identity=result["manifest"]["rpm_identity"],
                         rpm_payload_digest=result["manifest"]["rpm_payload_digest"])
                 artifacts += [dest, work / ("pacman-manifest.json" if family == "pacman" else "rpm-manifest.json")]
             except (ContractError, OSError) as error:
                 errors[pid] = error.code if isinstance(error, ContractError) else "PACKAGE_FILESYSTEM"
                 receipts = builder.receipts[mark:]
-                failed = (getattr(error, "receipt", None) or
-                          next((r for r in reversed(receipts) if Path(r.tool_name or (r.command[0] if r.command else "")).name == "rpmlint" and "--version" not in r.command), None)
-                          if errors[pid] == "RPMLINT_FAILED" else
-                          next((r for r in receipts if r.exit_code), receipts[-1] if receipts else None))
+                if errors[pid] == "RPM_INVENTORY_FAILED":
+                    failed = getattr(error, "receipt", None)
+                elif errors[pid] == "RPMLINT_FAILED":
+                    failed = (getattr(error, "receipt", None) or
+                              next((r for r in reversed(receipts) if Path(r.tool_name or (r.command[0] if r.command else "")).name == "rpmlint" and "--version" not in r.command), None))
+                else:
+                    failed = (getattr(error, "receipt", None) or
+                              next((r for r in receipts if r.exit_code), receipts[-1] if receipts else None))
                 details = {"product": pid, "family": family, "system": system, "substage": "package-build"}
                 if failed:
                     tool_cmd = failed.tool_name or (failed.command[0] if failed.command else "")
@@ -384,9 +401,28 @@ def execute(context):
                 if isinstance(error, ContractError):
                     details.update(error.details)
                 failures[pid] = {"code": errors[pid], **safe_details(details)}
-                if family == "rpm" and isinstance(error, ContractError) and error.code == "RPMLINT_FAILED":
+                inventory_diagnostic = getattr(error, "inventory_diagnostic", None)
+                if family == "rpm" and inventory_diagnostic is not None:
                     secondary = failures[pid].setdefault("diagnostics", {})
-                    ev = getattr(error, "evidence", None)
+                    try:
+                        diagnostics = scratch / "diagnostics"
+                        diagnostics.mkdir(exist_ok=True)
+                        path = diagnostics / f"rpm-inventory-{pid}.json"
+                        path.write_bytes(canonical(dict(inventory_diagnostic, product=pid)))
+                        artifacts.append(path)
+                        secondary["inventory"] = "retained"
+                    except OSError:
+                        secondary["inventory"] = "failed"
+                coverage = getattr(error, "dependency_coverage", None)
+                if family == "rpm" and coverage is not None:
+                    diagnostics = scratch / "diagnostics"
+                    diagnostics.mkdir(exist_ok=True)
+                    path = diagnostics / f"rpm-dependency-coverage-{pid}.json"
+                    path.write_bytes(canonical(coverage))
+                    artifacts.append(path)
+                if family == "rpm" and isinstance(error, ContractError) and (error.code == "RPMLINT_FAILED" or getattr(error,"rpmlint_evidence",None) is not None):
+                    secondary = failures[pid].setdefault("diagnostics", {})
+                    ev = getattr(error, "rpmlint_evidence", None) or getattr(error, "evidence", None)
                     if ev is not None:
                         lint_evidence[pid] = ev
                     failures[pid]["identities"] = {
@@ -425,7 +461,7 @@ def execute(context):
                     except OSError:
                         secondary["spec"] = "failed"
                     try:
-                        ev = getattr(error, "evidence", None) or error.details.get("evidence")
+                        ev = getattr(error, "rpmlint_evidence", None) or getattr(error, "evidence", None) or error.details.get("evidence")
                         if ev is not None:
                             diag_ev_dir = scratch / "diagnostics"
                             diag_ev_dir.mkdir(exist_ok=True)
@@ -437,6 +473,21 @@ def execute(context):
                             secondary["findings"] = "unavailable"
                     except OSError:
                         secondary["findings"] = "failed"
+                    try:
+                        policy = (getattr(error, "rpmlint_policy", None)
+                                  or error.details.get("rpmlint_policy"))
+                        if policy is not None:
+                            lint_policy[pid] = policy
+                            diagnostics = scratch / "diagnostics"
+                            diagnostics.mkdir(exist_ok=True)
+                            diagnostic = diagnostics / f"rpm-lint-policy-{pid}.json"
+                            diagnostic.write_bytes(canonical(policy))
+                            artifacts.append(diagnostic)
+                            secondary["policy"] = "retained"
+                        else:
+                            secondary["policy"] = "unavailable"
+                    except OSError:
+                        secondary["policy"] = "failed"
         if family == "rpm":
             constructed_lint_failures = {
                 pid for pid, code in errors.items()
@@ -446,9 +497,10 @@ def execute(context):
             build_failures = {k: v for k, v in errors.items() if k not in constructed_lint_failures}
             total_built = len(products) + len(constructed_lint_failures)
             build_pass = (total_built == 4 and not build_failures)
-            lint_pass = (len(products) == 4 and not errors)
+            lint_pass = (len(products) == 4 and not errors and len(lint_policy) == 4
+                         and all(p.get("accepted") is True for p in lint_policy.values()))
             gates.append({"name": "rpm-package-build", "status": "pass" if build_pass else "fail"})
-            gates.append({"name": "rpm-rpmlint-clean", "status": "pass" if lint_pass else "fail"})
+            gates.append({"name": "rpm-lint-policy-accepted", "status": "pass" if lint_pass else "fail"})
         else:
             gates.append({"name": family + "-package-build", "status": "pass" if len(products) == 4 and not errors else "fail"})
         if errors:
@@ -462,18 +514,21 @@ def execute(context):
             except OSError:
                 for failure in failures.values():
                     failure.setdefault("diagnostics", {})["lane_record"] = "failed"
-        if family == "rpm" and errors:
+        if family == "rpm" and (errors or not lint_pass):
             # Retained package identities prove construction independently of lint.
             # Either failure stops custody, indexing/signing and DNF.
-            reason = "blocked-by:rpm-package-build" if build_failures else "blocked-by:rpm-rpmlint-clean"
+            reason = "blocked-by:rpm-package-build" if build_failures else "blocked-by:rpm-lint-policy-accepted"
             gates.extend({"name":n,"status":"not-run","reason":reason}
                          for n in ("rpm-repository-indexing","rpm-client-qualification",
                                    "burst-native-addon-target","burst-native-addon-load"))
             gates.extend({"name":"rpm-trust.tamper."+kind,"status":"not-run","reason":reason}
                          for kind in ("package","index","signature","wrongkey"))
             return {"gates":gates,"artifacts":artifacts,
+                    "production_promotion_blockers": ["rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"]
+                        if any(p.get("accepted_findings") for p in lint_policy.values()) else [],
                     "details":{"environment":environment,"build_errors":errors,"product_failures":failures,
-                               "lint_evidence":lint_evidence,
+                               "lint_evidence":lint_evidence, "rpm_lint_raw":lint_evidence,
+                               "rpm_lint_policy":lint_policy,
                                "diagnostic_scope":"candidate-only-build-and-lint-failures"}}
         if len(products) != 4 or errors:
             first_product = sorted(errors.keys())[0] if errors else "unknown"
@@ -574,6 +629,12 @@ def execute(context):
         except (ContractError, OSError):
             pass
     details = {"environment": environment}
+    promotion = []
+    if family == "rpm":
+        details.update(rpm_lint_raw=lint_evidence, rpm_lint_policy=lint_policy)
+        if any(p.get("accepted_findings") for p in lint_policy.values()):
+            promotion.append("rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified")
     if errors:
         details["build_errors"] = errors
-    return {"gates": gates, "artifacts": artifacts, "details": details}
+    return {"gates": gates, "artifacts": artifacts, "details": details,
+            "production_promotion_blockers": promotion}

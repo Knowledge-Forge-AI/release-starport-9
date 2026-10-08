@@ -1,0 +1,83 @@
+{
+  "architectures": {
+    "amd64": {
+      "name": "deb-client.tamper.signature",
+      "negative_receipts": [
+        {
+          "executed": true,
+          "exit_code": 0,
+          "stage": "configure",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "executed": true,
+          "exit_code": 100,
+          "stage": "refresh",
+          "stderr_sha256": "37390e5b7ae15abe2dc1c021291a40fe55391bc395847a95c9ba94c45ae8247f",
+          "stdout_sha256": "854b0b21ffc20fdc5c0ae47d27edcf977ab5c500a2d0390bb9c429ca9f45ba1c"
+        },
+        {
+          "executed": true,
+          "exit_code": 100,
+          "stage": "install",
+          "stderr_sha256": "c3e2d30f8f94b579085b5e000f9ddd274ffa83651a4f64d456b67dc3972736d8",
+          "stdout_sha256": "b8d97fa5f27fa2e2463f1d83a366a93fcef8b402d7b67fc0e275cd5d1a73e505"
+        },
+        {
+          "executed": true,
+          "exit_code": 1,
+          "stage": "query",
+          "stderr_sha256": "9755912175bb56e4a622f3297b445f560299c48af5b04e176ce5555a5df9d4da",
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "qualifying_stage": "refresh",
+      "reason": "wrong-tamper-rejection-reason:UNCLASSIFIED_FAILURE",
+      "rejection_category": "UNCLASSIFIED_FAILURE",
+      "sample": "E: OpenPGP signature verification failed: file:[PATH] resolute InRelease: Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n",
+      "status": "fail"
+    },
+    "arm64": {
+      "name": "deb-client.tamper.signature",
+      "negative_receipts": [
+        {
+          "executed": true,
+          "exit_code": 0,
+          "stage": "configure",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "executed": true,
+          "exit_code": 100,
+          "stage": "refresh",
+          "stderr_sha256": "37390e5b7ae15abe2dc1c021291a40fe55391bc395847a95c9ba94c45ae8247f",
+          "stdout_sha256": "854b0b21ffc20fdc5c0ae47d27edcf977ab5c500a2d0390bb9c429ca9f45ba1c"
+        },
+        {
+          "executed": true,
+          "exit_code": 100,
+          "stage": "install",
+          "stderr_sha256": "c3e2d30f8f94b579085b5e000f9ddd274ffa83651a4f64d456b67dc3972736d8",
+          "stdout_sha256": "b8d97fa5f27fa2e2463f1d83a366a93fcef8b402d7b67fc0e275cd5d1a73e505"
+        },
+        {
+          "executed": true,
+          "exit_code": 1,
+          "stage": "query",
+          "stderr_sha256": "9755912175bb56e4a622f3297b445f560299c48af5b04e176ce5555a5df9d4da",
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "qualifying_stage": "refresh",
+      "reason": "wrong-tamper-rejection-reason:UNCLASSIFIED_FAILURE",
+      "rejection_category": "UNCLASSIFIED_FAILURE",
+      "sample": "E: OpenPGP signature verification failed: file:[PATH] resolute InRelease: Signed file isn't valid, got 'NODATA' (does the network require authentication?)\n",
+      "status": "fail"
+    }
+  },
+  "run_id": 37712447239,
+  "scope": "Retained sanitized samples, not original raw stderr bytes",
+  "source_commit": "dbf94dd5e506987a9316baaef837a38dd88e1f48"
+}

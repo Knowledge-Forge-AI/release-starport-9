@@ -326,6 +326,10 @@ def diagnostic_scope(repository, output, packet, contract, reported=None):
                                 raise ContractError("HOSTED_BINDING", "Summary and individual receipt differ")
                         gates = dict(lane, required_gates=lane.get("experiment_gates", []) if experimental else lane["required_gates"])
                         blockers = gate_blockers(gates, receipt)
+                        if lane["lane"] == "rpm":
+                            from rs9.hosted_summary import promotion_blockers, rpm_lint_results
+                            promotion_blockers(lane, receipt)
+                            row["rpm_lint_results"] = rpm_lint_results([receipt])
                         if receipt.get("execution_error") or receipt.get("policy_blockers"):
                             blockers.append("receipt-execution-or-policy-failed")
                         if experimental and receipt.get("network", {}).get("runtime_offline_status") != "pass":
