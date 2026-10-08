@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import tarfile
 import tempfile
 import unittest
@@ -25,6 +26,7 @@ from rs9.repo_apt import (
     tamper_apt_repository,
     validate_apt_repository,
     verify_apt_signatures,
+    verify_public_tree_modes,
 )
 from rs9.signed_store import SignedStore
 from rs9.signing_fixture import SigningFixture, find_gpg_binary
@@ -841,6 +843,189 @@ class FixtureSigningAndClientTests(unittest.TestCase):
                     tamper_apt_repository(copy, kind, wrong_signer=wrong, package="hello-world")
                     with self.assertRaises(ContractError):
                         verify_apt_signatures(copy, fixture)
+
+    def test_repo_apt_public_modes_under_both_umasks(self):
+        signer = FixtureSigner()
+        for mask in (0o022, 0o077):
+            with self.subTest(umask=oct(mask)):
+                orig = os.umask(mask)
+                try:
+                    with tempfile.TemporaryDirectory() as td:
+                        work = Path(td).resolve()
+                        outside_parent = work / "ancestor"
+                        outside_parent.mkdir()
+                        outside_parent.chmod(0o700)
+
+                        repo_root = outside_parent / "apt_repo"
+                        repo = build_apt_repository(repo_root, packages_bytes=self.debs)
+                        repo.sign_with_fixture(signer)
+
+                        # Outside caller ancestor must remain untouched
+                        self.assertEqual(stat.S_IMODE(outside_parent.stat().st_mode), 0o700)
+
+                        # verify_public_tree_modes must pass
+                        verification = verify_public_tree_modes(repo.root)
+                        self.assertEqual(verification["status"], "pass")
+                        self.assertEqual(verification["counts"]["file_mode"], 0)
+                        self.assertEqual(verification["counts"]["directory_mode"], 0)
+                        self.assertEqual(verification["counts"]["symlink"], 0)
+                        self.assertEqual(verification["counts"]["special"], 0)
+
+                        # Check owned root and subdirectories explicitly
+                        self.assertEqual(stat.S_IMODE(repo.root.stat().st_mode), 0o755)
+                        for cur, dirnames, filenames in os.walk(str(repo.root)):
+                            cur_p = Path(cur)
+                            self.assertEqual(stat.S_IMODE(cur_p.stat().st_mode), 0o755, f"Dir mode mismatch for {cur_p}")
+                            for f in filenames:
+                                fp = cur_p / f
+                                self.assertEqual(stat.S_IMODE(fp.stat().st_mode), 0o644, f"File mode mismatch for {fp}")
+                finally:
+                    os.umask(orig)
+
+    def test_repo_apt_byte_evidence_identical_under_both_umasks(self):
+        signer = FixtureSigner()
+        fixed_date = "Fri, 02 Jan 2026 12:00:00 +0000"
+
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td).resolve()
+            root022 = base / "repo022"
+            root077 = base / "repo077"
+
+            orig = os.umask(0o022)
+            try:
+                repo022 = build_apt_repository(root022, packages_bytes=self.debs, release_date=fixed_date)
+                repo022.sign_with_fixture(signer)
+            finally:
+                os.umask(orig)
+
+            orig = os.umask(0o077)
+            try:
+                repo077 = build_apt_repository(root077, packages_bytes=self.debs, release_date=fixed_date)
+                repo077.sign_with_fixture(signer)
+            finally:
+                os.umask(orig)
+
+            # Both pass verify_public_tree_modes
+            self.assertEqual(verify_public_tree_modes(repo022.root)["status"], "pass")
+            self.assertEqual(verify_public_tree_modes(repo077.root)["status"], "pass")
+
+            # Collect files from both repos
+            files022 = {p.relative_to(root022).as_posix(): p.read_bytes() for p in root022.rglob("*") if p.is_file()}
+            files077 = {p.relative_to(root077).as_posix(): p.read_bytes() for p in root077.rglob("*") if p.is_file()}
+
+            self.assertEqual(set(files022.keys()), set(files077.keys()))
+            for path in files022:
+                self.assertEqual(files022[path], files077[path], f"Byte divergence for {path}")
+
+            # Both verify signatures identically
+            sig022 = verify_apt_signatures(repo022.root, signer)
+            sig077 = verify_apt_signatures(repo077.root, signer)
+            self.assertEqual(sig022, sig077)
+
+    def test_repo_apt_tamper_copies_preserve_public_modes_under_both_umasks(self):
+        signer = FixtureSigner(fingerprint="A" * 40)
+        wrong = FixtureSigner(fingerprint="B" * 40)
+
+        for mask in (0o022, 0o077):
+            with self.subTest(umask=oct(mask)):
+                orig = os.umask(mask)
+                try:
+                    with tempfile.TemporaryDirectory() as td:
+                        work = Path(td).resolve()
+                        root = work / "orig_repo"
+                        repo = build_apt_repository(root, packages_bytes=self.debs)
+                        repo.sign_with_fixture(signer)
+
+                        for kind in TAMPER_KINDS:
+                            copy = work / f"tamper_{kind}"
+                            shutil.copytree(root, copy)
+                            tamper_apt_repository(copy, kind, wrong_signer=wrong, package="hello-world")
+
+                            # Tree modes must still be 0644/0755
+                            res = verify_public_tree_modes(copy)
+                            self.assertEqual(res["status"], "pass", f"Tamper {kind} altered tree modes: {res}")
+
+                            # Cryptographic verification must fail
+                            with self.assertRaises(ContractError):
+                                verify_apt_signatures(copy, signer)
+                finally:
+                    os.umask(orig)
+
+    def test_repo_apt_retain_external_signature_modes(self):
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td).resolve()
+            store_root = work / "private_store"
+            store = SignedStore(store_root, trust_config={"allowed_keys": {"synthetic-primary"}})
+
+            repo_root = work / "public_repo"
+            repo = build_apt_repository(repo_root, packages_bytes=self.debs)
+
+            dummy_sig = b"DUMMY-EXTERNAL-DETACHED-SIGNATURE"
+            def validator(u, s, ev):
+                return {"status": "valid", "verified_issuer": "synthetic-primary", "primary_key_id": "synthetic-primary"}
+
+            rec = repo.retain_external_signature(
+                store, dummy_sig, inline=False, issuer="synthetic-primary",
+                evidence={"test": "ev"}, validator=validator,
+            )
+
+            # Public repository file is 0o644 and dirs are 0o755
+            sig_file = repo.root / "dists/resolute/Release.gpg"
+            self.assertEqual(stat.S_IMODE(sig_file.stat().st_mode), 0o644)
+            bh_file = repo.root / f"dists/resolute/by-hash/SHA256/{rec['signed_sha256']}"
+            self.assertEqual(stat.S_IMODE(bh_file.stat().st_mode), 0o644)
+
+            # Private signed store file is 0o600
+            store_obj = store.objects_dir / rec["signed_sha256"]
+            self.assertEqual(stat.S_IMODE(store_obj.stat().st_mode), 0o600)
+
+            # Public repository verification passes
+            self.assertEqual(verify_public_tree_modes(repo.root)["status"], "pass")
+
+    def test_public_writer_confines_pool_byhash_and_tamper_components(self):
+        from rs9.repo_apt import _safe_write_public_repo_file
+        for mask in (0o022,0o077):
+            previous=os.umask(mask)
+            try:
+                with tempfile.TemporaryDirectory() as tmp:
+                    parent=Path(tmp).resolve()
+                    outside=parent/"outside";outside.mkdir(mode=0o700)
+                    sentinel=outside/"sentinel";sentinel.write_bytes(b"untouched")
+                    before=(sentinel.read_bytes(),stat.S_IMODE(outside.stat().st_mode))
+                    for relative in ("pool/main/f/fixture/file.deb", "dists/resolute/main/binary-amd64/by-hash/SHA256/object"):
+                        root=parent/("repo"+str(len(relative)));root.mkdir()
+                        first=relative.split('/')[0]
+                        (root/first).symlink_to(outside,target_is_directory=True)
+                        with self.assertRaises(ContractError):
+                            _safe_write_public_repo_file(root,relative,b"public")
+                        self.assertEqual((sentinel.read_bytes(),stat.S_IMODE(outside.stat().st_mode)),before)
+                        self.assertEqual(verify_public_tree_modes(root)["status"],"fail")
+                    repo=build_apt_repository(parent/"tamper",packages_bytes=self.debs)
+                    repo.sign_with_fixture(FixtureSigner())
+                    byhash=repo.root/"dists/resolute/main/binary-amd64/by-hash"
+                    shutil.rmtree(byhash)
+                    byhash.symlink_to(outside,target_is_directory=True)
+                    with self.assertRaises(ContractError):
+                        tamper_apt_repository(repo.root,"index",package="hello-world")
+                    self.assertEqual((sentinel.read_bytes(),stat.S_IMODE(outside.stat().st_mode)),before)
+            finally:
+                os.umask(previous)
+
+    def test_build_indices_rejects_link_before_creating_outside_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp).resolve()
+            outside=base/"outside"
+            outside.mkdir(mode=0o700)
+            sentinel=outside/"sentinel"
+            sentinel.write_bytes(b"unchanged")
+            repo=AptRepositoryCandidate(base/"repo")
+            (repo.root/"dists").symlink_to(outside,target_is_directory=True)
+            before=stat.S_IMODE(outside.stat().st_mode)
+            with self.assertRaises(ContractError):
+                repo.build_indices()
+            self.assertEqual(list(outside.iterdir()),[sentinel])
+            self.assertEqual(sentinel.read_bytes(),b"unchanged")
+            self.assertEqual(stat.S_IMODE(outside.stat().st_mode),before)
 
 
 if __name__ == "__main__":

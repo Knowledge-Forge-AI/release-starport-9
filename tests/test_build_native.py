@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -32,7 +33,7 @@ from rs9.build_native import (
 )
 from rs9.build_pacman import PACMAN_REQUIRED_TOOLS, build_pacman_candidate
 from rs9.build_rpm import RPM_REQUIRED_TOOLS, build_rpm_candidate
-from rs9.errors import ContractError
+from rs9.errors import ContractError, safe_details
 from rs9.profiles import selection_for_intent
 from rs9.release_core import authenticate_release, digest
 from rs9.scratch import canonical
@@ -889,6 +890,56 @@ class BuildNativeCommonTests(unittest.TestCase):
                     capture, intent, "any", scratch, offline_npm_archives=offline_npm, runner=runner
                 )
             self.assertEqual(caught.exception.code, "NONROOT_REQUIRED")
+
+
+class SubprocessRunnerTimeoutTests(unittest.TestCase):
+    def test_subprocess_runner_timeout_preserves_details_without_invented_substage(self):
+        runner = SubprocessRunner(timeout=10)
+        with patch("rs9.build_native.shutil.which", return_value="/bin/sleep"):
+            with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(
+                cmd=["sleep", "10"], timeout=10, output=b"partial-stdout", stderr=b"partial-stderr"
+            )):
+                with self.assertRaises(ContractError) as caught:
+                    runner.run(["sleep", "10"])
+                err = caught.exception
+                self.assertEqual(err.code, "TOOL_TIMEOUT")
+                self.assertEqual(err.details["tool"], "sleep")
+                self.assertEqual(err.details["stdout_sha256"], digest(b"partial-stdout"))
+                self.assertEqual(err.details["stderr_sha256"], digest(b"partial-stderr"))
+                self.assertEqual(err.details["deadline_seconds"], 10)
+                self.assertIsInstance(err.details["elapsed_ms"], int)
+                self.assertGreaterEqual(err.details["elapsed_ms"], 0)
+                # Ensure no invented substage was added to historical runner timeout
+                self.assertEqual(err.details["substage"], "tool-execution")
+
+    def test_safe_details_bounded_elapsed_ms_and_deadline_seconds(self):
+        # Valid bounds
+        valid = {"elapsed_ms": 1500, "deadline_seconds": 600}
+        self.assertEqual(safe_details(valid), valid)
+
+        # Boundary values
+        self.assertEqual(safe_details({"elapsed_ms": 0, "deadline_seconds": 0}),
+                         {"elapsed_ms": 0, "deadline_seconds": 0})
+        self.assertEqual(safe_details({"elapsed_ms": 86400 * 1000 * 7, "deadline_seconds": 86400 * 7}),
+                         {"elapsed_ms": 86400 * 1000 * 7, "deadline_seconds": 86400 * 7})
+
+        # Negative values dropped
+        self.assertEqual(safe_details({"elapsed_ms": -1, "deadline_seconds": -1}),
+                         {"details_truncated": True})
+
+        # Out-of-bounds values dropped
+        self.assertEqual(safe_details({"elapsed_ms": 86400 * 1000 * 7 + 1}),
+                         {"details_truncated": True})
+        self.assertEqual(safe_details({"deadline_seconds": 86400 * 7 + 1}),
+                         {"details_truncated": True})
+
+        # Non-integers dropped
+        self.assertEqual(safe_details({"elapsed_ms": "1000", "deadline_seconds": 10.5}),
+                         {"details_truncated": True})
+
+        # Unrelated keys dropped
+        self.assertEqual(safe_details({"unrelated_key": "val"}),
+                         {"details_truncated": True})
 
 
 if __name__ == "__main__":

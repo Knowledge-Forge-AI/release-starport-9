@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import stat
 from typing import Any
 
 from rs9.errors import ContractError
@@ -21,7 +22,7 @@ from rs9.pages import (
     verify_merkle_inventory,
 )
 from rs9.records import Record, snapshot, validate_sha256
-from rs9.scratch import ConfinedWriter, canonical, physical_directory
+from rs9.scratch import ConfinedWriter, canonical, physical_directory, verify_public_tree_modes
 from rs9.security import scan_for_credentials, validate_safe_basename, validate_safe_relative_posix_path
 from rs9.signed_store import SignedStore, _check_no_symlinks, _safe_read_file
 
@@ -207,6 +208,16 @@ def assemble_pages_candidate(
             "Pages candidate target scratch directory must be completely empty",
         )
 
+    # Public 0644/0755: explicitly set root mode to 0o755 with readback verification; outside ancestors untouched
+    target_fd = os.open(str(target), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fchmod(target_fd, 0o755)
+        st = os.fstat(target_fd)
+        if stat.S_IMODE(st.st_mode) != 0o755:
+            raise ContractError("PERMISSION_ERROR", "Failed to set Pages candidate root permissions")
+    finally:
+        os.close(target_fd)
+
     to_write = collect_candidate_sources(
         files=files, signed_store=signed_store, generation=generation, cname=cname,
         signing_fixture=signing_fixture, apt_repo=apt_repo,
@@ -226,10 +237,12 @@ def assemble_pages_candidate(
             raise ContractError("TAMPER_DETECTED", "Pages input differs from supplied inventory")
 
     # Confined atomic write
-    with ConfinedWriter(target) as writer:
+    with ConfinedWriter(target, file_mode=0o644, dir_mode=0o755) as writer:
         for rel_path in sorted(to_write):
             validate_safe_relative_posix_path(rel_path)
             writer.write(rel_path, to_write[rel_path])
+
+    verify_public_tree_modes(target, raise_on_error=True)
 
     # Compute inventory and verify against exact inventory
     computed_inventory: dict[str, str] = {}

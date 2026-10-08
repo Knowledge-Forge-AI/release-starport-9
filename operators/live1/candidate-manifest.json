@@ -5,39 +5,36 @@
   "bootstrap_role": "migration-configuration-only-not-fresh-release-authority",
   "candidate_adoption_ready": false,
   "changed_paths": [
-    ".gitignore",
     "docs/README.md",
-    "docs/live1-native-client-cont9.md",
-    "docs/live1-pages-endpoint-diagnostic.md",
-    "evidence/live1/cont9-source-verification.json",
-    "evidence/live1/cont9r1-adoption-scratch-verification.json",
+    "docs/live1-native-client-cont10.md",
+    "evidence/live1/cont10-hosted8-repair-verification.json",
     "operators/live1/candidate-manifest.json",
-    "operators/live1/run-hosted8.py",
+    "operators/live1/run-hosted9.py",
     "src/rs9/adopt_candidate.py",
     "src/rs9/apt_diagnostics.py",
-    "src/rs9/build_rpm.py",
-    "src/rs9/hosted_container_smoke.py",
+    "src/rs9/build_native.py",
+    "src/rs9/errors.py",
     "src/rs9/hosted_deb.py",
-    "src/rs9/hosted_observe.py",
     "src/rs9/hosted_packaging.py",
-    "src/rs9/hosted_smoke.py",
-    "src/rs9/hosted_summary.py",
-    "src/rs9/readers.py",
+    "src/rs9/pages_candidate.py",
+    "src/rs9/repo_apt.py",
     "src/rs9/rpm_lint.py",
-    "tests/test_adoption_scratch.py",
+    "src/rs9/scratch.py",
+    "src/rs9/signed_store.py",
     "tests/test_apt_diagnostics.py",
     "tests/test_build_native.py",
-    "tests/test_build_rpm.py",
     "tests/test_candidate_inventory.py",
-    "tests/test_collect_candidate.py",
-    "tests/test_hosted_container_smoke.py",
     "tests/test_hosted_deb.py",
-    "tests/test_hosted_observe.py",
     "tests/test_hosted_packaging.py",
-    "tests/test_hosted_summary.py",
-    "tests/test_live1_readers_operator.py",
+    "tests/test_pacman_wrongkey_replay.py",
+    "tests/test_pages_candidate.py",
+    "tests/test_preparation_diagnostics.py",
+    "tests/test_repo_apt.py",
+    "tests/test_rpm_failure_integration.py",
     "tests/test_rpm_lint.py",
-    "tests/test_run_hosted8.py"
+    "tests/test_run_hosted9.py",
+    "tests/test_scratch.py",
+    "tests/test_signed_store.py"
   ],
   "configuration_hashes": [
     {
@@ -195,9 +192,9 @@
     },
     {
       "path": "docs/README.md",
-      "size": 5021,
-      "sha256": "d933aba22ebbde00abc0a285f33f524ba9933b1b6e7cb746e149175b2abb82e1",
-      "git_blob": "b84b8c4de8168c5048f557b83abee1f8fbe73905",
+      "size": 5191,
+      "sha256": "6f8e99e5a72cda498dba1534533a12af15ed27d7e4903abe7702491e0488a982",
+      "git_blob": "4560800911df13a051618040f1c97af85db800b3",
       "mode": "100644"
     },
     {
@@ -383,6 +380,13 @@
       "mode": "100644"
     },
     {
+      "path": "docs/live1-native-client-cont10.md",
+      "size": 12381,
+      "sha256": "a15e9249bda2f98ccd41a74f38d1c1b9520b30d33fdb362180d5e7409aed256a",
+      "git_blob": "94e89915840e653944891646794074b453eac7fd",
+      "mode": "100644"
+    },
+    {
       "path": "docs/live1-native-client-cont9.md",
       "size": 15610,
       "sha256": "6ae9e56048b071059a587f3ebb12a0e4b4c749bf6fd0cd241263de8495f03326",
@@ -520,6 +524,13 @@
       "size": 1499,
       "sha256": "ca50341f79bee6d99ac87393a77d35710d1c9c9ae309617dba1ac0dd020a0a51",
       "git_blob": "a092e9639563502cef91a96691ac5b30d2e3fda9",
+      "mode": "100644"
+    },
+    {
+      "path": "evidence/live1/cont10-hosted8-repair-verification.json",
+      "size": 21336,
+      "sha256": "cd561fe7631fb66dbc0dd18ba156a66567bda6623088da1be36bc12b693ac764",
+      "git_blob": "88c8a7477ec0901ec3224c5343b5c80eab28ad37",
       "mode": "100644"
     },
     {
@@ -943,6 +954,13 @@
       "mode": "100644"
     },
     {
+      "path": "operators/live1/run-hosted9.py",
+      "size": 9411,
+      "sha256": "6038d5671dfdf19ce16ba3dbe90d05849a31e15847b842af093e4f08458fc12d",
+      "git_blob": "49e4f1ecd10ca6af0b6485c300461d049c3e220d",
+      "mode": "100644"
+    },
+    {
       "path": "operators/live1/signing-preflight.py",
       "size": 169,
       "sha256": "e0ac128a185c4576c5254ef3e9021da79a0ac677c422f0b1ac6e03cc160b3134",
@@ -980,15 +998,15 @@
     {
       "path": "src/rs9/adopt_candidate.py",
       "size": 17893,
-      "sha256": "0f043123b22eb8aa61c773ad1e359ec5909c0ff6a5478b923b75f6e4cf483e4b",
-      "git_blob": "9b2f5482bc179fa62fd1dceba47079d3d4bf64cc",
+      "sha256": "4caada274afe3d03f68865cebd4f44538ff0bffd05a7e329ff57d9c89db7cb1a",
+      "git_blob": "546a7ff1e87e137d02d444ceba45973fef1f657a",
       "mode": "100644"
     },
     {
       "path": "src/rs9/apt_diagnostics.py",
-      "size": 20870,
-      "sha256": "690c75bf830a7c7f9d81186ddae0b90c6dc8595dafdc9e5a1f135a45a1cedc41",
-      "git_blob": "11057eefa8d814e536d5c4c1b89ad43d338f626b",
+      "size": 23526,
+      "sha256": "269f68c6103c4ca503a7ddcc0a439740bef5a00f7481261ce4ccf6e3a7df1c4f",
+      "git_blob": "a047c8617266255a243536a0485c0d7976411841",
       "mode": "100644"
     },
     {
@@ -1014,9 +1032,9 @@
     },
     {
       "path": "src/rs9/build_native.py",
-      "size": 32425,
-      "sha256": "280fd7bd80c52a0da9d291fc6473d05f86f419f4ed185945bc414e351528491a",
-      "git_blob": "e1c70af4ff52d85e8bc409276632369e863b5234",
+      "size": 33358,
+      "sha256": "0e6a4bafde12c39f9ab52f1be5855e2242f2c64557849ba123f7ddcdee4b52e9",
+      "git_blob": "6ebc6b86c3cd7d30533167ba4ea8ed05f65c202a",
       "mode": "100644"
     },
     {
@@ -1147,9 +1165,9 @@
     },
     {
       "path": "src/rs9/errors.py",
-      "size": 8219,
-      "sha256": "d012417ad686559b32d80b9c83d0ee02cf7bad230ed2a747931c8c418b9079d1",
-      "git_blob": "9a5035113bf1aff300b980eebc5a6c62e6cbd821",
+      "size": 8689,
+      "sha256": "625c2800faf61be536c8614306218a0dc004bda693b5122b9c63661c9790a9cd",
+      "git_blob": "809c91fa7e972d34d18bfd7096411ce9e8210f92",
       "mode": "100644"
     },
     {
@@ -1238,9 +1256,9 @@
     },
     {
       "path": "src/rs9/hosted_deb.py",
-      "size": 88962,
-      "sha256": "751f2951e3dc52a11c74386757685e7c66248fb0ace0393525646272271c3658",
-      "git_blob": "f8631b20e0534a8472ee22e52ea9524bd7d1c806",
+      "size": 101256,
+      "sha256": "f52c2f0c49af4b5a75dfe0e17c0eb6cba5ad46822ac5d63251d00e91d4302111",
+      "git_blob": "bf4f5da101ee72f8108ce63d94a7763492df758b",
       "mode": "100644"
     },
     {
@@ -1280,9 +1298,9 @@
     },
     {
       "path": "src/rs9/hosted_packaging.py",
-      "size": 32875,
-      "sha256": "147327012cb7abc1736c138771cc924726f8212ce9878183e764766fb09e86e6",
-      "git_blob": "b718953c4d4399fc1476ff470de4d530784609bb",
+      "size": 34980,
+      "sha256": "6a53ff6319762d4dbea13ff1a6db9f7615e5e218a7b70aa679024ea8f958d261",
+      "git_blob": "4904741b999c375a4b94045a276fc62d8785390e",
       "mode": "100644"
     },
     {
@@ -1413,9 +1431,9 @@
     },
     {
       "path": "src/rs9/pages_candidate.py",
-      "size": 18948,
-      "sha256": "c5a8d152c0ee0d68167a9cca5380e4d0c0cb9cae10089b7ee3452327c1234a3c",
-      "git_blob": "f56ff88cb86685291c356738fbaa4f0512e9c762",
+      "size": 19543,
+      "sha256": "cc3a46911f6d4257db8279f23ffb8438b9956276b05e3ed15a7adb57f0a09390",
+      "git_blob": "cff9bc611d20c02e52fe39188df902d0d2300408",
       "mode": "100644"
     },
     {
@@ -1504,16 +1522,16 @@
     },
     {
       "path": "src/rs9/repo_apt.py",
-      "size": 33619,
-      "sha256": "ee38579beddd0823ca3c0fba5447e72defa467e6def1e63c0d065a9c566b615d",
-      "git_blob": "505cc949a306a884f5a214b1248c2e0eedf5fb45",
+      "size": 36549,
+      "sha256": "d2b102c31ec572ef45bb325cf204337005484d233fe0fbd27d2f42fc3932efc6",
+      "git_blob": "63a888afb65973c1f93f9680db12891274412994",
       "mode": "100644"
     },
     {
       "path": "src/rs9/rpm_lint.py",
-      "size": 17228,
-      "sha256": "07f8eb5ca4f206d7562cf8e016e01a277bf54dec6aa06e5f2d8eb5846d3dbb0d",
-      "git_blob": "a70e9ebf56658eadbae13f7e0df1069407e87dde",
+      "size": 20784,
+      "sha256": "ec21fbf72915f7bc58d12551b54710b68e7748bce65dfaad45ae9c5511236510",
+      "git_blob": "c6898172549d5c3ee782b5aa50c4fdfb1d01eb91",
       "mode": "100644"
     },
     {
@@ -1525,9 +1543,9 @@
     },
     {
       "path": "src/rs9/scratch.py",
-      "size": 5111,
-      "sha256": "63d28945a15918363c16074b25407fc063b906fb222d1f6b5ab78847f066e2b7",
-      "git_blob": "9a3dc063b55af2ca6a7f54016979d575352dabf4",
+      "size": 9087,
+      "sha256": "d99938f98a84653fa955b234ce4e6e0fddc6bd61402b72ccd5f16f4eac5a077c",
+      "git_blob": "2c26c7a7d97b650f75e537901aea6a741c2f5534",
       "mode": "100644"
     },
     {
@@ -1546,9 +1564,9 @@
     },
     {
       "path": "src/rs9/signed_store.py",
-      "size": 32450,
-      "sha256": "233665555a18f315d1ae1a0c5e9e6e0c7d2a1e8319caafd8996ba12969dcf973",
-      "git_blob": "fbe433c42fe610a755e7228003f1d36a7b0f7746",
+      "size": 32928,
+      "sha256": "abf8f363255bbcee8a80710d797aaa1bd9c54fc40707cb564f50af3cf1880abf",
+      "git_blob": "3ab0f5f639334f351774d5d1922c223704384f69",
       "mode": "100644"
     },
     {
@@ -1896,9 +1914,9 @@
     },
     {
       "path": "tests/test_apt_diagnostics.py",
-      "size": 16162,
-      "sha256": "298b7021dd4e317bae557cd393dcfde9135243ae483409240975f1ceef0250cd",
-      "git_blob": "7666ba3461c08b891a130a61d92d0d886231cc19",
+      "size": 23284,
+      "sha256": "9aae4305a7e783e89db8fbbaf5f2f8a75718cdc85d2b5dbf5b9df3e2b69e97c1",
+      "git_blob": "c0539f2e8f682ad9369ebaa7c79afbd62a3e9c24",
       "mode": "100644"
     },
     {
@@ -1924,9 +1942,9 @@
     },
     {
       "path": "tests/test_build_native.py",
-      "size": 43557,
-      "sha256": "2ccb063249ae0bbc41e586f2fd6e8d8bb71a4c8065b52143c6393ac696e0330f",
-      "git_blob": "05c5d94fdd06e213ff77f476ab5478258c1edaab",
+      "size": 46265,
+      "sha256": "65e82e9fc580ddaf237e5bea72082ef3755af24513053c1c9a9e8d6bc499ae5e",
+      "git_blob": "2fab77d99cf217713c5a3c780b9f7c009cafc5fe",
       "mode": "100644"
     },
     {
@@ -1966,9 +1984,9 @@
     },
     {
       "path": "tests/test_candidate_inventory.py",
-      "size": 6459,
-      "sha256": "965e23e76765c18eb30ca3d4dfadd79a860d592e61ec7c45f629610f813b5e6a",
-      "git_blob": "268a1e3cbbd87733056f8d5b424542fdaaab39f6",
+      "size": 6509,
+      "sha256": "0eb3e9c886474b0c4ea1597aa31c0239d6017c4a24de1a53502e0ed9995c6520",
+      "git_blob": "50f320b7ca0cd7a4611e327d0bdc2540c1edc2e4",
       "mode": "100644"
     },
     {
@@ -2134,9 +2152,9 @@
     },
     {
       "path": "tests/test_hosted_deb.py",
-      "size": 86212,
-      "sha256": "9fc016ddc41e26f96d7863aec64e5e71df03a1509ea6945f6b655512efcaede0",
-      "git_blob": "4904740dda95b2486265cc50f91e59593b8e12a9",
+      "size": 102471,
+      "sha256": "6b481751d645c79f445d4672918d1257191d7819fc7e94e71815d28d940e8044",
+      "git_blob": "b6ea615b82bca15c792fb088310618dd020c0587",
       "mode": "100644"
     },
     {
@@ -2183,9 +2201,9 @@
     },
     {
       "path": "tests/test_hosted_packaging.py",
-      "size": 61268,
-      "sha256": "d605f61b8c4e1b1f3ccacd234e1100724b02ed990badbd6f18316eeb2681bc22",
-      "git_blob": "b7d4d14aad8079f16d83e6d6ab901ac605dd404c",
+      "size": 78324,
+      "sha256": "94bb2eb357da1df421788fe241930ae3d4a2a9a504ce6d90d27ca7f17ced0665",
+      "git_blob": "822650ab10b3138bbe8b183c2b7a9ce93bc3d846",
       "mode": "100644"
     },
     {
@@ -2343,6 +2361,13 @@
       "mode": "100644"
     },
     {
+      "path": "tests/test_pacman_wrongkey_replay.py",
+      "size": 5036,
+      "sha256": "79091c0cad387d1496c888d108300beda5927dbfc84d13179310665e4df1a1d7",
+      "git_blob": "277832596a8f232dc128aa756892d854a7a833db",
+      "mode": "100644"
+    },
+    {
       "path": "tests/test_pages.py",
       "size": 37408,
       "sha256": "688c4a458bdd04ed9b3322db8490792596fc1e1bf44f15b5c75d5e144878db21",
@@ -2351,9 +2376,9 @@
     },
     {
       "path": "tests/test_pages_candidate.py",
-      "size": 34053,
-      "sha256": "44ad587d4797ff31fa0790a5c0c096bf7a4cfde4d25ec309212c3529f25499ea",
-      "git_blob": "f2e914c932bd2f39df39d10df3a05bd76f314714",
+      "size": 45319,
+      "sha256": "c3e438b63d6354263f3e476059070bc42f043df6c13cfbfbd890e5b17b152264",
+      "git_blob": "e787dc74a580be5c3e81315156a2fe9b7f68fa5c",
       "mode": "100644"
     },
     {
@@ -2368,6 +2393,13 @@
       "size": 8794,
       "sha256": "69731d6e2d3f4c5d6733d101978d382e9a871a08cb0a4eff0e2a42637a16b125",
       "git_blob": "c9cc52efeb57112d25df5e96a2b15b71e3ffc7a7",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/test_preparation_diagnostics.py",
+      "size": 8732,
+      "sha256": "9487726e492642a1b109129e202487d0cac99959052d33e04b2e1c87c5a38f8b",
+      "git_blob": "69b0cefb4d2a98434840b4d2fa57f12069029178",
       "mode": "100644"
     },
     {
@@ -2435,16 +2467,23 @@
     },
     {
       "path": "tests/test_repo_apt.py",
-      "size": 40886,
-      "sha256": "3329ce43a522a4165abd595449ab4694008876be7657b16f5eed0ce14e74caa2",
-      "git_blob": "397cf368ae6b9d734269709ebf462dfb8514e1ce",
+      "size": 50489,
+      "sha256": "4378d50b5d13f6a4d9a69fac070b8778faf993299a7f202f5d3836d8e9108d98",
+      "git_blob": "24b16ab64e968a5b9f6017a23ef4fd0bc0e5fdc1",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/test_rpm_failure_integration.py",
+      "size": 8475,
+      "sha256": "38d9f01227e48658b1113bac4587ec14c31e3e38462626dbe15bc11c79c2ea7c",
+      "git_blob": "cfd60578b1fb89b2d27a5f27620c9ce44da2b364",
       "mode": "100644"
     },
     {
       "path": "tests/test_rpm_lint.py",
-      "size": 21917,
-      "sha256": "6e40923282a7dc6c8570a9393a20eeec1bc5cf27d5c3c08d6e8f73b13d0c17dd",
-      "git_blob": "6468be6171a3a30382dd27834b9c065cc77d46f7",
+      "size": 32308,
+      "sha256": "fe919e64f7b4e523725a0762688e6408f0e25d9b8fe37bee95c5490977277d42",
+      "git_blob": "bfdab231aaaf333d15c9eb8073965b61038cca96",
       "mode": "100644"
     },
     {
@@ -2483,6 +2522,13 @@
       "mode": "100644"
     },
     {
+      "path": "tests/test_run_hosted9.py",
+      "size": 12021,
+      "sha256": "08bcfddcc1e52bbd2e1670a1fbd4b6726ae55894e26b847ed29a4774d1b0d6bb",
+      "git_blob": "a7f1bbac01fc78b1e369e98e16bb83954444c704",
+      "mode": "100644"
+    },
+    {
       "path": "tests/test_scoped_workflow_graph.py",
       "size": 1906,
       "sha256": "0fb0448409bfb5a9493036f20e690bbd8e6421e5324c3615e706690e17ac536d",
@@ -2491,9 +2537,9 @@
     },
     {
       "path": "tests/test_scratch.py",
-      "size": 7250,
-      "sha256": "612ccef6bb32341f8fe5873b3a89f8b6d48332260638528a0c53730aabfbdd5a",
-      "git_blob": "2f2409e1657d87da25d6d7b9d574d2769df7145f",
+      "size": 14149,
+      "sha256": "d79230e700712908423af2a062bc0d4a044c771137c505a28affeb324981d171",
+      "git_blob": "e2db2e0f47200dfa5c5b1091ce48ce2ac3c9b77a",
       "mode": "100644"
     },
     {
@@ -2519,9 +2565,9 @@
     },
     {
       "path": "tests/test_signed_store.py",
-      "size": 28743,
-      "sha256": "c60adab18efda5afa6502c76a37934922ad57cb0d7a0d836fcd152876260abaf",
-      "git_blob": "a5a461c663e4c01735c02b8f1a77560bfc26693c",
+      "size": 32076,
+      "sha256": "bcb8d2f954f56a97170c39854613919d8571c34c3faefa6d2e1d29a4138c5501",
+      "git_blob": "da9d97ff5e6d573607db6db95e6f5a95b0627c3e",
       "mode": "100644"
     },
     {
@@ -2569,7 +2615,7 @@
   ],
   "inventory_scope": "complete product source excluding this manifest and preserved unrelated local state",
   "kind": "non-production-hosted-source-candidate",
-  "parent": "2ac5033d936202bd9f505b67fd1f15120b1efef7",
+  "parent": "ab4b01d612ad2e2645ab649fc5fcf1e5c5d851eb",
   "phase_outcome": "source-repair-partial-diagnostic-native-qualification-pending",
   "production_enabled": false,
   "production_ready": false,
@@ -2599,8 +2645,8 @@
     "schema": "rs9.live1-candidate-readiness.v1alpha1",
     "source_adoption_scope": "partial-diagnostic"
   },
-  "review_status": "dispatcher-cumulative-reviewed-with-findings-terminal-amendments-not-independently-reviewed",
+  "review_status": "dispatcher-pre-final-reviewed-with-advisories",
   "schema": "rs9.live1-source-candidate-inventory.v1alpha2",
-  "task": "CONT9R1 ignored-root-scratch adoption repair preserving CONT9",
-  "terminal_disposition": "closeout-amend"
+  "task": "CONT10 hosted-run-8 native-client source repairs and preparation diagnostics",
+  "terminal_disposition": "amend"
 }

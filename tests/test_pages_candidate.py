@@ -35,12 +35,14 @@ from rs9.pages_candidate import (
     load_custody_bundle,
     render_install_docs,
     verify_pages_completeness,
+    verify_public_tree_modes,
     write_custody_bundle,
 )
+from rs9.repo_apt import AptRepositoryCandidate
 from rs9.scratch import canonical
 from rs9.signing_fixture import SigningFixture, find_gpg_binary
 from tests.pages_candidate_fixtures import construct_candidate_signed_tree
-from tests.test_repo_apt import FixtureSigner
+from tests.test_repo_apt import FixtureSigner, build_minimal_deb
 
 
 TRUTHFUL_ARMOR_PUBLIC_KEY = (
@@ -510,6 +512,218 @@ class PagesCandidateTests(unittest.TestCase):
                                              cname="rs9.knowledge-forge.ai")
                 self.assertEqual(caught.exception.code, code)
 
+    def test_assemble_pages_candidate_public_modes_under_both_umasks(self):
+        docs = render_install_docs()
+        sources = collect_candidate_sources(files=dict(docs), cname=PAGES_HOST)
+        exact_inv = exact_inventory_for(sources)
+
+        for mask in (0o022, 0o077):
+            old_umask = os.umask(mask)
+            try:
+                ancestor = self.root / f"ancestor_pages_{mask:o}"
+                ancestor.mkdir(mode=0o700)
+                os.chmod(ancestor, 0o700)
+                scratch = ancestor / "assembled"
+                scratch.mkdir(mode=0o700)
+                os.chmod(scratch, 0o700)
+
+                cand = assemble_pages_candidate(
+                    scratch,
+                    files=dict(docs),
+                    cname=PAGES_HOST,
+                    exact_inventory=exact_inv,
+                )
+
+                self.assertEqual(ancestor.stat().st_mode & 0o777, 0o700, f"Ancestor modified under umask {oct(mask)}")
+                self.assertEqual(scratch.stat().st_mode & 0o777, 0o755, f"Root not 0755 under umask {oct(mask)}")
+
+                report = verify_public_tree_modes(scratch)
+                self.assertEqual(report["status"], "pass")
+                self.assertEqual(report["mismatch_counts"]["file_mode_mismatches"], 0)
+                self.assertEqual(report["mismatch_counts"]["dir_mode_mismatches"], 0)
+                self.assertEqual(report["mismatch_counts"]["special_or_symlink_objects"], 0)
+            finally:
+                os.umask(old_umask)
+
+    def test_pages_candidate_byte_and_hash_invariance_under_both_umasks(self):
+        runs = {}
+        for mask in (0o022, 0o077):
+            old_umask = os.umask(mask)
+            try:
+                fixture = HermeticSigningDouble(homedir=self.root / f"fx_home_{mask:o}")
+                scratch = self.root / f"invariance_cand_{mask:o}"
+                scratch.mkdir()
+                cand = construct_candidate_signed_tree(scratch, signing_fixture=fixture)
+
+                file_data = {}
+                for cur, _, fnames in os.walk(scratch):
+                    cur_p = Path(cur)
+                    for f in fnames:
+                        fp = cur_p / f
+                        rel = fp.relative_to(scratch).as_posix()
+                        content = fp.read_bytes()
+                        file_data[rel] = {
+                            "bytes": content,
+                            "sha256": hashlib.sha256(content).hexdigest(),
+                            "mode": fp.stat().st_mode & 0o777,
+                        }
+                runs[mask] = {
+                    "cand": cand,
+                    "files": file_data,
+                    "merkle_root": cand.status()["merkle_root"],
+                    "exact_inventory": cand.exact_inventory,
+                }
+            finally:
+                os.umask(old_umask)
+
+        self.assertEqual(sorted(runs[0o022]["files"]), sorted(runs[0o077]["files"]))
+        for rel in sorted(runs[0o022]["files"]):
+            f022 = runs[0o022]["files"][rel]
+            f077 = runs[0o077]["files"][rel]
+            self.assertEqual(f022["bytes"], f077["bytes"], f"Byte mismatch on {rel}")
+            self.assertEqual(f022["sha256"], f077["sha256"], f"SHA256 mismatch on {rel}")
+            self.assertEqual(f022["mode"], 0o644)
+            self.assertEqual(f077["mode"], 0o644)
+
+        self.assertEqual(runs[0o022]["merkle_root"], runs[0o077]["merkle_root"])
+        self.assertEqual(runs[0o022]["exact_inventory"], runs[0o077]["exact_inventory"])
+
+    def test_pages_candidate_with_apt_repo_staging_projection_under_both_umasks(self):
+        deb_bytes = build_minimal_deb("tf-test", "1.0.0", "amd64", payload_content=b"test-content-for-apt-pages")
+        runs = {}
+
+        for mask in (0o022, 0o077):
+            old_umask = os.umask(mask)
+            try:
+                ancestor = self.root / f"anc_proj_{mask:o}"
+                ancestor.mkdir(mode=0o700)
+                os.chmod(ancestor, 0o700)
+
+                apt_dir = ancestor / "apt_repo"
+                apt_dir.mkdir(mode=0o700)
+                os.chmod(apt_dir, 0o700)
+
+                repo = AptRepositoryCandidate(apt_dir)
+                repo.add_package(deb_bytes=deb_bytes)
+                repo.build_indices()
+                fixture = HermeticSigningDouble(homedir=self.root / f"fx_apt_proj_{mask:o}")
+                repo.sign_with_fixture(fixture)
+
+                self.assertEqual(ancestor.stat().st_mode & 0o777, 0o700)
+                self.assertEqual(apt_dir.stat().st_mode & 0o777, 0o755)
+                apt_report = verify_public_tree_modes(apt_dir)
+                self.assertEqual(apt_report["status"], "pass")
+
+                pages_dir = ancestor / "pages_staging"
+                pages_dir.mkdir(mode=0o700)
+                os.chmod(pages_dir, 0o700)
+
+                docs = render_install_docs()
+                sources = collect_candidate_sources(
+                    files=dict(docs),
+                    apt_repo=repo,
+                    cname=PAGES_HOST,
+                    signing_fixture=fixture,
+                )
+                exact_inv = exact_inventory_for(sources)
+                cand = assemble_pages_candidate(
+                    pages_dir,
+                    files=dict(docs),
+                    apt_repo=repo,
+                    cname=PAGES_HOST,
+                    signing_fixture=fixture,
+                    exact_inventory=exact_inv,
+                )
+
+                self.assertEqual(ancestor.stat().st_mode & 0o777, 0o700)
+                self.assertEqual(pages_dir.stat().st_mode & 0o777, 0o755)
+                pages_report = verify_public_tree_modes(pages_dir)
+                self.assertEqual(pages_report["status"], "pass")
+
+                files = {}
+                for cur, _, fnames in os.walk(pages_dir):
+                    cur_p = Path(cur)
+                    for f in fnames:
+                        fp = cur_p / f
+                        rel = fp.relative_to(pages_dir).as_posix()
+                        content = fp.read_bytes()
+                        files[rel] = {
+                            "bytes": content,
+                            "sha256": hashlib.sha256(content).hexdigest(),
+                            "mode": fp.stat().st_mode & 0o777,
+                        }
+                runs[mask] = {
+                    "cand": cand,
+                    "files": files,
+                    "merkle_root": cand.status()["merkle_root"],
+                    "exact_inventory": cand.exact_inventory,
+                }
+            finally:
+                os.umask(old_umask)
+
+        self.assertEqual(sorted(runs[0o022]["files"]), sorted(runs[0o077]["files"]))
+        apt_files = [p for p in runs[0o022]["files"] if p.startswith("apt/")]
+        self.assertTrue(any("pool/main" in p for p in apt_files))
+        self.assertTrue(any("Packages" in p for p in apt_files))
+        self.assertTrue(any("InRelease" in p for p in apt_files))
+        self.assertTrue(any("by-hash" in p for p in apt_files))
+
+        for rel in sorted(runs[0o022]["files"]):
+            f022 = runs[0o022]["files"][rel]
+            f077 = runs[0o077]["files"][rel]
+            self.assertEqual(f022["bytes"], f077["bytes"], f"Byte mismatch on {rel}")
+            self.assertEqual(f022["sha256"], f077["sha256"], f"SHA256 mismatch on {rel}")
+            self.assertEqual(f022["mode"], 0o644)
+            self.assertEqual(f077["mode"], 0o644)
+
+        self.assertEqual(runs[0o022]["merkle_root"], runs[0o077]["merkle_root"])
+
+    def test_verify_public_tree_modes_detects_tamper_and_mode_defects(self):
+        docs = render_install_docs()
+        sources = collect_candidate_sources(files=dict(docs), cname=PAGES_HOST)
+        scratch = self.root / "tamper_scratch"
+        scratch.mkdir()
+        assemble_pages_candidate(scratch, files=dict(docs), cname=PAGES_HOST, exact_inventory=exact_inventory_for(sources))
+
+        report = verify_public_tree_modes(scratch)
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["mismatch_counts"]["file_mode_mismatches"], 0)
+        self.assertEqual(report["mismatch_counts"]["dir_mode_mismatches"], 0)
+
+        os.chmod(scratch / "CNAME", 0o600)
+        report = verify_public_tree_modes(scratch)
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(report["mismatch_counts"]["file_mode_mismatches"], 1)
+        self.assertTrue(any(sample["path"].endswith("CNAME") for sample in report["mismatch_samples"]["file_mode"]))
+        os.chmod(scratch / "CNAME", 0o644)
+
+        os.chmod(scratch / "docs", 0o700)
+        report = verify_public_tree_modes(scratch)
+        self.assertEqual(report["status"], "fail")
+        self.assertGreaterEqual(report["mismatch_counts"]["dir_mode_mismatches"], 1)
+        os.chmod(scratch / "docs", 0o755)
+
+        os.symlink(scratch / "CNAME", scratch / "symlink_file")
+        try:
+            report = verify_public_tree_modes(scratch)
+            self.assertEqual(report["status"], "fail")
+            self.assertEqual(report["mismatch_counts"]["special_or_symlink_objects"], 1)
+        finally:
+            (scratch / "symlink_file").unlink()
+
+    def test_assemble_pages_candidate_refuses_symlink_target(self):
+        real_target = self.root / "real_target"
+        real_target.mkdir()
+        sym_target = self.root / "sym_target"
+        try:
+            os.symlink(real_target, sym_target)
+        except OSError:
+            self.skipTest("Symlinks not supported")
+
+        with self.assertRaises(ContractError) as caught:
+            assemble_pages_candidate(sym_target, files={"index.html": b"hello"})
+        self.assertEqual(caught.exception.code, "SYMLINK_REJECTED")
+
 
 class CustodyAndCompletenessTests(unittest.TestCase):
     AUTH = "a" * 64
@@ -662,6 +876,38 @@ class CustodyAndCompletenessTests(unittest.TestCase):
         with self.assertRaises(ContractError) as empty:
             collect_candidate_sources()
         self.assertEqual(empty.exception.code, "EMPTY_CANDIDATE")
+
+    def test_write_custody_bundle_preserves_default_modes_under_both_umasks(self):
+        for mask in (0o022, 0o077):
+            old_umask = os.umask(mask)
+            try:
+                ancestor = self.root / f"ancestor_custody_{mask:o}"
+                ancestor.mkdir(mode=0o700)
+                os.chmod(ancestor, 0o700)
+                target = ancestor / "bundle"
+                target.mkdir(mode=0o700)
+                os.chmod(target, 0o700)
+
+                write_custody_bundle(
+                    target,
+                    family="deb",
+                    system="amd64",
+                    packages={"tf-cli_1.0-1_all.deb": b"sample-deb-content"},
+                    authentication_sha256=self.AUTH,
+                    source_commit=self.COMMIT,
+                )
+
+                self.assertEqual(ancestor.stat().st_mode & 0o777, 0o700, f"Ancestor chmoded under umask {oct(mask)}")
+                self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+                self.assertEqual((target / "files").stat().st_mode & 0o777, 0o755 & ~mask)
+                self.assertEqual((target / "files" / "tf-cli_1.0-1_all.deb").stat().st_mode & 0o777, 0o644 & ~mask)
+                self.assertEqual((target / CUSTODY_MANIFEST).stat().st_mode & 0o777, 0o644 & ~mask)
+
+                report = verify_public_tree_modes(target)
+                self.assertEqual(report["status"], "fail")
+            finally:
+                os.umask(old_umask)
+
 
 
 if __name__ == "__main__":

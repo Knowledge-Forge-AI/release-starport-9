@@ -426,8 +426,188 @@ class RpmLintExecutionAndEvidenceTests(unittest.TestCase):
                 )
                 self.assertEqual(ev["product"], name)
                 self.assertEqual(ev["rpm_identity"]["arch"], arch)
-                self.assertTrue(ev["clean"])
-                self.assertEqual(ev["status"], "pass")
+class RpmLintIntegratedExecutionTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name).resolve()
+        self.spec = self.root / "pkg.spec"
+        self.spec.write_bytes(b"Name: pkg\nVersion: 1.0.0\n")
+        self.rpm = self.root / "pkg-1.0.0-1.fc43.x86_64.rpm"
+        self.rpm.write_bytes(b"real-rpm-bytes-for-test")
+
+    def test_version_probe_variations(self):
+        # 1. Version succeeds
+        calls = []
+        def handler_succeeds(argv, **kw):
+            calls.append(list(argv))
+            if "--version" in argv:
+                return CommandReceipt(argv, 0, b"rpmlint 2.6.0\n", b"", executed=True)
+            if "-q" in argv:
+                return CommandReceipt(argv, 0, b"rpmlint|2.6.0|1.fc43|x86_64\n", b"", executed=True)
+            return CommandReceipt(argv, 0, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings.\n", b"", executed=True)
+
+        runner = MockCommandRunner(available_tools={"rpmlint": "/usr/bin/rpmlint", "rpm": "/usr/bin/rpm"},
+                                   handlers={"rpmlint": handler_succeeds, "rpm": handler_succeeds})
+        ev, receipts = execute_rpmlint(runner, self.spec, self.rpm, "pkg", cwd=self.root)
+        self.assertTrue(ev["clean"])
+        self.assertEqual(ev["tool_version"]["version"], "rpmlint 2.6.0")
+        self.assertEqual(ev["tool_version"]["exit_code"], 0)
+        self.assertEqual(calls[0], ["rpmlint", str(self.spec), str(self.rpm)])
+        self.assertEqual(receipts[0].command, ["rpmlint", str(self.spec), str(self.rpm)])
+        self.assertFalse(hasattr(receipts[0], "argv"))
+
+        # 2. Version fails with non-zero exit code
+        calls.clear()
+        def handler_fails(argv, **kw):
+            calls.append(list(argv))
+            if "--version" in argv:
+                return CommandReceipt(argv, 127, b"", b"rpmlint: not found\n", executed=True)
+            return CommandReceipt(argv, 1,
+                b"pkg.x86_64: E: explicit-lib-dependency nodejs\n1 packages and 1 specfiles checked; 1 errors, 0 warnings.\n",
+                b"", executed=True)
+
+        runner_fail = MockCommandRunner(available_tools={"rpmlint": "/usr/bin/rpmlint"},
+                                        handlers={"rpmlint": handler_fails})
+        with self.assertRaises(ContractError) as caught:
+            execute_rpmlint(runner_fail, self.spec, self.rpm, "pkg", cwd=self.root)
+        err = caught.exception
+        self.assertEqual(err.code, "RPMLINT_FAILED")
+        self.assertEqual(err.details["diagnostic_token"], "explicit-lib-dependency")
+        self.assertEqual(err.evidence["tool_version"]["version"], "query-failed")
+        self.assertEqual(err.evidence["tool_version"]["exit_code"], 127)
+
+        # 3. Version throws exception
+        calls.clear()
+        def handler_throws(argv, **kw):
+            calls.append(list(argv))
+            if "--version" in argv:
+                raise ContractError("TOOL_CRASH", "version probe crashed")
+            if "-q" in argv:
+                raise OSError("rpmdb corrupted")
+            return CommandReceipt(argv, 1,
+                b"pkg.x86_64: E: binary-or-shlib-defines-rpath /opt\n1 packages and 1 specfiles checked; 1 errors, 0 warnings.\n",
+                b"", executed=True)
+
+        runner_throw = MockCommandRunner(available_tools={"rpmlint": "/usr/bin/rpmlint", "rpm": "/usr/bin/rpm"},
+                                         handlers={"rpmlint": handler_throws, "rpm": handler_throws})
+        with self.assertRaises(ContractError) as caught:
+            execute_rpmlint(runner_throw, self.spec, self.rpm, "pkg", cwd=self.root)
+        err = caught.exception
+        self.assertEqual(err.code, "RPMLINT_FAILED")
+        self.assertEqual(err.details["diagnostic_token"], "binary-or-shlib-defines-rpath")
+        self.assertEqual(err.evidence["tool_version"]["version"], "query-unavailable")
+        self.assertEqual(err.evidence["tool_version"]["package_query"]["status"], "unavailable")
+        # Causal rpmlint command was run first
+        self.assertEqual(calls[0], ["rpmlint", str(self.spec), str(self.rpm)])
+
+    def test_zero_nonzero_cleanliness_combinations(self):
+        cases = [
+            # (exit_code, output_bytes, expected_clean, expected_reason)
+            (0, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings.\n", True, "clean"),
+            (0, b"pkg.x86_64: E: test-err detail\n1 packages and 1 specfiles checked; 1 errors, 0 warnings.\n", False, "lint-errors"),
+            (64, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings.\n", False, "lint-exit64"),
+            (1, b"1 packages and 1 specfiles checked; 0 errors, 0 warnings.\n", False, "exit-nonzero"),
+            (1, b"pkg.x86_64: E: test-err detail\n1 packages and 1 specfiles checked; 1 errors, 0 warnings.\n", False, "lint-errors"),
+            (0, b"unexpected garbage line without summary\n", False, "malformed-output"),
+            (0, b"pkg.x86_64: E: err1 msg\n1 packages and 1 specfiles checked; 2 errors, 0 warnings.\n", False, "count-mismatch"),
+            (0, b"2 packages and 1 specfiles checked; 0 errors, 0 warnings.\n", False, "input-count-mismatch"),
+        ]
+
+        for exit_code, out_bytes, expected_clean, expected_reason in cases:
+            with self.subTest(exit_code=exit_code, expected_reason=expected_reason):
+                receipt = CommandReceipt(["rpmlint", str(self.spec), str(self.rpm)], exit_code, out_bytes, b"", executed=True)
+                runner = MockCommandRunner(
+                    available_tools={"rpmlint": "/usr/bin/rpmlint"},
+                    handlers={"rpmlint": lambda argv, **kw: receipt},
+                )
+                if expected_clean:
+                    ev, r = execute_rpmlint(runner, self.spec, self.rpm, "pkg", cwd=self.root)
+                    self.assertTrue(ev["clean"])
+                    self.assertEqual(ev["reason_token"], expected_reason)
+                else:
+                    with self.assertRaises(ContractError) as caught:
+                        execute_rpmlint(runner, self.spec, self.rpm, "pkg", cwd=self.root)
+                    err = caught.exception
+                    self.assertEqual(err.code, "RPMLINT_FAILED")
+                    self.assertEqual(err.details["reason_token"], expected_reason)
+                    self.assertFalse(err.evidence["clean"])
+
+    def test_missing_package_and_spec_handling(self):
+        missing_spec = self.root / "nonexistent.spec"
+        missing_rpm = self.root / "nonexistent.rpm"
+
+        runner = MockCommandRunner(
+            available_tools={"rpmlint": "/usr/bin/rpmlint"},
+            handlers={"rpmlint": lambda argv, **kw: CommandReceipt(
+                argv, 1,
+                b"error: spec file not found\n1 packages and 1 specfiles checked; 1 errors, 0 warnings.\n",
+                b"file missing\n", executed=True)},
+        )
+
+        # 1. Missing spec file
+        with self.assertRaises(ContractError) as caught:
+            execute_rpmlint(runner, missing_spec, self.rpm, "pkg", cwd=self.root)
+        err = caught.exception
+        self.assertEqual(err.code, "RPMLINT_FAILED")
+        self.assertEqual(err.spec_sha256, "")
+        self.assertEqual(err.package_sha256, digest(self.rpm.read_bytes()))
+        self.assertEqual(err.spec_path, str(missing_spec))
+
+        # 2. Missing rpm file
+        with self.assertRaises(ContractError) as caught:
+            execute_rpmlint(runner, self.spec, missing_rpm, "pkg", cwd=self.root)
+        err = caught.exception
+        self.assertEqual(err.code, "RPMLINT_FAILED")
+        self.assertEqual(err.package_sha256, "")
+        self.assertEqual(err.spec_sha256, digest(self.spec.read_bytes()))
+        self.assertEqual(err.package_path, str(missing_rpm))
+
+        # 3. Missing both
+        with self.assertRaises(ContractError) as caught:
+            execute_rpmlint(runner, missing_spec, missing_rpm, "pkg", cwd=self.root)
+        err = caught.exception
+        self.assertEqual(err.code, "RPMLINT_FAILED")
+        self.assertEqual(err.spec_sha256, "")
+        self.assertEqual(err.package_sha256, "")
+
+    def test_diagnostic_filesystem_failure_does_not_replace_original_lint_error(self):
+        runner = MockCommandRunner(
+            available_tools={"rpmlint": "/usr/bin/rpmlint"},
+            handlers={"rpmlint": lambda argv, **kw: CommandReceipt(
+                argv, 1,
+                b"pkg.x86_64: E: explicit-lib-dependency nodejs\n1 packages and 1 specfiles checked; 1 errors, 0 warnings.\n",
+                b"", executed=True)},
+        )
+
+        with patch("pathlib.Path.write_bytes", side_effect=OSError("Read-only file system")):
+            # write_bytes for rpmlint-findings.json will raise OSError, but execute_rpmlint
+            # must catch it and preserve the original RPMLINT_FAILED error!
+            with self.assertRaises(ContractError) as caught:
+                execute_rpmlint(runner, self.spec, self.rpm, "pkg", cwd=self.root)
+
+        err = caught.exception
+        self.assertEqual(err.code, "RPMLINT_FAILED")
+        self.assertEqual(err.details["diagnostic_token"], "explicit-lib-dependency")
+        self.assertEqual(err.details["reason_token"], "lint-errors")
+        self.assertIsNotNone(err.receipt)
+        self.assertEqual(err.receipt.command, ["rpmlint", str(self.spec), str(self.rpm)])
+        self.assertFalse(hasattr(err.receipt, "argv"))
+
+    def test_collection_failure_does_not_fabricate_counts(self):
+        receipt = CommandReceipt(["rpmlint",str(self.spec),str(self.rpm)],64,b"unavailable-stream",b"",executed=True)
+        runner = MockCommandRunner(available_tools={"rpmlint":"rpmlint"},
+                                  handlers={"rpmlint":lambda command,**kw:receipt})
+        with patch("rs9.rpm_lint.build_rpmlint_evidence",side_effect=ContractError("DIAGNOSTIC_LIMIT","fixture-limit")):
+            with self.assertRaises(ContractError) as caught:
+                execute_rpmlint(runner,self.spec,self.rpm,"pkg",cwd=self.root)
+        error=caught.exception
+        self.assertEqual(error.code,"RPMLINT_FAILED")
+        self.assertIs(error.receipt,receipt)
+        self.assertIsNone(error.evidence["findings_summary"])
+        self.assertFalse(error.evidence["parse_complete"])
+        self.assertEqual(error.evidence["evidence_status"],"collection-failed")
+        self.assertEqual(error.evidence["tool_receipt"]["stdout_sha256"],receipt.stdout_sha256)
 
 
 if __name__ == "__main__":

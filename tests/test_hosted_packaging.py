@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import shutil
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -124,9 +125,14 @@ class HostedPackagingTests(unittest.TestCase):
                          patch("rs9.hosted_packaging.container_tool_facts", return_value={}), \
                          patch("rs9.hosted_packaging._resolve_offline_npm_archives", return_value=None), \
                          patch(name, autospec=True, side_effect=error) as builder:
-                        with self.assertRaises(ContractError) as caught:
-                            execute(context)
-                    self.assertEqual(caught.exception.code, "NATIVE_BUILD")
+                        if family == "rpm":
+                            result = execute(context)
+                            self.assertEqual(result["gates"][1]["status"], "fail")
+                            self.assertEqual(len(result["details"]["product_failures"]), 1)
+                        else:
+                            with self.assertRaises(ContractError) as caught:
+                                execute(context)
+                            self.assertEqual(caught.exception.code, "NATIVE_BUILD")
                     builder.assert_called_once()
                     self.assertNotIn("maintainer", builder.call_args.kwargs)
                     diagnostic = json.loads((scratch / "diagnostics/build-errors.json").read_bytes())
@@ -1025,6 +1031,7 @@ class HostedPackagingTests(unittest.TestCase):
                     },
                 )
                 lint_err.package_path = str(pkg_path)
+                lint_err.package_sha256 = digest(pkg_path.read_bytes())
                 lint_err.spec_path = str(spec_path)
                 lint_err.evidence = ev_data
                 raise lint_err
@@ -1133,11 +1140,10 @@ class HostedPackagingTests(unittest.TestCase):
              patch("rs9.hosted_packaging.container_tool_facts", return_value={"rpm": "v6"}), \
              patch("rs9.hosted_packaging._resolve_offline_npm_archives", return_value=None), \
              patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=ContractError("BUILD_FAILED", "rpmbuild failed")):
-            with self.assertRaises(ContractError) as caught:
-                from rs9.hosted_packaging import execute
-                execute(context)
-
-            self.assertEqual(caught.exception.code, "NATIVE_BUILD")
+            from rs9.hosted_packaging import execute
+            result = execute(context)
+            self.assertTrue(all(f["code"] == "BUILD_FAILED"
+                                for f in result["details"]["product_failures"].values()))
             diag_file = lane_scratch / "diagnostics" / "build-errors.json"
             self.assertTrue(diag_file.is_file())
             diag_data = json.loads(diag_file.read_bytes())
@@ -1145,6 +1151,348 @@ class HostedPackagingTests(unittest.TestCase):
             self.assertEqual(gates_by_name.get("rpm-package-build"), "fail")
             self.assertEqual(gates_by_name.get("rpm-rpmlint-clean"), "fail")
             self.assertFalse((lane_scratch / "unsigned-custody").exists())
+
+
+    def test_actual_command_receipt_no_argv_in_pipeline(self):
+        """Verify real CommandReceipt (command ONLY, no .argv) does not raise AttributeError in execute()."""
+        outer = self.root / "orchestration-no-argv"
+        outer.mkdir()
+        lane_scratch = outer / "lane-work"
+        lane_scratch.mkdir()
+
+        captures = []
+        for pid in ("theme-forge-stellar-burst", "theme-forge-stellar-loom",
+                    "theme-forge-solar-sail", "theme-forge-nebular-fusion"):
+            captures.append((
+                SimpleNamespace(root=outer / "capture" / pid),
+                {"project": {"id": pid}},
+                {},
+            ))
+
+        context = {
+            "family": "rpm",
+            "system": "x86_64-linux",
+            "repository": self.root,
+            "scratch": lane_scratch,
+            "pins": {},
+            "captures": captures,
+            "client": None,
+            "binding": {"source_commit": "0" * 40},
+            "authentication_sha256": "1" * 64,
+        }
+
+        env = {
+            "family": "rpm",
+            "system": "x86_64-linux",
+            "image_ref": "fedora@sha256:" + "0" * 64,
+            "platform": "linux/amd64",
+            "preprovisioned_packages": [],
+            "tools": {},
+        }
+
+        def mock_build(capture, intent, arch, scratch_dir, runner=None, **kwargs):
+            pid = intent["project"]["id"]
+            pkg_path = Path(scratch_dir) / f"{pid}-1.0.0-1.fc43.{arch}.rpm"
+            pkg_path.write_bytes(f"rpm-content-{pid}".encode())
+            spec_path = Path(scratch_dir) / "rpmbuild" / "SPECS" / f"{pid}.spec"
+            spec_path.parent.mkdir(parents=True, exist_ok=True)
+            spec_path.write_bytes(f"Name: {pid}\n".encode())
+
+            # Simulate real tool receipts appended to runner (builder)
+            if runner is not None:
+                # CommandReceipt has ONLY .command, NO .argv property
+                version_receipt = CommandReceipt(["rpmlint", "--version"], 0, b"rpmlint 2.6.0\n", b"", tool_name="rpmlint", executed=True)
+                lint_receipt = CommandReceipt(
+                    ["rpmlint", str(spec_path), str(pkg_path)],
+                    1 if pid == "theme-forge-nebular-fusion" else 0,
+                    b"theme-forge-nebular-fusion.x86_64: E: explicit-lib-dependency nodejs\n1 packages and 1 specfiles checked; 1 errors, 0 warnings.\n"
+                    if pid == "theme-forge-nebular-fusion" else
+                    b"1 packages and 1 specfiles checked; 0 errors, 0 warnings.\n",
+                    b"",
+                    tool_name="rpmlint",
+                    executed=True,
+                )
+                runner.receipts.extend([version_receipt, lint_receipt])
+
+            if pid == "theme-forge-nebular-fusion":
+                lint_err = ContractError(
+                    "RPMLINT_FAILED",
+                    "Candidate RPM did not pass rpmlint: explicit-lib-dependency",
+                    details={
+                        "substage": "rpmlint",
+                        "tool": "rpmlint",
+                        "exit_code": 1,
+                        "stdout_sha256": digest(b"stdout"),
+                        "stderr_sha256": digest(b"stderr"),
+                        "product": pid,
+                        "diagnostic_token": "explicit-lib-dependency",
+                        "reason_token": "lint-errors",
+                        "observed_field_tokens": ["explicit-lib-dependency"],
+                        "observed_field_count": 1,
+                    },
+                )
+                lint_err.package_path = str(pkg_path)
+                lint_err.package_sha256 = digest(pkg_path.read_bytes())
+                lint_err.spec_path = str(spec_path)
+                lint_err.receipt = lint_receipt
+                lint_err.evidence = {
+                    "schema": "rs9.rpmlint-evidence.v1alpha1",
+                    "product": pid,
+                    "clean": False,
+                    "status": "fail",
+                    "reason_token": "lint-errors",
+                    "package_file": pkg_path.name,
+                    "package_sha256": digest(pkg_path.read_bytes()),
+                    "spec_file": spec_path.name,
+                    "spec_sha256": digest(spec_path.read_bytes()),
+                    "findings": [{"target": pkg_path.name, "level": "E", "check": "explicit-lib-dependency", "message": "nodejs"}],
+                    "findings_summary": {"packages": 1, "specfiles": 1, "errors": 1, "warnings": 0, "filtered": 0},
+                }
+                raise lint_err
+
+            (Path(scratch_dir) / "rpm-manifest.json").write_bytes(b"{}")
+            return {
+                "rpm_path": pkg_path,
+                "manifest": {
+                    "rpm_identity": {"name": pid, "version": "1.0.0", "release": "1.fc43", "arch": arch},
+                    "rpm_payload_digest": {"tag": "PAYLOADSHA256", "algo_tag": "PAYLOADSHA256ALGO", "payload_digest": "0" * 64},
+                },
+            }
+
+        with patch("rs9.hosted_packaging.provision", return_value=env), \
+             patch("rs9.hosted_deb.provision_image"), \
+             patch("rs9.hosted_packaging.checked", return_value=CommandReceipt(["tool"], 0, b"", b"", executed=True)), \
+             patch("rs9.hosted_packaging.container_tool_facts", return_value={"rpm": "v6"}), \
+             patch("rs9.hosted_packaging._resolve_offline_npm_archives", return_value=None), \
+             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=mock_build):
+            from rs9.hosted_packaging import execute
+            # Must execute without AttributeError: 'CommandReceipt' object has no attribute 'argv'
+            res = execute(context)
+
+        self.assertIn("theme-forge-nebular-fusion", res["details"]["build_errors"])
+        self.assertEqual(res["details"]["build_errors"]["theme-forge-nebular-fusion"], "RPMLINT_FAILED")
+        gates = {g["name"]: g["status"] for g in res["gates"]}
+        self.assertEqual(gates["rpm-package-build"], "pass")
+        self.assertEqual(gates["rpm-rpmlint-clean"], "fail")
+        self.assertEqual(gates["rpm-repository-indexing"], "not-run")
+
+        # Quarantined failed RPM excluded from publishable artifacts
+        quarantine_dir = lane_scratch / "quarantine"
+        quarantined = quarantine_dir / "theme-forge-nebular-fusion-1.0.0-1.fc43.x86_64.rpm"
+        self.assertTrue(quarantined.is_file())
+        self.assertNotIn(quarantined, res["artifacts"])
+        self.assertFalse((lane_scratch / "unsigned-custody").exists())
+
+    def test_multi_product_retention_records_all_failures_and_quarantine(self):
+        """Verify multiple product failures are all retained, recorded, and quarantined."""
+        outer = self.root / "orchestration-multi-fail"
+        outer.mkdir()
+        lane_scratch = outer / "lane-work"
+        lane_scratch.mkdir()
+
+        captures = []
+        for pid in ("theme-forge-stellar-burst", "theme-forge-stellar-loom",
+                    "theme-forge-solar-sail", "theme-forge-nebular-fusion"):
+            captures.append((
+                SimpleNamespace(root=outer / "capture" / pid),
+                {"project": {"id": pid}},
+                {},
+            ))
+
+        context = {
+            "family": "rpm",
+            "system": "x86_64-linux",
+            "repository": self.root,
+            "scratch": lane_scratch,
+            "pins": {},
+            "captures": captures,
+            "client": None,
+            "binding": {"source_commit": "0" * 40},
+            "authentication_sha256": "1" * 64,
+        }
+
+        env = {
+            "family": "rpm",
+            "system": "x86_64-linux",
+            "image_ref": "fedora@sha256:" + "0" * 64,
+            "platform": "linux/amd64",
+            "preprovisioned_packages": [],
+            "tools": {},
+        }
+
+        # 2 products will fail lint: stellar-loom and nebular-fusion
+        failing_pids = {"theme-forge-stellar-loom", "theme-forge-nebular-fusion"}
+
+        def mock_build(capture, intent, arch, scratch_dir, runner=None, **kwargs):
+            pid = intent["project"]["id"]
+            pkg_path = Path(scratch_dir) / f"{pid}-1.0.0-1.fc43.{arch}.rpm"
+            pkg_path.write_bytes(f"rpm-content-{pid}".encode())
+            spec_path = Path(scratch_dir) / "rpmbuild" / "SPECS" / f"{pid}.spec"
+            spec_path.parent.mkdir(parents=True, exist_ok=True)
+            spec_path.write_bytes(f"Name: {pid}\n".encode())
+
+            if pid in failing_pids:
+                lint_receipt = CommandReceipt(["rpmlint", str(spec_path), str(pkg_path)], 1, b"err", b"", executed=True)
+                if runner is not None:
+                    runner.receipts.append(lint_receipt)
+                lint_err = ContractError(
+                    "RPMLINT_FAILED",
+                    f"Candidate RPM did not pass rpmlint: error in {pid}",
+                    details={
+                        "substage": "rpmlint", "tool": "rpmlint", "exit_code": 1,
+                        "stdout_sha256": digest(b"err"), "stderr_sha256": digest(b""),
+                        "product": pid, "diagnostic_token": "err", "reason_token": "lint-errors",
+                        "observed_field_tokens": ["err"], "observed_field_count": 1,
+                    },
+                )
+                lint_err.package_path = str(pkg_path)
+                lint_err.package_sha256 = digest(pkg_path.read_bytes())
+                lint_err.spec_path = str(spec_path)
+                lint_err.receipt = lint_receipt
+                lint_err.evidence = {
+                    "schema": "rs9.rpmlint-evidence.v1alpha1",
+                    "product": pid,
+                    "clean": False,
+                    "status": "fail",
+                    "reason_token": "lint-errors",
+                    "package_file": pkg_path.name,
+                    "package_sha256": digest(pkg_path.read_bytes()),
+                    "spec_file": spec_path.name,
+                    "spec_sha256": digest(spec_path.read_bytes()),
+                    "findings": [{"target": pkg_path.name, "level": "E", "check": "err", "message": "msg"}],
+                    "findings_summary": {"packages": 1, "specfiles": 1, "errors": 1, "warnings": 0, "filtered": 0},
+                }
+                raise lint_err
+
+            (Path(scratch_dir) / "rpm-manifest.json").write_bytes(b"{}")
+            return {
+                "rpm_path": pkg_path,
+                "manifest": {
+                    "rpm_identity": {"name": pid, "version": "1.0.0", "release": "1.fc43", "arch": arch},
+                    "rpm_payload_digest": {"tag": "PAYLOADSHA256", "algo_tag": "PAYLOADSHA256ALGO", "payload_digest": "0" * 64},
+                },
+            }
+
+        with patch("rs9.hosted_packaging.provision", return_value=env), \
+             patch("rs9.hosted_deb.provision_image"), \
+             patch("rs9.hosted_packaging.checked", return_value=CommandReceipt(["tool"], 0, b"", b"", executed=True)), \
+             patch("rs9.hosted_packaging.container_tool_facts", return_value={"rpm": "v6"}), \
+             patch("rs9.hosted_packaging._resolve_offline_npm_archives", return_value=None), \
+             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=mock_build):
+            from rs9.hosted_packaging import execute
+            res = execute(context)
+
+        # Both failed products are recorded
+        self.assertEqual(set(res["details"]["build_errors"].keys()), failing_pids)
+        self.assertEqual(set(res["details"]["product_failures"].keys()), failing_pids)
+
+        # Both failed RPMs are quarantined
+        quarantine = lane_scratch / "quarantine"
+        for pid in failing_pids:
+            self.assertTrue(any(pid in p.name for p in quarantine.iterdir()))
+
+        # Gate split: package-build pass (all 4 constructed), rpmlint-clean fail
+        gates = {g["name"]: g["status"] for g in res["gates"]}
+        self.assertEqual(gates["rpm-package-build"], "pass")
+        self.assertEqual(gates["rpm-rpmlint-clean"], "fail")
+
+        # Custody bundle never created
+        self.assertFalse((lane_scratch / "unsigned-custody").exists())
+
+        # build-errors.json contains both product failures
+        diag_file = lane_scratch / "diagnostics" / "build-errors.json"
+        self.assertTrue(diag_file.is_file())
+        diag_data = json.loads(diag_file.read_bytes())
+        self.assertEqual(set(diag_data["errors"].keys()), failing_pids)
+
+    def test_diagnostic_fs_failure_does_not_replace_original_lint_error(self):
+        """When quarantine copy or spec diagnostic write raises OSError, original error is kept."""
+        outer = self.root / "orchestration-fs-err"
+        outer.mkdir()
+        lane_scratch = outer / "lane-work"
+        lane_scratch.mkdir()
+
+        captures = []
+        for pid in ("theme-forge-stellar-burst", "theme-forge-stellar-loom",
+                    "theme-forge-solar-sail", "theme-forge-nebular-fusion"):
+            captures.append((
+                SimpleNamespace(root=outer / "capture" / pid),
+                {"project": {"id": pid}},
+                {},
+            ))
+
+        context = {
+            "family": "rpm",
+            "system": "x86_64-linux",
+            "repository": self.root,
+            "scratch": lane_scratch,
+            "pins": {},
+            "captures": captures,
+            "client": None,
+            "binding": {"source_commit": "0" * 40},
+            "authentication_sha256": "1" * 64,
+        }
+
+        env = {
+            "family": "rpm",
+            "system": "x86_64-linux",
+            "image_ref": "fedora@sha256:" + "0" * 64,
+            "platform": "linux/amd64",
+            "preprovisioned_packages": [],
+            "tools": {},
+        }
+
+        def mock_build(capture, intent, arch, scratch_dir, **kwargs):
+            pid = intent["project"]["id"]
+            pkg_path = Path(scratch_dir) / f"{pid}-1.0.0-1.fc43.{arch}.rpm"
+            pkg_path.write_bytes(b"rpm-bytes")
+            spec_path = Path(scratch_dir) / "rpmbuild" / "SPECS" / f"{pid}.spec"
+            spec_path.parent.mkdir(parents=True, exist_ok=True)
+            spec_path.write_bytes(f"Name: {pid}\n".encode())
+
+            if pid == "theme-forge-nebular-fusion":
+                lint_err = ContractError(
+                    "RPMLINT_FAILED",
+                    "Candidate RPM did not pass rpmlint: err",
+                    details={
+                        "substage": "rpmlint", "tool": "rpmlint", "exit_code": 1,
+                        "stdout_sha256": digest(b"err"), "stderr_sha256": digest(b""),
+                        "product": pid, "diagnostic_token": "err", "reason_token": "lint-errors",
+                        "observed_field_tokens": ["err"], "observed_field_count": 1,
+                    },
+                )
+                lint_err.package_path = str(pkg_path)
+                lint_err.spec_path = str(spec_path)
+                raise lint_err
+
+            (Path(scratch_dir) / "rpm-manifest.json").write_bytes(b"{}")
+            return {
+                "rpm_path": pkg_path,
+                "manifest": {
+                    "rpm_identity": {"name": pid, "version": "1.0.0", "release": "1.fc43", "arch": arch},
+                    "rpm_payload_digest": {"tag": "PAYLOADSHA256", "algo_tag": "PAYLOADSHA256ALGO", "payload_digest": "0" * 64},
+                },
+            }
+
+        # Mock shutil.copyfile to raise OSError specifically during quarantine copy
+        real_copyfile = shutil.copyfile
+        def fail_quarantine(src, dst, *args, **kwargs):
+            if "quarantine" in str(dst):
+                raise OSError("Disk write failed")
+            return real_copyfile(src, dst, *args, **kwargs)
+
+        with patch("rs9.hosted_packaging.provision", return_value=env), \
+             patch("rs9.hosted_deb.provision_image"), \
+             patch("rs9.hosted_packaging.checked", return_value=CommandReceipt(["tool"], 0, b"", b"", executed=True)), \
+             patch("rs9.hosted_packaging.container_tool_facts", return_value={"rpm": "v6"}), \
+             patch("rs9.hosted_packaging._resolve_offline_npm_archives", return_value=None), \
+             patch("shutil.copyfile", side_effect=fail_quarantine), \
+             patch("rs9.hosted_packaging.build_rpm_candidate", autospec=True, side_effect=mock_build):
+            from rs9.hosted_packaging import execute
+            res = execute(context)
+
+        # The error must remain RPMLINT_FAILED, never replaced by PACKAGE_FILESYSTEM!
+        self.assertEqual(res["details"]["build_errors"]["theme-forge-nebular-fusion"], "RPMLINT_FAILED")
 
 
 if __name__ == "__main__":

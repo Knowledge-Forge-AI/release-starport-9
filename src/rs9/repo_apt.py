@@ -21,7 +21,7 @@ import zlib
 
 from rs9.errors import ContractError
 from rs9.records import Record, snapshot, validate_bounded_int, validate_sanitized_string, validate_sha256
-from rs9.scratch import canonical, physical_directory
+from rs9.scratch import canonical, physical_directory, verify_public_tree_modes
 from rs9.security import (
     validate_ecosystem_name,
     validate_nonproduction_key_path,
@@ -42,6 +42,77 @@ MAX_AR_MEMBERS, MAX_TAR_MEMBERS, MAX_CONTROL_UNCOMPRESSED = 10, 50, 10 * 1024 * 
 
 def _digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _safe_write_public_repo_file(root: Path, rel_path: str, content: bytes) -> None:
+    """Descriptor-relative, race-safe atomic publication of public repository files.
+
+    Sets owned root and all subdirectories to 0o755, and files to 0o644 before publication,
+    independent of caller umask. Outside ancestors are never modified. Symlinks are rejected.
+    """
+    validate_safe_relative_posix_path(rel_path)
+    if not isinstance(content, bytes):
+        raise ContractError("INVALID_TYPE", "Content must be bytes")
+    _check_no_symlinks(root)
+
+    root_fd = os.open(str(root), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fchmod(root_fd, 0o755)
+        parts = rel_path.split("/")
+        dir_parts = parts[:-1]
+        filename = parts[-1]
+
+        current_fd = os.dup(root_fd)
+        try:
+            for part in dir_parts:
+                try:
+                    os.mkdir(part, 0o755, dir_fd=current_fd)
+                except FileExistsError:
+                    pass
+                child_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=current_fd)
+                try:
+                    os.fchmod(child_fd, 0o755)
+                except OSError:
+                    os.close(child_fd)
+                    raise
+                os.close(current_fd)
+                current_fd = child_fd
+
+            temp_name = f".tmp_{filename}_{os.urandom(8).hex()}"
+            temp_fd = os.open(temp_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644, dir_fd=current_fd)
+            temp_created = True
+            stream = None
+            try:
+                os.fchmod(temp_fd, 0o644)
+                stream = os.fdopen(temp_fd, "wb")
+                temp_fd = None
+                stream.write(content)
+                stream.close()
+                stream = None
+                os.replace(temp_name, filename, src_dir_fd=current_fd, dst_dir_fd=current_fd)
+                temp_created = False
+            finally:
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except OSError:
+                        pass
+                elif temp_fd is not None:
+                    try:
+                        os.close(temp_fd)
+                    except OSError:
+                        pass
+                if temp_created:
+                    try:
+                        os.unlink(temp_name, dir_fd=current_fd)
+                    except OSError:
+                        pass
+        finally:
+            os.close(current_fd)
+    except OSError:
+        raise ContractError("WRITE_ERROR", f"Confined repository write failed for {rel_path}") from None
+    finally:
+        os.close(root_fd)
 
 
 class DebPackage:
@@ -224,6 +295,14 @@ class AptRepositoryCandidate:
         p.mkdir(parents=True, exist_ok=True)
         self.root = physical_directory(p)
         _check_no_symlinks(self.root)
+        root_fd = os.open(str(self.root), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            os.fchmod(root_fd, 0o755)
+            st = os.fstat(root_fd)
+            if stat.S_IMODE(st.st_mode) != 0o755:
+                raise ContractError("PERMISSION_ERROR", "Failed to set repository root permissions")
+        finally:
+            os.close(root_fd)
         self.distribution, self.origin, self.label, self.packages = distribution, origin, label, []
         self._is_signed, self._signed_objects = False, {}
 
@@ -257,7 +336,7 @@ class AptRepositoryCandidate:
         filename = f"pool/main/{pkg_prefix}/{pkg_name}/{pkg_name}_{version}_{arch}.deb"
         validate_safe_relative_posix_path(filename)
 
-        _safe_write_file(self.root / filename, deb_bytes)
+        _safe_write_public_repo_file(self.root, filename, deb_bytes)
         package_obj = DebPackage(
             package=pkg_name, version=version, architecture=arch, filename=filename,
             size=size, sha256=sha256, description=desc, maintainer=maintainer, depends=depends,
@@ -270,9 +349,6 @@ class AptRepositoryCandidate:
         if "\n" in release_date or "\r" in release_date:
             raise ContractError("INVALID_METADATA", "Release date injection rejected")
         _check_no_symlinks(self.root)
-        dist_dir = self.root / f"dists/{self.distribution}"
-        dist_dir.mkdir(parents=True, exist_ok=True)
-        _check_no_symlinks(dist_dir)
 
         index_entries: dict[str, tuple[str, int, bytes]] = {}
         for arch in ARCHITECTURES:
@@ -287,14 +363,10 @@ class AptRepositoryCandidate:
             b_gz, b_xz = gz_buf.getvalue(), lzma.compress(b_txt, preset=6, check=lzma.CHECK_CRC64)
 
             c_rel = f"main/binary-{arch}"
-            c_dir = dist_dir / c_rel
-            h_dir = c_dir / "by-hash/SHA256"
-            h_dir.mkdir(parents=True, exist_ok=True)
-
             for fname, bdata in (("Packages", b_txt), ("Packages.gz", b_gz), ("Packages.xz", b_xz)):
                 sha = _digest(bdata)
-                _safe_write_file(c_dir / fname, bdata)
-                _safe_write_file(h_dir / sha, bdata)
+                _safe_write_public_repo_file(self.root, f"dists/{self.distribution}/{c_rel}/{fname}", bdata)
+                _safe_write_public_repo_file(self.root, f"dists/{self.distribution}/{c_rel}/by-hash/SHA256/{sha}", bdata)
                 index_entries[f"{c_rel}/{fname}"] = (sha, len(bdata), bdata)
 
         release_lines = [
@@ -305,12 +377,8 @@ class AptRepositoryCandidate:
 
         release_bytes = ("\n".join(release_lines) + "\n").encode("utf-8")
         release_sha = _digest(release_bytes)
-        _safe_write_file(dist_dir / "Release", release_bytes)
-
-        dist_by_hash = dist_dir / "by-hash/SHA256"
-        dist_by_hash.mkdir(parents=True, exist_ok=True)
-        _check_no_symlinks(dist_by_hash)
-        _safe_write_file(dist_by_hash / release_sha, release_bytes)
+        _safe_write_public_repo_file(self.root, f"dists/{self.distribution}/Release", release_bytes)
+        _safe_write_public_repo_file(self.root, f"dists/{self.distribution}/by-hash/SHA256/{release_sha}", release_bytes)
 
         return {
             "distribution": self.distribution, "release_sha256": release_sha,
@@ -328,17 +396,15 @@ class AptRepositoryCandidate:
 
         release_bytes = _safe_read_file(release_file)
         rel_path = f"dists/{self.distribution}/{'InRelease' if inline else 'Release.gpg'}"
-        target_file = dist_dir / ("InRelease" if inline else "Release.gpg")
 
         record = signed_store.retain(
             rel_path=rel_path, signed_bytes=signature_bytes, unsigned_bytes=release_bytes,
             issuer=issuer, evidence=evidence, validator=validator,
         )
 
-        _safe_write_file(target_file, signature_bytes)
-        dist_by_hash = dist_dir / "by-hash/SHA256"
-        dist_by_hash.mkdir(parents=True, exist_ok=True)
-        _safe_write_file(dist_by_hash / record["signed_sha256"], signature_bytes)
+        _safe_write_public_repo_file(self.root, rel_path, signature_bytes)
+        dist_by_hash_rel = f"dists/{self.distribution}/by-hash/SHA256/{record['signed_sha256']}"
+        _safe_write_public_repo_file(self.root, dist_by_hash_rel, signature_bytes)
 
         self._is_signed, self._signed_objects[rel_path] = True, record["signed_sha256"]
         return record
@@ -361,11 +427,9 @@ class AptRepositoryCandidate:
             raise ContractError("SIGNATURE_BODY_MISMATCH", "InRelease body differs from Release")
         verified = signer.verify(inrelease)
         signer.verify(release_bytes, release_gpg)
-        by_hash = dist_dir / "by-hash/SHA256"
-        by_hash.mkdir(parents=True, exist_ok=True)
         for name, blob in (("InRelease", inrelease), ("Release.gpg", release_gpg)):
-            _safe_write_file(dist_dir / name, blob)
-            _safe_write_file(by_hash / _digest(blob), blob)
+            _safe_write_public_repo_file(self.root, f"dists/{self.distribution}/{name}", blob)
+            _safe_write_public_repo_file(self.root, f"dists/{self.distribution}/by-hash/SHA256/{_digest(blob)}", blob)
             self._signed_objects[f"dists/{self.distribution}/{name}"] = _digest(blob)
         self._is_signed = True
         return {
@@ -614,12 +678,14 @@ def tamper_apt_repository(
     if package is not None:
         validate_ecosystem_name("apt", package)
     base = physical_directory(root)
+    _check_no_symlinks(base)
     dist_dir = base / f"dists/{distribution}"
     changed: list[str] = []
 
     def rewrite(path: Path, data: bytes) -> None:
-        _safe_write_file(path, data)
-        changed.append(path.relative_to(base).as_posix())
+        rel_p = path.relative_to(base).as_posix()
+        _safe_write_public_repo_file(base, rel_p, data)
+        changed.append(rel_p)
 
     if kind == "package":
         debs = sorted((base / "pool").rglob(f"{package}_*.deb" if package else "*.deb"))

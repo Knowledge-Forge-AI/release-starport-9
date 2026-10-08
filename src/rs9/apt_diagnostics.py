@@ -135,12 +135,26 @@ def classify_rejection(
     if "permission denied" in combined or "could not open lock file" in combined or "are you root?" in combined:
         return "PERMISSION_DENIED"
 
+    # A transport or missing-package failure cannot qualify a trust negative,
+    # even when the stream also contains a generic signature message.
+    if any(s in combined for s in ("network is unreachable", "could not connect",
+                                   "cannot assign requested address", "could not resolve host")):
+        return "NETWORK_UNAVAILABLE"
+    if any(s in combined for s in ("unable to locate package", "no installation candidate",
+                                   "target not found:", "no match for argument:")):
+        return "PACKAGE_NOT_FOUND"
+
     # Family-specific wording must precede generic corruption fallbacks. These
     # are diagnostic categories; the positive control and failing stage still
     # determine whether a tamper rejection earns qualification credit.
     if family == "apt" and re.search(r"\bmissing key [0-9a-f]+\b", combined):
         return "KEY_MISMATCH"
     if family == "pacman":
+        # Pacman prints this fixed repository-key diagnostic before its generic
+        # PGP corruption summary. Accept only a complete hexadecimal identity;
+        # malformed keys and remote lookup errors alone prove no key mismatch.
+        if re.search(r'^error: rs9: key "[0-9a-f]{40}" is unknown\s*$', combined, re.MULTILINE):
+            return "KEY_MISMATCH"
         if re.search(r'signature from .+ is invalid\b', combined) or any(
                 token in combined for token in ("invalid or corrupted database (pgp signature)",
                                                "invalid or corrupted package (pgp signature)")):
@@ -151,7 +165,7 @@ def classify_rejection(
         if "bad gpg signature" in combined:
             return "SIGNATURE_REJECTED"
 
-    if any(token in combined for token in ("no_pubkey", "public key is not available", "unknown key", "unknown trust", "public key not found")):
+    if family != "pacman" and any(token in combined for token in ("no_pubkey", "public key is not available", "unknown key", "unknown trust", "public key not found")):
         return "KEY_MISMATCH"
 
     if any(s in combined for s in ("badsig", "is not signed", "invalid signature", "corrupted signature", "expkeysig")):
@@ -328,6 +342,39 @@ def trust_identity(spec):
                              'inputs':identities}))
 
 
+def apt_readability(probe, *, executed, repo_root='/srv/rs9/apt',
+                    keyring_path='/etc/apt/keyrings/rs9-nonproduction.gpg', arch='amd64'):
+    """Credit only complete executed _apt target and ancestor observations."""
+    if not executed or not isinstance(probe, dict) or probe.get('status') != 'probed':
+        return 'not-run'
+    user = probe.get('users', {}).get('_apt', {})
+    if user.get('apt_user_present') is not True:
+        return 'not-run'
+    expected = {repo_root, keyring_path, *[f'{repo_root}/dists/resolute/{name}' for name in
+                ('InRelease', 'Release', 'Release.gpg', *[f'main/binary-{arch}/Packages{s}'
+                                                        for s in ('', '.xz', '.gz')])]}
+    targets = user.get('targets', [])
+    if len(targets) != len(expected) or {t.get('target') for t in targets} != expected:
+        return 'not-run'
+    for target in targets:
+        path = Path(target['target'])
+        ancestors = target.get('ancestors', [])
+        rows = {row.get('path'): row for row in ancestors}
+        required = {str(p) for p in (path, *path.parents)}
+        if len(rows) != len(ancestors) or not required <= set(rows):
+            return 'not-run'
+        leaf = rows[str(path)]
+        if leaf.get('readable') is not True or leaf.get('type') not in {'file', 'directory'}:
+            return 'fail'
+        for name in required - {str(path)}:
+            row = rows[name]
+            if row.get('type') != 'directory' or row.get('traversable') is not True:
+                return 'fail'
+        if leaf.get('type') == 'directory' and leaf.get('traversable') is not True:
+            return 'fail'
+    return 'pass'
+
+
 def build_positive_control(*, family,image,platform,product,repository=None,keyring=None,
                            receipts=None,success=False,setup_sha256=None):
     from rs9.release_core import digest
@@ -350,7 +397,8 @@ def validate_positive_control(control, *, family,image,platform,product,dirs=Non
         return False,'positive-control-binding-mismatch'
     stages=control.get('stages',{})
     if any(not isinstance(stages.get(s),list) or not stages[s] or
-           any(not isinstance(r,dict) or r.get('exit_code')!=0 for r in stages[s])
+           any(not isinstance(r,dict) or r.get('exit_code')!=0 or r.get('executed') is not True
+               for r in stages[s])
            for s in ('configure','refresh','install','query')):
         return False,'positive-control-stage-incomplete'
     return True,None
@@ -368,7 +416,7 @@ def qualify_tamper_rejection(
     installed = False
     if query_rcpt is not None and query_rcpt.exit_code == 0:
         installed = True
-    elif install_rcpt is not None and install_rcpt.exit_code == 0 and (query_rcpt is None or query_rcpt.exit_code == 0):
+    elif install_rcpt is not None and install_rcpt.exit_code == 0:
         installed = True
 
     if installed:
