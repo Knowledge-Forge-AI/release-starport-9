@@ -1,7 +1,7 @@
 """Strict RPM architecture, name, version evidence, query parsing, and derivation tests."""
 from pathlib import Path
 from unittest.mock import patch
-from tests.rpm_fixtures import inventory_response, fixture_policy
+from tests.rpm_fixtures import inventory_response, fixture_policy, write_source_rpm_fixture
 import re
 import tempfile
 import unittest
@@ -324,6 +324,7 @@ class BuildRpmTests(unittest.TestCase):
         createrepo_exit=0,
     ):
         def rpmbuild_handler(argv, cwd=None, env=None):
+            write_source_rpm_fixture(argv, cwd)
             rpm_dir = Path(cwd) / "RPMS" / arch
             rpm_dir.mkdir(parents=True, exist_ok=True)
             (rpm_dir / f"{name}-{version}-1.fc43.{arch}.rpm").write_bytes(b"rpm-payload")
@@ -654,9 +655,11 @@ class BuildRpmTests(unittest.TestCase):
 
     def test_burst_native_accepted_with_empty_messages_x86_64_and_aarch64(self):
         from rs9.scratch import canonical
-        for arch in ("x86_64", "aarch64"):
+        for index, arch in enumerate(("x86_64", "aarch64")):
             with self.subTest(arch=arch):
-                capture, intent, offline_npm = self._make_burst_fixture(arch)
+                # Distinct archived bytes must bind only this build's policy.
+                with patch("gzip.time.time", return_value=1791500000 + index * 100):
+                    capture, intent, offline_npm = self._make_burst_fixture(arch)
                 scratch = self.scratch / f"burst_empty_msg_{arch}"
                 scratch.mkdir()
                 runner = self._setup_runner(arch=arch, name="theme-forge-stellar-burst", version="0.6.1")
@@ -675,10 +678,11 @@ class BuildRpmTests(unittest.TestCase):
 
                 runner.handlers["rpmlint"] = custom_lint
 
-                result = build_rpm_candidate(
-                    capture, intent, arch, scratch,
-                    offline_npm_archives=offline_npm, runner=runner,
-                )
+                with patch("rs9.rpm_lint_policy.load_policy", side_effect=lambda: fixture_policy(scratch)):
+                    result = build_rpm_candidate(
+                        capture, intent, arch, scratch,
+                        offline_npm_archives=offline_npm, runner=runner,
+                    )
 
                 manifest = result["manifest"]
                 derivation = result["derivation_record"]

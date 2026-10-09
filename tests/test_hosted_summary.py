@@ -108,6 +108,42 @@ class HostedSummaryTests(unittest.TestCase):
         self.mutate_receipt("nix","x86_64-linux",lambda r:r["gates"][0].update(status="not-run",reason="unavailable"))
         self.assertEqual(self.finish()[0],2)
 
+    def test_late_failed_rpm_lanes_keep_verified_policy_and_raw_custody(self):
+        """Late repository failure does not erase complete, authenticated diagnostics."""
+        from rs9.hosted_summary import validate_rpm_custody
+        for system in ("x86_64-linux", "aarch64-linux"):
+            def block(receipt):
+                receipt["execution_error"] = "required-gates-unsatisfied"
+                for gate in receipt["gates"]:
+                    if gate["name"] == "rpm-repository-indexing":
+                        gate.update(status="fail", reason="RPM_REPOSITORY_OPERATION")
+                    elif gate["name"] in {"rpm-client-qualification", "burst-native-addon-target",
+                                          "burst-native-addon-load"} or gate["name"].startswith("rpm-trust.tamper."):
+                        gate.update(status="not-run", reason="blocked-by:rpm-repository-indexing")
+                receipt["details"]["repository_failure"] = {
+                    "operation": "repodata-signature-write", "errno": "EACCES",
+                    "target": "repodata/repomd.xml.asc", "causal_code": "PermissionError"}
+            self.mutate_receipt("rpm", system, block)
+            directory = self.inputs / ("candidate-rpm-" + system)
+            manifest = json.loads((directory / "artifact-manifest.json").read_bytes())
+            receipt = json.loads((directory / ("rpm-" + system + ".json")).read_bytes())
+            validate_rpm_custody(directory, manifest, receipt)
+        code, record = self.finish()
+        self.assertEqual(code, 2)
+        self.assertEqual(record["qualification_verdict"], "not-qualified")
+        self.assertEqual(len(record["rpm_lint_results"]), 8)
+        for view in record["rpm_lint_results"]:
+            self.assertTrue(view["policy"]["accepted"])
+            self.assertEqual(view["downstream_dnf"]["status"], "not-run")
+        for system in ("x86_64-linux", "aarch64-linux"):
+            directory = self.inputs / ("candidate-rpm-" + system)
+            raw_path = next(directory.rglob("rpmlint-*.json"))
+            raw_path.write_bytes(raw_path.read_bytes() + b" ")
+        code, record = self.finish()
+        self.assertEqual(code, 2)
+        for system in ("x86_64-linux", "aarch64-linux"):
+            self.assertIn("candidate-rpm-" + system + ":CUSTODY_HASH", record["blocking_reasons"])
+
     def test_allowed_darwin_offline_not_run_is_truthful(self):
         def change(r):
             next(g for g in r["gates"] if g["name"]=="wheel-offline-isolation").update(
