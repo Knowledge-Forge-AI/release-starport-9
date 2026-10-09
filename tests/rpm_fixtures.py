@@ -48,6 +48,12 @@ def fixture_members(scratch):
 
 def inventory_response(argv, cwd):
     """Return only the new real query shapes; existing identity tests keep control."""
+    if '--eval' in argv and '--target' in argv and argv[argv.index('--eval') + 1].startswith('%{_buildtime}|'):
+        macros = dict(argv[i + 1].split(' ', 1) for i, arg in enumerate(argv) if arg == '--define')
+        values = [macros['_buildtime'], macros['_buildhost'], '', 'noarch', 'linux',
+                  macros['_target_platform'], macros['use_source_date_epoch_as_buildtime'],
+                  macros['source_date_epoch_from_changelog'], macros['build_mtime_policy'], macros['_buildtime']]
+        return CommandReceipt(argv, 0, ('|'.join(values) + '\n').encode(), b'', executed=True)
     if '-q' in argv and argv[-1] == 'rpmlint':
         return CommandReceipt(argv,0,b'rpmlint|2.8.0|2.fc43|noarch\n',b'')
     if '--provides' in argv:
@@ -66,6 +72,18 @@ def inventory_response(argv, cwd):
         else:
             lines.append(f'{path}|{inode}|1|0')
     return CommandReceipt(argv,0,('\n'.join(lines)+'\n').encode(),b'')
+
+
+def write_source_rpm_fixture(argv, cwd):
+    """Explicit source-RPM tool double for the -ba contract; no real RPM claim."""
+    if '--target' not in argv or argv[argv.index('--target') + 1] != 'noarch':
+        return
+    topdir = Path(cwd)
+    spec = next((topdir / 'SPECS').glob('*.spec')).read_bytes()
+    name = re.search(rb'^Name: (.+)$', spec, re.M)[1].decode()
+    version = re.search(rb'^Version: (.+)$', spec, re.M)[1].decode()
+    directory = topdir / 'SRPMS'; directory.mkdir(exist_ok=True)
+    (directory / f'{name}-{version}-1.fc43.src.rpm').write_bytes(b'fixture-source-rpm\n' + spec)
 
 
 def fixture_policy(root):

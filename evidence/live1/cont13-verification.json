@@ -1,0 +1,390 @@
+{
+  "baseline_parent": "ad9d8723dac37e0f81aaa75fbb136b8800a898b3",
+  "deferred_native_proof": [
+    "pinned-RPM-6.0.2-repeated-whole-file-and-source-RPM-equality",
+    "x86_64-aarch64-noarch-whole-file-equality-and-run11-payload-preservation",
+    "DNF-installation-of-exact-identities-and-trust-tamper-positive-controls",
+    "container-ownership-and-fixture-agent-compatibility"
+  ],
+  "evidence_replay": {
+    "accepted_evaluations_verified": 8,
+    "actual_unsigned_noarch_pairs": 2,
+    "available_selected_objects_sha256_verified": 133,
+    "complete_policy_chunks_verified": 80,
+    "compressed_payloads_equal": true,
+    "differing_main_tags": [
+      1006,
+      1007,
+      1094,
+      1122,
+      1146
+    ],
+    "kit_access": "readable",
+    "manager_zip_crc_and_complete_selection_verification": "attributed-to-manager",
+    "original_hosted_owner_mode_errno": "not-captured",
+    "raw_rpmlint": "failed",
+    "reference_regression": "tests/fixtures/rpm-noarch-run11-header-delta.json",
+    "wrapper_clamp_epoch": 1790640000
+  },
+  "full_live1_qualification": false,
+  "handoff": {
+    "attended_run": 12,
+    "manager_acceptance_required": true,
+    "operator": "operators/live1/run-hosted12.py",
+    "triggered": false
+  },
+  "historical_run": {
+    "blocking_class": "HOSTED_GATES",
+    "id": 37847967104,
+    "rerun": false,
+    "verdict": "NOT QUALIFIED"
+  },
+  "preserved_unqualified_paths": [
+    "Linux-Nix-NIX_FHS_USERNS",
+    "PRoot-independent-experiment",
+    "Darwin-wheel-offline-not-run",
+    "Pages-TLS-unknown"
+  ],
+  "production_enabled": false,
+  "proposal_binding": {
+    "bytes": 17553,
+    "sha256": "fc6e57aed495da93d0f60f1e344185e927cac78e2e588d28109fc1038b6ff947"
+  },
+  "proposal_disposition": "amend",
+  "publication_authority": false,
+  "review": {
+    "closeout_final_verification": "task-scoped-source-pass-native-proof-pending-externally",
+    "owner": "dispatcher",
+    "pre_final": "reviewed_with_findings-advisory",
+    "terminal_revision_receives_no_additional_independent_review": true
+  },
+  "schema": "rs9.cont13-source-verification.v1",
+  "scratch": {
+    "persistent_root_exception": "filesystem-sandbox-allows-workspace-and-system-temporary-roots-only",
+    "persistent_shared_root_written": false,
+    "retention": "raw-test-logs-retained-only-in-ephemeral-task-directory;sanitized-counts-and-hashes-retained-here",
+    "verification_logs": "ephemeral-sandbox-temporary-files"
+  },
+  "status": "terminal-source-amended-scoped-verification-pass-native-proof-pending",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT13-HOSTED11-RPM-REPOSITORY1",
+  "terminal_closeout": {
+    "amendments": [
+      "unavailable-unsigned-custody-verification-not-run-detected-mutation-fails",
+      "createrepo_c-tool-identity-in-family-Pages-and-host-write-diagnostics",
+      "scope-Burst-dual-architecture-test-policy-to-current-build;force-distinct-archive-times"
+    ],
+    "disposition": "amend",
+    "finding_dispositions": [
+      {
+        "disposition": "retain-with-pinned-source-citation",
+        "evidence": "RPM-6.0.2-build/build.cc-getBuildTime-explicitly-consumes-_buildtime",
+        "finding": 1,
+        "source": "https://github.com/rpm-software-management/rpm/blob/rpm-6.0.2-release/build/build.cc"
+      },
+      {
+        "disposition": "native-proof-deferred",
+        "evidence": "noarch-SRPM-digests-and-copies-already-retained;cross-system-closure-spec-and-whole-file-equality-pending",
+        "finding": 2
+      },
+      {
+        "disposition": "native-proof-deferred",
+        "evidence": "distinct-real-owner-needs-root-authority-unavailable",
+        "finding": 3
+      },
+      {
+        "disposition": "amend",
+        "evidence": "absent-or-unreadable-custody-check-not-run;CUSTODY_HASH-remains-fail",
+        "finding": 4
+      },
+      {
+        "disposition": "retain-existing-gate-mapping",
+        "evidence": "custody-bundle-and-fixture-preparation-prerequisites-block-indexing;exact-causal-substage-retained",
+        "finding": 5
+      },
+      {
+        "disposition": "amend",
+        "evidence": "exact-owned-umask-wrapper-resolves-to-createrepo_c;real-CommandReceipt-command-used",
+        "finding": 6
+      }
+    ],
+    "fixture_failure_disposition": {
+      "cause": "test-policy-root-scan-selects-other-architecture-fixture-archive",
+      "correction": "current-build-only-fixture-policy;distinct-archive-times-retained-in-regression",
+      "focused_followup": {
+        "skips": 0,
+        "success": true,
+        "tests_run": 18
+      },
+      "observed": "umask-077-aarch64-Burst-unit-policy-rejection",
+      "reproduction": "forced-distinct-gzip-times-reproduced-asset-identity-mismatch",
+      "runtime_and_production_policy_changed": false
+    },
+    "initial_verification_attempts": [
+      {
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "log_sha256": "ec1740fab094ada83ce73cc8aa19f2b58dc89e456612cd2b1f8ee90d405f81a5",
+        "resource_warning_policy": "error",
+        "seconds": 63.214,
+        "skip_reasons": [
+          "GnuPG binary not available",
+          "GnuPG binary not available in environment",
+          "Real GnuPG binary not available on this host",
+          "both live capture directories required",
+          "distinct real writer ownership needs root and POSIX fork",
+          "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+          "live capture directory not supplied",
+          "native pinned RPM 6.0.2 tools unavailable",
+          "official archive directory not locatable",
+          "sandbox denies local socket creation; socket record grammar tested separately"
+        ],
+        "skipped_events": 17,
+        "success": true,
+        "successes": 1587,
+        "tests_run": 1603,
+        "umask": "022",
+        "unraisable_or_resource_warnings": false
+      },
+      {
+        "errors": 1,
+        "failure_ids": [
+          "test_build_rpm.BuildRpmTests.test_burst_native_accepted_with_empty_messages_x86_64_and_aarch64 (arch='aarch64')"
+        ],
+        "failures": 0,
+        "log_sha256": "f5ddcf3b5f40daa4b967c72d7ddab9caf2d3b94e2c128e958363428670f4ffb7",
+        "resource_warning_policy": "error",
+        "seconds": 63.427,
+        "skip_reasons": [
+          "GnuPG binary not available",
+          "GnuPG binary not available in environment",
+          "Real GnuPG binary not available on this host",
+          "both live capture directories required",
+          "distinct real writer ownership needs root and POSIX fork",
+          "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+          "live capture directory not supplied",
+          "native pinned RPM 6.0.2 tools unavailable",
+          "official archive directory not locatable",
+          "sandbox denies local socket creation; socket record grammar tested separately"
+        ],
+        "skipped_events": 17,
+        "success": false,
+        "successes": 1586,
+        "tests_run": 1603,
+        "umask": "077",
+        "unraisable_or_resource_warnings": false
+      }
+    ],
+    "manager_disposition_of_terminal_binding_required": true,
+    "provider_local_actions": {
+      "Pages_deployed": false,
+      "dispatcher_finalization": "outside-provider-local-authority",
+      "production_publish_performed": false,
+      "repository_git_metadata_mutated": false,
+      "run12_operator_executed": false,
+      "workflow_triggered": false
+    },
+    "reviewed_binding": {
+      "head": "ad9d8723dac37e0f81aaa75fbb136b8800a898b3",
+      "manifest_sha256": "1c8cc1131f2c6206df2e592899d06afd811bb304d01a269b069416171c5313fc",
+      "tree": "75cd11b59c05145f6da5b0b69bd2e65e6b95d45a"
+    },
+    "verification": {
+      "full_unit_discovery": "both-final-attempts-pass",
+      "implementation_bytes_match_tested_inventory": true,
+      "no_additional_substantive_review_obtained": true,
+      "reporting_and_manifest_checks": "inventory-links-credentials-whitespace-readiness-pass"
+    },
+    "worker_use": {
+      "disposition": "declined",
+      "reason": "small-coupled-terminal-corrections-and-parent-verification"
+    }
+  },
+  "verification": {
+    "candidate_inventory": "complete",
+    "captured_reference_regression": "passed-for-four-exact-supplied-unsigned-RPMs-with-hash-and-payload-byte-checks",
+    "credential_and_hygiene_checks": "pass",
+    "dependencies_and_workflow_bytes": "unchanged",
+    "diff_whitespace": "pass",
+    "filesystem_permissions": {
+      "actual-custody-read-denial": "pass",
+      "actual-index-read-denial": "pass",
+      "actual-signature-write-denial": "pass",
+      "distinct-real-owner": "not-run-root-authority-unavailable",
+      "same-writer-positive": "pass",
+      "umasks": [
+        "022",
+        "077"
+      ]
+    },
+    "fixture_fix_focused_followup": {
+      "errors": 0,
+      "failures": 0,
+      "skipped_events": 0,
+      "tests_run": 18
+    },
+    "focused_terminal_regressions": {
+      "errors": 0,
+      "failures": 0,
+      "scope": "repository sequence, ownership and operation diagnostics",
+      "skipped_events": 1,
+      "tests_run": 43
+    },
+    "fresh_public_main_readback": "unavailable-sandbox-network-and-web-tool;no-fresh-live-parity-claim",
+    "full_unit_discovery": [
+      {
+        "attempt": "post-fixture-fix",
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "implementation_inventory_sha256": "7ca75ff3463a0c8cfcfdfef1cb7655c70f1e30c905911c4f9897f3b33edafa54",
+        "log_sha256": "80275701dc8bc8b12a31604a130d71355789736497edc55b1c9f071b6dcdee65",
+        "resource_warning_policy": "error",
+        "seconds": 63.426,
+        "skip_reasons": [
+          "GnuPG binary not available",
+          "GnuPG binary not available in environment",
+          "Real GnuPG binary not available on this host",
+          "both live capture directories required",
+          "distinct real writer ownership needs root and POSIX fork",
+          "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+          "live capture directory not supplied",
+          "native pinned RPM 6.0.2 tools unavailable",
+          "official archive directory not locatable",
+          "sandbox denies local socket creation; socket record grammar tested separately"
+        ],
+        "skipped_events": 17,
+        "success": true,
+        "successes": 1587,
+        "tests_run": 1603,
+        "umask": "022",
+        "unraisable_or_resource_warnings": false
+      },
+      {
+        "attempt": "post-fixture-fix",
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "implementation_inventory_sha256": "7ca75ff3463a0c8cfcfdfef1cb7655c70f1e30c905911c4f9897f3b33edafa54",
+        "log_sha256": "f17dd64fcc8ca72bb479fce7f45dba25388dc105ef4d6c23be2050c8e8ce625b",
+        "resource_warning_policy": "error",
+        "seconds": 58.529,
+        "skip_reasons": [
+          "GnuPG binary not available",
+          "GnuPG binary not available in environment",
+          "Real GnuPG binary not available on this host",
+          "both live capture directories required",
+          "distinct real writer ownership needs root and POSIX fork",
+          "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+          "live capture directory not supplied",
+          "native pinned RPM 6.0.2 tools unavailable",
+          "official archive directory not locatable",
+          "sandbox denies local socket creation; socket record grammar tested separately"
+        ],
+        "skipped_events": 17,
+        "success": true,
+        "successes": 1587,
+        "tests_run": 1603,
+        "umask": "077",
+        "unraisable_or_resource_warnings": false
+      }
+    ],
+    "git_index_unchanged": true,
+    "implementation_inventory_sha256": "7ca75ff3463a0c8cfcfdfef1cb7655c70f1e30c905911c4f9897f3b33edafa54",
+    "late_failure_seams": "accepted-policy-raw-failed-lint-complete-chunks-custody-signing-metadata-client-and-secondary-failures-pass",
+    "local_document_links": "pass",
+    "local_document_links_checked": 43,
+    "native_proof": "pending-externally-in-one-manager-accepted-attended-run12",
+    "product_delta_paths": 26,
+    "resource_warning_policy": "error",
+    "runner_receipt_integration": "real-ContainerRunner-and-CommandReceipt-classes-with-explicit-modeled-native-transport",
+    "saved_remote_main_reference_matches_local_main": true,
+    "summary_chunk_raw_hash_contracts": "pass-in-final-unit-discovery-for-accepted-policy-and-late-failed-lanes",
+    "test_counting_note": "tests_run includes 16 individual skips; one class skip is an additional event; successes counts addSuccess directly",
+    "unrelated_local_state_preserved": true,
+    "workflow_contract_checks": "pass-in-final-unit-discovery"
+  },
+  "work_stage_verification": {
+    "candidate_inventory": "complete",
+    "captured_reference_regression": "passed-for-four-exact-supplied-unsigned-RPMs",
+    "credential_and_hygiene_checks": "pass",
+    "dependencies_and_workflow_bytes": "unchanged",
+    "diff_whitespace": "pass",
+    "filesystem_permissions": {
+      "actual-index-read-denial": "pass",
+      "actual-signature-write-denial": "pass",
+      "distinct-real-owner": "not-run-root-authority-unavailable",
+      "same-writer-positive": "pass",
+      "umasks": [
+        "022",
+        "077"
+      ]
+    },
+    "full_unit_discovery": [
+      {
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "log_sha256": "fa00b9d51f0251eff7280c006f658bf0efd171905b1907142bbe91e19bcfab47",
+        "seconds": 60.612,
+        "skip_reasons": [
+          "GnuPG binary not available",
+          "GnuPG binary not available in environment",
+          "Real GnuPG binary not available on this host",
+          "both live capture directories required",
+          "distinct real writer ownership needs root and POSIX fork",
+          "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+          "live capture directory not supplied",
+          "native pinned RPM 6.0.2 tools unavailable",
+          "official archive directory not locatable",
+          "sandbox denies local socket creation; socket record grammar tested separately"
+        ],
+        "skipped": 17,
+        "success": true,
+        "tests": 1598,
+        "umask": "022"
+      },
+      {
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "log_sha256": "5c2ec2eed8f130d08ed624dca1d1fa314cf060aa09b789d089291491343fd347",
+        "seconds": 65.561,
+        "skip_reasons": [
+          "GnuPG binary not available",
+          "GnuPG binary not available in environment",
+          "Real GnuPG binary not available on this host",
+          "both live capture directories required",
+          "distinct real writer ownership needs root and POSIX fork",
+          "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+          "live capture directory not supplied",
+          "native pinned RPM 6.0.2 tools unavailable",
+          "official archive directory not locatable",
+          "sandbox denies local socket creation; socket record grammar tested separately"
+        ],
+        "skipped": 17,
+        "success": true,
+        "tests": 1598,
+        "umask": "077"
+      }
+    ],
+    "git_index_unchanged": true,
+    "late_failure_seams": "accepted-policy-raw-failed-lint-complete-chunks-custody-signing-metadata-client-and-secondary-failures-pass",
+    "local_document_links": "pass",
+    "public_main_matches_local_main": true,
+    "public_main_readback": "read-only-GitHub-commit-API",
+    "resource_warning_policy": "error",
+    "runner_receipt_integration": "real-ContainerRunner-and-CommandReceipt-classes-with-explicit-modeled-native-transport",
+    "unrelated_local_state_preserved": true,
+    "workflow_contract_checks": "pass"
+  },
+  "workers": {
+    "abandoned_cleanup_proven": 1,
+    "admitted_jobs": 4,
+    "completed_cleanup_proven": 3,
+    "dispatcher_checkpoint_satisfied_by_workers": false,
+    "effective_model": "not-observed-in-worker-evidence",
+    "parent_disposition": "partial-results-adopted-and-amended-with-fresh-verification",
+    "requested_kind": "gemini"
+  }
+}

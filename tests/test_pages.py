@@ -5,6 +5,7 @@ import io
 import lzma
 import os
 from pathlib import Path
+import stat
 import struct
 import subprocess
 import tarfile
@@ -13,7 +14,7 @@ import tempfile
 import unittest
 import warnings
 import gc
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from rs9.errors import ContractError
 from rs9.pages import (
@@ -733,6 +734,80 @@ class MerkleInventoryTests(unittest.TestCase):
         for bad_doc in (None, {}, {**doc, "root": "0" * 64}, {**doc, "algorithm": "other"}):
             with self.subTest(doc=bad_doc), self.assertRaises(ContractError):
                 verify_merkle_inventory(bad_doc, self.INVENTORY)
+
+
+class PagesMetadataAndSignerContractTests(unittest.TestCase):
+    def test_pages_metadata_signature_verified_before_assembly(self):
+        from rs9.rpm_repository import sign_metadata, prepare_public_directory
+        from tests.test_repo_apt import FixtureSigner
+        from rs9.build_native import CommandReceipt
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            arch_dir = root / "rpm" / "fedora/43" / "x86_64"
+            prepare_public_directory(arch_dir / "Packages", root / "rpm")
+            repodata = arch_dir / "repodata"
+            repodata.mkdir(mode=0o755)
+            os.chmod(repodata, 0o755)
+            repomd = repodata / "repomd.xml"
+            repomd.write_bytes(b"<repomd><data>1</data></repomd>\n")
+            os.chmod(repomd, 0o644)
+
+            signer = FixtureSigner()
+            receipt = CommandReceipt(["createrepo_c", str(arch_dir)], 0, b"index created\n", b"")
+            report = sign_metadata(signer, arch_dir, receipt=receipt)
+
+            self.assertEqual(report["status"], "pass")
+            self.assertEqual(report["operation"], "repository-metadata")
+            self.assertEqual(report["verified_issuer"], signer.primary_fingerprint)
+            sig_file = repodata / "repomd.xml.asc"
+            self.assertTrue(sig_file.is_file())
+            self.assertEqual(stat.S_IMODE(sig_file.stat().st_mode), 0o644)
+
+            # Verification of signature on disk
+            verified = signer.verify(repomd.read_bytes(), sig_file.read_bytes())
+            self.assertEqual(verified["verified_issuer"], signer.primary_fingerprint)
+
+    def test_pages_signer_contract_no_root_writer(self):
+        from rs9.hosted_deb import ContainerRunner, _user
+
+        with patch("rs9.hosted_deb.os.getuid", return_value=1001), patch("rs9.hosted_deb.os.getgid", return_value=1002):
+            user_val = _user()
+            self.assertEqual(user_val, "1001:1002")
+            runner = ContainerRunner(None, "fedora:43", platform="linux/amd64", user=user_val)
+            argv = runner.docker_argv(["rpmsign", "pkg.rpm"])
+            self.assertIn("--user", argv)
+            self.assertIn("1001:1002", argv)
+            self.assertIn("HOME=/tmp", argv)
+
+    def test_pages_metadata_verification_failure_raises_contract_error_with_receipt_hashes(self):
+        from rs9.rpm_repository import sign_metadata
+        from tests.test_repo_apt import FixtureSigner
+        from rs9.build_native import CommandReceipt
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repodata = root / "repodata"
+            repodata.mkdir(mode=0o755)
+            repomd = repodata / "repomd.xml"
+            repomd.write_bytes(b"<repomd/>\n")
+            os.chmod(repomd, 0o644)
+
+            signer = FixtureSigner(fingerprint="A" * 40)
+            tamper_signer = MagicMock()
+            tamper_signer.detach_sign.return_value = b"corrupted-signature"
+            tamper_signer.verify.side_effect = ContractError("VERIFICATION_FAILED", "Bad signature")
+
+            receipt = CommandReceipt(["createrepo_c", str(root)], 0, b"out", b"err")
+            with self.assertRaises(ContractError) as caught:
+                sign_metadata(tamper_signer, root, receipt=receipt)
+
+            self.assertEqual(caught.exception.code, "RPM_REPOSITORY_OPERATION")
+            details = caught.exception.details
+            self.assertEqual(details["substage"], "signature-verify")
+            self.assertEqual(details["causal_code"], "VERIFICATION_FAILED")
+            self.assertEqual(details["stdout_sha256"], receipt.stdout_sha256)
+            self.assertEqual(details["stderr_sha256"], receipt.stderr_sha256)
 
 
 if __name__ == "__main__":

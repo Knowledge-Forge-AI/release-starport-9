@@ -1696,38 +1696,64 @@ def _custody_unique(bundles: Sequence[dict[str, Any]]) -> dict[str, Path]:
 
 
 def _rpm_custody_unique(bundles: Sequence[dict[str, Any]]) -> dict[str, Path]:
-    """Same noarch package filename or product across RPM lanes must be byte-identical."""
-    unique: dict[str, Path] = {}
-    products: dict[str, tuple[str, Path]] = {}
+    """Reject conflicting complete bytes; header deltas explain, never relax, equality."""
+    from rs9.rpm_header import header_delta
+    unique, products, origins = {}, {}, {}
+    seen = set()
     for bundle in bundles:
+        family, system = bundle["manifest"]["family"], bundle["manifest"]["system"]
+        if (family, system) in seen:
+            raise ContractError("CUSTODY_CONFLICT", "Duplicate RPM family/system custody bundle",
+                                details={"family": family, "system": system, "substage": "rpm-custody-unique"})
+        seen.add((family, system))
         _validate_bundle_architectures(bundle)
         for name, path in bundle["packages"].items():
-            path_bytes = path.read_bytes()
-            path_sha = digest(path_bytes)
-            if name in unique and digest(unique[name].read_bytes()) != path_sha:
-                raise ContractError("CUSTODY_CONFLICT", "RPM package bytes differ between lanes")
+            product = next((p for p in REQUIRED_PRODUCTS if name.startswith(p + "-")), None)
+            prior = unique.get(name)
             if name.endswith(".noarch.rpm"):
-                product = next((p for p in REQUIRED_PRODUCTS if name.startswith(p + "-")), None)
                 if product is None:
                     raise ContractError("CUSTODY_CONFLICT", "Unknown noarch RPM product")
                 if product in products:
-                    prior_name, prior_path = products[product]
-                    if prior_name != name or digest(prior_path.read_bytes()) != path_sha:
-                        raise ContractError("CUSTODY_CONFLICT", "Noarch RPM package bytes differ between lanes")
+                    prior_name, prior = products[product]
+                else:
+                    prior_name = name
+            else:
+                prior_name = name
+            if prior is not None and (prior_name != name or prior.read_bytes() != path.read_bytes()):
+                before, after = prior.read_bytes(), path.read_bytes()
+                details = {"substage": "rpm-custody-unique", "target": name, "product": product,
+                           "system": system, "expected_digest": digest(before), "actual_digest": digest(after)}
+                error = ContractError("CUSTODY_CONFLICT", "RPM candidate bytes differ between lanes", details=details)
+                report = {**error.details, "first_system": origins[prior], "second_system": system}
+                try:
+                    delta = header_delta(before, after)
+                    report.update(header_delta=delta[:16], header_delta_count=len(delta),
+                                  header_delta_complete=len(delta) <= 16)
+                    error.header_delta = delta[:16]
+                except ValueError:
+                    report["header_delta_status"] = "unavailable"
+                error.custody_conflict = report
+                error.conflict_package = name
+                error.package_sha256 = digest(after)
+                raise error
+            if name.endswith(".noarch.rpm"):
                 products.setdefault(product, (name, path))
             unique.setdefault(name, path)
+            origins.setdefault(path, system)
     return unique
 
 
-def _run_tool_container(host: RecordingRunner, image: str, platform: str, work: Path, argv: list[str], *, network: bool = False) -> None:
+def _run_tool_container(host: RecordingRunner, image: str, platform: str, work: Path, argv: list[str], *, network: bool = False) -> CommandReceipt:
     runner = ContainerRunner(host, image, platform=platform, mounts=[(str(work), str(work), True)],
                              user=_user(), network=network)
     receipt = runner.run(argv, cwd=work)
     if receipt.exit_code != 0:
-        tool = Path(argv[0]).name if argv else "tool"
-        raise ContractError("METADATA_BUILD_FAILED", f"{argv[0]} failed with exit code {receipt.exit_code}",
+        from rs9.rpm_repository import command_tool
+        tool = command_tool(argv)
+        raise ContractError("METADATA_BUILD_FAILED", f"{tool} failed with exit code {receipt.exit_code}",
                             details={"substage": "metadata", "tool": tool, "exit_code": receipt.exit_code,
                                      "stdout_sha256": receipt.stdout_sha256, "stderr_sha256": receipt.stderr_sha256})
+    return receipt
 
 
 PAGES_GATES = ("pages-repository-objects", "pages-inventory-integrity", "pages-privacy-scan", "pages-client.apt", "pages-client.dnf", "pages-client.pacman")
@@ -1851,16 +1877,20 @@ def _assemble_and_test_pages(
         wrong_rpm, wrong_rpm_owned = _new_wrong_signer(context)
         if wrong_rpm_owned:
             closers.append(wrong_rpm)
+        from rs9.rpm_repository import prepare_public_directory, sign_metadata, metadata_command, audit_owned_tree
         for arch, system in (("x86_64", "x86_64-linux"), ("aarch64", "aarch64-linux")):
             arch_dir = stage / "rpm" / "fedora/43" / arch
-            (arch_dir / "Packages").mkdir(parents=True)
+            prepare_public_directory(arch_dir / "Packages", stage / "rpm")
             for name, path in sorted(bundles[("rpm", system)]["packages"].items()):
-                shutil.copyfile(path, arch_dir / "Packages" / name)
+                target_pkg = arch_dir / "Packages" / name
+                shutil.copyfile(path, target_pkg)
+                os.chmod(target_pkg, 0o644)
                 from rs9.hosted_packaging import sign_rpm
-                signer = ContainerRunner(host,rpm_tag,platform="linux/amd64",
-                    mounts=[(str(stage),str(stage),True),(str(fixture.homedir),str(fixture.homedir),True)]
-                        + ([(str(wrong_rpm.homedir),str(wrong_rpm.homedir),True)]
-                           if getattr(wrong_rpm, "homedir", None) else []))
+                signer = ContainerRunner(host, rpm_tag, platform="linux/amd64",
+                    mounts=[(str(stage), str(stage), True), (str(fixture.homedir), str(fixture.homedir), True)]
+                        + ([(str(wrong_rpm.homedir), str(wrong_rpm.homedir), True)]
+                           if getattr(wrong_rpm, "homedir", None) else []),
+                    user=_user())
                 matches = [(capture, intent) for capture, intent, _ in context["captures"]
                            if name.startswith(intent["project"]["id"] + "-" +
                                               str(intent["version"]) + "-")]
@@ -1868,16 +1898,35 @@ def _assemble_and_test_pages(
                     raise ContractError("RPM_SIGNING", "Custody RPM has no unique intended product")
                 _, intent = matches[0]
                 from rs9.product_classes import is_pure_js_cli
-                rpm_signing_identities.append(sign_rpm(signer, arch_dir / "Packages" / name, fixture,
+                rpm_signing_identities.append(sign_rpm(signer, target_pkg, fixture,
                     wrong_fixture=wrong_rpm, diagnostics_dir=scratch / "diagnostics",
                     expected={"package_sha256": bundles[("rpm", system)]["manifest"]["files"][name]["sha256"],
                               "name": intent["project"]["id"], "version": str(intent["version"]),
                               "arch": "noarch" if is_pure_js_cli(intent["project"]["id"]) else arch,
                               "revision": 1}))
-            _run_tool_container(host, rpm_tag, "linux/amd64", stage,
-                                ["createrepo_c", "--no-database", "--compress-type", "gz", "-s", "sha256", str(arch_dir)])
-            repomd = arch_dir / "repodata/repomd.xml"
-            (arch_dir / "repodata/repomd.xml.asc").write_bytes(fixture.detach_sign(repomd.read_bytes(), armor=True))
+            receipt = _run_tool_container(
+                host, rpm_tag, "linux/amd64", stage,
+                metadata_command(arch_dir, sha256=True),
+            )
+            rpm_report = sign_metadata(fixture, arch_dir, receipt=receipt)
+            details.setdefault("rpm_metadata_reports", {})[arch] = rpm_report
+        rpm_tree_report = audit_owned_tree(stage / "rpm")
+        details["rpm_staging_public_modes"] = rpm_tree_report
+        if rpm_tree_report["status"] != "pass":
+            raise ContractError("RPM_REPOSITORY_OPERATION", "Pages RPM public staging audit failed")
+        for home in (fixture.homedir, getattr(wrong_rpm, "homedir", None)):
+            if home is not None:
+                private_report = audit_owned_tree(home, expected_file_mode=None, expected_dir_mode=None)
+                if private_report["status"] != "pass":
+                    raise ContractError("RPM_REPOSITORY_OPERATION", "Pages fixture writer ownership audit failed",
+                                        details={"substage": "fixture-ownership-audit", "target": "fixture"})
+        # Fixture signing changes copies only; both lane custody identities remain exact.
+        for system in ("x86_64-linux", "aarch64-linux"):
+            bundle = bundles[("rpm", system)]
+            for name, path in bundle["packages"].items():
+                if digest(path.read_bytes()) != bundle["manifest"]["files"][name]["sha256"]:
+                    raise ContractError("CUSTODY_HASH", "Unsigned Pages RPM custody changed",
+                                        details={"system": system, "target": name})
         pac_dir = stage / "pacman/x86_64"
         pac_dir.mkdir(parents=True)
         for name, path in sorted(bundles[("pacman", "x86_64-linux")]["packages"].items()):
@@ -1942,6 +1991,10 @@ def _assemble_and_test_pages(
             artifacts.extend(p for p in tree_files if not p.name.endswith((".deb",".pkg.tar.zst")))
             details["pages_tree_custody"] = "split-index-and-fixture-rpm-objects;apt-pacman-in-family-custody"
     except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
+        if hasattr(err, "custody_conflict"):
+            details["custody_conflict"] = err.custody_conflict
+        if isinstance(err, ContractError) and err.code == "RPM_REPOSITORY_OPERATION":
+            details["repository_failure"] = err.details
         for name in PAGES_GATES:
             if not any(g["name"] == name for g in gates):
                 gates.append(_gate(name, "not-run" if isinstance(err, NativePrerequisiteUnavailable) else "fail",

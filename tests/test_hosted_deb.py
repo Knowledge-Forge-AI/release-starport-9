@@ -19,7 +19,7 @@ import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from rs9 import hosted_deb as hd
 from rs9 import client_inventory as ci
@@ -190,8 +190,11 @@ class ScriptedDocker:
         if "createrepo_c" in a:
             repodata = Path(a[-1]) / "repodata"
             repodata.mkdir(exist_ok=True)
+            repodata.chmod(0o755)
             (repodata / "repomd.xml").write_bytes(b"<repomd/>\n")
             (repodata / "primary.xml.gz").write_bytes(gzip.compress(b"<metadata/>", mtime=0))
+            for path in repodata.iterdir():
+                path.chmod(0o644)
             return self.receipt(a)
         return self.receipt(a)
 
@@ -1614,6 +1617,13 @@ class PagesLaneTests(unittest.TestCase):
             verified = verify_apt_signatures(self.scratch / "pages-tree/apt", fixture)
             self.assertTrue(verified["signature_authenticated"])
             self.assertEqual(verified["verified_issuer"], fixture.primary_fingerprint)
+            # RPM metadata in the assembled tree is verified.
+            rpm_repomd = self.scratch / "pages-tree/rpm/fedora/43/x86_64/repodata/repomd.xml"
+            rpm_sig = self.scratch / "pages-tree/rpm/fedora/43/x86_64/repodata/repomd.xml.asc"
+            self.assertTrue(rpm_repomd.is_file())
+            self.assertTrue(rpm_sig.is_file())
+            rpm_ver = fixture.verify(rpm_repomd.read_bytes(), rpm_sig.read_bytes())
+            self.assertEqual(rpm_ver["verified_issuer"], fixture.primary_fingerprint)
         validate_execution_result(result)
         self._assert_assembled_tree_coverage(result, fixture, docker)
 
@@ -1631,6 +1641,12 @@ class PagesLaneTests(unittest.TestCase):
             verified = verify_apt_signatures(self.scratch / "pages-tree/apt", fixture)
             self.assertTrue(verified["signature_authenticated"])
             self.assertEqual(verified["verified_issuer"], fixture.primary_fingerprint)
+            rpm_repomd = self.scratch / "pages-tree/rpm/fedora/43/x86_64/repodata/repomd.xml"
+            rpm_sig = self.scratch / "pages-tree/rpm/fedora/43/x86_64/repodata/repomd.xml.asc"
+            self.assertTrue(rpm_repomd.is_file())
+            self.assertTrue(rpm_sig.is_file())
+            rpm_ver = fixture.verify(rpm_repomd.read_bytes(), rpm_sig.read_bytes())
+            self.assertEqual(rpm_ver["verified_issuer"], fixture.primary_fingerprint)
         validate_execution_result(result)
         self._assert_assembled_tree_coverage(result, fixture, docker)
 
@@ -1770,6 +1786,23 @@ class RpmCustodyTests(unittest.TestCase):
         with self.assertRaises(ContractError) as caught:
             hd._rpm_custody_unique([b1, b2])
         self.assertEqual(caught.exception.code, "CUSTODY_CONFLICT")
+
+    def test_rpm_custody_unique_diagnostic_conflict_details_with_header_delta(self):
+        b1 = self.make_bundle("rpm", "x86_64-linux", {
+            "theme-forge-stellar-loom-1.0.0-1.fc43.noarch.rpm": b"bytes-1",
+        })
+        b2 = self.make_bundle("rpm", "aarch64-linux", {
+            "theme-forge-stellar-loom-1.0.0-1.fc43.noarch.rpm": b"bytes-2",
+        })
+        mock_rpm_header = MagicMock()
+        mock_rpm_header.header_delta.return_value = [100, 200, 300]
+        with patch.dict("sys.modules", {"rs9.rpm_header": mock_rpm_header}):
+            with self.assertRaises(ContractError) as caught:
+                hd._rpm_custody_unique([b1, b2])
+            self.assertEqual(caught.exception.code, "CUSTODY_CONFLICT")
+            self.assertEqual(caught.exception.details.get("substage"), "rpm-custody-unique")
+            self.assertEqual(caught.exception.details.get("target"), "theme-forge-stellar-loom-1.0.0-1.fc43.noarch.rpm")
+            self.assertEqual(caught.exception.header_delta, [100, 200, 300])
 
     def test_rpm_custody_unique_allows_different_native_packages(self):
         b1 = self.make_bundle("rpm", "x86_64-linux", {

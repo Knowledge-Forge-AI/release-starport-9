@@ -1,4 +1,5 @@
 """Unsigned custody plus real fixture-signed pacman and RPM client qualification."""
+from contextlib import ExitStack, contextmanager
 import json
 import os
 from pathlib import Path
@@ -18,6 +19,7 @@ from rs9.rpm_query import query_rpm_identity, query_rpm_payload_digest, query_rp
 from rs9.scratch import canonical
 from rs9.signing_fixture import SigningFixture
 from rs9.rpm_client_runtime import prepare_client, verify_client_image
+from rs9.rpm_repository import command_tool
 
 FIXTURE_ARMOR = "rs9-candidate-fixture-NONPRODUCTION.asc"
 FIXTURE_KEYRING = "rs9-candidate-fixture-NONPRODUCTION.gpg"
@@ -58,7 +60,7 @@ def checked(runner, argv, **kwargs):
     substage = kwargs.pop("substage", "native-tool")
     receipt = runner.run(argv, **kwargs)
     if receipt.exit_code or not receipt.executed:
-        tool_name = Path(argv[0]).name if argv else "tool"
+        tool_name = command_tool(argv)
         details = {
             "substage": substage,
             "tool": tool_name,
@@ -66,7 +68,7 @@ def checked(runner, argv, **kwargs):
             "stdout_sha256": receipt.stdout_sha256,
             "stderr_sha256": receipt.stderr_sha256,
         }
-        raise ContractError("NATIVE_TOOL", "Actual native command failed: " + argv[0], details=details)
+        raise ContractError("NATIVE_TOOL", "Actual native command failed: " + tool_name, details=details)
     return receipt
 
 
@@ -107,6 +109,7 @@ def sign_rpm(runner, path, fixture, *, expected=None, wrong_fixture=None, diagno
         "checks": {},
     }
 
+    primary_error = None
     try:
         probe_record["rpm_version"] = _receipt_summary(runner.run(["rpm", "--version"]))
         isolated = rpm_isolation_args(dbpath=db, keyring=keyring_type, keyringpath=keyring_dir)
@@ -288,11 +291,23 @@ def sign_rpm(runner, path, fixture, *, expected=None, wrong_fixture=None, diagno
         probe_record["checks"]["payload_digest_preserved"] = True
         probe_record["status"] = "pass"
     except Exception as exc:
+        primary_error = exc
         probe_record["status"] = "fail"
         probe_record["error_code"] = getattr(exc, "code", type(exc).__name__)
         raise
     finally:
-        _write_probe_diagnostic(diag_dir, probe_record, path.name)
+        try:
+            _write_probe_diagnostic(diag_dir, probe_record, path.name)
+        except Exception as secondary:
+            if primary_error is None:
+                primary_error = ContractError("RPM_PROBE_CUSTODY", "Signing probe retention failed",
+                    details={"substage": "package-signing-probe-retention", "target": path.name,
+                             "causal_code": getattr(secondary, "code", type(secondary).__name__)})
+                primary_error.rpm_probe_record = probe_record
+                raise primary_error from secondary
+            primary_error.rpm_probe_record = probe_record
+            primary_error.secondary_diagnostics = [{"operation": "signing-probe-write",
+                "code": getattr(secondary, "code", type(secondary).__name__)}]
 
     return {
         "unsigned_sha256": before,
@@ -311,11 +326,14 @@ def sign_rpm(runner, path, fixture, *, expected=None, wrong_fixture=None, diagno
     }
 
 
-def write_keys(directory, fixture):
+def write_keys(directory, fixture, write_file=None):
+    writer = write_file or (lambda p, d: Path(p).write_bytes(d))
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / FIXTURE_ARMOR).write_bytes(_fixture_public_armor(fixture))
-    (directory / FIXTURE_KEYRING).write_bytes(fixture.public_key_binary)
-    (directory / "KEY-METADATA.json").write_bytes(canonical({"production": False, "fixture": True,
+    if write_file is not None:
+        directory.chmod(0o755)
+    writer(directory / FIXTURE_ARMOR, _fixture_public_armor(fixture))
+    writer(directory / FIXTURE_KEYRING, fixture.public_key_binary)
+    writer(directory / "KEY-METADATA.json", canonical({"production": False, "fixture": True,
         "fingerprint": fixture.primary_fingerprint, "purpose": "NON-PRODUCTION CANDIDATE TEST ONLY"}))
 
 
@@ -378,6 +396,38 @@ def caller_diagnostic(evidence):
             "missing_items": evidence.get("missing_items", [])}
 
 
+@contextmanager
+def _fixture_scope(directory, secondary, *, preserve_cleanup=False):
+    """Close both fixtures while preserving an operation's original exception."""
+    if preserve_cleanup:
+        with SigningFixture(scratch_dir=directory) as fixture, SigningFixture() as wrong:
+            yield fixture, wrong
+        return
+    def close(fixture):
+        try:
+            fixture.__exit__(None, None, None)
+        except Exception as error:
+            secondary.append({"operation": "fixture-cleanup", "code": getattr(error, "code", type(error).__name__)})
+    with ExitStack() as stack:
+        fixture = SigningFixture(scratch_dir=directory)
+        stack.callback(close, fixture)
+        fixture.__enter__()
+        wrong = SigningFixture()
+        stack.callback(close, wrong)
+        wrong.__enter__()
+        yield fixture, wrong
+
+
+def _verify_unsigned_products(products, metadata, bundle):
+    for product, path in products.items():
+        expected = metadata[product]["sha256"]
+        for candidate in (path, bundle / "files" / path.name):
+            if candidate.is_symlink() or digest(candidate.read_bytes()) != expected:
+                raise ContractError("CUSTODY_HASH", "Unsigned candidate changed during fixture operations",
+                                    details={"product": product, "target": candidate.name,
+                                             "substage": "unsigned-custody-verification"})
+
+
 def execute(context):
     # Import lazily: the APT/Pages module shares these native client primitives.
     from rs9.hosted_deb import (ContainerRunner, RecordingRunner, provision_image, client_cycle,
@@ -398,6 +448,17 @@ def execute(context):
     client_tag = "rs9-" + family + "-client:" + uuid.uuid4().hex[:12]
     artifacts, identities = [], []
     client_runtime, caller_evidence, preservation_policy = None, None, None
+    return_result = None
+    current_substage = "builder-provision"
+    failed_product = None
+    from rs9.hosted_deb import _user
+    from rs9.rpm_repository import (sign_metadata, prepare_public_directory, write_public_file,
+                                    audit_owned_tree, metadata_command)
+    late_phase = False
+    secondary_diagnostics = []
+    completed_operations = {}
+    repository_reports = {}
+    repo = bundle = keys = None
     try:
         provision_image(host, "pacman" if family == "pacman" else "dnf", environment["image_ref"],
                         platform, tag, [*tools, *environment["preprovisioned_packages"], *client_tools])
@@ -460,6 +521,9 @@ def execute(context):
                 shutil.copyfile(path, dest)
                 if family == "rpm":
                     witness = result.get("construction_witness")
+                    if isinstance(witness, dict) and isinstance(witness.get("reproducibility"), dict):
+                        witness["reproducibility"]["observed_hosted_environment"] = {
+                            "system": system, "platform": platform, "image_ref": environment["image_ref"]}
                     if verify_construction_witness(witness, dest, pid):
                         construction_witnesses[pid] = witness
                     completed_records["derivation"].add(pid)
@@ -498,6 +562,18 @@ def execute(context):
                     product_metadata[pid].update(rpm_identity=result["manifest"]["rpm_identity"],
                         rpm_payload_digest=result["manifest"]["rpm_payload_digest"])
                 artifacts += [dest, work / ("pacman-manifest.json" if family == "pacman" else "rpm-manifest.json")]
+                if family == "rpm" and result.get("srpm_path") is not None:
+                    # Small noarch SRPM retained for exact SOURCEPKGID diagnosis.
+                    srpm = Path(result["srpm_path"])
+                    expected = result["construction_witness"]["reproducibility"]["source_rpm"]["sha256"]
+                    if srpm.is_symlink() or digest(srpm.read_bytes()) != expected:
+                        raise ContractError("CUSTODY_HASH", "Noarch source RPM differs from construction witness",
+                                            details={"product": pid, "target": srpm.name})
+                    source_dir = scratch / "unsigned-source"
+                    source_dir.mkdir(exist_ok=True)
+                    source_copy = source_dir / srpm.name
+                    write_public_file(source_copy, srpm.read_bytes())
+                    artifacts.append(source_copy)
             except (ContractError, OSError) as error:
                 errors[pid] = error.code if isinstance(error, ContractError) else "PACKAGE_FILESYSTEM"
                 receipts = builder.receipts[mark:]
@@ -675,7 +751,7 @@ def execute(context):
                                    "burst-native-addon-target","burst-native-addon-load"))
             gates.extend({"name":"rpm-trust.tamper."+kind,"status":"not-run","reason":reason}
                          for kind in ("package","index","signature","wrongkey"))
-            return {"gates":gates,"artifacts":artifacts,
+            return_result = {"gates":gates,"artifacts":artifacts,
                     "production_promotion_blockers": ["rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"]
                         if any(p.get("accepted_findings") for p in lint_policy.values()) else [],
                     "details":{"environment":environment,"build_errors":errors,"product_failures":failures,
@@ -686,6 +762,7 @@ def execute(context):
                                "lint_evidence":lint_evidence, "rpm_lint_raw":lint_evidence,
                                "rpm_lint_policy":lint_policy,
                                "diagnostic_scope":"candidate-only-build-and-lint-failures"}}
+            return return_result
         if len(products) != 4 or errors:
             first_product = sorted(errors.keys())[0] if errors else "unknown"
             first_failure = failures.get(first_product, {})
@@ -704,45 +781,75 @@ def execute(context):
                     **{k: v for k, v in first_failure.items() if k != "code"},
                 },
             )
+        late_phase = family == "rpm"
+        current_substage = "custody-bundle"
         bundle = scratch / "unsigned-custody"
         bundle.mkdir()
         write_custody_bundle(bundle, packages={p.name:p.read_bytes() for p in products.values()}, family=family, system=system,
                              authentication_sha256=context["authentication_sha256"], source_commit=context["binding"]["source_commit"])
         artifacts.extend(p for p in bundle.rglob("*") if p.is_file())
+        if family == "rpm":
+            custody_manifest = bundle / "custody-manifest.json"
+            completed_operations["unsigned_custody"] = {"manifest_sha256": digest(custody_manifest.read_bytes()),
+                                                       "merkle": json.loads(custody_manifest.read_bytes())["merkle"]}
+            _verify_unsigned_products(products, product_metadata, bundle)
+        current_substage = "fixture-preparation"
         fixture_dir = scratch / "fixture"
         fixture_dir.mkdir()
-        with SigningFixture(scratch_dir=fixture_dir) as fixture, SigningFixture() as wrong:
+        with _fixture_scope(fixture_dir, secondary_diagnostics, preserve_cleanup=family != "rpm") as (fixture, wrong):
             (scratch / "fixture-identity.json").write_bytes(canonical({"used": True, "production": False,
                 "purpose": "NON-PRODUCTION CANDIDATE TEST ONLY", "fingerprint": fixture.primary_fingerprint,
                 "wrong_key_fingerprint": wrong.primary_fingerprint}))
             keys = scratch / "keys"
-            write_keys(keys, fixture)
+            write_keys(keys, fixture, write_file=write_public_file if family == "rpm" else None)
             repo = scratch / family
             directory = repo / ("x86_64" if family == "pacman" else "fedora/43/" + arch)
             package_directory = directory if family == "pacman" else directory / "Packages"
-            package_directory.mkdir(parents=True)
+            if family == "rpm":
+                prepare_public_directory(package_directory, repo)
+            else:
+                package_directory.mkdir(parents=True)
+            current_substage = "package-signing"
             for pid, path in products.items():
                 testcopy = package_directory / path.name
-                shutil.copyfile(path, testcopy)
                 if family == "rpm":
-                    signer = ContainerRunner(host,tag,platform=platform,mounts=[(str(scratch),str(scratch),True)])
+                    write_public_file(testcopy, path.read_bytes())
+                else:
+                    shutil.copyfile(path, testcopy)
+                if family == "rpm":
+                    failed_product = pid
+                    signer = ContainerRunner(host,tag,platform=platform,mounts=[(str(scratch),str(scratch),True)], user=_user())
                     metadata = product_metadata[pid]
                     identities.append(sign_rpm(signer, testcopy, fixture, expected={
                         "package_sha256": metadata["sha256"], "rpm_identity": metadata["rpm_identity"],
                         "rpm_payload_digest": metadata["rpm_payload_digest"]},
                         wrong_fixture=wrong,
                         diagnostics_dir=scratch / "diagnostics"))
+                    failed_product = None
                 else:
                     (package_directory / (path.name + ".sig")).write_bytes(fixture.detach_sign(path.read_bytes(), armor=False))
                     fixture.verify(path.read_bytes(), (package_directory / (path.name + ".sig")).read_bytes())
-            tool = ContainerRunner(host, tag, platform=platform, mounts=[(str(scratch), str(scratch), True)])
+            current_substage = "repository-metadata"
             if family == "rpm":
-                checked(tool, ["createrepo_c", "--no-database", "--compress-type", "gz", str(directory)])
-                index = directory / "repodata/repomd.xml"
-                (directory / "repodata/repomd.xml.asc").write_bytes(fixture.detach_sign(index.read_bytes(), armor=True))
-                fixture.verify(index.read_bytes(), (directory / "repodata/repomd.xml.asc").read_bytes())
+                tool = ContainerRunner(host, tag, platform=platform, mounts=[(str(scratch), str(scratch), True)], user=_user())
+                meta_receipt = checked(tool, metadata_command(directory), substage="repository-metadata")
+                repository_reports[arch] = sign_metadata(fixture, directory, receipt=meta_receipt)
+                public_report = audit_owned_tree(repo)
+                if public_report["status"] != "pass":
+                    raise ContractError("RPM_REPOSITORY_OPERATION", "Public repository audit failed",
+                                        details={"operation": "repodata-ownership-audit", "substage": "ownership-audit",
+                                                 "target": ".", "causal_code": "AUDIT_FAILED"})
+                for home in (fixture.homedir, wrong.homedir):
+                    report = audit_owned_tree(home, expected_file_mode=None, expected_dir_mode=None)
+                    if report["status"] != "pass":
+                        raise ContractError("RPM_REPOSITORY_OPERATION", "Fixture writer ownership audit failed",
+                                            details={"operation": "package-signing", "substage": "fixture-ownership-audit",
+                                                     "target": "fixture", "causal_code": "AUDIT_FAILED"})
+                completed_operations["repository"] = {"metadata": repository_reports, "public_tree": public_report}
+                _verify_unsigned_products(products, product_metadata, bundle)
                 spec_for = lambda dirs: dnf_spec(dirs["rpm"], keys, arch)
             else:
+                tool = ContainerRunner(host, tag, platform=platform, mounts=[(str(scratch), str(scratch), True)])
                 checked(tool, ["repo-add", str(directory / "rs9.db.tar.gz"), *[str(p) for p in sorted(package_directory.glob("*.pkg.tar.*")) if not p.name.endswith(".sig")]])
                 for suffix in ("db", "files"):
                     link = directory / ("rs9." + suffix)
@@ -755,8 +862,10 @@ def execute(context):
             gates.append({"name": family + "-repository-indexing", "status": "pass"})
             dirs = {family: repo}
             from rs9.hosted_smoke import prepare_smoke
+            current_substage = "client-preparation"
             neb = next(c for c,i,_ in context["captures"] if i["project"]["id"] == "theme-forge-nebular-fusion")
             prepared = prepare_smoke(neb, context["captures"], context["client"], scratch / "application-smoke")
+            current_substage = "client-cycle"
             if family == "rpm":
                 client_image = verify_client_image(host, client_tag, client_runtime,
                                                    environment=environment, arch=arch, system=system)
@@ -769,16 +878,18 @@ def execute(context):
                        products=list(products), repository=repository, prefix=family + "-client", smoke=prepared, system=system,
                        burst_record=_burst_release_record(context["captures"], system),
                        burst_scratch=scratch / "burst-native-probe")
+            gates.extend(rows)
+            gates.extend(burst_client_gates(rows))
+            current_substage = "tamper-cycle"
             (scratch / "tamper").mkdir()
             if family == "rpm":
                 verify_client_image(host, client_tag, client_runtime, environment=environment, arch=arch, system=system)
-            rows += tamper_cycle(host, spec_for, "dnf" if family == "rpm" else "pacman", dirs,
+            tamper_rows = tamper_cycle(host, spec_for, "dnf" if family == "rpm" else "pacman", dirs,
                     image=client_image, platform=platform, product=list(products)[0], work=scratch / "tamper", wrong_signer=wrong, arch=arch,
                     kinds=("package","index","signature","wrongkey"), prefix=family+"-trust",
                     positive_control=evidence.get(list(products)[0],{}).get("positive_control"))
-            gates.extend(rows)
-            gates.extend(burst_client_gates(rows))
-            gates.append({"name": family + "-client-qualification", "status": _fold(rows)})
+            gates.extend(tamper_rows)
+            gates.append({"name": family + "-client-qualification", "status": _fold([*rows, *tamper_rows])})
             artifacts.extend(p for p in [*repo.rglob("*"), *keys.rglob("*")] if p.is_file() and not p.is_symlink())
             manifest = scratch / "native-qualification.json"
             manifest.write_bytes(canonical({"schema": "rs9.native-hosted.v1alpha1", "production": False,
@@ -786,36 +897,117 @@ def execute(context):
                 "rpm_identities": identities, "products": product_metadata, "client": evidence, "build_errors": errors}))
             artifacts.append(manifest)
             artifacts.extend(sorted((scratch / "diagnostics").glob("rpm-signed-query-probe-*.json")))
-    except ContractError as error:
-        if family != "rpm" or error.code not in {"CLIENT_IMAGE_DRIFT", "CLIENT_IMAGE_IDENTITY"}:
+    except Exception as error:
+        if family != "rpm" or not late_phase:
             raise
-        for gate in gates:
-            if gate["name"] == "rpm-client-preparation":
-                gate.update(status="fail", reason=error.code, causal_substage="client-image-verification")
+        secondary_diagnostics.extend(getattr(error, "secondary_diagnostics", []))
+        if hasattr(error, "rpm_probe_record"):
+            completed_operations["unwritten_signing_probe"] = error.rpm_probe_record
+        causal = dict(error.details) if isinstance(error, ContractError) else {}
+        code = error.code if isinstance(error, ContractError) else type(error).__name__
+        substage = causal.get("substage", current_substage)
+        if code in {"CLIENT_IMAGE_DRIFT", "CLIENT_IMAGE_IDENTITY"}:
+            failed_gate = "rpm-client-preparation"
+            substage = "client-image-verification"
+        elif current_substage in {"client-preparation", "client-cycle", "tamper-cycle"}:
+            failed_gate = "rpm-client-qualification"
+        else:
+            failed_gate = "rpm-repository-indexing"
+        failure = {"operation": causal.get("operation", current_substage), "code": code,
+                   "causal_substage": current_substage, **safe_details(causal)}
+        gate = next((g for g in gates if g["name"] == failed_gate), None)
+        if gate is None:
+            gate = {"name": failed_gate}
+            gates.append(gate)
+        gate.update(status="fail", reason=code, causal_substage=substage)
+        pending = ["rpm-repository-indexing", "rpm-client-qualification", "burst-native-addon-target",
+                   "burst-native-addon-load", *["rpm-trust.tamper." + kind for kind in
+                                                ("package", "index", "signature", "wrongkey")]]
         present = {g["name"] for g in gates}
-        for name in ("rpm-client-qualification", "burst-native-addon-target", "burst-native-addon-load",
-                     *["rpm-trust.tamper." + kind for kind in ("package", "index", "signature", "wrongkey")]):
-            if name not in present:
-                gates.append({"name": name, "status": "not-run", "reason": "blocked-by:" + error.code})
-        diagnostic = scratch / "diagnostics/client-image-verification.json"
-        diagnostic.write_bytes(canonical({"status": "fail", "code": error.code, "system": system}))
-        artifacts.append(diagnostic)
-        return {"gates": gates, "artifacts": artifacts,
-                "production_promotion_blockers": ["rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"]
-                    if any(p.get("accepted_findings") for p in lint_policy.values()) else [],
-                "details": {"environment": environment, "rpm_evidence_contract": "rs9.rpm-evidence-contract.v2",
-                            "rpm_lint_raw": lint_evidence, "rpm_lint_policy": lint_policy,
-                            "construction_witnesses": construction_witnesses,
-                            "client_runtime_evidence": client_runtime, "client_image_verification": error.code}}
-    finally:
+        gates.extend({"name": name, "status": "not-run", "reason": "blocked-by:" + failed_gate}
+                     for name in pending if name not in present)
         try:
-            host.run(["docker", "rmi", "-f", tag, client_tag])
-        except (ContractError, OSError):
-            pass
-    details = {"environment": environment}
+            diagnostic = scratch / "diagnostics" / ("rpm-repository-failure-" + system + ".json")
+            diagnostic.parent.mkdir(exist_ok=True)
+            diagnostic.write_bytes(canonical({"schema": "rs9.rpm-late-failure.v1alpha1", "system": system,
+                                              "failed_gate": failed_gate, **failure}))
+            artifacts.append(diagnostic)
+        except Exception as secondary:
+            secondary_diagnostics.append({"operation": "failure-diagnostic-write",
+                                          "code": getattr(secondary, "code", type(secondary).__name__)})
+        return_result = {"gates": gates, "artifacts": artifacts,
+            "details": {"environment": environment, "rpm_evidence_contract": "rs9.rpm-evidence-contract.v2",
+                        "rpm_lint_raw": lint_evidence, "rpm_lint_policy": lint_policy,
+                        "construction_witnesses": construction_witnesses,
+                        "client_runtime_evidence": client_runtime, "caller_source_evidence": caller_diagnostic(caller_evidence),
+                        "operation_failure": failure, "repository_failure": failure,
+                        "completed_operations": completed_operations, "rpm_metadata_reports": repository_reports,
+                        "secondary_diagnostics": secondary_diagnostics,
+                        "completed_evidence_identities": {
+                            "construction_witnesses": {pid: w.get("package_sha256") for pid, w in construction_witnesses.items()},
+                            **{k: sorted(v) for k, v in completed_records.items()}}},
+            "production_promotion_blockers": ["rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"]
+                if any(p.get("accepted_findings") for p in lint_policy.values()) else []}
+        if failed_product:
+            return_result["details"]["product_failures"] = {failed_product: failure}
+        error.partial_result = return_result
+        if not isinstance(error, (ContractError, OSError)):
+            raise
+        return return_result
+    finally:
+        if family == "rpm" and late_phase:
+            # Retain only public objects and bounded probe diagnostics, including on failure.
+            for tree in (repo, keys):
+                if tree is not None:
+                    try:
+                        artifacts.extend(p for p in tree.rglob("*") if p.is_file() and not p.is_symlink() and p not in artifacts)
+                    except OSError as secondary:
+                        secondary_diagnostics.append({"operation": "public-artifact-retention", "code": type(secondary).__name__})
+            try:
+                probes = sorted((scratch / "diagnostics").glob("rpm-signed-query-probe-*.json"))
+                probe_hashes = {}
+                completed_operations["package_signing"] = {"identities": identities, "probes": probe_hashes}
+                for probe in probes:
+                    try:
+                        probe_hashes[probe.name] = digest(probe.read_bytes())
+                        if probe not in artifacts:
+                            artifacts.append(probe)
+                    except OSError as secondary:
+                        artifacts[:] = [p for p in artifacts if p != probe]
+                        secondary_diagnostics.append({"operation": "signing-probe-read", "target": probe.name,
+                                                      "code": type(secondary).__name__})
+            except OSError as secondary:
+                secondary_diagnostics.append({"operation": "signing-probe-selection", "code": type(secondary).__name__})
+            try:
+                _verify_unsigned_products(products, product_metadata, bundle)
+                completed_operations["unsigned_custody_unchanged"] = "pass"
+            except Exception as secondary:
+                # Failed reads or absent bundles do not prove custody mutation.
+                completed_operations["unsigned_custody_unchanged"] = (
+                    "fail" if isinstance(secondary, ContractError) and secondary.code == "CUSTODY_HASH"
+                    else "not-run")
+                secondary_diagnostics.append({"operation": "custody-verification", "code": getattr(secondary, "code", type(secondary).__name__)})
+        cleanup_evidence = {}
+        try:
+            cleanup_receipt = host.run(["docker", "rmi", "-f", tag, client_tag])
+            cleanup_evidence = {
+                "status": ("not-run" if not cleanup_receipt.executed else
+                           "pass" if cleanup_receipt.exit_code == 0 else "fail"),
+                "receipt": _receipt_summary(cleanup_receipt),
+            }
+        except Exception as cleanup_err:
+            cleanup_evidence = {
+                "status": "fail",
+                "error": getattr(cleanup_err, "code", type(cleanup_err).__name__),
+            }
+        if return_result is not None and isinstance(return_result.get("details"), dict):
+            return_result["details"]["cleanup_evidence"] = cleanup_evidence
+    details = {"environment": environment, "cleanup_evidence": cleanup_evidence,
+               "secondary_diagnostics": secondary_diagnostics}
     promotion = []
     if family == "rpm":
-        details.update(rpm_lint_raw=lint_evidence, rpm_lint_policy=lint_policy,
+        details.update(completed_operations=completed_operations, rpm_metadata_reports=repository_reports,
+                       rpm_lint_raw=lint_evidence, rpm_lint_policy=lint_policy,
                        rpm_evidence_contract="rs9.rpm-evidence-contract.v2",
                        client_runtime_evidence=client_runtime, caller_source_evidence=caller_diagnostic(caller_evidence),
                        construction_witnesses=construction_witnesses)
@@ -823,5 +1015,6 @@ def execute(context):
             promotion.append("rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified")
     if errors:
         details["build_errors"] = errors
-    return {"gates": gates, "artifacts": artifacts, "details": details,
+    return_result = {"gates": gates, "artifacts": artifacts, "details": details,
             "production_promotion_blockers": promotion}
+    return return_result

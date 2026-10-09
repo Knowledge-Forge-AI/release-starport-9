@@ -531,6 +531,8 @@ class BuildNativeCommonTests(unittest.TestCase):
             self.assertIn("%global _build_id_links none", spec_content)
             self.assertIn("%global __os_install_post %{nil}", spec_content)
 
+            from tests.rpm_fixtures import write_source_rpm_fixture
+            write_source_rpm_fixture(argv, cwd)
             # Generate built RPM in RPMS/noarch
             rpm_dir = Path(cwd) / "RPMS" / "noarch"
             rpm_dir.mkdir(parents=True, exist_ok=True)
@@ -837,6 +839,9 @@ class BuildNativeCommonTests(unittest.TestCase):
         scratch.mkdir()
 
         def rpmbuild_handler(argv, cwd=None, env=None):
+            self.assertIsNone(env)
+            self.assertNotIn("--target", argv)
+            self.assertFalse(any(a.startswith(("optflags ", "_buildhost ", "_buildtime ")) for a in argv))
             spec_file = Path(argv[2])
             spec_content = spec_file.read_text("utf-8")
             self.assertIn("ExclusiveArch: x86_64", spec_content)

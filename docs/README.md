@@ -56,3 +56,4 @@ Ecosystem-specific operator and adapter documentation will be added as individua
 - [CONT11 APT and RPM source candidate](live1-native-client-cont11.md) — Controlled invalid-envelope classification, RPM preservation policy and pending run-10 handoff.
 - [CONT12 RPM record and custody repair](live1-native-client-cont12.md) — Portable scratch, typed evidence, exact Nebular predicates and attended run-11 diagnostic handoff.
 - [CONT12R1 caller proof and custody](live1-native-client-cont12r1.md) — Independent client preparation, actual caller contracts, separate stage gates, and consumer evidence verification.
+- [CONT13 RPM repository repair](live1-native-client-cont13.md) — Explicit writer ownership, deterministic noarch inputs, retained partial evidence and attended run-12 handoff.

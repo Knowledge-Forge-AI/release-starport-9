@@ -153,6 +153,81 @@ def _format_rpm_changelog(
     )
 
 
+def _authenticated_source_epoch(
+    capture_or_published_at: ReleaseCapture | str | None,
+) -> tuple[int, str]:
+    """Derive authenticated deterministic source epoch (day clamped) from publication timestamp."""
+    published_at = None
+    if isinstance(capture_or_published_at, ReleaseCapture):
+        source_times = capture_or_published_at.record.get("source_times") or {}
+        published_at = source_times.get("published_at")
+        if not published_at:
+            published_at = capture_or_published_at.record.get("release", {}).get("published_at")
+    elif isinstance(capture_or_published_at, str):
+        published_at = capture_or_published_at
+
+    if not published_at:
+        raise ContractError("CHANGELOG_DATE", "Authenticated release publication time required")
+
+    if isinstance(published_at, str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z", published_at):
+        try:
+            dt = datetime.fromisoformat(published_at[:-1] + "+00:00").astimezone(timezone.utc)
+        except ValueError as exc:
+            raise ContractError("CHANGELOG_DATE", "Invalid authenticated publication timestamp") from exc
+    else:
+        raise ContractError("CHANGELOG_DATE", "Authenticated publication time must be UTC")
+
+    day_dt = datetime(dt.year, dt.month, dt.day, 0, 0, 0, tzinfo=timezone.utc)
+    epoch = int(day_dt.timestamp())
+    if not 0 < epoch < 2**32:
+        raise ContractError("CHANGELOG_DATE", "Publication day must fit the RPM timestamp contract")
+    return epoch, published_at
+
+
+NOARCH_BUILDHOST = "rs9-noarch-repack.reproducible.invalid"
+NOARCH_MACRO_QUERY = (
+    "%{_buildtime}|%{_buildhost}|%{optflags}|%{_target_cpu}|%{_target_os}|"
+    "%{_target_platform}|%{use_source_date_epoch_as_buildtime}|"
+    "%{source_date_epoch_from_changelog}|%{build_mtime_policy}|%{getenv:SOURCE_DATE_EPOCH}"
+)
+
+
+def _noarch_build_inputs(capture, topdir, runner):
+    """Pinned RPM 6.0.2 controls for repacking, shared by source and binary builds."""
+    epoch, published_at = _authenticated_source_epoch(capture)
+    controls = [f"_buildtime {epoch}", f"_buildhost {NOARCH_BUILDHOST}", "optflags %{nil}",
+                "_target_platform noarch-redhat-linux", "use_source_date_epoch_as_buildtime 1",
+                "source_date_epoch_from_changelog 1", "build_mtime_policy clamp_to_source_date_epoch"]
+    arguments = ["--target", "noarch"]
+    for control in controls:
+        arguments.extend(["--define", control])
+    environment = {"SOURCE_DATE_EPOCH": str(epoch), "TZ": "UTC", "LC_ALL": "C"}
+    # Input copies only: the authenticated archive and payload members are unchanged.
+    for subdirectory in ("SPECS", "SOURCES"):
+        for path in sorted((topdir / subdirectory).iterdir()):
+            if path.is_symlink() or not path.is_file():
+                raise ContractError("RPM_REPRODUCIBILITY", "Regular noarch source input required")
+            path.chmod(0o644)
+            os.utime(path, (epoch, epoch))
+    receipt = runner.run(["rpm", *arguments, "--eval", NOARCH_MACRO_QUERY], cwd=topdir, env=environment)
+    expected = f"{epoch}|{NOARCH_BUILDHOST}||noarch|linux|noarch-redhat-linux|1|1|clamp_to_source_date_epoch|{epoch}\n".encode()
+    if not receipt.executed or receipt.exit_code or receipt.stderr_bytes or receipt.stdout_bytes != expected:
+        error = ContractError("RPM_REPRODUCIBILITY", "Effective noarch controls differ from authenticated inputs",
+                              details={"substage": "noarch-macro-readback", "tool": "rpm",
+                                       "exit_code": receipt.exit_code, "stdout_sha256": receipt.stdout_sha256,
+                                       "stderr_sha256": receipt.stderr_sha256})
+        error.receipt = receipt
+        raise error
+    evidence = {"schema": "rs9.noarch-repack-inputs.v1", "source_date_epoch": epoch,
+                "epoch_source": "authenticated-release-publication-day-utc", "published_at": published_at,
+                "declared_buildhost": NOARCH_BUILDHOST, "physical_buildhost_claimed": False,
+                "target": "noarch", "controls": controls, "effective_macros": expected.decode().strip(),
+                "macro_receipt": {"executed": receipt.executed, "exit_code": receipt.exit_code,
+                                  "command_sha256": digest(canonical(receipt.command)),
+                                  "stdout_sha256": receipt.stdout_sha256, "stderr_sha256": receipt.stderr_sha256}}
+    return arguments, environment, evidence
+
+
 def is_soname_covered(soname: str, requires: Sequence[str], provides: Sequence[str]) -> bool:
     """Check if a native SONAME capability is covered by RPM requires or self-provides."""
     for p in provides:
@@ -603,7 +678,14 @@ def build_rpm_candidate(
         "--undefine",
         "__brp_mangle_shebangs",
     ]
-    rpmbuild_receipt = r.run(rpmbuild_cmd, cwd=rpm_topdir)
+    reproducibility = None
+    build_environment = None
+    if matched_arch == "noarch":
+        arguments, build_environment, reproducibility = _noarch_build_inputs(capture, rpm_topdir, r)
+        rpmbuild_cmd.extend(arguments)
+        reproducibility["npm_closure_sha256"] = closure_sha
+        reproducibility["builder_environment"] = {"system": system, "target_architecture": matched_arch}
+    rpmbuild_receipt = r.run(rpmbuild_cmd, cwd=rpm_topdir, env=build_environment)
     if rpmbuild_receipt.exit_code != 0:
         raise ContractError(
             "BUILD_FAILED",
@@ -659,6 +741,17 @@ def build_rpm_candidate(
         "package_size": len(rpm_bytes),
         "spec_sha256": digest(spec_bytes),
     }
+    if reproducibility is not None:
+        srpms = sorted((rpm_topdir / "SRPMS").glob("*.src.rpm"))
+        if len(srpms) != 1 or srpms[0].is_symlink():
+            error = ContractError("RPM_REPRODUCIBILITY", "One completed noarch source RPM required",
+                                  details={"substage": "noarch-source-rpm"})
+            error.construction_witness = construction_witness
+            error.package_path = str(dest_rpm)
+            raise error
+        reproducibility["source_rpm"] = {"name": srpms[0].name, "sha256": digest(srpms[0].read_bytes()),
+                                         "size": srpms[0].stat().st_size}
+        construction_witness["reproducibility"] = reproducibility
 
     def _attach_witness(exc: ContractError) -> ContractError:
         exc.construction_witness = construction_witness
@@ -947,6 +1040,8 @@ def build_rpm_candidate(
             },
             "construction_witness": construction_witness,
         }
+        if reproducibility is not None:
+            extra_ev["reproducibility"] = reproducibility
         if is_native:
             extra_ev["policy_dependencies"] = policy_dependencies
             extra_ev["elf_dependencies"] = {
@@ -1008,6 +1103,8 @@ def build_rpm_candidate(
             "construction_witness": construction_witness,
             "derivation": derivation,
         }
+        if reproducibility is not None:
+            manifest["reproducibility"] = reproducibility
 
         boundary_substage = "rpm-manifest-write"
         (scratch / "rpm-manifest.json").write_bytes(canonical(manifest))
@@ -1051,6 +1148,7 @@ def build_rpm_candidate(
         "manifest": manifest,
         "derivation_record": derivation,
         "rpm_path": dest_rpm,
+        "srpm_path": srpms[0] if reproducibility is not None else None,
         "repo_dir": scratch / "repo",
         "receipts": [
             rpmbuild_receipt,

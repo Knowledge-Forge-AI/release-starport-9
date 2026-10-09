@@ -163,9 +163,21 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
     except Exception as error:
         # Retain diagnostic custody even for an unexpected builder exception.
         # Interrupts and process termination remain outside this boundary.
+        partial = getattr(error, "partial_result", None)
+        if isinstance(partial, dict):
+            if not record.get("gates") and partial.get("gates"):
+                record["gates"] = partial["gates"]
+            if partial.get("artifacts"):
+                files.extend(partial["artifacts"])
+            if partial.get("details"):
+                record["details"] = {**record.get("details", {}), **partial["details"]}
+            if partial.get("production_promotion_blockers"):
+                record["production_promotion_blockers"].extend(partial["production_promotion_blockers"])
         record["execution_error"] = error.code if isinstance(error, ContractError) else "hosted-execution-failed"
         record["execution_error_detail"] = safe_details({"stage": lane,
             **(error.details if isinstance(error, ContractError) else internal_error_details(error, lane, row["module"]))})
+        if lane == "rpm":
+            record.setdefault("details", {})["rpm_evidence_contract"] = "rs9.rpm-evidence-contract.v2"
         if not record["gates"]:
             record["gates"] = [{"name": n, "status": "fail", "reason": record["execution_error"]} for n in row["required_gates"]]
     # A capture can be complete before core authentication fails. Preserve the
