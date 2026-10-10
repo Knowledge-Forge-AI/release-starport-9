@@ -60,6 +60,22 @@ SENSITIVE_FILENAME_RE = re.compile(
     r"(?i)(^|\b|_|-)(id_rsa|id_ecdsa|id_ed25519|id_dsa|privkey|private_key|private-key|private|secret|credential|passwd|password|api_key|token)($|\b|_|-|\.)"
 )
 
+
+def pages_path_details(substage: str, relative: str) -> dict[str, str]:
+    """Keep a bounded public relative path, otherwise only its digest."""
+    details = {"substage": substage}
+    public_root = relative.split("/", 1)[0] in {"apt", "rpm", "pacman", "keys", "docs", "CNAME", "index.html"}
+    try:
+        if (not public_root or not re.fullmatch(r"[A-Za-z0-9._+/-]{1,256}", relative)
+                or any(SENSITIVE_FILENAME_RE.search(p) for p in relative.split("/"))):
+            raise ValueError("nonpublic-path")
+        validate_safe_relative_posix_path(relative)
+        scan_for_credentials(relative)
+        details["path"] = relative
+    except (ContractError, ValueError):
+        details["path_sha256"] = hashlib.sha256(relative.encode("utf-8", "surrogatepass")).hexdigest()
+    return details
+
 # Allowed extensions for documentation files
 DOC_EXTENSIONS = frozenset(
     {
@@ -983,7 +999,8 @@ def scan_pages_tree(
             if dir_path.is_symlink():
                 raise ContractError("SYMLINK_REJECTED", "Directory symlink detected")
             if d.startswith("."):
-                raise ContractError("DISALLOWED_FILE", "Hidden directory detected")
+                raise ContractError("DISALLOWED_FILE", "Hidden directory detected",
+                                    details=pages_path_details("hidden-directory", dir_path.relative_to(root_path).as_posix()))
 
         for f in filenames:
             file_path = current_dir / f
@@ -1002,7 +1019,8 @@ def scan_pages_tree(
 
             is_allowed, category = classify_pages_path(rel_path)
             if not is_allowed:
-                raise ContractError("DISALLOWED_FILE", "Disallowed file or private payload detected")
+                raise ContractError("DISALLOWED_FILE", "Disallowed file or private payload detected",
+                                    details=pages_path_details("pages-path-classification", rel_path))
 
             sha256, file_size, format_scan = _scan_file_content(file_path, rel_path, category)
 

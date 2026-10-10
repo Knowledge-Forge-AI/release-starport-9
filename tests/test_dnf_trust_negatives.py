@@ -24,21 +24,24 @@ ORIGINAL = "a" * 64
 CHANGED = "b" * 64
 
 
-def receipt(code=0, out=b"", err=b"", executed=True):
-    return CommandReceipt(["dnf", "fixture"], code, out, err, executed=executed)
+def receipt(code=0, out=b"", err=b"", executed=True, stage=None):
+    stage = stage or ("install" if b"checksum" in err or b"No match" in err else "refresh")
+    return CommandReceipt(dd.stage_command(stage, PRODUCT), code, out, err, executed=executed)
 
 
 def absent(product=PRODUCT):
     return receipt(1, f"package {product} is not installed\n".encode())
 
 
-def checksum_message(actual=CHANGED, expected=ORIGINAL):
-    return (f"[1/1] {PRODUCT}-0:0.6.1\n"
-            f">>> Downloading successful, but checksum doesn't match. Calculated: {actual}(sha256)  Expected: {expected}(sha256) \n").encode()
+def checksum_message(actual=CHANGED, expected=ORIGINAL, product=PRODUCT, arch="x86_64"):
+    return (f"[1/1] {product}-0:0.6.1\n"
+            f">>> Downloading successful, but checksum doesn't match. Calculated: {actual}(sha256)  Expected: {expected}(sha256) \n"
+            f"Librepo error: Cannot download Packages/{product}-0.6.1-1.fc43.{arch}.rpm: All mirrors were tried\n").encode()
 
 
 def repo_message(reason="Bad PGP signature"):
-    return f">>> repomd.xml GPG signature verification error: {reason}\n".encode()
+    return (f">>> repomd.xml GPG signature verification error: {reason}\n"
+            f'Failed to download metadata (baseurl: "file:///srv/rs9/rpm/fedora/43/x86_64") for repository "{dd.DNF_REPO_ID}": repomd.xml GPG signature verification error: {reason}\n').encode()
 
 
 def synthetic_armor(seed=b"controlled synthetic signature"):
@@ -68,9 +71,11 @@ class ProbeClient:
 
     def __init__(self, spec):
         self.spec, self.calls, self.responses = spec, [], {}
-        for stage, command in spec["dnf_probe_commands"]:
+        for stage, command in spec.get("dnf_probe_commands", []):
             if stage.startswith("cache-"):
                 data = json.dumps({"key_sha256": spec["expected_key_sha256"], "candidate_cache_entries": 0}).encode()
+            elif stage == "presentation":
+                data = json.dumps(dd.DNF_PRESENTATION).encode() + b"\n"
             elif stage == "dnf-version": data = b"dnf5 version 5.2.18.0\nlibdnf5 version 5.2.18.0\n"
             elif stage == "rpm-version": data = b"RPM version 6.0.2\n"
             elif stage == "main-config":
@@ -81,13 +86,19 @@ class ProbeClient:
                         "skip_if_unavailable = 0\nmetalink = \nmirrorlist = \n"
                         '======== "fedora" repository configuration: ========\nenabled = 0\noptional_unset\n').encode()
             self.responses[stage] = receipt(out=data)
+        if "probe" in spec and isinstance(spec["probe"], Mapping):
+            for stage, command in spec["probe"].items():
+                if stage == "presentation" and stage not in self.responses:
+                    self.responses[stage] = receipt(out=json.dumps(dd.DNF_PRESENTATION).encode() + b"\n")
 
     def exec(self, argv, **kwargs):
         self.calls.append(list(argv))
         # cache-before and cache-after intentionally use identical argv.
-        stages = [stage for stage, command in self.spec["dnf_probe_commands"] if command == argv]
-        stage = stages[-1] if stages[0] == "cache-before" and len(self.calls) > 1 else stages[0]
-        return self.responses[stage]
+        stages = [stage for stage, command in self.spec.get("dnf_probe_commands", []) if command == argv]
+        if not stages and "probe" in self.spec and isinstance(self.spec["probe"], Mapping):
+            stages = [stage for stage, command in self.spec["probe"].items() if command == argv]
+        stage = stages[-1] if stages and stages[0] == "cache-before" and len(self.calls) > 1 else (stages[0] if stages else "unknown")
+        return self.responses.get(stage, receipt())
 
     def dnf_image_identity_receipt(self):
         return getattr(self, "image_receipt", receipt(out=(self.image + "\n").encode()))
@@ -108,8 +119,11 @@ class DnfTrustTests(unittest.TestCase):
     def context(self, kind="signature"):
         probe = self.probe()
         self.assertEqual(probe["status"], "pass")
-        mutation = {"kind": kind, "verified": True, "control_sha256": ORIGINAL, "tampered_sha256": CHANGED}
+        mutation = {"kind": kind, "verified": True, "control_sha256": ORIGINAL, "tampered_sha256": CHANGED,
+                    "target": "fedora/43/x86_64/Packages/" + PRODUCT + "-0.6.1-1.fc43.x86_64.rpm" if kind == "package" else "fedora/43/x86_64/repodata/repomd.xml" + ("" if kind == "index" else ".asc")}
         if kind == "index": mutation["authentication_boundary"] = "repomd-signature"
+        if kind == "signature":
+            mutation.update(armor_framing_preserved=True, packet_changed_offset=63, packet_length=64)
         if kind == "wrongkey":
             mutation.update(control_key_fingerprint=FINGERPRINT, replacement_issuer=WrongSigner.primary_fingerprint,
                             replacement_signature_verified=True)
@@ -119,7 +133,7 @@ class DnfTrustTests(unittest.TestCase):
 
     def qualify(self, kind="signature", *, refresh=None, install=None, query=None, context=None, configure=None):
         if refresh is None: refresh = receipt(0) if kind == "package" else receipt(1, err=repo_message("Signing key not found" if kind == "wrongkey" else "Bad PGP signature"))
-        if install is None: install = receipt(1, err=checksum_message() if kind == "package" else b"No match for argument: " + PRODUCT.encode() + b"\n")
+        if install is None: install = receipt(1, err=checksum_message() if kind == "package" else repo_message("Signing key not found" if kind == "wrongkey" else "Bad PGP signature"), stage="install")
         return ad.qualify_tamper_rejection(kind, refresh, install, query if query is not None else absent(), family="dnf",
                  configure_rcpt=configure if configure is not None else receipt(), dnf_context=context if context is not None else self.context(kind))
 
@@ -146,10 +160,15 @@ class DnfTrustTests(unittest.TestCase):
             host = Host(); client = hd.ClientContainer(host, "image", "linux/amd64", [], family)
             client.exec(["rpm", "-q", PRODUCT])
             self.assertEqual("LC_ALL=C" in host.argv, family == "dnf")
-            self.assertEqual("DNF5_FORCE_COLUMNS=512" in host.argv, family == "dnf")
+            self.assertEqual("LANG=C" in host.argv, family == "dnf")
             if family == "dnf":
                 client.dnf_image_identity_receipt()
                 self.assertEqual(host.argv, ["docker", "inspect", "--format", "{{.Image}}", client.name])
+        self.assertIn("FORCE_COLUMNS=512", self.spec["refresh"])
+        self.assertIn("LC_ALL=C", self.spec["refresh"])
+        self.assertIn("DNF5_FORCE_INTERACTIVE=0", self.spec["refresh"])
+        self.assertIn("FORCE_COLUMNS=512", self.spec["install"](PRODUCT))
+        self.assertIn("DNF5_FORCE_INTERACTIVE=0", self.spec["install"](PRODUCT))
 
     def test_actual_probe_binds_allowlisted_config_tools_key_and_image(self):
         client = ProbeClient(self.spec); result = dd.probe_dnf_client(client, self.spec)
@@ -160,6 +179,8 @@ class DnfTrustTests(unittest.TestCase):
         self.assertEqual(identity["key_sha256"], self.spec["expected_key_sha256"])
         self.assertEqual(identity["image_sha256"], digest(client.image.encode()))
         self.assertEqual(identity["image_id"], client.image)
+        self.assertEqual(identity["presentation"], dd.DNF_PRESENTATION)
+        self.assertEqual(identity["version"], dd.DNF_VERSION)
         self.assertFalse(identity["configuration"]["skip_if_unavailable"])
         self.assertEqual(result["candidate_cache_before"], 0)
         self.assertEqual(result["candidate_cache_after"], 0)
@@ -181,6 +202,8 @@ class DnfTrustTests(unittest.TestCase):
         for stage, data in (("main-config", b"======== Main configuration: ========\nsystem_cachedir=/wrong\ncacheonly=none\n"),
                             ("cache-before", b'{"key_sha256":"wrong","candidate_cache_entries":0}'),
                             ("cache-after", json.dumps({"key_sha256": self.spec["expected_key_sha256"], "candidate_cache_entries": 1}).encode()),
+                            ("presentation", b'{"FORCE_COLUMNS":"80","LC_ALL":"C","LANG":"C"}\n'),
+                            ("dnf-version", b"dnf5 version 5.3.0\n"),
                             ("repo-config", b"x" * (dd.CONFIG_LIMIT + 1)), ("repo-config", b"\xff")):
             client = ProbeClient(self.spec); client.responses[stage] = receipt(out=data)
             self.assertEqual(dd.probe_dnf_client(client, self.spec)["status"], "fail")
@@ -198,7 +221,7 @@ class DnfTrustTests(unittest.TestCase):
         self.assertEqual(first["status"], "pass")
         control = ad.build_positive_control(family="dnf", image=client.image, platform=client.platform,
             product=PRODUCT, setup_sha256="e" * 64,
-            receipts={s: receipt() for s in ("configure", "refresh", "install", "query")},
+            receipts={s: receipt(stage=s) for s in ("configure", "refresh", "install", "query")},
             success=True, dnf_probe=first)
         self.assertTrue(ad.validate_positive_control(control, family="dnf", image=client.image,
             platform=client.platform, product=PRODUCT, setup_sha256="e" * 64, dnf_probe=first)[0])
@@ -207,14 +230,27 @@ class DnfTrustTests(unittest.TestCase):
         self.assertEqual(changed["status"], "pass")
         self.assertFalse(ad.validate_positive_control(control, family="dnf", image=client.image,
             platform=client.platform, product=PRODUCT, setup_sha256="e" * 64, dnf_probe=changed)[0])
-        for field in ("key_sha256", "image_id", "tools", "configuration"):
+        for field in ("key_sha256", "image_id", "tools", "configuration", "presentation", "version"):
             malformed = copy.deepcopy(first); malformed["identity"][field] = 123
             malformed["identity_sha256"] = digest(canonical(malformed["identity"]))
             self.assertFalse(dd.valid_identity(malformed))
 
-    def test_dnf_causal_category_precedes_no_match_only_after_environment_veto(self):
+    def test_positive_control_vetoes_full_stream_environment_errors(self):
+        probe = self.probe()
+        for stage in ('configure', 'refresh', 'install', 'query'):
+            for stream in ('stdout', 'stderr'):
+                for message in (b'Could not resolve host\n', b'Permission denied\n', b'No match for argument: fixture\n'):
+                    receipts = {s: receipt(stage=s) for s in ('configure', 'refresh', 'install', 'query')}
+                    raw = b'x' * 70000 + b'\n' + message
+                    receipts[stage] = receipt(stage=stage, **{'out' if stream == 'stdout' else 'err': raw})
+                    control = ad.build_positive_control(family='dnf', image=ProbeClient.image,
+                        platform=ProbeClient.platform, product=PRODUCT, setup_sha256='e' * 64,
+                        success=True, dnf_probe=probe, receipts=receipts)
+                    self.assertFalse(control['success'], (stage, stream, message))
+
+    def test_dnf_missing_package_remains_a_veto_with_signature_text(self):
         combined = repo_message() + b"No match for argument: " + PRODUCT.encode() + b"\n"
-        self.assertEqual(ad.classify_rejection(receipt(1, err=combined), stage="refresh", family="dnf"), "SIGNATURE_REJECTED")
+        self.assertEqual(ad.classify_rejection(receipt(1, err=combined), stage="refresh", family="dnf"), "PACKAGE_NOT_FOUND")
         self.assertEqual(ad.classify_rejection(receipt(1, err=combined), stage="refresh", family="apt"), "PACKAGE_NOT_FOUND")
         for text, category in ((b"No match for argument: fixture\n", "PACKAGE_NOT_FOUND"),
                                (repo_message("Signing key not found"), "KEY_MISMATCH"),
@@ -314,6 +350,10 @@ class DnfTrustTests(unittest.TestCase):
     def test_index_and_wrongkey_need_causal_provenance_as_well_as_boundary_rejection(self):
         context = self.context("index"); context["mutation"].pop("authentication_boundary")
         self.assertEqual(self.qualify("index", context=context)[2], "dnf-index-provenance-unproven")
+        context = self.context("signature"); context["mutation"].pop("armor_framing_preserved")
+        self.assertEqual(self.qualify("signature", context=context)[2], "dnf-signature-provenance-unproven")
+        context = self.context("signature"); context["mutation"]["packet_changed_offset"] = -1
+        self.assertEqual(self.qualify("signature", context=context)[2], "dnf-signature-provenance-unproven")
         for field, value in (("replacement_signature_verified", False), ("replacement_issuer", FINGERPRINT),
                              ("replacement_issuer", "invalid"), ("control_key_fingerprint", "C" * 40)):
             context = self.context("wrongkey"); context["mutation"][field] = value
@@ -324,7 +364,7 @@ class DnfTrustTests(unittest.TestCase):
         kwargs = dict(family="dnf", image=ProbeClient.image, platform=ProbeClient.platform, product=PRODUCT,
                       setup_sha256="e" * 64)
         control = ad.build_positive_control(**kwargs, success=True, dnf_probe=probe,
-                      receipts={stage: receipt() for stage in ("configure", "refresh", "install", "query")})
+                      receipts={stage: receipt(stage=stage) for stage in ("configure", "refresh", "install", "query")})
         self.assertTrue(ad.validate_positive_control(control, **kwargs, dnf_probe=probe)[0])
         missing = ad.build_positive_control(**kwargs, success=True)
         self.assertFalse(ad.validate_positive_control(missing, **kwargs)[0])
@@ -350,7 +390,7 @@ class DnfTrustTests(unittest.TestCase):
     def make_repository(self):
         base = self.root / "rpm/fedora/43/x86_64"
         (base / "Packages").mkdir(parents=True)
-        (base / "Packages" / (PRODUCT + "-0.6.1-1.x86_64.rpm")).write_bytes(b"synthetic RPM payload")
+        (base / "Packages" / (PRODUCT + "-0.6.1-1.fc43.x86_64.rpm")).write_bytes(b"synthetic RPM payload")
         (base / "repodata").mkdir()
         (base / "repodata/repomd.xml").write_bytes(b"<repomd/>\n")
         (base / "repodata/repomd.xml.asc").write_bytes(synthetic_armor())
@@ -396,7 +436,7 @@ class DnfTrustTests(unittest.TestCase):
         spec = spec_for({"rpm": source}); probe = dd.probe_dnf_client(ProbeClient(spec), spec)
         control = ad.build_positive_control(family="dnf", image=ProbeClient.image, platform=ProbeClient.platform, product=PRODUCT,
                   setup_sha256=ad.trust_identity(spec), success=True, dnf_probe=probe,
-                  receipts={stage: receipt() for stage in ("configure", "refresh", "install", "query")})
+                  receipts={stage: receipt(stage=stage) for stage in ("configure", "refresh", "install", "query")})
         outer = self
         class Client(ProbeClient):
             def __init__(self, host, image, platform, mounts, family):
@@ -412,7 +452,7 @@ class DnfTrustTests(unittest.TestCase):
                     if self.accept: return receipt()
                     m = dm.verify_dnf_mutation(source, self.source, arch="x86_64", product=PRODUCT, kind=self.kind,
                                                wrong_signer=WrongSigner(), public_fingerprint=FINGERPRINT)
-                    r = receipt(1, err=checksum_message(m["tampered_sha256"], m["control_sha256"]) if self.kind == "package" else b"No match for argument: fixture\n")
+                    r = receipt(1, err=checksum_message(m["tampered_sha256"], m["control_sha256"]) if self.kind == "package" else repo_message("Signing key not found" if self.kind == "wrongkey" else "Bad PGP signature"), stage="install")
                 elif argv == self.spec["query"](PRODUCT):
                     if self.accept: raise ContractError("QUERY_FAILED", "synthetic query failure")
                     r = absent()

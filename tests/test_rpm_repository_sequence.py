@@ -51,12 +51,10 @@ class ContainerTransport(CommandRunner):
             assert inner == metadata_command(inner[-1])
             if self.failure == "metadata-command":
                 return receipt(1, b"", b"controlled createrepo failure\n")
+            from tests.rpm_metadata_fixtures import create_valid_repodata
+            res = create_valid_repodata(inner[-1])
             self.repodata = Path(inner[-1]) / "repodata"
-            self.repodata.mkdir()
-            self.repodata.chmod(0o755)
-            index = self.repodata / "repomd.xml"
-            index.write_bytes(self.index_bytes)
-            index.chmod(0o644)
+            self.index_bytes = res["repomd_bytes"]
             if self.failure == "metadata-write":
                 self.repodata.chmod(0o555)
             return receipt(out=b"created public metadata\n")

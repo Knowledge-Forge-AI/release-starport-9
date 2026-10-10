@@ -29,6 +29,7 @@ def safe_details(details):
     allowed.update({"target", "errno", "causal_code", "causal_substage",
                     "writer_is_owner", "owner_is_root", "group_matches", "target_exists",
                     "parent_mode", "target_mode"})
+    allowed.update({"path", "path_sha256"})
     result, dropped = {}, False
     if not isinstance(details, dict):
         return {}
@@ -156,7 +157,8 @@ def safe_details(details):
                      or (key == "operation" and isinstance(value, str) and value in {
                          "rpm-repository", "repository-metadata", "package-signing",
                          "repodata-index-read", "repodata-fixture-sign", "repodata-signature-write",
-                         "repodata-signature-verify", "repodata-public-modes", "repodata-ownership-audit"})
+                         "repodata-signature-verify", "repodata-public-modes", "repodata-ownership-audit",
+                         "repodata-format-verify"})
                      or (key == "host" and isinstance(value, str) and value in HOSTS)
                      or (key == "transport_error" and value in ("timeout", "tls", "dns", "connection", "protocol", "transport"))
                      or (key == "http_status" and type(value) is int and 100 <= value <= 599)

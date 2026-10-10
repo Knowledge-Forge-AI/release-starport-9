@@ -17,6 +17,7 @@ from typing import Any
 from rs9.errors import ContractError
 from rs9.pages import (
     merkle_inventory,
+    pages_path_details,
     scan_pages_tree,
     validate_pages_tree,
     verify_merkle_inventory,
@@ -356,7 +357,8 @@ def verify_pages_completeness(inventory: dict[str, str], families: tuple[str, ..
     for path in inventory:
         head = path.split("/", 1)[0]
         if "/" in path and head not in allowed_roots:
-            raise ContractError("DISALLOWED_FILE", "Pages tree contains an unreviewed top-level directory")
+            raise ContractError("DISALLOWED_FILE", "Pages tree contains an unreviewed top-level directory",
+                                details=pages_path_details("top-level", path))
 
 
 def write_custody_bundle(

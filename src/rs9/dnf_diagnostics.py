@@ -8,8 +8,9 @@ and retains only public candidate configuration and stream identities.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import re
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from rs9.build_native import CommandReceipt
 from rs9.errors import ContractError
@@ -24,6 +25,9 @@ KEY_URI = "file:///srv/rs9/keys/rs9-candidate-fixture-NONPRODUCTION.asc"
 CACHE_ROOT = "/var/cache/libdnf5"
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
 _FINGERPRINT = re.compile(r"[0-9A-F]{40}\Z")
+
+from rs9.dnf_commands import (DNF_PRESENTATION, DNF_VERSION, DNF_TOOL_VERSION,
+    guest_prefix, command_matches, command_identities, stage_command)
 
 
 def full_streams(receipt: CommandReceipt | None, *, limit=STREAM_LIMIT) -> tuple[str, str]:
@@ -41,6 +45,10 @@ def environment_failure(receipt: CommandReceipt | None) -> str | None:
     except ContractError:
         return "UNCLASSIFIED_FAILURE"
     combined = (out + "\n" + err).lower()
+    if any(s in combined for s in ("no match for argument:", "unable to find a match", "no package matches")):
+        return "PACKAGE_NOT_FOUND"
+    if any(s in combined for s in ("skipping repository", "ignoring repository", "repository is disabled")):
+        return "SOURCE_CONFIG_ERROR"
     if receipt.exit_code == 127 or "command not found" in combined:
         return "COMMAND_NOT_FOUND"
     if any(s in combined for s in ("permission denied", "could not open lock file", "are you root?")):
@@ -61,41 +69,68 @@ def environment_failure(receipt: CommandReceipt | None) -> str | None:
     return None
 
 
-def repository_rejection(receipt: CommandReceipt | None, *, stage: str | None) -> str | None:
-    if stage not in {"refresh", "install"} or receipt is None or receipt.exit_code != 1:
-        return None
-    if environment_failure(receipt):
+def parse_repository_rejection(receipt, *, stage, context=None, repo_id=None,
+                               source_uri=None, key_uri=None, fingerprint=None):
+    """Qualification requires a complete fatal record under a bound identity."""
+    if (stage not in {"refresh", "install"} or receipt is None or receipt.executed is not True
+            or receipt.exit_code != 1 or environment_failure(receipt)):
         return None
     out, err = full_streams(receipt)
-    # A complete repomd diagnostic identifies the authentication boundary. The
-    # trailing resolver's No match does not replace this earlier causal result.
-    reasons = re.findall(r"repomd\.xml GPG signature verification error: ([^\r\n]+)", out + "\n" + err)
-    categories = {"Bad PGP signature": "SIGNATURE_REJECTED", "Bad GPG signature": "SIGNATURE_REJECTED",
-                  "Signing key not found": "KEY_MISMATCH"}
-    # The RPM backend may append its diagnostic after this exact librepo prefix.
-    # Full-stream environmental vetoes above still take precedence over it.
-    matched = {"SIGNATURE_REJECTED" if re.fullmatch(r"Bad PGP signature: .+", reason.strip())
-               else categories.get(reason.strip()) for reason in reasons}
-    return next(iter(matched)) if len(matched) == 1 and None not in matched else None
+    if context is not None:
+        probe = context.get("probe")
+        if not valid_identity(probe) or not command_matches(receipt, stage, context.get("product", "RS9_PRODUCT")):
+            return None
+        from rs9.dnf_failure import terminal_failure
+        return terminal_failure(out, err, probe["identity"])
+    # Historical single-reason diagnostics can be labeled, never qualified here.
+    reasons = re.findall(r"(?:>>> )?repomd\.xml GPG signature verification error: ([^\r\n]+)", out + "\n" + err)
+    if reasons and (out + err).endswith("\n"):
+        from rs9.dnf_failure import reason_category
+        categories = {reason_category(r.strip()) if r.strip() != "Bad GPG signature" else "SIGNATURE_REJECTED" for r in reasons}
+        if len(categories) == 1 and None not in categories:
+            category = categories.pop()
+            return {"category": category, "terminal_category": category, "intermediate_categories": [], "bootstrap_categories": []}
+    return None
+
+
+def repository_rejection(receipt: CommandReceipt | None, *, stage: str | None,
+                         context: Mapping[str, Any] | None = None,
+                         repo_id: str | None = None,
+                         source_uri: str | None = None,
+                         key_uri: str | None = None,
+                         fingerprint: str | None = None) -> str | None:
+    parsed = parse_repository_rejection(receipt, stage=stage, context=context,
+                                        repo_id=repo_id, source_uri=source_uri,
+                                        key_uri=key_uri, fingerprint=fingerprint)
+    return parsed["category"] if parsed is not None else None
 
 
 def package_checksum(receipt: CommandReceipt | None, *, stage: str | None) -> dict[str, str] | None:
     if stage != "install" or receipt is None or receipt.exit_code != 1 or environment_failure(receipt):
         return None
     out, err = full_streams(receipt)
+    combined = out + "\n" + err
+    if (any(s and not s.endswith("\n") for s in (out, err))
+            or combined.count("Downloading successful, but checksum doesn't match.") != 1
+            or combined.count("Calculated:") != 1 or combined.count("Expected:") != 1):
+        return None
     # Librepo emits a space after each checksum, hence two before Expected.
     matches = re.findall(
         r"Downloading successful, but checksum doesn't match\. Calculated: "
         r"([0-9a-f]{64})\(sha256\) +Expected: ([0-9a-f]{64})\(sha256\)(?=[ \r\n]|\Z)",
-        out + "\n" + err)
-    unique = set(matches)
-    if len(unique) != 1:
+        combined)
+    if len(matches) != 1:
         return None
-    actual, expected = unique.pop()
+    actual, expected = matches[0]
     return {"calculated_sha256": actual, "expected_sha256": expected} if actual != expected else None
 
 
-def classify_dnf(receipt: CommandReceipt | None, *, stage: str | None) -> str:
+def classify_dnf(receipt: CommandReceipt | None, *, stage: str | None,
+                 context: Mapping[str, Any] | None = None,
+                 repo_id: str | None = None,
+                 source_uri: str | None = None,
+                 key_uri: str | None = None,
+                 fingerprint: str | None = None) -> str:
     if receipt is None:
         return "UNCLASSIFIED_FAILURE"
     if receipt.exit_code == 0:
@@ -103,7 +138,9 @@ def classify_dnf(receipt: CommandReceipt | None, *, stage: str | None) -> str:
     veto = environment_failure(receipt)
     if veto:
         return veto
-    category = repository_rejection(receipt, stage=stage)
+    category = repository_rejection(receipt, stage=stage, context=context,
+                                    repo_id=repo_id, source_uri=source_uri,
+                                    key_uri=key_uri, fingerprint=fingerprint)
     if category:
         return category
     if package_checksum(receipt, stage=stage):
@@ -140,6 +177,21 @@ def record_dnf_stage(*, stage, product, arch, receipt, **kwargs) -> dict[str, An
     checksum = package_checksum(receipt, stage=stage)
     if checksum:
         row["checksum"] = checksum
+    from rs9.dnf_failure import reason_category
+    events = []
+    for name, stream in (("stdout", out), ("stderr", err)):
+        for match in re.finditer(r"(?m)^\s*(?:>>> )?repomd\.xml GPG signature verification error: ([^\r\n]+)", stream):
+            events.append({"stream": name, "category": reason_category(match[1].strip()) or "UNCLASSIFIED_FAILURE"})
+    if events:
+        row["repository_diagnostic_events"] = events[:16]
+        row["repository_diagnostic_events_complete"] = len(events) <= 16
+    repo_diag = parse_repository_rejection(receipt, stage=stage)
+    if repo_diag:
+        if repo_diag.get("intermediate_categories"):
+            row["intermediate_categories"] = repo_diag["intermediate_categories"]
+            row["bootstrap_categories"] = repo_diag["intermediate_categories"]
+        if repo_diag.get("terminal_category"):
+            row["terminal_category"] = repo_diag["terminal_category"]
     row["environment_failure"] = environment_failure(receipt)
     return row
 
@@ -211,7 +263,11 @@ def probe_dnf_client(client, spec: Mapping[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {"schema": "rs9.dnf-client-identity.v1", "status": "fail", "receipts": []}
     receipts = {}
     try:
-        for stage, argv in spec["dnf_probe_commands"]:
+        probe_cmds = list(spec.get("dnf_probe_commands", []))
+        if "probe" in spec and isinstance(spec["probe"], Mapping) and "presentation" in spec["probe"]:
+            if not any(stage == "presentation" for stage, _ in probe_cmds):
+                probe_cmds.append(("presentation", spec["probe"]["presentation"]))
+        for stage, argv in probe_cmds:
             receipt = client.exec(argv)
             receipts[stage] = receipt
             result["receipts"].append(record_dnf_stage(stage=stage, product="client-identity", arch=spec["arch"],
@@ -223,6 +279,8 @@ def probe_dnf_client(client, spec: Mapping[str, Any]) -> dict[str, Any]:
                 result.update(status="unavailable" if receipt.exit_code == 127 else "fail",
                               reason="dnf-identity-command-failed", failed_stage=stage)
                 return result
+        if (spec["refresh"] != stage_command("refresh") or spec["install"]("RS9_PRODUCT") != stage_command("install")):
+            raise ValueError("command-presentation-mismatch")
         decoded = {name: full_streams(r, limit=CONFIG_LIMIT)[0] for name, r in receipts.items()}
         image_receipt = client.dnf_image_identity_receipt()
         result["receipts"].append(record_dnf_stage(stage="container-image", product="client-identity",
@@ -260,6 +318,17 @@ def probe_dnf_client(client, spec: Mapping[str, Any]) -> dict[str, Any]:
         main = _config_sections(decoded["main-config"])["main"]
         if main["system_cachedir"] != CACHE_ROOT or main["cacheonly"] != "none":
             raise ValueError("cache-config-mismatch")
+
+        # Presentation readback check
+        if "presentation" not in decoded:
+            raise ValueError("presentation-missing")
+        try:
+            pres_readback = json.loads(decoded["presentation"])
+        except (ValueError, TypeError, json.JSONDecodeError):
+            raise ValueError("presentation-unreadable")
+        if pres_readback != DNF_PRESENTATION or receipts["presentation"].stderr_bytes:
+            raise ValueError("presentation-mismatch")
+
         tools = {}
         from rs9.apt_diagnostics import safe_sample
         for name in ("dnf-version", "rpm-version"):
@@ -268,10 +337,15 @@ def probe_dnf_client(client, spec: Mapping[str, Any]) -> dict[str, Any]:
                 raise ValueError("tool-identity-incomplete")
             tools[name] = {"stdout_sha256": receipts[name].stdout_sha256,
                            "version": safe_sample(version.splitlines()[0], 128)}
+        if tools["dnf-version"]["version"] != f"dnf5 version {DNF_VERSION}":
+            raise ValueError("dnf-version-mismatch")
+
         identity = {"repo_id": DNF_REPO_ID, "source_uri": spec["source_uri"], "key_uri": KEY_URI,
                     "key_sha256": before["key_sha256"], "public_fingerprint": spec["public_fingerprint"],
                     "image_id": image_id, "image_sha256": digest(image_id.encode()),
                     "image_reference_sha256": digest(client.image.encode()), "platform": client.platform,
+                    "presentation": dict(DNF_PRESENTATION), "commands": command_identities(),
+                    "version": DNF_VERSION,
                     "configuration": {"enabled_repositories": [DNF_REPO_ID], "gpgcheck": True,
                                       "repo_gpgcheck": True, "skip_if_unavailable": False,
                                       "system_cachedir": CACHE_ROOT, "cacheonly": "none", "locale": "C"},
@@ -286,7 +360,10 @@ def probe_dnf_client(client, spec: Mapping[str, Any]) -> dict[str, Any]:
 
 def probe_commands(base: list[str]) -> list[tuple[str, list[str]]]:
     key_cache = ["python3", "-I", "-c", _KEY_CACHE_PROBE, KEY_URI.removeprefix("file://"), CACHE_ROOT, DNF_REPO_ID]
-    return [("cache-before", key_cache), ("dnf-version", ["dnf", "--version"]),
+    env_probe = [*guest_prefix(), "python3", "-I", "-c",
+                 "import json, os; print(json.dumps({k: os.environ.get(k) for k in ('FORCE_COLUMNS', 'LC_ALL', 'LANG', 'DNF5_FORCE_INTERACTIVE')}))"]
+    return [("cache-before", key_cache), ("presentation", env_probe),
+            ("dnf-version", guest_prefix(["dnf", "--version"])),
             ("rpm-version", ["rpm", "--version"]),
             ("main-config", [*base, "--dump-main-config"]),
             ("repo-config", [*base, "--dump-repo-config=*"]), ("cache-after", key_cache)]
@@ -312,6 +389,9 @@ def _identity_matches(probe) -> bool:
             and identity.get("key_uri") == KEY_URI
             and identity.get("source_uri") in {"file:///srv/rs9/rpm/fedora/43/x86_64", "file:///srv/rs9/rpm/fedora/43/aarch64"}
             and identity.get("configuration") == configuration
+            and identity.get("presentation") == DNF_PRESENTATION
+            and identity.get("commands") == command_identities()
+            and identity.get("version") == DNF_VERSION
             and _SHA.fullmatch(identity.get("image_sha256") or "") is not None
             and re.fullmatch(r"sha256:[0-9a-f]{64}", identity.get("image_id") or "") is not None
             and identity["image_sha256"] == digest(identity["image_id"].encode())
@@ -321,7 +401,8 @@ def _identity_matches(probe) -> bool:
             and set(identity["tools"]) == {"dnf-version", "rpm-version"}
             and all(isinstance(t, Mapping) and _SHA.fullmatch(t.get("stdout_sha256") or "")
                     and isinstance(t.get("version"), str) and 0 < len(t["version"]) <= 128
-                    for t in identity["tools"].values()))
+                    for t in identity["tools"].values())
+            and identity["tools"]["dnf-version"]["version"] == f"dnf5 version {DNF_VERSION}")
 
 
 def qualify_dnf(kind, refresh, install, query, *, configure, context):
@@ -343,22 +424,52 @@ def qualify_dnf(kind, refresh, install, query, *, configure, context):
             or probe["identity_sha256"] != context.get("positive_identity_sha256")):
         return False, "UNCLASSIFIED_FAILURE", "dnf-positive-control-binding-unproven", diag
     mutation = context.get("mutation") or {}
-    if mutation.get("verified") is not True or mutation.get("kind") != kind:
+    if (mutation.get("verified") is not True or mutation.get("kind") != kind
+            or any(not _SHA.fullmatch(mutation.get(k) or "") for k in ("control_sha256", "tampered_sha256"))
+            or mutation["control_sha256"] == mutation["tampered_sha256"]):
         return False, "UNCLASSIFIED_FAILURE", "dnf-mutation-unproven", diag
-    for r in (refresh, install, query):
+    arch = context.get("arch")
+    if (arch not in {"x86_64", "aarch64"} or probe["identity"]["source_uri"] != f"file:///srv/rs9/rpm/fedora/43/{arch}"
+            or probe["identity"]["platform"] != {"x86_64": "linux/amd64", "aarch64": "linux/arm64"}[arch]):
+        return False, "UNCLASSIFIED_FAILURE", "dnf-architecture-binding-unproven", diag
+    if not command_matches(refresh, "refresh") or not command_matches(install, "install", context.get("product", "")):
+        return False, "UNCLASSIFIED_FAILURE", "dnf-command-binding-unproven", diag
+    for r in (configure, refresh, install, query):
         if environment_failure(r):
             return False, environment_failure(r), "dnf-environment-failure", diag
-    category = classify_dnf(target, stage=diag["qualifying_stage"])
+    category = classify_dnf(target, stage=diag["qualifying_stage"], context=context)
     if kind == "package":
         checksum = package_checksum(install, stage="install")
         out, err = full_streams(install)
-        product = context["product"]
-        if (refresh.exit_code != 0 or not checksum or not re.search(r"(?<![A-Za-z0-9_.+-])" + re.escape(product) + r"(?=-[0-9]|[ \n:]|\Z)", out + "\n" + err)
+        product = context.get("product", "")
+        arch = context.get("arch", "")
+        combined = out + "\n" + err
+        if any(t in combined.lower() for t in ("no match for argument", "unable to find a match", "no package matches", "skipping", "ignoring repository", "disabled repository", "signing key not found", "bad pgp signature")):
+            return False, category, "dnf-package-rejection-unproven", diag
+        target_file = mutation.get("target", "")
+        prefix = f"fedora/43/{arch}/"
+        relative = target_file.removeprefix(prefix) if isinstance(target_file, str) and target_file.startswith(prefix) else ""
+        expected_path = probe["identity"]["source_uri"] + "/" + relative
+        uris = re.findall(r"file:[^\s\"']+", combined)
+        if any(uri.rstrip(":") not in {probe["identity"]["source_uri"], expected_path, KEY_URI} for uri in uris):
+            return False, category, "dnf-package-source-unproven", diag
+        paths = re.findall(r"(?:Librepo error: )?Cannot download ([^\s:]+|file://[^\s]+): All mirrors were tried", combined)
+        has_path = (bool(relative) and re.fullmatch(r"Packages/" + re.escape(product) + r"-[A-Za-z0-9_.+-]+\.(?:" + re.escape(arch) + r"|noarch)\.rpm", relative)
+                    and len(paths) == 1 and paths[0] in {relative, expected_path}
+                    and probe["identity"]["source_uri"].endswith("/" + arch))
+        if has_path:
+            diag["failed_download_path"] = relative
+            diag["failed_download_uri_sha256"] = digest(expected_path.encode())
+        if (refresh.exit_code != 0 or install.exit_code != 1 or not checksum or not has_path
+                or not re.search(r"(?<![A-Za-z0-9_.+-])" + re.escape(product) + r"(?=-[0-9]|[ \n:]|\Z)", combined)
                 or checksum["calculated_sha256"] != mutation.get("tampered_sha256")
                 or checksum["expected_sha256"] != mutation.get("control_sha256")):
             return False, category, "dnf-package-rejection-unproven", diag
         return True, category, None, diag
     if kind in {"index", "signature", "wrongkey"}:
+        expected_target = f"fedora/43/{arch}/repodata/repomd.xml" + ("" if kind == "index" else ".asc")
+        if mutation.get("target") != expected_target:
+            return False, category, "dnf-mutation-target-unproven", diag
         if refresh.exit_code == 0:
             return False, "COMMAND_SUCCESS", f"bypassed-{kind}-verification-on-refresh", diag
         expected = "KEY_MISMATCH" if kind == "wrongkey" else "SIGNATURE_REJECTED"
@@ -366,12 +477,24 @@ def qualify_dnf(kind, refresh, install, query, *, configure, context):
             return False, category, f"wrong-tamper-rejection-reason:{category}", diag
         diag["authentication_boundary"] = "repomd-signature"
         diag["boundary_rejection_category"] = category
+        repo_diag = parse_repository_rejection(refresh, stage="refresh", context=context)
+        if repo_diag:
+            diag["rejection_sequence"] = repo_diag.get("events", [])
+        if repo_diag and repo_diag.get("intermediate_categories"):
+            diag["intermediate_categories"] = repo_diag["intermediate_categories"]
+            diag["bootstrap_categories"] = repo_diag["intermediate_categories"]
         if kind == "index":
             if mutation.get("authentication_boundary") != "repomd-signature":
                 return False, category, "dnf-index-provenance-unproven", diag
-            # The client observes a signature rejection; exact mutation custody
-            # establishes that the index, with its signature unchanged, changed.
             return True, "INDEX_CORRUPT", None, diag
+        if kind == "signature":
+            if (mutation.get("armor_framing_preserved") is not True
+                    or type(mutation.get("packet_changed_offset")) is not int
+                    or type(mutation.get("packet_length")) is not int
+                    or mutation["packet_changed_offset"] < 0
+                    or mutation["packet_changed_offset"] != mutation["packet_length"] - 1):
+                return False, category, "dnf-signature-provenance-unproven", diag
+            return True, category, None, diag
         if kind == "wrongkey" and (mutation.get("replacement_signature_verified") is not True
                 or mutation.get("control_key_fingerprint") != probe["identity"]["public_fingerprint"]
                 or not _FINGERPRINT.fullmatch(mutation.get("replacement_issuer") or "")

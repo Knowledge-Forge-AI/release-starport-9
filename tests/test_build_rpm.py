@@ -231,7 +231,7 @@ class BuildRpmTests(unittest.TestCase):
                 build_rpm_candidate(capture,intent,'noarch',scratch,offline_npm_archives=npm,runner=runner)
             self.assertEqual(caught.exception.rpmlint_evidence['status'],'pass')
             self.assertFalse(caught.exception.rpmlint_policy['accepted'])
-            self.assertFalse(any(c['argv'][0].startswith('createrepo') for c in runner.calls))
+            self.assertFalse(any(Path(c['argv'][0]).name.startswith('createrepo') for c in runner.calls))
 
     def test_exact_query_architecture_vocabulary_and_rejection_of_banners_and_filenames(self):
         from rs9.build_native import CommandReceipt
@@ -368,7 +368,11 @@ class BuildRpmTests(unittest.TestCase):
         def createrepo_handler(argv, cwd=None, env=None):
             repodata = Path(argv[-1]) / "repodata"
             repodata.mkdir(parents=True, exist_ok=True)
-            (repodata / "repomd.xml").write_bytes(b"<repomd/>")
+            if createrepo_exit == 0:
+                from tests.rpm_metadata_fixtures import create_valid_repodata
+                create_valid_repodata(Path(argv[-1]))
+            else:
+                (repodata / "repomd.xml").write_bytes(b"<repomd/>")
             return CommandReceipt(argv, createrepo_exit, b"created\n", b"error\n" if createrepo_exit else b"")
 
         return MockCommandRunner(
@@ -377,12 +381,14 @@ class BuildRpmTests(unittest.TestCase):
                 "rpm": "/usr/bin/rpm",
                 "rpmlint": "/usr/bin/rpmlint",
                 "createrepo_c": "/usr/bin/createrepo_c",
+                "/usr/bin/createrepo_c": "/usr/bin/createrepo_c",
             },
             handlers={
                 "rpmbuild": rpmbuild_handler,
                 "rpm": rpm_query_handler,
                 "rpmlint": rpmlint_handler,
                 "createrepo_c": createrepo_handler,
+                "/usr/bin/createrepo_c": createrepo_handler,
             },
         )
 
@@ -776,6 +782,36 @@ class BuildRpmTests(unittest.TestCase):
         self.assertEqual(err.construction_witness["schema"], "rs9.rpm-construction-witness.v1")
         self.assertEqual(err.package_artifact, err.package_path)
         self.assertEqual(err.details.get("construction_witness")["schema"], "rs9.rpm-construction-witness.v1")
+
+    def test_metadata_format_failure_keeps_accepted_policy_and_unsigned_witness(self):
+        capture, intent, npm = create_cli_fixture(self.root / "metadata-format")
+        scratch = self.scratch / "metadata-format"; scratch.mkdir()
+        runner = self._setup_runner()
+        original = runner.handlers["/usr/bin/createrepo_c"]
+        def wrong_format(argv, **kwargs):
+            self.assertEqual(argv[1:-1], ["--general-compress-type", "gz", "--no-database", "-s", "sha256"])
+            result = original(argv, **kwargs)
+            index = Path(argv[-1]) / "repodata/repomd.xml"
+            index.write_text(index.read_text().replace(".xml.gz", ".xml.zst"))
+            return result
+        runner.handlers["/usr/bin/createrepo_c"] = wrong_format
+        with self.assertRaises(ContractError) as caught:
+            build_rpm_candidate(capture, intent, "noarch", scratch,
+                                offline_npm_archives=npm, runner=runner)
+        err = caught.exception
+        self.assertEqual(err.details["operation"], "repodata-format-verify")
+        self.assertEqual(err.details["causal_code"], "BAD_COMPRESSION")
+        self.assertEqual(err.causal_receipt.command[0], "/usr/bin/createrepo_c")
+        self.assertTrue(err.rpmlint_policy["accepted"])
+        self.assertEqual(err.package_sha256, digest(Path(err.package_path).read_bytes()))
+        self.assertEqual(err.construction_witness["schema"], "rs9.rpm-construction-witness.v1")
+        self.assertFalse((scratch / "rpm-manifest.json").exists())
+
+    def test_legacy_createrepo_name_alone_is_not_a_supported_prerequisite(self):
+        from rs9.build_rpm import _find_createrepo
+        runner = MockCommandRunner(available_tools={"createrepo": "/usr/bin/createrepo"})
+        self.assertIsNone(_find_createrepo(runner))
+        self.assertEqual(runner.calls, [])
 
     def test_record_boundary_failure_wrapped_preserving_field_rule_and_no_receipt(self):
         fixture_dir = self.root / "fixture_boundary"

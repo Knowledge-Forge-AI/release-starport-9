@@ -320,14 +320,13 @@ from rs9.rpm_lint_policy import evaluate_policy
 
 
 RPM_REQUIRED_TOOLS = ["rpmbuild", "rpm", "rpmlint"]
-CREATEREPO_CANDIDATES = ["createrepo_c", "createrepo"]
-
-
 def _find_createrepo(runner: CommandRunner) -> str | None:
-    for candidate in CREATEREPO_CANDIDATES:
-        if runner.which(candidate) is not None:
-            return candidate
-    return None
+    """Require the maintained C implementation and retain its resolved executable.
+
+    A legacy-name-only installation is an unavailable prerequisite; no ambiguous
+    version string establishes the supported option contract.
+    """
+    return runner.which("createrepo_c")
 
 
 def _render_rpm_spec(
@@ -1061,15 +1060,8 @@ def build_rpm_candidate(
         raise _attach_witness(err)
 
     # Execute createrepo gzip --no-database (atomic: reached ONLY after policy acceptance!)
-    createrepo_cmd = [
-        createrepo_bin,
-        "--no-database",
-        "--compress-type",
-        "gz",
-        "-s",
-        "sha256",
-        str(scratch / "repo"),
-    ]
+    from rs9.rpm_repository import metadata_command
+    createrepo_cmd = metadata_command(scratch / "repo", binary=createrepo_bin)
     createrepo_receipt = _post_construction_run(createrepo_cmd)
     if createrepo_receipt.exit_code != 0:
         details = {
@@ -1086,6 +1078,21 @@ def build_rpm_candidate(
             details=details,
         )
         err.receipt = createrepo_receipt
+        err.causal_receipt = createrepo_receipt
+        err.rpmlint_evidence, err.rpmlint_policy = rpmlint_evidence, policy_evidence
+        err.package_path, err.spec_path = str(dest_rpm), str(spec_path)
+        err.package_sha256, err.spec_sha256 = digest(rpm_bytes), digest(spec_path.read_bytes())
+        raise _attach_witness(err)
+
+    # Verify repository metadata format, compression, and content linkage before ready
+    from rs9.rpm_metadata import verify_repository_metadata
+    rel_builder_pkg = f"{matched_arch}/{dest_rpm.name}"
+    try:
+        verify_repository_metadata(
+            scratch / "repo", expected_packages=[rel_builder_pkg],
+            is_signed=False, receipt=createrepo_receipt,
+        )
+    except ContractError as err:
         err.causal_receipt = createrepo_receipt
         err.rpmlint_evidence, err.rpmlint_policy = rpmlint_evidence, policy_evidence
         err.package_path, err.spec_path = str(dest_rpm), str(spec_path)
@@ -1113,7 +1120,7 @@ def build_rpm_candidate(
             "rpmlint_exit_code": rpmlint_receipt.exit_code,
             "rpmlint": durable_lint,
             "rpmlint_policy": durable_policy,
-            "createrepo_flags": ["--no-database", "gzip"],
+            "createrepo_flags": createrepo_cmd[1:-1],
             "native_preservation": {
                 "strip": False,
                 "debug": False,

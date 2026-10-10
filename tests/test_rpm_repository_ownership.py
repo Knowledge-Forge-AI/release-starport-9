@@ -280,16 +280,16 @@ class SignMetadataTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name).resolve()
+        os.chmod(self.root, 0o755)
         self.repodata = self.root / "repodata"
         self.repodata.mkdir(mode=0o755)
         os.chmod(self.repodata, 0o755)
-        os.chmod(self.root, 0o755)
+        from tests.rpm_metadata_fixtures import create_valid_repodata
+        create_valid_repodata(self.root)
         self.repomd = self.repodata / "repomd.xml"
-        self.repomd.write_bytes(b"<repomd><revision>1</revision></repomd>\n")
-        os.chmod(self.repomd, 0o644)
         self.signer = FixtureSigner()
         self.receipt = CommandReceipt(
-            ["createrepo_c", "--no-database", str(self.root)],
+            ["createrepo_c", "--general-compress-type", "gz", "--no-database", "-s", "sha256", str(self.root)],
             0,
             b"createrepo_c complete\n",
             b"",
