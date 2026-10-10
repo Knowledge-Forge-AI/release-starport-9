@@ -195,6 +195,7 @@
       "required_gates": [
         "rpm-container-environment",
         "rpm-package-build",
+        "rpm-noarch-header-readback",
         "rpm-lint-policy-accepted",
         "rpm-client-preparation",
         "rpm-derivation-record",
@@ -224,6 +225,7 @@
       "required_gates": [
         "rpm-container-environment",
         "rpm-package-build",
+        "rpm-noarch-header-readback",
         "rpm-lint-policy-accepted",
         "rpm-client-preparation",
         "rpm-derivation-record",

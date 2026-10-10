@@ -326,6 +326,7 @@ def render_install_docs() -> dict[str, str]:
             "enabled=1\n"
             "gpgcheck=1\n"
             "repo_gpgcheck=1\n"
+            "skip_if_unavailable=False\n"
             f"gpgkey=https://{PAGES_HOST}/keys/rs9-candidate-fixture-NONPRODUCTION.asc\n"
         ),
     }

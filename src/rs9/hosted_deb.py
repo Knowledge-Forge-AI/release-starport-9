@@ -243,8 +243,12 @@ def _user() -> str | None:
 # --------------------------------------------------------------------------- inventory
 
 
-def inventory_excluded(family: str, rel_path: str) -> bool:
+def inventory_excluded(family: str, rel_path: str, *, kind: str | None = None) -> bool:
     """Documented package-manager state and generated caches only."""
+    if family == "dnf":
+        from rs9.dnf_state import is_dnf_state_file
+        if is_dnf_state_file(rel_path, kind=kind):
+            return True
     return is_excluded_inventory_path(rel_path) or any(p.search(rel_path) for p in INVENTORY_EXCLUDES[family])
 
 
@@ -256,7 +260,8 @@ def inventory_samples(paths):
 
 def parse_inventory(stdout: bytes, family: str) -> dict[str, str]:
     """Versioned byte-lossless transport with the maintained family exclusions."""
-    return parse_client_inventory(stdout, exclusion=lambda path: inventory_excluded(family, path), with_modes=True)
+    return parse_client_inventory(stdout, exclusion=lambda path: inventory_excluded(family, path),
+                                  file_exclusion="dnf" if family == "dnf" else None, with_modes=True)
 
 
 # --------------------------------------------------------------------------- containers
@@ -582,7 +587,14 @@ class ClientContainer:
         command = ["docker", "exec"]
         if user:
             command += ["--user", user]
+        if self.family == "dnf":
+            # DNF5 otherwise truncates checksums to its default 80 columns.
+            command += ["-e", "LC_ALL=C", "-e", "LANG=C", "-e", "DNF5_FORCE_COLUMNS=512"]
         return self.host.run([*command, self.name, *argv])
+
+    def dnf_image_identity_receipt(self) -> CommandReceipt:
+        """Read the immutable image of the running candidate container."""
+        return self.host.run(["docker", "inspect", "--format", "{{.Image}}", self.name])
 
     @property
     def unprivileged_prefix(self) -> list[str]:
@@ -593,6 +605,7 @@ class ClientContainer:
         res = run_and_parse(
             self,
             exclusion=lambda path: inventory_excluded(self.family, path),
+            file_exclusion="dnf" if self.family == "dnf" else None,
             with_modes=True,
             stage=stage,
             family=self.family,
@@ -629,22 +642,32 @@ def apt_spec(apt_dir: Path, keyring: Path, arch: str, *, public_fingerprint=None
     }
 
 
-def dnf_spec(rpm_dir: Path, keys_dir: Path, arch: str) -> dict[str, Any]:
+def dnf_spec(rpm_dir: Path, keys_dir: Path, arch: str, *, public_fingerprint=None) -> dict[str, Any]:
     if arch not in {"x86_64", "aarch64"}:
         raise ContractError("INVALID_ARCHITECTURE", "Fedora client architecture must be x86_64 or aarch64")
     repo = [
         f"[{DNF_REPO_ID}]", "name=RS9 Fedora 43 NONPRODUCTION candidate",
         f"baseurl=file://{SERVER_ROOT}/rpm/fedora/43/{arch}", "enabled=1",
-        "gpgcheck=1", "repo_gpgcheck=1", f"gpgkey=file://{SERVER_ROOT}/keys/rs9-candidate-fixture-NONPRODUCTION.asc",
+        "gpgcheck=1", "repo_gpgcheck=1", "skip_if_unavailable=False",
+        f"gpgkey=file://{SERVER_ROOT}/keys/rs9-candidate-fixture-NONPRODUCTION.asc",
     ]
     only = ["--disablerepo=*", f"--enablerepo={DNF_REPO_ID}"]
+    from rs9.dnf_diagnostics import probe_commands
+    strict = [f"--setopt={DNF_REPO_ID}.skip_if_unavailable=False",
+              f"--setopt={DNF_REPO_ID}.gpgcheck=1", f"--setopt={DNF_REPO_ID}.repo_gpgcheck=1",
+              "--setopt=system_cachedir=/var/cache/libdnf5", "--setopt=cacheonly=none", "--color=never"]
+    base = ["dnf", "-y", *only, *strict]
+    key = keys_dir / "rs9-candidate-fixture-NONPRODUCTION.asc"
     return {
-        "family": "dnf",
+        "family": "dnf", "arch": arch, "public_fingerprint": public_fingerprint,
+        "expected_key_sha256": digest(key.read_bytes()) if key.is_file() and not key.is_symlink() else None,
+        "source_uri": f"file://{SERVER_ROOT}/rpm/fedora/43/{arch}",
+        "dnf_probe_commands": probe_commands(base),
         "mounts": [(str(rpm_dir), f"{SERVER_ROOT}/rpm", False), (str(keys_dir), f"{SERVER_ROOT}/keys", False)],
         "configure": [_printf_file(DNF_REPO_FILE, repo)],
-        "refresh": ["dnf", "-y", *only, "makecache"],
-        "install": lambda pkg: ["dnf", "-y", *only, "install", pkg],
-        "remove": lambda pkg: ["dnf", "-y", "--setopt=clean_requirements_on_remove=False", "remove", pkg],
+        "refresh": [*base, "--refresh", "makecache"],
+        "install": lambda pkg: [*base, "install", pkg],
+        "remove": lambda pkg: ["dnf", "-y", "--disablerepo=*", "--setopt=clean_requirements_on_remove=False", "remove", pkg],
         "query": lambda pkg: ["rpm", "-q", "--qf", "%{VERSION}-%{RELEASE} %{ARCH}\\n", pkg],
     }
 
@@ -683,8 +706,19 @@ def _cleanup_installed_client(client, spec, product, label, before, family):
     try:
         removed=client.exec(spec["remove"](product))
         gone=client.exec(spec["query"](product))
-        ok=removed.exit_code==0 and gone.exit_code!=0
-        rows.append(_gate(label+".uninstall", *_pair(ok)))
+        if family == "dnf":
+            from rs9.dnf_diagnostics import dnf_absent, record_dnf_stage
+            absent = dnf_absent(gone, product)
+            ok = removed.exit_code == 0 and absent
+            status, reason = _pair(ok)
+            if not gone.executed and gone.exit_code != 0 and removed.exit_code == 0:
+                status, reason = "not-run", "synthetic-command-seam"
+            rows.append(_gate(label+".uninstall", status, reason if absent or status == "not-run" else "candidate-absence-unproven"))
+            evidence["absence_query"] = record_dnf_stage(stage="query", product=product,
+                arch=spec["arch"], receipt=gone)
+        else:
+            ok=removed.exit_code==0 and gone.exit_code!=0
+            rows.append(_gate(label+".uninstall", *_pair(ok)))
         evidence["uninstall"]={"exit_code":removed.exit_code,"query_exit_code":gone.exit_code,
                               "stdout_sha256":removed.stdout_sha256,"stderr_sha256":removed.stderr_sha256}
     except (ContractError,NativePrerequisiteUnavailable,OSError) as error:
@@ -694,6 +728,10 @@ def _cleanup_installed_client(client, spec, product, label, before, family):
         comparison=compare_inventories(before,after)
         diag=getattr(client,"last_diagnostics",{})
         evidence["inventory_stats"]={"post-remove":diag}
+        if family == "dnf":
+            from rs9.dnf_state import dnf_state_policy
+            evidence["inventory_policy"] = {**dnf_state_policy(),
+                "post_remove_excluded_files": diag.get("counters", {}).get("excluded_files")}
         evidence["inventory_clean"]=comparison["clean"]
         extra={}
         if not comparison["clean"]:
@@ -781,6 +819,13 @@ def client_cycle(
                 if negative.exit_code:
                     raise ContractError("NETWORK_DENIAL", "Disconnected client still has runtime egress")
                 rows.append(_gate(f"{label}.network-denial", "pass"))
+                if family == "dnf":
+                    from rs9.dnf_diagnostics import probe_dnf_client
+                    current_stage = "dnf-client-identity"
+                    dnf_probe = probe_dnf_client(client, spec)
+                    product_evidence["dnf_client"] = dnf_probe
+                    rows.append(_gate(f"{label}.dnf-client-identity", {"pass": "pass", "unavailable": "not-run"}.get(dnf_probe["status"], "fail"),
+                                      None if dnf_probe["status"] == "pass" else "dnf-identity-readback-unproven"))
                 current_stage = "pre-install"
                 before = client.inventory("pre-install")
                 product_evidence["inventory_stats"] = {"pre-install": getattr(client, "last_diagnostics", {})}
@@ -856,6 +901,7 @@ def client_cycle(
                         keyring=key_mount,
                         receipts={"configure": cfg_receipts, "refresh": refresh_rcpt, "install": installed, "query": present},
                         success=True, setup_sha256=setup_sha256,
+                        dnf_probe=product_evidence.get("dnf_client"),
                     )
                     product_evidence["positive_control"] = control
                     evidence.setdefault("positive_controls", {})[product] = control
@@ -901,6 +947,8 @@ def client_cycle(
                         stats={**product_evidence.get("inventory_stats",{}),**cleanup_evidence.get("inventory_stats",{})}
                         product_evidence.update(cleanup_evidence)
                         product_evidence["inventory_stats"]=stats
+                        if family == "dnf" and "inventory_policy" in product_evidence:
+                            product_evidence["inventory_policy"]["pre_install_excluded_files"] = stats.get("pre-install", {}).get("counters", {}).get("excluded_files")
                 evidence[product] = {**product_evidence, "family": family, "stage": "post-remove"}
         except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
             err_family = (err.details.get("family") if isinstance(err, ContractError) and err.details else None) or family
@@ -927,6 +975,7 @@ def client_cycle(
                 family=err_family, image=image, platform=platform, product=product,
                 repository=repo_mount, keyring=key_mount,
                 success=False, setup_sha256=setup_sha256,
+                dnf_probe=product_evidence.get("dnf_client"),
             )
             evidence[product] = {
                 **product_evidence,
@@ -1138,7 +1187,8 @@ def tamper_family_copy(
             with (base / "repodata/repomd.xml").open("ab") as stream:
                 stream.write(b"<!-- tampered -->\n")
         elif kind == "signature":
-            _corrupt_signature(base / "repodata/repomd.xml.asc")
+            from rs9.dnf_mutation import corrupt_dnf_signature
+            corrupt_dnf_signature(base / "repodata/repomd.xml.asc")
         else:
             (base / "repodata/repomd.xml.asc").write_bytes(
                 wrong_signer.detach_sign((base / "repodata/repomd.xml").read_bytes(), armor=True))
@@ -1196,6 +1246,8 @@ def tamper_cycle(
         label = f"{prefix}.tamper.{kind}"
         mark = host.mark()
         raw_negative_receipts: list[dict[str, Any]] = []
+        install = present = None
+        dnf_context = None
         try:
             copy_root = work / f"tamper-{family}-{kind}"
             copy_root.mkdir()
@@ -1204,6 +1256,14 @@ def tamper_cycle(
             spec = spec_for(tampered)
             signature_context = None
             mutation = None
+            if family == "dnf":
+                from rs9.dnf_mutation import verify_dnf_mutation
+                mutation = verify_dnf_mutation(dirs["rpm"], tampered["rpm"], arch=arch, product=product, kind=kind,
+                                               wrong_signer=wrong_signer,
+                                               public_fingerprint=spec.get("public_fingerprint"))
+                dnf_context = {"product": product, "arch": arch, "mutation": mutation,
+                               "positive_control_valid": control_ok,
+                               "positive_identity_sha256": ((positive_control or {}).get("dnf_client") or {}).get("identity_sha256")}
             if family == "apt" and kind == "signature":
                 mutation = verify_signature_tamper_mutation(dirs["apt"], tampered["apt"])
                 signature_context = {"source_uri": "file:/srv/rs9/apt", "distribution": "resolute",
@@ -1217,6 +1277,9 @@ def tamper_cycle(
                         "stage": "configure", "exit_code": cfg_rcpt.exit_code, "executed": cfg_rcpt.executed,
                         "stdout_sha256": cfg_rcpt.stdout_sha256, "stderr_sha256": cfg_rcpt.stderr_sha256,
                     })
+                    if family == "dnf":
+                        from rs9.dnf_diagnostics import record_dnf_stage
+                        raw_negative_receipts[-1] = record_dnf_stage(stage="configure", product=product, arch=arch, receipt=cfg_rcpt)
                     if cfg_rcpt.exit_code != 0:
                         raise ContractError("CLIENT_CONFIGURE_FAILED", "Client repository trust setup failed")
                 if signature_context is not None:
@@ -1229,27 +1292,37 @@ def tamper_cycle(
                     signature_context["network_disconnected"] = socket_probe.executed is True and socket_probe.exit_code == 0
                     if socket_probe.exit_code != 0:
                         raise ContractError("NETWORK_DENIAL", "Disconnected client still has runtime egress")
+                if family == "dnf":
+                    from rs9.dnf_diagnostics import probe_dnf_client
+                    dnf_context["probe"] = probe_dnf_client(client, spec)
                 refresh_rcpt = client.exec(spec["refresh"])  # may fail first; installation must still never succeed
                 raw_negative_receipts.append({
                     "stage": "refresh", "exit_code": refresh_rcpt.exit_code,
                     "stdout_sha256": refresh_rcpt.stdout_sha256, "stderr_sha256": refresh_rcpt.stderr_sha256,
                     "executed": refresh_rcpt.executed,
                 })
+                if family == "dnf":
+                    raw_negative_receipts[-1] = record_dnf_stage(stage="refresh", product=product, arch=arch, receipt=refresh_rcpt)
                 install = client.exec(spec["install"](product))
                 raw_negative_receipts.append({
                     "stage": "install", "exit_code": install.exit_code,
                     "stdout_sha256": install.stdout_sha256, "stderr_sha256": install.stderr_sha256,
                     "executed": install.executed,
                 })
+                if family == "dnf":
+                    raw_negative_receipts[-1] = record_dnf_stage(stage="install", product=product, arch=arch, receipt=install)
                 present = client.exec(spec["query"](product))
                 raw_negative_receipts.append({
                     "stage": "query", "exit_code": present.exit_code,
                     "executed": present.executed,
                     "stdout_sha256": present.stdout_sha256, "stderr_sha256": present.stderr_sha256,
                 })
+                if family == "dnf":
+                    raw_negative_receipts[-1] = record_dnf_stage(stage="query", product=product, arch=arch, receipt=present)
 
             is_qualified, category, qual_reason, qual_diag = qualify_tamper_rejection(
-                kind, refresh_rcpt, install, present, family=family, configure_rcpt=cfg_rcpt, signature_context=signature_context
+                kind, refresh_rcpt, install, present, family=family, configure_rcpt=cfg_rcpt,
+                signature_context=signature_context, dnf_context=dnf_context
             )
             if signature_context is not None:
                 raw_negative_receipts[ next(i for i, r in enumerate(raw_negative_receipts) if r["stage"] == "refresh") ].update(
@@ -1280,13 +1353,18 @@ def tamper_cycle(
                                 negative_receipts=raw_negative_receipts,
                                 **qual_diag)
         except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
-            if not control_ok:
+            if family == "dnf" and any(r is not None and r.exit_code == 0 for r in (install, present)):
+                row = _gate(label, "fail", "tampered-content-accepted", rejection_category="COMMAND_SUCCESS",
+                            negative_receipts=raw_negative_receipts, subsequent_error=_family_error(err))
+            elif not control_ok:
                 row = _gate(label, "not-run", "blocked-by:positive-control",
                             negative_receipts=raw_negative_receipts,
                             control_error=control_reason)
             else:
                 row = _gate(label, "fail" if not isinstance(err, NativePrerequisiteUnavailable) else "not-run",
                             _family_error(err), negative_receipts=raw_negative_receipts)
+        if family == "dnf" and dnf_context is not None:
+            row.update(dnf_client=dnf_context.get("probe"), mutation=dnf_context["mutation"])
         gates.append(row)
     return gates
 
@@ -1697,7 +1775,7 @@ def _custody_unique(bundles: Sequence[dict[str, Any]]) -> dict[str, Path]:
 
 def _rpm_custody_unique(bundles: Sequence[dict[str, Any]]) -> dict[str, Path]:
     """Reject conflicting complete bytes; header deltas explain, never relax, equality."""
-    from rs9.rpm_header import header_delta
+    from rs9.rpm_header import header_delta, inspect_rpm
     unique, products, origins = {}, {}, {}
     seen = set()
     for bundle in bundles:
@@ -1729,6 +1807,7 @@ def _rpm_custody_unique(bundles: Sequence[dict[str, Any]]) -> dict[str, Path]:
                     delta = header_delta(before, after)
                     report.update(header_delta=delta[:16], header_delta_count=len(delta),
                                   header_delta_complete=len(delta) <= 16)
+                    report["compressed_payload_equal"] = inspect_rpm(before)[2] == inspect_rpm(after)[2]
                     error.header_delta = delta[:16]
                 except ValueError:
                     report["header_delta_status"] = "unavailable"
@@ -2052,7 +2131,7 @@ def _pages_client_tests(
     families = [
         ("apt", apt_tag, {"apt": tree / "apt"}, lambda d: apt_spec(d["apt"], keys / "rs9-candidate-fixture-NONPRODUCTION.gpg", "amd64", public_fingerprint=fixture.primary_fingerprint),
          "amd64", list(REQUIRED_PRODUCTS)),
-        ("dnf", rpm_tag, {"rpm": tree / "rpm"}, lambda d: dnf_spec(d["rpm"], keys, "x86_64"), "x86_64",
+        ("dnf", rpm_tag, {"rpm": tree / "rpm"}, lambda d: dnf_spec(d["rpm"], keys, "x86_64", public_fingerprint=fixture.primary_fingerprint), "x86_64",
          list(REQUIRED_PRODUCTS)),
         ("pacman", pac_tag, {"pacman": tree / "pacman"}, lambda d: pacman_spec(d["pacman"], keys, fixture.primary_fingerprint),
          "x86_64", list(REQUIRED_PRODUCTS)),

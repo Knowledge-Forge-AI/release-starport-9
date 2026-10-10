@@ -383,6 +383,28 @@ def rpm_stage_gates(required_products, constructed, completed, failures):
     return rows
 
 
+def noarch_header_gate(witnesses):
+    """Require both pure-JS finished headers bound to their construction bytes."""
+    products = ("theme-forge-stellar-loom", "theme-forge-solar-sail")
+    failed = {}
+    for product in products:
+        witness = witnesses.get(product, {})
+        inputs = witness.get("reproducibility", {})
+        readback = witness.get("finished_header") or inputs.get("finished_header") or {}
+        identities = readback.get("identities", {})
+        expected = {"package_sha256": witness.get("package_sha256"),
+                    "spec_sha256": witness.get("spec_sha256"),
+                    "source_rpm_sha256": inputs.get("source_rpm", {}).get("sha256"),
+                    "closure_sha256": inputs.get("npm_closure_sha256")}
+        bound = all(isinstance(value, str) and len(value) == 64 and
+                    all(c in "0123456789abcdef" for c in value) and identities.get(key) == value
+                    for key, value in expected.items())
+        if readback.get("status") != "pass" or not bound:
+            failed[product] = readback.get("reason") or "missing-or-unbound-header-readback"
+    return {"name": "rpm-noarch-header-readback", "status": "fail" if failed else "pass",
+            **({"failed_products": failed} if failed else {"products": list(products)})}
+
+
 def caller_diagnostic(evidence):
     """Retain source identities separately from the full verified caller input."""
     if not isinstance(evidence, dict):
@@ -715,6 +737,8 @@ def execute(context):
                          and all(p.get("accepted") is True for p in lint_policy.values()))
             record_gates = rpm_stage_gates(required_products, construction_witnesses, completed_records, failures)
             gates.extend(record_gates)
+
+            gates.append(noarch_header_gate(construction_witnesses))
             gates.append({"name": "rpm-lint-policy-accepted", "status": "pass" if lint_pass else "fail"})
         else:
             gates.append({"name": family + "-package-build", "status": "pass" if len(products) == 4 and not errors else "fail"})
@@ -847,7 +871,7 @@ def execute(context):
                                                      "target": "fixture", "causal_code": "AUDIT_FAILED"})
                 completed_operations["repository"] = {"metadata": repository_reports, "public_tree": public_report}
                 _verify_unsigned_products(products, product_metadata, bundle)
-                spec_for = lambda dirs: dnf_spec(dirs["rpm"], keys, arch)
+                spec_for = lambda dirs: dnf_spec(dirs["rpm"], keys, arch, public_fingerprint=fixture.primary_fingerprint)
             else:
                 tool = ContainerRunner(host, tag, platform=platform, mounts=[(str(scratch), str(scratch), True)])
                 checked(tool, ["repo-add", str(directory / "rs9.db.tar.gz"), *[str(p) for p in sorted(package_directory.glob("*.pkg.tar.*")) if not p.name.endswith(".sig")]])
@@ -920,7 +944,7 @@ def execute(context):
             gate = {"name": failed_gate}
             gates.append(gate)
         gate.update(status="fail", reason=code, causal_substage=substage)
-        pending = ["rpm-repository-indexing", "rpm-client-qualification", "burst-native-addon-target",
+        pending = ["rpm-noarch-header-readback", "rpm-repository-indexing", "rpm-client-qualification", "burst-native-addon-target",
                    "burst-native-addon-load", *["rpm-trust.tamper." + kind for kind in
                                                 ("package", "index", "signature", "wrongkey")]]
         present = {g["name"] for g in gates}

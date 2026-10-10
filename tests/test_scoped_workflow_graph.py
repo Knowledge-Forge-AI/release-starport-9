@@ -39,7 +39,8 @@ class ScopedGraphTests(unittest.TestCase):
                     for name in row['required_gates']]
                 migrated += 1
         self.assertIn(migrated, (0, 2))  # zero after this exact candidate is adopted
-        added = {'rpm-client-preparation', 'rpm-derivation-record', 'rpm-manifest-record', 'rpm-policy-custody'}
+        added = {'rpm-client-preparation', 'rpm-derivation-record', 'rpm-manifest-record', 'rpm-policy-custody',
+                 'rpm-noarch-header-readback'}
         normalized = json.loads(json.dumps(current))
         for row in normalized['lanes']:
             if row['lane'] == 'rpm':

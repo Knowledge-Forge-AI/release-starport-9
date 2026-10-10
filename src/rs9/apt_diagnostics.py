@@ -126,6 +126,10 @@ def classify_rejection(
     if receipt.exit_code == 0:
         return "COMMAND_SUCCESS"
 
+    if family == "dnf":
+        from rs9.dnf_diagnostics import classify_dnf
+        return classify_dnf(receipt, stage=stage)
+
     combined = (receipt.stderr_text + "\n" + receipt.stdout_text)[:1024 * 1024].lower()
     categories = (("SIGNATURE_POLICY_REJECTED", ("policy rejects", "not bound", "weak digest", "unsupported public key algorithm")),
                   ("SANDBOX_UNREADABLE", ("unsandboxed as root", "couldn't be accessed by user '_apt'")),
@@ -505,7 +509,7 @@ def apt_readability(probe, *, executed, repo_root='/srv/rs9/apt',
 
 
 def build_positive_control(*, family,image,platform,product,repository=None,keyring=None,
-                           receipts=None,success=False,setup_sha256=None):
+                           receipts=None,success=False,setup_sha256=None,dnf_probe=None):
     from rs9.release_core import digest
     control={'success':bool(success),'family':family,'image_sha256':digest(image.encode()),
              'platform':platform,'product':product,'setup_sha256':setup_sha256,'stages':{}}
@@ -513,10 +517,14 @@ def build_positive_control(*, family,image,platform,product,repository=None,keyr
         if not isinstance(items,list):items=[items]
         control['stages'][stage]=[{'exit_code':r.exit_code,'executed':r.executed,
             'stdout_sha256':r.stdout_sha256,'stderr_sha256':r.stderr_sha256} for r in items]
+    if family == 'dnf':
+        from rs9.dnf_diagnostics import valid_identity
+        control['dnf_client'] = dnf_probe
+        control['success'] = bool(success and valid_identity(dnf_probe))
     return control
 
 
-def validate_positive_control(control, *, family,image,platform,product,dirs=None,keyring=None,setup_sha256=None):
+def validate_positive_control(control, *, family,image,platform,product,dirs=None,keyring=None,setup_sha256=None,dnf_probe=None):
     from rs9.release_core import digest
     if not isinstance(control,Mapping) or control.get('success') is not True:
         return False,'positive-control-failed-or-missing'
@@ -524,6 +532,14 @@ def validate_positive_control(control, *, family,image,platform,product,dirs=Non
               'setup_sha256':setup_sha256}
     if not setup_sha256 or any(control.get(k)!=v for k,v in expected.items()):
         return False,'positive-control-binding-mismatch'
+    if family == 'dnf':
+        from rs9.dnf_diagnostics import valid_identity
+        actual = control.get('dnf_client')
+        if (not valid_identity(actual) or actual['identity'].get('image_reference_sha256') != expected['image_sha256']
+                or actual['identity'].get('platform') != platform
+                or (dnf_probe is not None and (not valid_identity(dnf_probe)
+                    or dnf_probe['identity_sha256'] != actual['identity_sha256']))):
+            return False,'positive-control-binding-mismatch'
     stages=control.get('stages',{})
     if any(not isinstance(stages.get(s),list) or not stages[s] or
            any(not isinstance(r,dict) or r.get('exit_code')!=0 or r.get('executed') is not True
@@ -542,6 +558,7 @@ def qualify_tamper_rejection(
     *,
     configure_rcpt: CommandReceipt | None = None,
     signature_context: Mapping[str, Any] | None = None,
+    dnf_context: Mapping[str, Any] | None = None,
 ) -> tuple[bool, str, str | None, dict[str, Any]]:
     """Causally qualify rejection for the tamper kind; wrong reasons cannot pass."""
     # 1. Did installation succeed? If installed, rejection failed.
@@ -553,6 +570,11 @@ def qualify_tamper_rejection(
 
     if installed:
         return False, "COMMAND_SUCCESS", "tampered-content-accepted", {}
+
+    if family == "dnf":
+        from rs9.dnf_diagnostics import qualify_dnf
+        return qualify_dnf(kind, refresh_rcpt, install_rcpt, query_rcpt,
+                           configure=configure_rcpt, context=dnf_context)
 
     if configure_rcpt is not None and configure_rcpt.exit_code != 0:
         category = classify_rejection(configure_rcpt, stage="configure", family=family)
