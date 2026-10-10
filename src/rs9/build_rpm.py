@@ -47,6 +47,7 @@ from rs9.rpm_query import (
     rpm_isolation_args,
     read_rpm_identity,
 )
+from rs9.rpm_header import inspect_rpm, tag_digest_map
 
 _RPM_WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 _RPM_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
@@ -221,11 +222,81 @@ def _noarch_build_inputs(capture, topdir, runner):
     evidence = {"schema": "rs9.noarch-repack-inputs.v1", "source_date_epoch": epoch,
                 "epoch_source": "authenticated-release-publication-day-utc", "published_at": published_at,
                 "declared_buildhost": NOARCH_BUILDHOST, "physical_buildhost_claimed": False,
-                "target": "noarch", "controls": controls, "effective_macros": expected.decode().strip(),
+                "target": "noarch", "macro_readback_scope": "rpm-cli-context",
+                "spec_local_controls": ["%global optflags %{nil}"],
+                "controls": controls, "effective_macros": expected.decode().strip(),
                 "macro_receipt": {"executed": receipt.executed, "exit_code": receipt.exit_code,
                                   "command_sha256": digest(canonical(receipt.command)),
                                   "stdout_sha256": receipt.stdout_sha256, "stderr_sha256": receipt.stderr_sha256}}
     return arguments, environment, evidence
+
+
+def inspect_noarch_headers(
+    binary_rpm_bytes: bytes,
+    source_rpm_bytes: bytes,
+    expected_epoch: int,
+    expected_buildhost: str = NOARCH_BUILDHOST,
+    spec_bytes: bytes | None = None,
+    closure_sha: str | None = None,
+) -> dict[str, Any]:
+    """Parse finished binary and source RPM via rs9.rpm_header.inspect_rpm read-only.
+
+    Requires:
+    - noarch architecture in binary main header
+    - expected authenticated epoch (tag 1006 BUILDTIME) in both RPMs
+    - expected authenticated buildhost (tag 1007 BUILDHOST) in both RPMs
+    - OPTFLAGS (tag 1122) absent or empty in binary and source RPMs
+    Records digests of tags 1094, 1122, 1132, 1146, compressed payload, and byte identities.
+    Never modifies package bytes.
+    """
+    failures, parsed = [], {}
+    for name, raw in (("binary", binary_rpm_bytes), ("source", source_rpm_bytes)):
+        try:
+            _, tags, payload = inspect_rpm(raw)
+            tag_digests = tag_digest_map(raw)
+        except (ValueError, TypeError, UnicodeError):
+            failures.append(name + "-rpm-parse-failure")
+            tags, payload, tag_digests = {}, b"", {}
+        parsed[name] = (tags, payload, tag_digests)
+
+    def is_tag(tags, number, typ, value):
+        tag = tags.get(number, {})
+        return tag.get("type") == typ and tag.get("count") == 1 and tag.get("value") == [value]
+
+    records = {}
+    for name in ("binary", "source"):
+        tags, payload, tag_digests = parsed[name]
+        prefix = "" if name == "binary" else "srpm-"
+        arch_ok = is_tag(tags, 1022, 6, "noarch")
+        epoch_ok = is_tag(tags, 1006, 4, expected_epoch)
+        host_ok = is_tag(tags, 1007, 6, expected_buildhost)
+        opt_ok = 1122 not in tags or is_tag(tags, 1122, 6, "")
+        if tags:
+            if name == "binary" and not arch_ok: failures.append("arch-mismatch")
+            if not epoch_ok: failures.append(prefix + "buildtime-epoch-mismatch")
+            if not host_ok: failures.append(prefix + "buildhost-mismatch")
+            if not opt_ok: failures.append(prefix + "optflags-non-empty")
+        records[name + "_rpm"] = {
+            "architecture": "noarch" if arch_ok else None,
+            "buildtime": expected_epoch if epoch_ok else None,
+            "buildhost": expected_buildhost if host_ok else None,
+            "optflags": None,
+            "optflags_presence": "absent" if 1122 not in tags else "empty" if opt_ok else "unexpected-withheld",
+            "optflags_absent_or_empty": opt_ok and bool(tags),
+            "tag_digests": {str(k): tag_digests.get(k) for k in (1006, 1007, 1094, 1122, 1132, 1146)},
+            "compressed_payload_sha256": digest(payload) if tags else None,
+            "package_sha256": digest(binary_rpm_bytes if name == "binary" else source_rpm_bytes),
+        }
+    records["source_rpm"]["source_rpm_sha256"] = digest(source_rpm_bytes)
+    return {"schema": "rs9.noarch-header-readback.v1", "status": "fail" if failures else "pass",
+            "reason": failures[0] if failures else None, "failures": failures,
+            "target_architecture": "noarch", "authenticated_epoch": expected_epoch,
+            "declared_buildhost": expected_buildhost, **records,
+            "identities": {"spec_sha256": digest(spec_bytes) if spec_bytes is not None else None,
+                "source_rpm_sha256": digest(source_rpm_bytes), "closure_sha256": closure_sha,
+                "package_sha256": digest(binary_rpm_bytes),
+                "compressed_payload_sha256": records["binary_rpm"]["compressed_payload_sha256"],
+                **{"tag_" + str(k) + "_digest": parsed["binary"][2].get(k) for k in (1094, 1122, 1132, 1146)}}}
 
 
 def is_soname_covered(soname: str, requires: Sequence[str], provides: Sequence[str]) -> bool:
@@ -327,6 +398,10 @@ def _render_rpm_spec(
     cl_entry = changelog_text or _format_rpm_changelog(published_at, version, revision, maintainer)
     cl_section = f"\n{cl_entry.strip()}\n"
 
+    noarch_optflags = ""
+    if arch == "noarch" and name in {"theme-forge-stellar-loom", "theme-forge-solar-sail"}:
+        noarch_optflags = "%global optflags %{nil}\n"
+
     return (
         f"# RS9 LIVE1 RPM spec candidate from exact authenticated release capture.\n"
         f"# Publication and signing deferred.\n"
@@ -335,6 +410,7 @@ def _render_rpm_spec(
         f"%undefine __brp_mangle_shebangs\n"
         f"%global _build_id_links none\n"
         f"%global __os_install_post %{{nil}}\n"
+        f"{noarch_optflags}"
         f"{f2_excludes}"
         f"Name: {name}\n"
         f"Version: {version}\n"
@@ -749,9 +825,20 @@ def build_rpm_candidate(
             error.construction_witness = construction_witness
             error.package_path = str(dest_rpm)
             raise error
-        reproducibility["source_rpm"] = {"name": srpms[0].name, "sha256": digest(srpms[0].read_bytes()),
+        srpm_bytes = srpms[0].read_bytes()
+        reproducibility["source_rpm"] = {"name": srpms[0].name, "sha256": digest(srpm_bytes),
                                          "size": srpms[0].stat().st_size}
+        header_readback = inspect_noarch_headers(
+            binary_rpm_bytes=rpm_bytes,
+            source_rpm_bytes=srpm_bytes,
+            expected_epoch=reproducibility["source_date_epoch"],
+            expected_buildhost=reproducibility.get("declared_buildhost", NOARCH_BUILDHOST),
+            spec_bytes=spec_bytes,
+            closure_sha=closure_sha,
+        )
+        reproducibility["finished_header"] = header_readback
         construction_witness["reproducibility"] = reproducibility
+        construction_witness["finished_header"] = header_readback
 
     def _attach_witness(exc: ContractError) -> ContractError:
         exc.construction_witness = construction_witness

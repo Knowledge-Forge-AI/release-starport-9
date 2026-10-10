@@ -368,16 +368,25 @@ if len(SCANNER_SCRIPT.encode("utf-8")) >= 128 * 1024:
     raise RuntimeError("SCANNER_SCRIPT source code size exceeds 128 KiB limit")
 
 
-def scanner_argv(root: str | Path = "/", family: str | None = None) -> list[str]:
+def scanner_argv(
+    root: str | Path = "/",
+    family: str | None = None,
+    patterns: Sequence[str] | None = None,
+) -> list[str]:
     """Return argv to invoke the standalone isolated client scanner via python3."""
     cmd = ["python3", "-I", "-S", "-B", "-c", SCANNER_SCRIPT, str(root)]
-    if family:
+    if patterns is not None:
+        cmd.append(json.dumps(list(patterns), separators=(",", ":")))
+    elif family:
         from rs9.hosted_native import EXCLUDED_INVENTORY_PATTERNS
         from rs9.hosted_deb import INVENTORY_EXCLUDES
         if family not in INVENTORY_EXCLUDES:
             raise ContractError("INVENTORY_SCHEMA", "Unknown scanner family")
-        patterns = [*EXCLUDED_INVENTORY_PATTERNS, *(p.pattern for p in INVENTORY_EXCLUDES[family])]
-        cmd.append(json.dumps(patterns, separators=(",", ":")))
+        patterns_list = [*EXCLUDED_INVENTORY_PATTERNS, *(p.pattern for p in INVENTORY_EXCLUDES[family])]
+        if family == "dnf":
+            from rs9.dnf_state import DNF_STATE_FILE_PATTERNS
+            patterns_list.extend(DNF_STATE_FILE_PATTERNS)
+        cmd.append(json.dumps(patterns_list, separators=(",", ":")))
     return cmd
 
 
@@ -399,6 +408,27 @@ def _resolve_exclusion(exclusion: str | Callable[[str], bool] | None) -> Callabl
     if isinstance(exclusion, str):
         return make_family_exclusion(exclusion)
     raise ContractError("INVENTORY_SCHEMA", "Exclusion must be a callable, family name string, or None")
+
+
+def make_family_file_exclusion(family: str) -> Callable[[str], bool]:
+    """Return kind-aware regular-file exclusion predicate for package manager family."""
+    if family == "dnf":
+        from rs9.dnf_state import is_dnf_state_file
+        return is_dnf_state_file
+    from rs9.hosted_deb import INVENTORY_EXCLUDES, inventory_excluded
+    if family not in INVENTORY_EXCLUDES:
+        raise ContractError("INVENTORY_SCHEMA", "Unknown package manager family")
+    return lambda path: inventory_excluded(family, path)
+
+
+def _resolve_file_exclusion(file_exclusion: str | Callable[[str], bool] | None) -> Callable[[str], bool]:
+    if file_exclusion is None:
+        return lambda _: False
+    if callable(file_exclusion):
+        return file_exclusion
+    if isinstance(file_exclusion, str):
+        return make_family_file_exclusion(file_exclusion)
+    raise ContractError("INVENTORY_SCHEMA", "File exclusion must be a callable, family name string, or None")
 
 
 # --------------------------------------------------------------------------- Validation Helpers
@@ -516,6 +546,7 @@ def parse_inventory(
     stdout: bytes,
     exclusion: str | Callable[[str], bool] | None = None,
     *,
+    file_exclusion: str | Callable[[str], bool] | None = None,
     with_modes: bool = False,
     return_diagnostics: bool = False,
     max_stdout_bytes: int = MAX_STDOUT_BYTES,
@@ -531,7 +562,11 @@ def parse_inventory(
     Args:
         stdout: Raw output bytes from the scanner process.
         exclusion: Package manager family string ('apt', 'dnf', 'pacman'), external callable
-            accepting exact decoded path string, or None. Evaluated without backslash folding.
+            accepting exact decoded path string, or None. Evaluated without backslash folding
+            across all entry kinds (legacy exclusion semantics).
+        file_exclusion: Package manager family string or callable applied strictly to regular
+            files (kind == 'file'). Non-files (directories, symlinks, special devices) remain
+            inventoried.
         with_modes: When True, suffix values with ':mode' (e.g. 'sha256:0644' or 'dir:0755')
             for symmetric before/after comparison of permissions in compare_inventories.
         return_diagnostics: When True, return (inventory, diagnostics).
@@ -635,6 +670,7 @@ def parse_inventory(
         raise ContractError("INVENTORY_PARSE", f"Entry count mismatch: declared {entry_count}, actual {len(entries)}")
 
     exclusion_cb = _resolve_exclusion(exclusion)
+    file_exclusion_cb = _resolve_file_exclusion(file_exclusion)
 
     inventory: dict[str, str] = {}
     prev_path_bytes: bytes | None = None
@@ -731,8 +767,12 @@ def parse_inventory(
         if decoded_path in inventory:
             raise ContractError("INVENTORY_COLLISION", f"Path collision in inventory mapping: {decoded_path}")
 
-        # Evaluate exclusion on EXACT decoded path without backslash folding
+        # Evaluate legacy exclusion on EXACT decoded path without backslash folding
         if exclusion_cb(decoded_path):
+            continue
+
+        # Evaluate kind-aware regular-file exclusion (applies strictly to regular files)
+        if kind == "file" and file_exclusion_cb(decoded_path):
             continue
 
         inventory[decoded_path] = f"{val}:{mode:04o}" if with_modes else val
@@ -772,6 +812,7 @@ def run_and_parse(
     root: str | Path = "/",
     exclusion: str | Callable[[str], bool] | None = None,
     *,
+    file_exclusion: str | Callable[[str], bool] | None = None,
     with_modes: bool = False,
     timeout: float | None = None,
     stage: str | None = None,
@@ -784,8 +825,11 @@ def run_and_parse(
     If runner is provided (e.g. host runner, container client), invokes runner.exec or runner.run.
     Fails closed if the scanner exits with a non-zero exit code.
     """
-    if family is None and isinstance(exclusion, str):
-        family = exclusion
+    if family is None:
+        if isinstance(exclusion, str):
+            family = exclusion
+        elif isinstance(file_exclusion, str):
+            family = file_exclusion
     context = {"family": family or "unspecified", "stage": stage or "unspecified",
                "counters": {}, "max": {}}
     argv = scanner_argv(root=root, family=family)
@@ -845,6 +889,7 @@ def run_and_parse(
         return parse_inventory(
             stdout,
             exclusion=exclusion,
+            file_exclusion=file_exclusion,
             with_modes=with_modes,
             return_diagnostics=return_diagnostics,
         )

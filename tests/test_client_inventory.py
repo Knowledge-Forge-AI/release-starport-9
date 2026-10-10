@@ -335,6 +335,64 @@ class ClientInventoryPruningAndExclusionsTests(unittest.TestCase):
         self.assertIn("keep.me", inv2)
         self.assertNotIn("remove.drop", inv2)
 
+    def test_kind_aware_file_exclusion_retains_directories_and_symlinks(self):
+        """[synthetic-kind-aware-exclusion] file_exclusion applies strictly to files."""
+        entries = [
+            {"kind": "dir", "mode": 0o755, "path": base64.b64encode(b"usr/lib/sysimage/libdnf5").decode("ascii")},
+            {"kind": "file", "mode": 0o644, "path": base64.b64encode(b"usr/lib/sysimage/libdnf5/transaction_history.sqlite").decode("ascii"), "sha256": "1" * 64, "size": 10},
+            {"kind": "symlink", "mode": 0o777, "path": base64.b64encode(b"usr/lib/sysimage/libdnf5/symlink_to_state").decode("ascii"), "target": base64.b64encode(b"transaction_history.sqlite").decode("ascii")},
+            {"kind": "fifo", "mode": 0o600, "path": base64.b64encode(b"usr/lib/sysimage/libdnf5/control_fifo").decode("ascii")},
+            {"kind": "file", "mode": 0o755, "path": base64.b64encode(b"usr/bin/tool").decode("ascii"), "sha256": "2" * 64, "size": 20},
+        ]
+        framed = _make_framed_payload(entries)
+
+        # Using file_exclusion="dnf"
+        inv = ci.parse_inventory(framed, file_exclusion="dnf")
+        self.assertIn("usr/lib/sysimage/libdnf5", inv, "Root directory must be retained")
+        self.assertNotIn("usr/lib/sysimage/libdnf5/transaction_history.sqlite", inv, "Regular file must be excluded")
+        self.assertIn("usr/lib/sysimage/libdnf5/symlink_to_state", inv, "Symlink must be retained")
+        self.assertIn("usr/lib/sysimage/libdnf5/control_fifo", inv, "FIFO must be retained")
+        self.assertIn("usr/bin/tool", inv, "Unrelated file must be retained")
+
+        # Custom callable file_exclusion is only called for kind == 'file'
+        visited_by_file_exclusion = []
+        def custom_file_cb(p: str) -> bool:
+            visited_by_file_exclusion.append(p)
+            return p.endswith("transaction_history.sqlite")
+
+        inv_custom = ci.parse_inventory(framed, file_exclusion=custom_file_cb)
+        self.assertNotIn("usr/lib/sysimage/libdnf5", visited_by_file_exclusion)
+        self.assertNotIn("usr/lib/sysimage/libdnf5/symlink_to_state", visited_by_file_exclusion)
+        self.assertNotIn("usr/lib/sysimage/libdnf5/control_fifo", visited_by_file_exclusion)
+        self.assertIn("usr/lib/sysimage/libdnf5/transaction_history.sqlite", visited_by_file_exclusion)
+        self.assertIn("usr/bin/tool", visited_by_file_exclusion)
+        self.assertNotIn("usr/lib/sysimage/libdnf5/transaction_history.sqlite", inv_custom)
+
+    def test_file_exclusion_resolution_and_validation(self):
+        """[synthetic-file-exclusion-validation] Test validation of file_exclusion argument."""
+        # None returns callable returning False
+        cb_none = ci._resolve_file_exclusion(None)
+        self.assertFalse(cb_none("any/path"))
+
+        # Callable returned directly
+        cb_user = lambda p: True
+        self.assertIs(ci._resolve_file_exclusion(cb_user), cb_user)
+
+        # dnf family resolves to is_dnf_state_file
+        from rs9.dnf_state import is_dnf_state_file
+        cb_dnf = ci._resolve_file_exclusion("dnf")
+        self.assertIs(cb_dnf, is_dnf_state_file)
+
+        # Invalid type raises ContractError
+        with self.assertRaises(ContractError) as ctx:
+            ci._resolve_file_exclusion(123)  # type: ignore[arg-type]
+        self.assertEqual(ctx.exception.code, "INVENTORY_SCHEMA")
+
+        # Unknown family raises ContractError
+        with self.assertRaises(ContractError) as ctx:
+            ci._resolve_file_exclusion("unknown_family")
+        self.assertEqual(ctx.exception.code, "INVENTORY_SCHEMA")
+
 
 class ClientInventoryCompareAndModesTests(unittest.TestCase):
     """Test compare_inventories integration and symmetric mode comparison."""

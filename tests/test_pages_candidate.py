@@ -855,6 +855,8 @@ class CustodyAndCompletenessTests(unittest.TestCase):
                 self.assertIn("NONPRODUCTION", text, path)
         self.assertIn("gpgcheck=1", docs["rpm/rs9.repo"])
         self.assertIn("repo_gpgcheck=1", docs["rpm/rs9.repo"])
+        self.assertIn("gpgcheck=1\n", docs["rpm/rs9.repo"])
+        self.assertIn("skip_if_unavailable=False\n", docs["rpm/rs9.repo"])
         self.assertIn(NONPRODUCTION_BANNER, docs["docs/index.html"])
         sources = collect_candidate_sources(files=dict(docs), cname=PAGES_HOST)
         self.assertEqual(sorted(sources), sorted([*docs, "CNAME"]))

@@ -142,11 +142,7 @@ class AptDiagnosticsTests(unittest.TestCase):
             ('pacman', 'signature', 'signature from "Fixture" is invalid', 'SIGNATURE_REJECTED'),
             ('pacman', 'signature', 'invalid or corrupted database (PGP signature)', 'SIGNATURE_REJECTED'),
             ('pacman', 'wrongkey', 'error: rs9: key "' + 'A'*40 + '" is unknown', 'KEY_MISMATCH'),
-            ('dnf', 'signature', 'repomd.xml GPG signature verification error: Bad GPG signature', 'SIGNATURE_REJECTED'),
-            ('dnf', 'wrongkey', 'Signing key not found', 'KEY_MISMATCH'),
-            ('dnf', 'wrongkey', 'Public key is not installed', 'KEY_MISMATCH'),
             ('pacman', 'package', 'invalid or corrupted package (PGP signature)', 'SIGNATURE_REJECTED'),
-            ('dnf', 'package', 'package.rpm: Bad GPG signature', 'SIGNATURE_REJECTED'),
         ]
         for family, kind, text, expected in rows:
             with self.subTest(family=family, kind=kind, text=text):

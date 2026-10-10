@@ -789,6 +789,15 @@ class TamperTests(unittest.TestCase):
         original = self.snapshot(source)
         for kind in hd.TAMPER_KINDS_ALL:
             with self.subTest(kind=kind):
+                # Synthetic OpenPGP framing for the signature-value mutation.
+                # Other kinds retain this test's digest signer verification.
+                signature = source / "fedora/43/x86_64/repodata/repomd.xml.asc"
+                if kind == "signature":
+                    from tests.test_dnf_trust_negatives import synthetic_armor
+                    signature.write_bytes(synthetic_armor())
+                else:
+                    signature.write_bytes(self.signer.detach_sign(b"<repomd/>\n"))
+                original = self.snapshot(source)
                 dest = self.root / f"tamper-dnf-{kind}"
                 dest.mkdir()
                 out = hd.tamper_family_copy("dnf", kind, {"rpm": source}, dest, arch="x86_64",
