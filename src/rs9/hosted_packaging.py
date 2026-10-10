@@ -857,7 +857,8 @@ def execute(context):
             if family == "rpm":
                 tool = ContainerRunner(host, tag, platform=platform, mounts=[(str(scratch), str(scratch), True)], user=_user())
                 meta_receipt = checked(tool, metadata_command(directory), substage="repository-metadata")
-                repository_reports[arch] = sign_metadata(fixture, directory, receipt=meta_receipt)
+                expected_rpm_pkgs = [f"Packages/{path.name}" for path in products.values()]
+                repository_reports[arch] = sign_metadata(fixture, directory, receipt=meta_receipt, expected_packages=expected_rpm_pkgs)
                 public_report = audit_owned_tree(repo)
                 if public_report["status"] != "pass":
                     raise ContractError("RPM_REPOSITORY_OPERATION", "Public repository audit failed",

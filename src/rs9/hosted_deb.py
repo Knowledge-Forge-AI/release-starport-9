@@ -588,8 +588,8 @@ class ClientContainer:
         if user:
             command += ["--user", user]
         if self.family == "dnf":
-            # DNF5 otherwise truncates checksums to its default 80 columns.
-            command += ["-e", "LC_ALL=C", "-e", "LANG=C", "-e", "DNF5_FORCE_COLUMNS=512"]
+            # Also pin RPM query grammar; DNF presentation is in its guest argv.
+            command += ["-e", "LC_ALL=C", "-e", "LANG=C"]
         return self.host.run([*command, self.name, *argv])
 
     def dnf_image_identity_receipt(self) -> CommandReceipt:
@@ -651,12 +651,9 @@ def dnf_spec(rpm_dir: Path, keys_dir: Path, arch: str, *, public_fingerprint=Non
         "gpgcheck=1", "repo_gpgcheck=1", "skip_if_unavailable=False",
         f"gpgkey=file://{SERVER_ROOT}/keys/rs9-candidate-fixture-NONPRODUCTION.asc",
     ]
-    only = ["--disablerepo=*", f"--enablerepo={DNF_REPO_ID}"]
+    from rs9.dnf_commands import command_base, guest_prefix
     from rs9.dnf_diagnostics import probe_commands
-    strict = [f"--setopt={DNF_REPO_ID}.skip_if_unavailable=False",
-              f"--setopt={DNF_REPO_ID}.gpgcheck=1", f"--setopt={DNF_REPO_ID}.repo_gpgcheck=1",
-              "--setopt=system_cachedir=/var/cache/libdnf5", "--setopt=cacheonly=none", "--color=never"]
-    base = ["dnf", "-y", *only, *strict]
+    base = command_base()
     key = keys_dir / "rs9-candidate-fixture-NONPRODUCTION.asc"
     return {
         "family": "dnf", "arch": arch, "public_fingerprint": public_fingerprint,
@@ -667,7 +664,7 @@ def dnf_spec(rpm_dir: Path, keys_dir: Path, arch: str, *, public_fingerprint=Non
         "configure": [_printf_file(DNF_REPO_FILE, repo)],
         "refresh": [*base, "--refresh", "makecache"],
         "install": lambda pkg: [*base, "install", pkg],
-        "remove": lambda pkg: ["dnf", "-y", "--disablerepo=*", "--setopt=clean_requirements_on_remove=False", "remove", pkg],
+        "remove": lambda pkg: [*guest_prefix(), "dnf", "-y", "--disablerepo=*", "--setopt=clean_requirements_on_remove=False", "remove", pkg],
         "query": lambda pkg: ["rpm", "-q", "--qf", "%{VERSION}-%{RELEASE} %{ARCH}\\n", pkg],
     }
 
@@ -1925,10 +1922,14 @@ def _assemble_and_test_pages(
     mark = host.mark()
     real = _fixture_is_real(fixture)
     rpm_tag = ""
+    completed = details.setdefault("pages_completed_substages", [])
+    substage = "custody-equality"
     try:
         # APT: rebuilt from custody debs; signed by this lane's fixture only.
         debs = _custody_unique([bundles[("deb", "amd64")], bundles[("deb", "arm64")]])
         _rpm_custody_unique([bundles[("rpm", "x86_64-linux")], bundles[("rpm", "aarch64-linux")]])
+        completed.append(substage)
+        substage = "apt-staging"
         apt_root = stage / "apt-repo"
         apt_root.mkdir()
         repo = AptRepositoryCandidate(apt_root, distribution="resolute")
@@ -1942,6 +1943,8 @@ def _assemble_and_test_pages(
         if modes_report.get("status") != "pass":
             raise ContractError("MODE_MISMATCH", "Pages APT repository public tree mode verification failed",
                                 details={"substage": "pages-apt-staging", "reason": "public-mode-mismatch"})
+        completed.append(substage)
+        substage = "family-tool-preparation"
 
         files: dict[str, bytes | str] = dict(render_install_docs())
         # RPM and pacman metadata is rebuilt by the family tools in their own containers.
@@ -1958,6 +1961,7 @@ def _assemble_and_test_pages(
             closers.append(wrong_rpm)
         from rs9.rpm_repository import prepare_public_directory, sign_metadata, metadata_command, audit_owned_tree
         for arch, system in (("x86_64", "x86_64-linux"), ("aarch64", "aarch64-linux")):
+            substage = "rpm-metadata-" + arch
             arch_dir = stage / "rpm" / "fedora/43" / arch
             prepare_public_directory(arch_dir / "Packages", stage / "rpm")
             for name, path in sorted(bundles[("rpm", system)]["packages"].items()):
@@ -1987,8 +1991,11 @@ def _assemble_and_test_pages(
                 host, rpm_tag, "linux/amd64", stage,
                 metadata_command(arch_dir, sha256=True),
             )
-            rpm_report = sign_metadata(fixture, arch_dir, receipt=receipt)
+            rpm_report = sign_metadata(fixture, arch_dir, receipt=receipt,
+                expected_packages=["Packages/" + name for name in sorted(bundles[("rpm", system)]["packages"])])
             details.setdefault("rpm_metadata_reports", {})[arch] = rpm_report
+            completed.append(substage)
+        substage = "rpm-custody-and-public-modes"
         rpm_tree_report = audit_owned_tree(stage / "rpm")
         details["rpm_staging_public_modes"] = rpm_tree_report
         if rpm_tree_report["status"] != "pass":
@@ -2006,6 +2013,8 @@ def _assemble_and_test_pages(
                 if digest(path.read_bytes()) != bundle["manifest"]["files"][name]["sha256"]:
                     raise ContractError("CUSTODY_HASH", "Unsigned Pages RPM custody changed",
                                         details={"system": system, "target": name})
+        completed.append(substage)
+        substage = "pacman-metadata"
         pac_dir = stage / "pacman/x86_64"
         pac_dir.mkdir(parents=True)
         for name, path in sorted(bundles[("pacman", "x86_64-linux")]["packages"].items()):
@@ -2017,18 +2026,24 @@ def _assemble_and_test_pages(
                          "for n in db files; do rm -f rs9.$n; cp rs9.$n.tar.gz rs9.$n; done"])
         for name in ("rs9.db.tar.gz", "rs9.db", "rs9.files.tar.gz", "rs9.files"):
             (pac_dir / f"{name}.sig").write_bytes(fixture.detach_sign((pac_dir / name).read_bytes(), armor=False))
+        completed.append(substage)
         for family_dir in ((stage / "rpm"), pac_dir.parent):
             for path in sorted(family_dir.rglob("*")):
                 if path.is_file():
                     files[path.relative_to(stage).as_posix()] = path.read_bytes()
 
+        substage = "inventory"
         sources = collect_candidate_sources(files=files, cname=PAGES_HOST, signing_fixture=fixture, apt_repo=repo)
         inventory = exact_inventory_for(sources)
         verify_pages_completeness(inventory)
+        completed.append(substage)
+        substage = "assembly"
         tree = scratch / "pages-tree"
         tree.mkdir()
         candidate = assemble_pages_candidate(
             tree, files=files, cname=PAGES_HOST, signing_fixture=fixture, apt_repo=repo, exact_inventory=inventory)
+        completed.append(substage)
+        substage = "assembled-inventory-and-scans"
         if (tree / "apt").exists():
             pages_apt_modes = _verify_public_tree_modes(tree / "apt")
             details["pages_apt_public_modes"] = pages_apt_modes
@@ -2070,6 +2085,10 @@ def _assemble_and_test_pages(
             artifacts.extend(p for p in tree_files if not p.name.endswith((".deb",".pkg.tar.zst")))
             details["pages_tree_custody"] = "split-index-and-fixture-rpm-objects;apt-pacman-in-family-custody"
     except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
+        failure = {"code": _family_error(err), "substage": substage}
+        if isinstance(err, ContractError):
+            failure.update({k: v for k, v in err.details.items() if k in {"substage", "path", "path_sha256"}})
+        details["pages_failure"] = failure
         if hasattr(err, "custody_conflict"):
             details["custody_conflict"] = err.custody_conflict
         if isinstance(err, ContractError) and err.code == "RPM_REPOSITORY_OPERATION":

@@ -750,7 +750,8 @@ class PagesMetadataAndSignerContractTests(unittest.TestCase):
             repodata.mkdir(mode=0o755)
             os.chmod(repodata, 0o755)
             repomd = repodata / "repomd.xml"
-            repomd.write_bytes(b"<repomd><data>1</data></repomd>\n")
+            from tests.rpm_metadata_fixtures import create_valid_repodata
+            create_valid_repodata(arch_dir, [])
             os.chmod(repomd, 0o644)
 
             signer = FixtureSigner()
@@ -790,7 +791,8 @@ class PagesMetadataAndSignerContractTests(unittest.TestCase):
             repodata = root / "repodata"
             repodata.mkdir(mode=0o755)
             repomd = repodata / "repomd.xml"
-            repomd.write_bytes(b"<repomd/>\n")
+            from tests.rpm_metadata_fixtures import create_valid_repodata
+            create_valid_repodata(root, [])
             os.chmod(repomd, 0o644)
 
             signer = FixtureSigner(fingerprint="A" * 40)

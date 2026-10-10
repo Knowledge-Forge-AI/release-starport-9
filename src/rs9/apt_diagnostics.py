@@ -471,8 +471,13 @@ def trust_identity(spec):
         identities.append({'destination':target,'files':[
             {'path':f.name if p.is_file() else f.relative_to(p).as_posix(),'sha256':digest(f.read_bytes())}
             for f in sorted(files)]})
-    return digest(canonical({'family':spec['family'],'configure':spec['configure'],'refresh':spec['refresh'],
-                             'inputs':identities}))
+    binding = {'family':spec['family'],'configure':spec['configure'],'refresh':spec['refresh'],
+               'inputs':identities}
+    if spec['family'] == 'dnf':
+        from rs9.dnf_diagnostics import DNF_PRESENTATION, DNF_TOOL_VERSION
+        binding.update(install=spec['install']('RS9_PRODUCT'), presentation=dict(DNF_PRESENTATION),
+                       noninteractive='DNF5_FORCE_INTERACTIVE=0', tool_version=DNF_TOOL_VERSION)
+    return digest(canonical(binding))
 
 
 def apt_readability(probe, *, executed, repo_root='/srv/rs9/apt',
@@ -518,9 +523,16 @@ def build_positive_control(*, family,image,platform,product,repository=None,keyr
         control['stages'][stage]=[{'exit_code':r.exit_code,'executed':r.executed,
             'stdout_sha256':r.stdout_sha256,'stderr_sha256':r.stderr_sha256} for r in items]
     if family == 'dnf':
-        from rs9.dnf_diagnostics import valid_identity
+        from rs9.dnf_diagnostics import valid_identity, environment_failure
+        from rs9.dnf_commands import command_matches
         control['dnf_client'] = dnf_probe
-        control['success'] = bool(success and valid_identity(dnf_probe))
+        control['success'] = bool(success and valid_identity(dnf_probe)
+            and all(environment_failure(r) is None for stage in ('configure', 'refresh', 'install', 'query')
+                    for r in ((receipts or {}).get(stage) if isinstance((receipts or {}).get(stage), list)
+                              else [(receipts or {}).get(stage)]))
+            and all(command_matches(r, stage, product) for stage in ('refresh', 'install')
+                    for r in ((receipts or {}).get(stage) if isinstance((receipts or {}).get(stage), list)
+                              else [(receipts or {}).get(stage)])))
     return control
 
 

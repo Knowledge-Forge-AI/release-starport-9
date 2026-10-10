@@ -19,7 +19,8 @@ class RpmFilesystemControls(unittest.TestCase):
         try:
             repository = root / "rpm"
             directory = prepare_public_directory(repository / "fedora/43/noarch/repodata", repository)
-            write_public_file(directory / "repomd.xml", b"authenticated-fixture-index\n")
+            from tests.rpm_metadata_fixtures import create_valid_repodata
+            create_valid_repodata(directory.parent)
             return directory.parent
         finally:
             os.umask(old)

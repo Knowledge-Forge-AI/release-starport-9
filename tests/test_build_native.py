@@ -400,7 +400,8 @@ class BuildNativeCommonTests(unittest.TestCase):
         def createrepo_handler(argv, cwd=None, env=None):
             repodata = Path(argv[-1]) / "repodata"
             repodata.mkdir(parents=True, exist_ok=True)
-            (repodata / "repomd.xml").write_bytes(b"<repomd/>")
+            from tests.rpm_metadata_fixtures import create_valid_repodata
+            create_valid_repodata(Path(argv[-1]))
             return CommandReceipt(argv, 0, b"createrepo ok\n", b"")
 
         def rpmlint_handler(argv, cwd=None, env=None):
@@ -413,12 +414,14 @@ class BuildNativeCommonTests(unittest.TestCase):
                 "rpm": "/usr/bin/rpm",
                 "rpmlint": "/usr/bin/rpmlint",
                 "createrepo_c": "/usr/bin/createrepo_c",
+                "/usr/bin/createrepo_c": "/usr/bin/createrepo_c",
             },
             handlers={
                 "rpmbuild": rpmbuild_handler,
                 "rpm": rpm_handler,
                 "rpmlint": rpmlint_handler,
                 "createrepo_c": createrepo_handler,
+                "/usr/bin/createrepo_c": createrepo_handler,
             },
         )
         result = build_rpm_candidate(
@@ -563,8 +566,8 @@ class BuildNativeCommonTests(unittest.TestCase):
             self.assertIn("sha256", argv)
             repodata = Path(argv[-1]) / "repodata"
             repodata.mkdir(parents=True, exist_ok=True)
-            (repodata / "repomd.xml").write_bytes(b"<repomd/>")
-            (repodata / "primary.xml.gz").write_bytes(b"gzip-xml")
+            from tests.rpm_metadata_fixtures import create_valid_repodata
+            create_valid_repodata(Path(argv[-1]))
             return CommandReceipt(argv, 0, b"createrepo_c complete\n", b"")
 
         runner = MockCommandRunner(
@@ -573,12 +576,14 @@ class BuildNativeCommonTests(unittest.TestCase):
                 "rpm": "/usr/bin/rpm",
                 "rpmlint": "/usr/bin/rpmlint",
                 "createrepo_c": "/usr/bin/createrepo_c",
+                "/usr/bin/createrepo_c": "/usr/bin/createrepo_c",
             },
             handlers={
                 "rpmbuild": rpmbuild_handler,
                 "rpm": rpm_query_handler,
                 "rpmlint": rpmlint_handler,
                 "createrepo_c": createrepo_handler,
+                "/usr/bin/createrepo_c": createrepo_handler,
             },
         )
 
@@ -881,7 +886,8 @@ class BuildNativeCommonTests(unittest.TestCase):
         def createrepo_handler(argv, cwd=None, env=None):
             repodata = Path(argv[-1]) / "repodata"
             repodata.mkdir(parents=True, exist_ok=True)
-            (repodata / "repomd.xml").write_bytes(b"<repomd/>")
+            from tests.rpm_metadata_fixtures import create_valid_repodata
+            create_valid_repodata(Path(argv[-1]))
             return CommandReceipt(argv, 0, b"createrepo_c complete\n", b"")
 
         runner = MockCommandRunner(
@@ -890,12 +896,14 @@ class BuildNativeCommonTests(unittest.TestCase):
                 "rpm": "/usr/bin/rpm",
                 "rpmlint": "/usr/bin/rpmlint",
                 "createrepo_c": "/usr/bin/createrepo_c",
+                "/usr/bin/createrepo_c": "/usr/bin/createrepo_c",
             },
             handlers={
                 "rpmbuild": rpmbuild_handler,
                 "rpm": rpm_handler,
                 "rpmlint": rpmlint_handler,
                 "createrepo_c": createrepo_handler,
+                "/usr/bin/createrepo_c": createrepo_handler,
             },
         )
 
@@ -923,7 +931,7 @@ class BuildNativeCommonTests(unittest.TestCase):
                 build_rpm_candidate(capture, intent, 'x86_64', other, runner=runner)
             self.assertEqual(caught.exception.code, 'DEPENDENCY_DERIVATION')
             self.assertEqual(caught.exception.dependency_coverage['missing_dependencies'], [soname])
-            self.assertFalse(any(c['argv'][0] in ('rpmlint','createrepo_c') for c in runner.calls[before:]))
+            self.assertFalse(any(Path(c['argv'][0]).name in ('rpmlint','createrepo_c') for c in runner.calls[before:]))
 
     def test_pacman_root_execution_refused(self):
         capture, intent, offline_npm = create_cli_fixture(self.root / "root_test")

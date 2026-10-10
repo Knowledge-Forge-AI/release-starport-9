@@ -11,16 +11,27 @@ import hashlib
 import os
 from pathlib import Path
 import stat
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from rs9.errors import ContractError
 
 
-def metadata_command(directory: Path | str, *, sha256: bool = False) -> list[str]:
-    """Set the creator's umask inside the container without interpolating paths."""
+def metadata_command(
+    directory: Path | str,
+    *,
+    binary: str | None = None,
+    sha256: bool = True,
+) -> list[str]:
+    """Enforce core-inclusive gzip and SHA-256, with the creator's public umask.
+
+    The old sha256 keyword remains source-compatible; SHA-256 is always required.
+    """
+    dir_str = str(directory)
+    flags = ["--general-compress-type", "gz", "--no-database", "-s", "sha256", dir_str]
+    if binary is not None:
+        return [binary, *flags]
     return ["sh", "-c", 'umask 022; exec "$@"', "rs9-rpm-metadata",
-            "createrepo_c", "--no-database", "--compress-type", "gz",
-            *(["-s", "sha256"] if sha256 else []), str(directory)]
+            "createrepo_c", *flags]
 
 
 def command_tool(argv: list[str]) -> str:
@@ -92,7 +103,8 @@ def _build_details(
     valid_operations = {
         "rpm-repository", "repository-metadata", "package-signing",
         "repodata-index-read", "repodata-fixture-sign", "repodata-signature-write",
-        "repodata-signature-verify", "repodata-public-modes", "repodata-ownership-audit"
+        "repodata-signature-verify", "repodata-public-modes", "repodata-ownership-audit",
+        "repodata-format-verify"
     }
     op_val = operation if operation in valid_operations else "repository-metadata"
 
@@ -460,10 +472,16 @@ def audit_owned_tree(
     }
 
 
-def sign_metadata(fixture: Any, directory: Path | str, receipt: Any = None) -> dict[str, Any]:
+def sign_metadata(
+    fixture: Any,
+    directory: Path | str,
+    receipt: Any = None,
+    *,
+    expected_packages: Sequence[str] | set[str] | None = None,
+) -> dict[str, Any]:
     """Signs repodata/repomd.xml in directory, verifies signature, and audits public tree modes.
 
-    Splits index read, fixture sign, signature write (0644), verify, public modes and ownership audit.
+    Splits index read, format verify, fixture sign, signature write (0644), verify, public modes and ownership audit.
     Raises ContractError('RPM_REPOSITORY_OPERATION', ..., details=...) on any failure.
     """
     dir_path = Path(directory)
@@ -487,12 +505,34 @@ def sign_metadata(fixture: Any, directory: Path | str, receipt: Any = None) -> d
             raise ContractError("RPM_REPOSITORY_OPERATION", "Linked metadata index refused",
                                 details=_build_details("repodata-index-read", "index-read",
                                     "repodata/repomd.xml", causal_code="SYMLINK_REJECTED", receipt=receipt))
-        index_bytes = index_file.read_bytes()
+        if not stat.S_ISREG(index_file.lstat().st_mode) or index_file.stat().st_size > 1024**2:
+            raise ContractError("RPM_REPOSITORY_OPERATION", "Metadata index exceeds the physical read contract",
+                                details=_build_details("repodata-index-read", "index-read",
+                                    "repodata/repomd.xml", causal_code="SIZE_EXCEEDED", receipt=receipt))
+        with os.fdopen(os.open(index_file, os.O_RDONLY | os.O_NOFOLLOW), "rb") as stream:
+            index_bytes = stream.read(1024**2 + 1)
+        if len(index_bytes) > 1024**2:
+            raise ContractError("RPM_REPOSITORY_OPERATION", "Metadata index exceeds the read bound",
+                                details=_build_details("repodata-index-read", "index-read",
+                                    "repodata/repomd.xml", causal_code="SIZE_EXCEEDED", receipt=receipt))
     except OSError as err:
         raise ContractError("RPM_REPOSITORY_OPERATION", "Repository metadata index read failed",
                             details=_build_details("repodata-index-read", "index-read",
                                 "repodata/repomd.xml", errno_val=err.errno, causal_code=type(err).__name__,
                                 extra=_relationships(index_file), receipt=receipt)) from err
+
+    # Substage 1b: Verify format, compression, and content linkage before signing
+    from rs9.rpm_metadata import verify_repository_metadata
+    format_report = verify_repository_metadata(
+        dir_path,
+        expected_packages=expected_packages,
+        is_signed=False,
+        receipt=receipt,
+    )
+    if hashlib.sha256(index_bytes).hexdigest() != format_report["repomd_sha256"]:
+        raise ContractError("RPM_REPOSITORY_OPERATION", "Metadata changed during format verification",
+                            details=_build_details("repodata-format-verify", "metadata-format-verify",
+                                "repodata/repomd.xml", causal_code="REPOSITORY_CHANGED", receipt=receipt))
 
     # Substage 2: Fixture sign
     if fixture is None:
@@ -561,8 +601,10 @@ def sign_metadata(fixture: Any, directory: Path | str, receipt: Any = None) -> d
 
     # Substage 4: Verify
     try:
-        retained_index = index_file.read_bytes()
-        retained_signature = sig_file.read_bytes()
+        with os.fdopen(os.open(index_file, os.O_RDONLY | os.O_NOFOLLOW), "rb") as stream:
+            retained_index = stream.read(1024**2 + 1)
+        with os.fdopen(os.open(sig_file, os.O_RDONLY | os.O_NOFOLLOW), "rb") as stream:
+            retained_signature = stream.read(1024**2 + 1)
         if retained_index != index_bytes or retained_signature != sig_bytes:
             raise ContractError("REPOSITORY_CHANGED", "Metadata changed during fixture signing")
         verification = fixture.verify(retained_index, retained_signature)
@@ -628,6 +670,7 @@ def sign_metadata(fixture: Any, directory: Path | str, receipt: Any = None) -> d
         "signature_sha256": sig_sha,
         "verified_issuer": verified_issuer,
         "verification": verification,
+        "format_verification": format_report,
         "ownership_audit": audit,
     }
     if receipt is not None:

@@ -1,0 +1,640 @@
+{
+  "adoption_executed": false,
+  "checks": {
+    "credential_and_private_path_scan_files": 461,
+    "executable_sources_match_terminal_tests": true,
+    "git_diff_check": "pass",
+    "index_preserved_since_recorded_baseline": true,
+    "index_sha256": "ee574a8df4a8dfb395e1754b7ebb981e0945073fdc94eb9c97938d9acbd53223",
+    "missing_links": [],
+    "private_path_failures": [],
+    "protected_bytes_unchanged": [
+      {
+        "path": "operators/live1/readiness.json",
+        "sha256": "74c0704b2572cb12b0b7e8bcb856f4fc8458ff364a8c8c274a33f98455b7e0f2"
+      },
+      {
+        "path": "operators/live1/targets.json",
+        "sha256": "d5b0f7187d9db2fdb39d931d88488f46e73f5ab094cc595e39993285d97142fd"
+      },
+      {
+        "path": "operators/live1/rpm-lint-policy.json",
+        "sha256": "620f3f3195f8f81c7ea023b6aba0b038134164f515f49ab252c9b92c6286cd1a"
+      },
+      {
+        "path": ".github/workflows/rs9-candidate-tests.yml",
+        "sha256": "0b5582b18bcb561257239d9fa6512e9c8b8852d4d46ddd21b343a01abdc1cab7"
+      },
+      {
+        "path": "src/rs9/client_inventory.py",
+        "sha256": "3890c7982cb0f2aa64a572502c03824f665b7445663cd284fd1c890b6f307ac0"
+      },
+      {
+        "path": "src/rs9/dnf_mutation.py",
+        "sha256": "ddcb710f27386565d49f994145dabf7d67bd38b81b365ed8eeb85be1d59606c1"
+      },
+      {
+        "path": "src/rs9/dnf_state.py",
+        "sha256": "ab24ff65281d3767ef8f94295d0c2556bad6642363b51900eebb40189da7afe2"
+      },
+      {
+        "path": "operators/live1/adopt-and-qualify.py",
+        "sha256": "d3274a424f679b502d72371e8a3e81d735e6ab9a257d4fc6c003f45055ab16e2"
+      },
+      {
+        "path": "src/rs9/collect_candidate.py",
+        "sha256": "fde35cd1ac455a7b7d94b300861e9df00d354c50187f2ade61d1dbeff7229620"
+      }
+    ],
+    "python_parsed_and_compiled": 257,
+    "relative_markdown_links": 45,
+    "status": "pass"
+  },
+  "deferred": [
+    "dispatcher-pre-final-review-and-closeout-verification",
+    "externally-attested-manager-acceptance",
+    "one-attended-run14-nonproduction-push-and-collection",
+    "native-complete-wide-same-install-checksum-evidence",
+    "native-ordered-terminal-DNF-negative-qualification",
+    "native-gzip-generation-and-later-Pages-scans-clients",
+    "Linux-Nix-PRoot",
+    "Pages-TLS",
+    "Darwin-offline-wheel-isolation",
+    "Linux-wheel-production-compatibility"
+  ],
+  "entry_stage_deltas": [],
+  "evidence_inputs": [
+    {
+      "path": "MANAGER-REVIEW.md",
+      "sha256": "855cadc9493b45e238b76b2310dac9ed712dfa98281a7ef047b71425c624480f"
+    },
+    {
+      "path": "MANAGER-DISPOSITION.json",
+      "sha256": "c7c98826bffc9bece10b7365239f003b5a8805c7093d051babbd4df749a97175"
+    },
+    {
+      "path": "source-binding.json",
+      "sha256": "f21d6fce5141210f7927a36ed6bb339ab438e83ede24fe7369522323f04f1d15"
+    },
+    {
+      "path": "verify_evidence.py",
+      "sha256": "59f38a0958d71f43604811adbd6d8b69b37bb2db0df924fac6d18e6fb077b1fc"
+    },
+    {
+      "path": "replay_noarch_headers.py",
+      "sha256": "b85e9836efe36c0a791e7a500bca060ab9accd7276d6739d7306a4b3febeba1f"
+    },
+    {
+      "path": "evidence/rpm-noarch-header-comparison.json",
+      "sha256": "a378490f96722f81dc2ef5ce81ccd144521c841d59766900354277d4d4afae57"
+    },
+    {
+      "path": "evidence/run13-dnf-projection.json",
+      "sha256": "e8ef1221c485663cc8e53d8a3db65c6a816f8ffdfec20569e83e7e9471472035"
+    }
+  ],
+  "executable_sources_unchanged_after_terminal_full_tests": true,
+  "external_run13_metadata_test": {
+    "class_skips": 0,
+    "discovered_test_methods": 1,
+    "errors": 0,
+    "expected_failures": 0,
+    "failures": 0,
+    "index_unchanged_during_run": true,
+    "label": "final-real-metadata",
+    "loader_errors": 0,
+    "log_bytes": 96,
+    "log_sha256": "e5c9ea81668365a6e062c81c56042f7baceea493cc9ac06c4f9a7b821e04ab88",
+    "passed_test_methods": 1,
+    "resource_warning": "error",
+    "resource_warning_in_log": false,
+    "schema": "rs9.cont15-test-counts.v1",
+    "skip_events": 0,
+    "skips": [],
+    "source_unchanged_during_run": true,
+    "test_skips": 0,
+    "tested_metadata_sources_match_terminal_candidate": true,
+    "tests_run": 1,
+    "umask": "022",
+    "unexpected_successes": 0
+  },
+  "focused_tests": {
+    "class_skips": 0,
+    "discovered_test_methods": 186,
+    "errors": 0,
+    "expected_failures": 0,
+    "failures": 0,
+    "index_unchanged_during_run": true,
+    "label": "terminal-focused",
+    "loader_errors": 0,
+    "log_bytes": 452,
+    "log_sha256": "647d3693788520c88e44a12fd7556258873a3cb3b97719137345b130d0a2dca5",
+    "passed_test_methods": 182,
+    "resource_warning": "error",
+    "resource_warning_in_log": false,
+    "schema": "rs9.cont15-test-counts.v1",
+    "skip_events": 4,
+    "skips": [
+      {
+        "reason": "GnuPG unavailable; native DNF remains unavailable independently",
+        "test": "test_real_gnupg_signature_value_mutation_if_available (tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available)"
+      },
+      {
+        "reason": "Run 13 public metadata reference requires RS9_RUN13_REFERENCE_DIR",
+        "test": "test_actual_kit_six_xml_zst_repomd_references_regression (tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression)"
+      },
+      {
+        "reason": "distinct real writer ownership needs root and POSIX fork",
+        "test": "test_distinct_unprivileged_writer_negative_and_owner_aligned_positive (tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive)"
+      },
+      {
+        "reason": "GnuPG binary not available",
+        "test": "test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family (tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family)"
+      }
+    ],
+    "source_unchanged_during_run": true,
+    "test_skips": 4,
+    "tests_run": 186,
+    "umask": "022",
+    "unexpected_successes": 0
+  },
+  "full_discovery": [
+    {
+      "class_skips": 1,
+      "discovered_test_methods": 1708,
+      "errors": 0,
+      "expected_failures": 0,
+      "failures": 0,
+      "index_unchanged_during_run": true,
+      "label": "terminal-022",
+      "loader_errors": 0,
+      "log_bytes": 1886,
+      "log_sha256": "775d0b243ef28fdd4639d0539c1a64734c8233076380093c4c2d58a92edf41d5",
+      "passed_test_methods": 1678,
+      "resource_warning": "error",
+      "resource_warning_in_log": false,
+      "schema": "rs9.cont15-test-counts.v1",
+      "skip_events": 21,
+      "skips": [
+        {
+          "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+          "test": "test_raw_invalid_utf8_path_roundtrip_where_supported (test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported)"
+        },
+        {
+          "reason": "sandbox denies local socket creation; socket record grammar tested separately",
+          "test": "test_socket_and_arbitrary_symlink_targets_are_never_read (test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read)"
+        },
+        {
+          "reason": "GnuPG unavailable; native DNF remains unavailable independently",
+          "test": "test_real_gnupg_signature_value_mutation_if_available (test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available)"
+        },
+        {
+          "reason": "GnuPG binary not available",
+          "test": "test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family (test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family)"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_captured_reference_tree_and_byte_comparison (test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison)"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_captured_release_bytes_and_deterministic_goldens (test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens)"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_reference_semantic_facts_detect_material_recipe_drift (test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift)"
+        },
+        {
+          "reason": "both live capture directories required",
+          "test": "test_both_real_release_captures_replay_through_same_core (test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core)"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_reauthenticate_live_bytes_and_deterministic_records (test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records)"
+        },
+        {
+          "reason": "official archive directory not locatable",
+          "test": "test_aarch64_darwin (test_nix_installer.OfficialArchiveTests.test_aarch64_darwin)"
+        },
+        {
+          "reason": "official archive directory not locatable",
+          "test": "test_aarch64_linux (test_nix_installer.OfficialArchiveTests.test_aarch64_linux)"
+        },
+        {
+          "reason": "official archive directory not locatable",
+          "test": "test_x86_64_linux (test_nix_installer.OfficialArchiveTests.test_x86_64_linux)"
+        },
+        {
+          "reason": "GnuPG binary not available",
+          "test": "test_construct_candidate_signed_tree_with_fixture (test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture)"
+        },
+        {
+          "reason": "GnuPG binary not available",
+          "test": "test_real_gnupg_fixture_signs_and_rejects_every_tamper (test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper)"
+        },
+        {
+          "reason": "distinct real writer ownership needs root and POSIX fork",
+          "test": "test_distinct_unprivileged_writer_negative_and_owner_aligned_positive (test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive)"
+        },
+        {
+          "reason": "Run 13 public metadata reference requires RS9_RUN13_REFERENCE_DIR",
+          "test": "test_actual_kit_six_xml_zst_repomd_references_regression (test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression)"
+        },
+        {
+          "reason": "exact captured references supplied by attended evidence replay",
+          "test": "test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes (test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes)"
+        },
+        {
+          "reason": "native pinned RPM 6.0.2 tools unavailable",
+          "test": "test_native_pinned_repeated_source_and_binary_bytes_converge (test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge)"
+        },
+        {
+          "reason": "RUN12 reference directory not supplied",
+          "test": "test_reference_readback_with_run12_references (test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references)"
+        },
+        {
+          "reason": "Real GnuPG binary not available on this host",
+          "test": "test_sign_metadata_with_real_gpg_when_available (test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available)"
+        },
+        {
+          "reason": "GnuPG binary not available in environment",
+          "test": "setUpClass (test_signing_fixture.SigningFixtureTests)"
+        }
+      ],
+      "source_unchanged_during_run": true,
+      "test_skips": 20,
+      "tests_run": 1698,
+      "umask": "022",
+      "unexpected_successes": 0
+    },
+    {
+      "class_skips": 1,
+      "discovered_test_methods": 1708,
+      "errors": 0,
+      "expected_failures": 0,
+      "failures": 0,
+      "index_unchanged_during_run": true,
+      "label": "terminal-077",
+      "loader_errors": 0,
+      "log_bytes": 1886,
+      "log_sha256": "5b8f8fbce0c2704f033d3a491fe16934652f6b5abfc2e616dd3121e3e36f1e02",
+      "passed_test_methods": 1678,
+      "resource_warning": "error",
+      "resource_warning_in_log": false,
+      "schema": "rs9.cont15-test-counts.v1",
+      "skip_events": 21,
+      "skips": [
+        {
+          "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+          "test": "test_raw_invalid_utf8_path_roundtrip_where_supported (test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported)"
+        },
+        {
+          "reason": "sandbox denies local socket creation; socket record grammar tested separately",
+          "test": "test_socket_and_arbitrary_symlink_targets_are_never_read (test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read)"
+        },
+        {
+          "reason": "GnuPG unavailable; native DNF remains unavailable independently",
+          "test": "test_real_gnupg_signature_value_mutation_if_available (test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available)"
+        },
+        {
+          "reason": "GnuPG binary not available",
+          "test": "test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family (test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family)"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_captured_reference_tree_and_byte_comparison (test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison)"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_captured_release_bytes_and_deterministic_goldens (test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens)"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_reference_semantic_facts_detect_material_recipe_drift (test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift)"
+        },
+        {
+          "reason": "both live capture directories required",
+          "test": "test_both_real_release_captures_replay_through_same_core (test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core)"
+        },
+        {
+          "reason": "live capture directory not supplied",
+          "test": "test_reauthenticate_live_bytes_and_deterministic_records (test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records)"
+        },
+        {
+          "reason": "official archive directory not locatable",
+          "test": "test_aarch64_darwin (test_nix_installer.OfficialArchiveTests.test_aarch64_darwin)"
+        },
+        {
+          "reason": "official archive directory not locatable",
+          "test": "test_aarch64_linux (test_nix_installer.OfficialArchiveTests.test_aarch64_linux)"
+        },
+        {
+          "reason": "official archive directory not locatable",
+          "test": "test_x86_64_linux (test_nix_installer.OfficialArchiveTests.test_x86_64_linux)"
+        },
+        {
+          "reason": "GnuPG binary not available",
+          "test": "test_construct_candidate_signed_tree_with_fixture (test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture)"
+        },
+        {
+          "reason": "GnuPG binary not available",
+          "test": "test_real_gnupg_fixture_signs_and_rejects_every_tamper (test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper)"
+        },
+        {
+          "reason": "distinct real writer ownership needs root and POSIX fork",
+          "test": "test_distinct_unprivileged_writer_negative_and_owner_aligned_positive (test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive)"
+        },
+        {
+          "reason": "Run 13 public metadata reference requires RS9_RUN13_REFERENCE_DIR",
+          "test": "test_actual_kit_six_xml_zst_repomd_references_regression (test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression)"
+        },
+        {
+          "reason": "exact captured references supplied by attended evidence replay",
+          "test": "test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes (test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes)"
+        },
+        {
+          "reason": "native pinned RPM 6.0.2 tools unavailable",
+          "test": "test_native_pinned_repeated_source_and_binary_bytes_converge (test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge)"
+        },
+        {
+          "reason": "RUN12 reference directory not supplied",
+          "test": "test_reference_readback_with_run12_references (test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references)"
+        },
+        {
+          "reason": "Real GnuPG binary not available on this host",
+          "test": "test_sign_metadata_with_real_gpg_when_available (test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available)"
+        },
+        {
+          "reason": "GnuPG binary not available in environment",
+          "test": "setUpClass (test_signing_fixture.SigningFixtureTests)"
+        }
+      ],
+      "source_unchanged_during_run": true,
+      "test_skips": 20,
+      "tests_run": 1698,
+      "umask": "077",
+      "unexpected_successes": 0
+    }
+  ],
+  "full_run_manifest_sha256": "879feb848836bf716fff924d24d98286a097440001db7a425a81d6a57bf743f0",
+  "historical_first_Pages_rejected_path": "unknown",
+  "hosted_run_executed": false,
+  "limitations": [
+    "DNF5-RPM6-createrepo_c-GnuPG-native-tools-unavailable",
+    "exact-width-rendering-source-re-fetch-unavailable-manager-exact-blobs-used",
+    "createrepo-version-not-retained-in-kit",
+    "default-real-metadata-test-skips-without-explicit-reference-directory",
+    "process-local-temporary-verification-files-only-configured-scratch-root-unwritable-no-host-directory-created"
+  ],
+  "manager_kit_replay": {
+    "accepted_preservation_policies": 8,
+    "archive_manifests": 18,
+    "included_objects": 143,
+    "receipt_hashes": 16,
+    "reconstructing_chunks": 80,
+    "selection_records": 167,
+    "status": "pass"
+  },
+  "noarch_reference_replay": {
+    "differing_main_header_tags": [],
+    "pairs": 4,
+    "source_macros_timestamps_OPTFLAGS_reopened": false,
+    "whole_unsigned_binary_and_source_equality": true
+  },
+  "observed_work_changes": [
+    "DNF-only-presentation-identity-and-terminal-grammar",
+    "shared-RPM-generator-and-metadata-verifier",
+    "Pages-safe-path-details-and-completed-substages",
+    "coherent-fixtures-and-adverse-replays",
+    "run14-wrapper-and-reporting"
+  ],
+  "original_scope": [
+    "same-install-DNF-presentation-and-full-checksum-proof",
+    "ordered-bound-terminal-DNF-repository-failures",
+    "core-inclusive-gzip-generation-verification-and-Pages-causality",
+    "producer-verification-and-attended-run14-handoff"
+  ],
+  "plan_review_findings": {
+    "1": "amend-explicit-builder-and-Packages-layouts",
+    "2": "amend-both-real-wrongkey-display-replays",
+    "3": "amend-fatal-summary-line-role",
+    "4": "amend-exact-relative-download-path-resolved-under-sole-bound-baseURI",
+    "5": "accept-native-wide-output-still-required",
+    "6": "amend-explicit-armor-and-packet-provenance",
+    "7": "amend-resolved-C-executable-legacy-name-refused",
+    "8": "amend-real-reference-check-executed-default-skip-disclosed",
+    "9": "amend-locale-presentation-and-command-binding"
+  },
+  "post_test_reporting_only_paths": [
+    "docs/live1-native-client-cont15.md",
+    "evidence/live1/cont15-verification.json",
+    "operators/live1/candidate-manifest.json"
+  ],
+  "production_enabled": false,
+  "production_ready": false,
+  "proposal": {
+    "bytes": 18125,
+    "disposition": "amend",
+    "schema": "agent-phase-plan-material-v1",
+    "sha256": "9a53e5df75ec70cd304f5eaf48131b40a6c2c1bbdd1bda9d2e361e215624a056"
+  },
+  "publication_authority": false,
+  "qualification": "NOT QUALIFIED / HOSTED_GATES",
+  "raw_rpmlint": {
+    "Fedora_inclusion_eligible_claimed": false,
+    "exit_code": 64,
+    "status": "fail"
+  },
+  "run13_checksum_samples": {
+    "architectures": 2,
+    "fixed_unqualified": true,
+    "fixture_kind": "redacted-run13-display",
+    "hashes_extended_from_mutation": false,
+    "original_stream_bytes": false
+  },
+  "run13_metadata_observation": {
+    "Pages_rejection": "DISALLOWED_FILE",
+    "architectures": 2,
+    "compressed_sha256_and_size_match_repomd": true,
+    "core_objects": 6,
+    "gzip_verifier_rejection": "BAD_COMPRESSION",
+    "magic": "28b52ffd",
+    "new_native_generation_claimed": false,
+    "suffix": ".xml.zst"
+  },
+  "schema": "rs9.cont15-producer-verification.v1",
+  "status": "producer-source-verification-pass-dispatcher-closeout-pending",
+  "task": "RS9-LIVE1-THEME-FORGE-CONT15-HOSTED13-DNF-PAGES1",
+  "tested_runtime_inventory_count": 329,
+  "tested_runtime_inventory_sha256": "a4d0976e8b6d95421686e82dfdaf6242999bb351be6437233684a01acd4bc881",
+  "tested_source_identities": [
+    {
+      "bytes": 10341,
+      "path": "operators/live1/run-hosted14.py",
+      "sha256": "888cbc6a11c0adef40fe83769b683b3029e347bf6de64a111a0c50e8b0adb20b"
+    },
+    {
+      "bytes": 33286,
+      "path": "src/rs9/apt_diagnostics.py",
+      "sha256": "746456535bb7e83369c5161a7e43a6da2a5198d566ae2a48fc3909790c0b6676"
+    },
+    {
+      "bytes": 59315,
+      "path": "src/rs9/build_rpm.py",
+      "sha256": "89bb1f75b089dc9306a095c0430cba39be676ccdeb80bb851dd6557a5253c616"
+    },
+    {
+      "bytes": 1927,
+      "path": "src/rs9/dnf_commands.py",
+      "sha256": "f6583df8c3d4691015fd0c90680f4648b87cb0893d9d5f73b965c13b9b28afb3"
+    },
+    {
+      "bytes": 29327,
+      "path": "src/rs9/dnf_diagnostics.py",
+      "sha256": "6b9fd3992c44f6effcd3b182a2d3a5c812c3448755f7e597dd919aef11fb5b7a"
+    },
+    {
+      "bytes": 4658,
+      "path": "src/rs9/dnf_failure.py",
+      "sha256": "4a7e16b8dc12de9af9a8f7a17b2be8d7f8cff109980711e5dc5dac7f7be7649d"
+    },
+    {
+      "bytes": 10622,
+      "path": "src/rs9/errors.py",
+      "sha256": "9742297f6e9e8f7143f59c1b4042484dbf95e8f3a91c20ce300af194f9f8fb53"
+    },
+    {
+      "bytes": 119815,
+      "path": "src/rs9/hosted_deb.py",
+      "sha256": "c1da01cc1bf2a9afe131098bba312073671eef4b9e8b031c5a2f038d7f70217c"
+    },
+    {
+      "bytes": 65594,
+      "path": "src/rs9/hosted_packaging.py",
+      "sha256": "66a7ea326a3a440c40a6e3337cfe609ff9f34b33e06f13945e51b592dceb0f0f"
+    },
+    {
+      "bytes": 41002,
+      "path": "src/rs9/pages.py",
+      "sha256": "a24164da0b85679294a4bd032348e88f970ffb464119836f62b0477b34c94383"
+    },
+    {
+      "bytes": 19688,
+      "path": "src/rs9/pages_candidate.py",
+      "sha256": "b7342453ef7226c416c52767f9a916e5181c855ae8ebd1fcf63f42eba689e403"
+    },
+    {
+      "bytes": 15052,
+      "path": "src/rs9/rpm_metadata.py",
+      "sha256": "e1bc0acd08fdf4d281d42eb231ac0868ef29662dfe891fde98f28ccc4a5bcfdf"
+    },
+    {
+      "bytes": 25642,
+      "path": "src/rs9/rpm_repository.py",
+      "sha256": "644c773cd504ac34583a25923714608d3d08c82f46224b436b71ebf9d5263718"
+    },
+    {
+      "bytes": 13087,
+      "path": "tests/fixtures/run13-dnf-display.json",
+      "sha256": "edb7203eb252857e205d33b94b3af0dc250e423dde88e9043fd22ef28c6b93c4"
+    },
+    {
+      "bytes": 10841,
+      "path": "tests/rpm_metadata_fixtures.py",
+      "sha256": "961e9acd89610f80300ffec72f0d8bc48e91838bb5472703229de531f623a6e9"
+    },
+    {
+      "bytes": 49981,
+      "path": "tests/test_build_native.py",
+      "sha256": "02d1e18532f22f29f6062d75a5fcef6dae39b71b57c65d2e1884109a6ad2297c"
+    },
+    {
+      "bytes": 50682,
+      "path": "tests/test_build_rpm.py",
+      "sha256": "c7d453ee46a47f07d895dfa07fbd0f641f6fdeb5e2c10a80d0bbbacafa8248be"
+    },
+    {
+      "bytes": 12132,
+      "path": "tests/test_dnf_run13_diagnostics.py",
+      "sha256": "79e93a3b398eecf6d4bdc36ad9f20dc0818217ae57c156990e3d0b4c75ed01c9"
+    },
+    {
+      "bytes": 34801,
+      "path": "tests/test_dnf_trust_negatives.py",
+      "sha256": "97ba48b6ca6138b9575c2191263b0216d54a412648ecdce1293aed2d339cb8c4"
+    },
+    {
+      "bytes": 121003,
+      "path": "tests/test_hosted_deb.py",
+      "sha256": "c391d64175d837f6c51c16c860838378ab1d447c2093d3817241f8a4376d262c"
+    },
+    {
+      "bytes": 41268,
+      "path": "tests/test_pages.py",
+      "sha256": "3b3697d7c8ffb3f7537c98e1d33b7dd13848bc484513da7e941a9b1bfc4e8acc"
+    },
+    {
+      "bytes": 2533,
+      "path": "tests/test_pages_failure_details.py",
+      "sha256": "cd111284aaa108d873a965a4d208066500ed0f221b19d4ea67d1ed40dc3ca8eb"
+    },
+    {
+      "bytes": 7516,
+      "path": "tests/test_rpm_filesystem_controls.py",
+      "sha256": "88b23f73c27e55e27ca3ea5e9b79ef77d5f7caef0f1a97e4c97e6793f2fc9d56"
+    },
+    {
+      "bytes": 29779,
+      "path": "tests/test_rpm_metadata.py",
+      "sha256": "68064ff2120273f4db2d9524c044c2deb58acb2f0cc62e4797567ab7a3e3d512"
+    },
+    {
+      "bytes": 3665,
+      "path": "tests/test_rpm_operation_details.py",
+      "sha256": "d2fd0450102797c31687f892032bc2c40dca24e13a370da8d1f2b05ec7f07a76"
+    },
+    {
+      "bytes": 20108,
+      "path": "tests/test_rpm_repository_ownership.py",
+      "sha256": "c05366439defb6c8d9af7ae19577e7d58ae42b0de2022bf78dfa96b83f9a3b19"
+    },
+    {
+      "bytes": 19896,
+      "path": "tests/test_rpm_repository_sequence.py",
+      "sha256": "76abd5131f775e7ceea3720f9797bf48177ff7ed949668e4a8a94f666c84e56d"
+    },
+    {
+      "bytes": 6571,
+      "path": "tests/test_run_hosted14.py",
+      "sha256": "277103c5efa2f425ce745e6629030f40d4e23707dcaac19daba9e82961d7a79a"
+    }
+  ],
+  "verification_classes": {
+    "DNF_terminal_and_checksum": "explicit-redacted-display-replays-and-synthetic-commands-no-new-native-qualification",
+    "Docker_native_execution": "not-run-not-a-source-phase-prerequisite",
+    "Pages": "real-scanner-assembly-with-labeled-package-and-tool-fixtures",
+    "RPM_metadata": "coherent-real-gzip-XML-files-and-read-only-retained-zstd-objects",
+    "adoption_and_collection": "temporary-Git-and-filesystem-backends-hosted-transport-doubles-no-real-adoption",
+    "native_DNF5_RPM6_createrepo_c_GnuPG": "unavailable",
+    "noarch": "original-retained-unsigned-binary-and-source-RPM-bytes"
+  },
+  "verification_driver_sha256": "bb72b15f06a27a292506dbed63126574ef8927e7f4ed319b6f7c654de011a97f",
+  "verification_repairs": [
+    "Initial discovery exposed incomplete synthetic metadata stubs, a private-path test literal and stale cumulative inventory; corrected and retested.",
+    "Manifest self-path was then explicitly included and the live delta/index checks passed.",
+    "Parent full-stream check added a DNF-only positive-control environment veto after the first passing pair of full runs; terminal tests cover both streams and all four stages after 64 KiB."
+  ],
+  "workers": {
+    "cleanup_proven": true,
+    "count": 2,
+    "dispatcher_review_checkpoint": false,
+    "dispositions": {
+      "DNF-parser": "partial-parent-amended-terminal-grammar-and-bindings",
+      "RPM-metadata": "partial-parent-amended-bounds-inventory-and-preservation"
+    },
+    "effective_model": "not-observed",
+    "kind": "gemini",
+    "requested_profile": "gemini-3.8-flash-high",
+    "used": true
+  }
+}

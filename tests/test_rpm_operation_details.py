@@ -21,6 +21,21 @@ class RepositoryOperationDetailsTests(unittest.TestCase):
         error = ContractError("RPM_REPOSITORY_OPERATION", "Repository write failed", details=details)
         self.assertEqual(error.details, details)
 
+    def test_repodata_format_verify_survives_safe_details(self):
+        details = dict(
+            operation="repodata-format-verify",
+            substage="compression-verify",
+            target="repodata/primary.xml.gz",
+            causal_code="BAD_COMPRESSION",
+            stdout_sha256="a" * 64,
+            stderr_sha256="b" * 64,
+            exit_code=0,
+            tool="createrepo_c",
+        )
+        error = ContractError("RPM_REPOSITORY_OPERATION", "Format verify failed", details=details)
+        self.assertEqual(error.details, details)
+        self.assertEqual(safe_details(details), details)
+
     def test_relationships_cannot_include_private_or_untyped_values(self):
         for field, value in (("target", "/" + "home/operator/repodata.xml"),
                              ("writer_is_owner", 1), ("owner_is_root", "root"),

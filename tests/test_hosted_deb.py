@@ -188,13 +188,8 @@ class ScriptedDocker:
                                                  maintainer=MAINTAINER, depends="nodejs (>= 22)"))
             return self.receipt(a)
         if "createrepo_c" in a:
-            repodata = Path(a[-1]) / "repodata"
-            repodata.mkdir(exist_ok=True)
-            repodata.chmod(0o755)
-            (repodata / "repomd.xml").write_bytes(b"<repomd/>\n")
-            (repodata / "primary.xml.gz").write_bytes(gzip.compress(b"<metadata/>", mtime=0))
-            for path in repodata.iterdir():
-                path.chmod(0o644)
+            from tests.rpm_metadata_fixtures import create_valid_repodata
+            create_valid_repodata(Path(a[-1]))
             return self.receipt(a)
         return self.receipt(a)
 
@@ -204,6 +199,10 @@ class ScriptedDocker:
             i += 2 if a[i] in ("--user", "-e") else 1
         state, cmd = self.containers[a[i]], a[i + 1:]
         joined = " ".join(cmd)
+        if cmd and cmd[0] == "env":
+            cmd = cmd[1:]
+            while cmd and "=" in cmd[0]:
+                cmd = cmd[1:]
         if cmd[:5] == ci.scanner_argv()[:5]:
             is_post = state.get("installed") or state.get("had_install", False)
             if not is_post and self.fail_pre_inventory:
@@ -1658,6 +1657,35 @@ class PagesLaneTests(unittest.TestCase):
             self.assertEqual(rpm_ver["verified_issuer"], fixture.primary_fingerprint)
         validate_execution_result(result)
         self._assert_assembled_tree_coverage(result, fixture, docker)
+
+    def test_late_pages_path_rejection_keeps_completed_assembly_inputs(self):
+        self.all_bundles()
+        docker = ScriptedDocker()
+        home = self.root / "fixture-home"
+        home.mkdir()
+        fixture = HermeticFixtureSigner(homedir=home)
+        original = hd.assemble_pages_candidate
+        relative = "rpm/fedora/43/x86_64/repodata/unreviewed.xml.zst"
+
+        def rejected_tree(target, **kwargs):
+            # Real assembler/scanner boundary, with a declared forbidden object.
+            kwargs["files"][relative] = zstd_raw_frame(b"<metadata/>\n")
+            kwargs["exact_inventory"][relative] = digest(kwargs["files"][relative])
+            return original(target, **kwargs)
+
+        with patch("rs9.hosted_packaging.sign_rpm", side_effect=fake_sign_rpm), \
+                patch("rs9.hosted_deb.assemble_pages_candidate", side_effect=rejected_tree):
+            result = hd.execute(self.context(docker, signing_fixture=fixture))
+        details = result["details"]
+        self.assertEqual(details["pages_failure"], {"code": "DISALLOWED_FILE",
+            "substage": "pages-path-classification", "path": relative})
+        self.assertEqual(details["pages_completed_substages"], ["custody-equality", "apt-staging",
+            "rpm-metadata-x86_64", "rpm-metadata-aarch64", "rpm-custody-and-public-modes",
+            "pacman-metadata", "inventory"])
+        self.assertEqual(set(details["rpm_metadata_reports"]), {"x86_64", "aarch64"})
+        self.assertFalse(docker.calls_containing("docker", "exec"))
+        self.assertTrue(all(g["status"] == "fail" for g in result["gates"]))
+        self.assertNotIn(str(self.root), json.dumps(details["pages_failure"]))
 
     def _assert_assembled_tree_coverage(self, result, fixture, docker):
         gates = self.by_name(result)
