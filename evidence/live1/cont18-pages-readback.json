@@ -1,0 +1,54 @@
+{
+  "commands": [
+    [
+      "gh",
+      "api",
+      "--method",
+      "GET",
+      "repos/Knowledge-Forge-AI/release-starport-9/pages"
+    ],
+    [
+      "dig",
+      "+noall",
+      "+answer",
+      "+time=3",
+      "+tries=1",
+      "rs9.knowledge-forge.ai",
+      "CNAME"
+    ]
+  ],
+  "configuration_changed": false,
+  "dns": {
+    "answers": [
+      {
+        "owner": "rs9.knowledge-forge.ai",
+        "target": "knowledge-forge-ai.github.io",
+        "type": "CNAME"
+      }
+    ],
+    "exit_code": 0,
+    "status": "ok",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_bytes": 67,
+    "stdout_sha256": "0beaa626fa2fb9792f521d506d833f1d4079b188766db9eaa7fa1b3b7b5befee",
+    "tool": "dig"
+  },
+  "github_pages": {
+    "exit_code": 1,
+    "status": "unavailable",
+    "stderr_bytes": 25,
+    "stderr_sha256": "d2c8985c89b29a842ac4946d13bdbc297709f44f20bb968faf9682664b211db6",
+    "stdout_bytes": 126,
+    "stdout_sha256": "563d97060c2459a0ff950c9fdf8d97e70237ccbc433002dd0c4bd5be7680f166",
+    "tool": "gh"
+  },
+  "observed_at": "2026-10-11T16:13:59.805276Z",
+  "publication_authority": false,
+  "qualification_authority": false,
+  "read_only": true,
+  "repository": "Knowledge-Forge-AI/release-starport-9",
+  "schema": "rs9.pages-settings-readback.v1",
+  "status": "partial-or-unavailable",
+  "target": "rs9.knowledge-forge.ai"
+}

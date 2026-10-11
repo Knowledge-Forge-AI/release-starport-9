@@ -713,7 +713,7 @@ def bound_diagnostic(diagnostic, max_bytes=60 * 1024):
     return result
 
 
-def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, discovered=None, baseline=None, label=None):
+def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, discovered=None, baseline=None, label=None, diagnostic_extras: bool = False):
     """No extraction here: runtime_root is the wheel cache, Nix cache, or installed package."""
     env = runtime_environment(env)
     import_evidence = verifier_import_preflight(prepared, system, prefix, env)
@@ -769,50 +769,15 @@ def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, 
                             details={"product": "theme-forge-nebular-fusion", "substage": "released-sidecar-verifier",
                                      "system": system, "reason": verifier["reason_token"],
                                      **{k: v for k, v in verifier.items() if k in {"exit_code", "stdout_sha256", "stderr_sha256", "exception_type", "phase"}}})
-    platform = "darwin-arm64" if darwin else "linux-arm64" if system == "aarch64-linux" else "linux-x64"
-    scenarios = ["A"] if darwin else ["B"] if platform == "linux-arm64" else ["C", "C-signal"]
-    evidence = prepared["scratch"] / "evidence"
-    evidence.mkdir(exist_ok=True)
-    evidence.chmod(0o755 if prepared.get("container_client") else 0o777)
-    runs = []
-    for scenario in scenarios:
-        command = ["node", str(prepared["tools"] / "native-rc-smoke.mjs"), "--platform", platform,
-                   "--scenario", scenario, "--launch-root", str(launch_root), "--checkout", str(prepared.get("checkout", prepared["source"])),
-                   "--evidence", str(evidence), "--label", platform + "-" + scenario]
-        if not darwin:
-            command = ["xvfb-run", "-a", "dbus-run-session", "--", *command]
-        try:
-            result = subprocess.run([*prefix, *command], env=env, capture_output=True, timeout=240)
-        except subprocess.TimeoutExpired as error:
-            raise ContractError("APPLICATION_SMOKE", "Released application-aware smoke timed out", details={
-                "reason_token": "process-timeout", "exception_type": "TimeoutExpired",
-                "stdout_sha256": digest(error.output or b""), "stderr_sha256": digest(error.stderr or b"")}) from None
-        command_details = {"exit_code": result.returncode, "stdout_sha256": digest(result.stdout),
-                           "stderr_sha256": digest(result.stderr)}
-        path = evidence / (platform + "-" + scenario + ".run.json")
-        if result.returncode:
-            raise ContractError("APPLICATION_SMOKE", "Released application-aware smoke failed",
-                                details={**command_details, "reason_token": "process-nonzero"})
-        if not path.is_file():
-            raise ContractError("APPLICATION_SMOKE", "Released smoke receipt missing", details={
-                **command_details, "reason_token": "receipt-missing", "cause": "smoke-evidence",
-                "missing_path": "output/evidence/" + path.name})
-        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-        with os.fdopen(descriptor, "rb") as stream:
-            info = os.fstat(stream.fileno())
-            if not stat.S_ISREG(info.st_mode) or info.st_size > 1024 * 1024:
-                raise ContractError("APPLICATION_SMOKE", "Bounded regular smoke receipt required",
-                                    details={**command_details, "reason_token": "receipt-invalid"})
-            raw = stream.read(1024 * 1024 + 1)
-        if len(raw) > 1024 * 1024:
-            raise ContractError("APPLICATION_SMOKE", "Smoke receipt exceeded bound",
-                                details={**command_details, "reason_token": "receipt-oversize"})
-        record = json.loads(raw)
-        if record.get("status") != "pass" or record.get("problems"):
-            raise ContractError("APPLICATION_SMOKE", "Released smoke receipt failed",
-                                details={**command_details, "reason_token": "receipt-failed"})
-        runs.append({"scenario": scenario, "receipt_sha256": digest(raw),
-                     "executable_sha256": record["executable"]["sha256"]})
+    from rs9.application_smoke_diagnostic import execute_application_smoke
+    runs = execute_application_smoke(
+        prepared=prepared,
+        system=system,
+        launch_root=launch_root,
+        prefix=prefix,
+        env=env,
+        diagnostic_extras=diagnostic_extras,
+    )
     # Raw harness logs can contain ephemeral paths. Keep only bounded public identities.
     res = {"sidecar": {"verifier_stdout_sha256": digest(canonical(verification)), "verified": True},
            "scenarios": runs, "source_bindings": prepared["records"]}

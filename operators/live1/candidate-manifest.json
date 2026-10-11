@@ -7,25 +7,30 @@
   "changed_paths": [
     "docs/README.md",
     "docs/adr/0008-nix-linux-runtime-without-user-namespaces.md",
-    "docs/live1-native-client-cont17.md",
-    "evidence/live1/cont17-pages-readback.json",
-    "evidence/live1/cont17-verification.json",
+    "docs/live1-native-client-cont18.md",
+    "evidence/live1/cont18-input-evidence.json",
+    "evidence/live1/cont18-pages-readback.json",
+    "evidence/live1/cont18-pinned-dbus-source.json",
+    "evidence/live1/cont18-signal-disposition.json",
+    "evidence/live1/cont18-verification.json",
+    "nix/nebular-proot-experiment.nix",
     "operators/live1/candidate-manifest.json",
-    "operators/live1/run-hosted16.py",
-    "src/rs9/hosted_nix.py",
-    "src/rs9/hosted_nix_proot.py",
+    "operators/live1/run-hosted17.py",
+    "src/rs9/application_smoke_diagnostic.py",
+    "src/rs9/errors.py",
+    "src/rs9/hosted_smoke.py",
+    "src/rs9/hosted_wheels.py",
     "src/rs9/nix_proot.py",
     "src/rs9/nix_proot_audit.py",
+    "src/rs9/nix_proot_dbus.py",
     "src/rs9/nix_proot_launch.py",
-    "src/rs9/nix_proot_signals.py",
-    "src/rs9/nix_proot_wait.py",
-    "tests/test_hosted_nix.py",
+    "tests/test_application_smoke_diagnostic.py",
+    "tests/test_hosted_smoke.py",
+    "tests/test_hosted_wheels.py",
     "tests/test_nix_proot.py",
     "tests/test_nix_proot_audit.py",
     "tests/test_nix_proot_launch.py",
-    "tests/test_nix_proot_processes.py",
-    "tests/test_nix_proot_wait.py",
-    "tests/test_run_hosted16.py"
+    "tests/test_run_hosted17.py"
   ],
   "configuration_hashes": [
     {
@@ -182,11 +187,11 @@
       "size": 1251
     },
     {
-      "git_blob": "c4d5b87e80e27093cd1faf154aace63d98c7e1b0",
+      "git_blob": "50e10ced855fdebecffbad982886ffc1bd80906f",
       "mode": "100644",
       "path": "docs/README.md",
-      "sha256": "9b5c9cce7b066a5865094f1f24d9890e7c806b62324438fe0b77234970531e6e",
-      "size": 6680
+      "sha256": "c522da04d720e42c8da09c8dad7a9c82a5a8ff5551619a799eb26f3557b02ac5",
+      "size": 6871
     },
     {
       "git_blob": "521a7bc4badf347db9176d0118dadc9881cfd3a2",
@@ -238,11 +243,11 @@
       "size": 1646
     },
     {
-      "git_blob": "1bc5dd10ed8c18d3f490a2d9feda9a95d5880e46",
+      "git_blob": "2c504bb816a39a05d95c21529df1ab4b356ac402",
       "mode": "100644",
       "path": "docs/adr/0008-nix-linux-runtime-without-user-namespaces.md",
-      "sha256": "744e11b5ca3887920f4409575cb3943841dfc0ed8d235d2bc5e2ee5cde385787",
-      "size": 10719
+      "sha256": "2e8b543e62a81d5903f4a7f88517e6a7c3d1ec7af69a74a405794287e91ee61e",
+      "size": 12187
     },
     {
       "git_blob": "4771f5c9106f0fb52f088102d08eefd58d41a68f",
@@ -432,6 +437,13 @@
       "path": "docs/live1-native-client-cont17.md",
       "sha256": "4007d73433ae9fd5d00c898ece4c7c8112658b30830914142f0acc8bf75d7ef2",
       "size": 14507
+    },
+    {
+      "git_blob": "3df314ecd92fb02c047b5ada610d3af531f553b0",
+      "mode": "100644",
+      "path": "docs/live1-native-client-cont18.md",
+      "sha256": "e851b8f96c08559285191c758edeea5e89e64b83ca20d39b59fd9f0612215398",
+      "size": 14681
     },
     {
       "git_blob": "2910bb27b786a3b59b36a3d8e1ceba8e6b1b0eea",
@@ -656,6 +668,41 @@
       "path": "evidence/live1/cont17-verification.json",
       "sha256": "675527c789728709c9c25826dd4f07ba99a6139c5aa0caa314dd2cf4dda8dcd4",
       "size": 42136
+    },
+    {
+      "git_blob": "739f8746fb2854129ea57df040b59f2bbcbec7e4",
+      "mode": "100644",
+      "path": "evidence/live1/cont18-input-evidence.json",
+      "sha256": "0b8d5fb0b9ee1e880755b2156f12127931df0c2594407d53135a7b63ff6ae136",
+      "size": 12120
+    },
+    {
+      "git_blob": "65b31634c11cdf850548bbcf48881bd0394ad03d",
+      "mode": "100644",
+      "path": "evidence/live1/cont18-pages-readback.json",
+      "sha256": "4d5e3e08a727ce2616f10ffc9730917fecde7f4ad83ffbe5ed0cd19176aa3108",
+      "size": 1416
+    },
+    {
+      "git_blob": "92262ac5845536b37f7b23edb5cde565c55732c3",
+      "mode": "100644",
+      "path": "evidence/live1/cont18-pinned-dbus-source.json",
+      "sha256": "18ba6337afe892d838429d4c883a4e0e0297e1e8e79f182521bf1253436ed269",
+      "size": 945
+    },
+    {
+      "git_blob": "b579b6b6b665f5a5e2aacf314e8354f66dd85e0f",
+      "mode": "100644",
+      "path": "evidence/live1/cont18-signal-disposition.json",
+      "sha256": "6260b0bd1df066eec0e8b3f8eec050915b8546916cb789adcaadeabe99e6bfe5",
+      "size": 1443
+    },
+    {
+      "git_blob": "f7eb4ea395a07852c0b094470b229a789237eae6",
+      "mode": "100644",
+      "path": "evidence/live1/cont18-verification.json",
+      "sha256": "c0348ef13f341eace46330955c5b4e195be96d97b59349cbb3fd566fdadcbac8",
+      "size": 11365
     },
     {
       "git_blob": "8d6235ee7a9deb7807cabed204ddf0ce280369aa",
@@ -966,11 +1013,11 @@
       "size": 3
     },
     {
-      "git_blob": "e03bd29ec40fd881795858e96a5da8f7b37e153c",
+      "git_blob": "c5c55aaa12a18f1a099c3b66b50ebe04633d1509",
       "mode": "100644",
       "path": "nix/nebular-proot-experiment.nix",
-      "sha256": "9517bc55b22fb7e363a6d78899983db58ddfb1d030a7efb6e46b3c4593b4f417",
-      "size": 6478
+      "sha256": "e58828d0670b2f8d005a4eb5be2944d62b442f893c25e408d4cb05c08c91b6fd",
+      "size": 6772
     },
     {
       "git_blob": "e234d6d240bde1f59df83020753d5536cf76cc4e",
@@ -1113,6 +1160,13 @@
       "size": 548
     },
     {
+      "git_blob": "a5932f82a4abbe23b1728a65a0e7e4f8d42acc74",
+      "mode": "100644",
+      "path": "operators/live1/run-hosted17.py",
+      "sha256": "1f465d87142c3da8b460360ca59e22f46ad5ac3d8fa987ed1e292d3782e2b1c7",
+      "size": 546
+    },
+    {
       "git_blob": "bab09448a3b7f3fdc7b88ae9bf0d56e4ccbaa397",
       "mode": "100644",
       "path": "operators/live1/run-hosted5.py",
@@ -1188,6 +1242,13 @@
       "path": "src/rs9/adopt_candidate.py",
       "sha256": "4caada274afe3d03f68865cebd4f44538ff0bffd05a7e329ff57d9c89db7cb1a",
       "size": 17893
+    },
+    {
+      "git_blob": "af9861804d47b881d4d1331b787ca7b908e09988",
+      "mode": "100644",
+      "path": "src/rs9/application_smoke_diagnostic.py",
+      "sha256": "c8d55052f5f0654caa83c93c5dfb8a45e374d199a0997fbb24906ad6d9fb9ef5",
+      "size": 16544
     },
     {
       "git_blob": "85207de59d37210203f4f6ebbf220b29f623be41",
@@ -1386,11 +1447,11 @@
       "size": 19568
     },
     {
-      "git_blob": "b00609cd9c0714a34451391ffa287494d2c222f4",
+      "git_blob": "964748f62a61ec7c4f393eb5a18abf0a7e00a5de",
       "mode": "100644",
       "path": "src/rs9/errors.py",
-      "sha256": "9742297f6e9e8f7143f59c1b4042484dbf95e8f3a91c20ce300af194f9f8fb53",
-      "size": 10622
+      "sha256": "6beb2f7923fe15273029970bb189cf829246aa312ea93aa4d087b92b605a1eb1",
+      "size": 10892
     },
     {
       "git_blob": "f3d20f59b568465e798a0f5a3c886841ba57769a",
@@ -1547,11 +1608,11 @@
       "size": 6680
     },
     {
-      "git_blob": "5a2b6bc2d546bea691e4b5d10ecfe6d3fbbf7cda",
+      "git_blob": "bb2070070d86673ccd0ea70eeb9f9f4d5d1ddefe",
       "mode": "100644",
       "path": "src/rs9/hosted_smoke.py",
-      "sha256": "2704d4361e73644e89084fb43299032f7abac235896457bc4a8fd3a37ae3ba10",
-      "size": 45519
+      "sha256": "b1c201726862a76dab49bb2b2a75c35258843fb18fa4d9d3b47a2fab5a558c15",
+      "size": 42637
     },
     {
       "git_blob": "59b52f9c7bb9f5543fab4b57984a3f3ac395dd83",
@@ -1568,11 +1629,11 @@
       "size": 9765
     },
     {
-      "git_blob": "8ee6d56a9237d7aca93a06527f28ac9b8ea5213a",
+      "git_blob": "5f7b07e8f00c38c1e9c45490277092cfb5cf4e62",
       "mode": "100644",
       "path": "src/rs9/hosted_wheels.py",
-      "sha256": "63d95a082aa96ed791227b7015dc9d6ece1ed75cd8bb51396c77b58bb6cb6754",
-      "size": 21446
+      "sha256": "88ddb3918522c826e61fad4259fe1afdcf3e4cf99d7d6616a4c21bbf660cb9bf",
+      "size": 21685
     },
     {
       "git_blob": "acf27e076762f5a89f5d3abd75476e767a287232",
@@ -1617,25 +1678,32 @@
       "size": 8064
     },
     {
-      "git_blob": "b20c789a4d3145c9fd44dc96badaea8ef4350fb1",
+      "git_blob": "4ecce3b1b9070d03c46a24b1777b1b2bd7028a83",
       "mode": "100644",
       "path": "src/rs9/nix_proot.py",
-      "sha256": "5829483db8ae275c913a7ee369c9272ebda7bc0f4dce35756c2bbd4c3a60124c",
-      "size": 64973
+      "sha256": "76b2bd3364ee3f79d8346cdd65d4401102665a3e3a66b520d3f625c926eca019",
+      "size": 66083
     },
     {
-      "git_blob": "bfd6efca41dde19d7769637dd27de1252e31cd25",
+      "git_blob": "acd86c47893d60ac10be6b793144a3c180ed79ed",
       "mode": "100644",
       "path": "src/rs9/nix_proot_audit.py",
-      "sha256": "585553ceb144a0bf2c75dbc80aa1041776e5fe4df15e583d1159f557a5796a70",
-      "size": 10300
+      "sha256": "0f6f4551d998594c9b848a296ffeb6ccf96ea4ae0047d5359fe0b780a792aabc",
+      "size": 11056
     },
     {
-      "git_blob": "f113ae02548c6ac40a6b9772959c058dcc7401f0",
+      "git_blob": "37470ec047ce0cbd0bf7b34ea69d0cc77016c2da",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_dbus.py",
+      "sha256": "7b083270bb031164e579cbdb2aeedf776a073431cc031083e91ca59f22de69d2",
+      "size": 8409
+    },
+    {
+      "git_blob": "dfad89bdb6580dd6ab01fe468c5c9613c6501a41",
       "mode": "100644",
       "path": "src/rs9/nix_proot_launch.py",
-      "sha256": "e33619d464ddd712bff0d2cfed4e1b885ffd952e7ab902c1ce95dabd993d41dc",
-      "size": 14286
+      "sha256": "cd8b23ba664db7d9f8f691ce778ed71044dc5926c29821fcfe8bdb1327c50a18",
+      "size": 15513
     },
     {
       "git_blob": "4085a9b5ad3450ac0cd2bd97bcba27a1a2377350",
@@ -2485,6 +2553,13 @@
       "size": 23637
     },
     {
+      "git_blob": "89d2c8e2d8eaff47c9c5747266aa5f05001237b5",
+      "mode": "100644",
+      "path": "tests/test_application_smoke_diagnostic.py",
+      "sha256": "2c2cb523a5a38ba727c861866d180d6b90610fe1750005ba2e1c869fe6300fdf",
+      "size": 29424
+    },
+    {
       "git_blob": "83db166e8c52d7e5cc959e305b16270c2877550c",
       "mode": "100644",
       "path": "tests/test_apt_diagnostics.py",
@@ -2821,11 +2896,11 @@
       "size": 8894
     },
     {
-      "git_blob": "f87ca4991b289bbfb60eab81aec671e95a76104c",
+      "git_blob": "1be490e5b7f89394e84b39242599bfef025a4ce2",
       "mode": "100644",
       "path": "tests/test_hosted_smoke.py",
-      "sha256": "b3b4bee3f52db7187d4994b5d2e1d8d6f1ea2900ed228d67c3d67bd34a40334a",
-      "size": 40607
+      "sha256": "242721d828b933f0170094daf74225f7cd3f8eaa363a376d56312d36e33d01b0",
+      "size": 44111
     },
     {
       "git_blob": "90facd2d1e80b4055cfb7288d3bed284e9e58c46",
@@ -2849,11 +2924,11 @@
       "size": 11938
     },
     {
-      "git_blob": "6a8c8bbb788ad8c315db1e8ed2fd6e7d6eda56e4",
+      "git_blob": "02afc8fe175422a499dffcf7b6b5020fa7cf5d83",
       "mode": "100644",
       "path": "tests/test_hosted_wheels.py",
-      "sha256": "791f900f921d910857f4255124c75bbe95288d669d4fe5409bc22e54858c4688",
-      "size": 21970
+      "sha256": "e8d725a8e758c6f98a93a0f379960dfd17d2c78429615278a3a5d32edcec64b6",
+      "size": 26768
     },
     {
       "git_blob": "0d914fcb73b612e2f498971d3d3efcc93087d60d",
@@ -2940,25 +3015,25 @@
       "size": 5048
     },
     {
-      "git_blob": "e59c7056a0471c41a019d1cfb4ab985da17108b6",
+      "git_blob": "4a469252f3b74d4cbf4f0575a315daee252cfc1b",
       "mode": "100644",
       "path": "tests/test_nix_proot.py",
-      "sha256": "d017dfbbe4c0c672eb67366f84b556ffb19c7ba7829725a7e03c0ad121433f89",
-      "size": 65033
+      "sha256": "17b87c6f8e1484e56759b5c3bc720456802b3536f48f1ed9774904f101ee4191",
+      "size": 66733
     },
     {
-      "git_blob": "bef1c6c1992e4cda00b84834e807732702da2b80",
+      "git_blob": "53a8607a306bc9082602c088e46b60320bad91d6",
       "mode": "100644",
       "path": "tests/test_nix_proot_audit.py",
-      "sha256": "fc7f9d5bac5f39214a5add40b1f9798e27ba8b5ab2df80766c39be77f94099e5",
-      "size": 6791
+      "sha256": "411e4fb10a8a580d0e6fb31b1bd7138741958ce29a75a253c57c57fd069123bb",
+      "size": 20617
     },
     {
-      "git_blob": "010715bf9430d45614b025065ea05ac047238b07",
+      "git_blob": "ea24f984ccd518e50bc971530db9fa965f1d9158",
       "mode": "100644",
       "path": "tests/test_nix_proot_launch.py",
-      "sha256": "b8bd95530d8933dbfb1a912ed9ec2207a6ef1f28ed39262031c75f98fa24e2f9",
-      "size": 8728
+      "sha256": "45327f182652b27235e39a5d165908acf75036e7d565eed179aa207dcac7dd79",
+      "size": 10918
     },
     {
       "git_blob": "a708603a96c5ee0ac3e76d1a6ea53a8e9e664c38",
@@ -3325,6 +3400,13 @@
       "size": 2010
     },
     {
+      "git_blob": "5eff583dac9787a849629dfb6643aa904680ea8f",
+      "mode": "100644",
+      "path": "tests/test_run_hosted17.py",
+      "sha256": "cccb18dc0a0585b3025668189c85d39245e28aed4eb11ebfbe22a6862af05e11",
+      "size": 2010
+    },
+    {
       "git_blob": "54a27d6215549c7c3c57ceab4f660dcb4fe47222",
       "mode": "100644",
       "path": "tests/test_run_hosted5.py",
@@ -3453,8 +3535,8 @@
   ],
   "inventory_scope": "complete product source excluding this manifest and preserved unrelated local state",
   "kind": "non-production-hosted-source-candidate",
-  "parent": "f1f55f7cb049a690750de8c1acd0122ad2eedef1",
-  "phase_outcome": "runtime-diagnostics-hosted-qualification-pending",
+  "parent": "50183be0935178de3d4799d39f31d22169400dad",
+  "phase_outcome": "dbus-source-repair-wheel-diagnostics-hosted-qualification-pending",
   "production_enabled": false,
   "production_ready": false,
   "publication_authority": false,
@@ -3483,8 +3565,8 @@
     "schema": "rs9.live1-candidate-readiness.v1alpha1",
     "source_adoption_scope": "partial-diagnostic"
   },
-  "review_status": "dispatcher-pre-final-candidate-pending",
+  "review_status": "dispatcher-reviewed-with-findings-terminal-amendment-no-re-review",
   "schema": "rs9.live1-source-candidate-inventory.v1alpha2",
-  "task": "CONT17 Linux Nix runtime diagnostics and read-only Pages origin analysis",
+  "task": "CONT18 precise guest D-Bus closure and x86 wheel regression evidence",
   "terminal_disposition": "amend"
 }

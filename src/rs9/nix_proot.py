@@ -36,7 +36,7 @@ from rs9.errors import ContractError, safe_details
 from rs9.nix_proot_launch import classify_failure, measure_proot_latency, run_launch_chain
 
 SCHEMA = "rs9.nix-proot-evaluation.v2"
-FACTS_SCHEMA = "rs9.nix-proot-facts.v2"
+FACTS_SCHEMA = "rs9.nix-proot-facts.v3"
 MAX_OUTPUT = 1024 * 1024
 MAX_CLOSURE = 4096
 MAX_ELFS = 512
@@ -54,7 +54,7 @@ INTERPRETERS = {
 }
 STORE_FACTS = ("proot", "proot_recipe_file", "guest_root", "guest_env", "guest_path", "closure_paths_file",
                "loader", "glibc_lib", "env", "sh", "python", "node", "readelf", "ldd", "xvfb_run",
-               "dbus_run_session", "bwrap", "launcher")
+               "dbus_run_session", "dbus_daemon", "dbus_session_config", "bwrap", "launcher")
 HOST_ONLY_FACTS = frozenset({"proot", "proot_recipe_file", "guest_root", "closure_paths_file"})
 SCALAR_FACTS = ("schema", "system", "proot_version", "proot_nixpkgs_rev", "proot_recipe_blob",
                 "proot_source_hash", "foreign_interpreter")
@@ -75,7 +75,7 @@ _STORE = re.compile(r"/nix/store/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]+(?:/[A-
 _STORE_TOP = re.compile(r"/nix/store/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]+")
 _GUEST_SENTINELS = ("/etc/os-release", "/etc/ld.so.cache", "/lib/x86_64-linux-gnu", "/lib/aarch64-linux-gnu",
                     "/usr/lib", "/usr/share", "/var/lib/dpkg")
-_GUEST_ETC = frozenset({"passwd", "group", "nsswitch.conf", "hosts"})
+_GUEST_ETC = frozenset({"passwd", "group", "nsswitch.conf", "hosts", "dbus-1"})
 
 
 def verify_pinned_proot(content: bytes | str | Path) -> dict[str, Any]:
@@ -161,6 +161,11 @@ def validate_proot_facts(facts: dict[str, Any]) -> dict[str, Any]:
     if (os.path.basename(facts["loader"]) != loader_name or str(Path(facts["loader"]).parent) != facts["glibc_lib"]
             or facts["glibc_lib"] not in libraries):
         raise ContractError("NIX_PROOT_FACTS", "Loader and libc must share the pinned glibc output")
+    if (_top(facts["dbus_daemon"]) != _top(facts["dbus_run_session"])
+            or _top(facts["dbus_session_config"]) != _top(facts["dbus_run_session"])
+            or facts["dbus_daemon"] != _top(facts["dbus_run_session"]) + "/bin/dbus-daemon"
+            or facts["dbus_session_config"] != _top(facts["dbus_run_session"]) + "/share/dbus-1/session.conf"):
+        raise ContractError("NIX_PROOT_FACTS", "D-Bus daemon and session config must share the pinned dbus package")
 
     guest = facts["guest_environment"]
     if not isinstance(guest, dict) or set(guest) != GUEST_ENVIRONMENT_KEYS:
@@ -479,10 +484,15 @@ def probe_no_userns_ptrace(rt: GuestRuntime) -> dict[str, Any]:
     nonce = secrets.token_hex(8)
     (rt.layout.tmp_dir / "rs9-translation-nonce").write_text(nonce)
     code = ("import json,os\n"
-            "nonce=open('/tmp/rs9-translation-nonce').read()\n"
+            "with open('/tmp/rs9-translation-nonce') as stream: nonce=stream.read()\n"
             f"sentinels={list(_GUEST_SENTINELS)!r}\n"
+            f"expected_config={rt.facts['dbus_session_config']!r}\n"
+            "dbus_dir='/etc/dbus-1';dbus_config=dbus_dir+'/session.conf'\n"
+            "dbus_ok=(os.path.isdir(dbus_dir) and not os.path.islink(dbus_dir) and "
+            "sorted(os.listdir(dbus_dir))==['session.conf'] and "
+            "os.path.isfile(dbus_config) and os.path.realpath(dbus_config)==expected_config)\n"
             "print(json.dumps({'userns':os.readlink('/proc/self/ns/user'),'uid':os.getuid(),'nonce':nonce,"
-            "'visible':[p for p in sentinels if os.path.exists(p)],'etc':sorted(os.listdir('/etc'))}))\n")
+            "'visible':[p for p in sentinels if os.path.exists(p)],'etc':sorted(os.listdir('/etc')),'dbus_ok':dbus_ok}))\n")
     run = rt.run(name, [rt.facts["python"], "-I", "-S", "-B", "-c", code])
     policy = "unavailable"
     try:
@@ -499,11 +509,13 @@ def probe_no_userns_ptrace(rt: GuestRuntime) -> dict[str, Any]:
         host_userns = rt.host_userns()
     except OSError:
         return _result(name, "not-run", "host-userns-unreadable", userns_policy=policy)
-    unexpected = sorted(set(doc["etc"]) - _GUEST_ETC) if isinstance(doc["etc"], list) else ["unparseable"]
+    etc = doc["etc"]
+    unexpected = sorted(set(etc) - _GUEST_ETC) if isinstance(etc, list) and all(isinstance(p, str) for p in etc) else ["unparseable"]
+    dbus_exact = isinstance(etc, list) and "dbus-1" in etc and doc.get("dbus_ok") is True
     visible = doc["visible"] if isinstance(doc["visible"], list) else ["unparseable"]
     checks = {"userns_inode_equal": doc["userns"] == host_userns, "uid_equal": doc["uid"] == os.getuid(),
               "tmp_translated": doc["nonce"] == nonce, "host_paths_hidden": not visible,
-              "etc_closed": not unexpected}
+              "etc_closed": not unexpected and dbus_exact}
     details = {**checks, "userns_policy": policy, "bind_count": rt.bind_count, "host_paths_visible": len(visible),
                "unexpected_etc_entries": len(unexpected), "elapsed_seconds": round(run.elapsed, 3)}
     if not checks["userns_inode_equal"]:

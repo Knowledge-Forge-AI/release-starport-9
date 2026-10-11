@@ -145,3 +145,40 @@ class LaunchDiagnostics(unittest.TestCase):
                 self.assertEqual(arm["status"], "fail")
                 self.assertEqual(arm["successful_samples"], 0)
                 self.assertIsNone(arm["median_seconds"])
+
+    def test_stage_receipts_include_explicit_safe_argv_and_config_identity_synthetic(self):
+        with tempfile.TemporaryDirectory() as temp:
+            def runner(argv, **kwargs):
+                return subprocess.CompletedProcess(argv, 0, b"", b"")
+            rt = self.runtime(Path(temp), runner)
+            with patch("rs9.nix_proot_launch.guest_audit", return_value={"files": [], "dbus_config": {"status": "pass"}}):
+                result = run_launch_chain(rt)
+            self.assertEqual(len(result["stages"]), 5)
+            for stage in result["stages"]:
+                self.assertIn("stage_argv", stage)
+                if any("dbus-run-session" in arg for arg in stage["stage_argv"]):
+                    self.assertIn("config_identity", stage)
+                    cfg = stage["config_identity"]
+                    self.assertEqual(cfg["guest_config"], "/etc/dbus-1/session.conf")
+                    self.assertEqual(cfg["store_config"], rt.facts["dbus_session_config"])
+                    self.assertEqual(cfg["daemon"], rt.facts["dbus_daemon"])
+                else:
+                    self.assertIsNone(stage["config_identity"])
+
+    def test_launch_chain_fails_if_dbus_config_audit_fails_synthetic(self):
+        with tempfile.TemporaryDirectory() as temp:
+            def runner(argv, **kwargs):
+                return subprocess.CompletedProcess(argv, 0, b"", b"")
+            rt = self.runtime(Path(temp), runner)
+            mock_dbus_audit = {
+                "status": "fail",
+                "reason": "dbus-session-config-missing",
+                "failing_path": "/etc/dbus-1/session.conf",
+            }
+            with patch("rs9.nix_proot_launch.guest_audit", return_value={"files": [], "dbus_config": mock_dbus_audit}):
+                result = run_launch_chain(rt)
+            self.assertEqual(result["status"], "fail")
+            self.assertIsNotNone(result["first_failure"])
+            self.assertEqual(result["first_failure"]["stage"], "dbus-config-audit")
+            self.assertEqual(result["first_failure"]["reason"], "dbus-session-config-missing")
+            self.assertEqual(result["first_failure"]["path"], "/etc/dbus-1/session.conf")

@@ -1,0 +1,456 @@
+{
+  "inputs": [
+    {
+      "bytes": 3096297,
+      "name": "hosted-summary.json",
+      "sha256": "eddfe0efe7ceaec1fd46113d4effe501f304ae4e9c2094dbed9b99c4ca68f0d9"
+    },
+    {
+      "bytes": 145096,
+      "name": "manager-packet.json",
+      "sha256": "a8d493fde8e5095277981712d41171e8b387906afbf12c470ec3356e0a94729a"
+    },
+    {
+      "bytes": 115198,
+      "name": "proot-x86_64-linux.json",
+      "sha256": "a563f3ac0dfcbf985a3a9241e9b380f78f0f2f3d37921125ff4a9e533864bcb9"
+    },
+    {
+      "bytes": 115232,
+      "name": "proot-aarch64-linux.json",
+      "sha256": "5e53d315aa16799f545fa001e674b60bb0f625e95a14fc3ef827578a8973615c"
+    },
+    {
+      "bytes": 730,
+      "name": "wheel-x86-lifecycle-diagnostic.json",
+      "sha256": "6e8a286195b10ccaa8d0dac1924ca270995403694033ea30f31bc2c5aa2da010"
+    },
+    {
+      "bytes": 1695,
+      "name": "run15-wheel-x86-baseline.json",
+      "sha256": "e58553f074c320540f7cd7645825a2f0e67dcbcf92e7bd145b911730346e64d8"
+    }
+  ],
+  "production_enabled": false,
+  "proot": [
+    {
+      "application_qualified": false,
+      "first_failure": {
+        "argv_sha256": "1c3271052b2ec6683cf82256917df51c00efae0fc8d75ba1673e66c3153c3f56",
+        "bounded_capture_complete": true,
+        "elapsed_seconds": 0.101,
+        "error_class": "ENOENT",
+        "exit_code": 127,
+        "guest_cwd_policy": "/tmp",
+        "path": "/etc/dbus-1/session.conf",
+        "path_class": "guest-system",
+        "path_sha256": "39f4c074afa0b7a4b108e03b6800c0f462ff1eaa90a175f64cdd905aabf2bd51",
+        "raw_returncode": 127,
+        "reason": "guest-file-missing",
+        "role": "dbus-session",
+        "signal": null,
+        "stage": "dbus-only",
+        "status": "fail",
+        "stderr_length": 164,
+        "stderr_sha256": "ae2b55f128ca747611842eef3cc26f2868bf23d21c8ebdecaf8a23c00732e11c",
+        "stdout_length": 0,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "tool": "dbus-run-session",
+        "tool_source": "stderr",
+        "warnings": []
+      },
+      "gates": [
+        {
+          "name": "proot-pinned-derivation",
+          "status": "pass"
+        },
+        {
+          "name": "proot-no-userns-ptrace",
+          "status": "pass"
+        },
+        {
+          "name": "proot-executable-self",
+          "reason": "guest-file-missing",
+          "status": "fail"
+        },
+        {
+          "name": "proot-descendant-interpreter",
+          "reason": "guest-file-missing",
+          "status": "fail"
+        },
+        {
+          "name": "proot-closure-resolution",
+          "status": "pass"
+        },
+        {
+          "name": "proot-args-exit-signals",
+          "reason": "guest-signal-status-not-propagated",
+          "status": "fail"
+        },
+        {
+          "name": "proot-in-guest-offline",
+          "runtime_offline_status": "pass",
+          "status": "pass"
+        },
+        {
+          "name": "proot-webkit-sandbox-state",
+          "reason": "webkit-main-process-unobserved",
+          "status": "fail"
+        },
+        {
+          "name": "proot-verifier-smoke",
+          "reason": "APPLICATION_SMOKE",
+          "status": "fail"
+        }
+      ],
+      "qualification_authority": false,
+      "system": "x86_64-linux"
+    },
+    {
+      "application_qualified": false,
+      "first_failure": {
+        "argv_sha256": "7a013f1a5d413de21245355945137619e39c35738cebc456efa182f8ebf364d6",
+        "bounded_capture_complete": true,
+        "elapsed_seconds": 0.051,
+        "error_class": "ENOENT",
+        "exit_code": 127,
+        "guest_cwd_policy": "/tmp",
+        "path": "/etc/dbus-1/session.conf",
+        "path_class": "guest-system",
+        "path_sha256": "39f4c074afa0b7a4b108e03b6800c0f462ff1eaa90a175f64cdd905aabf2bd51",
+        "raw_returncode": 127,
+        "reason": "guest-file-missing",
+        "role": "dbus-session",
+        "signal": null,
+        "stage": "dbus-only",
+        "status": "fail",
+        "stderr_length": 164,
+        "stderr_sha256": "0ed56cec4f9230533029b1448c19a3033699373d815755229f06ba6f0e5ae30f",
+        "stdout_length": 0,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "tool": "dbus-run-session",
+        "tool_source": "stderr",
+        "warnings": []
+      },
+      "gates": [
+        {
+          "name": "proot-pinned-derivation",
+          "status": "pass"
+        },
+        {
+          "name": "proot-no-userns-ptrace",
+          "status": "pass"
+        },
+        {
+          "name": "proot-executable-self",
+          "reason": "guest-file-missing",
+          "status": "fail"
+        },
+        {
+          "name": "proot-descendant-interpreter",
+          "reason": "guest-file-missing",
+          "status": "fail"
+        },
+        {
+          "name": "proot-closure-resolution",
+          "status": "pass"
+        },
+        {
+          "name": "proot-args-exit-signals",
+          "reason": "guest-signal-status-not-propagated",
+          "status": "fail"
+        },
+        {
+          "name": "proot-in-guest-offline",
+          "runtime_offline_status": "pass",
+          "status": "pass"
+        },
+        {
+          "name": "proot-webkit-sandbox-state",
+          "reason": "webkit-main-process-unobserved",
+          "status": "fail"
+        },
+        {
+          "name": "proot-verifier-smoke",
+          "reason": "APPLICATION_SMOKE",
+          "status": "fail"
+        }
+      ],
+      "qualification_authority": false,
+      "system": "aarch64-linux"
+    }
+  ],
+  "publication_authority": false,
+  "required_lanes": [
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 0,
+        "pass": 3
+      },
+      "failed_gates": [],
+      "gates": 3,
+      "lane": "pins",
+      "system": "generation"
+    },
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 0,
+        "pass": 2
+      },
+      "failed_gates": [],
+      "gates": 2,
+      "lane": "authenticate",
+      "system": "generation"
+    },
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 1,
+        "pass": 23
+      },
+      "failed_gates": [],
+      "gates": 24,
+      "lane": "wheels",
+      "system": "aarch64-darwin"
+    },
+    {
+      "counts": {
+        "fail": 3,
+        "not-run": 0,
+        "pass": 23
+      },
+      "failed_gates": [
+        {
+          "name": "lifecycle.theme-forge-nebular-fusion",
+          "reason": "APPLICATION_SMOKE",
+          "status": "fail"
+        },
+        {
+          "name": "wheel-lifecycle-install-test",
+          "reason": "lifecycle-validation-incomplete",
+          "status": "fail"
+        },
+        {
+          "name": "wheel-native-verifier",
+          "reason": "sidecar-verifier-not-executed",
+          "status": "fail"
+        }
+      ],
+      "gates": 26,
+      "lane": "wheels",
+      "system": "x86_64-linux"
+    },
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 0,
+        "pass": 26
+      },
+      "failed_gates": [],
+      "gates": 26,
+      "lane": "wheels",
+      "system": "aarch64-linux"
+    },
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 0,
+        "pass": 12
+      },
+      "failed_gates": [],
+      "gates": 12,
+      "lane": "nix",
+      "system": "aarch64-darwin"
+    },
+    {
+      "counts": {
+        "fail": 1,
+        "not-run": 4,
+        "pass": 8
+      },
+      "failed_gates": [
+        {
+          "details": {
+            "command": "tfnf",
+            "diagnostic_token": "uid-map-denied",
+            "exit_code": 1,
+            "expected_exit": 0,
+            "probe_id": "tfnf.0.fhs-runtime",
+            "product": "theme-forge-nebular-fusion",
+            "stderr_matches": true,
+            "stderr_sha256": "6722ac7f6d5dd369bd7fe48142072295d4894a41818c22da36804bd329388bbc",
+            "stdout_matches": true,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "substage": "nix-fhs-runtime-smoke",
+            "system": "x86_64-linux",
+            "userns_policy": "restricted"
+          },
+          "name": "nix-fhs-runtime-smoke",
+          "reason": "NIX_FHS_USERNS",
+          "status": "fail"
+        }
+      ],
+      "gates": 13,
+      "lane": "nix",
+      "system": "x86_64-linux"
+    },
+    {
+      "counts": {
+        "fail": 1,
+        "not-run": 4,
+        "pass": 8
+      },
+      "failed_gates": [
+        {
+          "details": {
+            "command": "tfnf",
+            "diagnostic_token": "uid-map-denied",
+            "exit_code": 1,
+            "expected_exit": 0,
+            "probe_id": "tfnf.0.fhs-runtime",
+            "product": "theme-forge-nebular-fusion",
+            "stderr_matches": true,
+            "stderr_sha256": "6722ac7f6d5dd369bd7fe48142072295d4894a41818c22da36804bd329388bbc",
+            "stdout_matches": true,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "substage": "nix-fhs-runtime-smoke",
+            "system": "aarch64-linux",
+            "userns_policy": "restricted"
+          },
+          "name": "nix-fhs-runtime-smoke",
+          "reason": "NIX_FHS_USERNS",
+          "status": "fail"
+        }
+      ],
+      "gates": 13,
+      "lane": "nix",
+      "system": "aarch64-linux"
+    },
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 0,
+        "pass": 40
+      },
+      "failed_gates": [],
+      "gates": 40,
+      "lane": "pacman",
+      "system": "x86_64-linux"
+    },
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 0,
+        "pass": 50
+      },
+      "failed_gates": [],
+      "gates": 50,
+      "lane": "rpm",
+      "system": "x86_64-linux"
+    },
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 0,
+        "pass": 50
+      },
+      "failed_gates": [],
+      "gates": 50,
+      "lane": "rpm",
+      "system": "aarch64-linux"
+    },
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 0,
+        "pass": 41
+      },
+      "failed_gates": [],
+      "gates": 41,
+      "lane": "deb",
+      "system": "amd64"
+    },
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 0,
+        "pass": 41
+      },
+      "failed_gates": [],
+      "gates": 41,
+      "lane": "deb",
+      "system": "arm64"
+    },
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 0,
+        "pass": 112
+      },
+      "failed_gates": [],
+      "gates": 112,
+      "lane": "pages",
+      "system": "generation"
+    },
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 1,
+        "pass": 1
+      },
+      "failed_gates": [],
+      "gates": 2,
+      "lane": "observe",
+      "system": "generation"
+    },
+    {
+      "counts": {
+        "fail": 0,
+        "not-run": 0,
+        "pass": 2
+      },
+      "failed_gates": [],
+      "gates": 2,
+      "lane": "foundation3",
+      "system": "generation"
+    }
+  ],
+  "run16_verdict": "not-qualified",
+  "schema": "rs9.cont18-input-evidence.v1",
+  "verification": {
+    "manifests": 18,
+    "omitted_objects": 323,
+    "omitted_objects_independently_verified": false,
+    "present_objects": 148,
+    "selected_records": 172,
+    "status": "verified"
+  },
+  "wheel": {
+    "baseline_grants_current_authority": false,
+    "causal_output_retained": false,
+    "regression_status": "unresolved",
+    "run15_baseline_status": "pass",
+    "run16": {
+      "details": {
+        "asset_platform": "x86_64-linux",
+        "exit_code": 1,
+        "origin": "verify_offline_venv_lifecycle",
+        "product": "theme-forge-nebular-fusion",
+        "reason_token": "process-nonzero",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "bd082f9f8c29dabf59e6d8c9dc1c9188006f915b32a8e22e6b0cf37bc861d076",
+        "substage": "lifecycle",
+        "system": "x86_64-linux",
+        "target_triple": "x86_64-unknown-linux-gnu",
+        "wheel_tag": "py3-none-linux_x86_64"
+      },
+      "error_code": "APPLICATION_SMOKE",
+      "product": "theme-forge-nebular-fusion",
+      "schema": "rs9.hosted-candidate-diagnostic.v1alpha2",
+      "substage": "lifecycle",
+      "system": "x86_64-linux"
+    }
+  }
+}

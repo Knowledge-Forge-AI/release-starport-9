@@ -704,3 +704,53 @@ class SmokeEnvironmentTests(unittest.TestCase):
             with patch("rs9.hosted_smoke.subprocess.run", return_value=SimpleNamespace(returncode=2, stdout=doc_bytes, stderr=b"")):
                 evidence, _ = _run_verifier(script, "/fake/bin", "/fake/payload", (), {})
                 self.assertEqual(evidence["phase"], test_phase)
+
+    def test_application_smoke_diagnostic_extras_x86_linux(self):
+        """Synthetic x86_64-linux wheel lifecycle opts into causal diagnostics."""
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp).resolve()
+            root = work / "runtime"
+            (root / "bin").mkdir(parents=True)
+            (root / "bin/tfsb-studio-service").write_bytes(b"bin")
+            (root / "lib/sidecar-payload").mkdir(parents=True)
+            (root / "lib/sidecar-payload/manifest.json").write_bytes(b"[]")
+            scratch = work / "smoke"
+            scratch.mkdir()
+            (scratch / "native-rc-smoke.mjs").write_text("// smoke fixture\n")
+            (scratch / "sidecar-common.mjs").write_text("// common fixture\n")
+            prepared = {"scratch": scratch, "tools": scratch, "source": scratch, "records": []}
+
+            with patch("rs9.hosted_smoke.verifier_import_preflight", return_value={"status": "pass"}), \
+                 patch("rs9.hosted_smoke._run_verifier", return_value=({"status": "pass"}, {"status": "pass"})):
+                with patch("subprocess.run", return_value=SimpleNamespace(returncode=127, stdout=b"", stderr=b"dbus-run-session: error\n")), \
+                     patch("rs9.application_smoke_diagnostic._bounded_run", return_value=SimpleNamespace(returncode=127, stdout=b"", stderr=b"dbus-run-session: error\n")):
+                    with self.assertRaises(ContractError) as caught:
+                        verify_nebular_runtime(root, prepared, "x86_64-linux", diagnostic_extras=True)
+                    self.assertEqual(caught.exception.code, "APPLICATION_SMOKE")
+                    self.assertEqual(caught.exception.details["scenario"], "C")
+                    self.assertIn("diagnostic_sha256", caught.exception.details)
+                    self.assertTrue((work / "diagnostics/application-smoke-diagnostic.json").is_file())
+
+    def test_application_smoke_no_extras_by_default(self):
+        """Default verify_nebular_runtime does not write application smoke diagnostic."""
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp).resolve()
+            root = work / "runtime"
+            (root / "bin").mkdir(parents=True)
+            (root / "bin/tfsb-studio-service").write_bytes(b"bin")
+            (root / "lib/sidecar-payload").mkdir(parents=True)
+            (root / "lib/sidecar-payload/manifest.json").write_bytes(b"[]")
+            scratch = work / "smoke"
+            scratch.mkdir()
+            (scratch / "native-rc-smoke.mjs").write_text("// smoke fixture\n")
+            (scratch / "sidecar-common.mjs").write_text("// common fixture\n")
+            prepared = {"scratch": scratch, "tools": scratch, "source": scratch, "records": []}
+
+            with patch("rs9.hosted_smoke.verifier_import_preflight", return_value={"status": "pass"}), \
+                 patch("rs9.hosted_smoke._run_verifier", return_value=({"status": "pass"}, {"status": "pass"})):
+                with patch("subprocess.run", return_value=SimpleNamespace(returncode=1, stdout=b"", stderr=b"err\n")):
+                    with self.assertRaises(ContractError) as caught:
+                        verify_nebular_runtime(root, prepared, "x86_64-linux")
+                    self.assertEqual(caught.exception.code, "APPLICATION_SMOKE")
+                    self.assertNotIn("diagnostic_sha256", caught.exception.details)
+                    self.assertFalse((work / "diagnostics/application-smoke-diagnostic.json").is_file())

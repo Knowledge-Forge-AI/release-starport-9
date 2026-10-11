@@ -190,12 +190,20 @@ def run_launch_chain(rt, elfs=None):
     for label, command, tool, role, cwd in stages:
         run = rt.run("launch-chain-" + label, command, timeout=45, cwd=cwd)
         passed = not run.error and run.returncode == 0
+        safe_argv = [redact_text(a, host_binds) for a in command]
         receipt = {"stage": label, "status": "pass" if passed else "fail", "guest_cwd_policy": cwd or "inherit-or-proot-fallback",
                    "argv_sha256": _sha(json.dumps(command).encode()),
+                   "stage_argv": safe_argv,
                    **classify_failure(run, tool_hint=tool, role_hint=role, host_binds=host_binds, closure=rt.closure)}
         if passed:
             receipt.pop("reason", None)
             receipt["error_class"] = "none"
+        has_dbus = ("dbus" in role or tool in ("dbus-run-session", "dbus-daemon") or any("dbus-run-session" in a for a in command))
+        receipt["config_identity"] = {
+            "guest_config": "/etc/dbus-1/session.conf",
+            "store_config": facts.get("dbus_session_config"),
+            "daemon": facts.get("dbus_daemon"),
+        } if has_dbus else None
         if supports_error and label in {"display-only", "combined-pinned-python"}:
             path = rt.layout.tmp_dir / Path(error_paths[label]).name
             try:
@@ -212,6 +220,26 @@ def run_launch_chain(rt, elfs=None):
                 receipt["xvfb_error_stream"] = {"status": "unavailable"}
         receipts.append(receipt)
     first = next((r for r in receipts if r["status"] != "pass"), None)
+    if first is None and audit.get("dbus_config", {}).get("status") == "fail":
+        dbus_diag = audit["dbus_config"]
+        first = {
+            "stage": "dbus-config-audit",
+            "status": "fail",
+            "reason": dbus_diag.get("reason"),
+            "tool": "dbus-daemon",
+            "role": "dbus-config",
+            "error_class": "config-audit-failed",
+            "path": dbus_diag.get("failing_path"),
+        }
+    elif first is None and audit.get("status") == "fail":
+        first = {
+            "stage": "helper-audit",
+            "status": "fail",
+            "reason": audit.get("reason"),
+            "tool": "guest-audit",
+            "role": "helper-audit",
+            "error_class": "audit-failed",
+        }
     return {"status": "fail" if first else "observed" if audit.get("status") == "observed" else "incomplete",
             "helper_audit": audit, "default_guest_cwd": {"state": cwd_state, "streams": classify_failure(cwd_run)}, "stages": receipts,
             "first_failure": first, "qualification_authority": False}

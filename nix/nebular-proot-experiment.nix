@@ -92,6 +92,9 @@ let
   # per run by the hosted runner; nothing else of the host is visible.
   guestRoot = runCommand "rs9-nebular-proot-guest-root" { } ''
     mkdir -p "$out"/{bin,usr/bin,etc,tmp,dev,proc,run,var/tmp,nix/store,lib,lib64}
+    mkdir -p "$out/etc/dbus-1"
+    test -f "${pkgs.dbus}/share/dbus-1/session.conf" || exit 1
+    ln -s "${pkgs.dbus}/share/dbus-1/session.conf" "$out/etc/dbus-1/session.conf"
     ln -s ${pkgs.bash}/bin/sh "$out/bin/sh"
     ln -s ${pkgs.coreutils}/bin/env "$out/usr/bin/env"
     ln -s ${loaderPath} "$out${foreignInterpreter}"
@@ -102,7 +105,7 @@ let
   '';
 
   runtimeFacts = writeText "rs9-nebular-proot-facts.json" (builtins.toJSON {
-    schema = "rs9.nix-proot-facts.v2";
+    schema = "rs9.nix-proot-facts.v3";
     inherit system;
     proot = "${proot}/bin/proot";
     proot_version = proot.version;
@@ -134,6 +137,8 @@ let
     ldd = "${pkgs.glibc.bin}/bin/ldd";
     xvfb_run = "${pkgs.xvfb-run}/bin/xvfb-run";
     dbus_run_session = "${pkgs.dbus}/bin/dbus-run-session";
+    dbus_daemon = "${pkgs.dbus}/bin/dbus-daemon";
+    dbus_session_config = "${pkgs.dbus}/share/dbus-1/session.conf";
     bwrap = "${pkgs.bubblewrap}/bin/bwrap";
     launcher = "${launcher}";
   });
