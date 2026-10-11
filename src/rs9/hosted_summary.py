@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 
 from rs9.errors import ContractError
@@ -25,11 +26,15 @@ def validate_product_architectures(lane, files):
     family, system = lane["lane"], lane["system"]
     if family not in {"wheels", "pacman", "rpm", "deb"}:
         return
+    from rs9.package_roles import is_installable_binary, effective_role, FIXTURE_SIGNED_COPY
     for product in lane.get("required_products", []):
         product_class = get_product_class(product)
         prefix = product.replace("-", "_") + "-" if family == "wheels" else product + ("_" if family == "deb" else "-")
-        names = [Path(r["path"]).name for r in files if r.get("kind") == "custody"
-                 and r.get("promotion") != "fixture-test-only" and Path(r["path"]).name.startswith(prefix)]
+        names = [Path(r["path"]).name for r in files if
+                 (is_installable_binary(r) or
+                  (r.get("kind") == "custody" and r.get("role") == FIXTURE_SIGNED_COPY) or
+                  (r.get("role") is None and effective_role(family, r) in {"binary-package", FIXTURE_SIGNED_COPY}))
+                 and Path(r["path"]).name.startswith(prefix)]
         for name in names:
             if family == "wheels":
                 tag = name.removesuffix(".whl").rsplit("-", 1)[-1]
@@ -44,19 +49,60 @@ def validate_product_architectures(lane, files):
                 raise ContractError("CUSTODY_ARCHITECTURE", "Product custody has an unqualified package architecture")
 
 
-def promotion_blockers(lane, receipt):
+def promotion_restrictions(lane, receipt):
+    """Compute (tokens, errors), recording HOSTED_POLICY and conservatively retaining required blockers."""
+    tokens = set()
+    errors = []
     values = receipt.get("production_promotion_blockers", [])
-    if not isinstance(values, list) or any(not isinstance(v, str) for v in values):
-        raise ContractError("HOSTED_POLICY", "Production promotion blockers must be a list of tokens")
-    if (lane["lane"] == "wheels" and lane["system"].endswith("linux")
-            and LINUX_WHEEL_PROMOTION_BLOCKER not in values):
-        raise ContractError("HOSTED_POLICY", "Linux candidate wheels must retain the production compatibility blocker")
-    if lane["lane"] == "rpm":
-        policies = receipt.get("details", {}).get("rpm_lint_policy", {})
-        if (any(p.get("accepted_findings") for p in policies.values())
-                and RPM_POLICY_PROMOTION_BLOCKER not in values):
-            raise ContractError("HOSTED_POLICY", "RPM preservation exceptions must retain promotion limits")
-    return values
+    if not isinstance(values, list):
+        errors.append("HOSTED_POLICY")
+    else:
+        for v in values:
+            if isinstance(v, str) and re.fullmatch(r"[a-z][a-z0-9-]{0,127}", v):
+                tokens.add(v)
+            else:
+                errors.append("HOSTED_POLICY")
+
+    if lane.get("lane") == "wheels" and lane.get("system", "").endswith("linux"):
+        if LINUX_WHEEL_PROMOTION_BLOCKER not in tokens:
+            errors.append("HOSTED_POLICY")
+            tokens.add(LINUX_WHEEL_PROMOTION_BLOCKER)
+
+    if lane.get("lane") == "rpm":
+        details = receipt.get("details", {})
+        if not isinstance(details, dict):
+            errors.append("HOSTED_POLICY")
+            tokens.add(RPM_POLICY_PROMOTION_BLOCKER)
+        else:
+            policies = details.get("rpm_lint_policy", {})
+            if not isinstance(policies, dict):
+                # Malformed rpm_lint_policy non-dict records HOSTED_POLICY AND adds RPM_POLICY_PROMOTION_BLOCKER
+                errors.append("HOSTED_POLICY")
+                tokens.add(RPM_POLICY_PROMOTION_BLOCKER)
+            else:
+                malformed = any(not isinstance(p, dict) or
+                    ("accepted_findings" in p and not isinstance(p["accepted_findings"], list))
+                    for p in policies.values())
+                if malformed:
+                    errors.append("HOSTED_POLICY")
+                    tokens.add(RPM_POLICY_PROMOTION_BLOCKER)
+                has_accepted = any(
+                    isinstance(p, dict) and p.get("accepted_findings")
+                    for p in policies.values()
+                )
+                if has_accepted:
+                    if RPM_POLICY_PROMOTION_BLOCKER not in tokens:
+                        errors.append("HOSTED_POLICY")
+                        tokens.add(RPM_POLICY_PROMOTION_BLOCKER)
+
+    return sorted(tokens), sorted(set(errors))
+
+
+def promotion_blockers(lane, receipt):
+    tokens, errors = promotion_restrictions(lane, receipt)
+    if errors:
+        raise ContractError(errors[0], "Production promotion blockers must be a list of tokens")
+    return tokens
 
 
 def rpm_lint_results(receipts):
@@ -66,16 +112,22 @@ def rpm_lint_results(receipts):
         if receipt.get("lane") != "rpm":
             continue
         details = receipt.get("details", {})
+        details = details if isinstance(details, dict) else {}
         raw = details.get("rpm_lint_raw", {})
         policy = details.get("rpm_lint_policy", {})
+        raw = raw if isinstance(raw, dict) else {}
+        policy = policy if isinstance(policy, dict) else {}
         for product in sorted(set(raw) | set(policy)):
             evidence = raw.get(product, {})
+            evidence = evidence if isinstance(evidence, dict) else {}
+            tool = evidence.get("tool_receipt", {})
+            tool = tool if isinstance(tool, dict) else {}
             client_gates = [g for g in receipt.get("gates", [])
                             if g.get("name") == "rpm-client-qualification"]
             results.append({"system": receipt["system"], "product": product,
                             "raw_status": evidence.get("status", "unavailable"),
                             "raw_clean": evidence.get("clean"),
-                            "raw_exit_code": evidence.get("tool_receipt", {}).get("exit_code"),
+                            "raw_exit_code": tool.get("exit_code"),
                             "raw_counts": evidence.get("findings_summary", {}),
                             "policy": policy.get(product, {"accepted": False, "status": "unavailable"}),
                             "downstream_dnf": client_gates[0] if len(client_gates) == 1 else {"status": "unavailable"}})
@@ -97,7 +149,10 @@ def validate_rpm_policy_source(repository, receipt):
     """Bind retained policy evaluations to the source file in builder provenance."""
     if receipt.get('lane') != 'rpm':
         return
-    policies = receipt.get('details', {}).get('rpm_lint_policy', {})
+    details = receipt.get('details', {})
+    if not isinstance(details, dict):
+        raise ContractError('HOSTED_POLICY', 'Malformed RPM policy details')
+    policies = details.get('rpm_lint_policy', {})
     if not isinstance(policies, dict):
         raise ContractError('HOSTED_POLICY', 'Malformed RPM policy evaluations')
     if not policies:
@@ -145,6 +200,7 @@ def summarize(repository, inputs, output):
     auth_values = set()
     for lane in lanes:
         directory = inputs / lane["artifact_name"]
+        lane_name = lane["artifact_name"]
         try:
             manifest = verify_set(directory)
             name = lane["lane"] + "-" + lane["system"] + ".json"
@@ -154,23 +210,74 @@ def summarize(repository, inputs, output):
             auth_values.add(manifest["release_ingestion_sha256"])
             receipts.append(receipt)
             manifests.append(manifest)
-            reasons.extend(lane["artifact_name"] + ":" + r for r in gate_blockers(lane, receipt))
-            if lane.get("custody_required") and not any(r["kind"] == "custody" for r in manifest["files"]):
-                reasons.append(lane["artifact_name"] + ":missing-custody-objects")
-            validate_product_architectures(lane, manifest["files"])
-            for product in lane.get("required_products", []):
-                needle = product.replace("-", "_") if lane["lane"] == "wheels" else product
-                if not any(Path(r["path"]).name.startswith(needle + "-" if lane["lane"] != "deb" else needle + "_")
-                           and r["kind"] == "custody" and r.get("promotion") != "fixture-test-only" for r in manifest["files"]):
-                    reasons.append(lane["artifact_name"] + ":missing-product:" + product)
-            if receipt.get("execution_error"):
-                reasons.append(lane["artifact_name"] + ":execution-failed")
-            reasons.extend(receipt.get("policy_blockers", []))
-            promotion.extend(promotion_blockers(lane, receipt))
-            validate_rpm_policy_source(repository, receipt)
-            validate_rpm_policy_custody(directory, manifest, receipt)
         except (ContractError, OSError, ValueError, KeyError) as error:
-            reasons.append(lane["artifact_name"] + ":" + (error.code if isinstance(error, ContractError) else "missing-or-invalid-artifact"))
+            reasons.append(lane_name + ":" + (error.code if isinstance(error, ContractError) else "missing-or-invalid-artifact"))
+            continue
+
+        # Guarded step: Gate blockers
+        try:
+            reasons.extend(lane_name + ":" + r for r in gate_blockers(lane, receipt))
+        except (ContractError, OSError, ValueError, KeyError) as error:
+            reasons.append(lane_name + ":" + (error.code if isinstance(error, ContractError) else "gate-blockers-error"))
+
+        # Guarded step: Custody required
+        from rs9.package_roles import verify_package_roles, is_installable_binary
+        if lane.get("custody_required") and not any(is_installable_binary(r) for r in manifest.get("files", [])):
+            reasons.append(lane_name + ":missing-custody-objects")
+
+        # Guarded step: Role verification
+        try:
+            verify_package_roles(directory, manifest)
+        except ContractError as error:
+            reasons.append(lane_name + ":" + error.code)
+        except Exception:
+            reasons.append(lane_name + ":CUSTODY_ROLE")
+
+        # Guarded step: Product architectures
+        try:
+            validate_product_architectures(lane, manifest.get("files", []))
+        except ContractError as error:
+            reasons.append(lane_name + ":" + error.code)
+        except Exception:
+            reasons.append(lane_name + ":CUSTODY_ARCHITECTURE")
+
+        # Guarded step: Required binary presence
+        for product in lane.get("required_products", []):
+            needle = product.replace("-", "_") if lane["lane"] == "wheels" else product
+            prefix = needle + "_" if lane["lane"] == "deb" else needle + "-"
+            if not any(Path(r["path"]).name.startswith(prefix)
+                       and is_installable_binary(r) for r in manifest.get("files", [])):
+                reasons.append(lane_name + ":missing-product:" + product)
+
+        # Guarded step: Execution error & policy blockers
+        if receipt.get("execution_error"):
+            reasons.append(lane_name + ":execution-failed")
+        reasons.extend(receipt.get("policy_blockers", []))
+
+        # Guarded step: Promotion restrictions (retained even if other checks fail)
+        try:
+            lane_tokens, lane_errors = promotion_restrictions(lane, receipt)
+            promotion.extend(lane_tokens)
+            for err in lane_errors:
+                reasons.append(lane_name + ":" + err)
+        except Exception:
+            reasons.append(lane_name + ":HOSTED_POLICY")
+
+        # Guarded step: RPM policy source
+        try:
+            validate_rpm_policy_source(repository, receipt)
+        except ContractError as error:
+            reasons.append(lane_name + ":" + error.code)
+        except Exception:
+            reasons.append(lane_name + ":HOSTED_POLICY")
+
+        # Guarded step: RPM policy custody
+        try:
+            validate_rpm_policy_custody(directory, manifest, receipt)
+        except ContractError as error:
+            reasons.append(lane_name + ":" + error.code)
+        except Exception:
+            reasons.append(lane_name + ":RPM_POLICY_CUSTODY")
     if len(auth_values) != 1 or None in auth_values:
         reasons.append("release-projection-missing-or-mixed")
     ingestion = next(iter(auth_values)) if len(auth_values) == 1 else None
@@ -240,6 +347,18 @@ def validate_summary(summary, repository, commit):
     manifests = record.get("artifact_manifests", [])
     if len(manifests) != len(keys) or {(r["lane"], r["system"]) for r in manifests} != keys:
         raise ContractError("HOSTED_COMPLETENESS", "Exact required manifest set missing")
+    for receipt in receipts:
+        details = receipt.get("details", {})
+        if receipt.get("lane") == "rpm" and isinstance(details, dict) and details.get("rpm_evidence_contract") != CURRENT_RPM_EVIDENCE_CONTRACT:
+            raise ContractError("HOSTED_NOT_QUALIFIED", "Historical RPM evidence cannot acquire current qualification")
+    # Check the conservative union before any lane's failing architecture or
+    # policy check can hide a lost restriction in a public summary.
+    promotion = sorted({token for receipt in receipts
+                        for token in promotion_restrictions(receipt, receipt)[0]})
+    if (record.get("production_promotion_blockers") != promotion
+            or record.get("production_promotion_blocked") is not bool(promotion)):
+        raise ContractError("HOSTED_POLICY", "Summary must preserve production promotion blockers")
+    from rs9.package_roles import is_installable_binary, validate_role_declarations
     for row in receipts:
         lane = next(l for l in lanes if (l["lane"], l["system"]) == (row["lane"], row["system"]))
         if row.get("provenance") != {k: record[k] for k in expected} or gate_blockers(lane, row):
@@ -248,22 +367,29 @@ def validate_summary(summary, repository, commit):
             raise ContractError("HOSTED_GATES", "Receipt has unresolved failures or publication authority")
         if row.get("lane") == "rpm":
             details = row.get("details", {})
+            if not isinstance(details, dict):
+                raise ContractError("HOSTED_POLICY", "Malformed RPM policy details")
             if details.get("rpm_evidence_contract") != CURRENT_RPM_EVIDENCE_CONTRACT:
                 raise ContractError("HOSTED_NOT_QUALIFIED", "Historical marker-free RPM evidence cannot acquire new qualification")
         validate_rpm_policy_source(repository, row)
-        promotion_blockers(lane, row)
+        tokens, errors = promotion_restrictions(lane, row)
+        if errors:
+            raise ContractError(errors[0], "Receipt has invalid promotion restrictions")
         manifest = next(m for m in manifests if (m["lane"],m["system"]) == (row["lane"],row["system"]))
+        validate_role_declarations(manifest)
         validate_product_architectures(lane, manifest.get("files", []))
+        for product in lane.get("required_products", []):
+            needle = product.replace("-", "_") if lane["lane"] == "wheels" else product
+            prefix = needle + "_" if lane["lane"] == "deb" else needle + "-"
+            if not any(Path(r["path"]).name.startswith(prefix)
+                       and is_installable_binary(r) for r in manifest.get("files", [])):
+                raise ContractError("HOSTED_CUSTODY", f"Missing required installable binary for {product}")
         receipt_name = row["lane"] + "-" + row["system"] + ".json"
         if (any(manifest.get(k) != record[k] for k in expected)
                 or manifest.get("qualification_receipt_hashes") != {receipt_name: hashlib.sha256(canonical(row)).hexdigest()}
                 or manifest.get("production_enabled") is not False or manifest.get("publication_authority") is not False
                 or not manifest.get("files")):
             raise ContractError("HOSTED_CUSTODY", "Manifest and receipt binding differ")
-    promotion = sorted({v for row in receipts for v in promotion_blockers(row, row)})
-    if (record.get("production_promotion_blockers") != promotion
-            or record.get("production_promotion_blocked") is not bool(promotion)):
-        raise ContractError("HOSTED_POLICY", "Summary must preserve production promotion blockers")
     if record.get("job_conclusions") != {key:"success" for key in set(contract(repository)["required_jobs"]) - {"summary"}}:
         raise ContractError("HOSTED_JOBS", "Source-required workflow job conclusions missing")
     if (record.get("production_enabled") is not False or record.get("publication_authority") is not False

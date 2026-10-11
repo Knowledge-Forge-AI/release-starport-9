@@ -8,6 +8,28 @@ from rs9.errors import ContractError
 from rs9.hosted_custody import provenance, retain
 from rs9.hosted_summary import contract, required, summarize, validate_summary, LINUX_WHEEL_PROMOTION_BLOCKER
 from rs9.scratch import canonical
+import struct
+from rs9.rpm_header import RPM_LEAD_MAGIC, RPM_HEADER_MAGIC
+
+def _make_synthetic_rpm(name, arch="noarch", is_source=False):
+    lead_type = 1 if is_source else 0
+    lead = RPM_LEAD_MAGIC + struct.pack(">BBH", 3, 0, lead_type) + b"\0" * 88
+    def _hdr(tags):
+        store = bytearray()
+        index = []
+        for tid, (typ, val) in sorted(tags.items()):
+            off = len(store)
+            if typ == 6:
+                s = val[0] if isinstance(val, list) else val
+                store.extend(s.encode("utf-8") + b"\0")
+                num = 1
+            index.append(struct.pack(">IIII", tid, typ, off, num))
+        return RPM_HEADER_MAGIC + b"\0\0\0\0" + struct.pack(">II", len(index), len(store)) + b"".join(index) + bytes(store)
+    sig_hdr = _hdr({1000: (6, "sig")})
+    pad = b"\0" * (((len(sig_hdr) + 7) & ~7) - len(sig_hdr))
+    main_hdr = _hdr({1000: (6, name), 1001: (6, "0.6.1"), 1002: (6, "1.fc43"), 1022: (6, "src" if is_source else arch)})
+    return lead + sig_hdr + pad + main_hdr + b"fixture-rpm-payload"
+
 ROOT=Path(__file__).resolve().parents[1]
 
 class HostedSummaryTests(unittest.TestCase):
@@ -38,7 +60,11 @@ class HostedSummaryTests(unittest.TestCase):
                         name = product + "-0.6.1-1." + arch + ".rpm"
                     else:
                         name = product + "-0.6.1-1-" + ("any" if pure else "x86_64") + ".pkg.tar.zst"
-                    path=scratch / "unsigned" / name;path.parent.mkdir(exist_ok=True);path.write_bytes(b"fixture-custody")
+                    path=scratch / "unsigned" / name;path.parent.mkdir(exist_ok=True)
+                    if row["lane"] == "rpm":
+                        path.write_bytes(_make_synthetic_rpm(product, arch=arch, is_source=False))
+                    else:
+                        path.write_bytes(b"fixture-custody")
                     files.append(path)
             else:
                 path=scratch / "fixture-evidence.json";path.write_bytes(b"{}");files.append(path)

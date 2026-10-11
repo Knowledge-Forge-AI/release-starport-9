@@ -1,0 +1,1319 @@
+{
+  "aarch64-linux": {
+    "attempt": 1,
+    "builder_source_sha256": "ab89864049bab37ea362bd5482f72f1e4e2de8a12f622c4ffe3e17a1842758c7",
+    "contract_sha256": "56f972f168717ccac7b378d62db11895d1b143908c81817f3d3339c08046e13f",
+    "event": "push",
+    "files": [
+      {
+        "kind": "evidence",
+        "path": "objects/authentication-projection.json",
+        "promotion": "candidate-only",
+        "sha256": "693f5984983af030312f0143ddcdcca1632077bc2821c83590f9bd4c084ccb0b",
+        "size": 23014
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/authentication-transport.json",
+        "promotion": "candidate-only",
+        "sha256": "083be8b9aeb11419c612183b5e7621163dd72ae5929c30805f73161b26518ff3",
+        "size": 20523
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/capture/summary/authentication.json",
+        "promotion": "candidate-only",
+        "sha256": "90242ae1f46d9599ce36437a515a551c881796f97d7b2f1e3c2ad0e9252daf10",
+        "size": 23067
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/command-bindings.json",
+        "promotion": "candidate-only",
+        "sha256": "89400311eb5dd95ecc05212fe3257ede64bebec186456fe53fa77fffc7757d1a",
+        "size": 3050
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/command-report.json",
+        "promotion": "candidate-only",
+        "sha256": "e5f057af2546dda646499c58b2c9fbeb019a4b63dd0b0913e353884b0b8b62ff",
+        "size": 7390
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/build/theme-forge-nebular-fusion/rpm-manifest.json",
+        "promotion": "candidate-only",
+        "sha256": "65d36fbfb8a0f29d9eacc5f5ca6a4e8288881491a5ee994962f29dc0a80e159c",
+        "size": 101721
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/build/theme-forge-solar-sail/rpm-manifest.json",
+        "promotion": "candidate-only",
+        "sha256": "e16713ce18118d2e572372e0c85144f3634140cb2d071cb176ed8ebb820c6b3e",
+        "size": 58864
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/build/theme-forge-stellar-burst/rpm-manifest.json",
+        "promotion": "candidate-only",
+        "sha256": "4692bd071f48ba69d0c4287975a86764eb7a9ff3a2a7b9d87a6b0a302e3fe012",
+        "size": 48780
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/build/theme-forge-stellar-loom/rpm-manifest.json",
+        "promotion": "candidate-only",
+        "sha256": "b0d2839843c5b609eb5105d3603215030447954b0dfd31a38a6c2eabb3bcb238",
+        "size": 61928
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/nebular-caller-sources-aarch64-linux.json",
+        "promotion": "candidate-only",
+        "sha256": "70628c7e6230b0824432ac98cc2d29ed904d44ff5733ecac438dd9ad512d82ad",
+        "size": 5280
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-client-runtime-aarch64-linux.json",
+        "promotion": "candidate-only",
+        "sha256": "4c6f5e77060f140734f6a4dafaacd9d8ec182511047376cb9ad01a527d41f4e4",
+        "size": 3097
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.json",
+        "promotion": "candidate-only",
+        "sha256": "cdc8a4e0c2458a3508181c41a494fa7aa2c60135995ef52850126e8b00666fe9",
+        "size": 9353
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0001.json",
+        "promotion": "candidate-only",
+        "sha256": "81ded6fbb2f07800933be187e4ce7b923c0c4f5b9618b1b5a404b6b8a298b17c",
+        "size": 1293
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0002.json",
+        "promotion": "candidate-only",
+        "sha256": "7354468531f88e274f5e96d59825238d0c08b7b13ed4ddcac99b86f31785db19",
+        "size": 5538
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0003.json",
+        "promotion": "candidate-only",
+        "sha256": "d4f46b5e16034b7399a8eb08cd8eb5e6779c57d442b30681141fa7c1cda08fdc",
+        "size": 493
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0004.json",
+        "promotion": "candidate-only",
+        "sha256": "87b48dd0bbb224b56ceacdced0bffc066303d174c728b012ebe5a43fd417ea90",
+        "size": 49016
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0005.json",
+        "promotion": "candidate-only",
+        "sha256": "c3ac043acd336d220b061ec244f19962ad2ac6f999eb3c6e6e8d8e5072d10eed",
+        "size": 48739
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0006.json",
+        "promotion": "candidate-only",
+        "sha256": "3c6cbe83955442fa9fda2c1d1c6d714d04443686da48ffc2fee0da6bc487a645",
+        "size": 7784
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0007.json",
+        "promotion": "candidate-only",
+        "sha256": "5d14ae6efba8640f144cb8b40480049ce82eac02457344664631cf5125932af5",
+        "size": 8263
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0008.json",
+        "promotion": "candidate-only",
+        "sha256": "ec2ff6d123168885496cdffa8af93b5e1edc089818840be8a763860242f1aea4",
+        "size": 49025
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0009.json",
+        "promotion": "candidate-only",
+        "sha256": "c13eeedbe62602430683a22a9718f74aaba3b274fe6878535409833c284259b0",
+        "size": 48748
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0010.json",
+        "promotion": "candidate-only",
+        "sha256": "e5d8c87d80b40d600d6783ac3d007a4184aa4eadf44b4f858b877cf5e32cd28b",
+        "size": 7794
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0011.json",
+        "promotion": "candidate-only",
+        "sha256": "031e101401d4a6ba9cc57dd18979d275f156b7df46c8d605fccc19ed6297509a",
+        "size": 4970
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0012.json",
+        "promotion": "candidate-only",
+        "sha256": "a9631c820b45f4d94c836e913dc49a50a35f611c852c289c86df841f3ea7130b",
+        "size": 505
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0013.json",
+        "promotion": "candidate-only",
+        "sha256": "5bc2c7c616c54a98a489a5973943bd5695e11ce0cf380bfbc515f496554e4552",
+        "size": 499
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.json",
+        "promotion": "candidate-only",
+        "sha256": "f29af2248ebd136741f19559d21aae3fda83766ee3b72347fa39c38ffb78bffd",
+        "size": 3768
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0001.json",
+        "promotion": "candidate-only",
+        "sha256": "ac287ea83e752001baa9c68d1622bd4ef10a25111f6ec36eb7444c068a213b15",
+        "size": 1342
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0002.json",
+        "promotion": "candidate-only",
+        "sha256": "dd0575e792f9f2e22c426a57b9f7aa02de065ba39d519f3c7d4bcb3b1c76db61",
+        "size": 947
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0003.json",
+        "promotion": "candidate-only",
+        "sha256": "35fd8c663f7f922daf75fc793853e350be31e7b55748519a39aad85b1d1eb662",
+        "size": 488
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0004.json",
+        "promotion": "candidate-only",
+        "sha256": "65373f272b573f3c09d7296b7825340e6a0f002542d3f37efb92c83502f067de",
+        "size": 496
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0005.json",
+        "promotion": "candidate-only",
+        "sha256": "5e668200f07188666f3a958670b9f792531978ab2420cfe3878a17deafa314cd",
+        "size": 932
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0006.json",
+        "promotion": "candidate-only",
+        "sha256": "cf64703b01a1a02d21d030831e130392c8456af0e9510be390fbd415233cc8a8",
+        "size": 1155
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0007.json",
+        "promotion": "candidate-only",
+        "sha256": "9111dcc728716cc8e5b6d260f2f4ac8ebf19551b999f5e5d999085a45d5391af",
+        "size": 928
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0008.json",
+        "promotion": "candidate-only",
+        "sha256": "8deaa6b5ae516a96847221113a0a1ce3eda1aaf5678ea440ce3bc403fc1be24c",
+        "size": 499
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0009.json",
+        "promotion": "candidate-only",
+        "sha256": "bbb876941394195c1a2f3cc421612f74d9553711c332a85bf556fac3f837665b",
+        "size": 493
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.json",
+        "promotion": "candidate-only",
+        "sha256": "ac14e127561a9907f3299bec848753ed36ea827e556a195808bc197652e4037e",
+        "size": 5706
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0001.json",
+        "promotion": "candidate-only",
+        "sha256": "18c049c52b8d32ed2cc0b49ff2f226501772d7d58cdd41919606f5203329b40b",
+        "size": 1354
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0002.json",
+        "promotion": "candidate-only",
+        "sha256": "379b5c217545fa08cc15136acdd6f856ac0867d7b6e077835e48ef3eee4fc14f",
+        "size": 2843
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0003.json",
+        "promotion": "candidate-only",
+        "sha256": "0824d00c73c0381b71fc2698b2b5fc9d004ccd78c6ab111ae9c82098b2761f27",
+        "size": 491
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0004.json",
+        "promotion": "candidate-only",
+        "sha256": "71c4ff657557c3335056ebbae6a152f2599a9d871ff540fd0c62486294d75287",
+        "size": 2726
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0005.json",
+        "promotion": "candidate-only",
+        "sha256": "5defc1fccaab940298fb07701765ec72d6a760f8ba18241eaac0f85e84a61dbd",
+        "size": 2387
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0006.json",
+        "promotion": "candidate-only",
+        "sha256": "d5ce2d92b07cded3f8d6a17cfe33d497b1b9668253282e6daff79e25d8b43706",
+        "size": 2735
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0007.json",
+        "promotion": "candidate-only",
+        "sha256": "7d87f807312d91df2c5e955379985ccc9f8fc3af4fdb24fccfda3581be79ca0d",
+        "size": 2315
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0008.json",
+        "promotion": "candidate-only",
+        "sha256": "d0f24f0a27c682c73ab994fa971c6b2197cea0daacf318880a36561901a0682e",
+        "size": 502
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0009.json",
+        "promotion": "candidate-only",
+        "sha256": "6ca7a8e46f0abbb3b8e59285a7429fa15dce80f8ca32915157e31f00a0c52414",
+        "size": 496
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.json",
+        "promotion": "candidate-only",
+        "sha256": "2a26d04c395621dc6f970ad65119ad6a4f4cc50bfe926332285abe2287e835e3",
+        "size": 4265
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0001.json",
+        "promotion": "candidate-only",
+        "sha256": "5332dd2cadb2ffa8e2a4140903443626888a1739124bcb2ee01006a899034186",
+        "size": 1346
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0002.json",
+        "promotion": "candidate-only",
+        "sha256": "856373391a5fcc0f75d4ea1c0bec60d596c8b4592b336b0c408320b430b80422",
+        "size": 1421
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0003.json",
+        "promotion": "candidate-only",
+        "sha256": "206645eee6c37b396b6851cb0cf00c5513bd4cb75df7fb9737eac4d5249b7573",
+        "size": 490
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0004.json",
+        "promotion": "candidate-only",
+        "sha256": "0c549b4cf35ed404bbd84601520d41afb4b68f88c0c884532db338fef0b3b645",
+        "size": 498
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0005.json",
+        "promotion": "candidate-only",
+        "sha256": "ff80c47459edffa72b8f9ebdc0e9a49f9745fdc744629c977a5ff14a01f81cb9",
+        "size": 1393
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0006.json",
+        "promotion": "candidate-only",
+        "sha256": "51ec585c7b78444c3ab2c8e4b44c1c39a82e57d439cfab91a82c0167a589185d",
+        "size": 1165
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0007.json",
+        "promotion": "candidate-only",
+        "sha256": "b915ccdc76965a9c73e215cbb63101f2684047b35b098dc006db02fafa920969",
+        "size": 1370
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0008.json",
+        "promotion": "candidate-only",
+        "sha256": "5a446c133ced332a66e0fb25238992c7aabe70564d2552e9d8b6599bbac1fa86",
+        "size": 501
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0009.json",
+        "promotion": "candidate-only",
+        "sha256": "987e92f8856cbe451af3e7f44291e6cf25f763319108554eb59236a27708192b",
+        "size": 495
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-signed-query-probe-2309670fdfbd7e6a.json",
+        "promotion": "candidate-only",
+        "sha256": "81bab3a9684fc0d902fd38fa3c6cc963130c187d1d9125cdcf085dfcea0270b8",
+        "size": 7437
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-signed-query-probe-38ca4bfb967096bc.json",
+        "promotion": "candidate-only",
+        "sha256": "5be43ac9578d78b070487942d1271c8c995f3dc9a72a50783243760f17738e46",
+        "size": 7447
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-signed-query-probe-af4c5648837aeda2.json",
+        "promotion": "candidate-only",
+        "sha256": "b86cc64db55ccffd6eac616d18be213c56e72a89e03ca5b3e109d3dc0977d9c9",
+        "size": 7457
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-signed-query-probe-cf45d5182e2e7f44.json",
+        "promotion": "candidate-only",
+        "sha256": "85a85f57aca831ca44d2743bc1e5297602e55f1eceba969fb28e4c57d27d2508",
+        "size": 7462
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpmlint-theme-forge-nebular-fusion.json",
+        "promotion": "candidate-only",
+        "sha256": "b8628710b93a22814223d3ec00bdf0ea0efd5f5ad8c8d410749de117e7471692",
+        "size": 42482
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpmlint-theme-forge-solar-sail.json",
+        "promotion": "candidate-only",
+        "sha256": "1594f69e8973f23dea29fb8e7ac260c5c053c8c66aa06d88c037027c0d19e723",
+        "size": 7290
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpmlint-theme-forge-stellar-burst.json",
+        "promotion": "candidate-only",
+        "sha256": "93a84930813cf745de88b74e3e3cf6c399060468b50d48acfb8a356a8df34a54",
+        "size": 14589
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpmlint-theme-forge-stellar-loom.json",
+        "promotion": "candidate-only",
+        "sha256": "1f03a4c0b5b5483ae801a3eabf8603ef1a8636093cdeb960fe2e169b5e3cb36e",
+        "size": 8634
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/sidecar-verifier-dnf.json",
+        "promotion": "candidate-only",
+        "sha256": "4b73aa85ab0dc6ecca238cbc8a60f0b7c43418c5f43031b24ec4f39ecb09f002",
+        "size": 9197
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/fixture-identity.json",
+        "promotion": "candidate-only",
+        "sha256": "2e803e65fbac4c987dd19fdd0e5371e04490d8153d1e72bbb87fe33ceb4ed16a",
+        "size": 225
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/keys/KEY-METADATA.json",
+        "promotion": "candidate-only",
+        "sha256": "62e642142e030b480c358c6ad0938cf62d43ac20de6a4ac9f8e5fc0d68368fd0",
+        "size": 157
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/keys/rs9-candidate-fixture-NONPRODUCTION.asc",
+        "promotion": "candidate-only",
+        "sha256": "6dcdefa5918fc525df34c96fc44e879c3e0fb385f0371bf5b84b3d2bf9e363f7",
+        "size": 681
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/keys/rs9-candidate-fixture-NONPRODUCTION.gpg",
+        "promotion": "candidate-only",
+        "sha256": "d197e50d0dd4d7ff033385cb11f9405ca4951af5a35adf53e5f8182c3fa3ab73",
+        "size": 444
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/native-qualification.json",
+        "promotion": "candidate-only",
+        "sha256": "2854ddc652f7fbc7469d34f2d3cb44a9ea84887200b9e0bccc493cb530723346",
+        "size": 423541
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/rpm/fedora/43/aarch64/Packages/theme-forge-nebular-fusion-0.6.1-1.fc43.aarch64.rpm",
+        "promotion": "fixture-test-only",
+        "sha256": "30528f5511a14f014cca34e4a09eaf266b560e65f022353d993928ada519359f",
+        "size": 38917415
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/rpm/fedora/43/aarch64/Packages/theme-forge-solar-sail-0.2.1-1.fc43.noarch.rpm",
+        "promotion": "fixture-test-only",
+        "sha256": "81b4ed63f86a0105ffb61a88a292b3b41341c831acbc249f28ddc9e3ca55f046",
+        "size": 90894
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/rpm/fedora/43/aarch64/Packages/theme-forge-stellar-burst-0.6.1-1.fc43.aarch64.rpm",
+        "promotion": "fixture-test-only",
+        "sha256": "63fdaaad8b9396b58a0e4b142704bf8ea9435344f30ea2df1783455b1cac33b2",
+        "size": 673849
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/rpm/fedora/43/aarch64/Packages/theme-forge-stellar-loom-0.4.0-1.fc43.noarch.rpm",
+        "promotion": "fixture-test-only",
+        "sha256": "fd8b8a5d0fbe5619acb3f7fea3aac0bfd6c9d225a68cccb6b4a5cdaf54e86652",
+        "size": 237272
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/rpm/fedora/43/aarch64/repodata/36d9f04dd3c71f66e64319b51733589629de5708c679e68b4175b98bcc76e481-primary.xml.gz",
+        "promotion": "candidate-only",
+        "sha256": "36d9f04dd3c71f66e64319b51733589629de5708c679e68b4175b98bcc76e481",
+        "size": 1671
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/rpm/fedora/43/aarch64/repodata/6a43c3f42dca596723973096349712ae64a3acd2624bf03cdb5fc6809fe353e7-other.xml.gz",
+        "promotion": "candidate-only",
+        "sha256": "6a43c3f42dca596723973096349712ae64a3acd2624bf03cdb5fc6809fe353e7",
+        "size": 584
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/rpm/fedora/43/aarch64/repodata/a425b655afaeb26558f99ebaf3ccf924922eec45f8e005d026cf4703d567a6ee-filelists.xml.gz",
+        "promotion": "candidate-only",
+        "sha256": "a425b655afaeb26558f99ebaf3ccf924922eec45f8e005d026cf4703d567a6ee",
+        "size": 16010
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/rpm/fedora/43/aarch64/repodata/repomd.xml",
+        "promotion": "candidate-only",
+        "sha256": "c88e88497e0f75679e92a83b97207b63f934dbbc1dcae95552f86f905bf4ae59",
+        "size": 1553
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/rpm/fedora/43/aarch64/repodata/repomd.xml.asc",
+        "promotion": "candidate-only",
+        "sha256": "ead5a2bc0d0326c670156c3e121653c0e26cbd67606ccd1cff6fa3403a4e6b84",
+        "size": 228
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/unsigned-custody/custody-manifest.json",
+        "promotion": "candidate-only",
+        "sha256": "b931c29613afe44a458b4f796a24d17837df0536618cd5d3c2bc18c7d9b118df",
+        "size": 2210
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned-custody/files/theme-forge-nebular-fusion-0.6.1-1.fc43.aarch64.rpm",
+        "promotion": "candidate-only",
+        "sha256": "34cfdb4efe41e06e3262a1bbb1168cca6277495143375293a7768ac63488821f",
+        "size": 38917415
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned-custody/files/theme-forge-solar-sail-0.2.1-1.fc43.noarch.rpm",
+        "promotion": "candidate-only",
+        "sha256": "c8cac1477304883670c602af3650a568bbda729f898e0f0689078a1df5b2b9fa",
+        "size": 90894
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned-custody/files/theme-forge-stellar-burst-0.6.1-1.fc43.aarch64.rpm",
+        "promotion": "candidate-only",
+        "sha256": "4f4b19e83424f37e3c14ccb7f1bdc3a511b03750e9d1036402b44e707d7a2597",
+        "size": 673849
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned-custody/files/theme-forge-stellar-loom-0.4.0-1.fc43.noarch.rpm",
+        "promotion": "candidate-only",
+        "sha256": "5f47170aa8f084e2abd3ad8eb8a34df25e54a8d1b2da0d0e2109a33ad6da2d23",
+        "size": 237272
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned-source/theme-forge-solar-sail-0.2.1-1.fc43.src.rpm",
+        "promotion": "candidate-only",
+        "sha256": "623bcc37b98bd02b5620946981b4d21ea104da2054082c9d81877d34dfaf0c5a",
+        "size": 121711
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned-source/theme-forge-stellar-loom-0.4.0-1.fc43.src.rpm",
+        "promotion": "candidate-only",
+        "sha256": "90c1585e2b848f2dd12ecebe64792f5c3cb3c613d1083af46a7117d772e1a4a0",
+        "size": 284590
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned/theme-forge-nebular-fusion-0.6.1-1.fc43.aarch64.rpm",
+        "promotion": "candidate-only",
+        "sha256": "34cfdb4efe41e06e3262a1bbb1168cca6277495143375293a7768ac63488821f",
+        "size": 38917415
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned/theme-forge-solar-sail-0.2.1-1.fc43.noarch.rpm",
+        "promotion": "candidate-only",
+        "sha256": "c8cac1477304883670c602af3650a568bbda729f898e0f0689078a1df5b2b9fa",
+        "size": 90894
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned/theme-forge-stellar-burst-0.6.1-1.fc43.aarch64.rpm",
+        "promotion": "candidate-only",
+        "sha256": "4f4b19e83424f37e3c14ccb7f1bdc3a511b03750e9d1036402b44e707d7a2597",
+        "size": 673849
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned/theme-forge-stellar-loom-0.4.0-1.fc43.noarch.rpm",
+        "promotion": "candidate-only",
+        "sha256": "5f47170aa8f084e2abd3ad8eb8a34df25e54a8d1b2da0d0e2109a33ad6da2d23",
+        "size": 237272
+      }
+    ],
+    "lane": "rpm",
+    "production_enabled": false,
+    "publication_authority": false,
+    "qualification_receipt_hashes": {
+      "rpm-aarch64-linux.json": "baf749b28a80ccb3d8e26e321408963df5a51be8710cd93bccaedb357026f8bb"
+    },
+    "ref": "refs/heads/main",
+    "release_ingestion_sha256": "693f5984983af030312f0143ddcdcca1632077bc2821c83590f9bd4c084ccb0b",
+    "runner": {
+      "architecture": "aarch64",
+      "image_os": "ubuntu24-arm64",
+      "image_version": "20261004.142.1",
+      "kernel": "6.17.0-1022-azure",
+      "os": "Linux",
+      "tools": {
+        "docker": "Docker version 28.0.4, build b8034c0",
+        "dpkg-deb": "Debian 'dpkg-deb' package archive backend version 1.22.6 (arm64).",
+        "gpg": "gpg (GnuPG) 2.4.4",
+        "node": "v22.23.3",
+        "python": "3.12.3",
+        "rpm": "RPM version 4.18.2"
+      }
+    },
+    "schema": "rs9.hosted-artifact-set.v1alpha2",
+    "source_commit": "84d5921c40306bb24b12c69b85667c0b147220a7",
+    "system": "aarch64-linux",
+    "workflow_sha256": "0b5582b18bcb561257239d9fa6512e9c8b8852d4d46ddd21b343a01abdc1cab7"
+  },
+  "schema": "rs9.run14-rpm-manifests.v1",
+  "x86_64-linux": {
+    "attempt": 1,
+    "builder_source_sha256": "ab89864049bab37ea362bd5482f72f1e4e2de8a12f622c4ffe3e17a1842758c7",
+    "contract_sha256": "56f972f168717ccac7b378d62db11895d1b143908c81817f3d3339c08046e13f",
+    "event": "push",
+    "files": [
+      {
+        "kind": "evidence",
+        "path": "objects/authentication-projection.json",
+        "promotion": "candidate-only",
+        "sha256": "693f5984983af030312f0143ddcdcca1632077bc2821c83590f9bd4c084ccb0b",
+        "size": 23014
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/authentication-transport.json",
+        "promotion": "candidate-only",
+        "sha256": "b10b36be1a864c3500d7137edba2185f1c8ed878bb9c608879f60589e2990f3a",
+        "size": 20523
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/capture/summary/authentication.json",
+        "promotion": "candidate-only",
+        "sha256": "77c3b4ab36ba7d5e3ca7577a27c68108e6bd8fb73a02d00d110ac6da516c3fc3",
+        "size": 23067
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/command-bindings.json",
+        "promotion": "candidate-only",
+        "sha256": "89400311eb5dd95ecc05212fe3257ede64bebec186456fe53fa77fffc7757d1a",
+        "size": 3050
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/command-report.json",
+        "promotion": "candidate-only",
+        "sha256": "e5f057af2546dda646499c58b2c9fbeb019a4b63dd0b0913e353884b0b8b62ff",
+        "size": 7390
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/build/theme-forge-nebular-fusion/rpm-manifest.json",
+        "promotion": "candidate-only",
+        "sha256": "6fe4f763ba104f804e961eec3e2892e157fda89f539ef03d0d73c26005cd4bcf",
+        "size": 104087
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/build/theme-forge-solar-sail/rpm-manifest.json",
+        "promotion": "candidate-only",
+        "sha256": "201b3f65c0d55aaff1324a1e148fb555a758806652f15b93483737dda44230e7",
+        "size": 58855
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/build/theme-forge-stellar-burst/rpm-manifest.json",
+        "promotion": "candidate-only",
+        "sha256": "70ae9f03bb749f819380a47ce06bb9708e45f39e4ea457f17ecd2fdea133a00f",
+        "size": 48859
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/build/theme-forge-stellar-loom/rpm-manifest.json",
+        "promotion": "candidate-only",
+        "sha256": "e8b0227098b2172f1af0660c0c896228b0f93ddf09a20d001bd6fc95beab61b7",
+        "size": 61919
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/nebular-caller-sources-x86_64-linux.json",
+        "promotion": "candidate-only",
+        "sha256": "70628c7e6230b0824432ac98cc2d29ed904d44ff5733ecac438dd9ad512d82ad",
+        "size": 5280
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-client-runtime-x86_64-linux.json",
+        "promotion": "candidate-only",
+        "sha256": "5bd3d547969fd37b6b137c3238ae4774019ad9b0380abc821275a3e517c1f762",
+        "size": 3094
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.json",
+        "promotion": "candidate-only",
+        "sha256": "60443995481c1e4166213fe82fc31e48d7a78f281364e7d654f7effecb3fec79",
+        "size": 9340
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0001.json",
+        "promotion": "candidate-only",
+        "sha256": "88bc174d39a6cc8f24de8fb4a5b3d25a4b1edc173e2dd9dded65c6ed1bb7be36",
+        "size": 1290
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0002.json",
+        "promotion": "candidate-only",
+        "sha256": "2b674db03c12320ccc559e765d31b7d4b085c620b0dbeab1e46099bacbbc47d0",
+        "size": 5528
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0003.json",
+        "promotion": "candidate-only",
+        "sha256": "78fa665a5983469e03c6561c4e182a9c2971d48780517ea13d1e81c4d851f1e1",
+        "size": 492
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0004.json",
+        "promotion": "candidate-only",
+        "sha256": "f93d3a1f56c215076566231728584e8ec54645f542d30e12f98af2a9f028c87b",
+        "size": 49015
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0005.json",
+        "promotion": "candidate-only",
+        "sha256": "7399e01969a3b9e5429ea11c0c5a817ca48ad929feed5e29b96a0f0c71eaebe5",
+        "size": 48738
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0006.json",
+        "promotion": "candidate-only",
+        "sha256": "0ba5ecdbcb3d145e44d8217979a1490e8ee84ec45ea3440c78f88a024f4cf136",
+        "size": 7783
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0007.json",
+        "promotion": "candidate-only",
+        "sha256": "186d50341fd9233043537bdc41504dfdc3941a2b43c8bd2dcb1bf88a27cdb012",
+        "size": 8262
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0008.json",
+        "promotion": "candidate-only",
+        "sha256": "1b67ba8c2a469a84a5450894791c95f00c36e9c188363946cc8f0f16496b0384",
+        "size": 49024
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0009.json",
+        "promotion": "candidate-only",
+        "sha256": "708fc0531005f344b7a693ee1ff624a61d8fbdb2ef8e89a16089d7fc2de6ee4f",
+        "size": 48747
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0010.json",
+        "promotion": "candidate-only",
+        "sha256": "1c6f6707a580ddaabde2bcd50b7e243ef597d5e2852cc2622c6bcb9504f62629",
+        "size": 7793
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0011.json",
+        "promotion": "candidate-only",
+        "sha256": "dbb81fbdfc0df0a02dd6b1462f1821da392ce385dd407cb4f75fa1d3bc840f3e",
+        "size": 4969
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0012.json",
+        "promotion": "candidate-only",
+        "sha256": "38b41758f92019ff8e079810e7f13efd0c936e039797cbfaf288b4034076d96c",
+        "size": 504
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-nebular-fusion.part-0013.json",
+        "promotion": "candidate-only",
+        "sha256": "d6ee87eb54ff9ef4706c5767743d9ee5136dcfd07bcff67adb233352688f7a1f",
+        "size": 498
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.json",
+        "promotion": "candidate-only",
+        "sha256": "ad1d1c3ee11e93b71a5ccf3fd8476ac692c2e86746ea479516c9ed268968e788",
+        "size": 3766
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0001.json",
+        "promotion": "candidate-only",
+        "sha256": "2d824b43eb2cd28357068b119adc7c0c00fab737674d75dfe370d6ed1f90cb03",
+        "size": 1340
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0002.json",
+        "promotion": "candidate-only",
+        "sha256": "e57346de29b4962c706adef0b45c89462d8e38b40745b7c46bed5dda8fdec36e",
+        "size": 946
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0003.json",
+        "promotion": "candidate-only",
+        "sha256": "2b375e17e6f7e812c93f77a9164fb98257f52ca5312e6de2680351811902c269",
+        "size": 487
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0004.json",
+        "promotion": "candidate-only",
+        "sha256": "c368a1b8c1a9f8482909a50e5ffc6b8e16c990380f8903ef85f2a57d526e8ec2",
+        "size": 495
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0005.json",
+        "promotion": "candidate-only",
+        "sha256": "7e6e96ba0cd6af9f5cc61c1ceb4ad9cd775d6e118c2fbd7a69c0b81f3833f459",
+        "size": 931
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0006.json",
+        "promotion": "candidate-only",
+        "sha256": "f46e91a2140f683a6097591aa466329f2a792ad02a5bab124e4bade54d55b488",
+        "size": 1154
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0007.json",
+        "promotion": "candidate-only",
+        "sha256": "5e101ec3df7fcfe04e703d480cd38a91c7433f260922693b301c37079df7c4ee",
+        "size": 927
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0008.json",
+        "promotion": "candidate-only",
+        "sha256": "7beb83be0885212e3b3126b8a3ff73a4b696c8d35a9cf392f9077c54823630f0",
+        "size": 498
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-solar-sail.part-0009.json",
+        "promotion": "candidate-only",
+        "sha256": "97232097096cb800a2f12590c06c212f4574c91e8f7a069eacf09e774c0e237b",
+        "size": 492
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.json",
+        "promotion": "candidate-only",
+        "sha256": "2b003695e57afd985ae26866f8daf452f4042c6d572910b6a5565d73d5da224c",
+        "size": 5697
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0001.json",
+        "promotion": "candidate-only",
+        "sha256": "0e15caf61e247e896cfa15774670a302115cae6d5c606521fff55101cba1db1e",
+        "size": 1351
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0002.json",
+        "promotion": "candidate-only",
+        "sha256": "67e486a956d39b7e16fac230a8ef6d85989a901ef071af60a15016e9118c45cf",
+        "size": 2837
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0003.json",
+        "promotion": "candidate-only",
+        "sha256": "e73997b25580070fbac3227247c730911be109d6039826c5853ebc46416e304d",
+        "size": 490
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0004.json",
+        "promotion": "candidate-only",
+        "sha256": "d68b7706a187d12168a6b394866ff89a75bf408e3ff55675fabe6cc02a77e35a",
+        "size": 2725
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0005.json",
+        "promotion": "candidate-only",
+        "sha256": "d126f3a005eeefb8cd4d86865a672a3238b1becea8e6784887c24ea2ff45ae19",
+        "size": 2386
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0006.json",
+        "promotion": "candidate-only",
+        "sha256": "00c46ef0d1f6bf06f782c578b1be2b75c060c0913d9c92362b9d8131d9c9b72b",
+        "size": 2734
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0007.json",
+        "promotion": "candidate-only",
+        "sha256": "961bda22b91a8b7ef8c4dbe555e9e1e7c4b2794be8bbb1a0e11e76f0fa01a1bd",
+        "size": 2314
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0008.json",
+        "promotion": "candidate-only",
+        "sha256": "88e04f3433740e8c44db1d17a7019b01fba56d0adde240f04d61960b319df9d2",
+        "size": 501
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-burst.part-0009.json",
+        "promotion": "candidate-only",
+        "sha256": "36b97be6752b8bfa6f4dc977259dfc15084fb7efa8eecc6bc1baad24449cfcd3",
+        "size": 495
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.json",
+        "promotion": "candidate-only",
+        "sha256": "8dd80268dcab461564e339d7c3475750269644099580d45ec4fb6f2d0e89df40",
+        "size": 4263
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0001.json",
+        "promotion": "candidate-only",
+        "sha256": "d830d9db50d9f12475b66b522279de2ff36093b445b403d68278488bab12ea17",
+        "size": 1344
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0002.json",
+        "promotion": "candidate-only",
+        "sha256": "d2ebc03191b45df55cde894c9c1218128031425e8e70ad2160cdfd441f52fd58",
+        "size": 1420
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0003.json",
+        "promotion": "candidate-only",
+        "sha256": "a784e77034c144e011acf9a81e43b27ddd1ad56f072e021ac43aa45f71823db8",
+        "size": 489
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0004.json",
+        "promotion": "candidate-only",
+        "sha256": "3d8859c850cbd5278cbd6c964a7c3f6399627d565107ffb218d73a553b0bc2be",
+        "size": 497
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0005.json",
+        "promotion": "candidate-only",
+        "sha256": "a25951a51adb322775333190c7e08f39e91fd9ad9b7a4919e8a25ab52e8e7abe",
+        "size": 1392
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0006.json",
+        "promotion": "candidate-only",
+        "sha256": "e4dae73b06068bdeee5e5d0a7dfcc2597c37ffe6cbc997292e86119ef73b40f7",
+        "size": 1164
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0007.json",
+        "promotion": "candidate-only",
+        "sha256": "c0e596f908bd1d72de707b9f06d4be716e705c16858a35bb6818c3e1276b3d67",
+        "size": 1369
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0008.json",
+        "promotion": "candidate-only",
+        "sha256": "c0c9d25c7446c912981acf2513e8176353dd1672214e71c5b40bafbd69803997",
+        "size": 500
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-lint-policy-theme-forge-stellar-loom.part-0009.json",
+        "promotion": "candidate-only",
+        "sha256": "48f500b86aa62d28528e66bf4e9a9206049b187fd8fb37c4644bd78a87efd811",
+        "size": 494
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-signed-query-probe-2309670fdfbd7e6a.json",
+        "promotion": "candidate-only",
+        "sha256": "14e098a022e47eb734647337dad9a97394f9aa1a3e2d1630431f397a973026ed",
+        "size": 7437
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-signed-query-probe-38ca4bfb967096bc.json",
+        "promotion": "candidate-only",
+        "sha256": "808890a5f6aad9804d8eaf88da4ce0d5ba7d4d5013d7e2b3bf02d96813d0a45b",
+        "size": 7447
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-signed-query-probe-3efcefc9782c8a08.json",
+        "promotion": "candidate-only",
+        "sha256": "0b95a4345c01a038f4bf22ef32d3c6b798cc25684720e4b52e76b5cdec65a5ca",
+        "size": 7457
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpm-signed-query-probe-530cb92038ee3a2b.json",
+        "promotion": "candidate-only",
+        "sha256": "d7a6ffc548fca28904944d919e95de18dc7efaada496aa4d8108dd8ac67c4ade",
+        "size": 7452
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpmlint-theme-forge-nebular-fusion.json",
+        "promotion": "candidate-only",
+        "sha256": "58b6fd597591f3e54d9fc3432671e68602519123375aa09d5b17639da598b0d6",
+        "size": 42348
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpmlint-theme-forge-solar-sail.json",
+        "promotion": "candidate-only",
+        "sha256": "99914bd99c4f01bc305cd4b1dc2fa0bb92760a96c14902ce405c555bda4f68e3",
+        "size": 7290
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpmlint-theme-forge-stellar-burst.json",
+        "promotion": "candidate-only",
+        "sha256": "7bb1fab4912340cbf9adf8d20d2b72624bd4fc2681733fe9e636f20cde2f8529",
+        "size": 14552
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/rpmlint-theme-forge-stellar-loom.json",
+        "promotion": "candidate-only",
+        "sha256": "a86f4a2455482002dca48e78301f368689e170583ffb3e0943ac581ab1e68bb6",
+        "size": 8634
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/diagnostics/sidecar-verifier-dnf.json",
+        "promotion": "candidate-only",
+        "sha256": "4cab8bc7b3a8865af1f67290dc8cbba32179f77ccd24ac9bf1d76c4bb15e9079",
+        "size": 9196
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/fixture-identity.json",
+        "promotion": "candidate-only",
+        "sha256": "7894b3ffed96923002705afbd56116f212ecf8b5bf8ec3c824bc0e0c3e0daaeb",
+        "size": 225
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/keys/KEY-METADATA.json",
+        "promotion": "candidate-only",
+        "sha256": "04d84d11e32e614d33278e7b79fe704bfa40909c607025136be689a438253d1e",
+        "size": 157
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/keys/rs9-candidate-fixture-NONPRODUCTION.asc",
+        "promotion": "candidate-only",
+        "sha256": "b56b9fc1be8efdf5fd2fa43e0fd9c7ac9948a9a09f9ab0c56c27eab47497793e",
+        "size": 681
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/keys/rs9-candidate-fixture-NONPRODUCTION.gpg",
+        "promotion": "candidate-only",
+        "sha256": "8005c6e2862087276deb9bcd92f1052e761184d86ca3388f664bde49c5e56d80",
+        "size": 444
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/native-qualification.json",
+        "promotion": "candidate-only",
+        "sha256": "b9bb727ada3959651f8df6a016b0ecf52be2f008203f84ab98b9f3544994f85b",
+        "size": 423983
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/rpm/fedora/43/x86_64/Packages/theme-forge-nebular-fusion-0.6.1-1.fc43.x86_64.rpm",
+        "promotion": "fixture-test-only",
+        "sha256": "ec2401c22deae93db2c2c1f6d23d357158a0c71394c321f88c407001b78e0c05",
+        "size": 38999449
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/rpm/fedora/43/x86_64/Packages/theme-forge-solar-sail-0.2.1-1.fc43.noarch.rpm",
+        "promotion": "fixture-test-only",
+        "sha256": "bf9e0461b7b938f252d6c827c78a851bf7034f871f54fd3578067d4f77f15637",
+        "size": 90894
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/rpm/fedora/43/x86_64/Packages/theme-forge-stellar-burst-0.6.1-1.fc43.x86_64.rpm",
+        "promotion": "fixture-test-only",
+        "sha256": "98f918775a11eccc5bc2d71b2ea5f0720a786c4a8b2289a937c74388f3ef81d7",
+        "size": 673917
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/rpm/fedora/43/x86_64/Packages/theme-forge-stellar-loom-0.4.0-1.fc43.noarch.rpm",
+        "promotion": "fixture-test-only",
+        "sha256": "ba7f66803242aeab4dfede537bba9d88132a663e6008d149fe596d8c1cd9b948",
+        "size": 237272
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/rpm/fedora/43/x86_64/repodata/3ad1639a883832d490375c76929f6a2f73126bd8c3af4ec480f4f16664278d6d-filelists.xml.gz",
+        "promotion": "candidate-only",
+        "sha256": "3ad1639a883832d490375c76929f6a2f73126bd8c3af4ec480f4f16664278d6d",
+        "size": 16015
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/rpm/fedora/43/x86_64/repodata/816d663cebd6383e4e9abca1ec3dec9ff6ebfa4ea80aa35f751cbbd6b4001c8a-other.xml.gz",
+        "promotion": "candidate-only",
+        "sha256": "816d663cebd6383e4e9abca1ec3dec9ff6ebfa4ea80aa35f751cbbd6b4001c8a",
+        "size": 587
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/rpm/fedora/43/x86_64/repodata/e2bbe3ced46bb521d3ac9a8bfadd9b9234f2c4e7a841fd207744d9157648fabe-primary.xml.gz",
+        "promotion": "candidate-only",
+        "sha256": "e2bbe3ced46bb521d3ac9a8bfadd9b9234f2c4e7a841fd207744d9157648fabe",
+        "size": 1679
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/rpm/fedora/43/x86_64/repodata/repomd.xml",
+        "promotion": "candidate-only",
+        "sha256": "74d127b9738a58836e6aafec8066ac69503972d6a06faf3bd5c5acea03c81e2e",
+        "size": 1553
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/rpm/fedora/43/x86_64/repodata/repomd.xml.asc",
+        "promotion": "candidate-only",
+        "sha256": "c0fa1ac7fbf0defba902d28660bdf8b4d00fdf59b74fed213ce6ec2fd2830e09",
+        "size": 228
+      },
+      {
+        "kind": "evidence",
+        "path": "objects/lane-work/unsigned-custody/custody-manifest.json",
+        "promotion": "candidate-only",
+        "sha256": "03ac75acf75ad14d23e5697f4f59ced2132ebba8b0f8800d8332fa8548767ad4",
+        "size": 2205
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned-custody/files/theme-forge-nebular-fusion-0.6.1-1.fc43.x86_64.rpm",
+        "promotion": "candidate-only",
+        "sha256": "f538bd073a02448a9e7e9dc74dcb1510809d99477bfc9c4215d1e1458b2303fd",
+        "size": 38999449
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned-custody/files/theme-forge-solar-sail-0.2.1-1.fc43.noarch.rpm",
+        "promotion": "candidate-only",
+        "sha256": "c8cac1477304883670c602af3650a568bbda729f898e0f0689078a1df5b2b9fa",
+        "size": 90894
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned-custody/files/theme-forge-stellar-burst-0.6.1-1.fc43.x86_64.rpm",
+        "promotion": "candidate-only",
+        "sha256": "8ff4103d3599a90b94b939f45e5b4264dfd9ffc6fefdccd78ea50778e4dd90c7",
+        "size": 673917
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned-custody/files/theme-forge-stellar-loom-0.4.0-1.fc43.noarch.rpm",
+        "promotion": "candidate-only",
+        "sha256": "5f47170aa8f084e2abd3ad8eb8a34df25e54a8d1b2da0d0e2109a33ad6da2d23",
+        "size": 237272
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned-source/theme-forge-solar-sail-0.2.1-1.fc43.src.rpm",
+        "promotion": "candidate-only",
+        "sha256": "623bcc37b98bd02b5620946981b4d21ea104da2054082c9d81877d34dfaf0c5a",
+        "size": 121711
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned-source/theme-forge-stellar-loom-0.4.0-1.fc43.src.rpm",
+        "promotion": "candidate-only",
+        "sha256": "90c1585e2b848f2dd12ecebe64792f5c3cb3c613d1083af46a7117d772e1a4a0",
+        "size": 284590
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned/theme-forge-nebular-fusion-0.6.1-1.fc43.x86_64.rpm",
+        "promotion": "candidate-only",
+        "sha256": "f538bd073a02448a9e7e9dc74dcb1510809d99477bfc9c4215d1e1458b2303fd",
+        "size": 38999449
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned/theme-forge-solar-sail-0.2.1-1.fc43.noarch.rpm",
+        "promotion": "candidate-only",
+        "sha256": "c8cac1477304883670c602af3650a568bbda729f898e0f0689078a1df5b2b9fa",
+        "size": 90894
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned/theme-forge-stellar-burst-0.6.1-1.fc43.x86_64.rpm",
+        "promotion": "candidate-only",
+        "sha256": "8ff4103d3599a90b94b939f45e5b4264dfd9ffc6fefdccd78ea50778e4dd90c7",
+        "size": 673917
+      },
+      {
+        "kind": "custody",
+        "path": "objects/lane-work/unsigned/theme-forge-stellar-loom-0.4.0-1.fc43.noarch.rpm",
+        "promotion": "candidate-only",
+        "sha256": "5f47170aa8f084e2abd3ad8eb8a34df25e54a8d1b2da0d0e2109a33ad6da2d23",
+        "size": 237272
+      }
+    ],
+    "lane": "rpm",
+    "production_enabled": false,
+    "publication_authority": false,
+    "qualification_receipt_hashes": {
+      "rpm-x86_64-linux.json": "2aa97e7379da79e5f9a6c6f741789312b1a51f46ed957202de13a42fd987da93"
+    },
+    "ref": "refs/heads/main",
+    "release_ingestion_sha256": "693f5984983af030312f0143ddcdcca1632077bc2821c83590f9bd4c084ccb0b",
+    "runner": {
+      "architecture": "x86_64",
+      "image_os": "ubuntu24",
+      "image_version": "20261004.327.1",
+      "kernel": "6.17.0-1022-azure",
+      "os": "Linux",
+      "tools": {
+        "docker": "Docker version 28.0.4, build b8034c0",
+        "dpkg-deb": "Debian 'dpkg-deb' package archive backend version 1.22.6 (amd64).",
+        "gpg": "gpg (GnuPG) 2.4.4",
+        "node": "v22.23.3",
+        "python": "3.12.3",
+        "rpm": "RPM version 4.18.2"
+      }
+    },
+    "schema": "rs9.hosted-artifact-set.v1alpha2",
+    "source_commit": "84d5921c40306bb24b12c69b85667c0b147220a7",
+    "system": "x86_64-linux",
+    "workflow_sha256": "0b5582b18bcb561257239d9fa6512e9c8b8852d4d46ddd21b343a01abdc1cab7"
+  }
+}

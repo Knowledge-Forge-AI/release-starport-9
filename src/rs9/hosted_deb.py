@@ -1739,7 +1739,8 @@ def _validate_bundle_architectures(bundle):
     manifest = bundle["manifest"]
     validate_product_architectures({"lane": manifest["family"], "system": manifest["system"],
                                    "required_products": list(REQUIRED_PRODUCTS)},
-                                  [{"path": name, "kind": "custody"} for name in bundle["packages"]])
+                                  [{"path": name, "kind": "custody", "role": "binary-package", "promotion": "candidate-only"}
+                                   for name in bundle["packages"]])
 
 
 def _gather_custody(inputs: Path | None, authentication_sha256: str | None, source_commit: str | None = None) -> dict[tuple[str, str], dict[str, Any]]:
@@ -1749,6 +1750,12 @@ def _gather_custody(inputs: Path | None, authentication_sha256: str | None, sour
     for manifest in sorted(inputs.rglob(CUSTODY_MANIFEST)):
         bundle = load_custody_bundle(manifest.parent, expected_authentication_sha256=authentication_sha256)
         _validate_bundle_architectures(bundle)
+        # Verified unsigned custody provenance supplies the binary role; check
+        # actual RPM type before using the bundle in assembled repositories.
+        if bundle["manifest"]["family"] == "rpm":
+            from rs9.package_roles import BINARY_PACKAGE, verify_rpm_package_role
+            for path in bundle["packages"].values():
+                verify_rpm_package_role(path, BINARY_PACKAGE)
         if source_commit is not None and bundle["manifest"].get("source_commit") != source_commit:
             raise ContractError("CUSTODY_SOURCE", "Unsigned bundle source differs from the candidate source")
         key = (bundle["manifest"]["family"], bundle["manifest"]["system"])

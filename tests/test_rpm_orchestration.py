@@ -23,6 +23,19 @@ class RpmOrchestrationTests(unittest.TestCase):
     def lane(self, root, *, probe_failure=None, version="22.23.0", boundary=None, hosted=False):
         capture, intent, npm = create_cli_fixture(root / "input")
         runner = build_helpers.BuildRpmTests()._setup_runner()
+        # The external tool double must emit real package-type headers now that
+        # consumers validate bytes, rather than trusting the filename or role.
+        from tests.test_foundation3_adapters import make_test_rpm
+        rpmbuild = runner.handlers["rpmbuild"]
+        def typed_rpmbuild(command, **kwargs):
+            receipt = rpmbuild(command, **kwargs)
+            topdir = Path(kwargs["cwd"])
+            for path in topdir.rglob("RPMS/**/*.rpm"):
+                path.write_bytes(make_test_rpm(intent["project"]["id"], "noarch"))
+            for path in topdir.rglob("SRPMS/**/*.src.rpm"):
+                path.write_bytes(make_test_rpm(intent["project"]["id"], "noarch", is_source=True))
+            return receipt
+        runner.handlers["rpmbuild"] = typed_rpmbuild
         original_run = runner.run
         events = []
         # The double represents an executed external command for source orchestration;
@@ -106,6 +119,16 @@ class RpmOrchestrationTests(unittest.TestCase):
                     stack.enter_context(patch.object(hosted_pipeline, "compute_auth_sha256", return_value="1" * 64))
                     stack.enter_context(patch.object(hosted_pipeline, "bind_commands", side_effect=command_bindings))
                     stack.enter_context(patch.object(hosted_packaging, "SubprocessRunner", return_value=host))
+                    if boundary == "unclassified":
+                        execute = hosted_packaging.execute
+                        def with_unclassified_package(context):
+                            result = execute(context)
+                            unknown = context["scratch"] / "unsigned/unexpected.src.rpm"
+                            unknown.write_bytes(b"unclassified-test-package")
+                            result["artifacts"].append(unknown)
+                            return result
+                        stack.enter_context(patch.object(hosted_packaging, "execute",
+                                                        side_effect=with_unclassified_package))
                     code = hosted_pipeline.run_lane(ROOT, outer_scratch, retained, "rpm", "x86_64-linux",
                                                    client=SimpleNamespace(receipts=[]), inputs=upstream)
                     self.assertEqual(code, 2)  # One-product fixture cannot qualify a four-product lane.
@@ -127,10 +150,31 @@ class RpmOrchestrationTests(unittest.TestCase):
             row = next(row for row in result["artifact_manifest"]["files"] if '/quarantine/' in row['path'])
             self.assertEqual(row['sha256'], witness['package_sha256'])
             self.assertEqual(row['size'], witness['package_size'])
+            self.assertEqual(row['role'], 'binary-package')
+            self.assertEqual(row['promotion'], 'candidate-only')
             self.assertEqual(failure['diagnostics']['construction'], 'verified-retained')
             self.assertEqual(failure['code'], 'RPM_MANIFEST_RECORD')
             gate = next(g for g in result['gates'] if g['name'] == 'rpm-derivation-record')
             self.assertNotIn(product, gate['products'])
+
+    def test_unknown_package_keeps_actual_pipeline_manifest_and_completed_objects(self):
+        from rs9.package_roles import is_installable_binary, verify_package_roles
+        with tempfile.TemporaryDirectory() as tmp:
+            result, _, _, product = self.lane(Path(tmp).resolve(), boundary="unclassified", hosted=True)
+            manifest = result["artifact_manifest"]
+            unknown = next(r for r in manifest["files"] if r["path"].endswith("unexpected.src.rpm"))
+            self.assertEqual(unknown["role"], "unclassified-package")
+            self.assertFalse(is_installable_binary(unknown))
+            self.assertTrue(any(is_installable_binary(r) and product in r["path"]
+                                for r in manifest["files"]))
+            self.assertTrue(any(r["path"].endswith("rpm-manifest.json") for r in manifest["files"]))
+            self.assertEqual(result["receipt"]["execution_error"], "required-gates-unsatisfied")
+            self.assertEqual(result["receipt"]["custody_role_failures"], [{
+                "path": unknown["path"], "code": "CUSTODY_ROLE"}])
+            self.assertEqual((result["retained"] / unknown["path"]).read_bytes(), b"unclassified-test-package")
+            with self.assertRaises(ContractError) as caught:
+                verify_package_roles(result["retained"], manifest)
+            self.assertEqual(caught.exception.code, "CUSTODY_ROLE")
 
     def test_execute_builder_pipeline_custody_reaches_all_four_consumers(self):
         from rs9.hosted_summary import validate_rpm_policy_custody, summarize

@@ -207,6 +207,14 @@ class HostedReadbackTests(unittest.TestCase):
 
 class HostedObserveExecutionTests(unittest.TestCase):
     def setUp(self):
+        origin = patch("rs9.pages_origin.diagnose_pages_origin", return_value={
+            "schema": "rs9.pages-origin-diagnostic.v1alpha1",
+            "target": "rs9.knowledge-forge.ai", "path": "CNAME",
+            "state": "unknown", "stage": "dns", "class": "dns-unknown",
+            "code": None, "origin_verified": False, "diagnostics": [],
+        })
+        self.origin_diagnostic = origin.start()
+        self.addCleanup(origin.stop)
         # Fresh planner binding is exercised separately with an authenticated profile/configuration.
         planner = patch("rs9.hosted_observe.reference_noop", return_value={"planner_outcome": "noop", "plan_sha256": "a" * 64})
         planner.start()
@@ -1053,3 +1061,103 @@ class HostedObserveExecutionTests(unittest.TestCase):
             self.assertEqual(len(details["exact_observations"]), 8)
             # 12 satisfied observations (4 pypi + 4 npm + 4 brew)
             self.assertEqual(len(details["satisfied_observations"]), 12)
+
+            # Pages origin diagnostic retained in scratch/diagnostics and artifacts
+            diag_path = scratch / "diagnostics/pages-origin-diagnostic.json"
+            self.assertTrue(diag_path.is_file())
+            self.assertIn(diag_path, result["artifacts"])
+            from rs9.hosted_custody import diagnostic_bytes
+            diagnostic_bytes(diag_path)
+
+            # details.pages_origin bounded state/stage/class/code exposed
+            self.assertIn("pages_origin", details)
+            po = details["pages_origin"]
+            self.assertIn(po["state"], {"unknown", "absent", "exact", "present"})
+            self.assertIn(po["stage"], {"dns", "tcp", "tls", "http", "redirect", "comparison"})
+            self.assertIsInstance(po["class"], str)
+            self.assertTrue(po["code"] is None or isinstance(po["code"], int))
+
+    def test_pages_origin_diagnostic_retention_and_never_feeds_observation_authority(self):
+        """Pages origin diagnostic is retained and accepted by diagnostic_bytes, but NEVER feeds observation authority."""
+        from rs9.hosted_custody import diagnostic_bytes
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            scratch = root / "scratch"
+            scratch.mkdir()
+            captures = self._create_real_captures(root, count=4)
+
+            formulas = {}
+            blobs = {}
+            for cap, itn, prof in captures:
+                p = itn["project"]["id"]
+                facts = homebrew_generation_facts(cap, itn, prof, npm_projection=authenticated_npm_projection(cap, itn, prof), npm_state="exact")
+                template = (Path(__file__).parent / "fixtures/homebrew/Formula" / (p + ".rb")).read_text()
+                content = re.sub(r"(?m)^  sha256 \"[0-9a-f]{64}\"$", lambda _: f"  sha256 \"{facts['sha256']}\"", template).encode()
+                rel_path = f"Formula/{p}.rb"
+                formulas[rel_path] = content
+                blobs[rel_path] = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
+
+            def mock_get(url, *args, **kwargs):
+                for path, content in formulas.items():
+                    if url.endswith(path):
+                        return content
+                raise ValueError(f"Unexpected raw GET URL: {url}")
+
+            client = MagicMock()
+            client.json.return_value = {"default_branch": "main", "sha": "e" * 40}
+
+            # Diagnostic probe reports exact authenticated 404 (absent)
+            synth_diag = {
+                "schema": "rs9.pages-origin-diagnostic.v1alpha1",
+                "target": "rs9.knowledge-forge.ai",
+                "port": 443,
+                "path": "CNAME",
+                "observed_at": "2026-10-10T14:00:00Z",
+                "state": "absent",
+                "stage": "http",
+                "class": "authenticated-404",
+                "code": 404,
+                "dns_safe": {"host": "rs9.knowledge-forge.ai"},
+                "origin_verified": True,
+                "diagnostics": [{"code": "pages-origin-exact-404", "message": "Exact authenticated 404 on origin"}],
+            }
+
+            # Primary Pages reader remains unknown (e.g. TLS transport error)
+            pages_obs = {
+                "state": "unknown",
+                "diagnostics": [
+                    {"code": "pages-tls-error", "message": "TLS verification failed: certificate-verify-failed"},
+                    {"code": "pages-tls-certificate-verify-failed", "message": "TLS failure class certificate-verify-failed"},
+                ],
+            }
+
+            with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, blobs)), \
+                 patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                 patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
+                 patch("rs9.hosted_observe.read_pages", return_value=pages_obs), \
+                 patch("rs9.pages_origin.diagnose_pages_origin", return_value=synth_diag), \
+                 patch("rs9.readers._get", side_effect=mock_get):
+                result = execute({"captures": captures, "scratch": scratch, "client": client})
+
+            # Invariant: Diagnostic absent state NEVER feeds observation or hosted authority.
+            # Pages observation remains unknown, and aggregate gate 1 remains blocked (not-run).
+            destinations = result["details"]["destinations"]
+            self.assertFalse(destinations["pages"]["satisfied"])
+            self.assertEqual(destinations["pages"]["states"]["generation"], "unknown")
+            self.assertEqual(result["gates"][1]["status"], "not-run")
+
+            # Retained diagnostic file is present in scratch and accepted by diagnostic_bytes
+            diag_file = scratch / "diagnostics/pages-origin-diagnostic.json"
+            self.assertTrue(diag_file.is_file())
+            self.assertIn(diag_file, result["artifacts"])
+            accepted_bytes = diagnostic_bytes(diag_file)
+            self.assertEqual(accepted_bytes, diag_file.read_bytes())
+
+            # Bounded details.pages_origin reflects the diagnostic
+            po = result["details"]["pages_origin"]
+            self.assertEqual(po, {
+                "state": "absent",
+                "stage": "http",
+                "class": "authenticated-404",
+                "code": 404,
+            })
