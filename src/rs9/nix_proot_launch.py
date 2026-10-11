@@ -198,6 +198,13 @@ def run_launch_chain(rt, elfs=None):
         if passed:
             receipt.pop("reason", None)
             receipt["error_class"] = "none"
+        else:
+            from rs9.nix_proot_stderr import stream_diagnostic
+            receipt["stderr_diagnostic"] = stream_diagnostic(
+                run.stderr, stage=label, argv_sha256=receipt["argv_sha256"],
+                returncode=run.returncode, run_error=run.error,
+                host_binds=host_binds, closure=rt.closure,
+                allow_excerpt="dbus" in role or "dbus-run-session" in command)
         has_dbus = ("dbus" in role or tool in ("dbus-run-session", "dbus-daemon") or any("dbus-run-session" in a for a in command))
         receipt["config_identity"] = {
             "guest_config": "/etc/dbus-1/session.conf",
@@ -240,9 +247,20 @@ def run_launch_chain(rt, elfs=None):
             "role": "helper-audit",
             "error_class": "audit-failed",
         }
+    from rs9.nix_proot_dbus_probe import config_include_structure
+    include_structure = config_include_structure(audit.get("dbus_config", {}))
+    decomposition = {"status": "not-run", "reason": "dbus-positive-control-did-not-fail",
+                     "qualification_authority": False}
+    if receipts[1]["status"] == "fail":
+        from rs9.nix_proot_dbus_probe import run_dbus_decomposition
+        try:
+            decomposition = run_dbus_decomposition(rt, True, _DBUS_STATE)
+        except DIAGNOSTIC_ERRORS as error:
+            decomposition = {**diagnostic_failure("dbus-decomposition", error), "qualification_authority": False}
     return {"status": "fail" if first else "observed" if audit.get("status") == "observed" else "incomplete",
             "helper_audit": audit, "default_guest_cwd": {"state": cwd_state, "streams": classify_failure(cwd_run)}, "stages": receipts,
-            "first_failure": first, "qualification_authority": False}
+            "first_failure": first, "dbus_decomposition": decomposition,
+            "dbus_config_include_structure": include_structure, "qualification_authority": False}
 
 
 def measure_proot_latency(rt, sample_count=5):

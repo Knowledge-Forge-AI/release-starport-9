@@ -1,0 +1,164 @@
+{
+  "artifact_manifests": 18,
+  "config_include_structure": {
+    "config_bytes": 3561,
+    "config_sha256": "206f009ddcf909422f3651c687b4623a5780fb7486c6d650e5332f57c00d6be1",
+    "native_causality_proven": false,
+    "root_self_include_observed": true
+  },
+  "documents": [
+    {
+      "bytes": 3143,
+      "name": "first-failure-summary.json",
+      "sha256": "c9b1468b9ce9dc69ca386b66ed74ee9dbfb113d725fe95594aabc321704c4a5e"
+    },
+    {
+      "bytes": 131248,
+      "name": "proot-aarch64-linux.json",
+      "sha256": "9370f7c2dacb3365b3511bbdcc3dc3214e0090ea0827a7cf919acbe89144d576"
+    },
+    {
+      "bytes": 131206,
+      "name": "proot-x86_64-linux.json",
+      "sha256": "fd9b750d0b6d55c6fc02e4cff284c5b537b8dc5e5503148cc6d8eda7a3f40164"
+    },
+    {
+      "bytes": 3133793,
+      "name": "hosted-summary.json",
+      "sha256": "5984f260b25e284b47e68c46e3035cc1234133fa5dc1714c7b6a2ec3097072d5"
+    },
+    {
+      "bytes": 144354,
+      "name": "manager-packet.json",
+      "sha256": "4abc5dded49979519821b2e90db1fb964a3ec5a429c2ef12cd92295bf60a7b1c"
+    }
+  ],
+  "included_selected_objects": 147,
+  "omitted_objects_not_independently_rehashed": 323,
+  "production_enabled": false,
+  "publication_authority": false,
+  "readiness_flags_preserved": true,
+  "run_id": 38161669474,
+  "schema": "rs9.cont19-input-evidence.v1",
+  "selected_records": 171,
+  "source_inspection": {
+    "dbus_message_templates_verified": false,
+    "pinned_dbus_source": "unavailable-network-restricted-and-tag-ref-unavailable",
+    "pinned_nixpkgs_dbus_recipe": "connector-readback-sha256-matches-CONT18",
+    "pinned_nixpkgs_dbus_recipe_sha256": "9499bc6c45b5e50f81a2a3ec6a2968c9281e1257cc6c27d3ce525be102aaea24",
+    "upstream_proot_tag_source": "read-only-web-observed-not-recursive-hash-authenticated"
+  },
+  "status": "verified-before-interpretation",
+  "systems": {
+    "aarch64-linux": {
+      "dbus": {
+        "config_audit_complete": true,
+        "config_audit_status": "pass",
+        "error_class": "unclassified",
+        "exit_code": 127,
+        "first_stage": "dbus-only",
+        "stderr_length": 149,
+        "stderr_sha256": "6e4a0fa58af44208a2bad348ff622c44d739962ecf4756af96fb5f13e55ed0d9",
+        "tool": "dbus-run-session"
+      },
+      "gates": [
+        {
+          "name": "proot-pinned-derivation",
+          "status": "pass"
+        },
+        {
+          "name": "proot-no-userns-ptrace",
+          "status": "pass"
+        },
+        {
+          "name": "proot-executable-self",
+          "reason": "proot-launch-failed",
+          "status": "fail"
+        },
+        {
+          "name": "proot-descendant-interpreter",
+          "reason": "proot-launch-failed",
+          "status": "fail"
+        },
+        {
+          "name": "proot-closure-resolution",
+          "status": "pass"
+        },
+        {
+          "name": "proot-args-exit-signals",
+          "reason": "guest-signal-status-not-propagated",
+          "status": "fail"
+        },
+        {
+          "name": "proot-in-guest-offline",
+          "status": "pass"
+        },
+        {
+          "name": "proot-webkit-sandbox-state",
+          "reason": "webkit-main-process-unobserved",
+          "status": "fail"
+        },
+        {
+          "name": "proot-verifier-smoke",
+          "reason": "APPLICATION_SMOKE",
+          "status": "fail"
+        }
+      ]
+    },
+    "x86_64-linux": {
+      "dbus": {
+        "config_audit_complete": true,
+        "config_audit_status": "pass",
+        "error_class": "unclassified",
+        "exit_code": 127,
+        "first_stage": "dbus-only",
+        "stderr_length": 149,
+        "stderr_sha256": "b41ee7cec78a2a329e260efaff8768a00046efb5e2cc8edf1706436a9e44bea5",
+        "tool": "dbus-run-session"
+      },
+      "gates": [
+        {
+          "name": "proot-pinned-derivation",
+          "status": "pass"
+        },
+        {
+          "name": "proot-no-userns-ptrace",
+          "status": "pass"
+        },
+        {
+          "name": "proot-executable-self",
+          "reason": "proot-launch-failed",
+          "status": "fail"
+        },
+        {
+          "name": "proot-descendant-interpreter",
+          "reason": "proot-launch-failed",
+          "status": "fail"
+        },
+        {
+          "name": "proot-closure-resolution",
+          "status": "pass"
+        },
+        {
+          "name": "proot-args-exit-signals",
+          "reason": "guest-signal-status-not-propagated",
+          "status": "fail"
+        },
+        {
+          "name": "proot-in-guest-offline",
+          "status": "pass"
+        },
+        {
+          "name": "proot-webkit-sandbox-state",
+          "reason": "webkit-main-process-unobserved",
+          "status": "fail"
+        },
+        {
+          "name": "proot-verifier-smoke",
+          "reason": "APPLICATION_SMOKE",
+          "status": "fail"
+        }
+      ]
+    }
+  }
+}

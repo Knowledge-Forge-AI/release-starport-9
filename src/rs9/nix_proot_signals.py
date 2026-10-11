@@ -1,7 +1,10 @@
 """Independent raw signal stages plus a separate, non-remapping wait diagnostic."""
 import json
+import platform
 import secrets
 import signal
+import subprocess
+import time
 
 from rs9.nix_proot_launch import DIAGNOSTIC_ERRORS, classify_failure, diagnostic_failure
 from rs9.nix_proot_wait import diagnostic_guest_run
@@ -60,7 +63,47 @@ def probe_signals(rt, external_sigterm, reap):
         observed = record.get("signal") if kind == "signaled" else record.get("exit_code")
         passed = (not run.error and diagnostic.get("status") == "valid" and
                   diagnostic.get("compatible_status") is True and record.get("kind") == kind and observed == expected)
-        row(label, run, passed, diagnostic.get("reason") or "guest-wait-evidence-incomplete", wait=diagnostic)
+        extra = {}
+        if (kind == "signaled" and not run.error and diagnostic.get("status") == "valid"
+                and diagnostic.get("signal_status_collapsed") is True and observed == 15 and run.returncode == 255):
+            extra["signal_status_token"] = "observed-signal-status-collapse"
+            extra["diagnostic_token"] = "observed-signal-status-collapse"
+        row(label, run, passed, diagnostic.get("reason") or "guest-wait-evidence-incomplete", wait=diagnostic, **extra)
+
+    native_prefix_sigterm = None
+    if platform.system() == "Linux":
+        start = time.monotonic()
+        try:
+            result = rt.runner([*rt.prefix, *python, signal_code], env=rt.host_env(), capture_output=True, timeout=30)
+            from rs9.nix_proot import Run
+            run_native = Run(result.returncode, result.stdout, result.stderr, time.monotonic() - start, None)
+        except OSError:
+            from rs9.nix_proot import Run
+            run_native = Run(None, b"", b"", time.monotonic() - start, "spawn-failed")
+        except subprocess.TimeoutExpired:
+            from rs9.nix_proot import Run
+            run_native = Run(None, b"", b"", time.monotonic() - start, "timeout")
+        native_passed = not run_native.error and run_native.returncode in {-signal.SIGTERM, 128 + signal.SIGTERM}
+        receipt = {"status": "pass" if native_passed else "fail", **classify_failure(run_native)}
+        if native_passed:
+            receipt.pop("reason", None)
+            receipt["error_class"] = "none"
+        native_prefix_sigterm = {
+            "arm": "native-prefix-self-sigterm",
+            "status": "pass" if native_passed else "fail",
+            "raw_returncode": run_native.returncode,
+            "receipt": receipt,
+            "qualification_authority": False,
+            "claim_patched": False,
+        }
+    else:
+        native_prefix_sigterm = {
+            "arm": "native-prefix-self-sigterm",
+            "status": "unavailable",
+            "reason": "linux-native-prefix-unavailable-on-provider",
+            "qualification_authority": False,
+            "claim_patched": False,
+        }
 
     nonce = secrets.token_hex(16)
     orphan_code = ("import subprocess,sys;subprocess.Popen([sys.executable,'-I','-S','-B','-c',"
@@ -75,7 +118,8 @@ def probe_signals(rt, external_sigterm, reap):
     failed = next((r for r in stages if r["status"] != "pass"), None)
     details = {"stages": stages, "exit_codes_verified": verified, "guest_signal_exit_code": raw_signal_status,
                "raw_proot_signal_status": raw_signal_status, "orphaned_tracees": survivors,
-               "external_sigterm": external["details"], "status_mapping_enabled": False}
+               "external_sigterm": external["details"], "status_mapping_enabled": False,
+               "native_prefix_sigterm": native_prefix_sigterm}
     if failed:
         # Keep historical top-level failure details while retaining later stages.
         details.update(failed["details"])

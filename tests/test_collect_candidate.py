@@ -349,7 +349,8 @@ class CollectionTests(unittest.TestCase):
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, "w") as zf:
                 zf.writestr("dup.txt", b"first")
-                zf.writestr("dup.txt", b"second")
+                with self.assertWarnsRegex(UserWarning, "Duplicate name:"):
+                    zf.writestr("dup.txt", b"second")
             zip_path.write_bytes(buf.getvalue())
             with self.assertRaises(ContractError) as caught:
                 extract_safe_zip(zip_path, dest)

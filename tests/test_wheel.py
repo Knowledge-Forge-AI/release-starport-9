@@ -123,7 +123,8 @@ class WheelTests(unittest.TestCase):
                 wheel.writestr(n, b)
             # Add duplicate of an existing member
             dup_name = "theme_forge_stellar_loom/payload/package/bin/tfsl.js"
-            wheel.writestr(dup_name, entries[dup_name])
+            with self.assertWarnsRegex(UserWarning, "Duplicate name:"):
+                wheel.writestr(dup_name, entries[dup_name])
 
         self.assertFalse(inspect_wheel(target_dup_member)["record_valid"])
         with self.assertRaises(ContractError) as ctx_m:

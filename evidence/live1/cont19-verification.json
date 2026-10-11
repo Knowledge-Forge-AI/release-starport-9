@@ -1,0 +1,295 @@
+{
+  "candidate_adoption_ready": false,
+  "candidate_inventory": {
+    "calculation": "read-only Git object hashing; no real or temporary Git index mutation",
+    "candidate_files": 511,
+    "changed_paths": 20,
+    "digest_location": "terminal closeout handoff",
+    "manifest": "operators/live1/candidate-manifest.json"
+  },
+  "closeout_verification_command": {
+    "focused": "python3 -B -W error <temporary closeout runner> 022 focused",
+    "full": "python3 -B -W error <temporary closeout runner> <022|077> full",
+    "runner": "unittest discovery; process-local umask; success counting; unraisable hook; PYTHONPATH=src"
+  },
+  "closeout_worker_use": {
+    "disposition": "declined",
+    "reason": "bounded tightly coupled closeout amendments performed locally; no further substantive review"
+  },
+  "compilation": {
+    "evidence_owner": "closeout-parent-fresh-check",
+    "fixed_guest_sources_compiled": [
+      "_OBSERVER",
+      "DBUS_AUDIT_SOURCE",
+      "DAEMON_PROBE_SOURCE",
+      "SOCKET_PROBE_SOURCE",
+      "SESSION_PROBE_SOURCE",
+      "_DBUS_STATE",
+      "GUEST_SUPERVISOR_SOURCE"
+    ],
+    "passed": true,
+    "python_files_compiled_without_bytecode": 291
+  },
+  "dispatcher_checkpoint_status": "dispatcher-owned",
+  "disposition": "amend",
+  "final_inventory_hygiene_tests": {
+    "command": "PYTHONPATH=src python3 -B -W error -m unittest tests.test_candidate_inventory tests.test_candidate_readiness -q",
+    "errors": 0,
+    "failures": 0,
+    "final_metadata_verification": "read-only inventory and credential scan after report and manifest regeneration",
+    "passed": 9,
+    "runner_tests": 9,
+    "success": true
+  },
+  "focused_adversarial_suite": {
+    "class_skip_records": 0,
+    "discovered_methods": 83,
+    "elapsed_seconds": 17.959,
+    "error_ids": [],
+    "errors": 0,
+    "failure_ids": [],
+    "failures": 0,
+    "fixtures": "synthetic frames and disposable local children; not native Linux PRoot qualification",
+    "individual_skips": 1,
+    "passed": 82,
+    "platform": "Darwin",
+    "python": "3.13.12",
+    "runner_tests": 83,
+    "scope": [
+      "stderr",
+      "daemon-controls",
+      "layers",
+      "signals",
+      "processes",
+      "framed-wait",
+      "launch-chain"
+    ],
+    "skip_records": 1,
+    "success": true,
+    "umask": "022",
+    "unraisable_exceptions": [],
+    "warnings_policy": "error"
+  },
+  "full_live1_qualification": false,
+  "full_source_suites": [
+    {
+      "class_skip_records": 1,
+      "discovered_methods": 1933,
+      "elapsed_seconds": 85.224,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "individual_skips": 21,
+      "passed": 1902,
+      "platform": "Darwin",
+      "python": "3.13.12",
+      "runner_tests": 1923,
+      "scope": "full",
+      "skip_records": 22,
+      "success": true,
+      "umask": "022",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    },
+    {
+      "class_skip_records": 1,
+      "discovered_methods": 1933,
+      "elapsed_seconds": 84.151,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "individual_skips": 21,
+      "passed": 1902,
+      "platform": "Darwin",
+      "python": "3.13.12",
+      "runner_tests": 1923,
+      "scope": "full",
+      "skip_records": 22,
+      "success": true,
+      "umask": "077",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    }
+  ],
+  "git_diff_check_passed": true,
+  "hosted_run_18": "not-run-manager-authorization-required-after-source-review",
+  "independent_cumulative_review": "dispatcher-provided-reviewed-with-advisory-findings-no-blockers",
+  "initial_full_suite_failures": {
+    "causes": [
+      "stale-candidate-inventory",
+      "private-path-test-fixture",
+      "two-unasserted-deliberate-duplicate-zip-warnings"
+    ],
+    "resolved": true,
+    "umasks": [
+      "022",
+      "077"
+    ]
+  },
+  "latest_parent_correction": "diagnostic-only minimal no-include daemon control; conservative lifecycle observations",
+  "native_linux_qualification": "not-run-provider-darwin",
+  "no_native_receipts_fabricated": true,
+  "pin_and_released_byte_changes": false,
+  "plan_review": "reviewed-with-advisory-findings-no-blockers",
+  "post_review_amendments": [
+    "docs/live1-native-client-cont19.md",
+    "evidence/live1/cont19-verification.json",
+    "operators/live1/candidate-manifest.json",
+    "src/rs9/nix_proot.py",
+    "src/rs9/nix_proot_dbus_probe.py",
+    "src/rs9/nix_proot_layers.py",
+    "tests/test_nix_proot_dbus_probe.py",
+    "tests/test_nix_proot_layers.py"
+  ],
+  "post_review_rereview": false,
+  "preservation_and_credential_scan": {
+    "bounded_credential_scanned_candidate_files": 511,
+    "credential_scan_passed": true,
+    "existing_operational_entries_preserved": true,
+    "existing_operational_entry_count": 204,
+    "head_unchanged": true,
+    "new_product_symlinks": false,
+    "nix_and_pin_files_unchanged": true,
+    "passed": true,
+    "post_review_amended_paths": [
+      "docs/live1-native-client-cont19.md",
+      "evidence/live1/cont19-verification.json",
+      "operators/live1/candidate-manifest.json",
+      "src/rs9/nix_proot.py",
+      "src/rs9/nix_proot_dbus_probe.py",
+      "src/rs9/nix_proot_layers.py",
+      "tests/test_nix_proot_dbus_probe.py",
+      "tests/test_nix_proot_layers.py"
+    ],
+    "real_index_unchanged": true,
+    "tracked_and_product_modes_preserved": true,
+    "unrelated_tracked_path_count": 491,
+    "unrelated_tracked_paths_preserved": true
+  },
+  "production_enabled": false,
+  "production_promotion_blockers": [
+    "linux-wheel-production-promotion-compatibility-unproven",
+    "rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"
+  ],
+  "proposal_bytes": 15666,
+  "proposal_disposition": "amend",
+  "proposal_sha256": "4d56c4f2bc276f1edf45377f5fe9a38c69e6fec6e8a60aa544599105d402623a",
+  "publication_authority": false,
+  "published_linux_nix_ready": false,
+  "remaining_changes_after_full_suites": "documentation, verification metadata and manifest inventory only",
+  "review_after_this_stage": "none-substantive-terminal-revision-dispatcher-bound",
+  "review_findings": {
+    "closeout": "terminal-parent-amendment-no-further-substantive-review",
+    "post_planning": {
+      "advisory": 7,
+      "blocking": 0,
+      "disposition": "addressed-in-amended-proposal"
+    },
+    "pre_final": {
+      "advisory": 5,
+      "blocking": 0,
+      "bound_producer_tree": "d5efaaab643cdaa881c599e0d71ad9ea6abf4dba",
+      "dispositions": [
+        {
+          "action": "add deny-only temporary no-include daemon control",
+          "disposition": "amend-diagnostic-alternative",
+          "finding": 1,
+          "remaining": "exact original stderr and pinned message templates unavailable; no cycle causality or config fix claimed"
+        },
+        {
+          "action": "distinct simultaneous default-and-explicit-daemon-controls-failed token",
+          "disposition": "amend",
+          "finding": 2
+        },
+        {
+          "action": "empty comm-based daemon list is unobserved; absence_proven remains false",
+          "disposition": "amend",
+          "finding": 3,
+          "remaining": "PRoot loader may obscure comm identity; native daemon discovery remains unproven"
+        },
+        {
+          "action": "at most 0.9-second settling before forced cleanup; incomplete or unreadable survival stays unobserved",
+          "disposition": "amend",
+          "finding": 4
+        },
+        {
+          "disposition": "defer",
+          "finding": 5,
+          "reason": "authentic native Linux signal/timeout/interruption and orphan qualification requires separately authorized hosted execution"
+        }
+      ],
+      "reviewer_limitations": [
+        "reviewer could not recompute Git tree or manifest SHA; final inventory independently calculated by closeout parent"
+      ],
+      "status": "dispatcher-provided-reviewed-with-findings-advisory"
+    }
+  },
+  "reviewed_producer_full_source_suites": [
+    {
+      "discovered_methods": 1928,
+      "elapsed_seconds": 89.9,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "platform": "Darwin",
+      "python": "3.13.12",
+      "runner_tests": 1918,
+      "skip_records": 22,
+      "success": true,
+      "umask": "022",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    },
+    {
+      "discovered_methods": 1928,
+      "elapsed_seconds": 89.867,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "platform": "Darwin",
+      "python": "3.13.12",
+      "runner_tests": 1918,
+      "skip_records": 22,
+      "success": true,
+      "umask": "077",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    }
+  ],
+  "schema": "rs9.cont19-verification.v1",
+  "scratch_exception": "shared scratch root outside writable sandbox; allowed temporary root used",
+  "source_behavior_fix": "deferred-unproven-native-cause; terminal amendments affect diagnostic controls only",
+  "source_paths_changed_after_final_full_suites": [],
+  "stage": "closeout",
+  "stage_deltas_before_work": [],
+  "status": "terminal-source-verified-native-qualification-deferred",
+  "stderr_hash_not_reconstructed": true,
+  "unresolved_lanes": [
+    "linux-nix-x86_64-NIX_FHS_USERNS",
+    "linux-nix-aarch64-NIX_FHS_USERNS",
+    "proot-dbus-only-127-unclassified-both-architectures",
+    "proot-guest-signal-status-not-propagated-both-architectures",
+    "proot-webkit-main-process-unobserved",
+    "pages-direct-tls-hostname-verification-62"
+  ],
+  "workers": [
+    {
+      "cleanup_proven": true,
+      "disposition": "adopted-parent-amended",
+      "kind": "gemini",
+      "task": "stderr",
+      "used": true
+    },
+    {
+      "cleanup_proven": true,
+      "disposition": "adopted-parent-amended",
+      "kind": "gemini",
+      "task": "signals",
+      "used": true
+    }
+  ]
+}
