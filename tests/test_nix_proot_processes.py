@@ -90,6 +90,37 @@ sys.exit(255 if rc<0 else rc)
             self.assertTrue(details["process_group_control"]["guest_handler_observed"])
             self.assertFalse(details["supervisor_added"])
             self.assertEqual(details["group_control_layers"][0], "created-process-group")
+            # Verify bounded stderr and layer observation
+            self.assertIn("stderr", details)
+            self.assertIn("raw_length", details["stderr"])
+            self.assertIn("sha256", details["stderr"])
+            self.assertTrue(details["stderr"]["completed"])
+            self.assertFalse(details["stderr"]["truncated"])
+            self.assertIn("observed_layers", details)
+            self.assertIn("layer_survival", details)
+
+            # Verify group control is kept completely separate and not conflated
+            control = details["process_group_control"]
+            self.assertIn("stderr", control)
+            self.assertIn("observed_layers", control)
+            self.assertIn("layer_survival", control)
+            self.assertEqual(control["delivery_scope"], "process-group")
+            self.assertEqual(details["delivery_scope"], "outer-process")
+
+    def test_non_forwarding_outer_retains_separate_control_and_diagnostics(self):
+        with tempfile.TemporaryDirectory() as temp:
+            rt = self.signal_runtime(Path(temp), forwards=False)
+            result = _external_sigterm(rt, "external-fake-non-forwarding")
+            self.assertEqual(result["status"], "fail")
+            self.assertEqual(result["reason"], "sigterm-did-not-terminate-wrapper")
+            details = result["details"]
+            self.assertFalse(details["guest_handler_observed"])
+            control = details["process_group_control"]
+            self.assertTrue(control["guest_handler_observed"])
+            self.assertEqual(control["status"], "pass")
+            self.assertIn("stderr", details)
+            self.assertIn("stderr", control)
+            self.assertIn("Outer-process delivery did not reach the guest handler", details["product_wrapper_implication"])
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux /proc owned-child state readback unavailable on Darwin")
     def test_linux_forced_kill_has_no_signal_compatibility_receipt(self):

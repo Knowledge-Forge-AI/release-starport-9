@@ -5,32 +5,26 @@
   "bootstrap_role": "migration-configuration-only-not-fresh-release-authority",
   "candidate_adoption_ready": false,
   "changed_paths": [
-    "docs/README.md",
-    "docs/adr/0008-nix-linux-runtime-without-user-namespaces.md",
-    "docs/live1-native-client-cont18.md",
-    "evidence/live1/cont18-input-evidence.json",
-    "evidence/live1/cont18-pages-readback.json",
-    "evidence/live1/cont18-pinned-dbus-source.json",
-    "evidence/live1/cont18-signal-disposition.json",
-    "evidence/live1/cont18-verification.json",
-    "nix/nebular-proot-experiment.nix",
+    "docs/live1-native-client-cont19.md",
+    "evidence/live1/cont19-input-evidence.json",
+    "evidence/live1/cont19-pages-readback.json",
+    "evidence/live1/cont19-verification.json",
     "operators/live1/candidate-manifest.json",
-    "operators/live1/run-hosted17.py",
-    "src/rs9/application_smoke_diagnostic.py",
-    "src/rs9/errors.py",
-    "src/rs9/hosted_smoke.py",
-    "src/rs9/hosted_wheels.py",
+    "operators/live1/run-hosted18.py",
     "src/rs9/nix_proot.py",
-    "src/rs9/nix_proot_audit.py",
-    "src/rs9/nix_proot_dbus.py",
+    "src/rs9/nix_proot_dbus_probe.py",
     "src/rs9/nix_proot_launch.py",
-    "tests/test_application_smoke_diagnostic.py",
-    "tests/test_hosted_smoke.py",
-    "tests/test_hosted_wheels.py",
-    "tests/test_nix_proot.py",
-    "tests/test_nix_proot_audit.py",
-    "tests/test_nix_proot_launch.py",
-    "tests/test_run_hosted17.py"
+    "src/rs9/nix_proot_layers.py",
+    "src/rs9/nix_proot_signals.py",
+    "src/rs9/nix_proot_stderr.py",
+    "tests/test_collect_candidate.py",
+    "tests/test_nix_proot_dbus_probe.py",
+    "tests/test_nix_proot_layers.py",
+    "tests/test_nix_proot_processes.py",
+    "tests/test_nix_proot_signals_cont19.py",
+    "tests/test_nix_proot_stderr.py",
+    "tests/test_run_hosted18.py",
+    "tests/test_wheel.py"
   ],
   "configuration_hashes": [
     {
@@ -446,6 +440,13 @@
       "size": 14681
     },
     {
+      "git_blob": "ef6bbfbef7e0d6c822a1f9553f27f75a6be95df4",
+      "mode": "100644",
+      "path": "docs/live1-native-client-cont19.md",
+      "sha256": "39257a50e48a54dd21effbdcebbd195fe3b6ed14acfaadf7b3ece75ed4b94d7e",
+      "size": 13458
+    },
+    {
       "git_blob": "2910bb27b786a3b59b36a3d8e1ceba8e6b1b0eea",
       "mode": "100644",
       "path": "docs/live1-native-client-cont9.md",
@@ -703,6 +704,27 @@
       "path": "evidence/live1/cont18-verification.json",
       "sha256": "c0348ef13f341eace46330955c5b4e195be96d97b59349cbb3fd566fdadcbac8",
       "size": 11365
+    },
+    {
+      "git_blob": "4e1d295dcd192a72844120977fef84c59445afa8",
+      "mode": "100644",
+      "path": "evidence/live1/cont19-input-evidence.json",
+      "sha256": "9ada21c13f92062c342b0c5e0b16e3d680ed5f1b5a6aa63814dec5015d9f994f",
+      "size": 4853
+    },
+    {
+      "git_blob": "47603c404ccbcd88db325539ec2eb628957f0f01",
+      "mode": "100644",
+      "path": "evidence/live1/cont19-pages-readback.json",
+      "sha256": "a6aa901fc1237c25ceca2be23158de0973c13088d983097cd384f77bcac85c14",
+      "size": 1416
+    },
+    {
+      "git_blob": "34b4a0def562f240f745afd1d08199ffeed753f2",
+      "mode": "100644",
+      "path": "evidence/live1/cont19-verification.json",
+      "sha256": "e7c29d4ae8c1c04e42e6efade17d3c071fc77286b528f7af006f5488f3120e77",
+      "size": 9917
     },
     {
       "git_blob": "8d6235ee7a9deb7807cabed204ddf0ce280369aa",
@@ -1165,6 +1187,13 @@
       "path": "operators/live1/run-hosted17.py",
       "sha256": "1f465d87142c3da8b460360ca59e22f46ad5ac3d8fa987ed1e292d3782e2b1c7",
       "size": 546
+    },
+    {
+      "git_blob": "0558f1e5be0478704e693a465950d493f44b057c",
+      "mode": "100644",
+      "path": "operators/live1/run-hosted18.py",
+      "sha256": "2329e76378d37b79b35d4d117ba7c3e0dccbe116d4950196d8971ddbf6aa16d6",
+      "size": 528
     },
     {
       "git_blob": "bab09448a3b7f3fdc7b88ae9bf0d56e4ccbaa397",
@@ -1678,11 +1707,11 @@
       "size": 8064
     },
     {
-      "git_blob": "4ecce3b1b9070d03c46a24b1777b1b2bd7028a83",
+      "git_blob": "19431aadef98e5f2d9a7ba2fbf54d33af4323b29",
       "mode": "100644",
       "path": "src/rs9/nix_proot.py",
-      "sha256": "76b2bd3364ee3f79d8346cdd65d4401102665a3e3a66b520d3f625c926eca019",
-      "size": 66083
+      "sha256": "1c57f003789dd9beb0c81498e9d09289c66d3d1c0b58f1acbfdb5c27c85dc909",
+      "size": 69703
     },
     {
       "git_blob": "acd86c47893d60ac10be6b793144a3c180ed79ed",
@@ -1699,18 +1728,39 @@
       "size": 8409
     },
     {
-      "git_blob": "dfad89bdb6580dd6ab01fe468c5c9613c6501a41",
+      "git_blob": "a6169db7c3b617d1b8cfb2eac674729f4cd364b2",
       "mode": "100644",
-      "path": "src/rs9/nix_proot_launch.py",
-      "sha256": "cd8b23ba664db7d9f8f691ce778ed71044dc5926c29821fcfe8bdb1327c50a18",
-      "size": 15513
+      "path": "src/rs9/nix_proot_dbus_probe.py",
+      "sha256": "e7eff3a233387f15c3200bf6eef823bacdd5843914f8570a2a121cce2e768e64",
+      "size": 19134
     },
     {
-      "git_blob": "4085a9b5ad3450ac0cd2bd97bcba27a1a2377350",
+      "git_blob": "05627247b75d6e54cc51c80b757fc7a4195d60fe",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_launch.py",
+      "sha256": "5052d8ac6f4030c0f167a98f44ec9d3c921943b774d940aae6e2c8baa0a6c86b",
+      "size": 16674
+    },
+    {
+      "git_blob": "5824d636e13e560fd602a49576a15fe4e17c91a3",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_layers.py",
+      "sha256": "4a1bf404a75ce4da4f4d295206b812974c98b15fad68da77c169b4237229b004",
+      "size": 14577
+    },
+    {
+      "git_blob": "3390c45b84ee13bef487d5de3bb6658032cbf2c2",
       "mode": "100644",
       "path": "src/rs9/nix_proot_signals.py",
-      "sha256": "34da5fb6442a3000b025038472714779886e14285239f5bb794f5be2f7f65bf6",
-      "size": 4767
+      "sha256": "92c256355fb029169cea26e3bc405214037679fcbe2381e869682322c87f2609",
+      "size": 6900
+    },
+    {
+      "git_blob": "2b1d8160ed8b413711fade1b59c89b1adce04738",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_stderr.py",
+      "sha256": "db3935631110759ab3312050ef07e727139218c08fde5051bb3d159c5a7c3c9d",
+      "size": 8332
     },
     {
       "git_blob": "7b9b6e9fccd744e05be0a8bfc454d6183ff16eb8",
@@ -2672,11 +2722,11 @@
       "size": 8271
     },
     {
-      "git_blob": "8a6c98b17f0acb3f08400b56b675968e7043bbf8",
+      "git_blob": "9c56adead6cca99e5ca3cda3f05600980a554a49",
       "mode": "100644",
       "path": "tests/test_collect_candidate.py",
-      "sha256": "84e7f71449e62bcd270c108494f8eb4392278fb9dc066ba06d7605b77812bf91",
-      "size": 33104
+      "sha256": "473876790abff529dde7e407654b1524560283bb00f97c69d159fbe291d30b49",
+      "size": 33184
     },
     {
       "git_blob": "f3520b196558944906e06b367742ba578dcf664e",
@@ -3029,6 +3079,13 @@
       "size": 20617
     },
     {
+      "git_blob": "15681b09a86b548cdc50dfd0d7ec6f3577cab598",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_dbus_probe.py",
+      "sha256": "55a2edcf36155f1f14bd421492cbc63ccd522cc7ef7b3ea7b4eec4148daa9eb8",
+      "size": 14163
+    },
+    {
       "git_blob": "ea24f984ccd518e50bc971530db9fa965f1d9158",
       "mode": "100644",
       "path": "tests/test_nix_proot_launch.py",
@@ -3036,11 +3093,32 @@
       "size": 10918
     },
     {
-      "git_blob": "a708603a96c5ee0ac3e76d1a6ea53a8e9e664c38",
+      "git_blob": "a7c08e380c6284990cf2b1cf2dbf27c2b650cf87",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_layers.py",
+      "sha256": "7c5d885e0e83b209e31682dcc127574083329d4955c9ecfc5015f6f342138346",
+      "size": 14811
+    },
+    {
+      "git_blob": "a1928f4a1d76240b4631a5798b083edb60810f45",
       "mode": "100644",
       "path": "tests/test_nix_proot_processes.py",
-      "sha256": "a42ae9a577f6c0c0ddbade421d1ae72541f46bd0934e4a450a8241ab0b778efe",
-      "size": 6961
+      "sha256": "b042c8664bb269739882dd947c486f547551600bede6f889bf6f87bdcce3fca2",
+      "size": 8747
+    },
+    {
+      "git_blob": "3e9829370b1af985b568f6e6874fb4e95829f3a8",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_signals_cont19.py",
+      "sha256": "fedbc478ca3cd087c909fc6543d8f724b6838ea8d66d13a424322fb62c015237",
+      "size": 2259
+    },
+    {
+      "git_blob": "1c40fbab44ebaf104e93175716c4dbaf819dfc5c",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_stderr.py",
+      "sha256": "0ff2bc9fe4972f1ec12c73f8e205510294c0533d163ca7aea3bbfde3c503f330",
+      "size": 16559
     },
     {
       "git_blob": "141630464bc51905ec1f75038edb4a7eafef98d4",
@@ -3407,6 +3485,13 @@
       "size": 2010
     },
     {
+      "git_blob": "63a340fa87a02b214107a40950278055dd0da52b",
+      "mode": "100644",
+      "path": "tests/test_run_hosted18.py",
+      "sha256": "35cbf1c89efb3e2e3b083ca3ab77e03d34f6f226827d97e858b1367e634e988e",
+      "size": 2010
+    },
+    {
       "git_blob": "54a27d6215549c7c3c57ceab4f660dcb4fe47222",
       "mode": "100644",
       "path": "tests/test_run_hosted5.py",
@@ -3505,11 +3590,11 @@
       "size": 12942
     },
     {
-      "git_blob": "e0ae580a2440d0187943529207d0fbe85320d8e7",
+      "git_blob": "71b46d2bce870558a3f9e9b16ab66cb1fad5d383",
       "mode": "100644",
       "path": "tests/test_wheel.py",
-      "sha256": "bc95dfa74f3fa8fefb90da9b498fd99462ecd01387053c8e46dc05ed0eed30e5",
-      "size": 12875
+      "sha256": "1ef702bf9a6bfd77159a34434c02415efa533d782ea0d6d62bdb7e05766c24c9",
+      "size": 12951
     },
     {
       "git_blob": "f3d8120a73d637d9bfccdb3d4be31b1e80e78506",
@@ -3535,8 +3620,8 @@
   ],
   "inventory_scope": "complete product source excluding this manifest and preserved unrelated local state",
   "kind": "non-production-hosted-source-candidate",
-  "parent": "50183be0935178de3d4799d39f31d22169400dad",
-  "phase_outcome": "dbus-source-repair-wheel-diagnostics-hosted-qualification-pending",
+  "parent": "8345ce5b919b623d51c55961fd85f0a8c3d69c83",
+  "phase_outcome": "diagnostic-source-candidate-native-cause-unproven",
   "production_enabled": false,
   "production_ready": false,
   "publication_authority": false,
@@ -3565,8 +3650,8 @@
     "schema": "rs9.live1-candidate-readiness.v1alpha1",
     "source_adoption_scope": "partial-diagnostic"
   },
-  "review_status": "dispatcher-reviewed-with-findings-terminal-amendment-no-re-review",
+  "review_status": "dispatcher-reviewed-with-advisory-findings-terminal-amendments-not-rereviewed",
   "schema": "rs9.live1-source-candidate-inventory.v1alpha2",
-  "task": "CONT18 precise guest D-Bus closure and x86 wheel regression evidence",
+  "task": "CONT19 bounded PRoot D-Bus and authentic signal diagnostics",
   "terminal_disposition": "amend"
 }

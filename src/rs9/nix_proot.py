@@ -34,6 +34,7 @@ from typing import Any, Callable, NamedTuple
 
 from rs9.errors import ContractError, safe_details
 from rs9.nix_proot_launch import classify_failure, measure_proot_latency, run_launch_chain
+from rs9.nix_proot_layers import capture_bounded_stderr, check_layer_survival, observe_descendant_layers
 
 SCHEMA = "rs9.nix-proot-evaluation.v2"
 FACTS_SCHEMA = "rs9.nix-proot-facts.v3"
@@ -947,8 +948,41 @@ def _json_list(run: Run) -> Any:
         return None
 
 
+class SignalAttemptResult(tuple):
+    """5-element tuple preserving legacy unpacked return, enriched with diagnostic fields."""
+    reason: str | None
+    exit_code: int | None
+    observed: bool
+    survivors: int
+    target: str
+    stderr: dict[str, Any]
+    layers: dict[str, Any]
+    survival: dict[str, Any]
+
+    def __new__(cls, reason: str | None, exit_code: int | None, observed: bool,
+                survivors: int, target: str, *,
+                stderr: dict[str, Any] | None = None,
+                layers: dict[str, Any] | None = None,
+                survival: dict[str, Any] | None = None) -> SignalAttemptResult:
+        instance = super().__new__(cls, (reason, exit_code, observed, survivors, target))
+        instance.reason = reason
+        instance.exit_code = exit_code
+        instance.observed = observed
+        instance.survivors = survivors
+        instance.target = target
+        instance.stderr = stderr or {}
+        instance.layers = layers or {}
+        instance.survival = survival or {}
+        return instance
+
+
 def _run_signal_attempt(rt: GuestRuntime, name: str, *, deliver_to_group: bool = False
-                        ) -> tuple[str | None, int | None, bool, int, str]:
+                        ) -> SignalAttemptResult:
+    with tempfile.TemporaryFile() as stderr_file:
+        return _run_signal_attempt_with_stream(rt, name, stderr_file, deliver_to_group=deliver_to_group)
+
+
+def _run_signal_attempt_with_stream(rt, name, stderr_file, *, deliver_to_group=False):
     nonce = secrets.token_hex(8)
     marker, ready = f"rs9-term-{nonce}", f"rs9-ready-{nonce}"
     code = ("import os,signal,sys,time\n"
@@ -958,17 +992,28 @@ def _run_signal_attempt(rt: GuestRuntime, name: str, *, deliver_to_group: bool =
             "open('/tmp/%s','w').write('1')\n"
             "time.sleep(60)\nos._exit(3)\n" % (marker, ready))
     argv = rt.argv([rt.facts["python"], "-I", "-S", "-B", "-c", code])
+    proc_root = getattr(rt, "proc_root", Path("/proc"))
+
+    # Anonymous host-owned file: the guest never receives a pathname to rewrite.
     proc = rt.popen(argv, env=rt.host_env(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL, start_new_session=True)
+                    stderr=stderr_file, start_new_session=True)
     reason, exit_code, survivors = None, None, 0
+    layers_before: dict[str, Any] = {}
+    survival_after: dict[str, Any] = {}
     try:
         for _ in range(100):
+            if os.fstat(stderr_file.fileno()).st_size > 4096:
+                reason = "signal-probe-output-limit"
+                break
             if (rt.layout.tmp_dir / ready).exists() or proc.poll() is not None:
                 break
             rt.sleep(0.2)
         if not (rt.layout.tmp_dir / ready).exists():
-            reason = "signal-probe-guest-not-ready"
+            reason = reason or "signal-probe-guest-not-ready"
+            layers_before = observe_descendant_layers(proc_root, getattr(proc, "pid", None)
+                if getattr(proc, "returncode", None) is None else None)
         else:
+            layers_before = observe_descendant_layers(proc_root, getattr(proc, "pid", None))
             if deliver_to_group:
                 if hasattr(proc, "send_group_signal"):
                     proc.send_group_signal(signal.SIGTERM)
@@ -984,10 +1029,22 @@ def _run_signal_attempt(rt: GuestRuntime, name: str, *, deliver_to_group: bool =
             else:
                 proc.send_signal(signal.SIGTERM)
             try:
-                exit_code = proc.wait(timeout=10)
+                deadline = time.monotonic() + 10
+                for attempt in range(100):
+                    if os.fstat(stderr_file.fileno()).st_size > 4096:
+                        reason = "signal-probe-output-limit"
+                        break
+                    try:
+                        exit_code = proc.wait(timeout=min(.1, max(.001, deadline-time.monotonic())))
+                        break
+                    except subprocess.TimeoutExpired:
+                        if time.monotonic() >= deadline or attempt == 99:
+                            raise
             except subprocess.TimeoutExpired:
                 rt.timeouts[name] = rt.timeouts.get(name, 0) + 1
                 reason = "sigterm-did-not-terminate-wrapper"
+            finally:
+                survival_after = check_layer_survival(proc_root, layers_before, sleep=rt.sleep)
     finally:
         # Only the session/process group created by this exact Popen is owned.
         # A forced group kill bypasses guest framing; it never implies success.
@@ -1000,18 +1057,27 @@ def _run_signal_attempt(rt: GuestRuntime, name: str, *, deliver_to_group: bool =
             proc.kill()
             proc.wait(timeout=10)
         survivors = _reap(rt, nonce.encode())
+        stderr_details = capture_bounded_stderr(stderr_file,
+            stage="external-group-control" if deliver_to_group else "external-outer-process",
+            argv_sha256=hashlib.sha256(json.dumps(argv).encode()).hexdigest(), returncode=exit_code,
+            run_error="timeout" if reason == "sigterm-did-not-terminate-wrapper" else
+                      "output-limit" if reason == "signal-probe-output-limit" else None)
+
     observed = (rt.layout.tmp_dir / marker).exists()
     if reason is None and not observed:
         reason = "guest-sigterm-not-observed"
     if survivors:
         reason = "orphaned-tracee-survived"
-    return reason, exit_code, observed, survivors, os.path.basename(argv[0])
+    return SignalAttemptResult(reason, exit_code, observed, survivors, os.path.basename(argv[0]),
+                               stderr=stderr_details, layers=layers_before, survival=survival_after)
 
 
 def _external_sigterm(rt: GuestRuntime, name: str) -> dict[str, Any]:
-    reason, exit_code, observed, survivors, target = _run_signal_attempt(rt, name, deliver_to_group=False)
+    outer_attempt = _run_signal_attempt(rt, name, deliver_to_group=False)
+    reason, exit_code, observed, survivors, target = outer_attempt
     control_details: dict[str, Any] | None = None
-    c_reason, c_exit_code, c_observed, c_survivors, _ = _run_signal_attempt(rt, name, deliver_to_group=True)
+    group_attempt = _run_signal_attempt(rt, name, deliver_to_group=True)
+    c_reason, c_exit_code, c_observed, c_survivors, _ = group_attempt
     control_details = {
         "delivery_scope": "process-group",
         "guest_handler_observed": c_observed,
@@ -1019,6 +1085,9 @@ def _external_sigterm(rt: GuestRuntime, name: str) -> dict[str, Any]:
         "orphaned_tracees": c_survivors,
         "status": "pass" if c_observed and not c_reason else "fail",
         **({"reason": c_reason} if c_reason else {}),
+        "stderr": getattr(group_attempt, "stderr", {}),
+        "observed_layers": getattr(group_attempt, "layers", {}),
+        "layer_survival": getattr(group_attempt, "survival", {}),
     }
 
     if observed:
@@ -1049,6 +1118,9 @@ def _external_sigterm(rt: GuestRuntime, name: str) -> dict[str, Any]:
         "group_control_layers": ["created-process-group", "offline-host-prefix", "proot", "guest-handler"],
         "supervisor_added": False,
         "product_wrapper_implication": product_implication,
+        "stderr": getattr(outer_attempt, "stderr", {}),
+        "observed_layers": getattr(outer_attempt, "layers", {}),
+        "layer_survival": getattr(outer_attempt, "survival", {}),
     }
     if control_details:
         details["process_group_control"] = control_details
