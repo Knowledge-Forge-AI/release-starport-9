@@ -60,6 +60,7 @@ def make_facts(system="x86_64-linux"):
     gtk = store("gtk3-3.24.43")
     env = store("rs9-nebular-proot-guest-env")
     library_path = glibc + "/lib:" + gtk + "/lib"
+    dbus = store("dbus-1.14.10")
     facts = {
         "schema": FACTS_SCHEMA,
         "system": system,
@@ -92,7 +93,9 @@ def make_facts(system="x86_64-linux"):
         "readelf": store("binutils-2.43.1") + "/bin/readelf",
         "ldd": store("glibc-2.40-66-bin") + "/bin/ldd",
         "xvfb_run": store("xvfb-run-1") + "/bin/xvfb-run",
-        "dbus_run_session": store("dbus-1.14.10") + "/bin/dbus-run-session",
+        "dbus_run_session": dbus + "/bin/dbus-run-session",
+        "dbus_daemon": dbus + "/bin/dbus-daemon",
+        "dbus_session_config": dbus + "/share/dbus-1/session.conf",
         "bwrap": store("bubblewrap-0.10.0") + "/bin/bwrap",
         "launcher": store("rs9-nebular-proot-launch"),
     }
@@ -182,6 +185,9 @@ class NixSourceTests(unittest.TestCase):
         self.assertIn("rootPaths", self.recipe)
         self.assertIn('closure_paths_file = "${closure}/store-paths";', self.recipe)
         self.assertIn(': > "$out/etc/passwd"', self.recipe)
+        self.assertIn('mkdir -p "$out/etc/dbus-1"', self.recipe)
+        self.assertIn('test -f "${pkgs.dbus}/share/dbus-1/session.conf" || exit 1', self.recipe)
+        self.assertIn('ln -s "${pkgs.dbus}/share/dbus-1/session.conf" "$out/etc/dbus-1/session.conf"', self.recipe)
         self.assertNotIn("ln -s /etc", self.recipe)
 
     def test_experiment_is_a_separate_linux_only_output_that_legacy_outputs_never_reach(self):
@@ -221,6 +227,10 @@ class FactsAndClosureTests(unittest.TestCase):
             "arm-with-x86-loader": dict(arm, loader=self.facts["loader"]),
             "host-library-path": dict(self.facts, library_path=self.facts["library_path"] + ":/usr/lib"),
             "unknown-system": dict(self.facts, system="aarch64-darwin"),
+            "mismatched-dbus-daemon": dict(self.facts, dbus_daemon=store("other-dbus") + "/bin/dbus-daemon"),
+            "mismatched-dbus-config": dict(self.facts, dbus_session_config=store("other-dbus") + "/share/dbus-1/session.conf"),
+            "dbus-daemon-wrong-name": dict(self.facts, dbus_daemon=self.facts["dbus_daemon"][:-11] + "other-daemon"),
+            "dbus-config-wrong-name": dict(self.facts, dbus_session_config=self.facts["dbus_session_config"][:-12] + "other.conf"),
         }
         for name, bad in cases.items():
             with self.subTest(name):
@@ -420,7 +430,7 @@ class GuestCase(unittest.TestCase):
         if "rs9-translation-nonce" in text:
             nonce = (self.layout.tmp_dir / "rs9-translation-nonce").read_text()
             body = {"userns": "user:[4026531837]", "uid": os.getuid(), "nonce": nonce, "visible": [],
-                    "etc": ["group", "hosts", "nsswitch.conf", "passwd"]}
+                    "etc": ["dbus-1", "group", "hosts", "nsswitch.conf", "passwd"], "dbus_ok": True}
             return completed(argv, 0, json.dumps(body).encode())
         if "readlink('/proc/self/exe')" in text:
             return completed(argv, 0, json.dumps({"exe": self.facts["python"]}).encode())
@@ -511,6 +521,19 @@ class GuestCase(unittest.TestCase):
 
 
 class TranslationProbeTests(GuestCase):
+    def test_dbus_directory_requires_exact_guest_readback(self):
+        for exact in (False, None, "true"):
+            def malformed(argv, exact=exact):
+                nonce = (self.layout.tmp_dir / "rs9-translation-nonce").read_text()
+                body = {"userns": "user:[4026531837]", "uid": os.getuid(), "nonce": nonce,
+                        "visible": [], "etc": ["dbus-1", "passwd"], "dbus_ok": exact}
+                return completed(argv, 0, json.dumps(body).encode())
+            self.overrides = {"rs9-translation-nonce": malformed}
+            with self.subTest(exact=exact):
+                row = probe_no_userns_ptrace(self.rt)
+                self.assertEqual(row["status"], "fail")
+                self.assertIs(row["details"]["etc_closed"], False)
+
     def test_same_userns_inode_and_translated_paths_pass(self):
         row = probe_no_userns_ptrace(self.rt)
         self.assertEqual((row["name"], row["status"]), ("proot-no-userns-ptrace", "pass"))

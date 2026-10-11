@@ -1,0 +1,46 @@
+{
+  "decision": "defer-proposed-host-forwarder",
+  "native_rerun_owed": true,
+  "observations": [
+    {
+      "deliberate_255_verified": true,
+      "orphaned_tracees": 0,
+      "outer_signal_guest_handler_observed": false,
+      "outer_wrapper_exit_code": null,
+      "process_group_control": {
+        "delivery_scope": "process-group",
+        "guest_handler_observed": true,
+        "orphaned_tracees": 0,
+        "status": "pass",
+        "wrapper_exit_code": 0
+      },
+      "raw_signal_returncode": 255,
+      "reason": "guest-signal-status-not-propagated",
+      "status": "fail",
+      "system": "x86_64-linux"
+    },
+    {
+      "deliberate_255_verified": true,
+      "orphaned_tracees": 0,
+      "outer_signal_guest_handler_observed": false,
+      "outer_wrapper_exit_code": null,
+      "process_group_control": {
+        "delivery_scope": "process-group",
+        "guest_handler_observed": true,
+        "orphaned_tracees": 0,
+        "status": "pass",
+        "wrapper_exit_code": 0
+      },
+      "raw_signal_returncode": 255,
+      "reason": "guest-signal-status-not-propagated",
+      "status": "fail",
+      "system": "aarch64-linux"
+    }
+  ],
+  "product_wrapper_changed": false,
+  "qualification_authority": false,
+  "reason": "detached-group-supervisor-cleanup-and-status-contract-unproven",
+  "required_nix_qualification_blocked": true,
+  "schema": "rs9.cont18-signal-disposition.v1",
+  "status_mapping_enabled": false
+}

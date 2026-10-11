@@ -30,6 +30,7 @@ def safe_details(details):
                     "writer_is_owner", "owner_is_root", "group_matches", "target_exists",
                     "parent_mode", "target_mode"})
     allowed.update({"path", "path_sha256"})
+    allowed.update({"scenario", "diagnostic_sha256"})
     result, dropped = {}, False
     if not isinstance(details, dict):
         return {}
@@ -63,6 +64,12 @@ def safe_details(details):
             continue
         if key == "errno":
             if isinstance(value, str) and re.fullmatch(r"E[A-Z0-9_]{1,31}|unknown", value):
+                result[key] = value
+            else:
+                dropped = True
+            continue
+        if key == "scenario":
+            if isinstance(value, str) and value in {"A", "B", "C", "C-signal"}:
                 result[key] = value
             else:
                 dropped = True

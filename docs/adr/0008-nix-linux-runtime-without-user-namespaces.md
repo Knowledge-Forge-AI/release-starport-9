@@ -2,6 +2,31 @@
 
 Status: PRoot dependency class authorized for a candidate-only experiment; product runtime not selected or qualified.
 
+## CONT18 diagnostic amendment
+
+Run 16 narrowed D-Bus startup failure to missing guest
+`/etc/dbus-1/session.conf` on both architectures. The experiment may supply
+that exact file from the existing pinned D-Bus store output, with closure
+validation, a singleton guest directory, exact identity readback and bounded
+transitive include audit. Relative include names resolve from the guest
+configuration location. No host configuration directory is exposed and
+the required FHS harness stays unchanged. Native application and descendant
+readback after repair is still required.
+
+Raw outer SIGTERM forwarding and signal-death status remain unresolved.
+Process-group control is diagnostic evidence only; exit 255 is never remapped.
+The proposed detached-group forwarder is deferred while its supervisor-death,
+process ownership and escaped-descendant cleanup contracts are unproven.
+
+Wheel causal diagnostics are an explicit x86 Linux lifecycle option.
+Retained data stays bounded and excludes raw process output: closed error
+categories, validated problem tokens and stream/receipt identities only.
+One failed-scenario replay in a fresh workspace cannot reverse the original
+failure or waive native verifier gates. Other smoke callers keep their
+existing execution and timeout behavior. No new package query or dependency
+is introduced. Rollback removes the CONT18 diagnostic option and experimental
+guest mapping without changing production gates, release bytes or pins.
+
 ## Context and preserved contracts
 
 Hosted run 6 could not start Nebular's `buildFHSEnv` runtime because creation

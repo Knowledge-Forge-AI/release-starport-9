@@ -424,6 +424,78 @@ class HostedWheelIsolationTests(unittest.TestCase):
     def test_linux_aarch64_nebular_lifecycle_fail_retains_four_records_burst_evidence_independent_gates(self):
         self._run_linux_nebular_lifecycle_fail_regression("aarch64-linux")
 
+    def test_x86_wheel_lifecycle_failure_retains_causal_diagnostic_artifact(self):
+        """Synthetic x86_64 wheel lifecycle retains causal diagnostic artifact on APPLICATION_SMOKE failure."""
+        diag_sha = "d" * 64
+
+        def side_effect_lifecycle(wheel_path, distribution_name, commands_to_test, venv_dir, cache_dir, command_prefix=None):
+            if "nebular_fusion" in wheel_path.name:
+                # Simulate application smoke failure with causal diagnostic
+                smoke_diag = self.scratch / "diagnostics/application-smoke-diagnostic.json"
+                smoke_diag.parent.mkdir(parents=True, exist_ok=True)
+                smoke_diag.write_text(json.dumps({
+                    "schema": "rs9.application-smoke-diagnostic.v1alpha1",
+                    "system": "x86_64-linux",
+                    "scenario": "C",
+                    "cause": "dbus-session-failure",
+                }))
+                raise ContractError("APPLICATION_SMOKE", "Released application-aware smoke failed",
+                                    details={"scenario": "C", "diagnostic_sha256": diag_sha, "cause": "dbus-session-failure"})
+            if "stellar_burst" in wheel_path.name:
+                verifier = commands_to_test["tfsb"]["verifier"]
+                verifier(self.scratch / "bin/tfsb", [], {"THEME_FORGE_CACHE_DIR": str(self.scratch / "cache")})
+            return {"installed": True}
+
+        # Build dummy wheels
+        wheel_map = {}
+        for pid in ("theme-forge-stellar-burst", "theme-forge-stellar-loom", "theme-forge-solar-sail", "theme-forge-nebular-fusion"):
+            w = MagicMock()
+            w.wheel_path = self.scratch / f"{pid.replace('-', '_')}-0.1.0-py3-none-linux_x86_64.whl"
+            w.filename = w.wheel_path.name
+            w.sha256 = "a" * 64
+            w.size = 100
+            w.tag = "py3-none-linux_x86_64"
+            w.can_publish = False
+            w.wheel_bytes = b"whl"
+            w.record = {"platform_specific": pid == "theme-forge-stellar-burst", "target_system": "x86_64-linux"}
+            wheel_map[pid] = w
+
+        captures = [(MagicMock(source={"package.json": "{}"}), {"project": {"id": pid}}, {}) for pid in wheel_map]
+        context = {"repository": self.repo, "scratch": self.scratch, "system": "x86_64-linux", "captures": captures}
+        receipt_path = self.scratch / "wheel-client-deb-receipt.json"
+        receipt_path.write_bytes(b"{}")
+
+        with patch("rs9.npm_deps.closure_for_capture", return_value=[]), \
+             patch("rs9.hosted_wheels.linux_runtime_prefix", return_value=[]), \
+             patch("subprocess.run", return_value=MagicMock(returncode=0)), \
+             patch("rs9.hosted_commands.run_probes", return_value=[{"name": "tfsb", "status": "pass"}]), \
+             patch("rs9.hosted_wheels.verify_double_build", side_effect=lambda b, pid, *a, **k: (wheel_map[pid], wheel_map[pid])), \
+             patch("rs9.hosted_wheels.verify_wheel_record_bidirectional", return_value={"record_valid": True, "member_count": 5}), \
+             patch("rs9.hosted_smoke.prepare_smoke", return_value={"source": self.scratch, "tools": self.scratch, "scratch": self.scratch, "records": []}), \
+             patch("rs9.hosted_wheels.verify_installed_burst", return_value={"status": "pass"}), \
+             patch("rs9.hosted_wheels.verify_offline_venv_lifecycle", side_effect=side_effect_lifecycle), \
+             patch("rs9.hosted_wheel_clients.qualify", return_value=([], [receipt_path])):
+            result = execute(context)
+
+        # Artifacts must retain BOTH lifecycle diagnostic AND application smoke diagnostic
+        artifact_names = [a.name for a in result["artifacts"]]
+        self.assertIn("application-smoke-diagnostic.json", artifact_names)
+        self.assertIn("theme-forge-nebular-fusion-lifecycle-diagnostic.json", artifact_names)
+
+        # Lifecycle diagnostic retains scenario and diagnostic_sha256 within safe_details
+        lifecycle_diag_path = self.scratch / "diagnostics/theme-forge-nebular-fusion-lifecycle-diagnostic.json"
+        self.assertTrue(lifecycle_diag_path.is_file())
+        lifecycle_diag = json.loads(lifecycle_diag_path.read_text())
+        self.assertEqual(lifecycle_diag["details"]["scenario"], "C")
+        self.assertEqual(lifecycle_diag["details"]["diagnostic_sha256"], diag_sha)
+        self.assertEqual(lifecycle_diag["details"]["cause"], "dbus-session-failure")
+
+        # Gates confirm failure
+        gate_map = {g["name"]: g for g in result["gates"]}
+        self.assertEqual(gate_map["lifecycle.theme-forge-nebular-fusion"]["status"], "fail")
+        self.assertEqual(gate_map["lifecycle.theme-forge-nebular-fusion"]["reason"], "APPLICATION_SMOKE")
+        self.assertEqual(gate_map["wheel-lifecycle-install-test"]["status"], "fail")
+
 
 if __name__ == "__main__":
     unittest.main()

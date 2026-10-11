@@ -1,0 +1,20 @@
+{
+  "configure_datadir": "/etc",
+  "configure_sysconfdir": "/etc",
+  "dbus_recipe": "pkgs/development/libraries/dbus/default.nix",
+  "dbus_recipe_sha256": "9499bc6c45b5e50f81a2a3ec6a2968c9281e1257cc6c27d3ce525be102aaea24",
+  "dbus_source_hash": "sha256-uh8h0r2dM52i1KqHgMCd8y/qh5mLc9ok9Jq53x42pQ8=",
+  "dbus_version": "1.14.10",
+  "install_datadir": "output/share",
+  "install_sysconfdir": "output/etc",
+  "linux_output_built": false,
+  "native_daemon_resolution_observed": false,
+  "native_transitive_includes_observed": false,
+  "nixpkgs_nar_hash_expected": "sha256-ESJ4VgytmAt+98YLM8466luln4HyEZ9Q36b9+Bb4P5w=",
+  "nixpkgs_nar_hash_observed": "sha256-ESJ4VgytmAt+98YLM8466luln4HyEZ9Q36b9+Bb4P5w=",
+  "nixpkgs_revision": "0921fdb3e13e40fe25fbc52b89661a9d6d32ac68",
+  "qualification_authority": false,
+  "schema": "rs9.cont18-pinned-dbus-source.v1",
+  "session_config_candidate": "output/share/dbus-1/session.conf",
+  "source_verified": true
+}

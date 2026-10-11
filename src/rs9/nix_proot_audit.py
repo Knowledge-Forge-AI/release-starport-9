@@ -1,12 +1,13 @@
 """Bounded guest-side command closure audit; references are diagnostic candidates."""
 import hashlib
 import json
+from rs9.nix_proot_dbus import DBUS_AUDIT_SOURCE, audit_dbus_config
 
 
 # Executed only by an explicit probe using the pinned guest Python. No host
 # filesystem substitution can establish guest visibility.
 GUEST_AUDIT_SOURCE = r'''
-import hashlib,json,os,re,shlex,shutil,stat,struct,sys
+import hashlib,json,os,re,shlex,shutil,stat,struct,sys,xml.etree.ElementTree as ET
 spec=json.loads(sys.argv[1])
 store=re.compile(r"/nix/store/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]+(?:/[A-Za-z0-9+._?=@~-]+)*")
 known=set(spec['closure'])
@@ -18,7 +19,7 @@ runtime_paths=('/etc/dbus-1/session.conf','/etc/dbus-1','/run','/var/run','/var/
 absolute_command=re.compile(r'/(?:usr/)?(?:bin|sbin)/[A-Za-z0-9+._-]+')
 def sha(raw): return hashlib.sha256(raw).hexdigest()
 def top(p):
-    return '/'.join(p.split('/')[:4]) if p.startswith('/nix/store/') else None
+    return '/'.join(p.split('/')[:4]) if p and p.startswith('/nix/store/') else None
 def path_fact(p):
     if any(p==b or p.startswith(b+'/') for b in binds):
         return {'path_class':'host-bind-state','path_sha256':sha(p.encode())}
@@ -131,23 +132,37 @@ while queue and len(files)<64:
         elif depth>=4 and target not in seen and os.path.isfile(target): limited=True
     files.append(rec)
 if queue: limited=True
-print(json.dumps({'schema':'rs9.proot-launch-audit.v1','status':'observed','references_are_candidates':True,
-    'roots':roots,'files':files,'audit_complete':not limited,'limits':{'files':64,'depth':4,'script_bytes':262144,'elf_bytes':16777216},
+
+
+''' + DBUS_AUDIT_SOURCE + r'''
+dbus_audit=audit_dbus_config(spec) if 'dbus_session_config' in spec else None
+out_status='fail' if dbus_audit and dbus_audit['status']=='fail' else 'observed'
+doc={'schema':'rs9.proot-launch-audit.v1','status':out_status,'references_are_candidates':True,
+    'roots':roots,'files':files,'audit_complete':not limited and (dbus_audit is None or dbus_audit['audit_complete']),
+    'limits':{'files':64,'depth':4,'script_bytes':262144,'elf_bytes':16777216},
     'filesystem':{'cwd':path_fact(os.getcwd()),'tmp_present':os.path.isdir('/tmp'),
         'tmp_writable':os.access('/tmp',os.W_OK),'x11_socket_directory_present':os.path.isdir('/tmp/.X11-unix'),
         'foreign_interpreter':reference(spec['foreign_interpreter'],'released-ELF-interpreter'),
-        'runtime_candidates':[reference(p,'runtime-file-candidate') for p in runtime_paths]}}))
+        'runtime_candidates':[reference(p,'runtime-file-candidate') for p in runtime_paths]}}
+if dbus_audit is not None:doc['dbus_config']=dbus_audit
+if out_status=='fail':doc['reason']=dbus_audit['reason']
+print(json.dumps(doc))
 '''
 
 
 def guest_audit(rt):
     """Execute the audit in the real guest and retain only its bounded safe record."""
-    roots = {k: rt.facts[k] for k in ("xvfb_run", "dbus_run_session", "python", "node")}
-    spec = {"roots": roots, "names": {"xvfb_run": "xvfb-run", "dbus_run_session": "dbus-run-session",
-                                     "python": "python3", "node": "node"},
+    roots = {k: rt.facts[k] for k in ("xvfb_run", "dbus_run_session", "dbus_daemon", "python", "node") if k in rt.facts}
+    names = {"xvfb_run": "xvfb-run", "dbus_run_session": "dbus-run-session",
+             "dbus_daemon": "dbus-daemon", "python": "python3", "node": "node"}
+    spec = {"roots": roots, "names": {k: names[k] for k in roots},
             "closure": rt.closure, "foreign_interpreter": rt.facts["foreign_interpreter"],
             "host_binds": [str(p) for p in (rt.layout.tmp_dir, rt.layout.cache_dir, rt.layout.loader_tmp,
                                             rt.layout.etc_dir, *rt.layout.workspaces)]}
+    if "dbus_session_config" in rt.facts:
+        spec["dbus_session_config"] = rt.facts["dbus_session_config"]
+    if "dbus_daemon" in rt.facts:
+        spec["dbus_daemon"] = rt.facts["dbus_daemon"]
     run = rt.run("launch-chain-static-audit", [rt.facts["python"], "-I", "-S", "-B", "-c",
                                              GUEST_AUDIT_SOURCE, json.dumps(spec)], timeout=45, cwd="/tmp")
     streams = {"exit_code": run.returncode, "signal": -run.returncode if run.returncode is not None and run.returncode < 0 else None,

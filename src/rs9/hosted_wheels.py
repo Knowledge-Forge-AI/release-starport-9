@@ -339,7 +339,7 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
                     raise ContractError("SIDECAR_REPRESENTATION", "Installed wheel did not materialize one payload")
                 if baseline is None:
                     raise ContractError("SIDECAR_BASELINE", "Runtime baseline must precede remaining command probes")
-                sidecar_details = verify_nebular_runtime(roots[0], prepared, system, prefix, env, baseline=baseline)
+                sidecar_details = verify_nebular_runtime(roots[0], prepared, system, prefix, env, baseline=baseline, diagnostic_extras=(system == "x86_64-linux"))
             if current_pid == "theme-forge-stellar-burst" and command == "tfsb":
                 burst_details = verify_installed_burst(path, product_records[current_pid], system,
                                                        scratch / "burst-probe", prefix, env)
@@ -381,6 +381,9 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
                 "details": safe_details(error_details),
             }))
             artifacts.append(diag_file)
+            smoke_diag = diagnostics_dir / "application-smoke-diagnostic.json"
+            if smoke_diag.is_file() and smoke_diag not in artifacts:
+                artifacts.append(smoke_diag)
             gates.append({"name": f"lifecycle.{product_id}", "status": "fail", "reason": err.code})
 
     gates.extend(probe_gates)

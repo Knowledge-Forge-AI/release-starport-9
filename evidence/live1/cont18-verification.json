@@ -1,0 +1,325 @@
+{
+  "candidate_adoption_ready": false,
+  "canonical_apgr_zip_receipt": "dispatcher-owned-finalization-pending",
+  "closeout": {
+    "broken_relative_links": 0,
+    "disposition": "amend",
+    "git_diff_check": "pass",
+    "independent_re_review_performed": false,
+    "inventory_hygiene": "498 bounded physical credential-scanned files; no unsafe modes or private operational paths in CONT18 documents/evidence",
+    "manager_handoff": "accept final exact tree and manifest plus partial-diagnostic attestation and canonical dispatcher ZIP/receipt before one possible attended nonproduction hosted run 17",
+    "metadata_refreshed_after_closeout_full_suites": true,
+    "rationale": "preserve original x86 comparison and real child status while making replay limitations explicit",
+    "relative_links_checked": 310,
+    "reviewed_producer_binding": {
+      "head": "50183be0935178de3d4799d39f31d22169400dad",
+      "tree": "4d21f9a37b4fa244b7bec8464492aa27d8ab2205"
+    },
+    "source_changed_after_closeout_full_suites": false,
+    "verification_not_run": [
+      "native Linux PRoot D-Bus and transitive-config readback",
+      "privileged Linux prefix cleanup and signal forwarding",
+      "released Linux x86 wheel reproduction",
+      "new hosted workflow or full hosted gates",
+      "new Pages network or configuration operations"
+    ],
+    "work_review_findings": {
+      "F1": {
+        "disposition": "amend",
+        "result": "original attempt retains legacy process, argv and timeout; only failure replay instrumented"
+      },
+      "F2": {
+        "disposition": "amend",
+        "result": "EPERM cannot skip bounded child wait or erase child status; reap timeout is separately recorded; native privileged cleanup unproven"
+      },
+      "F3": {
+        "disposition": "amend",
+        "result": "explicit withheld-or-unresolved causal evidence flag and expected hosted outcome; released problem format unverified"
+      },
+      "F4": {
+        "disposition": "defer",
+        "result": "exact installed pinned config and SELinux-root-relative semantics await native readback; no sys bind; static expected facts distinguished from shared observed audit"
+      },
+      "F5": {
+        "disposition": "amend",
+        "result": "unused replay parameter removed"
+      }
+    },
+    "workers": {
+      "disposition": "declined",
+      "reason": "tightly coupled terminal corrections handled locally; no additional substantive review permitted"
+    }
+  },
+  "closeout_report_and_inventory_amendments": [
+    "docs/live1-native-client-cont18.md",
+    "evidence/live1/cont18-verification.json",
+    "operators/live1/candidate-manifest.json"
+  ],
+  "closeout_source_amendments": [
+    "src/rs9/application_smoke_diagnostic.py",
+    "tests/test_application_smoke_diagnostic.py",
+    "tests/test_hosted_smoke.py"
+  ],
+  "dispatcher_closeout": "provider-local-terminal-amendment-verified-dispatcher-finalization-pending",
+  "dispatcher_pre_final_review": "reviewed_with_findings-advisory",
+  "focused_source_function_tests": {
+    "changed_boundaries": {
+      "errors": 0,
+      "failures": 0,
+      "modules": [
+        "test_application_smoke_diagnostic",
+        "test_hosted_smoke",
+        "test_hosted_wheels",
+        "test_nix_proot",
+        "test_nix_proot_audit",
+        "test_nix_proot_launch",
+        "test_run_hosted17"
+      ],
+      "passed": 179,
+      "runner_tests": 179,
+      "skipped": 0
+    },
+    "diagnostic_adverse_and_process": {
+      "errors": 0,
+      "failures": 0,
+      "module": "test_application_smoke_diagnostic",
+      "passed": 25,
+      "runner_tests": 25,
+      "skipped": 0
+    },
+    "platform": "Darwin",
+    "python": "3.13.12",
+    "resource_warning_policy": "error",
+    "synthetic_receipts_grant_native_authority": false
+  },
+  "full_live1_qualification": false,
+  "full_source_suites": [
+    {
+      "discovered_methods": 1878,
+      "elapsed_seconds": 69.276,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "passed_methods": 1847,
+      "platform": "Darwin",
+      "python": "3.13.12",
+      "resource_warning_messages": 0,
+      "resource_warning_policy": "error",
+      "runner_tests": 1868,
+      "skip_records": 22,
+      "skipped_methods": 31,
+      "success": true,
+      "umask": "022",
+      "unraisable_exceptions": []
+    },
+    {
+      "discovered_methods": 1878,
+      "elapsed_seconds": 67.291,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "passed_methods": 1847,
+      "platform": "Darwin",
+      "python": "3.13.12",
+      "resource_warning_messages": 0,
+      "resource_warning_policy": "error",
+      "runner_tests": 1868,
+      "skip_records": 22,
+      "skipped_methods": 31,
+      "success": true,
+      "umask": "077",
+      "unraisable_exceptions": []
+    }
+  ],
+  "hygiene": {
+    "bounded_credential_scanned_files": 498,
+    "private_material_retained": false,
+    "regular_physical_files": true,
+    "relative_links_checked": 310,
+    "schema": "rs9.cont18-hygiene-checks.v1",
+    "source_modes": "owner-readable-no-group-or-world-write-no-special-bits"
+  },
+  "index": {
+    "byte_digest_unchanged_from_closeout_snapshot": true,
+    "explicit_staging_commit_push_performed": false,
+    "optional_git_refresh_disabled": true,
+    "staged_entries_match_head": true
+  },
+  "initial_verification_harness_error": {
+    "cause": "repository-root-omitted-from-scratch-runner-import-path",
+    "excluded_from_source_gate_results": true,
+    "import_errors": 96,
+    "resolved": true
+  },
+  "native_linux_wheel_reproduction": "not-run-provider-darwin",
+  "native_proot_qualification": "not-run-provider-darwin",
+  "nix_parse": "pass",
+  "original_scope_preserved": true,
+  "preservation": {
+    "operational_scratch_and_serena_not_removed": true,
+    "production_nix_fhs_unchanged": true,
+    "raw_signal_and_wait_probes_unchanged": true,
+    "release_and_nix_pins_unchanged": true,
+    "required_lane_contract_unchanged": true,
+    "wheel_builder_and_asset_tags_unchanged": true,
+    "workflows_unchanged": true
+  },
+  "producer_cumulative_inspection": {
+    "dispatcher_checkpoint_satisfied": false,
+    "known_native_blockers": [
+      "NIX_FHS_USERNS-both-linux-systems",
+      "PRoot-application-and-WebKit-unqualified",
+      "PRoot-outer-signal-forwarding-fails",
+      "PRoot-guest-signal-status-collapses",
+      "x86-wheel-APPLICATION_SMOKE-regression-unresolved",
+      "Pages-origin-certificate-hostname-verification-62"
+    ],
+    "promotion_blockers_preserved": [
+      "linux-wheel-production-promotion-compatibility-unproven",
+      "rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"
+    ],
+    "record_scope": "historical-producer-before-work-review",
+    "source_changed_after_full_suites": false,
+    "status": "source-corrections-integrated"
+  },
+  "producer_focused_source_function_tests": {
+    "platform": "Darwin",
+    "proot": {
+      "errors": 0,
+      "failures": 0,
+      "passed": 155,
+      "runner_tests": 156,
+      "skipped": 1
+    },
+    "python": "3.13.12",
+    "synthetic_receipts_grant_native_authority": false,
+    "wheel_operator_hygiene": {
+      "errors": 0,
+      "failures": 0,
+      "passed": 57,
+      "runner_tests": 57,
+      "skipped": 0
+    }
+  },
+  "producer_full_source_suites": [
+    {
+      "discovered_methods": 1873,
+      "elapsed_seconds": 65.153,
+      "errors": 0,
+      "failures": 0,
+      "passed_methods": 1842,
+      "platform": "Darwin",
+      "python": "3.13.12",
+      "resource_warning_messages": 0,
+      "resource_warning_policy": "error",
+      "runner_tests": 1863,
+      "skip_records": 22,
+      "skipped_methods": 31,
+      "success": true,
+      "umask": "022"
+    },
+    {
+      "discovered_methods": 1873,
+      "elapsed_seconds": 65.022,
+      "errors": 0,
+      "failures": 0,
+      "passed_methods": 1842,
+      "platform": "Darwin",
+      "python": "3.13.12",
+      "resource_warning_messages": 0,
+      "resource_warning_policy": "error",
+      "runner_tests": 1863,
+      "skip_records": 22,
+      "skipped_methods": 31,
+      "success": true,
+      "umask": "077"
+    }
+  ],
+  "producer_index_observation": {
+    "byte_digest_unchanged": false,
+    "drift_cause": "unproven-optional-read-refresh-possible",
+    "explicit_staging_commit_push_performed": false,
+    "optional_git_refresh_disabled_for_remaining_checks": true,
+    "staged_entries_match_head": true
+  },
+  "producer_integration_amendments": [
+    "src/rs9/application_smoke_diagnostic.py",
+    "src/rs9/errors.py",
+    "src/rs9/hosted_smoke.py",
+    "src/rs9/nix_proot.py",
+    "src/rs9/nix_proot_audit.py",
+    "src/rs9/nix_proot_dbus.py",
+    "tests/test_application_smoke_diagnostic.py",
+    "tests/test_hosted_smoke.py",
+    "tests/test_nix_proot.py",
+    "tests/test_nix_proot_audit.py"
+  ],
+  "production_enabled": false,
+  "proposal_disposition": "amend",
+  "proposal_sha256": "4da89666921ac342465fa5db43ec924066575ca67c4f366e55ad8b10bec47ec7",
+  "publication_authority": false,
+  "published_linux_nix_ready": false,
+  "python_profile": {
+    "apg_fallback_max_new_callable_statements": 50,
+    "closeout_decision": "Orange: narrow replay-supervision correction; legacy gate preserved; adverse and real disposable process tests; rollback removes optional diagnostic replay",
+    "legacy_large_modules": "narrow-fixes-only-no-broad-refactor",
+    "level": "Orange",
+    "new_module_lines": {
+      "application_smoke_diagnostic.py": 324,
+      "nix_proot_dbus.py": 149
+    },
+    "reason": "bounded-optional-process-supervision-and-fixed-guest-source-execution",
+    "response": "isolated-source-modules-adverse-and-real-process-tests-explicit-scope-and-rollback"
+  },
+  "re_review_status": "not-performed-terminal-contract-prohibits-another-substantive-review",
+  "schema": "rs9.cont18-verification.v1",
+  "scratch_exception": "managed shared scratch root outside filesystem write permission; writable temporary root used",
+  "signal_forwarder": "deferred-unsafe-proposal",
+  "source_function_checks": {
+    "collection_subprocess_or_origin_started": false,
+    "dbus_guest_function_statement_counts_apg_fallback": {
+      "audit_dbus_config": 26,
+      "d_entries": 7,
+      "d_include": 22,
+      "d_path": 11,
+      "d_read": 17,
+      "d_top": 1,
+      "d_traverse": 50
+    },
+    "dbus_guest_source_sha256": "25dbeb9709442970800f695a17b15934a723e9c206092cdb28b3f78f78bf431d",
+    "guarded_collection_methods": 1878,
+    "guest_audit_compile": "pass",
+    "python_compile_files": 282,
+    "qualification_scope": "final-source-bytes-no-native-authority",
+    "resource_warning_policy": "error",
+    "schema": "rs9.cont18-source-function-checks.v1"
+  },
+  "stage": "closeout",
+  "stage_deltas_before_work": [],
+  "status": "terminal-source-tests-pass-native-qualification-pending",
+  "workers": [
+    {
+      "cleanup_proven": true,
+      "disposition": "partial-adopted-parent-amended",
+      "kind": "gemini",
+      "task": "dbus",
+      "used": true
+    },
+    {
+      "cleanup_proven": true,
+      "disposition": "partial-adopted-parent-amended",
+      "kind": "gemini",
+      "task": "wheel",
+      "used": true
+    },
+    {
+      "cleanup_proven": true,
+      "disposition": "accepted-bounded-evidence-forwarder-deferred",
+      "kind": "gemini",
+      "task": "signal-investigation",
+      "used": true
+    }
+  ]
+}
