@@ -183,6 +183,7 @@ class HostedFoundation3Tests(unittest.TestCase):
                     "size": len(deb_pkg_bytes),
                     "sha256": deb_pkg_sha,
                     "kind": "custody",
+                    "role": "binary-package",
                     "promotion": "candidate-only",
                 }
             ],

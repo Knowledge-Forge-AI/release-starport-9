@@ -10,6 +10,23 @@ Lane receipts state preparation network access separately from the runtime denia
 
 The manifest includes schema, lane/system, runner/tool facts, files, production_enabled:false, publication_authority:false and qualification_receipt_hashes. Files carry kind:custody|evidence and promotion:candidate-only|candidate-policy-pending|fixture-test-only. Unsigned RPM custody and fixture-signed RPM identities are distinct. Linux Nebular wheels are candidate-policy-pending.
 
+Current package custody also declares a producer role: binary-package,
+source-package-evidence, fixture-signed-copy or unclassified-package. Source RPMs
+remain retained reproducibility evidence with their original object identity and
+source/system bindings. They cannot satisfy installable binary presence or
+architecture requirements. The shared role contract checks producer provenance
+and actual RPM package type; declarations do not override package bytes.
+Unclassified packages fail closed. Historical manifests without roles may be
+read for diagnostics but do not acquire current qualification authority.
+An unclassified object is retained with its explicit unknown role; the receipt
+records `custody_role_failures` and preserves an earlier causal execution error,
+or records `CUSTODY_ROLE` when no earlier error exists. Other objects and the
+hash-bound receipt remain available. Quarantine copies retain their unsigned
+candidate role. Fixture copies must match the lane's expected product architecture
+and cannot satisfy candidate binary presence.
+Unsigned custody bundle entries use their bundle provenance rather than a
+basename-derived fixture role.
+
 Uploaded archive digests are produced by GitHub artifact storage, outside the logical manifest (embedding an archive's own digest would be circular). The operator binds API artifact ID/name/digest/size/expiry to the exact run and commit and preserves these fields in its packet. Future consumers must check both archive custody and every logical object.
 
 Pages tree inventory includes all paths and object hashes. Merkle leaves hash 0x00 followed by a four-byte big-endian UTF-8 path length, the path bytes and the 32-byte content SHA-256. Interior nodes hash 0x01 plus left/right hashes. Leaves are sorted by path bytes; odd nodes are promoted unchanged. Empty inventories are refused. The implementation and test vectors in pages.py are authority. A public tree up to 2 GiB is retained whole. The split fallback retains the tree index, non-package objects and newly fixture-signed RPM objects because signing changes their bytes; unchanged package bytes are held by their family artifact manifests.

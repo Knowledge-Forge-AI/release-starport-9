@@ -59,3 +59,4 @@ Ecosystem-specific operator and adapter documentation will be added as individua
 - [CONT13 RPM repository repair](live1-native-client-cont13.md) — Explicit writer ownership, deterministic noarch inputs, retained partial evidence and attended run-12 handoff.
 - [CONT14 DNF contracts and noarch headers](live1-native-client-cont14.md) — Canonical state inventory, strict causal trust negatives, finished header readback and attended run-13 handoff.
 - [CONT15 DNF diagnostics and gzip metadata](live1-native-client-cont15.md) — Ordered terminal failures, bounded same-command presentation, verified public metadata and attended run-14 handoff.
+- [CONT16 evidence consumers and Pages transport](live1-native-client-cont16.md) — Source and binary custody roles, canonical publication adapters, bounded TLS diagnostics and attended run-15 handoff.

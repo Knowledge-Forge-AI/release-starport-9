@@ -118,9 +118,23 @@ def retain(scratch, output, files, record):
         else:
             shutil.copyfile(source, target)
         kind = "custody" if target.name.endswith((".whl", ".rpm", ".deb", ".pkg.tar.zst", ".pkg.tar.xz")) else "evidence"
-        fixture_copy = kind == "custody" and record["lane"] in {"rpm", "pacman", "pages"} and "unsigned" not in relative and "custody" not in relative
-        rows.append({"path": target.relative_to(output).as_posix(), **file_identity(target), "kind": kind,
-                     "promotion": "fixture-test-only" if fixture_copy else "candidate-policy-pending" if target.suffix == ".whl" and target.stem.rsplit("-", 1)[-1].startswith("linux_") else "candidate-only"})
+        role = None
+        if kind == "custody":
+            from rs9.package_roles import producer_role, UNCLASSIFIED_PACKAGE
+            role = producer_role(record["lane"], relative)
+            if role == UNCLASSIFIED_PACKAGE:
+                # Preserve the object and all other evidence while refusing its
+                # authority. Role verification rejects this explicit unknown role.
+                record.setdefault("custody_role_failures", []).append({
+                    "path": target.relative_to(output).as_posix(), "code": "CUSTODY_ROLE"})
+                if not record.get("execution_error"):
+                    record["execution_error"] = "CUSTODY_ROLE"
+        fixture_copy = role == "fixture-signed-copy"
+        row = {"path": target.relative_to(output).as_posix(), **file_identity(target), "kind": kind,
+               "promotion": "fixture-test-only" if fixture_copy else "candidate-policy-pending" if target.suffix == ".whl" and target.stem.rsplit("-", 1)[-1].startswith("linux_") else "candidate-only"}
+        if kind == "custody":
+            row["role"] = role
+        rows.append(row)
     receipt_name = record["lane"] + "-" + record["system"] + ".json"
     raw = canonical(record)
     scan_for_credentials(raw.decode())

@@ -1,0 +1,839 @@
+{
+  "candidate_adoption_ready": false,
+  "checks": {
+    "focused_integrated_paths": {
+      "class_skips": [],
+      "foundation3_real_product_adapter_paths": 16,
+      "individual_skips": [
+        {
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+        }
+      ],
+      "passed": 159,
+      "resource_warning_policy": "error",
+      "rpm_policy_records_current_package_bound": 8,
+      "run": 160,
+      "status": "pass"
+    },
+    "full_unittest": [
+      {
+        "class_skips": [
+          {
+            "affected_methods": 10,
+            "class": "tests.test_signing_fixture.SigningFixtureTests",
+            "reason": "GnuPG binary not available in environment"
+          }
+        ],
+        "discovered_methods": 1780,
+        "duration_seconds": 62.833,
+        "errors": [],
+        "failures": [],
+        "individual_skips": [
+          {
+            "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+            "test": "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported"
+          },
+          {
+            "reason": "sandbox denies local socket creation; socket record grammar tested separately",
+            "test": "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read"
+          },
+          {
+            "reason": "GnuPG unavailable; native DNF remains unavailable independently",
+            "test": "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available"
+          },
+          {
+            "reason": "GnuPG binary not available",
+            "test": "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+          },
+          {
+            "reason": "live capture directory not supplied",
+            "test": "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison"
+          },
+          {
+            "reason": "live capture directory not supplied",
+            "test": "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens"
+          },
+          {
+            "reason": "live capture directory not supplied",
+            "test": "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift"
+          },
+          {
+            "reason": "both live capture directories required",
+            "test": "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core"
+          },
+          {
+            "reason": "live capture directory not supplied",
+            "test": "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records"
+          },
+          {
+            "reason": "official archive directory not locatable",
+            "test": "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin"
+          },
+          {
+            "reason": "official archive directory not locatable",
+            "test": "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux"
+          },
+          {
+            "reason": "official archive directory not locatable",
+            "test": "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux"
+          },
+          {
+            "reason": "GnuPG binary not available",
+            "test": "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture"
+          },
+          {
+            "reason": "GnuPG binary not available",
+            "test": "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper"
+          },
+          {
+            "reason": "distinct real writer ownership needs root and POSIX fork",
+            "test": "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive"
+          },
+          {
+            "reason": "Run 13 public metadata reference requires RS9_RUN13_REFERENCE_DIR",
+            "test": "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression"
+          },
+          {
+            "reason": "exact captured references supplied by attended evidence replay",
+            "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes"
+          },
+          {
+            "reason": "native pinned RPM 6.0.2 tools unavailable",
+            "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge"
+          },
+          {
+            "reason": "RUN12 reference directory not supplied",
+            "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references"
+          },
+          {
+            "reason": "Real GnuPG binary not available on this host",
+            "test": "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available"
+          }
+        ],
+        "passed": 1750,
+        "resource_warning_occurrences": 0,
+        "run": 1770,
+        "status": "pass",
+        "umask": "022"
+      },
+      {
+        "class_skips": [
+          {
+            "affected_methods": 10,
+            "class": "tests.test_signing_fixture.SigningFixtureTests",
+            "reason": "GnuPG binary not available in environment"
+          }
+        ],
+        "discovered_methods": 1780,
+        "duration_seconds": 63.913,
+        "errors": [],
+        "failures": [],
+        "individual_skips": [
+          {
+            "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+            "test": "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported"
+          },
+          {
+            "reason": "sandbox denies local socket creation; socket record grammar tested separately",
+            "test": "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read"
+          },
+          {
+            "reason": "GnuPG unavailable; native DNF remains unavailable independently",
+            "test": "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available"
+          },
+          {
+            "reason": "GnuPG binary not available",
+            "test": "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+          },
+          {
+            "reason": "live capture directory not supplied",
+            "test": "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison"
+          },
+          {
+            "reason": "live capture directory not supplied",
+            "test": "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens"
+          },
+          {
+            "reason": "live capture directory not supplied",
+            "test": "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift"
+          },
+          {
+            "reason": "both live capture directories required",
+            "test": "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core"
+          },
+          {
+            "reason": "live capture directory not supplied",
+            "test": "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records"
+          },
+          {
+            "reason": "official archive directory not locatable",
+            "test": "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin"
+          },
+          {
+            "reason": "official archive directory not locatable",
+            "test": "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux"
+          },
+          {
+            "reason": "official archive directory not locatable",
+            "test": "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux"
+          },
+          {
+            "reason": "GnuPG binary not available",
+            "test": "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture"
+          },
+          {
+            "reason": "GnuPG binary not available",
+            "test": "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper"
+          },
+          {
+            "reason": "distinct real writer ownership needs root and POSIX fork",
+            "test": "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive"
+          },
+          {
+            "reason": "Run 13 public metadata reference requires RS9_RUN13_REFERENCE_DIR",
+            "test": "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression"
+          },
+          {
+            "reason": "exact captured references supplied by attended evidence replay",
+            "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes"
+          },
+          {
+            "reason": "native pinned RPM 6.0.2 tools unavailable",
+            "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge"
+          },
+          {
+            "reason": "RUN12 reference directory not supplied",
+            "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references"
+          },
+          {
+            "reason": "Real GnuPG binary not available on this host",
+            "test": "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available"
+          }
+        ],
+        "passed": 1750,
+        "resource_warning_occurrences": 0,
+        "run": 1770,
+        "status": "pass",
+        "umask": "077"
+      }
+    ],
+    "operator_and_workflow": {
+      "passed": 26,
+      "resource_warning_policy": "error",
+      "run": 26,
+      "status": "pass"
+    },
+    "source_static": {
+      "bytecode_written": false,
+      "candidate_inventory_files": 473,
+      "candidate_manifest_exact_inventory": "pass",
+      "changed_paths": 32,
+      "changed_python_files_parse_compile": 26,
+      "credential_private_path_scan_files": 32,
+      "diff_whitespace": "pass",
+      "index_changes": false,
+      "python_files_parse_compile": 267,
+      "readiness_production_publication_flags": false,
+      "relative_links_checked": 47,
+      "status": "pass",
+      "workflow_and_production_configuration_changes": false
+    }
+  },
+  "entry": {
+    "branch": "main",
+    "index_changes": false,
+    "live_remote_read": "unavailable",
+    "source_commit": "84d5921c40306bb24b12c69b85667c0b147220a7",
+    "source_tree": "0a6ba1ccb4cc996ee3934b9c04cd75c3e7f2fc4f",
+    "tracking_divergence": [
+      0,
+      0
+    ]
+  },
+  "final_verification": "provider-local-terminal-closeout",
+  "integration_amendments": [
+    "source RPM type uses lead and typed SOURCEPACKAGE; source ARCH is not runtime architecture",
+    "source object requires exact name-size-hash reproducibility declaration and actual source hash",
+    "current roles require exact hosted source producer path; nosrc/unknown formats fail closed",
+    "binary RPM header architecture must agree with filename and supported runtime set",
+    "promotion union retains valid tokens beside malformed values and malformed policy remains causal",
+    "origin CLI and bounded killed-and-reaped DNS resolver added; body deadline and redirect metadata retained",
+    "Foundation3 corrective attempt adopted after current package-bound producer raw/policy references and source evidence replace archived substitutes",
+    "Pages verifies actual RPM binary type at authenticated unsigned-bundle ingestion; whole-file noarch equality remains unchanged",
+    "legacy orchestration and Pages external-tool doubles emit valid typed RPM bytes rather than placeholder or header-incomplete data",
+    "raw custody continues validating the selected derivation projection and evidence reference"
+  ],
+  "intermediate_findings": [
+    {
+      "cause": "legacy rpmbuild double used placeholder package bytes",
+      "disposition": "repaired fixture to real source/binary headers without weakening consumer checks"
+    },
+    {
+      "cause": "Pages fixture RPM headers lacked ARCH and a conflict test reused the old incomplete helper",
+      "disposition": "repaired typed fixture while preserving complete-byte equality and assembly expectations"
+    }
+  ],
+  "live_pages_origin_diagnostic": {
+    "class": "dns-unknown",
+    "code": 8,
+    "github_pages_settings_read": "not-requested",
+    "origin_verified": false,
+    "path": "CNAME",
+    "remote_certificate_cause_established": false,
+    "schema": "rs9.pages-origin-diagnostic.v1alpha1",
+    "stage": "dns",
+    "state": "unknown",
+    "target": "rs9.knowledge-forge.ai"
+  },
+  "observed_entry_stage_deltas": [],
+  "original_plan_review": {
+    "authority": "dispatcher",
+    "findings": 9,
+    "outcome": "reviewed_with_findings"
+  },
+  "original_source_replays": {
+    "apt_required_gates": 20,
+    "debian_adapter": "ADAPTER_GATES",
+    "dnf_required_gates": 20,
+    "kit_tls_script": "unavailable-optional-cryptography",
+    "rpm_aarch64": "CUSTODY_ARCHITECTURE",
+    "rpm_adapter": "ADAPTER_GATES",
+    "rpm_x86_64": "CUSTODY_ARCHITECTURE",
+    "supplied_memorybio_tls_result": "native-type-lost-on-string-reason",
+    "unknown_adapter": "ADAPTER_GATES"
+  },
+  "pre_final_review": {
+    "advisory": true,
+    "authority": "dispatcher",
+    "identity_independently_recomputed": false,
+    "original_text": "Read-only inspection of the working-tree candidate (no tests or git run; tree/manifest hash identity not independently recomputed). Core repairs are substantively correct: explicit package roles with producer-pinned source-RPM path and bounded RPM header type verification; presence checks use is_installable_binary only; src/nosrc not added to architecture sets; source evidence bound exactly by name/size/sha to reproducibility declarations; promotion restrictions computed in an independent guarded step and the conservative union enforced in validate_summary; centralized family/format->canonical adapter mapping (deb->apt, rpm->dnf, pacman->pacman) failing closed with UNKNOWN_ADAPTER, ADAPTER_GATES unchanged with no aliases, destination id/revision scheme/qualification scope preserved, bounded partial results on later failure consumed by hosted_pipeline; classify_tls_error now checks typed SSL exceptions before unwrapping, with bounded cycle-safe unwrapping (max 4 levels) and bounded verify_code; pages_origin keeps CERT_REQUIRED + check_hostname, refuses redirects, failure=unknown, absent only on exact 404 over verified TLS. Findings (advisory): (1) MEDIUM: hosted_observe.execute unconditionally calls diagnose_pages_origin(path='CNAME') (src/rs9/hosted_observe.py:388-389), but most HostedObserveExecutionTests patch read_pages and not diagnose_pages_origin (only tests/test_hosted_observe.py:1130 does); e.g. test_failure_g_real_record_shape_regression (lines 310-320) therefore performs a live DNS child process, TCP, TLS and HTTP GET to rs9.knowledge-forge.ai during the unit suite. Tests pass offline because states are not asserted, but the suite has outbound side effects and latency, and the reported qualification run probably attempted network access. Patch it in class setUp or inject it. (2) LOW-MEDIUM: retain() raises CUSTODY_ROLE for any unclassified package (src/rs9/hosted_custody.py:122-126) and hosted_pipeline calls retain outside its try/partial-result boundary (src/rs9/hosted_pipeline.py:231), so one unexpected package path drops the entire lane manifest/receipt instead of recording a bounded failure and retaining remaining evidence. (3) LOW: fixture-signed-copy is inferred by a negative substring rule (src/rs9/package_roles.py:88-93); the real failure path lane-work/quarantine/<name>.rpm (unsigned, construction-verified candidate; src/rs9/hosted_packaging.py:629-638, collected at src/rs9/hosted_pipeline.py:229) is labelled fixture-signed-copy/fixture-test-only. No authority upgrade, but binary/fixture distinguishability is not exact. (4) LOW: validate_product_architectures now checks only binary-package rows (src/rs9/hosted_summary.py:33-35); fixture-signed copies (what client gates install) are no longer checked against the lane's expected system. RPM copies only get header/filename self-consistency and membership in {x86_64,aarch64,noarch}; pacman fixture copies get no type check. (5) LOW: the run-14 manifests fixture is used only for the historical architecture diagnostic and authority rejection; no test replays the exact run-14 custody path set (lane-work/unsigned, unsigned-custody/files, rpm/fedora/43/<arch>/Packages fixture copies, unsigned-source) through producer_role/retain and checks that roles and promotions match the historical promotions. The retain->summarize integration test uses 'unsigned/' without the lane-work prefix and omits the fixture and unsigned-custody copies. (6) NITS: operators/live1/run-hosted15.py is recorded mode 100644 versus 100755 for run-hosted10..14 (works via the documented python3 invocation); the diagnostic message 'TLS verification failed: <token>' is also emitted for handshake/protocol/eof classes (src/rs9/readers.py:671,683; src/rs9/pages_origin.py:281).",
+    "outcome": "reviewed_with_findings",
+    "reviewed_binding": {
+      "head": "84d5921c40306bb24b12c69b85667c0b147220a7",
+      "kind": "git_tree",
+      "manifest_sha256": "d02b259db251a2f85fed44667dddb22419e284ac883e96d6e397435ef983c263",
+      "tree": "ba69c9e9ba74ba86083d90cf8d06e2c57f7620fa"
+    },
+    "tests_run_by_reviewer": false
+  },
+  "production_enabled": false,
+  "proposal_binding": {
+    "bytes": 15283,
+    "schema": "agent-phase-plan-material-v1",
+    "sha256": "f2a23a730155e99c7ee1d27b2f1b6d1f915a8e7986c90c14e72cd1d3f6272e17"
+  },
+  "proposal_disposition": "amend",
+  "publication_authority": false,
+  "publication_or_destination_mutations_performed": false,
+  "retained_hosted_successes": {
+    "assembled_pages": "112/112",
+    "deb_amd64": "41/41",
+    "deb_arm64": "41/41",
+    "fresh_local_native_execution": false,
+    "pacman_x86_64": "40/40",
+    "pages_tree_files": 67,
+    "rpm_aarch64": "50/50",
+    "rpm_x86_64": "50/50"
+  },
+  "retained_limits": {
+    "accepted_preservation_policies": 8,
+    "darwin_wheel_offline_isolation": "not-run",
+    "linux_nix_namespace": "required-unqualified",
+    "official_fedora_admission": false,
+    "pages_live_origin": "unknown",
+    "pypi_published": false,
+    "raw_rpmlint_exit_code": 64,
+    "raw_rpmlint_status": "fail"
+  },
+  "run15": {
+    "acceptance_required": "external-manager-exact-byte-attestation",
+    "automatic_rerun": false,
+    "executed": false,
+    "operator": "operators/live1/run-hosted15.py",
+    "readiness_flags_remain_false": true,
+    "shared_contract": "operators/live1/attended_run.py",
+    "status": "prepared-only",
+    "workflow_runs_per_invocation": 1
+  },
+  "schema": "rs9.cont16-producer-verification.v1",
+  "small_packet_verification": {
+    "artifact_manifests": 18,
+    "canonical_receipt_hashes": 16,
+    "large_package_bytes_independently_reverified": false,
+    "present_objects": 146,
+    "selection_records": 170,
+    "status": "pass"
+  },
+  "stage": "implementation_testing",
+  "status": "terminal-closeout-source-verification-passed",
+  "terminal_closeout": {
+    "additional_substantive_review_obtained": false,
+    "changed_paths_after_work_review": [
+      "docs/live1-native-client-cont16.md",
+      "docs/specs/rs9-hosted-artifact-set-v1alpha2.md",
+      "evidence/live1/cont16-verification.json",
+      "operators/live1/candidate-manifest.json",
+      "src/rs9/hosted_custody.py",
+      "src/rs9/hosted_summary.py",
+      "src/rs9/package_roles.py",
+      "src/rs9/pages_origin.py",
+      "src/rs9/readers.py",
+      "tests/test_hosted_observe.py",
+      "tests/test_hosted_summary_roles.py",
+      "tests/test_package_roles.py",
+      "tests/test_rpm_orchestration.py"
+    ],
+    "changes_after_work_review": true,
+    "checks": {
+      "focused_batches": [
+        {
+          "passed": 79,
+          "resource_warning_policy": "error",
+          "run": 79
+        },
+        {
+          "passed": 78,
+          "resource_warning_policy": "error",
+          "run": 78
+        }
+      ],
+      "focused_commands": [
+        "python3 -W error::ResourceWarning -m unittest tests.test_hosted_summary_roles tests.test_package_roles tests.test_hosted_observe tests.test_tls_classification tests.test_pages_origin -q",
+        "python3 -W error::ResourceWarning -m unittest tests.test_rpm_orchestration tests.test_rpm_consumer_custody tests.test_hosted_foundation3 tests.test_foundation3_adapters tests.test_hosted_summary tests.test_live1_readers_operator tests.test_run_hosted15 tests.test_pages_diagnostic_custody -q"
+      ],
+      "full_unittest": [
+        {
+          "class_skips": [
+            {
+              "affected_methods": 10,
+              "class": "test_signing_fixture.SigningFixtureTests",
+              "reason": "GnuPG binary not available in environment"
+            }
+          ],
+          "discovered_methods": 1784,
+          "duration_seconds": 63.733,
+          "errors": [],
+          "failures": [],
+          "individual_skips": [
+            {
+              "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+              "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported"
+            },
+            {
+              "reason": "sandbox denies local socket creation; socket record grammar tested separately",
+              "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read"
+            },
+            {
+              "reason": "GnuPG unavailable; native DNF remains unavailable independently",
+              "test": "test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available"
+            },
+            {
+              "reason": "GnuPG binary not available",
+              "test": "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+            },
+            {
+              "reason": "live capture directory not supplied",
+              "test": "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison"
+            },
+            {
+              "reason": "live capture directory not supplied",
+              "test": "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens"
+            },
+            {
+              "reason": "live capture directory not supplied",
+              "test": "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift"
+            },
+            {
+              "reason": "both live capture directories required",
+              "test": "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core"
+            },
+            {
+              "reason": "live capture directory not supplied",
+              "test": "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records"
+            },
+            {
+              "reason": "official archive directory not locatable",
+              "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_darwin"
+            },
+            {
+              "reason": "official archive directory not locatable",
+              "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_linux"
+            },
+            {
+              "reason": "official archive directory not locatable",
+              "test": "test_nix_installer.OfficialArchiveTests.test_x86_64_linux"
+            },
+            {
+              "reason": "GnuPG binary not available",
+              "test": "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture"
+            },
+            {
+              "reason": "GnuPG binary not available",
+              "test": "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper"
+            },
+            {
+              "reason": "distinct real writer ownership needs root and POSIX fork",
+              "test": "test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive"
+            },
+            {
+              "reason": "Run 13 public metadata reference requires RS9_RUN13_REFERENCE_DIR",
+              "test": "test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression"
+            },
+            {
+              "reason": "exact captured references supplied by attended evidence replay",
+              "test": "test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes"
+            },
+            {
+              "reason": "native pinned RPM 6.0.2 tools unavailable",
+              "test": "test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge"
+            },
+            {
+              "reason": "RUN12 reference directory not supplied",
+              "test": "test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references"
+            },
+            {
+              "reason": "Real GnuPG binary not available on this host",
+              "test": "test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available"
+            }
+          ],
+          "passed": 1754,
+          "resource_warning_occurrences": 0,
+          "resource_warning_policy": "error",
+          "run": 1774,
+          "status": "pass",
+          "umask": "022",
+          "unraisable_exception_types": []
+        },
+        {
+          "class_skips": [
+            {
+              "affected_methods": 10,
+              "class": "test_signing_fixture.SigningFixtureTests",
+              "reason": "GnuPG binary not available in environment"
+            }
+          ],
+          "discovered_methods": 1784,
+          "duration_seconds": 63.854,
+          "errors": [],
+          "failures": [],
+          "individual_skips": [
+            {
+              "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+              "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported"
+            },
+            {
+              "reason": "sandbox denies local socket creation; socket record grammar tested separately",
+              "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read"
+            },
+            {
+              "reason": "GnuPG unavailable; native DNF remains unavailable independently",
+              "test": "test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available"
+            },
+            {
+              "reason": "GnuPG binary not available",
+              "test": "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+            },
+            {
+              "reason": "live capture directory not supplied",
+              "test": "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison"
+            },
+            {
+              "reason": "live capture directory not supplied",
+              "test": "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens"
+            },
+            {
+              "reason": "live capture directory not supplied",
+              "test": "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift"
+            },
+            {
+              "reason": "both live capture directories required",
+              "test": "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core"
+            },
+            {
+              "reason": "live capture directory not supplied",
+              "test": "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records"
+            },
+            {
+              "reason": "official archive directory not locatable",
+              "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_darwin"
+            },
+            {
+              "reason": "official archive directory not locatable",
+              "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_linux"
+            },
+            {
+              "reason": "official archive directory not locatable",
+              "test": "test_nix_installer.OfficialArchiveTests.test_x86_64_linux"
+            },
+            {
+              "reason": "GnuPG binary not available",
+              "test": "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture"
+            },
+            {
+              "reason": "GnuPG binary not available",
+              "test": "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper"
+            },
+            {
+              "reason": "distinct real writer ownership needs root and POSIX fork",
+              "test": "test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive"
+            },
+            {
+              "reason": "Run 13 public metadata reference requires RS9_RUN13_REFERENCE_DIR",
+              "test": "test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression"
+            },
+            {
+              "reason": "exact captured references supplied by attended evidence replay",
+              "test": "test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes"
+            },
+            {
+              "reason": "native pinned RPM 6.0.2 tools unavailable",
+              "test": "test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge"
+            },
+            {
+              "reason": "RUN12 reference directory not supplied",
+              "test": "test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references"
+            },
+            {
+              "reason": "Real GnuPG binary not available on this host",
+              "test": "test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available"
+            }
+          ],
+          "passed": 1754,
+          "resource_warning_occurrences": 0,
+          "resource_warning_policy": "error",
+          "run": 1774,
+          "status": "pass",
+          "umask": "077",
+          "unraisable_exception_types": []
+        }
+      ],
+      "full_unittest_command": "rtk proxy env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -W error::ResourceWarning - <022|077>; inline runner sets os.umask and runs unittest.defaultTestLoader.discover('tests')",
+      "initial_full_run": {
+        "class_skips": [
+          {
+            "affected_methods": 10,
+            "class": "test_signing_fixture.SigningFixtureTests",
+            "reason": "GnuPG binary not available in environment"
+          }
+        ],
+        "discovered_methods": 1784,
+        "duration_seconds": 63.384,
+        "errors": [
+          {
+            "test": "test_adoption_scratch.AdoptionScratchTests.test_live_checkout_verification_preserves_real_index_contents",
+            "traceback_sha256": "94bf0ae3ad8da69a8826278cc1b31159d1ad3ecf7fdcc2b52a218ee3b6fd7393"
+          },
+          {
+            "test": "test_candidate_inventory.CandidateInventoryTests.test_manifest_matches_full_live_product_delta",
+            "traceback_sha256": "8a62947a5acc244da1320d6b898be15b9690d1821d581f33b8ff4ac29d9ff7e7"
+          }
+        ],
+        "failures": [],
+        "individual_skips": [
+          {
+            "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+            "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported"
+          },
+          {
+            "reason": "sandbox denies local socket creation; socket record grammar tested separately",
+            "test": "test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read"
+          },
+          {
+            "reason": "GnuPG unavailable; native DNF remains unavailable independently",
+            "test": "test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available"
+          },
+          {
+            "reason": "GnuPG binary not available",
+            "test": "test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+          },
+          {
+            "reason": "live capture directory not supplied",
+            "test": "test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison"
+          },
+          {
+            "reason": "live capture directory not supplied",
+            "test": "test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens"
+          },
+          {
+            "reason": "live capture directory not supplied",
+            "test": "test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift"
+          },
+          {
+            "reason": "both live capture directories required",
+            "test": "test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core"
+          },
+          {
+            "reason": "live capture directory not supplied",
+            "test": "test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records"
+          },
+          {
+            "reason": "official archive directory not locatable",
+            "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_darwin"
+          },
+          {
+            "reason": "official archive directory not locatable",
+            "test": "test_nix_installer.OfficialArchiveTests.test_aarch64_linux"
+          },
+          {
+            "reason": "official archive directory not locatable",
+            "test": "test_nix_installer.OfficialArchiveTests.test_x86_64_linux"
+          },
+          {
+            "reason": "GnuPG binary not available",
+            "test": "test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture"
+          },
+          {
+            "reason": "GnuPG binary not available",
+            "test": "test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper"
+          },
+          {
+            "reason": "distinct real writer ownership needs root and POSIX fork",
+            "test": "test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive"
+          },
+          {
+            "reason": "Run 13 public metadata reference requires RS9_RUN13_REFERENCE_DIR",
+            "test": "test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression"
+          },
+          {
+            "reason": "exact captured references supplied by attended evidence replay",
+            "test": "test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes"
+          },
+          {
+            "reason": "native pinned RPM 6.0.2 tools unavailable",
+            "test": "test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge"
+          },
+          {
+            "reason": "RUN12 reference directory not supplied",
+            "test": "test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references"
+          },
+          {
+            "reason": "Real GnuPG binary not available on this host",
+            "test": "test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available"
+          }
+        ],
+        "passed": 1752,
+        "resource_warning_occurrences": 0,
+        "resource_warning_policy": "error",
+        "run": 1774,
+        "status": "fail",
+        "umask": "022",
+        "unraisable_exception_types": []
+      },
+      "initial_full_run_disposition": "Two errors were stale-manifest inventory checks; refreshed inventory and both checks passed. Full gate is rerun.",
+      "operator_and_workflow": {
+        "command": "python3 -W error::ResourceWarning -m unittest tests.test_workflow_static tests.test_scoped_workflow_graph tests.test_live1_readers_operator tests.test_run_hosted15 -q",
+        "passed": 29,
+        "run": 29,
+        "status": "pass"
+      },
+      "small_packet": {
+        "large_package_bytes_reverified": false,
+        "manifests": 18,
+        "present_objects": 146,
+        "receipt_hashes": 16,
+        "selected_records": 170,
+        "status": "pass"
+      },
+      "source_static": {
+        "bytecode_written": false,
+        "candidate_inventory_files": 473,
+        "candidate_manifest_exact_inventory": "pass",
+        "changed_paths": 32,
+        "changed_python_files_parse_compile": 26,
+        "credential_private_path_scan_files": 32,
+        "diff_whitespace": "pass",
+        "index_changes": false,
+        "privacy_pattern_false_positive_disposition": "An encoded newline after 'as s:' in a static container Python command is source syntax, not a Windows private path.",
+        "python_files_parse_compile": 267,
+        "readiness_production_publication_flags": false,
+        "relative_links_checked": 47,
+        "status": "pass",
+        "workflow_and_production_configuration_changes": false
+      }
+    },
+    "dispatcher_finalization": "Dispatcher owns Git finalization and archive outcome; provider performed no Git metadata mutation or hosted publication action.",
+    "disposition": "amend",
+    "findings": [
+      {
+        "disposition": "amend",
+        "finding": 1,
+        "resolution": "Patch the diagnostic in HostedObserveExecutionTests.setUp; explicit diagnostic tests may override the patch."
+      },
+      {
+        "disposition": "amend",
+        "finding": 2,
+        "resolution": "Retain unknown-role objects and remaining evidence; hash-bind a receipt with CUSTODY_ROLE failures and preserve any earlier execution error. Actual pipeline regression covers retention."
+      },
+      {
+        "disposition": "amend",
+        "finding": 3,
+        "resolution": "Use producer directory components, including quarantine, rather than filename substrings; share current inference with historical diagnostics. Actual failed-builder quarantine retains binary-package/candidate-only."
+      },
+      {
+        "disposition": "amend",
+        "finding": 4,
+        "resolution": "Validate fixture-copy product architecture against lane system; sources and fixtures remain insufficient for candidate binary presence. Integrated RPM and pacman adverse cases cover wrong fixture architecture."
+      },
+      {
+        "disposition": "amend",
+        "finding": 5,
+        "resolution": "Replay the exact custody path sets from both run-14 manifests through current producer classification, retain, verify_set, package-type verification and architecture validation, using explicitly synthetic bytes. Preserve historical promotions without claiming historical byte requalification."
+      },
+      {
+        "disposition": "accept-with-amendment",
+        "finding": 6,
+        "resolution": "Use TLS failure wording for certificate, handshake, protocol and EOF classes. Retain operator mode 100644 because the documented and tested invocation is python3; executable mode is optional advice."
+      }
+    ],
+    "full_hosted_qualification": "not-qualified",
+    "rationale": "Accept core consumer and TLS repairs; correct review findings while preserving qualification and publication restrictions.",
+    "remaining_obligations": [
+      "Pages live origin remains unknown; remote certificate cause and Pages settings not established",
+      "Required Linux Nix namespace failure remains unresolved; PRoot does not substitute",
+      "Raw rpmlint remains failed with exit 64; eight historical preservation policies do not imply official Fedora admission",
+      "Darwin wheel offline isolation remains not-run and Linux wheel production compatibility remains unproven",
+      "Large hosted package bytes were not independently reverified locally",
+      "Manager acceptance and exact-byte attestation for one attended run 15 remain pending externally"
+    ],
+    "run15": "prepared-only-pending-manager-exact-terminal-byte-attestation",
+    "status": "qualified-source-closeout",
+    "unrun_checks": [
+      "No new native package construction or native client execution",
+      "No live Pages request or Pages configuration read in closeout",
+      "No additional substantive review"
+    ],
+    "workers": {
+      "disposition": "declined",
+      "reason": "tightly coupled terminal corrections kept local"
+    }
+  },
+  "workers": {
+    "admitted_attempts": 4,
+    "admitted_tasks": [
+      "cont16_roles",
+      "cont16_foundation3",
+      "cont16_tls"
+    ],
+    "completed_attempts_cleanup_proven": 4,
+    "corrective_attempt": {
+      "attempt": 2,
+      "decision": "amend",
+      "predecessor_cleanup_proven": true,
+      "predecessor_disposition": "partial",
+      "task": "cont16_foundation3"
+    },
+    "disposition": "adopted-with-parent-corrections",
+    "effective_model_observed": false,
+    "facility": "selected-apgr",
+    "independent_review": false,
+    "kind": "gemini",
+    "requested_profile": "gemini-3.8-flash-high",
+    "task_dispositions": {
+      "cont16_foundation3_attempt1": "partial",
+      "cont16_foundation3_attempt2": "accepted",
+      "cont16_roles": "accepted",
+      "cont16_tls": "accepted"
+    }
+  }
+}

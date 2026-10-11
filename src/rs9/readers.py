@@ -544,26 +544,86 @@ TLS_CLASSES = (
 )
 
 
+def unwrap_transport_error(error, max_depth=4):
+    """Unwrap actual URLError exception reason or explicit cause up to max 4 times with cycle detection.
+
+    Typed SSL exceptions are preserved directly without inspecting .reason as an exception,
+    since genuine native SSL exceptions have string .reason attributes.
+    """
+    current = error
+    seen = set()
+    depth = 0
+    limit = min(4, max(0, max_depth)) if type(max_depth) is int else 4
+    while depth < limit:
+        if current is None or not isinstance(current, BaseException):
+            break
+        if id(current) in seen:
+            break
+        seen.add(id(current))
+        if isinstance(current, (ssl.SSLError, getattr(ssl, "CertificateError", ()))):
+            return current
+        next_err = None
+        if isinstance(current, URLError) and isinstance(getattr(current, "reason", None), BaseException):
+            next_err = current.reason
+        elif getattr(current, "__cause__", None) is not None and isinstance(current.__cause__, BaseException):
+            next_err = current.__cause__
+
+        if next_err is None or next_err is current:
+            break
+        current = next_err
+        depth += 1
+    return current
+
+
+def extract_tls_verify_code(error):
+    """Safely extract bounded numeric verify_code from an SSL exception if present."""
+    unwrapped = unwrap_transport_error(error)
+    if not isinstance(unwrapped, ssl.SSLError):
+        return None
+    code = getattr(unwrapped, "verify_code", None)
+    if type(code) is int and 0 <= code <= 1000:
+        return code
+    return None
+
+
 def classify_tls_error(error):
-    """Classify a TLS exception into a bounded enum of tokens."""
-    reason = getattr(error, "reason", error)
-    if isinstance(reason, getattr(ssl, "SSLCertVerificationError", ())):
+    """Classify a TLS exception into a bounded enum of tokens.
+
+    Inspects typed SSL exception before .reason to preserve genuine native
+    SSLError string reasons without discarding the exception type.
+    """
+    unwrapped = unwrap_transport_error(error)
+
+    if isinstance(unwrapped, getattr(ssl, "SSLCertVerificationError", ())):
         return "certificate-verify-failed"
-    if isinstance(reason, getattr(ssl, "CertificateError", ())):
+    if isinstance(unwrapped, getattr(ssl, "CertificateError", ())):
         return "certificate-verify-failed"
-    if isinstance(reason, getattr(ssl, "SSLEOFError", ())):
+    if isinstance(unwrapped, getattr(ssl, "SSLEOFError", ())):
         return "unexpected-eof"
-    if isinstance(reason, getattr(ssl, "SSLZeroReturnError", ())):
+    if isinstance(unwrapped, getattr(ssl, "SSLZeroReturnError", ())):
         return "protocol-error"
-    if isinstance(reason, (getattr(ssl, "SSLWantReadError", ()), getattr(ssl, "SSLWantWriteError", ()))):
+    if isinstance(unwrapped, (getattr(ssl, "SSLWantReadError", ()), getattr(ssl, "SSLWantWriteError", ()))):
         return "transport-error"
-    if isinstance(reason, getattr(ssl, "SSLSyscallError", ())):
+    if isinstance(unwrapped, getattr(ssl, "SSLSyscallError", ())):
         return "transport-error"
-    if isinstance(reason, ssl.SSLError):
-        msg = str(reason).lower()
-        if any(term in msg for term in ("cert", "verify", "verification", "self-signed", "hostname", "altnames")):
+    if isinstance(unwrapped, ssl.SSLError):
+        if extract_tls_verify_code(unwrapped) is not None:
             return "certificate-verify-failed"
-        if "handshake" in msg:
+        reason_str = str(getattr(unwrapped, "reason", "") or "")[:64].lower()
+        if reason_str in {"wrong_version_number", "unsupported_protocol", "tlsv1_alert_protocol_version"}:
+            return "protocol-error"
+        if any(term in reason_str for term in ("cert", "verify", "verification", "self-signed", "self signed", "hostname", "altname")):
+            return "certificate-verify-failed"
+        if "handshake" in reason_str:
+            return "handshake-failure"
+        if "eof" in reason_str:
+            return "unexpected-eof"
+        if "protocol" in reason_str:
+            return "protocol-error"
+        msg = str(unwrapped)[:256].lower()
+        if any(term in msg for term in ("cert", "verify", "verification", "self-signed", "self signed", "hostname", "altname", "certificate")):
+            return "certificate-verify-failed"
+        if any(term in msg for term in ("handshake", "wrong version", "unsupported protocol")):
             return "handshake-failure"
         if "eof" in msg:
             return "unexpected-eof"
@@ -603,21 +663,44 @@ def read_pages(output_or_destination, subject=None, *, path, host="rs9.knowledge
             error.close()
             raise
         except URLError as error:
-            reason = getattr(error, "reason", None)
-            if isinstance(reason, socket.gaierror):
+            unwrapped = unwrap_transport_error(error)
+            if isinstance(unwrapped, (socket.gaierror, socket.herror)):
                 diagnostics.append({"code": "pages-dns-unknown", "message": "DNS resolution unavailable"})
-            elif isinstance(reason, (ssl.SSLError, getattr(ssl, "CertificateError", ()))):
-                token = classify_tls_error(reason)
-                diagnostics.append({"code": "pages-tls-error", "message": "TLS verification failed: " + token})
+            elif isinstance(unwrapped, (ssl.SSLError, getattr(ssl, "CertificateError", ()))):
+                token = classify_tls_error(unwrapped)
+                diagnostics.append({"code": "pages-tls-error", "message": "TLS failure: " + token})
                 diagnostics.append({"code": "pages-tls-" + token, "message": "TLS failure class " + token})
+                verify_code = extract_tls_verify_code(unwrapped)
+                if verify_code is not None:
+                    diagnostics.append({"code": "pages-tls-verify-code", "message": f"TLS verify code {verify_code}"})
+            elif isinstance(unwrapped, (TimeoutError, socket.timeout)):
+                diagnostics.append({"code": "pages-timeout", "message": "Destination timeout"})
+            elif isinstance(unwrapped, OSError):
+                diagnostics.append({"code": "pages-tcp-error", "message": "Destination connection failed"})
             raise
         except (ssl.SSLError, getattr(ssl, "CertificateError", ())) as error:
             token = classify_tls_error(error)
-            diagnostics.append({"code": "pages-tls-error", "message": "TLS verification failed: " + token})
+            diagnostics.append({"code": "pages-tls-error", "message": "TLS failure: " + token})
             diagnostics.append({"code": "pages-tls-" + token, "message": "TLS failure class " + token})
+            verify_code = extract_tls_verify_code(error)
+            if verify_code is not None:
+                diagnostics.append({"code": "pages-tls-verify-code", "message": f"TLS verify code {verify_code}"})
             raise
         except HTTPException:
             diagnostics.append({"code": "pages-protocol-error", "message": "HTTP protocol error"})
+            raise
+        except TimeoutError:
+            diagnostics.append({"code": "pages-timeout", "message": "Destination timeout"})
+            raise
+        except socket.gaierror:
+            diagnostics.append({"code": "pages-dns-unknown", "message": "DNS resolution unavailable"})
+            raise
+        except OSError:
+            diagnostics.append({"code": "pages-tcp-error", "message": "Destination connection failed"})
+            raise
+        except ContractError as error:
+            if error.code == "READER_REDIRECT":
+                diagnostics.append({"code": "pages-redirect-refused", "message": "Destination redirect refused"})
             raise
         sha = hashlib.sha256(data).hexdigest()
         components = {clean_path: sha}

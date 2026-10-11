@@ -463,7 +463,9 @@ def verify_raw_custody(directory, manifest, raw, product=None, receipt=None, der
         if derivation is not None and derivation != selected_derivation:
             _fail("RPM_EVIDENCE_PROJECTION")
         derivation = selected_derivation
-        packages = [r for r in rows if r.get("path", "").startswith(prefix + "unsigned/") and r.get("kind") == "custody"
+        from rs9.package_roles import is_installable_binary
+        packages = [r for r in rows if is_installable_binary(r)
+                    and r.get("path", "").startswith(prefix + "unsigned/")
                     and Path(r["path"]).name == Path(rpm_manifest.get("package_file", "")).name]
         if len(packages) != 1 or packages[0].get("sha256") != raw.get("package_sha256") or packages[0].get("size") != rpm_manifest.get("package_size"):
             fail("PACKAGE")

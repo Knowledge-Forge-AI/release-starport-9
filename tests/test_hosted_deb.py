@@ -1484,8 +1484,21 @@ class PagesLaneTests(unittest.TestCase):
         return packages
 
     def rpm_packages(self, arch):
-        return {f"{p}-1.0.0-1.fc43.{'noarch' if p in self.CLI else arch}.rpm": make_rpm({f"usr/bin/{p}": p.encode()})
+        from tests.test_foundation3_adapters import make_test_rpm
+        return {f"{p}-1.0.0-1.fc43.{'noarch' if p in self.CLI else arch}.rpm":
+                make_test_rpm(p, 'noarch' if p in self.CLI else arch, files={f"usr/bin/{p}": p.encode()})
                 for p in PRODUCTS}
+
+    def test_source_type_cannot_enter_a_binary_pages_bundle(self):
+        from tests.test_foundation3_adapters import make_test_rpm
+        packages = self.rpm_packages("x86_64")
+        product = self.CLI[0]
+        name = f"{product}-1.0.0-1.fc43.noarch.rpm"
+        packages[name] = make_test_rpm(product, "noarch", is_source=True)
+        self.bundle("rpm-source-as-binary", "rpm", "x86_64-linux", packages)
+        with self.assertRaises(ContractError) as caught:
+            hd._gather_custody(self.inputs, AUTH)
+        self.assertEqual(caught.exception.code, "CUSTODY_ROLE")
 
     def pacman_packages(self):
         return {f"{p}-1.0.0-1-{'any' if p in self.CLI else 'x86_64'}.pkg.tar.zst": zstd_raw_frame(b"pkg:" + p.encode())
@@ -1741,7 +1754,8 @@ class PagesLaneTests(unittest.TestCase):
         self.bundle("deb-arm64", "deb", "arm64", self.deb_packages("arm64"))
         rpm_x86, rpm_arm = self.rpm_packages("x86_64"), self.rpm_packages("aarch64")
         name = f"{self.CLI[0]}-1.0.0-1.fc43.noarch.rpm"
-        rpm_arm[name] = make_rpm({f"usr/bin/{self.CLI[0]}": b"conflicting"})
+        from tests.test_foundation3_adapters import make_test_rpm
+        rpm_arm[name] = make_test_rpm(self.CLI[0], "noarch", files={f"usr/bin/{self.CLI[0]}": b"conflicting"})
         self.bundle("rpm-x86", "rpm", "x86_64-linux", rpm_x86)
         self.bundle("rpm-arm", "rpm", "aarch64-linux", rpm_arm)
         self.bundle("pacman", "pacman", "x86_64-linux", self.pacman_packages())

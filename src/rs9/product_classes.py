@@ -3,9 +3,99 @@
 from __future__ import annotations
 
 import types
-from typing import Mapping
+from typing import Mapping, NamedTuple
 
 from rs9.errors import ContractError
+
+class NativePackagingMapping(NamedTuple):
+    family: str
+    format: str
+    canonical_adapter: str
+    revision_scheme: str
+    qualification_gate: str
+
+
+# Explicit centralized native family -> format/canonical publication adapter/revision scheme/qualification gate mapping
+# (deb,debian,apt,apt-revision; rpm,rpm,dnf,rpm-release; pacman,pacman,pacman,pkgrel)
+NATIVE_PACKAGING_MAPPINGS: tuple[NativePackagingMapping, ...] = (
+    NativePackagingMapping(
+        family="deb",
+        format="debian",
+        canonical_adapter="apt",
+        revision_scheme="apt-revision",
+        qualification_gate="apt",
+    ),
+    NativePackagingMapping(
+        family="rpm",
+        format="rpm",
+        canonical_adapter="dnf",
+        revision_scheme="rpm-release",
+        qualification_gate="dnf",
+    ),
+    NativePackagingMapping(
+        family="pacman",
+        format="pacman",
+        canonical_adapter="pacman",
+        revision_scheme="pkgrel",
+        qualification_gate="pacman",
+    ),
+)
+
+_NATIVE_FAMILY_MAP: dict[str, NativePackagingMapping] = {
+    m.family: m for m in NATIVE_PACKAGING_MAPPINGS
+}
+_NATIVE_FORMAT_MAP: dict[str, NativePackagingMapping] = {
+    m.format: m for m in NATIVE_PACKAGING_MAPPINGS
+}
+_NATIVE_ADAPTER_MAP: dict[str, NativePackagingMapping] = {
+    m.canonical_adapter: m for m in NATIVE_PACKAGING_MAPPINGS
+}
+
+NATIVE_FAMILY_TO_MAPPING: Mapping[str, NativePackagingMapping] = types.MappingProxyType(_NATIVE_FAMILY_MAP)
+NATIVE_FORMAT_TO_MAPPING: Mapping[str, NativePackagingMapping] = types.MappingProxyType(_NATIVE_FORMAT_MAP)
+NATIVE_ADAPTER_TO_MAPPING: Mapping[str, NativePackagingMapping] = types.MappingProxyType(_NATIVE_ADAPTER_MAP)
+
+NATIVE_FAMILIES: frozenset[str] = frozenset(_NATIVE_FAMILY_MAP.keys())
+NATIVE_FORMATS: frozenset[str] = frozenset(_NATIVE_FORMAT_MAP.keys())
+CANONICAL_PUBLICATION_ADAPTERS: frozenset[str] = frozenset(_NATIVE_ADAPTER_MAP.keys())
+NATIVE_REVISION_SCHEMES: frozenset[str] = frozenset(m.revision_scheme for m in NATIVE_PACKAGING_MAPPINGS)
+
+
+def get_native_packaging_mapping(key: str) -> NativePackagingMapping:
+    """Retrieve explicit native packaging mapping by family, format, or canonical adapter.
+
+    Fails closed with UNKNOWN_ADAPTER for unrecognized identifiers.
+    """
+    if not isinstance(key, str):
+        raise ContractError("UNKNOWN_ADAPTER", f"Invalid native packaging key type: {type(key)}")
+    if key in _NATIVE_FAMILY_MAP:
+        return _NATIVE_FAMILY_MAP[key]
+    if key in _NATIVE_FORMAT_MAP:
+        return _NATIVE_FORMAT_MAP[key]
+    if key in _NATIVE_ADAPTER_MAP:
+        return _NATIVE_ADAPTER_MAP[key]
+    raise ContractError("UNKNOWN_ADAPTER", f"Unknown native packaging identifier: {key}")
+
+
+def resolve_canonical_publication_adapter(key: str) -> str:
+    """Resolve native family, format, or adapter to canonical publication adapter (apt, dnf, pacman)."""
+    return get_native_packaging_mapping(key).canonical_adapter
+
+
+def resolve_native_revision_scheme(key: str) -> str:
+    """Resolve native family, format, or adapter to revision scheme (apt-revision, rpm-release, pkgrel)."""
+    return get_native_packaging_mapping(key).revision_scheme
+
+
+def resolve_qualification_gate(key: str) -> str:
+    """Resolve native family, format, or adapter to qualification gate identity (apt, dnf, pacman)."""
+    return get_native_packaging_mapping(key).qualification_gate
+
+
+def resolve_qualification_scope(key: str) -> str:
+    """Resolve native family, format, or adapter to qualification scope (debian.candidate-inventory, rpm.candidate-inventory, pacman.candidate-inventory)."""
+    return f"{get_native_packaging_mapping(key).format}.candidate-inventory"
+
 
 # Exact packaging classifications
 PURE_JS_CLI: str = "pure-js-cli"

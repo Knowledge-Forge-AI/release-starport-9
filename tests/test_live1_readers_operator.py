@@ -223,3 +223,30 @@ class ReaderOperatorTests(unittest.TestCase):
                 # Diagnostic message retains the bounded token
                 tls_msg = next(d["message"] for d in obs["diagnostics"] if d["code"] == "pages-tls-error")
                 self.assertIn(expected_token, tls_msg)
+
+    def test_pages_native_ssl_cert_verification_error_unwrapped_and_verify_code(self):
+        """Native unwrapped SSLCertVerificationError with string .reason preserves verify_code."""
+        import ssl
+        from rs9.readers import classify_tls_error, extract_tls_verify_code, read_pages
+
+        err = ssl.SSLCertVerificationError(18, "[SSL: CERTIFICATE_VERIFY_FAILED] self signed certificate")
+        err.verify_code = 18
+        err.reason = "CERTIFICATE_VERIFY_FAILED"
+
+        self.assertEqual(classify_tls_error(err), "certificate-verify-failed")
+        self.assertEqual(extract_tls_verify_code(err), 18)
+
+        pages_dest = {"id": "pages", "adapter": "pages", "mode": "direct"}
+        pages_subj = {"package": "rs9-pages", "version": "1", "revision": None}
+
+        with patch("rs9.readers._get", side_effect=err):
+            obs = read_pages(pages_dest, pages_subj, path="CNAME")
+
+        self.assertEqual(obs["state"], "unknown")
+        self.assertEqual(obs["readback"]["presence"], "unknown")
+        diag_codes = [d["code"] for d in obs["diagnostics"]]
+        self.assertIn("pages-tls-error", diag_codes)
+        self.assertIn("pages-tls-certificate-verify-failed", diag_codes)
+        self.assertIn("pages-tls-verify-code", diag_codes)
+        verify_msg = next(d["message"] for d in obs["diagnostics"] if d["code"] == "pages-tls-verify-code")
+        self.assertIn("18", verify_msg)

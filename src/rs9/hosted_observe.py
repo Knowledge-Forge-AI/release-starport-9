@@ -377,6 +377,25 @@ def execute(context):
         {"package": "rs9-pages", "version": "1", "revision": None}, path="CNAME")
     observations.append({"project": "generation", "adapter": "pages", "deployment_performed": False,
                          "observation": pages})
+
+    # A separate diagnostic request records transport stages for the fixed
+    # public origin. Its result never feeds observation or hosted authority.
+    if isinstance(pages, dict) and "pages_origin" in pages and isinstance(pages["pages_origin"], dict):
+        pages_origin_diag = pages["pages_origin"]
+    else:
+        # Separate read-only diagnostic request to rs9.knowledge-forge.ai;
+        # carries strictly no observation or hosted authority.
+        from rs9.pages_origin import diagnose_pages_origin
+        pages_origin_diag = diagnose_pages_origin(path="CNAME")
+
+    from rs9.hosted_custody import diagnostic_bytes
+
+    diag_dir = context["scratch"] / "diagnostics"
+    diag_dir.mkdir(parents=True, exist_ok=True)
+    diag_path = diag_dir / "pages-origin-diagnostic.json"
+    diag_path.write_bytes(canonical(pages_origin_diag))
+    diagnostic_bytes(diag_path)
+
     doc = {"schema": "rs9.hosted-destination-observations.v1alpha1", "production_enabled": False,
            "observations": observations, "homebrew_tap": tap_evidence, "publication_receipts": []}
     path = context["scratch"] / "destination-observations.json"
@@ -408,10 +427,16 @@ def execute(context):
     return {"gates": [{"name": "destination-observations-recorded", "status": "pass"},
             {"name": "readback-byte-comparison", "status": "pass" if known else "fail" if conflict else "not-run",
              "reason": "identity-conflict-or-required-target-absent" if conflict else "observations-recorded-with-unknown-or-metadata-only-states" if not known else "live-byte-readback"}],
-            "artifacts": [path], "details": {"observations_sha256": record_sha256(doc),
+            "artifacts": [path, diag_path], "details": {"observations_sha256": record_sha256(doc),
             "production_receipt_count": 0, "states": [r["observation"]["state"] for r in observations],
             "planner_noops": exact_planner_noops,
             "destinations": destinations,
+            "pages_origin": {
+                "state": pages_origin_diag.get("state", "unknown"),
+                "stage": pages_origin_diag.get("stage", "unknown"),
+                "class": pages_origin_diag.get("class", "unknown"),
+                "code": pages_origin_diag.get("code"),
+            },
             "satisfied_observations": satisfied_observations,
             "exact_observations": exact_observations,
             "tap_default_branch": default_branch,

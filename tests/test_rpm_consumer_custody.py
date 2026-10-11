@@ -43,6 +43,28 @@ FIXTURES = ROOT / "tests/fixtures/run10/rpm"
 
 from rs9.build_native import CommandReceipt
 from tests.rpm_fixtures import fixture_policy
+import struct
+from rs9.rpm_header import RPM_LEAD_MAGIC, RPM_HEADER_MAGIC
+
+
+def _make_synthetic_rpm(name, arch="noarch", is_source=False):
+    lead_type = 1 if is_source else 0
+    lead = RPM_LEAD_MAGIC + struct.pack(">BBH", 3, 0, lead_type) + b"\0" * 88
+    def _hdr(tags):
+        store = bytearray()
+        index = []
+        for tid, (typ, val) in sorted(tags.items()):
+            off = len(store)
+            if typ == 6:
+                s = val[0] if isinstance(val, list) else val
+                store.extend(s.encode("utf-8") + b"\0")
+                num = 1
+            index.append(struct.pack(">IIII", tid, typ, off, num))
+        return RPM_HEADER_MAGIC + b"\0\0\0\0" + struct.pack(">II", len(index), len(store)) + b"".join(index) + bytes(store)
+    sig_hdr = _hdr({1000: (6, "sig")})
+    pad = b"\0" * (((len(sig_hdr) + 7) & ~7) - len(sig_hdr))
+    main_hdr = _hdr({1000: (6, name), 1001: (6, "0.6.1"), 1002: (6, "1.fc43"), 1022: (6, "src" if is_source else arch)})
+    return lead + sig_hdr + pad + main_hdr + b"fixture-rpm-payload"
 
 
 class RpmConsumerCustodyTests(unittest.TestCase):
@@ -86,6 +108,17 @@ class RpmConsumerCustodyTests(unittest.TestCase):
                 receipts.append(receipt)
             return receipt
         runner.handlers["rpmlint"] = lint
+        original_rpmbuild = runner.handlers["rpmbuild"]
+        def rpmbuild(argv, cwd=None, **kwargs):
+            res = original_rpmbuild(argv, cwd=cwd, **kwargs)
+            topdir = Path(cwd)
+            for f in topdir.rglob("RPMS/**/*.rpm"):
+                f.write_bytes(_make_synthetic_rpm(product, arch=arch, is_source=False))
+            for f in topdir.rglob("SRPMS/**/*.src.rpm"):
+                f.write_bytes(_make_synthetic_rpm(product, arch="src", is_source=True))
+            return res
+        runner.handlers["rpmbuild"] = rpmbuild
+
         def policy(*args, **kwargs):
             value = fixture_policy(helper.root)
             launcher = "tfsb" if product.endswith("burst") else "tfsl" if product.endswith("loom") else "tfss"
@@ -580,3 +613,139 @@ class RpmConsumerCustodyTests(unittest.TestCase):
         self.assertEqual(pages_res["details"]["custody_error"], "RPM_RAW_EVIDENCE_HASH")
         failed_gates = [g for g in pages_res["gates"] if "custody-invalid:RPM_RAW_EVIDENCE_HASH" in g.get("reason", "")]
         self.assertTrue(len(failed_gates) > 0)
+
+    def test_pages_bundle_gather_and_custody_unique_rpm_and_pacman_regressions(self):
+        """Regress real _gather_custody, _rpm_custody_unique, and _custody_unique for RPM and pacman paths."""
+        from rs9.hosted_deb import _gather_custody, _rpm_custody_unique, _custody_unique
+        from rs9.pages_candidate import write_custody_bundle
+        from rs9.package_roles import producer_role, UNCLASSIFIED_PACKAGE, BINARY_PACKAGE, FIXTURE_SIGNED_COPY
+
+        with tempfile.TemporaryDirectory() as td:
+            inputs = Path(td).resolve() / "inputs"
+            inputs.mkdir()
+            auth = "a" * 64
+            commit = "1" * 40
+
+            # 1. RPM bundles (x86_64-linux and aarch64-linux)
+            rpm_x86_packages = {
+                "theme-forge-stellar-burst-0.6.1-1.x86_64.rpm": _make_synthetic_rpm("theme-forge-stellar-burst", arch="x86_64"),
+                "theme-forge-stellar-loom-0.6.1-1.noarch.rpm": _make_synthetic_rpm("theme-forge-stellar-loom", arch="noarch"),
+                "theme-forge-solar-sail-0.6.1-1.noarch.rpm": _make_synthetic_rpm("theme-forge-solar-sail", arch="noarch"),
+                "theme-forge-nebular-fusion-0.6.1-1.x86_64.rpm": _make_synthetic_rpm("theme-forge-nebular-fusion", arch="x86_64"),
+            }
+            rpm_arm_packages = {
+                "theme-forge-stellar-burst-0.6.1-1.aarch64.rpm": _make_synthetic_rpm("theme-forge-stellar-burst", arch="aarch64"),
+                "theme-forge-stellar-loom-0.6.1-1.noarch.rpm": rpm_x86_packages["theme-forge-stellar-loom-0.6.1-1.noarch.rpm"],
+                "theme-forge-solar-sail-0.6.1-1.noarch.rpm": rpm_x86_packages["theme-forge-solar-sail-0.6.1-1.noarch.rpm"],
+                "theme-forge-nebular-fusion-0.6.1-1.aarch64.rpm": _make_synthetic_rpm("theme-forge-nebular-fusion", arch="aarch64"),
+            }
+
+            # 2. Pacman bundle (x86_64-linux)
+            pacman_packages = {
+                "theme-forge-stellar-burst-0.6.1-1-x86_64.pkg.tar.zst": b"pacman-burst-x86_64",
+                "theme-forge-stellar-loom-0.6.1-1-any.pkg.tar.zst": b"pacman-loom-any",
+                "theme-forge-solar-sail-0.6.1-1-any.pkg.tar.zst": b"pacman-sail-any",
+                "theme-forge-nebular-fusion-0.6.1-1-x86_64.pkg.tar.zst": b"pacman-fusion-x86_64",
+            }
+
+            (inputs / "rpm-x86_64").mkdir(parents=True, exist_ok=True)
+            write_custody_bundle(inputs / "rpm-x86_64", family="rpm", system="x86_64-linux",
+                                 packages=rpm_x86_packages, authentication_sha256=auth, source_commit=commit)
+            (inputs / "rpm-aarch64").mkdir(parents=True, exist_ok=True)
+            write_custody_bundle(inputs / "rpm-aarch64", family="rpm", system="aarch64-linux",
+                                 packages=rpm_arm_packages, authentication_sha256=auth, source_commit=commit)
+            (inputs / "pacman-x86_64").mkdir(parents=True, exist_ok=True)
+            write_custody_bundle(inputs / "pacman-x86_64", family="pacman", system="x86_64-linux",
+                                 packages=pacman_packages, authentication_sha256=auth, source_commit=commit)
+
+            # Assert that bare basenames are never fixture-reclassified
+            for bare_name in rpm_x86_packages:
+                self.assertNotEqual(producer_role("rpm", bare_name), FIXTURE_SIGNED_COPY)
+                self.assertEqual(producer_role("rpm", bare_name), BINARY_PACKAGE)
+
+            # Test _gather_custody resolves all bundles and validates architectures without fixture-reclassification
+            bundles = _gather_custody(inputs, auth, commit)
+            self.assertIn(("rpm", "x86_64-linux"), bundles)
+            self.assertIn(("rpm", "aarch64-linux"), bundles)
+            self.assertIn(("pacman", "x86_64-linux"), bundles)
+
+            # Test _rpm_custody_unique
+            rpm_unique = _rpm_custody_unique([bundles[("rpm", "x86_64-linux")], bundles[("rpm", "aarch64-linux")]])
+            self.assertEqual(len(rpm_unique), 6)  # 2 x86, 2 arm, 2 identical noarch
+            self.assertIn("theme-forge-stellar-burst-0.6.1-1.x86_64.rpm", rpm_unique)
+            self.assertIn("theme-forge-stellar-burst-0.6.1-1.aarch64.rpm", rpm_unique)
+            self.assertIn("theme-forge-stellar-loom-0.6.1-1.noarch.rpm", rpm_unique)
+
+            # Test _custody_unique for pacman
+            pacman_unique = _custody_unique([bundles[("pacman", "x86_64-linux")]])
+            self.assertEqual(len(pacman_unique), 4)
+
+            # Conflict regression: mismatched noarch RPM between lanes must be rejected
+            tampered_rpm_arm = copy.deepcopy(rpm_arm_packages)
+            tampered_rpm_arm["theme-forge-stellar-loom-0.6.1-1.noarch.rpm"] = _make_synthetic_rpm(
+                "theme-forge-stellar-loom", arch="noarch"
+            ) + b"-diff"
+            bad_dir = Path(td).resolve() / "bad_rpm_arm"
+            bad_dir.mkdir(parents=True, exist_ok=True)
+            write_custody_bundle(bad_dir, family="rpm", system="aarch64-linux",
+                                 packages=tampered_rpm_arm, authentication_sha256=auth, source_commit=commit)
+            from rs9.pages_candidate import load_custody_bundle
+            bad_bundle = load_custody_bundle(bad_dir, expected_authentication_sha256=auth)
+            with self.assertRaises(ContractError) as ctx:
+                _rpm_custody_unique([bundles[("rpm", "x86_64-linux")], bad_bundle])
+            self.assertEqual(ctx.exception.code, "CUSTODY_CONFLICT")
+
+    def test_rpm_evidence_selector_enforces_is_installable_binary_and_denies_historical(self):
+        """Cover independent rpm_evidence selector with explicit is_installable_binary predicate."""
+        product = "theme-forge-stellar-burst"
+        helper, capture, intent, npm, arch, runner, policy, _ = self.fixture(product)
+        pipeline = self._build_accepted_pipeline(helper, capture, intent, npm, arch, runner, policy, product)
+        product = "theme-forge-stellar-burst"
+        record = copy.deepcopy(pipeline["record"])
+        raw = pipeline["raw"]
+        manifest_obj = pipeline["manifest_obj"]
+
+        # Base valid retention
+        lane_packet_dir = helper.root / "packet_selector_test"
+        lane_packet_dir.mkdir(parents=True, exist_ok=True)
+        raw_path = helper.scratch / "diagnostics" / ("rpmlint-" + product + ".json")
+        pkg_path = helper.scratch / "unsigned" / Path(manifest_obj["package_file"]).name
+        manifest_path = helper.scratch / "build" / product / "rpm-manifest.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_bytes((helper.scratch / "rpm-manifest.json").read_bytes())
+
+        retained = retain(
+            helper.scratch, lane_packet_dir,
+            [manifest_path, raw_path, pkg_path, *pipeline["policy_files"]],
+            record
+        )
+
+        # 1. Valid selector succeeds with explicit binary-package role
+        verify_raw_custody(
+            lane_packet_dir, retained, raw, product=product,
+            receipt=record, derivation=manifest_obj["derivation"], rpm_manifest=manifest_obj,
+        )
+
+        # 2. Source-package-evidence row must NOT be selected by verify_raw_custody
+        tampered_manifest_src = copy.deepcopy(retained)
+        for r in tampered_manifest_src["files"]:
+            if r.get("path", "").endswith(".rpm"):
+                r["role"] = "source-package-evidence"
+        with self.assertRaises(ContractError) as ctx:
+            verify_raw_custody(
+                lane_packet_dir, tampered_manifest_src, raw, product=product,
+                receipt=record, derivation=manifest_obj["derivation"], rpm_manifest=manifest_obj,
+            )
+        self.assertEqual(ctx.exception.code, "RPM_RAW_EVIDENCE_PACKAGE")
+
+        # 3. Historical absent-role row must NOT gain authority (fails closed)
+        tampered_manifest_hist = copy.deepcopy(retained)
+        for r in tampered_manifest_hist["files"]:
+            if r.get("path", "").endswith(".rpm"):
+                r.pop("role", None)
+        with self.assertRaises(ContractError) as ctx:
+            verify_raw_custody(
+                lane_packet_dir, tampered_manifest_hist, raw, product=product,
+                receipt=record, derivation=manifest_obj["derivation"], rpm_manifest=manifest_obj,
+            )
+        self.assertEqual(ctx.exception.code, "RPM_RAW_EVIDENCE_PACKAGE")
