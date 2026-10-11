@@ -307,7 +307,36 @@ def execute(context):
                     source, system, overrides, scratch, neb, prefix, env)
                 runtime = json.loads(command(["nix", "build", "--json", "--no-link", *overrides,
                     str(source) + "#candidates." + system + "." + pid + ".runtime"]))[0]["outputs"]["out"]
-                gates.append(fhs_runtime_smoke(runtime, system, prefix, env))
+                try:
+                    gates.append(fhs_runtime_smoke(runtime, system, prefix, env))
+                except ContractError as err:
+                    if err.code == "NIX_FHS_USERNS":
+                        failed_gate = "nix-fhs-runtime-smoke"
+                        owed_commands = [
+                            {"name": f"command.{name}.supported-behavior", "status": "not-run", "reason": f"blocked-by:{failed_gate}"}
+                            for name in products[pid]["commands"]
+                        ]
+                        partial_gates = [
+                            *gates,
+                            {"name": failed_gate, "status": "fail", "reason": err.code, "details": err.details},
+                            {"name": "nix-store-archive-readback", "status": "not-run", "reason": f"blocked-by:{failed_gate}"},
+                            *owed_commands,
+                            {"name": "nix-native-closure", "status": "not-run", "reason": f"blocked-by:{failed_gate}"},
+                            {"name": "nix-build-check-run", "status": "not-run", "reason": f"blocked-by:{failed_gate}"},
+                        ]
+                        artifacts = []
+                        if (scratch / "nix-loader-evaluation.json").is_file():
+                            artifacts.append(scratch / "nix-loader-evaluation.json")
+                        if installer_lane_copy.is_file():
+                            artifacts.append(installer_lane_copy)
+                        if installer_failure_copy.is_file():
+                            artifacts.append(installer_failure_copy)
+                        err.partial_result = {
+                            "gates": partial_gates,
+                            "artifacts": artifacts,
+                            "details": {"outputs": paths, "locked": locked},
+                        }
+                    raise
                 runtime_prefix = [str(Path(runtime) / "bin/rs9-nebular-fhs")]
             # Native outPath has symlink payload passthru: read back compressed archive from store
             store_payload_dir = Path(output) / "payload"

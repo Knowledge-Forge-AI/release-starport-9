@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import time
 from typing import Any
 
 from rs9.errors import ContractError, safe_details
@@ -128,6 +129,7 @@ def _release_inventory(root):
 
 def execute(context: dict[str, Any]) -> dict[str, Any]:
     """Execute the hosted PRoot experiment on a candidate Linux platform."""
+    experiment_start = time.monotonic()
     system, repository, scratch = context["system"], context["repository"], context["scratch"]
     if system not in SYSTEMS:
         raise ContractError("NIX_SYSTEM", "Unsupported Linux Nix system for PRoot experiment: " + str(system))
@@ -235,6 +237,10 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
 
     evaluation = evaluate_proot_experiment(runtime, recipe, materialize=materialize, smoke=smoke,
                                            closure_size_bytes=closure_size)
+    evaluation.setdefault("measurements", {})["hosted_experiment_seconds"] = round(time.monotonic() - experiment_start, 3)
+    evaluation["baseline_policy"] = {"materialization_unsupervised": True, "command_probes_unsupervised": True,
+                                     "sea_unsupervised": True, "released_verifier_unsupervised": True,
+                                     "application_smoke_unsupervised": True, "signal_status_mapping": False}
 
     evaluation_file = scratch / "nix-proot-evaluation.json"
     evaluation_file.write_bytes(canonical(evaluation))
