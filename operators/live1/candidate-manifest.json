@@ -6,37 +6,26 @@
   "candidate_adoption_ready": false,
   "changed_paths": [
     "docs/README.md",
-    "docs/live1-native-client-cont16.md",
-    "docs/specs/rs9-hosted-artifact-set-v1alpha2.md",
-    "evidence/live1/cont16-verification.json",
-    "operators/live1/attended_run.py",
+    "docs/adr/0008-nix-linux-runtime-without-user-namespaces.md",
+    "docs/live1-native-client-cont17.md",
+    "evidence/live1/cont17-pages-readback.json",
+    "evidence/live1/cont17-verification.json",
     "operators/live1/candidate-manifest.json",
-    "operators/live1/run-hosted15.py",
-    "src/rs9/hosted_custody.py",
-    "src/rs9/hosted_deb.py",
-    "src/rs9/hosted_foundation3.py",
-    "src/rs9/hosted_observe.py",
-    "src/rs9/hosted_summary.py",
-    "src/rs9/package_roles.py",
-    "src/rs9/pages_origin.py",
-    "src/rs9/product_classes.py",
-    "src/rs9/readers.py",
-    "src/rs9/rpm_evidence.py",
-    "tests/fixtures/run14-rpm-manifests.json",
-    "tests/test_foundation3_adapters.py",
-    "tests/test_hosted_deb.py",
-    "tests/test_hosted_foundation3.py",
-    "tests/test_hosted_observe.py",
-    "tests/test_hosted_summary.py",
-    "tests/test_hosted_summary_roles.py",
-    "tests/test_live1_readers_operator.py",
-    "tests/test_package_roles.py",
-    "tests/test_pages_origin.py",
-    "tests/test_product_classes.py",
-    "tests/test_rpm_consumer_custody.py",
-    "tests/test_rpm_orchestration.py",
-    "tests/test_run_hosted15.py",
-    "tests/test_tls_classification.py"
+    "operators/live1/run-hosted16.py",
+    "src/rs9/hosted_nix.py",
+    "src/rs9/hosted_nix_proot.py",
+    "src/rs9/nix_proot.py",
+    "src/rs9/nix_proot_audit.py",
+    "src/rs9/nix_proot_launch.py",
+    "src/rs9/nix_proot_signals.py",
+    "src/rs9/nix_proot_wait.py",
+    "tests/test_hosted_nix.py",
+    "tests/test_nix_proot.py",
+    "tests/test_nix_proot_audit.py",
+    "tests/test_nix_proot_launch.py",
+    "tests/test_nix_proot_processes.py",
+    "tests/test_nix_proot_wait.py",
+    "tests/test_run_hosted16.py"
   ],
   "configuration_hashes": [
     {
@@ -193,11 +182,11 @@
       "size": 1251
     },
     {
-      "git_blob": "49bb23c191e331f45b0f66f229dff693d61d9400",
+      "git_blob": "c4d5b87e80e27093cd1faf154aace63d98c7e1b0",
       "mode": "100644",
       "path": "docs/README.md",
-      "sha256": "c4a0d63399f902677b9d415a1df88057a77581000d570ace89143cd72dbea073",
-      "size": 6496
+      "sha256": "9b5c9cce7b066a5865094f1f24d9890e7c806b62324438fe0b77234970531e6e",
+      "size": 6680
     },
     {
       "git_blob": "521a7bc4badf347db9176d0118dadc9881cfd3a2",
@@ -249,11 +238,11 @@
       "size": 1646
     },
     {
-      "git_blob": "be6fe56fd601bc1291f8003b9c905114f263fec9",
+      "git_blob": "1bc5dd10ed8c18d3f490a2d9feda9a95d5880e46",
       "mode": "100644",
       "path": "docs/adr/0008-nix-linux-runtime-without-user-namespaces.md",
-      "sha256": "4c26c3426573e0783e3039d52e8d698f6d486ad9ba6468ec1715b8184017d72e",
-      "size": 6900
+      "sha256": "744e11b5ca3887920f4409575cb3943841dfc0ed8d235d2bc5e2ee5cde385787",
+      "size": 10719
     },
     {
       "git_blob": "4771f5c9106f0fb52f088102d08eefd58d41a68f",
@@ -436,6 +425,13 @@
       "path": "docs/live1-native-client-cont16.md",
       "sha256": "90872a7ce85a2cc244cefc2082df19105f73e92f816407aa0714ee24dad3ef8b",
       "size": 10210
+    },
+    {
+      "git_blob": "35d62a195f8326b2cda1829e9b9524dedfddff78",
+      "mode": "100644",
+      "path": "docs/live1-native-client-cont17.md",
+      "sha256": "4007d73433ae9fd5d00c898ece4c7c8112658b30830914142f0acc8bf75d7ef2",
+      "size": 14507
     },
     {
       "git_blob": "2910bb27b786a3b59b36a3d8e1ceba8e6b1b0eea",
@@ -646,6 +642,20 @@
       "path": "evidence/live1/cont16-verification.json",
       "sha256": "33e59fb676e9433c32728b60935c1067edc27743578b3c05e85f3d61db65c422",
       "size": 43140
+    },
+    {
+      "git_blob": "5776b4fde42eb11b9e4ad7c6383e86ce91310d05",
+      "mode": "100644",
+      "path": "evidence/live1/cont17-pages-readback.json",
+      "sha256": "c057a867c91cf5c59a0d75ed5bf3ae8f186d64bc3188371edea439759ae55eee",
+      "size": 1861
+    },
+    {
+      "git_blob": "c9565c5503afe9697a4bd0a5db58ffcc1c601944",
+      "mode": "100644",
+      "path": "evidence/live1/cont17-verification.json",
+      "sha256": "675527c789728709c9c25826dd4f07ba99a6139c5aa0caa314dd2cf4dda8dcd4",
+      "size": 42136
     },
     {
       "git_blob": "8d6235ee7a9deb7807cabed204ddf0ce280369aa",
@@ -1096,6 +1106,13 @@
       "size": 564
     },
     {
+      "git_blob": "4f7a2ce1723262bf8ec4b8c4388625d6d3ee2893",
+      "mode": "100644",
+      "path": "operators/live1/run-hosted16.py",
+      "sha256": "ba3957f841ec30826a774d32557dc9cf692a1763b7f2aada52b08df407a3a810",
+      "size": 548
+    },
+    {
       "git_blob": "bab09448a3b7f3fdc7b88ae9bf0d56e4ccbaa397",
       "mode": "100644",
       "path": "operators/live1/run-hosted5.py",
@@ -1481,18 +1498,18 @@
       "size": 5817
     },
     {
-      "git_blob": "4cd64bac6ed68f82c5b3a207d4959156a66f68a5",
+      "git_blob": "f06c6ff105a0785be00bc20fa103f1f09d3ba779",
       "mode": "100644",
       "path": "src/rs9/hosted_nix.py",
-      "sha256": "c785cf91f1fad29c1ccb018249af68e4185205be80f32052c45ad59d8c655f63",
-      "size": 22077
+      "sha256": "737adac0d5836f8682b234acefe64661771207afedcf15f535ac416d9abf72fa",
+      "size": 23898
     },
     {
-      "git_blob": "c686df866d2643b9433b2c1902ee6f05e55aa1c6",
+      "git_blob": "9d714732ba352e54b7b2fe6291953ec085226acd",
       "mode": "100644",
       "path": "src/rs9/hosted_nix_proot.py",
-      "sha256": "9b65e0c9af6bf446f65fd46968b8d4c386e586d236af6fe2976a43571dffd7b0",
-      "size": 12377
+      "sha256": "721ab0915c3607854799ed8a69ae3cfcfbdd767185e875c1264815baaed9f63f",
+      "size": 12876
     },
     {
       "git_blob": "372402b0c96d7f3d2bef7c33b327ffe7656d2878",
@@ -1600,11 +1617,39 @@
       "size": 8064
     },
     {
-      "git_blob": "f6013bb30efc2c3d649687f1a6d344c4fa8a3d28",
+      "git_blob": "b20c789a4d3145c9fd44dc96badaea8ef4350fb1",
       "mode": "100644",
       "path": "src/rs9/nix_proot.py",
-      "sha256": "cbbd3f1e2a3ab48620e54193ac0340be1ec216dd416883b49d483ce59efb3909",
-      "size": 59571
+      "sha256": "5829483db8ae275c913a7ee369c9272ebda7bc0f4dce35756c2bbd4c3a60124c",
+      "size": 64973
+    },
+    {
+      "git_blob": "bfd6efca41dde19d7769637dd27de1252e31cd25",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_audit.py",
+      "sha256": "585553ceb144a0bf2c75dbc80aa1041776e5fe4df15e583d1159f557a5796a70",
+      "size": 10300
+    },
+    {
+      "git_blob": "f113ae02548c6ac40a6b9772959c058dcc7401f0",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_launch.py",
+      "sha256": "e33619d464ddd712bff0d2cfed4e1b885ffd952e7ab902c1ce95dabd993d41dc",
+      "size": 14286
+    },
+    {
+      "git_blob": "4085a9b5ad3450ac0cd2bd97bcba27a1a2377350",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_signals.py",
+      "sha256": "34da5fb6442a3000b025038472714779886e14285239f5bb794f5be2f7f65bf6",
+      "size": 4767
+    },
+    {
+      "git_blob": "7b9b6e9fccd744e05be0a8bfc454d6183ff16eb8",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_wait.py",
+      "sha256": "f9b050a5d96677fefccd2eae65d59e7696d7856a54beb01cbf342ea5abda57fe",
+      "size": 10299
     },
     {
       "git_blob": "d57a54514909594300396f2bc15daaa25fd87c14",
@@ -2734,11 +2779,11 @@
       "size": 8936
     },
     {
-      "git_blob": "3d927ad77239ad7aa2946010f4b0b6211ca6b003",
+      "git_blob": "55d66af7192cf31a913a27d1678994c48e5b2c33",
       "mode": "100644",
       "path": "tests/test_hosted_nix.py",
-      "sha256": "e93c092ea66219ff316cfeb938f5f5cb3233f1c8d4ce716138688d22a6749992",
-      "size": 26645
+      "sha256": "248e116831c5c3e5534cf99eec98f25b62435eafa07b3a6dbc5e75133d9f1c1e",
+      "size": 49595
     },
     {
       "git_blob": "a44275aa37758627412288ad0d6ea5cdf814d395",
@@ -2895,11 +2940,39 @@
       "size": 5048
     },
     {
-      "git_blob": "584cf5ae54e0a12f01612eef11680639be345ac0",
+      "git_blob": "e59c7056a0471c41a019d1cfb4ab985da17108b6",
       "mode": "100644",
       "path": "tests/test_nix_proot.py",
-      "sha256": "8298eca0d573798f0deac528e80a1a460b1de2848b51bf29d82ff33db387eb58",
-      "size": 59818
+      "sha256": "d017dfbbe4c0c672eb67366f84b556ffb19c7ba7829725a7e03c0ad121433f89",
+      "size": 65033
+    },
+    {
+      "git_blob": "bef1c6c1992e4cda00b84834e807732702da2b80",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_audit.py",
+      "sha256": "fc7f9d5bac5f39214a5add40b1f9798e27ba8b5ab2df80766c39be77f94099e5",
+      "size": 6791
+    },
+    {
+      "git_blob": "010715bf9430d45614b025065ea05ac047238b07",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_launch.py",
+      "sha256": "b8bd95530d8933dbfb1a912ed9ec2207a6ef1f28ed39262031c75f98fa24e2f9",
+      "size": 8728
+    },
+    {
+      "git_blob": "a708603a96c5ee0ac3e76d1a6ea53a8e9e664c38",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_processes.py",
+      "sha256": "a42ae9a577f6c0c0ddbade421d1ae72541f46bd0934e4a450a8241ab0b778efe",
+      "size": 6961
+    },
+    {
+      "git_blob": "141630464bc51905ec1f75038edb4a7eafef98d4",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_wait.py",
+      "sha256": "ced3da1a1d99c8bd87e5c6d69c67ce83a2498c8dab21f427bae361b0bd39ff6a",
+      "size": 12442
     },
     {
       "git_blob": "bc1457eac7a82d5612ed62023d02087b3ce4e07b",
@@ -3245,6 +3318,13 @@
       "size": 6599
     },
     {
+      "git_blob": "3a26fd9de3c3449bed09c33ebdc01fd65db9ba73",
+      "mode": "100644",
+      "path": "tests/test_run_hosted16.py",
+      "sha256": "73c5e130c6125d6c0a817630fa9abda431e662a5fc3eaf91e86475852852af83",
+      "size": 2010
+    },
+    {
       "git_blob": "54a27d6215549c7c3c57ceab4f660dcb4fe47222",
       "mode": "100644",
       "path": "tests/test_run_hosted5.py",
@@ -3373,8 +3453,8 @@
   ],
   "inventory_scope": "complete product source excluding this manifest and preserved unrelated local state",
   "kind": "non-production-hosted-source-candidate",
-  "parent": "84d5921c40306bb24b12c69b85667c0b147220a7",
-  "phase_outcome": "source-consumer-and-TLS-repair-hosted-qualification-pending",
+  "parent": "f1f55f7cb049a690750de8c1acd0122ad2eedef1",
+  "phase_outcome": "runtime-diagnostics-hosted-qualification-pending",
   "production_enabled": false,
   "production_ready": false,
   "publication_authority": false,
@@ -3403,8 +3483,8 @@
     "schema": "rs9.live1-candidate-readiness.v1alpha1",
     "source_adoption_scope": "partial-diagnostic"
   },
-  "review_status": "dispatcher-reviewed-with-findings-terminal-amendment",
+  "review_status": "dispatcher-pre-final-candidate-pending",
   "schema": "rs9.live1-source-candidate-inventory.v1alpha2",
-  "task": "CONT16 hosted run 14 consumers and Pages transport diagnostics",
+  "task": "CONT17 Linux Nix runtime diagnostics and read-only Pages origin analysis",
   "terminal_disposition": "amend"
 }

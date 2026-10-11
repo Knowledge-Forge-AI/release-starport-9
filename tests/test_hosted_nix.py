@@ -9,7 +9,8 @@ import unittest
 from unittest.mock import Mock, patch
 
 from rs9.errors import ContractError
-from rs9.hosted_nix import command, execute, fhs_runtime_smoke, prepare_input, record_direct_loader_evaluation, SYSTEMS
+from rs9.hosted_nix import command, execute, fhs_runtime_smoke, prepare_input, record_direct_loader_evaluation, PRODUCTS, SYSTEMS
+from rs9.hosted_summary import contract, gate_blockers
 from rs9.scratch import canonical
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -497,6 +498,449 @@ class NixHostedTests(unittest.TestCase):
                     execute(context)
                 self.assertEqual(ctx.exception.code, "NIX_OUTPUT")
                 self.assertIn("mismatch", ctx.exception.message)
+
+    def test_execute_linux_nix_fhs_userns_partial_result_retention(self):
+        with tempfile.TemporaryDirectory() as td:
+            scratch = Path(td) / "scratch"
+            scratch.mkdir()
+            runner_temp = Path(td) / "runner_temp"
+            install_dir = runner_temp / "rs9-nix-install"
+            install_dir.mkdir(parents=True)
+
+            pin_val = "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60"
+            identity_doc = {
+                "version": "2.31.2",
+                "system": "x86_64-linux",
+                "sha256": pin_val,
+                "pin_provenance": "source-pinned",
+                "status": "pass",
+            }
+            (install_dir / "installer-identity.json").write_bytes(canonical(identity_doc))
+
+            mock_store = Path(td) / "nix_store"
+            mock_store.mkdir()
+
+            products = {
+                "theme-forge-stellar-burst": {"commands": ["tfsb"], "asset_sha256": "burst-sha"},
+                "theme-forge-stellar-loom": {"commands": ["tfsl"], "asset_sha256": "loom-sha"},
+                "theme-forge-solar-sail": {"commands": ["tfss"], "asset_sha256": "sail-sha"},
+                "theme-forge-nebular-fusion": {"commands": ["tfnf"], "asset_sha256": "nebular-sha"},
+            }
+
+            for pid, pdata in products.items():
+                p_out = mock_store / pid
+                (p_out / "bin").mkdir(parents=True)
+                for cmd in pdata["commands"]:
+                    (p_out / "bin" / cmd).write_text("#!/bin/sh\nexit 0\n")
+
+            runtime_dir = mock_store / "theme-forge-nebular-fusion-runtime"
+            (runtime_dir / "bin").mkdir(parents=True)
+            (runtime_dir / "bin/rs9-nebular-fhs").write_text("#!/bin/sh\nexit 1\n")
+
+            def mock_command(argv, **kwargs):
+                if argv[0] != "nix":
+                    return ""
+                sub = argv[1]
+                if sub == "flake" and argv[2] == "metadata":
+                    return json.dumps({
+                        "locks": {"nodes": {"nixpkgs": {"locked": {
+                            "rev": "0" * 40,
+                            "narHash": "sha256-hash",
+                        }}}}
+                    })
+                if sub == "flake" and argv[2] == "check":
+                    return ""
+                if sub == "build":
+                    attr = argv[-1]
+                    if attr.endswith(".runtime"):
+                        return json.dumps([{"drvPath": "/nix/store/runtime.drv", "outputs": {"out": str(runtime_dir)}}])
+                    pid = attr.split(".")[-1]
+                    out_dir = str(mock_store / pid)
+                    return json.dumps([{"drvPath": f"/nix/store/{pid}.drv", "outputs": {"out": out_dir}}])
+                if sub == "path-info":
+                    out_path = argv[-1]
+                    return json.dumps([{"path": out_path, "narHash": "sha256-mock", "narSize": 1024}])
+                raise ValueError(f"Unexpected mock_command argv: {argv}")
+
+            def mock_record_loader(source, system, overrides, scratch, neb, prefix, env):
+                doc = {
+                    "schema": "rs9.nix-loader-evaluation.v1",
+                    "status": "fail",
+                    "application_qualified": False,
+                    "reason": "direct-loader-evaluation-mock",
+                }
+                (scratch / "nix-loader-evaluation.json").write_bytes(canonical(doc))
+                return doc
+
+            userns_error = ContractError(
+                "NIX_FHS_USERNS",
+                "Disconnected native FHS runtime failed",
+                details={
+                    "diagnostic_token": "userns-denied",
+                    "system": "x86_64-linux",
+                    "substage": "nix-fhs-runtime-smoke",
+                    "userns_policy": "restricted",
+                },
+            )
+
+            context = {
+                "system": "x86_64-linux",
+                "repository": ROOT,
+                "scratch": scratch,
+                "pins": {
+                    "nix": {
+                        "installer_version": "2.31.2",
+                        "installer_sha256_by_system": {
+                            "aarch64-darwin": "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8",
+                            "x86_64-linux": pin_val,
+                            "aarch64-linux": "64db528412096d718b4bf8f78f85e5ac2b714b774e5005500dee37d23f560456",
+                        },
+                        "nixpkgs_revision": "0" * 40,
+                        "nixpkgs_nar_hash": "sha256-hash",
+                    }
+                },
+                "captures": [(Mock(), {"project": {"id": pid}}, {}) for pid in PRODUCTS],
+                "client": Mock(),
+            }
+
+            with patch.dict(os.environ, {"RUNNER_TEMP": str(runner_temp)}), \
+                 patch("rs9.hosted_nix.prepare_input", return_value=(scratch, scratch, products)), \
+                 patch("rs9.hosted_nix.command", side_effect=mock_command), \
+                 patch("rs9.hosted_nix.release_load_record", return_value={"synthetic": True}), \
+                 patch("rs9.hosted_nix.verify_burst_payload", return_value={"status": "pass", "native_binding": "burst.node"}), \
+                 patch("rs9.hosted_nix.run_probes", side_effect=lambda name, *a, **k: [{"name": f"command.{name}.supported-behavior", "status": "pass"}]), \
+                 patch("rs9.hosted_nix.record_direct_loader_evaluation", side_effect=mock_record_loader), \
+                 patch("rs9.hosted_nix.fhs_runtime_smoke", side_effect=userns_error):
+
+                with self.assertRaises(ContractError) as ctx:
+                    execute(context)
+
+                err = ctx.exception
+                self.assertEqual(err.code, "NIX_FHS_USERNS")
+                self.assertEqual(err.message, "Disconnected native FHS runtime failed")
+                self.assertEqual(err.details["diagnostic_token"], "userns-denied")
+                self.assertEqual(err.details["system"], "x86_64-linux")
+                self.assertEqual(err.details["substage"], "nix-fhs-runtime-smoke")
+                self.assertEqual(err.details["userns_policy"], "restricted")
+
+                self.assertTrue(hasattr(err, "partial_result"))
+                partial = err.partial_result
+                self.assertIsInstance(partial, dict)
+
+                # Check gate rows and exact names
+                gates = partial["gates"]
+                gate_names = [g["name"] for g in gates]
+                expected_gate_names = [
+                    "nix-lock-pin",
+                    "burst-native-addon-target",
+                    "burst-native-addon-load",
+                    "command.tfsb.supported-behavior",
+                    "command.tfsl.supported-behavior",
+                    "command.tfss.supported-behavior",
+                    "nix-fhs-runtime-smoke",
+                    "nix-store-archive-readback",
+                    "command.tfnf.supported-behavior",
+                    "nix-native-closure",
+                    "nix-build-check-run",
+                ]
+                self.assertEqual(gate_names, expected_gate_names)
+                # Ensure no wildcard names
+                for name in gate_names:
+                    self.assertNotIn("*", name)
+                # Ensure no duplicate gate names
+                self.assertEqual(len(gate_names), len(set(gate_names)))
+
+                # Check statuses and reasons
+                passed_gates = {g["name"] for g in gates if g["status"] == "pass"}
+                self.assertEqual(passed_gates, {
+                    "nix-lock-pin",
+                    "burst-native-addon-target",
+                    "burst-native-addon-load",
+                    "command.tfsb.supported-behavior",
+                    "command.tfsl.supported-behavior",
+                    "command.tfss.supported-behavior",
+                })
+
+                failing_gates = [g for g in gates if g["status"] == "fail"]
+                self.assertEqual(len(failing_gates), 1)
+                self.assertEqual(failing_gates[0]["name"], "nix-fhs-runtime-smoke")
+                self.assertEqual(failing_gates[0]["reason"], "NIX_FHS_USERNS")
+                self.assertEqual(failing_gates[0]["details"], err.details)
+
+                not_run_gates = [g for g in gates if g["status"] == "not-run"]
+                expected_not_run = [
+                    "nix-store-archive-readback",
+                    "command.tfnf.supported-behavior",
+                    "nix-native-closure",
+                    "nix-build-check-run",
+                ]
+                self.assertEqual([g["name"] for g in not_run_gates], expected_not_run)
+                for g in not_run_gates:
+                    self.assertEqual(g["reason"], "blocked-by:nix-fhs-runtime-smoke")
+
+                # Artifacts retention
+                artifacts = partial["artifacts"]
+                self.assertIn(scratch / "nix-loader-evaluation.json", artifacts)
+                self.assertIn(scratch / "diagnostics/installer-identity.json", artifacts)
+
+                # Output facts and completed vs unexecuted distinction
+                outputs = partial["details"]["outputs"]
+                self.assertEqual(partial["details"]["locked"], {"rev": "0" * 40, "narHash": "sha256-hash"})
+
+                # Burst completed loader fact
+                self.assertIn("theme-forge-stellar-burst", outputs)
+                self.assertEqual(outputs["theme-forge-stellar-burst"]["native_loader"], {"status": "pass", "native_binding": "burst.node"})
+
+                # Loom and sail stage facts
+                self.assertIn("theme-forge-stellar-loom", outputs)
+                self.assertIn("outPath", outputs["theme-forge-stellar-loom"])
+                self.assertIn("theme-forge-solar-sail", outputs)
+                self.assertIn("outPath", outputs["theme-forge-solar-sail"])
+
+                # Nebular partial stage facts: drvPath, outPath, direct_loader_evaluation present,
+                # but unexecuted post-build facts absent
+                self.assertIn("theme-forge-nebular-fusion", outputs)
+                neb_out = outputs["theme-forge-nebular-fusion"]
+                self.assertIn("direct_loader_evaluation", neb_out)
+                self.assertNotIn("store_archive_sha256", neb_out)
+                self.assertNotIn("asset_sha256", neb_out)
+                self.assertNotIn("native_smoke", neb_out)
+
+                # Gate blockers integration: required gates still fail, no allowed_not_run waiver
+                lanes = [l for l in contract(ROOT)["lanes"] if l.get("lane") == "nix" and l.get("system") == "x86_64-linux"]
+                self.assertEqual(len(lanes), 1)
+                nix_lane = lanes[0]
+                blockers = gate_blockers(nix_lane, {"gates": gates})
+
+                self.assertEqual(blockers, [
+                    "not-run:nix-native-closure",
+                    "not-run:nix-build-check-run",
+                    "failed-gate:nix-fhs-runtime-smoke",
+                ])
+                self.assertNotIn("missing-or-duplicate-gate:nix-native-closure", blockers)
+                self.assertNotIn("missing-or-duplicate-gate:nix-build-check-run", blockers)
+                self.assertNotIn("duplicate-gates", blockers)
+
+    def test_execute_linux_nix_other_error_does_not_attach_partial_result(self):
+        with tempfile.TemporaryDirectory() as td:
+            scratch = Path(td) / "scratch"
+            scratch.mkdir()
+            runner_temp = Path(td) / "runner_temp"
+            install_dir = runner_temp / "rs9-nix-install"
+            install_dir.mkdir(parents=True)
+
+            pin_val = "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60"
+            identity_doc = {
+                "version": "2.31.2",
+                "system": "x86_64-linux",
+                "sha256": pin_val,
+                "pin_provenance": "source-pinned",
+                "status": "pass",
+            }
+            (install_dir / "installer-identity.json").write_bytes(canonical(identity_doc))
+
+            mock_store = Path(td) / "nix_store"
+            mock_store.mkdir()
+
+            products = {
+                "theme-forge-stellar-burst": {"commands": ["tfsb"], "asset_sha256": "burst-sha"},
+                "theme-forge-stellar-loom": {"commands": ["tfsl"], "asset_sha256": "loom-sha"},
+                "theme-forge-solar-sail": {"commands": ["tfss"], "asset_sha256": "sail-sha"},
+                "theme-forge-nebular-fusion": {"commands": ["tfnf"], "asset_sha256": "nebular-sha"},
+            }
+
+            for pid, pdata in products.items():
+                p_out = mock_store / pid
+                (p_out / "bin").mkdir(parents=True)
+                for cmd in pdata["commands"]:
+                    (p_out / "bin" / cmd).write_text("#!/bin/sh\nexit 0\n")
+
+            runtime_dir = mock_store / "theme-forge-nebular-fusion-runtime"
+            (runtime_dir / "bin").mkdir(parents=True)
+            (runtime_dir / "bin/rs9-nebular-fhs").write_text("#!/bin/sh\nexit 1\n")
+
+            def mock_command(argv, **kwargs):
+                if argv[0] != "nix":
+                    return ""
+                sub = argv[1]
+                if sub == "flake" and argv[2] == "metadata":
+                    return json.dumps({
+                        "locks": {"nodes": {"nixpkgs": {"locked": {
+                            "rev": "0" * 40,
+                            "narHash": "sha256-hash",
+                        }}}}
+                    })
+                if sub == "flake" and argv[2] == "check":
+                    return ""
+                if sub == "build":
+                    attr = argv[-1]
+                    if attr.endswith(".runtime"):
+                        return json.dumps([{"drvPath": "/nix/store/runtime.drv", "outputs": {"out": str(runtime_dir)}}])
+                    pid = attr.split(".")[-1]
+                    out_dir = str(mock_store / pid)
+                    return json.dumps([{"drvPath": f"/nix/store/{pid}.drv", "outputs": {"out": out_dir}}])
+                if sub == "path-info":
+                    out_path = argv[-1]
+                    return json.dumps([{"path": out_path, "narHash": "sha256-mock", "narSize": 1024}])
+                raise ValueError(f"Unexpected mock_command argv: {argv}")
+
+            context = {
+                "system": "x86_64-linux",
+                "repository": ROOT,
+                "scratch": scratch,
+                "pins": {
+                    "nix": {
+                        "installer_version": "2.31.2",
+                        "installer_sha256_by_system": {
+                            "aarch64-darwin": "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8",
+                            "x86_64-linux": pin_val,
+                            "aarch64-linux": "64db528412096d718b4bf8f78f85e5ac2b714b774e5005500dee37d23f560456",
+                        },
+                        "nixpkgs_revision": "0" * 40,
+                        "nixpkgs_nar_hash": "sha256-hash",
+                    }
+                },
+                "captures": [(Mock(), {"project": {"id": pid}}, {}) for pid in PRODUCTS],
+                "client": Mock(),
+            }
+
+            with patch.dict(os.environ, {"RUNNER_TEMP": str(runner_temp)}), \
+                 patch("rs9.hosted_nix.prepare_input", return_value=(scratch, scratch, products)), \
+                 patch("rs9.hosted_nix.command", side_effect=mock_command), \
+                 patch("rs9.hosted_nix.release_load_record", return_value={"synthetic": True}), \
+                 patch("rs9.hosted_nix.verify_burst_payload", return_value={"status": "pass"}), \
+                 patch("rs9.hosted_nix.run_probes", return_value=[{"name": "probe", "status": "pass"}]), \
+                 patch("rs9.hosted_nix.record_direct_loader_evaluation", return_value={}), \
+                 patch("rs9.hosted_nix.fhs_runtime_smoke", side_effect=ContractError("NIX_FHS_RUNTIME", "generic runtime smoke failure")):
+
+                with self.assertRaises(ContractError) as ctx:
+                    execute(context)
+
+                err = ctx.exception
+                self.assertEqual(err.code, "NIX_FHS_RUNTIME")
+                self.assertFalse(hasattr(err, "partial_result"))
+
+    def test_execute_linux_nix_fhs_success_unaltered(self):
+        with tempfile.TemporaryDirectory() as td:
+            scratch = Path(td) / "scratch"
+            scratch.mkdir()
+            runner_temp = Path(td) / "runner_temp"
+            install_dir = runner_temp / "rs9-nix-install"
+            install_dir.mkdir(parents=True)
+
+            pin_val = "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60"
+            identity_doc = {
+                "version": "2.31.2",
+                "system": "x86_64-linux",
+                "sha256": pin_val,
+                "pin_provenance": "source-pinned",
+                "status": "pass",
+            }
+            (install_dir / "installer-identity.json").write_bytes(canonical(identity_doc))
+
+            mock_store = Path(td) / "nix_store"
+            mock_store.mkdir()
+
+            from rs9.release_core import digest
+            archive_bytes = b"real-nebular-payload-tar-gz"
+            archive_sha = digest(archive_bytes)
+
+            products = {
+                "theme-forge-stellar-burst": {"commands": ["tfsb"], "asset_sha256": "burst-sha"},
+                "theme-forge-stellar-loom": {"commands": ["tfsl"], "asset_sha256": "loom-sha"},
+                "theme-forge-solar-sail": {"commands": ["tfss"], "asset_sha256": "sail-sha"},
+                "theme-forge-nebular-fusion": {"commands": ["tfnf"], "asset_sha256": archive_sha},
+            }
+
+            for pid, pdata in products.items():
+                p_out = mock_store / pid
+                (p_out / "bin").mkdir(parents=True)
+                for cmd in pdata["commands"]:
+                    (p_out / "bin" / cmd).write_text("#!/bin/sh\nexit 0\n")
+                if pid == "theme-forge-nebular-fusion":
+                    payload_dir = p_out / "payload"
+                    payload_dir.mkdir()
+                    (payload_dir / "payload.tar.gz").write_bytes(archive_bytes)
+
+            runtime_dir = mock_store / "theme-forge-nebular-fusion-runtime"
+            (runtime_dir / "bin").mkdir(parents=True)
+            (runtime_dir / "bin/rs9-nebular-fhs").write_text("#!/bin/sh\nexit 0\n")
+
+            def mock_command(argv, **kwargs):
+                if argv[0] != "nix":
+                    return ""
+                sub = argv[1]
+                if sub == "flake" and argv[2] == "metadata":
+                    return json.dumps({
+                        "locks": {"nodes": {"nixpkgs": {"locked": {
+                            "rev": "0" * 40,
+                            "narHash": "sha256-hash",
+                        }}}}
+                    })
+                if sub == "flake" and argv[2] == "check":
+                    return ""
+                if sub == "build":
+                    attr = argv[-1]
+                    if attr.endswith(".runtime"):
+                        return json.dumps([{"drvPath": "/nix/store/runtime.drv", "outputs": {"out": str(runtime_dir)}}])
+                    pid = attr.split(".")[-1]
+                    out_dir = str(mock_store / pid)
+                    return json.dumps([{"drvPath": f"/nix/store/{pid}.drv", "outputs": {"out": out_dir}}])
+                if sub == "path-info":
+                    out_path = argv[-1]
+                    return json.dumps([{"path": out_path, "narHash": "sha256-mock", "narSize": 1024}])
+                raise ValueError(f"Unexpected mock_command argv: {argv}")
+
+            context = {
+                "system": "x86_64-linux",
+                "repository": ROOT,
+                "scratch": scratch,
+                "pins": {
+                    "nix": {
+                        "installer_version": "2.31.2",
+                        "installer_sha256_by_system": {
+                            "aarch64-darwin": "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8",
+                            "x86_64-linux": pin_val,
+                            "aarch64-linux": "64db528412096d718b4bf8f78f85e5ac2b714b774e5005500dee37d23f560456",
+                        },
+                        "nixpkgs_revision": "0" * 40,
+                        "nixpkgs_nar_hash": "sha256-hash",
+                    }
+                },
+                "captures": [(Mock(), {"project": {"id": pid}}, {}) for pid in PRODUCTS],
+                "client": Mock(),
+            }
+
+            with patch.dict(os.environ, {"RUNNER_TEMP": str(runner_temp)}), \
+                 patch("rs9.hosted_nix.prepare_input", return_value=(scratch, scratch, products)), \
+                 patch("rs9.hosted_nix.command", side_effect=mock_command), \
+                 patch("rs9.hosted_nix.release_load_record", return_value={"synthetic": True}), \
+                 patch("rs9.hosted_nix.verify_burst_payload", return_value={"status": "pass"}), \
+                 patch("rs9.hosted_nix.run_probes", side_effect=lambda name, *a, **k: (k.get("after_probe", lambda: None)() or [{"name": f"command.{name}.supported-behavior", "status": "pass"}])), \
+                 patch("rs9.hosted_nix.record_direct_loader_evaluation", return_value={"status": "pass", "application_qualified": False}), \
+                 patch("rs9.hosted_nix.fhs_runtime_smoke", return_value={"name": "nix-fhs-runtime-smoke", "status": "pass"}), \
+                 patch("rs9.hosted_nix.snapshot_nebular_runtime", return_value={"runtime_root_sha256": "a" * 64}), \
+                 patch("rs9.hosted_nix.prepare_smoke", return_value={}), \
+                 patch("rs9.hosted_nix.verifier_import_preflight", return_value={"status": "pass"}), \
+                 patch("rs9.hosted_nix.verify_nebular_runtime", return_value={"status": "pass"}):
+
+                # Ensure cache directory entry exists for nebular smoke materialization check
+                cache_dir = scratch / "nix-runtime-cache"
+                entry_payload = cache_dir / "entries/test/payload/app"
+                entry_payload.mkdir(parents=True)
+
+                result = execute(context)
+                self.assertIn("outputs", result["details"])
+                gate_names = [g["name"] for g in result["gates"]]
+                self.assertIn("nix-fhs-runtime-smoke", gate_names)
+                self.assertIn("nix-store-archive-readback", gate_names)
+                self.assertIn("nix-native-closure", gate_names)
+                self.assertIn("nix-build-check-run", gate_names)
+
+                lanes = [l for l in contract(ROOT)["lanes"] if l.get("lane") == "nix" and l.get("system") == "x86_64-linux"]
+                self.assertEqual(len(lanes), 1)
+                blockers = gate_blockers(lanes[0], result)
+                self.assertEqual(blockers, [])
 
 
 if __name__ == "__main__":

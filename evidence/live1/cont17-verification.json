@@ -1,0 +1,1006 @@
+{
+  "attended_handoff": {
+    "artifact_receipt_summary_bindings_required": true,
+    "existing_empty_output_directory_required": true,
+    "fresh_non_production_hosted_run": 16,
+    "operator": "operators/live1/run-hosted16.py",
+    "preserve_diagnostic_failures": true,
+    "requires_exact_external_acceptance": true,
+    "run15_rerun": false,
+    "stdout_stderr_files_required": true,
+    "stop_for_manager_disposition": true
+  },
+  "candidate_adoption_ready": false,
+  "candidate_inventory": {
+    "all_readiness_and_publication_flags_false": true,
+    "changed_path_count": 21,
+    "inventoried_files_excluding_manifest": 486,
+    "scope_delta_exact": true,
+    "status": "pass"
+  },
+  "check_categories": {
+    "native_linux_forced_group_kill_proc_readback": {
+      "reason": "Linux /proc owned-child state readback unavailable on Darwin",
+      "status": "skipped"
+    },
+    "native_linux_nix_proot_webkit": {
+      "reason": "provider is Darwin; Linux guest and actual PRoot runtime not executed",
+      "status": "unavailable"
+    },
+    "real_local_filesystem": {
+      "scope": "exact guest audit source over disposable mapped guest paths; shebang, wrapper PATH, helper and ELF interpreter facts",
+      "status": "pass"
+    },
+    "real_local_processes": {
+      "scope": [
+        "observer exec failure and stream closure",
+        "timeout stream and actual killed status",
+        "created-group descendant termination on exit and timeout",
+        "outer forwarding and group control via explicitly fake transport",
+        "guest waitpid ordinary 255 versus signal death",
+        "contradictory actual wrapper status via fake transport"
+      ],
+      "status": "pass"
+    },
+    "synthetic": {
+      "scope": "framing, causal classification, injected argv/runner and guest path seams; no native PRoot or application PASS authority",
+      "status": "pass"
+    }
+  },
+  "diff_check": "pass",
+  "focused_runtime_argv_filesystem_wait_process_tests": {
+    "modules": [
+      "test_nix_proot",
+      "test_nix_proot_launch",
+      "test_nix_proot_wait",
+      "test_nix_proot_processes",
+      "test_nix_proot_audit",
+      "test_hosted_nix",
+      "test_hosted_nix_proot"
+    ],
+    "passed": 151,
+    "resource_warning_policy": "error",
+    "run": 152,
+    "skipped": 1,
+    "status": "pass"
+  },
+  "full_live1_qualification": false,
+  "full_source_tests": [
+    {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -B -W error::ResourceWarning; unittest.TestLoader.discover(tests, top_level_dir=.) and TextTestRunner after os.umask",
+      "discovered_methods": 1826,
+      "duration_seconds": 67.672,
+      "errors": [],
+      "failures": [],
+      "log_sha256": "8ce571aa8a8ecfe2efb2bf759fe9ca17d30f4c0f749ff46004df51e0f8a97dd9",
+      "passed": 1795,
+      "resource_warning_messages": 0,
+      "resource_warning_policy": "error",
+      "run": 1816,
+      "skipped_methods": 31,
+      "skips": [
+        {
+          "affected_methods": 1,
+          "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+          "test": "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "sandbox denies local socket creation; socket record grammar tested separately",
+          "test": "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG unavailable; native DNF remains unavailable independently",
+          "test": "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "both live capture directories required",
+          "test": "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "official archive directory not locatable",
+          "test": "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "official archive directory not locatable",
+          "test": "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "official archive directory not locatable",
+          "test": "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "Linux /proc owned-child state readback unavailable on Darwin",
+          "test": "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "distinct real writer ownership needs root and POSIX fork",
+          "test": "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "Run 13 public metadata reference requires RS9_RUN13_REFERENCE_DIR",
+          "test": "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "exact captured references supplied by attended evidence replay",
+          "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "native pinned RPM 6.0.2 tools unavailable",
+          "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "RUN12 reference directory not supplied",
+          "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "Real GnuPG binary not available on this host",
+          "test": "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available"
+        },
+        {
+          "affected_methods": 10,
+          "reason": "GnuPG binary not available in environment",
+          "test": "setUpClass (tests.test_signing_fixture.SigningFixtureTests)"
+        }
+      ],
+      "status": "pass",
+      "umask": "022"
+    },
+    {
+      "command": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -B -W error::ResourceWarning; unittest.TestLoader.discover(tests, top_level_dir=.) and TextTestRunner after os.umask",
+      "discovered_methods": 1826,
+      "duration_seconds": 65.759,
+      "errors": [],
+      "failures": [],
+      "log_sha256": "9a1746e7ca136d56da944ba8eae0b37194df5e67be887ee7320801c0f9f33c27",
+      "passed": 1795,
+      "resource_warning_messages": 0,
+      "resource_warning_policy": "error",
+      "run": 1816,
+      "skipped_methods": 31,
+      "skips": [
+        {
+          "affected_methods": 1,
+          "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+          "test": "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "sandbox denies local socket creation; socket record grammar tested separately",
+          "test": "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG unavailable; native DNF remains unavailable independently",
+          "test": "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "both live capture directories required",
+          "test": "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "official archive directory not locatable",
+          "test": "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "official archive directory not locatable",
+          "test": "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "official archive directory not locatable",
+          "test": "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "Linux /proc owned-child state readback unavailable on Darwin",
+          "test": "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "distinct real writer ownership needs root and POSIX fork",
+          "test": "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "Run 13 public metadata reference requires RS9_RUN13_REFERENCE_DIR",
+          "test": "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "exact captured references supplied by attended evidence replay",
+          "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "native pinned RPM 6.0.2 tools unavailable",
+          "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "RUN12 reference directory not supplied",
+          "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "Real GnuPG binary not available on this host",
+          "test": "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available"
+        },
+        {
+          "affected_methods": 10,
+          "reason": "GnuPG binary not available in environment",
+          "test": "setUpClass (tests.test_signing_fixture.SigningFixtureTests)"
+        }
+      ],
+      "status": "pass",
+      "umask": "077"
+    }
+  ],
+  "guarded_collection": {
+    "discovered_methods": 1826,
+    "errors": [],
+    "processes_and_origin_requests_forbidden": true,
+    "status": "pass"
+  },
+  "kit": {
+    "canonical_receipt_hashes": 16,
+    "manifests": 18,
+    "omitted_large_packages_reverified": false,
+    "present_selected_objects": 147,
+    "selected_rows": 171,
+    "status": "pass"
+  },
+  "native_evidence_owed": [
+    "actual causal display/D-Bus/helper closure and evidence-led producer fix",
+    "unchanged released verifier and application smoke",
+    "actual main and SEA/self/loader descendants",
+    "actual WebKit sandbox and userns/ptrace suitability",
+    "raw and guest-wait signal propagation, forwarding and owned cleanup",
+    "same-prefix latency, materialization and experiment wall costs"
+  ],
+  "observed_stage_deltas_at_entry": [],
+  "origin": {
+    "public_cname_matches_intended_target": true,
+    "readback": "evidence/live1/cont17-pages-readback.json",
+    "repository_pages_settings": "unavailable",
+    "run15_origin_verified": false,
+    "run15_verify_code": 62,
+    "served_certificate_names": "unresolved",
+    "settings_or_dns_changed": false,
+    "status": "partial"
+  },
+  "parent": "f1f55f7cb049a690750de8c1acd0122ad2eedef1",
+  "parse_compile_credentials_and_relative_links": {
+    "broken_links": [],
+    "bytecode_written": false,
+    "credential_scanned_files": 487,
+    "python_parse_compile": 277,
+    "relative_links_checked": 306,
+    "status": "pass"
+  },
+  "preserved_contracts": {
+    "experiment_gate_count": 9,
+    "nix_recipe_and_pins_unchanged": true,
+    "original_required_gates_preserved": true,
+    "original_required_linux_nix_lanes": 2,
+    "release_bytes_unchanged": true,
+    "repository_index_unchanged": true,
+    "shared_released_verifier_and_smoke_unchanged": true,
+    "unrelated_operational_state_preserved": true,
+    "workflow_and_lane_contract_unchanged": true
+  },
+  "producer_full_source_tests": [
+    {
+      "discovered_methods": 1814,
+      "duration_seconds": 67.748,
+      "errors": [],
+      "failures": [],
+      "log_sha256": "f5b15fcc288d2ba2e5ec2d7b4f1fbff0cdbd313fa44c0d1528f6b77922e09cff",
+      "passed": 1783,
+      "resource_warning_messages": 0,
+      "resource_warning_policy": "error",
+      "run": 1804,
+      "skipped_methods": 31,
+      "skips": [
+        {
+          "affected_methods": 1,
+          "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+          "test": "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "sandbox denies local socket creation; socket record grammar tested separately",
+          "test": "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG unavailable; native DNF remains unavailable independently",
+          "test": "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "both live capture directories required",
+          "test": "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "official archive directory not locatable",
+          "test": "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "official archive directory not locatable",
+          "test": "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "official archive directory not locatable",
+          "test": "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "Linux /proc owned-child state readback unavailable on Darwin",
+          "test": "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "distinct real writer ownership needs root and POSIX fork",
+          "test": "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "Run 13 public metadata reference requires RS9_RUN13_REFERENCE_DIR",
+          "test": "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "exact captured references supplied by attended evidence replay",
+          "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "native pinned RPM 6.0.2 tools unavailable",
+          "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "RUN12 reference directory not supplied",
+          "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "Real GnuPG binary not available on this host",
+          "test": "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available"
+        },
+        {
+          "affected_methods": 10,
+          "reason": "GnuPG binary not available in environment",
+          "test": "setUpClass (tests.test_signing_fixture.SigningFixtureTests)"
+        }
+      ],
+      "status": "pass",
+      "umask": "022"
+    },
+    {
+      "discovered_methods": 1814,
+      "duration_seconds": 68.073,
+      "errors": [],
+      "failures": [],
+      "log_sha256": "3ca0cb0bc32523d72879734063d0e9cad070d2016f4659b86944e424eab940c4",
+      "passed": 1783,
+      "resource_warning_messages": 0,
+      "resource_warning_policy": "error",
+      "run": 1804,
+      "skipped_methods": 31,
+      "skips": [
+        {
+          "affected_methods": 1,
+          "reason": "host filesystem rejects invalid UTF-8 filename bytes; parser fixture covers them",
+          "test": "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "sandbox denies local socket creation; socket record grammar tested separately",
+          "test": "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG unavailable; native DNF remains unavailable independently",
+          "test": "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "both live capture directories required",
+          "test": "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "live capture directory not supplied",
+          "test": "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "official archive directory not locatable",
+          "test": "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "official archive directory not locatable",
+          "test": "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "official archive directory not locatable",
+          "test": "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "Linux /proc owned-child state readback unavailable on Darwin",
+          "test": "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "GnuPG binary not available",
+          "test": "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "distinct real writer ownership needs root and POSIX fork",
+          "test": "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "Run 13 public metadata reference requires RS9_RUN13_REFERENCE_DIR",
+          "test": "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "exact captured references supplied by attended evidence replay",
+          "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "native pinned RPM 6.0.2 tools unavailable",
+          "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "RUN12 reference directory not supplied",
+          "test": "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references"
+        },
+        {
+          "affected_methods": 1,
+          "reason": "Real GnuPG binary not available on this host",
+          "test": "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available"
+        },
+        {
+          "affected_methods": 10,
+          "reason": "GnuPG binary not available in environment",
+          "test": "setUpClass (tests.test_signing_fixture.SigningFixtureTests)"
+        }
+      ],
+      "status": "pass",
+      "umask": "077"
+    }
+  ],
+  "producer_tested_changed_python_files": [
+    {
+      "git_blob": "4f7a2ce1723262bf8ec4b8c4388625d6d3ee2893",
+      "mode": "100644",
+      "path": "operators/live1/run-hosted16.py",
+      "sha256": "ba3957f841ec30826a774d32557dc9cf692a1763b7f2aada52b08df407a3a810",
+      "size": 548
+    },
+    {
+      "git_blob": "04811243ef11fff94c4d4afd8a9136742eed3b1d",
+      "mode": "100644",
+      "path": "src/rs9/hosted_nix.py",
+      "sha256": "222d48a04cfe82e36934cf094638f5cddfdaee219d094784cb24f441b2ee58dc",
+      "size": 24027
+    },
+    {
+      "git_blob": "9d714732ba352e54b7b2fe6291953ec085226acd",
+      "mode": "100644",
+      "path": "src/rs9/hosted_nix_proot.py",
+      "sha256": "721ab0915c3607854799ed8a69ae3cfcfbdd767185e875c1264815baaed9f63f",
+      "size": 12876
+    },
+    {
+      "git_blob": "bb4f19b9e9ec9022d29fe455110d0a26f12221c3",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot.py",
+      "sha256": "1bfb2dacd444d7449090f17784ed80c98cbe553ba7ce801f80eb11f3a79bd250",
+      "size": 64167
+    },
+    {
+      "git_blob": "13e303d732cf52327cd7d1acf0a400d5914d63c2",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_audit.py",
+      "sha256": "4ddb56bfeadb4a108ef4c3f591895104cef2fa357b40c1e65d8eca947f0186be",
+      "size": 10068
+    },
+    {
+      "git_blob": "1b545d3637803616be1d603c0a8fa8e49ccd8e34",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_launch.py",
+      "sha256": "7056ccdec33c77920d7b25fe09172a19900c768545391c994c009fdce1eb6679",
+      "size": 13388
+    },
+    {
+      "git_blob": "2be366a36b343aaa5844587cee45ec87cd591323",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_signals.py",
+      "sha256": "1ddd4fd806a7ea5a0e2c2d867988f83d007272d29a7bc687079f27ae8c016a5d",
+      "size": 4313
+    },
+    {
+      "git_blob": "c98d6d65761cbd32a38fe591c3dcc1fae3f11873",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_wait.py",
+      "sha256": "b79cfbc05d1e7133024993f4d8d634ce108ca397aa4840953962e649d3902a0e",
+      "size": 9757
+    },
+    {
+      "git_blob": "0252a59dba6fc34414d82a729c5791010afb15dd",
+      "mode": "100644",
+      "path": "tests/test_hosted_nix.py",
+      "sha256": "40d1b12fcf15d84f9c4eef3247ae9e9977795cc8748c8e26e6d151747ed367d3",
+      "size": 49669
+    },
+    {
+      "git_blob": "3cd1370d86681e89c961fa55db64d94eaff9d4ae",
+      "mode": "100644",
+      "path": "tests/test_nix_proot.py",
+      "sha256": "787768332c7aec8d419fd64b64cd2e94a24028a7d3d314ef07b0c37b884354e8",
+      "size": 62276
+    },
+    {
+      "git_blob": "3a723a429995d175218b06194145f27cf9b6633d",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_audit.py",
+      "sha256": "6a75dfbcf9b1b3bdb22416d34a13f2f2bfb426ae4f30921124d3a9c1968e5817",
+      "size": 6508
+    },
+    {
+      "git_blob": "e2e04fa632704fb26cd6f0df9385a78ba09a31fb",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_launch.py",
+      "sha256": "345d598da8dd8e66ec17ba86a76a70219819067bf4d2369eb7507ed4c367fccf",
+      "size": 6059
+    },
+    {
+      "git_blob": "a708603a96c5ee0ac3e76d1a6ea53a8e9e664c38",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_processes.py",
+      "sha256": "a42ae9a577f6c0c0ddbade421d1ae72541f46bd0934e4a450a8241ab0b778efe",
+      "size": 6961
+    },
+    {
+      "git_blob": "f0b48e64dfcfc2ca8798afa4b60404a5905dcf39",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_wait.py",
+      "sha256": "f624caf605132415485374411bec62b1c85dc03a0b73d080f49d2a11752de85b",
+      "size": 9289
+    },
+    {
+      "git_blob": "3a26fd9de3c3449bed09c33ebdc01fd65db9ba73",
+      "mode": "100644",
+      "path": "tests/test_run_hosted16.py",
+      "sha256": "73c5e130c6125d6c0a817630fa9abda431e662a5fc3eaf91e86475852852af83",
+      "size": 2010
+    }
+  ],
+  "production_enabled": false,
+  "production_ready": false,
+  "proposal_binding": {
+    "bytes": 20861,
+    "schema": "agent-phase-plan-material-v1",
+    "sha256": "95a47f217c2fdfdd1292e85577ae6db730b35d788c77fc055a4f200790b0ba6b"
+  },
+  "proposal_disposition": "amend",
+  "publication_authority": false,
+  "published_linux_nix_ready": false,
+  "qualification_authority": false,
+  "resolved_intermediate_failures": [
+    "initial full-suite inventory failure corrected by current manifest regeneration",
+    "observer launch causality loss through evaluation reproduced and fixed before final source checks",
+    "Adverse tests reproduced advisory defects before terminal corrections",
+    "Initial guarded collection used a nonexistent origin symbol; corrected guard completed with 1826 methods and no effects"
+  ],
+  "review": {
+    "additional_substantive_review_obtained": false,
+    "closeout_verification": "terminal-corrections-and-task-scoped-verification",
+    "owner": "dispatcher",
+    "pre_final": "reviewed_with_findings",
+    "producer_invoked_reviewer": false,
+    "terminal_revision_automatically_independently_reviewed": false
+  },
+  "schema": "rs9.cont17-source-verification.v1",
+  "signal_policy": {
+    "guest_source_run_argv_binding": true,
+    "host_supervisor_adopted": false,
+    "passing_baseline_paths_unsupervised": true,
+    "raw_status_preserved": true,
+    "records_authenticated_against_guest": false,
+    "status_mapping_enabled": false,
+    "subreaper_added": false
+  },
+  "stage": "implementation_testing",
+  "status": "terminal-source-checks-passed-native-qualification-pending",
+  "terminal_closeout": {
+    "bound_review_candidate_tree": "5110dea6cedc78f93640d13b65ceef715f7cf763",
+    "disposition": "amend",
+    "findings": [
+      {
+        "disposition": "corrected",
+        "evidence": "tool_source distinguishes stderr evidence from outer display hints",
+        "number": 1
+      },
+      {
+        "disposition": "deferred",
+        "evidence": "Released smoke and shared verifier unchanged; handoff explicitly limits node-e baseline and warns exit 127 may remain uncaused, requiring later attended work",
+        "number": 2
+      },
+      {
+        "disposition": "corrected",
+        "evidence": "Launch-chain, signal and latency exceptions retain safe rows and all nine gate results; wait failures retain subsequent signal stages",
+        "number": 3
+      },
+      {
+        "disposition": "corrected",
+        "evidence": "Host wait record retained in evaluation, no host-owned file in guest-writable channel; ADR corrected",
+        "number": 4
+      },
+      {
+        "disposition": "corrected",
+        "evidence": "Passing signal and latency receipts remove failure reason; failed signal cause uses distinct launch_reason",
+        "number": 5
+      },
+      {
+        "disposition": "corrected",
+        "evidence": "No SIGKILL handler installation; block signals across fork and only forward to positive owned child PID; actual local fork-boundary and SIGKILL tests pass through fake transport",
+        "number": 6
+      },
+      {
+        "disposition": "corrected",
+        "evidence": "Separate Xvfb error paths for both stages",
+        "number": 7
+      },
+      {
+        "disposition": "corrected",
+        "evidence": "Gate-relevant main precedes bare-name comparison; existing wrapper PATH resolution documented as unlikely causal difference",
+        "number": 8
+      },
+      {
+        "disposition": "amended",
+        "evidence": "Remove nonexisting success-path nix-app-smoke name and default command fallback; retain one owed supported-behavior row per unexecuted command, consistent with shared unbound-command not-run behavior; no probe execution claimed",
+        "number": 9
+      },
+      {
+        "disposition": "corrected",
+        "evidence": "ELF absolute command literals recorded as diagnostic candidates",
+        "number": 10
+      }
+    ],
+    "hosted_run16": "pending-external-exact-acceptance-and-attended-execution",
+    "log_capture": "Full-suite streams captured and hashed in memory; sanitized result records retained, raw logs not retained",
+    "native_execution": "unavailable-on-Darwin",
+    "pages_capture_readback": {
+      "capture_matches_retained_sha256": true,
+      "live_origin_request_started": false,
+      "settings": "unavailable",
+      "status": "pass"
+    },
+    "provider_actions": {
+      "account_or_pages_or_dns_mutation": false,
+      "ci_trigger_or_rerun": false,
+      "commit_or_push": false,
+      "git_metadata_mutation": false,
+      "publication": false
+    },
+    "reason": "Correct supported advisory findings while retaining the experiment and original required Linux lanes; native smoke cause and suitability remain unproven",
+    "stage": "closeout",
+    "unresolved": [
+      "Native causal display and released-smoke transitive closure repair",
+      "Actual PRoot signal propagation, forwarding and owned-descendant cleanup",
+      "WebKit sandbox compatibility and operational latency",
+      "Repository Pages custom-domain/build/certificate/HTTPS settings and served certificate names"
+    ],
+    "workers": {
+      "reason": "Closeout corrections are coupled and bounded; prior three completed Gemini worker dispositions remain recorded",
+      "status": "declined"
+    }
+  },
+  "test_binding_scope": "All 277 Python source/test files unchanged after terminal full suites; subsequent documentation, evidence and manifest receive fresh final checks",
+  "tested_changed_python_files": [
+    {
+      "git_blob": "4f7a2ce1723262bf8ec4b8c4388625d6d3ee2893",
+      "mode": "100644",
+      "path": "operators/live1/run-hosted16.py",
+      "sha256": "ba3957f841ec30826a774d32557dc9cf692a1763b7f2aada52b08df407a3a810",
+      "size": 548
+    },
+    {
+      "git_blob": "f06c6ff105a0785be00bc20fa103f1f09d3ba779",
+      "mode": "100644",
+      "path": "src/rs9/hosted_nix.py",
+      "sha256": "737adac0d5836f8682b234acefe64661771207afedcf15f535ac416d9abf72fa",
+      "size": 23898
+    },
+    {
+      "git_blob": "9d714732ba352e54b7b2fe6291953ec085226acd",
+      "mode": "100644",
+      "path": "src/rs9/hosted_nix_proot.py",
+      "sha256": "721ab0915c3607854799ed8a69ae3cfcfbdd767185e875c1264815baaed9f63f",
+      "size": 12876
+    },
+    {
+      "git_blob": "b20c789a4d3145c9fd44dc96badaea8ef4350fb1",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot.py",
+      "sha256": "5829483db8ae275c913a7ee369c9272ebda7bc0f4dce35756c2bbd4c3a60124c",
+      "size": 64973
+    },
+    {
+      "git_blob": "bfd6efca41dde19d7769637dd27de1252e31cd25",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_audit.py",
+      "sha256": "585553ceb144a0bf2c75dbc80aa1041776e5fe4df15e583d1159f557a5796a70",
+      "size": 10300
+    },
+    {
+      "git_blob": "f113ae02548c6ac40a6b9772959c058dcc7401f0",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_launch.py",
+      "sha256": "e33619d464ddd712bff0d2cfed4e1b885ffd952e7ab902c1ce95dabd993d41dc",
+      "size": 14286
+    },
+    {
+      "git_blob": "4085a9b5ad3450ac0cd2bd97bcba27a1a2377350",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_signals.py",
+      "sha256": "34da5fb6442a3000b025038472714779886e14285239f5bb794f5be2f7f65bf6",
+      "size": 4767
+    },
+    {
+      "git_blob": "7b9b6e9fccd744e05be0a8bfc454d6183ff16eb8",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_wait.py",
+      "sha256": "f9b050a5d96677fefccd2eae65d59e7696d7856a54beb01cbf342ea5abda57fe",
+      "size": 10299
+    },
+    {
+      "git_blob": "55d66af7192cf31a913a27d1678994c48e5b2c33",
+      "mode": "100644",
+      "path": "tests/test_hosted_nix.py",
+      "sha256": "248e116831c5c3e5534cf99eec98f25b62435eafa07b3a6dbc5e75133d9f1c1e",
+      "size": 49595
+    },
+    {
+      "git_blob": "e59c7056a0471c41a019d1cfb4ab985da17108b6",
+      "mode": "100644",
+      "path": "tests/test_nix_proot.py",
+      "sha256": "d017dfbbe4c0c672eb67366f84b556ffb19c7ba7829725a7e03c0ad121433f89",
+      "size": 65033
+    },
+    {
+      "git_blob": "bef1c6c1992e4cda00b84834e807732702da2b80",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_audit.py",
+      "sha256": "fc7f9d5bac5f39214a5add40b1f9798e27ba8b5ab2df80766c39be77f94099e5",
+      "size": 6791
+    },
+    {
+      "git_blob": "010715bf9430d45614b025065ea05ac047238b07",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_launch.py",
+      "sha256": "b8bd95530d8933dbfb1a912ed9ec2207a6ef1f28ed39262031c75f98fa24e2f9",
+      "size": 8728
+    },
+    {
+      "git_blob": "a708603a96c5ee0ac3e76d1a6ea53a8e9e664c38",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_processes.py",
+      "sha256": "a42ae9a577f6c0c0ddbade421d1ae72541f46bd0934e4a450a8241ab0b778efe",
+      "size": 6961
+    },
+    {
+      "git_blob": "141630464bc51905ec1f75038edb4a7eafef98d4",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_wait.py",
+      "sha256": "ced3da1a1d99c8bd87e5c6d69c67ce83a2498c8dab21f427bae361b0bd39ff6a",
+      "size": 12442
+    },
+    {
+      "git_blob": "3a26fd9de3c3449bed09c33ebdc01fd65db9ba73",
+      "mode": "100644",
+      "path": "tests/test_run_hosted16.py",
+      "sha256": "73c5e130c6125d6c0a817630fa9abda431e662a5fc3eaf91e86475852852af83",
+      "size": 2010
+    }
+  ],
+  "worker_disposition": {
+    "cleanup_proven": true,
+    "completed_jobs": 3,
+    "dispatcher_checkpoint": false,
+    "kind": "gemini",
+    "parent_dispositions": [
+      {
+        "disposition": "partial",
+        "reason": "adopted bounded argv and classification work; parent replaced guest audit and corrected measurement and evidence retention",
+        "task": "launch-diagnostics"
+      },
+      {
+        "disposition": "partial",
+        "reason": "host supervisor declined; parent narrowed to diagnostic guest wait and preserved raw status",
+        "task": "wait-protocol"
+      },
+      {
+        "disposition": "accepted",
+        "reason": "fresh parent tests confirm exact partial rows and unchanged execution error",
+        "task": "required-nix-retention"
+      }
+    ]
+  },
+  "workflow_operator_contract_inventory_and_hygiene_tests": {
+    "failed": 0,
+    "modules": [
+      "test_hygiene",
+      "test_workflow_static",
+      "test_scoped_workflow_graph",
+      "test_run_hosted16",
+      "test_candidate_inventory",
+      "test_live1_contracts",
+      "test_hosted_contract",
+      "test_command_contracts"
+    ],
+    "run": 60,
+    "skipped": 0,
+    "status": "pass"
+  }
+}

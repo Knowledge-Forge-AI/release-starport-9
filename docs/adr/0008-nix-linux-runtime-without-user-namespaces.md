@@ -113,3 +113,61 @@ evaluation/build success or native application compatibility. The original
 Linux runtime repair therefore remains open pending native hosted
 qualification and separately reviewed product/harness promotion. This explicit deferral is independent of the
 completed RPM, Debian, inventory and Homebrew source repairs.
+
+## CONT17 diagnostic launch and wait protocol
+
+The candidate adds transitive guest launch-chain inspection and bounded causal
+launch receipts. Shebangs, ELF interpreters, wrapper references and PATH helpers
+are inspected as candidate dependencies, then display and D-Bus roles are
+executed separately. The original bare-name chain remains a diagnostic baseline
+alongside explicit store-backed paths. The released verifier and application
+smoke retain their original commands and unsupervised guest execution.
+
+A separate diagnostic supervisor may distinguish ordinary guest exit from
+signal death using a waitpid record. The guest writes started and final frames
+with schema, nonce, binding over guest facts/closure and source/run/argv, and
+WIFEXITED or WIFSIGNALED state.
+The host validates bounded no-follow regular-file framing, ownership, closed
+keys and types, binding and agreement with the raw PRoot status. Ordinary exit
+255 remains ordinary exit. The guest supervisor re-raises a child's actual
+signal, while the host preserves the raw PRoot return status. A valid signaled
+record with raw status 255 exposes a status collapse and still fails signal
+compatibility; it is never converted into a synthetic signal exit. Missing,
+malformed and contradictory records fail as well. The bound host diagnostic
+is retained inside the experiment evaluation without consuming stdout. It is
+not written into the guest-writable frame channel. An oversized host record
+fails closed; diagnostic exceptions are retained without discarding gate rows.
+Forwarded signals are blocked across fork until the child's default handlers
+are restored, and forwarding targets only a positive owned child PID. SIGKILL
+is re-raised without trying to install an uncatchable signal handler.
+
+This record detects accidental mismatch, not hostile-guest forgery: PRoot
+shares the uid, temporary storage and readable process arguments with its
+guest. It is neither authentication nor isolation. Supervision is confined to
+diagnostic probes and measurements. Materialization, command contracts, SEA,
+released verifier and authoritative application smoke remain the run-15
+baseline. Any changed outcome on a previously passing path disqualifies
+supervision for that path.
+
+External outer-process delivery and whole-group control are reported separately.
+The raw group includes the offline harness, PRoot and guest handler; the wait
+diagnostic is a separate arm and adds only its guest supervisor. No host
+supervisor or status mapper is adopted. A forwarding/group-control real-process
+test uses a fake transport and cannot prove actual PRoot or sudo behavior.
+Targets are the exact created outer process and process group, or the guest
+supervisor's own forked child. Ambient receipt PIDs are never signal targets.
+Cleanup is bounded to the created group; ambient nonce matches confer no kill authority. A
+forced process-group SIGKILL bypasses Python cleanup, so PRoot's existing
+`--kill-on-exit` behavior and survivor observations remain explicit limits,
+rather than presumed cleanup proof. No subreaper is introduced; descendants
+escaping both the created group and PRoot custody remain an explicit native
+cleanup limitation and failure observation.
+
+All nine experimental gates and all original required Linux Nix gates stay in
+place. Native run 16 must measure launch latency, materialization and experiment
+cost, and execute the unchanged verifier/smoke and actual main/sidecar observers.
+If corrected launch exposes a WebKit userns/ptrace constraint, retain precise
+failures for manager disposition. No sandbox disablement or substrate promotion
+follows from source acceptance. Removing the added diagnostic modules and
+restoring their callers rolls back this continuation without release, pin,
+required-runtime or external-settings changes.

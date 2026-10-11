@@ -33,6 +33,7 @@ import tempfile
 from typing import Any, Callable, NamedTuple
 
 from rs9.errors import ContractError, safe_details
+from rs9.nix_proot_launch import classify_failure, measure_proot_latency, run_launch_chain
 
 SCHEMA = "rs9.nix-proot-evaluation.v2"
 FACTS_SCHEMA = "rs9.nix-proot-facts.v2"
@@ -337,12 +338,14 @@ def bounded_guest_run(argv, *, env, capture_output=True, timeout=60):
         child = subprocess.Popen(argv, env=env, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr,
                                  start_new_session=True)
         deadline = time.monotonic() + timeout
+        timed_out = False
         try:
             while child.poll() is None:
                 if max(os.fstat(stdout.fileno()).st_size, os.fstat(stderr.fileno()).st_size) > MAX_OUTPUT:
                     break
                 if time.monotonic() >= deadline:
-                    raise subprocess.TimeoutExpired(argv, timeout)
+                    timed_out = True
+                    break
                 time.sleep(0.05)
         finally:
             try:
@@ -351,7 +354,12 @@ def bounded_guest_run(argv, *, env, capture_output=True, timeout=60):
                 pass
             child.wait(timeout=10)
         stdout.seek(0); stderr.seek(0)
-        return subprocess.CompletedProcess(argv, child.returncode, stdout.read(MAX_OUTPUT + 1), stderr.read(MAX_OUTPUT + 1))
+        out, err = stdout.read(MAX_OUTPUT + 1), stderr.read(MAX_OUTPUT + 1)
+        if timed_out:
+            error = subprocess.TimeoutExpired(argv, timeout, output=out, stderr=err)
+            error.returncode = child.returncode
+            raise error
+        return subprocess.CompletedProcess(argv, child.returncode, out, err)
 
 
 @dataclass
@@ -386,9 +394,10 @@ class GuestRuntime:
         result = None
         try:
             result = self.runner(argv, env=self.host_env(), capture_output=True, timeout=timeout)
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as expired:
             self.timeouts[probe] = self.timeouts.get(probe, 0) + 1
             error = "timeout"
+            result = subprocess.CompletedProcess(argv, getattr(expired, "returncode", None), expired.output, expired.stderr)
         except OSError:
             error = "spawn-failed"
         elapsed = time.monotonic() - start
@@ -397,8 +406,8 @@ class GuestRuntime:
             return Run(None, b"", b"", elapsed, error)
         stdout, stderr = _bytes(result.stdout), _bytes(result.stderr)
         if len(stdout) > MAX_OUTPUT or len(stderr) > MAX_OUTPUT:
-            return Run(result.returncode, b"", b"", elapsed, "output-limit")
-        return Run(result.returncode, stdout, stderr, elapsed, None)
+            return Run(result.returncode, stdout[:MAX_OUTPUT], stderr[:MAX_OUTPUT], elapsed, "output-limit")
+        return Run(result.returncode, stdout, stderr, elapsed, error)
 
 
 def _result(name: str, status: str, reason: str | None = None, **details: Any) -> dict[str, Any]:
@@ -419,21 +428,29 @@ def _sha(data: bytes) -> str:
 
 
 def _launch_reason(stderr: bytes) -> str:
-    text = stderr.decode("utf-8", errors="replace").lower()
-    if "ptrace" in text:
-        return "ptrace-denied"
-    if "no such file or directory" in text:
-        return "guest-path-missing"
-    if "user namespace" in text or "creating new namespace" in text:
-        return "userns-denied"
-    return "proot-launch-failed"
+    return classify_failure(Run(None, b"", stderr, 0.0, None))["reason"]
 
 
 def _run_failure(name: str, run: Run, **details: Any) -> dict[str, Any]:
-    reason = {"timeout": "probe-timeout", "spawn-failed": "probe-spawn-failed", "output-limit": "probe-output-limit"}.get(run.error or "")
-    return _result(name, "fail", reason or _launch_reason(run.stderr), exit_code=run.returncode,
-                   stdout_sha256=_sha(run.stdout), stderr_sha256=_sha(run.stderr),
-                   elapsed_seconds=round(run.elapsed, 3), **details)
+    diag = classify_failure(run)
+    reason = {"timeout": "probe-timeout", "spawn-failed": "probe-spawn-failed", "output-limit": "probe-output-limit"}.get(run.error or "") or diag["reason"]
+    return _result(
+        name,
+        "fail",
+        reason,
+        exit_code=diag["exit_code"],
+        signal=diag["signal"],
+        stdout_length=diag["stdout_length"],
+        stderr_length=diag["stderr_length"],
+        stdout_sha256=diag["stdout_sha256"],
+        stderr_sha256=diag["stderr_sha256"],
+        elapsed_seconds=diag["elapsed_seconds"],
+        tool=diag["tool"],
+        role=diag["role"],
+        error_class=diag["error_class"],
+        path_class=diag["path_class"],
+        **details,
+    )
 
 
 def _json(run: Run) -> dict[str, Any] | None:
@@ -498,7 +515,8 @@ def probe_no_userns_ptrace(rt: GuestRuntime) -> dict[str, Any]:
 
 _OBSERVER = r'''
 import hashlib, json, os, signal, subprocess, sys, time, tempfile
-spec = json.load(open(sys.argv[1]))
+with open(sys.argv[1]) as stream:
+    spec = json.load(stream)
 PROC = "/proc"
 expected = set(spec["expected"])
 
@@ -583,14 +601,18 @@ stderr_file = tempfile.TemporaryFile()
 try:
     child = subprocess.Popen([spec["exe"], *spec["args"]], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                              stderr=stderr_file, start_new_session=True)
-except OSError:
-    print(json.dumps({"started": False, "processes": []}))
+except OSError as error:
+    stderr_file.close()
+    print(json.dumps({"started": False, "processes": [], "launch_errno": error.errno,
+                      "cause_role": "released-launcher-exec"}))
     sys.exit(0)
 seen = {}
 early = None
 last = {}
 grace = None
-deadline = time.monotonic() + spec["hold"]
+observation_start = time.monotonic()
+first_webkit_seconds = None
+deadline = observation_start + spec["hold"]
 while time.monotonic() < deadline:
     code = child.poll()
     last = tree(child.pid)
@@ -605,6 +627,7 @@ while time.monotonic() < deadline:
         break
     if spec["until_webkit"]:
         if grace is None and any(k[1].startswith("WebKitWebProc") for k in seen):
+            first_webkit_seconds = round(time.monotonic() - observation_start, 3)
             grace = time.monotonic() + 2.0
         if grace is not None and time.monotonic() >= grace:
             break
@@ -633,13 +656,14 @@ print(json.dumps({"started": True, "early_exit_code": early, "root_pid": child.p
                   "processes": list(seen.values()) if len(seen) <= 48 else [],
                   "process_capacity_exceeded": len(seen) > 48, "stderr_capacity_exceeded": len(stderr) > 65536,
                   "stderr_sha256": hashlib.sha256(stderr).hexdigest(),
+                  "stderr_length": len(stderr), "first_webkit_seconds": first_webkit_seconds,
                   "diagnostic_token": "userns-denied" if userns_denied else "none"}))
 '''
 
 
 def observe_native(rt: GuestRuntime, exe: str, *, label: str, expected: list[str], root_is_elf: bool,
                    args: tuple[str, ...] = (), display: bool = False, hold: float = 6.0,
-                   until_webkit: bool = False) -> dict[str, Any]:
+                   until_webkit: bool = False, pinned_display: bool = True) -> dict[str, Any]:
     """Launch an unmodified released executable in the guest and sample its actual process tree.
 
     The sampler is a sibling guest process reading /proc, so release bytes, env and argv are untouched.
@@ -653,22 +677,58 @@ def observe_native(rt: GuestRuntime, exe: str, *, label: str, expected: list[str
         "glibc_lib": rt.facts["glibc_lib"], "allowed": allowed}))
     command = [rt.facts["python"], "-I", "-S", "-B", "/tmp/rs9-observer.py", f"/tmp/rs9-observe-{label}.json"]
     if display:
-        command = ["xvfb-run", "-a", "dbus-run-session", "--", *command]
+        xvfb = (rt.facts.get("xvfb_run") if pinned_display else None) or "xvfb-run"
+        dbus = (rt.facts.get("dbus_run_session") if pinned_display else None) or "dbus-run-session"
+        command = [xvfb, "-a", dbus, "--", *command]
     run = rt.run("observe-" + label, command, timeout=hold + 90, cwd="/tmp")
     if run.error or run.returncode != 0:
-        return {"label": label, "status": "unobserved", "reason": _run_failure(label, run)["reason"]}
+        host_binds = tuple(str(b) for b in (
+            rt.layout.tmp_dir, rt.layout.cache_dir, rt.layout.loader_tmp, rt.layout.etc_dir, *rt.layout.workspaces
+        ) if b is not None)
+        failure_diag = classify_failure(run, tool_hint=xvfb if display else "python",
+                                        role_hint="display" if display else "observer", host_binds=host_binds)
+        partial_doc = _json(run)
+        partial_counts: dict[str, Any] = {}
+        if partial_doc and isinstance(partial_doc, dict):
+            procs = partial_doc.get("processes")
+            if isinstance(procs, list):
+                partial_counts["process_count"] = len(procs)
+                # Outer failure cannot validate or expose raw partial process maps.
+                partial_counts["observer_completed"] = partial_doc.get("started") is True
+            if partial_doc.get("early_exit_code") is None or type(partial_doc.get("early_exit_code")) is int:
+                partial_counts["early_exit_code"] = partial_doc.get("early_exit_code")
+            if partial_doc.get("diagnostic_token") in {"none", "userns-denied"}:
+                partial_counts["diagnostic_token"] = partial_doc.get("diagnostic_token")
+            if type(partial_doc.get("root_pid")) is int:
+                partial_counts["root_pid"] = partial_doc.get("root_pid")
+        return {
+            "label": label,
+            "status": "unobserved",
+            "reason": failure_diag["reason"],
+            "outer_failure": failure_diag,
+            "exit_code": run.returncode,
+            "stdout_sha256": failure_diag["stdout_sha256"],
+            "stderr_sha256": failure_diag["stderr_sha256"],
+            "elapsed_seconds": failure_diag["elapsed_seconds"],
+            **partial_counts,
+        }
     doc = _json(run)
     if doc is None or not doc.get("started") or (doc.get("process_capacity_exceeded") or doc.get("stderr_capacity_exceeded")) or not isinstance(doc.get("processes"), list):
-        return {"label": label, "status": "unobserved", "reason": "release-process-not-started"}
+        return {"label": label, "status": "unobserved", "reason": "release-process-not-started",
+                "outer_streams": classify_failure(run),
+                **({"launch_errno": doc["launch_errno"], "cause_role": "released-launcher-exec"}
+                   if doc and type(doc.get("launch_errno")) is int else {})}
     token = "userns-denied" if doc.get("diagnostic_token") == "userns-denied" else "none"
     if any(not isinstance(p, dict) for p in doc["processes"]):
         return {"label": label, "status": "unobserved", "reason": "malformed-process-record"}
     processes = doc["processes"]
     if not processes or all(p.get("exe_class") == "unreadable" for p in processes):
         return {"label": label, "status": "unobserved", "reason": "exited-before-observation",
-                "early_exit_code": doc.get("early_exit_code"), "diagnostic_token": token}
+                "early_exit_code": doc.get("early_exit_code"), "diagnostic_token": token,
+                "elapsed_seconds": round(run.elapsed, 3)}
     return {"label": label, "status": "observed", "root_is_elf": root_is_elf, "root_pid": doc.get("root_pid"),
-            "early_exit_code": doc.get("early_exit_code"), "processes": processes, "diagnostic_token": token}
+            "early_exit_code": doc.get("early_exit_code"), "processes": processes, "diagnostic_token": token,
+            "elapsed_seconds": round(run.elapsed, 3), "first_webkit_seconds": doc.get("first_webkit_seconds")}
 
 
 def _combine(parts: dict[str, tuple[str, str | None, dict]]) -> tuple[str, str | None, dict]:
@@ -685,8 +745,18 @@ def _observation_state(obs: dict[str, Any] | None, check: Callable[[dict], tuple
     if not obs or obs.get("status") == "not-run":
         return "not-run", (obs or {}).get("reason", "release-observation-absent"), {}
     if obs.get("status") != "observed":
-        return "fail", obs.get("reason", "release-process-unobserved"), {}
+        return "fail", obs.get("reason", "release-process-unobserved"), {"observation": _observation_receipt(obs)}
     return check(obs)
+
+
+def _observation_receipt(obs: dict[str, Any] | None) -> dict[str, Any]:
+    """Retain causal boundary evidence without duplicating native process maps."""
+    if obs is None:
+        return {"status": "not-run", "reason": "release-observation-absent"}
+    receipt = {k: v for k, v in obs.items() if k != "processes"}
+    if isinstance(obs.get("processes"), list):
+        receipt["process_count"] = len(obs["processes"])
+    return receipt
 
 
 def _self_check(obs: dict[str, Any]) -> tuple[str, str | None, dict]:
@@ -846,50 +916,16 @@ def _reap(rt: GuestRuntime, needle: bytes) -> int:
         if not survivors:
             return 0
         rt.sleep(0.3)
-    for pid in survivors:
-        try:
-            os.kill(pid, signal.SIGKILL)
-        except OSError:
-            pass
+    # A nonce match is diagnostic, never process ownership or kill authority.
+    # Exact created-group cleanup belongs to bounded_guest_run and the external
+    # attempt's finally block. Escaped survivors remain an explicit failure.
     return len(survivors)
 
 
 def probe_args_exit_signals_orphans(rt: GuestRuntime) -> dict[str, Any]:
-    """Gate proot-args-exit-signals: argv, exit status, signal death, external SIGTERM and orphan tracees."""
-    name = "proot-args-exit-signals"
-    python = [rt.facts["python"], "-I", "-S", "-B", "-c"]
-    args = ["arg with space", "--flag=value", "semi;colon", "quote'test", "new\nline", "", "$HOME", "*"]
-    run = rt.run(name, [*python, "import sys,json;print(json.dumps(sys.argv[1:]))", *args], timeout=30)
-    if run.error or run.returncode != 0:
-        return _run_failure(name, run, stage="arguments")
-    if (_json_list(run)) != args:
-        return _result(name, "fail", "argument-forwarding-mismatch")
-    for code in (0, 7, 42):
-        run = rt.run(name, [*python, f"import sys;sys.exit({code})"], timeout=30)
-        if run.error or run.returncode != code:
-            return _result(name, "fail", "exit-code-propagation-failed", expected_exit=code, exit_code=run.returncode,
-                           stage="exit")
-    run = rt.run(name, [*python, "import os,signal,time;signal.signal(signal.SIGTERM,signal.SIG_DFL);"
-                                 "os.kill(os.getpid(),signal.SIGTERM);time.sleep(5)"], timeout=30)
-    if run.error or run.returncode not in {-signal.SIGTERM, 128 + signal.SIGTERM}:
-        return _result(name, "fail", "guest-signal-status-not-propagated", exit_code=run.returncode, stage="signal")
-    guest_signal_status = run.returncode
-
-    orphan = secrets.token_hex(8).encode()
-    run = rt.run(name, [*python, "import subprocess,sys;subprocess.Popen([sys.executable,'-I','-S','-B','-c',"
-                                 "'import time;time.sleep(600)',sys.argv[1]]);import os;os._exit(0)",
-                        orphan.decode()], timeout=30)
-    survivors = _reap(rt, orphan)
-    if run.error or run.returncode != 0:
-        return _run_failure(name, run, stage="orphan")
-    if survivors:
-        return _result(name, "fail", "orphaned-tracee-survived", orphaned_tracees=survivors)
-
-    external = _external_sigterm(rt, name)
-    if external["status"] != "pass":
-        return _result(name, "fail", external["reason"], **external["details"])
-    return _result(name, "pass", arg_forwarding="verified", exit_codes_verified=[0, 7, 42],
-                   guest_signal_exit_code=guest_signal_status, orphaned_tracees=0, external_sigterm=external["details"])
+    """Run independent raw stages and separate wait diagnostics without mapping exit 255."""
+    from rs9.nix_proot_signals import probe_signals
+    return probe_signals(rt, _external_sigterm, lambda needle: _reap(rt, needle))
 
 
 def _json_list(run: Run) -> Any:
@@ -941,6 +977,13 @@ def _run_signal_attempt(rt: GuestRuntime, name: str, *, deliver_to_group: bool =
                 rt.timeouts[name] = rt.timeouts.get(name, 0) + 1
                 reason = "sigterm-did-not-terminate-wrapper"
     finally:
+        # Only the session/process group created by this exact Popen is owned.
+        # A forced group kill bypasses guest framing; it never implies success.
+        if getattr(proc, "pid", None) is not None:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
         if proc.poll() is None:
             proc.kill()
             proc.wait(timeout=10)
@@ -956,16 +999,15 @@ def _run_signal_attempt(rt: GuestRuntime, name: str, *, deliver_to_group: bool =
 def _external_sigterm(rt: GuestRuntime, name: str) -> dict[str, Any]:
     reason, exit_code, observed, survivors, target = _run_signal_attempt(rt, name, deliver_to_group=False)
     control_details: dict[str, Any] | None = None
-    if reason in {"guest-sigterm-not-observed", "sigterm-did-not-terminate-wrapper"}:
-        c_reason, c_exit_code, c_observed, c_survivors, _ = _run_signal_attempt(rt, name, deliver_to_group=True)
-        control_details = {
-            "delivery_scope": "process-group",
-            "guest_handler_observed": c_observed,
-            "wrapper_exit_code": c_exit_code,
-            "orphaned_tracees": c_survivors,
-            "status": "pass" if c_observed and not c_reason else "fail",
-            **({"reason": c_reason} if c_reason else {}),
-        }
+    c_reason, c_exit_code, c_observed, c_survivors, _ = _run_signal_attempt(rt, name, deliver_to_group=True)
+    control_details = {
+        "delivery_scope": "process-group",
+        "guest_handler_observed": c_observed,
+        "wrapper_exit_code": c_exit_code,
+        "orphaned_tracees": c_survivors,
+        "status": "pass" if c_observed and not c_reason else "fail",
+        **({"reason": c_reason} if c_reason else {}),
+    }
 
     if observed:
         product_implication = (
@@ -991,6 +1033,9 @@ def _external_sigterm(rt: GuestRuntime, name: str) -> dict[str, Any]:
         "stage": "signal",
         "signal_target": target,
         "delivery_scope": "outer-process",
+        "delivery_layers": [os.path.basename(rt.prefix[0]) if rt.prefix else "proot", "offline-host-prefix", "proot", "guest-handler"],
+        "group_control_layers": ["created-process-group", "offline-host-prefix", "proot", "guest-handler"],
+        "supervisor_added": False,
         "product_wrapper_implication": product_implication,
     }
     if control_details:
@@ -1113,16 +1158,22 @@ def evaluate_proot_experiment(
     receives that mapping and runs the released verifier and unchanged smoke. Missing inputs
     are recorded as not-run, never as a pass.
     """
+    eval_start = time.monotonic()
+    materialization_seconds: float | None = None
     released: dict[str, Any] | None = None
     release_problem: tuple[str, str] | None = None
     if materialize is None:
         release_problem = ("not-run", "payload-materialization-absent")
     else:
+        mat_start = time.monotonic()
         try:
             released = materialize()
+            materialization_seconds = round(time.monotonic() - mat_start, 3)
         except ContractError as error:
+            materialization_seconds = round(time.monotonic() - mat_start, 3)
             release_problem = ("fail", error.code)
         except (OSError, KeyError, ValueError, TypeError):
+            materialization_seconds = round(time.monotonic() - mat_start, 3)
             release_problem = ("fail", "release-materialization-failed")
 
     def absent(reason: str) -> dict[str, Any]:
@@ -1136,17 +1187,29 @@ def evaluate_proot_experiment(
         verifier = _result("proot-verifier-smoke", *(release_problem or ("not-run", "payload-materialization-absent")))
     else:
         verifier = probe_verifier_and_smoke((lambda: smoke(released)) if smoke else None)
-    observations: dict[str, dict[str, Any] | None] = {}
+
     elfs: list[str] | None = None
     if released is None:
         status, reason = release_problem or ("not-run", "payload-materialization-absent")
-        observations = {"sea": {"status": "unobserved" if status == "fail" else "not-run", "reason": reason},
-                        "main": {"status": "unobserved" if status == "fail" else "not-run", "reason": reason}}
         if status == "fail":
             elfs = []
     else:
         elfs = list(released.get("elfs") or [])
-        all_elfs = [str(p) for p in elfs]
+
+    # Launch chain diagnostic runs before observations, preserving baseline verifier/smoke order
+    from rs9.nix_proot_launch import DIAGNOSTIC_ERRORS, diagnostic_failure
+    try:
+        launch_chain = run_launch_chain(rt, elfs)
+    except DIAGNOSTIC_ERRORS as error:
+        launch_chain = diagnostic_failure("launch-chain", error)
+
+    observations: dict[str, dict[str, Any] | None] = {}
+    if released is None:
+        status, reason = release_problem or ("not-run", "payload-materialization-absent")
+        observations = {"sea": {"status": "unobserved" if status == "fail" else "not-run", "reason": reason},
+                        "main": {"status": "unobserved" if status == "fail" else "not-run", "reason": reason}}
+    else:
+        all_elfs = [str(p) for p in elfs] if elfs is not None else []
         sea, launcher = released.get("sea"), released.get("launcher")
         observations["sea"] = (observe_native(rt, str(sea), label="sea", expected=all_elfs, root_is_elf=True, hold=4.0)
                                if sea else absent("sea-executable-unresolved"))
@@ -1154,18 +1217,63 @@ def evaluate_proot_experiment(
                                                root_is_elf=bool(released.get("launcher_is_elf")), display=True,
                                                hold=30.0, until_webkit=True)
                                 if launcher else absent("launcher-unresolved"))
+        # Run the optional bare-name comparison after the gate-relevant launch.
+        # guestEnv already supplies both wrappers; path spelling alone is not
+        # evidence of a causal difference.
+        observations["main_bare_baseline"] = (observe_native(rt, str(launcher), label="main_baseline", expected=all_elfs,
+                                                        root_is_elf=bool(released.get("launcher_is_elf")), display=True,
+                                                        hold=30.0, until_webkit=True, pinned_display=False)
+                                              if launcher else absent("launcher-unresolved"))
     exe_self = probe_executable_self(rt, observations)
     interp = probe_descendant_interpreter(rt, observations)
     closure = probe_closure_resolution(rt, elfs, closure_size_bytes)
-    signals = probe_args_exit_signals_orphans(rt)
+    try:
+        signals = probe_args_exit_signals_orphans(rt)
+    except DIAGNOSTIC_ERRORS as error:
+        failure = diagnostic_failure("signals", error)
+        signals = _result("proot-args-exit-signals", "fail", failure.pop("reason"), diagnostic=failure)
     offline = probe_in_guest_offline(rt)
     webkit = probe_webkit_sandbox_state(rt, observations.get("main"), probe_bwrap_mechanism(rt))
+
+    # Reference launch_chain first failure in WebKit/smoke evaluation details
+    first_launch_failure = launch_chain.get("first_failure")
+    if first_launch_failure:
+        if "details" in webkit and isinstance(webkit["details"], dict):
+            webkit["details"]["first_launch_failure"] = first_launch_failure
+        if "details" in verifier and isinstance(verifier["details"], dict):
+            verifier["details"]["first_launch_failure"] = first_launch_failure
+
+    # A3 PRoot latency measurement (5 runs, median/max, diagnostic metrics)
+    try:
+        latency_metrics = measure_proot_latency(rt, sample_count=5)
+    except DIAGNOSTIC_ERRORS as error:
+        latency_metrics = diagnostic_failure("latency", error)
+
+    whole_eval_seconds = round(time.monotonic() - eval_start, 3)
+
+    webkit_obs = observations.get("main") or {}
+    webkit_first_observation_seconds = webkit_obs.get("first_webkit_seconds")
 
     probes = [pinned, userns, exe_self, interp, closure, signals, offline, webkit, verifier]
     gates = [{"name": p["name"], "status": p["status"], **({"reason": p["reason"]} if "reason" in p else {}),
               **({"runtime_offline_status": p["runtime_offline_status"]} if "runtime_offline_status" in p else {})}
              for p in probes]
     all_passed = all(p["status"] == "pass" for p in probes)
+
+    measurements: dict[str, Any] = {
+        "bind_count": rt.bind_count,
+        "closure_path_count": len(rt.closure),
+        "closure_size_bytes": closure_size_bytes,
+        "timeouts": dict(sorted(rt.timeouts.items())),
+        "elapsed_seconds": dict(sorted(rt.elapsed.items())),
+        "raw_proot_latency": latency_metrics,
+        "whole_evaluation_seconds": whole_eval_seconds,
+    }
+    if materialization_seconds is not None:
+        measurements["materialization_seconds"] = materialization_seconds
+    if webkit_first_observation_seconds is not None:
+        measurements["webkit_first_observation_seconds"] = webkit_first_observation_seconds
+
     return {
         "schema": SCHEMA,
         "system": rt.facts["system"],
@@ -1174,9 +1282,9 @@ def evaluate_proot_experiment(
         "status": "diagnostic-pass" if all_passed else "diagnostic-fail",
         "probes": probes,
         "gates": gates,
-        "measurements": {"bind_count": rt.bind_count, "closure_path_count": len(rt.closure),
-                         "closure_size_bytes": closure_size_bytes, "timeouts": dict(sorted(rt.timeouts.items())),
-                         "elapsed_seconds": dict(sorted(rt.elapsed.items()))},
+        "measurements": measurements,
+        "launch_chain": launch_chain,
+        "observations": {label: _observation_receipt(obs) for label, obs in observations.items()},
         "gaps": [{"name": p["name"], "status": p["status"], "reason": p.get("reason")}
                  for p in probes if p["status"] != "pass"],
         "reason": None if all_passed else "falsifiable-probe-incompatibility-or-missing-evidence",

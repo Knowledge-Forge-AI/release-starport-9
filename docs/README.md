@@ -60,3 +60,4 @@ Ecosystem-specific operator and adapter documentation will be added as individua
 - [CONT14 DNF contracts and noarch headers](live1-native-client-cont14.md) — Canonical state inventory, strict causal trust negatives, finished header readback and attended run-13 handoff.
 - [CONT15 DNF diagnostics and gzip metadata](live1-native-client-cont15.md) — Ordered terminal failures, bounded same-command presentation, verified public metadata and attended run-14 handoff.
 - [CONT16 evidence consumers and Pages transport](live1-native-client-cont16.md) — Source and binary custody roles, canonical publication adapters, bounded TLS diagnostics and attended run-15 handoff.
+- [CONT17 Linux Nix runtime and origin readback](live1-native-client-cont17.md) — Candidate PRoot launch and signal diagnostics, required-lane retention and attended run-16 handoff.

@@ -386,6 +386,18 @@ class GuestCase(unittest.TestCase):
         self.closure = closure_for(self.facts)
         self.layout = prepare_layout(self.base / "guest", self.base / "cache")
         self.calls = []
+        # Protocol receipts here are explicitly synthetic; real guest supervisor
+        # process evidence is covered separately and never qualified as PRoot.
+        def wait_diagnostic(rt, probe, command, **kwargs):
+            run = rt.run(probe, command, **kwargs)
+            kind = "signaled" if "SIG_DFL" in "\n".join(command) else "exited"
+            return run, {"status": "valid", "reason": None, "evidence_kind": "synthetic",
+                         "compatible_status": run.returncode in (-15, 143) if kind == "signaled" else run.returncode == 255,
+                         "record": {"kind": kind, "signal": 15 if kind == "signaled" else None,
+                                    "exit_code": 255 if kind == "exited" else None}}
+        waiter = patch("rs9.nix_proot_signals.diagnostic_guest_run", side_effect=wait_diagnostic)
+        waiter.start()
+        self.addCleanup(waiter.stop)
         self.overrides = {}
         self.observations = {}
         self.ldd = {}
@@ -416,7 +428,7 @@ class GuestCase(unittest.TestCase):
             return completed(argv, 0, json.dumps({"exe": self.facts["node"], "execPath": self.facts["node"]}).encode())
         if "rs9-observer.py" in text:
             label = re.search(r"rs9-observe-(\w+)\.json", argv[-1]).group(1)
-            return completed(argv, 0, json.dumps(self.observations[label]).encode())
+            return completed(argv, 0, json.dumps(self.observations.get(label, self.observations.get("main", {}))).encode())
         if self.facts["ldd"] in argv:
             code, out = self.ldd.get(argv[-1], (0, self.resolved()))
             return completed(argv, code, out)
@@ -424,7 +436,7 @@ class GuestCase(unittest.TestCase):
         if code:
             return completed(argv, 0, json.dumps(argv[argv.index(code) + 1:]).encode())
         code = self.code_of(argv, "sys.exit(")
-        if code:
+        if code and re.search(r"sys\.exit\((\d+)\)", code):
             return completed(argv, int(re.search(r"sys\.exit\((\d+)\)", code).group(1)))
         if "SIG_DFL" in text:
             return completed(argv, -signal.SIGTERM)
@@ -632,8 +644,12 @@ class ObserverTests(GuestCase):
         self.observations["main"] = {"started": True, "root_pid": 10, "processes": [self.proc(10, 1, "app")]}
         observe_native(self.rt, "/cache/launcher", label="main", expected=[], root_is_elf=False, display=True,
                        until_webkit=True)
-        tail = self.calls[-1][self.calls[-1].index("xvfb-run"):]
-        self.assertEqual(tail[:4], ["xvfb-run", "-a", "dbus-run-session", "--"])
+        tail = self.calls[-1][self.calls[-1].index(self.facts["xvfb_run"]):]
+        self.assertEqual(tail[:4], [self.facts["xvfb_run"], "-a", self.facts["dbus_run_session"], "--"])
+        observe_native(self.rt, "/cache/launcher", label="main", expected=[], root_is_elf=False, display=True,
+                       until_webkit=True, pinned_display=False)
+        tail_baseline = self.calls[-1][self.calls[-1].index("xvfb-run"):]
+        self.assertEqual(tail_baseline[:4], ["xvfb-run", "-a", "dbus-run-session", "--"])
 
     def test_early_exit_before_any_readable_exe_is_unobserved_not_passed(self):
         self.observations["sea"] = {"started": True, "early_exit_code": 1, "root_pid": 10,
@@ -743,7 +759,7 @@ class ArgsExitSignalTests(GuestCase):
     def test_arguments_exit_codes_signals_and_orphans_pass(self):
         row = probe_args_exit_signals_orphans(self.rt)
         self.assertEqual(row["status"], "pass", row)
-        self.assertEqual(row["details"]["exit_codes_verified"], [0, 7, 42])
+        self.assertEqual(row["details"]["exit_codes_verified"], [0, 7, 42, 255])
         self.assertEqual(row["details"]["guest_signal_exit_code"], -signal.SIGTERM)
         self.assertEqual(row["details"]["orphaned_tracees"], 0)
         self.assertTrue(row["details"]["external_sigterm"]["guest_handler_observed"])
@@ -763,7 +779,7 @@ class ArgsExitSignalTests(GuestCase):
         self.overrides = {"SIG_DFL": lambda a: completed(a, 128 + signal.SIGTERM)}
         self.assertEqual(probe_args_exit_signals_orphans(self.rt)["status"], "pass")
 
-    def test_surviving_orphan_is_reported_and_killed(self):
+    def test_nonce_survivor_is_reported_without_ambient_kill_authority(self):
         def orphaning(argv):
             token = argv[-1]
             (self.base / "proc" / "4242").mkdir()
@@ -774,7 +790,7 @@ class ArgsExitSignalTests(GuestCase):
             row = probe_args_exit_signals_orphans(self.rt)
         self.assertEqual((row["status"], row["reason"]), ("fail", "orphaned-tracee-survived"))
         self.assertEqual(row["details"]["orphaned_tracees"], 1)
-        kill.assert_called_once_with(4242, signal.SIGKILL)
+        kill.assert_not_called()
 
     def test_external_sigterm_that_never_stops_the_wrapper_fails(self):
         self.hangs = True
@@ -968,6 +984,50 @@ class EvaluationTests(GuestCase):
             "proot-verifier-smoke": "not-run"})
         self.assertEqual({g["name"] for g in result["gaps"]}, {n for n, s in statuses.items() if s != "pass"})
 
+    def test_diagnostic_exceptions_preserve_all_gate_rows_and_later_probes(self):
+        for target in ("run_launch_chain", "probe_args_exit_signals_orphans", "measure_proot_latency"):
+            for error in (ValueError("private-error"), FileExistsError("private-path")):
+                with self.subTest(target=target, error=type(error).__name__), \
+                        patch("rs9.nix_proot." + target, side_effect=error):
+                    result = evaluate_proot_experiment(self.rt, None)
+                    gates = {g["name"]: g for g in result["gates"]}
+                    self.assertEqual(list(gates), list(GATES))
+                    self.assertEqual(gates["proot-no-userns-ptrace"]["status"], "pass")
+                    self.assertEqual(gates["proot-in-guest-offline"]["status"], "pass")
+                    if target == "probe_args_exit_signals_orphans":
+                        self.assertEqual(gates["proot-args-exit-signals"]["status"], "fail")
+                    self.assertNotIn("private-", json.dumps(result))
+
+    def test_failed_wait_arm_retains_later_signal_stages_and_raw_failure(self):
+        with patch("rs9.nix_proot_signals.diagnostic_guest_run", side_effect=FileExistsError("private-path")):
+            row = probe_args_exit_signals_orphans(self.rt)
+        self.assertEqual(row["status"], "fail")
+        self.assertEqual([r["stage"] for r in row["details"]["stages"]][-2:], ["orphan", "external-sigterm"])
+        self.assertNotIn("private-path", json.dumps(row))
+
+    def test_signal_success_receipts_do_not_contain_failure_tokens(self):
+        row = probe_args_exit_signals_orphans(self.rt)
+        self.assertEqual(row["status"], "pass")
+        for stage in row["details"]["stages"]:
+            if "raw_returncode" in stage["details"]:
+                self.assertNotIn("reason", stage["details"])
+                self.assertEqual(stage["details"]["error_class"], "none")
+        self.overrides["SIG_DFL"] = lambda argv: completed(argv, 255)
+        row = probe_args_exit_signals_orphans(self.rt)
+        self.assertEqual(row["reason"], "guest-signal-status-not-propagated")
+        self.assertNotIn("reason", row["details"])
+
+    def test_gate_relevant_main_precedes_bare_name_baseline(self):
+        self.released_observations()
+        labels = []
+        released = {"elfs": [], "sea": None, "launcher": "/c/launch", "launcher_is_elf": False}
+        def observe(*args, **kwargs):
+            labels.append(kwargs["label"])
+            return {"status": "unobserved", "reason": "fixture"}
+        with patch("rs9.nix_proot.observe_native", side_effect=observe):
+            evaluate_proot_experiment(self.rt, None, materialize=lambda: released)
+        self.assertEqual(labels, ["main", "main_baseline"])
+
     def test_failed_release_materialization_fails_dependent_gates_with_its_code(self):
         def broken():
             raise ContractError("NIX_COMMAND", "Installed PRoot command contract failed")
@@ -1009,6 +1069,20 @@ class EvaluationTests(GuestCase):
                                   smoke=lambda r: order.append("smoke") or {"sidecar": {"verified": True},
                                                                             "scenarios": [{"scenario": "C"}]})
         self.assertLess(order.index("smoke"), order.index("observer"))
+
+    def test_outer_launch_causality_and_original_baseline_survive_evaluation(self):
+        released = {"elfs": ["/c/a"], "sea": "/c/sidecar", "launcher": "/c/launch", "launcher_is_elf": False}
+        self.overrides = {"rs9-observer.py": lambda argv: completed(argv, 127, b"", b"getopt: command not found")}
+        result = evaluate_proot_experiment(self.rt, None, materialize=lambda: released, closure_size_bytes=9)
+        for key in ("main", "main_bare_baseline"):
+            observation = result["observations"][key]
+            self.assertEqual(observation["outer_failure"]["tool"], "getopt")
+            self.assertEqual(observation["outer_failure"]["raw_returncode"], 127)
+            self.assertEqual(observation["outer_failure"]["stderr_length"], len(b"getopt: command not found"))
+            self.assertNotIn("processes", observation)
+        row = next(p for p in result["probes"] if p["name"] == "proot-descendant-interpreter")
+        self.assertEqual(row["details"]["parts"]["main"]["observation"]["outer_failure"]["tool"], "getopt")
+        self.assertEqual(row["status"], "fail")
 
     def test_fully_observed_release_passes_every_gate_and_stays_unqualified(self):
         self.released_observations()
