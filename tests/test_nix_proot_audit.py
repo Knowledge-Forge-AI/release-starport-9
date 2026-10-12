@@ -1,5 +1,6 @@
 """Exact guest audit source against an explicitly mapped disposable filesystem."""
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -14,6 +15,7 @@ from unittest.mock import patch
 
 from rs9.nix_proot_audit import GUEST_AUDIT_SOURCE, audit_dbus_config, guest_audit
 from rs9.nix_proot import Run
+from rs9.nix_proot_dbus import DBUS_AUDIT_SOURCE, DBUS_SESSION_CONFIG_SHA256
 
 
 class GuestAuditTests(unittest.TestCase):
@@ -168,8 +170,6 @@ class DBusConfigAuditTests(unittest.TestCase):
 </busconfig>
 """
         self.write_file(self.session_conf_store, xml)
-        Path(self.host("/etc/dbus-1")).mkdir(parents=True, exist_ok=True)
-        self.symlink(self.session_conf_store, "/etc/dbus-1/session.conf")
 
     def run_audit(self, spec=None, full_guest=False):
         if spec is None:
@@ -178,7 +178,7 @@ class DBusConfigAuditTests(unittest.TestCase):
                 "dbus_session_config": self.session_conf_store,
                 "dbus_daemon": self.dbus_daemon_store,
             }
-        originals = {k: getattr(os.path, k) for k in ("exists", "isfile", "isdir", "islink", "realpath")}
+        originals = {k: getattr(os.path, k) for k in ("exists", "isfile", "isdir", "islink", "realpath", "lexists")}
         orig_stat = os.stat
         orig_listdir = os.listdir
         orig_scandir = os.scandir
@@ -192,7 +192,11 @@ class DBusConfigAuditTests(unittest.TestCase):
 
         open_file = open
         open_fd = os.open
+        fixture_path = Path(self.host(self.session_conf_store))
+        fixture_digest = hashlib.sha256(fixture_path.read_bytes()).hexdigest() if fixture_path.is_file() else DBUS_SESSION_CONFIG_SHA256
+        source = DBUS_AUDIT_SOURCE.replace(repr(DBUS_SESSION_CONFIG_SHA256), repr(fixture_digest), 1)
         with patch("os.path.exists", side_effect=lambda p: originals["exists"](self.host(p))), \
+                patch("os.path.lexists", side_effect=lambda p: originals["lexists"](self.host(p))), \
                 patch("os.path.isfile", side_effect=lambda p: originals["isfile"](self.host(p))), \
                 patch("os.path.isdir", side_effect=lambda p: originals["isdir"](self.host(p))), \
                 patch("os.path.islink", side_effect=lambda p: originals["islink"](self.host(p))), \
@@ -210,9 +214,11 @@ class DBusConfigAuditTests(unittest.TestCase):
                 output = io.StringIO()
                 with patch.object(sys, "argv", ["audit", json.dumps(full_spec)]), \
                         contextlib.redirect_stdout(output), patch("os.getcwd", return_value="/tmp"):
-                    exec(compile(GUEST_AUDIT_SOURCE, "guest-audit", "exec"), {})
+                    guest_source = GUEST_AUDIT_SOURCE.replace(repr(DBUS_SESSION_CONFIG_SHA256), repr(fixture_digest), 1)
+                    exec(compile(guest_source, "guest-audit", "exec"), {})
                 return json.loads(output.getvalue())["dbus_config"]
-            return audit_dbus_config(spec)
+            with patch('rs9.nix_proot_dbus.DBUS_AUDIT_SOURCE', source):
+                return audit_dbus_config(spec)
 
     def test_complete_guest_source_records_same_dbus_config(self):
         self.setup_happy_path('<auth>EXTERNAL</auth><standard_session_servicedirs/>')
@@ -233,9 +239,9 @@ class DBusConfigAuditTests(unittest.TestCase):
     def test_include_count_and_directory_entries_are_bounded(self):
         self.setup_happy_path('<include ignore_missing="yes">missing.conf</include>' * 129)
         self.assertEqual(self.run_audit()["reason"], "config-audit-limit")
-        self.write_file(self.session_conf_store, '<busconfig/>')
+        self.write_file(self.session_conf_store, '<busconfig><includedir>session.d</includedir></busconfig>')
         for index in range(129):
-            self.write_file('/etc/dbus-1/extra-%d' % index, '')
+            self.write_file(self.dbus_store + '/share/dbus-1/session.d/extra-%d' % index, '')
         result = self.run_audit()
         self.assertEqual(result["reason"], "config-audit-limit")
         self.assertNotIn('extra-128', json.dumps(result))
@@ -244,8 +250,8 @@ class DBusConfigAuditTests(unittest.TestCase):
         self.setup_happy_path()
         res = self.run_audit()
         self.assertEqual(res["status"], "pass")
-        self.assertTrue(res["singleton_directory"]["is_singleton"])
-        self.assertTrue(res["session_config_identity"]["matches_fact"])
+        self.assertTrue(res["legacy_absence"]["absent"])
+        self.assertEqual(res["session_config_identity"]["real_path"], self.session_conf_store)
         self.assertTrue(res["daemon_identity"]["same_real_file"])
         self.assertTrue(res["audit_complete"])
         self.assertEqual(len(res["files"]), 1)
@@ -255,22 +261,22 @@ class DBusConfigAuditTests(unittest.TestCase):
         self.write_file(self.dbus_daemon_store, b"#!/bin/sh\nexit 0\n", 0o755)
         self.write_file(self.session_conf_store, "<busconfig/>")
         res = self.run_audit()
-        self.assertEqual(res["status"], "fail")
-        self.assertEqual(res["reason"], "dbus-directory-missing")
+        self.assertEqual(res["status"], "pass")
+        self.assertTrue(res["legacy_absence"]["absent"])
 
     def test_non_singleton_directory_synthetic(self):
         self.setup_happy_path()
         self.write_file("/etc/dbus-1/extra.conf", "<busconfig/>")
         res = self.run_audit()
         self.assertEqual(res["status"], "fail")
-        self.assertEqual(res["reason"], "dbus-directory-not-singleton")
+        self.assertEqual(res["reason"], "legacy-dbus-directory-present")
 
     def test_missing_session_conf_synthetic(self):
         self.write_file(self.dbus_daemon_store, b"#!/bin/sh\nexit 0\n", 0o755)
         Path(self.host("/etc/dbus-1")).mkdir(parents=True, exist_ok=True)
         res = self.run_audit()
         self.assertEqual(res["status"], "fail")
-        self.assertIn(res["reason"], ("dbus-directory-not-singleton", "dbus-session-config-missing"))
+        self.assertEqual(res["reason"], "legacy-dbus-directory-present")
 
     def test_session_conf_mismatch_synthetic(self):
         self.setup_happy_path()
@@ -282,7 +288,7 @@ class DBusConfigAuditTests(unittest.TestCase):
         }
         res = self.run_audit(spec)
         self.assertEqual(res["status"], "fail")
-        self.assertEqual(res["reason"], "dbus-session-config-mismatch")
+        self.assertEqual(res["reason"], "config-outside-closure")
 
     def test_daemon_missing_and_mismatch_synthetic(self):
         self.setup_happy_path()
@@ -323,8 +329,6 @@ class DBusConfigAuditTests(unittest.TestCase):
     def test_malformed_xml_fails_synthetic(self):
         self.write_file(self.dbus_daemon_store, b"#!/bin/sh\nexit 0\n", 0o755)
         self.write_file(self.session_conf_store, "<busconfig><unclosed>")
-        Path(self.host("/etc/dbus-1")).mkdir(parents=True, exist_ok=True)
-        self.symlink(self.session_conf_store, "/etc/dbus-1/session.conf")
         res = self.run_audit()
         self.assertEqual(res["status"], "fail")
         self.assertEqual(res["reason"], "config-malformed")
@@ -333,8 +337,6 @@ class DBusConfigAuditTests(unittest.TestCase):
         self.write_file(self.dbus_daemon_store, b"#!/bin/sh\nexit 0\n", 0o755)
         oversize_xml = "<busconfig><!-- " + ("A" * 65536) + " --></busconfig>"
         self.write_file(self.session_conf_store, oversize_xml)
-        Path(self.host("/etc/dbus-1")).mkdir(parents=True, exist_ok=True)
-        self.symlink(self.session_conf_store, "/etc/dbus-1/session.conf")
         res = self.run_audit()
         self.assertEqual(res["status"], "fail")
         self.assertEqual(res["reason"], "config-oversize")
@@ -344,8 +346,6 @@ class DBusConfigAuditTests(unittest.TestCase):
         outside_store = "/nix/store/" + "9" * 32 + "-outside/sub.conf"
         self.write_file(outside_store, "<busconfig/>")
         self.write_file(self.session_conf_store, f'<busconfig><include>{outside_store}</include></busconfig>')
-        Path(self.host("/etc/dbus-1")).mkdir(parents=True, exist_ok=True)
-        self.symlink(self.session_conf_store, "/etc/dbus-1/session.conf")
         res = self.run_audit()
         self.assertEqual(res["status"], "fail")
         self.assertEqual(res["reason"], "symlink-outside-closure")
@@ -354,17 +354,13 @@ class DBusConfigAuditTests(unittest.TestCase):
     def test_relative_include_resolves_from_guest_filename_synthetic(self):
         self.write_file(self.dbus_daemon_store, b"#!/bin/sh\nexit 0\n", 0o755)
         self.write_file(self.session_conf_store, '<busconfig><include ignore_missing="yes">sub.conf</include></busconfig>')
-        Path(self.host("/etc/dbus-1")).mkdir(parents=True, exist_ok=True)
-        self.symlink(self.session_conf_store, "/etc/dbus-1/session.conf")
         res = self.run_audit()
         self.assertEqual(res["status"], "pass")
         inc = next(i for i in res["includes"] if i["raw"] == "sub.conf")
-        self.assertEqual(inc["resolved"], "/etc/dbus-1/sub.conf")
+        self.assertEqual(inc["resolved"], self.dbus_store + "/share/dbus-1/sub.conf")
 
     def test_recursion_depth_bounded_synthetic(self):
         self.write_file(self.dbus_daemon_store, b"#!/bin/sh\nexit 0\n", 0o755)
-        Path(self.host("/etc/dbus-1")).mkdir(parents=True, exist_ok=True)
-        self.symlink(self.session_conf_store, "/etc/dbus-1/session.conf")
         for i in range(5):
             next_target = self.dbus_store + f"/share/dbus-1/conf{i+1}.conf"
             content = f'<busconfig><include ignore_missing="yes">{next_target}</include></busconfig>'

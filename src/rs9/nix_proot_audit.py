@@ -16,6 +16,7 @@ public=('/etc/','/run/','/var/run/','/var/tmp/','/usr/','/bin/','/lib/','/lib64/
 helpers=('Xvfb','xauth','xkbcomp','getopt','mcookie','mktemp','which','awk','sed','rm','dbus-daemon','node','python3','sh','bash','env')
 runtime_paths=('/etc/dbus-1/session.conf','/etc/dbus-1','/run','/var/run','/var/lib/dbus/machine-id',
                '/etc/machine-id','/usr/share/X11','/etc/X11','/tmp/.X11-unix')
+if 'dbus_session_config' in spec:runtime_paths=(*runtime_paths,spec['dbus_session_config'])
 absolute_command=re.compile(r'/(?:usr/)?(?:bin|sbin)/[A-Za-z0-9+._-]+')
 def sha(raw): return hashlib.sha256(raw).hexdigest()
 def top(p):

@@ -9,6 +9,10 @@ from rs9.security import scan_for_credentials
 
 MAX_STREAM_BYTES = 4096
 MAX_EXCERPT_BYTES = 512
+DBUS_STAGES = frozenset({'dbus-only', 'combined-pinned-python', 'baseline-original-main',
+    'baseline-original-smoke', 'daemon-default', 'daemon-explicit', 'daemon-minimal',
+    'daemon-legacy-alias', 'session-tmp', 'session-root', 'session-explicit',
+    'session-default', 'session-legacy-alias'})
 PUBLIC_GUEST_PATHS = ("/etc/dbus-1", "/etc/X11", "/usr/share/X11", "/run",
                       "/var/run", "/bin", "/lib", "/lib64", "/dev")
 ERRNOS = {
@@ -124,6 +128,24 @@ def _excerpt(rows, host_binds, closure):
     return "\n".join(clean)
 
 
+def _dbus_excerpt(rows):
+    """Observed D-Bus lines only, with paths and numeric identities removed."""
+    if not rows or any(origin not in ('dbus-daemon', 'dbus-run-session')
+                       or not re.fullmatch(r'[ -~]{1,200}', line)
+                       or re.search(r'(?i)\b(password|passwd|passphrase|secret|token|api[_-]?key|cookie|authorization|credential)\s*[:=]', line)
+                       for origin, line in rows):
+        return None
+    clean = []
+    for _, line in rows:
+        line = re.sub(r"/[^\s:'\"<>,()\[\]{};]+", '<path>', line)
+        line = re.sub(r'\[[0-9]+\]', '[<pid>]', line)
+        line = re.sub(r'(?i)\b(pid|process|vpid|uid|euid|gid)[=:\s]+\d+\b', r'\1 <id>', line)
+        line = re.sub(r'(?<![\w])[0-9a-fA-F]{16,}(?![\w])', '<hex>', line)
+        clean.append(line)
+    excerpt = '\n'.join(clean)
+    return excerpt if len(excerpt.encode()) <= MAX_EXCERPT_BYTES else None
+
+
 def stream_diagnostic(raw, *, stage, argv_sha256, returncode, run_error=None,
                       host_binds=(), closure=(), truncated=False, allow_excerpt=True):
     """Closed observations from the actual separately captured stream."""
@@ -157,13 +179,21 @@ def stream_diagnostic(raw, *, stage, argv_sha256, returncode, run_error=None,
     try:
         scan_for_credentials(raw.decode("utf-8", "replace"))
         if complete and valid and not controls and allow_excerpt and raw and cause != "conflicting":
-            excerpt = _excerpt(rows, host_binds, closure)
+            dbus_excerpt = _dbus_excerpt(rows) if stage in DBUS_STAGES and len(text.splitlines()) == len(rows) else None
+            excerpt = dbus_excerpt if dbus_excerpt is not None else _excerpt(rows, host_binds, closure)
             if excerpt is not None and len(excerpt.encode()) <= MAX_EXCERPT_BYTES:
                 scan_for_credentials(excerpt)
                 result.update(excerpt=excerpt, excerpt_status="present")
+                if dbus_excerpt is not None:
+                    result['excerpt_basis'] = 'redacted-observed-text'
+                    if any('Circular inclusion' in line for _, line in rows):
+                        result.update(cause_token='dbus-config-circular-include', cause_basis='observed-substring')
         scan_for_credentials(json.dumps(result))
     except ContractError:
         result.pop("excerpt", None)
+        result.pop('excerpt_basis', None)
+        if result.pop('cause_basis', None):
+            result['cause_token'] = cause
         result["excerpt_status"] = "withheld"
     return result
 

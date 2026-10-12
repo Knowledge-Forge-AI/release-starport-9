@@ -1,0 +1,541 @@
+{
+  "after_latest_full_suites": "post-review documentation and two source-comment edits, verification evidence and inventory; executable source ASTs unchanged; no test logic edits",
+  "candidate_adoption_ready": false,
+  "changed_file_delta_vs_parent": {
+    "docs_evidence_recipe_inventory_files": 6,
+    "exact_list": "operators/live1/candidate-manifest.json changed_paths",
+    "parent": "02cd47b2e1f25c3168d53fce983d1a6cf3403674",
+    "paths": 26,
+    "source_files": 11,
+    "test_files": 9
+  },
+  "checks": {
+    "candidate_credential_scan_passed": true,
+    "closeout_scoped_python_files_compiled_without_bytecode": 20,
+    "fixed_guest_sources_compiled": [
+      "observer",
+      "audit",
+      "dbus_audit",
+      "daemon_control",
+      "socket_control",
+      "session_control",
+      "dbus_state",
+      "display_state",
+      "wait"
+    ],
+    "index_unchanged": true,
+    "linux_nix_build_run": false,
+    "nix_parse_passed": true,
+    "nix_pin_expression_evaluation_passed": true,
+    "python_files_compiled_without_bytecode": 295
+  },
+  "closeout_delta_vs_reviewed_candidate": [
+    "docs/adr/0008-nix-linux-runtime-without-user-namespaces.md",
+    "docs/live1-native-client-cont20.md",
+    "evidence/live1/cont20-verification.json",
+    "operators/live1/candidate-manifest.json",
+    "src/rs9/hosted_nix_proot.py",
+    "src/rs9/nix_proot_dbus_probe.py"
+  ],
+  "closeout_verification": {
+    "actual_native_95_149_byte_stderr": "not-present-in-selected-packet; content-unknown",
+    "compilation": {
+      "fixed_guest_sources_compiled": [
+        "audit",
+        "daemon_control",
+        "dbus_audit",
+        "dbus_state",
+        "display_state",
+        "observer",
+        "session_control",
+        "socket_control",
+        "wait"
+      ],
+      "scoped_python_files_compiled_without_bytecode": 20,
+      "success": true
+    },
+    "complete_input_json_and_zip_crc_readback": true,
+    "credential_scan_passed": true,
+    "diff_check_passed": true,
+    "executable_source_comparison": {
+      "all_executable_source_unchanged_since_review": true,
+      "source_modules": [
+        {
+          "executable_ast_unchanged": true,
+          "path": "src/rs9/application_smoke_diagnostic.py",
+          "reviewed_bytes_authenticated": true
+        },
+        {
+          "executable_ast_unchanged": true,
+          "path": "src/rs9/hosted_nix_proot.py",
+          "reviewed_bytes_authenticated": true
+        },
+        {
+          "executable_ast_unchanged": true,
+          "path": "src/rs9/hosted_smoke.py",
+          "reviewed_bytes_authenticated": true
+        },
+        {
+          "executable_ast_unchanged": true,
+          "path": "src/rs9/nix_proot.py",
+          "reviewed_bytes_authenticated": true
+        },
+        {
+          "executable_ast_unchanged": true,
+          "path": "src/rs9/nix_proot_audit.py",
+          "reviewed_bytes_authenticated": true
+        },
+        {
+          "executable_ast_unchanged": true,
+          "path": "src/rs9/nix_proot_dbus.py",
+          "reviewed_bytes_authenticated": true
+        },
+        {
+          "executable_ast_unchanged": true,
+          "path": "src/rs9/nix_proot_dbus_command.py",
+          "reviewed_bytes_authenticated": true
+        },
+        {
+          "executable_ast_unchanged": true,
+          "path": "src/rs9/nix_proot_dbus_pin.py",
+          "reviewed_bytes_authenticated": true
+        },
+        {
+          "executable_ast_unchanged": true,
+          "path": "src/rs9/nix_proot_dbus_probe.py",
+          "reviewed_bytes_authenticated": true
+        },
+        {
+          "executable_ast_unchanged": true,
+          "path": "src/rs9/nix_proot_launch.py",
+          "reviewed_bytes_authenticated": true
+        },
+        {
+          "executable_ast_unchanged": true,
+          "path": "src/rs9/nix_proot_stderr.py",
+          "reviewed_bytes_authenticated": true
+        }
+      ]
+    },
+    "focused_source_suites": [
+      {
+        "elapsed_seconds": 19.626,
+        "error_ids": [],
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "modules": [
+          "tests.test_nix_proot",
+          "tests.test_nix_proot_audit",
+          "tests.test_nix_proot_dbus_cont20",
+          "tests.test_nix_proot_dbus_command",
+          "tests.test_nix_proot_dbus_probe",
+          "tests.test_nix_proot_launch",
+          "tests.test_nix_proot_stderr",
+          "tests.test_nix_proot_wait",
+          "tests.test_nix_proot_signals_cont19",
+          "tests.test_nix_proot_processes",
+          "tests.test_hosted_nix_proot",
+          "tests.test_hosted_smoke",
+          "tests.test_application_smoke_diagnostic"
+        ],
+        "passed": 332,
+        "runner_tests": 333,
+        "scope": "cont20-closeout-focused",
+        "skip_records": 1,
+        "success": true,
+        "umask": "022",
+        "unraisable_exceptions": [],
+        "warnings_policy": "error"
+      },
+      {
+        "elapsed_seconds": 19.603,
+        "error_ids": [],
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "modules": [
+          "tests.test_nix_proot",
+          "tests.test_nix_proot_audit",
+          "tests.test_nix_proot_dbus_cont20",
+          "tests.test_nix_proot_dbus_command",
+          "tests.test_nix_proot_dbus_probe",
+          "tests.test_nix_proot_launch",
+          "tests.test_nix_proot_stderr",
+          "tests.test_nix_proot_wait",
+          "tests.test_nix_proot_signals_cont19",
+          "tests.test_nix_proot_processes",
+          "tests.test_hosted_nix_proot",
+          "tests.test_hosted_smoke",
+          "tests.test_application_smoke_diagnostic"
+        ],
+        "passed": 332,
+        "runner_tests": 333,
+        "scope": "cont20-closeout-focused",
+        "skip_records": 1,
+        "success": true,
+        "umask": "077",
+        "unraisable_exceptions": [],
+        "warnings_policy": "error"
+      }
+    ],
+    "fresh_public_main": {
+      "local_tracking_ref_matches_parent": true,
+      "manager_prior_check": "matched-parent-before-dispatch",
+      "operation": "git ls-remote origin refs/heads/main",
+      "returncode": 128,
+      "status": "unobserved-dns-resolution-failed"
+    },
+    "full_source_suite_reason": "Only source comments changed after review; focused task-boundary evidence and authenticated AST equality qualify those changes.",
+    "full_source_suite_rerun": false,
+    "further_substantive_review_obtained": false,
+    "manager_verifier": {
+      "manifests": 18,
+      "omitted_objects": 323,
+      "present_objects": 147,
+      "selected_records": 171,
+      "status": "verified"
+    },
+    "metadata_verification": [
+      {
+        "elapsed_seconds": 0.836,
+        "error_ids": [],
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "modules": [
+          "tests.test_candidate_inventory",
+          "tests.test_candidate_readiness",
+          "tests.test_hygiene"
+        ],
+        "passed": 13,
+        "runner_tests": 13,
+        "scope": "cont20-closeout-metadata",
+        "skip_records": 0,
+        "success": true,
+        "umask": "022",
+        "unraisable_exceptions": [],
+        "warnings_policy": "error"
+      },
+      {
+        "elapsed_seconds": 0.836,
+        "error_ids": [],
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "modules": [
+          "tests.test_candidate_inventory",
+          "tests.test_candidate_readiness",
+          "tests.test_hygiene"
+        ],
+        "passed": 13,
+        "runner_tests": 13,
+        "scope": "cont20-closeout-metadata",
+        "skip_records": 0,
+        "success": true,
+        "umask": "077",
+        "unraisable_exceptions": [],
+        "warnings_policy": "error"
+      }
+    ],
+    "native_application_qualification": false,
+    "native_daemon_acceptance": "unproven",
+    "native_linux_build_run": false,
+    "preservation": {
+      ".scratch_unchanged": true,
+      ".serena_unchanged": true,
+      "closeout_only_expected_six_paths": true,
+      "cumulative_paths_unchanged": true,
+      "real_index_unchanged": true
+    },
+    "source_suite_command": "rtk python3 -B -W error -c <process-local unittest runner> <022|077>; exact 13 modules listed in each result",
+    "verification_provenance": "focused suites and compilation before final metadata amendment; inventory, hygiene and readiness repeated on terminal bytes"
+  },
+  "closeout_worker_disposition": {
+    "reason": "Bounded documentation/comment closeout and scoped verification are tightly coupled; no internal worker invoked.",
+    "status": "declined"
+  },
+  "diff_check_passed": true,
+  "disposition": "amend",
+  "final_source_verification": "closeout-focused-source-only; full-suite totals retained as producer evidence, not rerun",
+  "focused_adversarial_suite": {
+    "elapsed_seconds": 19.901,
+    "error_ids": [],
+    "errors": 0,
+    "failure_ids": [],
+    "failures": 0,
+    "passed": 346,
+    "platform": "Darwin",
+    "python": "3.13.12",
+    "runner_tests": 347,
+    "scope": "focused",
+    "skip_records": 1,
+    "success": true,
+    "umask": "022",
+    "unraisable_exceptions": [],
+    "warnings_policy": "error"
+  },
+  "full_live1_qualification": false,
+  "full_source_suite_command": "PYTHONPATH=src python3 -B -W error <temporary unittest runner> <022|077> full",
+  "full_source_suites": [
+    {
+      "elapsed_seconds": 88.029,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "passed": 1997,
+      "platform": "Darwin",
+      "python": "3.13.12",
+      "runner_tests": 2018,
+      "scope": "full",
+      "skip_records": 22,
+      "success": true,
+      "umask": "022",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    },
+    {
+      "elapsed_seconds": 88.428,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "passed": 1997,
+      "platform": "Darwin",
+      "python": "3.13.12",
+      "runner_tests": 2018,
+      "scope": "full",
+      "skip_records": 22,
+      "success": true,
+      "umask": "077",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    }
+  ],
+  "hosted_run_18": "not-repeated-or-readopted",
+  "hosted_run_19": "not-run-not-authorized",
+  "initial_integration_failures_resolved": [
+    "obsolete alias/default-argv fixtures",
+    "temporary runner tests import path",
+    "plain credential-assignment excerpt guard",
+    "extracted helper closure argument"
+  ],
+  "metadata_verification": {
+    "command": "PYTHONPATH=src python3 -B -W error -m unittest tests.test_candidate_inventory tests.test_candidate_readiness tests.test_hygiene -q",
+    "errors": 0,
+    "failures": 0,
+    "passed": 13,
+    "runner_tests": 13,
+    "success": true
+  },
+  "native_acceptance": "unproven",
+  "original_scope_preserved": true,
+  "parent_amendments": [
+    "public fixture digest override removed; fixture-only compiled namespaces used",
+    "single verification pin shared between Nix and guest source",
+    "policy summaries omit arbitrary attribute values",
+    "UTF-16/entity and dangling include negatives fail closed",
+    "alias statuses alone cannot imply reproduction; complete observed circular token required",
+    "compiled-default and non-config controls labelled accurately",
+    "guest audit element and legacy checks split into bounded helpers"
+  ],
+  "post_planning_review": {
+    "disposition": "addressed-or-explicitly-deferred-see-cont20-doc",
+    "findings": 10,
+    "status": "reviewed-with-findings-advisory"
+  },
+  "post_pre_final_amendments": [
+    "ADR and CONT20 document explicitly identify CONT18 alias as run-16 missing-file repair and describe expected default-config baseline failures",
+    "hosted smoke and decomposition comments label the compiled default path/dependency as an inference from run-16/18 rather than pinned-build proof",
+    "replace aggregate-deadline claim with twelve separate 15-second timeouts and additional daemon survivor polling",
+    "document and defer SELinux directory heuristic and config-relative SELinux include resolution",
+    "record repeated read-only public-main DNS failure and distinguish local tracking parity from external proof",
+    "refresh verification evidence and source inventory after comment/document amendments"
+  ],
+  "pre_final_review": {
+    "blocking": 0,
+    "findings": 5,
+    "owner": "dispatcher",
+    "reviewer_reproduced_tests": false,
+    "status": "reviewed-with-findings-advisory"
+  },
+  "preserved_native_blockers": [
+    "NIX_FHS_USERNS-both-required-Linux-Nix-lanes",
+    "guest-signal-status-not-propagated-both-architectures",
+    "outer-target-sigterm-handler-unobserved",
+    "WebKit-main-process-unobserved-and-bwrap-red",
+    "Pages-direct-TLS-hostname-verification-code-62",
+    "linux-wheel-production-promotion-compatibility-unproven",
+    "rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"
+  ],
+  "preserved_state": {
+    "committed": false,
+    "existing_scratch_and_serena_untouched": true,
+    "published": false,
+    "pushed": false,
+    "real_index_unchanged": true,
+    "signal_and_FHS_sources_unchanged": true,
+    "staged": false
+  },
+  "production_enabled": false,
+  "proposal_bytes": 15043,
+  "proposal_disposition": "amend",
+  "proposal_sha256": "01c2ce46d865adabda65d1507e10a6b1694fef7c466def4364ca857263866e78",
+  "publication_authority": false,
+  "published_linux_nix_ready": false,
+  "rationale": "Retain the reviewed source repair and signal failure; clarify three advisory findings without changing executable behavior and explicitly defer SELinux semantics and fresh public-main parity.",
+  "remaining_native_questions": [
+    "full pinned store daemon/session acceptance with absent legacy override",
+    "actual scanner-approved native 95/149-byte stderr or a bounded unknown result",
+    "WebKit main process/bwrap and released smoke nested bus behavior",
+    "unchanged guest SIGTERM versus deliberate 255 and outer/group boundary",
+    "fresh public main readback; latest GET failed DNS resolution"
+  ],
+  "rtk_tracking": "unavailable-tracking-database-open-failed; command proxy usable",
+  "runner_contract": "process-local umask; unittest discovery; explicit addSuccess counts; unraisable exception recording; source root on import path",
+  "schema": "rs9.cont20-verification.v1",
+  "scratch_exception": "configured shared scratch outside writable roots; allowed temporary directory used",
+  "signal_gate": "fail-retained-guest-signal-status-not-propagated",
+  "source_unresolved_findings": {
+    "advisory": [
+      "SELinux conditional/root-relative audit model differs from native daemon semantics; deferred for guest without /sys",
+      "fresh public-main parity unobserved because DNS lookup failed; manager prior observation and local tracking ref retained"
+    ],
+    "advisory_count": 2,
+    "blocking": 0
+  },
+  "stage": "closeout",
+  "stage_deltas_before_work": [],
+  "structural_review": {
+    "basis": "AST statement fallback and physical lines; not a configured linter",
+    "bounded_legacy_exception": "large existing runtime/smoke owners receive small fixes with no new responsibility; new guest audit helpers remain below 51 statement nodes",
+    "guest_dbus_functions": [
+      {
+        "name": "d_top",
+        "statement_nodes": 1
+      },
+      {
+        "name": "d_path",
+        "statement_nodes": 11
+      },
+      {
+        "name": "d_is_standard_legacy",
+        "statement_nodes": 7
+      },
+      {
+        "name": "d_check_no_symlinks",
+        "statement_nodes": 7
+      },
+      {
+        "name": "d_entries",
+        "statement_nodes": 7
+      },
+      {
+        "name": "d_read",
+        "statement_nodes": 41
+      },
+      {
+        "name": "d_include",
+        "statement_nodes": 31
+      },
+      {
+        "name": "d_element_facts",
+        "statement_nodes": 18
+      },
+      {
+        "name": "d_traverse",
+        "statement_nodes": 44
+      },
+      {
+        "name": "d_legacy_state",
+        "statement_nodes": 30
+      },
+      {
+        "name": "audit_dbus_config",
+        "statement_nodes": 45
+      }
+    ],
+    "source_modules": [
+      {
+        "after_physical_lines": 337,
+        "before_physical_lines": 324,
+        "path": "src/rs9/application_smoke_diagnostic.py"
+      },
+      {
+        "after_physical_lines": 260,
+        "before_physical_lines": 258,
+        "path": "src/rs9/hosted_nix_proot.py"
+      },
+      {
+        "after_physical_lines": 790,
+        "before_physical_lines": 786,
+        "path": "src/rs9/hosted_smoke.py"
+      },
+      {
+        "after_physical_lines": 1374,
+        "before_physical_lines": 1375,
+        "path": "src/rs9/nix_proot.py"
+      },
+      {
+        "after_physical_lines": 186,
+        "before_physical_lines": 185,
+        "path": "src/rs9/nix_proot_audit.py"
+      },
+      {
+        "after_physical_lines": 380,
+        "before_physical_lines": 149,
+        "path": "src/rs9/nix_proot_dbus.py"
+      },
+      {
+        "after_physical_lines": 162,
+        "before_physical_lines": 0,
+        "path": "src/rs9/nix_proot_dbus_command.py"
+      },
+      {
+        "after_physical_lines": 1,
+        "before_physical_lines": 0,
+        "path": "src/rs9/nix_proot_dbus_pin.py"
+      },
+      {
+        "after_physical_lines": 413,
+        "before_physical_lines": 360,
+        "path": "src/rs9/nix_proot_dbus_probe.py"
+      },
+      {
+        "after_physical_lines": 311,
+        "before_physical_lines": 310,
+        "path": "src/rs9/nix_proot_launch.py"
+      },
+      {
+        "after_physical_lines": 199,
+        "before_physical_lines": 169,
+        "path": "src/rs9/nix_proot_stderr.py"
+      }
+    ]
+  },
+  "terminal_tree_and_manifest_sha": "terminal-handoff-avoids-self-hash-cycle",
+  "workers": [
+    {
+      "cleanup_proven": true,
+      "disposition": "accepted",
+      "kind": "gemini",
+      "task": "evidence-signal",
+      "used": true
+    },
+    {
+      "cleanup_proven": true,
+      "disposition": "accepted-parent-amended",
+      "kind": "gemini",
+      "task": "dbus-audit",
+      "used": true
+    },
+    {
+      "cleanup_proven": true,
+      "disposition": "accepted",
+      "kind": "gemini",
+      "task": "smoke-command",
+      "used": true
+    }
+  ]
+}

@@ -6,6 +6,10 @@
 # hypothesis, not an isolation boundary or an application qualification, and it
 # leaves the production recipe (nebular.nix) and its gates untouched.
 let
+  # One source-only byte pin shared with the guest audit. No release pin changes.
+  dbusConfigSha256 = builtins.head (builtins.match
+    "DBUS_SESSION_CONFIG_SHA256 = \"([0-9a-f]{64})\"\n"
+    (builtins.readFile ../src/rs9/nix_proot_dbus_pin.py));
   pin = {
     version = "5.4.0";
     rev = "0921fdb3e13e40fe25fbc52b89661a9d6d32ac68";
@@ -92,9 +96,10 @@ let
   # per run by the hosted runner; nothing else of the host is visible.
   guestRoot = runCommand "rs9-nebular-proot-guest-root" { } ''
     mkdir -p "$out"/{bin,usr/bin,etc,tmp,dev,proc,run,var/tmp,nix/store,lib,lib64}
-    mkdir -p "$out/etc/dbus-1"
     test -f "${pkgs.dbus}/share/dbus-1/session.conf" || exit 1
-    ln -s "${pkgs.dbus}/share/dbus-1/session.conf" "$out/etc/dbus-1/session.conf"
+    printf '%s  %s\n' '${dbusConfigSha256}' '${pkgs.dbus}/share/dbus-1/session.conf' | sha256sum -c -
+    # The main file includes this optional legacy override; it must stay absent.
+    test ! -e "$out/etc/dbus-1" && test ! -L "$out/etc/dbus-1"
     ln -s ${pkgs.bash}/bin/sh "$out/bin/sh"
     ln -s ${pkgs.coreutils}/bin/env "$out/usr/bin/env"
     ln -s ${loaderPath} "$out${foreignInterpreter}"

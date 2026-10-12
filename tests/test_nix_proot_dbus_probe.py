@@ -71,7 +71,8 @@ class DbusControls(unittest.TestCase):
 
     def rows(self):
         rows = [{'stage':k,'status':'pass'} for k in ('daemon-version','run-session-version','socket-controls',
-                'daemon-default','daemon-explicit','session-tmp','session-root','session-explicit')]
+                'daemon-default','daemon-explicit','session-tmp','session-root','session-explicit',
+                'session-default','daemon-legacy-alias','session-legacy-alias')]
         by = {r['stage']:r for r in rows}
         by['socket-controls']['control'] = {'status':'observed','path':{'bound':True},'abstract':{'bound':False}}
         for k in ('daemon-default','daemon-explicit'):by[k]['control']={'status':'observed'}
@@ -79,8 +80,8 @@ class DbusControls(unittest.TestCase):
 
     def test_control_boundaries_and_cwd_precede_orchestration(self):
         rows,by = self.rows()
-        self.assertEqual(decomposition_cause(rows,True),'target-or-probe-failed')
-        self.assertEqual(decomposition_cause(rows,False),'not-reproduced-in-controls')
+        self.assertEqual(decomposition_cause(rows,True),'explicit-store-config-accepted')
+        self.assertEqual(decomposition_cause(rows,False),'explicit-store-config-accepted')
         for key,expected in (('daemon-version','daemon-version-control-failed'),
                 ('run-session-version','run-session-version-control-failed'),
                 ('session-tmp','guest-cwd-dependent'),('session-root','session-control-divergent'),
@@ -92,11 +93,11 @@ class DbusControls(unittest.TestCase):
         self.assertEqual(decomposition_cause(rows,True),'run-session-control-failed')
         rows,by=self.rows()
         by['daemon-default']['control']['status']='fail'
-        self.assertEqual(decomposition_cause(rows,True),'compiled-config-path-control-divergent')
+        self.assertEqual(decomposition_cause(rows,True),'explicit-store-config-accepted')
         by['daemon-explicit']['control']['status']='fail'
-        self.assertEqual(decomposition_cause(rows,True),'default-and-explicit-daemon-controls-failed')
+        self.assertEqual(decomposition_cause(rows,True),'explicit-store-config-rejected')
         by['daemon-default']['control']['status']='observed'
-        self.assertEqual(decomposition_cause(rows,True),'explicit-config-daemon-control-failed')
+        self.assertEqual(decomposition_cause(rows,True),'explicit-store-config-rejected')
         by['daemon-version']['status']='unobserved'
         self.assertEqual(decomposition_cause(rows,True),'control-evidence-incomplete')
         rows,by=self.rows();by['socket-controls']['control']['path']['bound']=False
@@ -187,8 +188,63 @@ class DbusControls(unittest.TestCase):
             self.assertIn('daemon-minimal',by)
             self.assertEqual(by['daemon-minimal']['config_variant'],'temporary-minimal-no-includes')
             self.assertEqual(by['daemon-minimal']['qualification_authority'],False)
-            self.assertIn('--config-file=/etc/dbus-1/session.conf',' '.join(by['daemon-explicit']['stage_argv']))
+            self.assertIn('--config-file='+rt.facts['dbus_session_config'], ' '.join(by['daemon-explicit']['stage_argv']))
+            self.assertNotIn('--config-file=/etc/dbus-1/session.conf', ' '.join(by['daemon-explicit']['stage_argv']))
             self.assertFalse(result['application_qualified'])
+
+    def test_alias_bind_is_confined_to_two_diagnostic_arms(self):
+        from rs9.nix_proot import guest_bindings
+        with tempfile.TemporaryDirectory() as temp:
+            calls=[]
+            def runner(argv, **kwargs):
+                calls.append(argv)
+                return subprocess.CompletedProcess(argv,127,b'',b'unknown')
+            rt=test_nix_proot_launch.LaunchDiagnostics().runtime(Path(temp),runner)
+            original_argv=rt.argv(['original'])
+            result=run_dbus_decomposition(rt,True,'pass')
+            alias=rt.facts['dbus_session_config']+':/etc/dbus-1/session.conf'
+            self.assertEqual(sum(alias in argv for argv in calls),2)
+            self.assertEqual([row['stage'] for row,argv in zip(result['stages'],calls) if alias in argv],
+                             ['daemon-legacy-alias','session-legacy-alias'])
+            self.assertEqual(rt.argv(['original']),original_argv)
+            self.assertFalse(any(target.startswith('/etc/dbus-1') for _,target in guest_bindings(rt.layout,rt.closure)))
+            for row in result['stages']:
+                self.assertTrue(row['diagnostic_only'])
+                self.assertFalse(row['qualification_authority'])
+
+    def test_alias_falsifier_cannot_claim_causality_or_config_acceptance(self):
+        from rs9.nix_proot_dbus_probe import differential_findings
+        rows=[{'stage':'daemon-legacy-alias','status':'pass','control':{'raw_returncode':0}},
+              {'stage':'session-legacy-alias','status':'pass','raw_returncode':0},
+              {'stage':'daemon-default','status':'fail','control':{'raw_returncode':1}},
+              {'stage':'session-default','status':'fail','raw_returncode':127}]
+        result=differential_findings(rows)
+        self.assertEqual(result['legacy_alias'],'legacy-alias-not-reproduced')
+        self.assertEqual(result['compiled_default'],'compiled-default-dependency-observed')
+        self.assertFalse(result['self_include_causality_proven'])
+
+    def test_daemon_native_stream_redaction_applies_inside_control_frame(self):
+        raw=b"dbus-daemon[123]: Circular inclusion of file '/etc/dbus-1/session.conf'\n"
+        result=self.control(self.frame(stderr_bytes=len(raw),stderr_sha256=hashlib.sha256(raw).hexdigest(),
+                                       stderr_base64=base64.b64encode(raw).decode()))
+        diagnostic=result['stderr_diagnostic']
+        self.assertEqual(diagnostic['cause_token'],'dbus-config-circular-include')
+        self.assertEqual(diagnostic['excerpt_basis'],'redacted-observed-text')
+        self.assertNotIn('123',diagnostic['excerpt'])
+
+    def test_alias_statuses_need_complete_observed_circular_evidence(self):
+        from rs9.nix_proot_dbus_probe import differential_findings
+        diagnostic={'complete':True,'cause_token':'dbus-config-circular-include'}
+        rows=[{'stage':'daemon-legacy-alias','status':'fail','control':{'raw_returncode':1,
+               'stderr_bytes':95,'timed_out':False,'output_limit':False,'stderr_diagnostic':diagnostic}},
+              {'stage':'session-legacy-alias','status':'fail','raw_returncode':127,'stderr_length':149,
+               'bounded_capture_complete':True,'stderr_diagnostic':{'complete':True}},
+              {'stage':'daemon-default','status':'fail','control':{'raw_returncode':1}},
+              {'stage':'session-default','status':'fail','raw_returncode':127}]
+        self.assertEqual(differential_findings(rows)['legacy_alias'],'legacy-alias-reproduced')
+        for update in ({'cause_token':'unknown'}, {'complete':False}):
+            with self.subTest(update=update), patch.dict(diagnostic,update):
+                self.assertEqual(differential_findings(rows)['legacy_alias'],'legacy-alias-not-reproduced')
 
     def test_real_harness_reaps_only_its_child_without_retaining_address(self):
         command=[sys.executable,'-c',"import sys,time;print('unix:path=/tmp/private-socket,guid=abc',flush=True);time.sleep(30)"]

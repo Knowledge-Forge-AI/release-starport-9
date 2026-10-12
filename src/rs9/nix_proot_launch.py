@@ -14,6 +14,7 @@ import time
 from rs9.nix_proot_audit import guest_audit
 from rs9.errors import ContractError
 from rs9.security import scan_for_credentials
+from rs9.nix_proot_dbus_command import dbus_session_command
 
 TOOLS = {"xvfb-run", "dbus-run-session", "dbus-daemon", "Xvfb", "xauth", "xkbcomp", "getopt",
          "mktemp", "mcookie", "env", "proot", "node", "python3", "python", "sh", "bash", "bwrap"}
@@ -179,8 +180,8 @@ def run_launch_chain(rt, elfs=None):
         return [facts["xvfb_run"], "-a", *(["-e", error_paths[label]] if supports_error else [])]
     stages = [
         ("display-only", [*display("display-only"), *python, _DISPLAY_STATE], "xvfb-run", "display", "/tmp"),
-        ("dbus-only", [facts["dbus_run_session"], "--", *python, _DBUS_STATE], "dbus-run-session", "dbus", "/tmp"),
-        ("combined-pinned-python", [*display("combined-pinned-python"), facts["dbus_run_session"], "--", *python, _DISPLAY_STATE], "xvfb-run", "display+dbus", "/tmp"),
+        ("dbus-only", [*dbus_session_command(facts), *python, _DBUS_STATE], "dbus-run-session", "dbus", "/tmp"),
+        ("combined-pinned-python", [*display("combined-pinned-python"), *dbus_session_command(facts), *python, _DISPLAY_STATE], "xvfb-run", "display+dbus", "/tmp"),
         ("baseline-original-main", ["xvfb-run", "-a", "dbus-run-session", "--", *python, _DISPLAY_STATE], "xvfb-run", "baseline-main-display", "/tmp"),
         ("baseline-original-smoke", ["xvfb-run", "-a", "dbus-run-session", "--", "node", "-e", "console.log(process.version)"], "xvfb-run", "baseline-smoke", None),
     ]
@@ -192,6 +193,7 @@ def run_launch_chain(rt, elfs=None):
         passed = not run.error and run.returncode == 0
         safe_argv = [redact_text(a, host_binds) for a in command]
         receipt = {"stage": label, "status": "pass" if passed else "fail", "guest_cwd_policy": cwd or "inherit-or-proot-fallback",
+                   "gate_relevant": not label.startswith("baseline-original-"),
                    "argv_sha256": _sha(json.dumps(command).encode()),
                    "stage_argv": safe_argv,
                    **classify_failure(run, tool_hint=tool, role_hint=role, host_binds=host_binds, closure=rt.closure)}
@@ -210,6 +212,8 @@ def run_launch_chain(rt, elfs=None):
             "guest_config": "/etc/dbus-1/session.conf",
             "store_config": facts.get("dbus_session_config"),
             "daemon": facts.get("dbus_daemon"),
+            "config_mode": "compiled-default-baseline" if label.startswith("baseline-original-") else "explicit-store-main",
+            "legacy_override": "absent-required",
         } if has_dbus else None
         if supports_error and label in {"display-only", "combined-pinned-python"}:
             path = rt.layout.tmp_dir / Path(error_paths[label]).name
@@ -226,7 +230,7 @@ def run_launch_chain(rt, elfs=None):
             except OSError:
                 receipt["xvfb_error_stream"] = {"status": "unavailable"}
         receipts.append(receipt)
-    first = next((r for r in receipts if r["status"] != "pass"), None)
+    first = next((r for r in receipts if r["gate_relevant"] and r["status"] != "pass"), None)
     if first is None and audit.get("dbus_config", {}).get("status") == "fail":
         dbus_diag = audit["dbus_config"]
         first = {
@@ -249,14 +253,11 @@ def run_launch_chain(rt, elfs=None):
         }
     from rs9.nix_proot_dbus_probe import config_include_structure
     include_structure = config_include_structure(audit.get("dbus_config", {}))
-    decomposition = {"status": "not-run", "reason": "dbus-positive-control-did-not-fail",
-                     "qualification_authority": False}
-    if receipts[1]["status"] == "fail":
-        from rs9.nix_proot_dbus_probe import run_dbus_decomposition
-        try:
-            decomposition = run_dbus_decomposition(rt, True, _DBUS_STATE)
-        except DIAGNOSTIC_ERRORS as error:
-            decomposition = {**diagnostic_failure("dbus-decomposition", error), "qualification_authority": False}
+    from rs9.nix_proot_dbus_probe import run_dbus_decomposition
+    try:
+        decomposition = run_dbus_decomposition(rt, receipts[1]["status"] != "pass", _DBUS_STATE)
+    except DIAGNOSTIC_ERRORS as error:
+        decomposition = {**diagnostic_failure("dbus-decomposition", error), "qualification_authority": False}
     return {"status": "fail" if first else "observed" if audit.get("status") == "observed" else "incomplete",
             "helper_audit": audit, "default_guest_cwd": {"state": cwd_state, "streams": classify_failure(cwd_run)}, "stages": receipts,
             "first_failure": first, "dbus_decomposition": decomposition,

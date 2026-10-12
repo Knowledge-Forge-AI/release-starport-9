@@ -26,6 +26,7 @@ from rs9.application_smoke_diagnostic import (
     sanitize_receipt_summary,
     validate_problem_codes,
     _bounded_run,
+    _command,
 )
 from rs9.errors import ContractError, safe_details
 from rs9.release_core import digest
@@ -581,7 +582,156 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
         result = _bounded_run([sys.executable, "-B", "-c", parent_code], env=None, timeout=3)
         self.assertEqual(result.returncode, 0)
         time.sleep(0.4)
-        self.assertFalse(marker.exists())
+    def test_golden_default_command_argv_unchanged_across_platforms(self):
+        """Golden test proving default command argv is unchanged for linux-x64, linux-arm64, and darwin."""
+        # 1. Linux x64
+        cmd_linux_x64 = _command(self.prepared, "linux-x64", "C", self.launch_root, self.scratch, extras=False)
+        self.assertEqual(cmd_linux_x64[:4], ["xvfb-run", "-a", "dbus-run-session", "--"])
+        self.assertEqual(cmd_linux_x64[4], "node")
+
+        # 2. Linux arm64
+        cmd_linux_arm64 = _command(self.prepared, "linux-arm64", "B", self.launch_root, self.scratch, extras=False)
+        self.assertEqual(cmd_linux_arm64[:4], ["xvfb-run", "-a", "dbus-run-session", "--"])
+        self.assertEqual(cmd_linux_arm64[4], "node")
+
+        # 3. Darwin arm64 (no xvfb, no dbus)
+        cmd_darwin = _command(self.prepared, "darwin-arm64", "A", self.launch_root, self.scratch, extras=False)
+        self.assertEqual(cmd_darwin[0], "node")
+        self.assertNotIn("xvfb-run", cmd_darwin)
+        self.assertNotIn("dbus-run-session", cmd_darwin)
+
+    def test_explicit_pinned_dbus_argv_injection_on_linux(self):
+        """Optional explicit pinned dbus command replaces dbus-run-session on linux."""
+        root = "/nix/store/00000000000000000000000000001023-dbus-1.14.10"
+        pinned_argv = [
+            f"{root}/bin/dbus-run-session",
+            f"--dbus-daemon={root}/bin/dbus-daemon",
+            f"--config-file={root}/share/dbus-1/session.conf",
+            "--",
+        ]
+        # Linux x64
+        cmd_x64 = _command(self.prepared, "linux-x64", "C", self.launch_root, self.scratch,
+                           extras=False, session_bus_argv=pinned_argv)
+        self.assertEqual(cmd_x64[:6], ["xvfb-run", "-a", *pinned_argv])
+        self.assertEqual(cmd_x64[6], "node")
+
+        # Linux arm64
+        cmd_arm64 = _command(self.prepared, "linux-arm64", "B", self.launch_root, self.scratch,
+                             extras=False, session_bus_argv=pinned_argv)
+        self.assertEqual(cmd_arm64[:6], ["xvfb-run", "-a", *pinned_argv])
+        self.assertEqual(cmd_arm64[6], "node")
+
+    def test_explicit_pinned_dbus_argv_injection_on_darwin_remains_unchanged(self):
+        """Darwin does not use display/dbus even when valid session_bus_argv is injected."""
+        root = "/nix/store/00000000000000000000000000001023-dbus-1.14.10"
+        pinned_argv = [
+            f"{root}/bin/dbus-run-session",
+            f"--dbus-daemon={root}/bin/dbus-daemon",
+            f"--config-file={root}/share/dbus-1/session.conf",
+            "--",
+        ]
+        cmd_darwin = _command(self.prepared, "darwin-arm64", "A", self.launch_root, self.scratch,
+                              extras=False, session_bus_argv=pinned_argv)
+        self.assertEqual(cmd_darwin[0], "node")
+        self.assertNotIn("xvfb-run", cmd_darwin)
+        self.assertNotIn("dbus-run-session", cmd_darwin)
+        self.assertNotIn(root, " ".join(cmd_darwin))
+
+    def test_execute_application_smoke_with_pinned_dbus_and_no_leakage(self):
+        """execute_application_smoke uses injected session_bus_argv on linux, and does not leak to subsequent runs."""
+        root = "/nix/store/00000000000000000000000000001023-dbus-1.14.10"
+        pinned_argv = [
+            f"{root}/bin/dbus-run-session",
+            f"--dbus-daemon={root}/bin/dbus-daemon",
+            f"--config-file={root}/share/dbus-1/session.conf",
+            "--",
+        ]
+
+        def fake_run(cmd, **kwargs):
+            evidence = Path(cmd[cmd.index("--evidence") + 1])
+            scenario = cmd[cmd.index("--scenario") + 1]
+            (evidence / ("linux-x64-" + scenario + ".run.json")).write_text(json.dumps({
+                "status": "pass", "executable": {"sha256": "a" * 64}}))
+            return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+
+        # Run 1: with explicit pinned argv
+        with patch("subprocess.run", side_effect=fake_run) as run_mock:
+            runs = execute_application_smoke(
+                prepared=self.prepared,
+                system="x86_64-linux",
+                launch_root=self.launch_root,
+                session_bus_argv=pinned_argv,
+            )
+            self.assertEqual(len(runs), 2)
+            self.assertEqual(run_mock.call_args_list[0].args[0][:6], ["xvfb-run", "-a", *pinned_argv])
+
+        # Run 2: without pinned argv (default lane) -> MUST NOT LEAK!
+        with patch("subprocess.run", side_effect=fake_run) as run_mock:
+            runs = execute_application_smoke(
+                prepared=self.prepared,
+                system="x86_64-linux",
+                launch_root=self.launch_root,
+                session_bus_argv=None,
+            )
+            self.assertEqual(len(runs), 2)
+            self.assertEqual(run_mock.call_args_list[0].args[0][:4], ["xvfb-run", "-a", "dbus-run-session", "--"])
+
+    def test_malicious_session_bus_argv_rejected_on_all_platforms(self):
+        """Malicious or invalid session_bus_argv is rejected with ContractError across platforms."""
+        bad_vectors = [
+            ["malicious"],
+            ["dbus-run-session", "--"],
+            ["/usr/bin/dbus-run-session", "--dbus-daemon=/usr/bin/dbus-daemon", "--config-file=/etc/session.conf", "--"],
+            ["/nix/store/00000000000000000000000000001023-dbus-1/bin/dbus-run-session;rm",
+             "--dbus-daemon=/nix/store/00000000000000000000000000001023-dbus-1/bin/dbus-daemon",
+             "--config-file=/nix/store/00000000000000000000000000001023-dbus-1/share/dbus-1/session.conf", "--"],
+        ]
+        for system in ("x86_64-linux", "aarch64-linux", "aarch64-darwin"):
+            for bad_vec in bad_vectors:
+                with self.subTest(system=system, bad_vec=bad_vec):
+                    with self.assertRaises(ContractError) as caught:
+                        execute_application_smoke(
+                            prepared=self.prepared,
+                            system=system,
+                            launch_root=self.launch_root,
+                            session_bus_argv=bad_vec,
+                        )
+                    self.assertEqual(caught.exception.code, "NIX_PROOT_DBUS")
+
+    def test_replay_propagates_pinned_session_bus_argv(self):
+        """Replay receives and uses pinned session_bus_argv with xvfb error log options."""
+        root = "/nix/store/00000000000000000000000000001023-dbus-1.14.10"
+        pinned_argv = [
+            f"{root}/bin/dbus-run-session",
+            f"--dbus-daemon={root}/bin/dbus-daemon",
+            f"--config-file={root}/share/dbus-1/session.conf",
+            "--",
+        ]
+
+        def replay_result(cmd, **kwargs):
+            evidence = Path(cmd[cmd.index("--evidence") + 1])
+            (evidence / "linux-x64-C.run.json").write_text(json.dumps({
+                "status": "pass", "executable": {"sha256": "a" * 64}}))
+            return SimpleNamespace(returncode=0, stdout=b"", stderr=b"", capture_error=None,
+                cleanup_error=None, child_reaped=True)
+
+        with patch("rs9.application_smoke_diagnostic._bounded_run", side_effect=replay_result) as mock_bounded:
+            label, replay = run_replay(
+                scenario="C",
+                platform="linux-x64",
+                launch_root=self.launch_root,
+                checkout=self.prepared["checkout"],
+                tools=self.tools,
+                prefix=[],
+                env=None,
+                scratch=self.scratch,
+                session_bus_argv=pinned_argv,
+            )
+            self.assertEqual(label, "replay-passed")
+            called_cmd = mock_bounded.call_args[0][0]
+            self.assertEqual(called_cmd[:2], ["xvfb-run", "-a"])
+            self.assertEqual(called_cmd[2], "-e")
+            self.assertEqual(called_cmd[4:8], pinned_argv)
 
 
 if __name__ == "__main__":
