@@ -288,13 +288,9 @@ def decomposition_cause(rows, original_failed):
         return 'socket-control-unobserved'
     if not sockets['path']['bound']:
         return 'path-socket-bind-failed'
-    default, explicit = (by[k]['control']['status'] == 'observed' for k in ('daemon-default', 'daemon-explicit'))
-    if not default and not explicit:
-        return 'default-and-explicit-daemon-controls-failed'
+    explicit = by['daemon-explicit']['control']['status'] == 'observed'
     if not explicit:
-        return 'explicit-config-daemon-control-failed'
-    if not default:
-        return 'compiled-config-path-control-divergent'
+        return 'explicit-store-config-rejected'
     tmp, root = (by[k]['status'] == 'pass' for k in ('session-tmp', 'session-root'))
     if not tmp and root:
         return 'guest-cwd-dependent'
@@ -302,13 +298,55 @@ def decomposition_cause(rows, original_failed):
         return 'run-session-control-failed'
     if not root or by['session-explicit']['status'] != 'pass':
         return 'session-control-divergent'
-    return 'target-or-probe-failed' if original_failed else 'not-reproduced-in-controls'
+    return 'explicit-store-config-accepted'
+
+
+def _legacy_alias_runtime(rt):
+    """Separate diagnostic context; never alter the gate prefix or bindings."""
+    from dataclasses import replace
+    from rs9.errors import ContractError
+    from rs9.nix_proot_dbus_command import dbus_session_command
+    dbus_session_command(rt.facts)  # Reject malformed or non-co-root source paths.
+    source = rt.facts['dbus_session_config']
+    def alias_runner(argv, **kwargs):
+        index = len(rt.prefix) + 2
+        if argv[index:index+2] != [rt.facts['proot'], '--kill-on-exit']:
+            raise ContractError('PROOT_DIAGNOSTIC', 'Pinned diagnostic invocation required')
+        command = [*argv[:index+1], '-b', source + ':/etc/dbus-1/session.conf', *argv[index+1:]]
+        return rt.runner(command, **kwargs)
+    return replace(rt, runner=alias_runner, timeouts={}, elapsed={})
+
+
+def differential_findings(rows):
+    """Closed observations; expected negative arms cannot establish acceptance."""
+    by = {row['stage']: row for row in rows}
+    alias_daemon, alias_session = (by[k] for k in ('daemon-legacy-alias', 'session-legacy-alias'))
+    reproduced = (alias_daemon.get('control', {}).get('raw_returncode') == 1
+                  and alias_daemon.get('control', {}).get('stderr_bytes', 0) > 0
+                  and alias_daemon.get('control', {}).get('timed_out') is False
+                  and alias_daemon.get('control', {}).get('output_limit') is False
+                  and alias_daemon.get('control', {}).get('stderr_diagnostic', {}).get('complete') is True
+                  and alias_session.get('raw_returncode') == 127
+                  and alias_session.get('stderr_length', 0) > 0
+                  and alias_session.get('bounded_capture_complete') is True
+                  and alias_session.get('stderr_diagnostic', {}).get('complete') is True
+                  and any(d.get('cause_token') == 'dbus-config-circular-include' for d in (
+                      alias_daemon.get('control', {}).get('stderr_diagnostic', {}),
+                      alias_session.get('stderr_diagnostic', {})))
+                  and all(r['status'] == 'fail' for r in (alias_daemon, alias_session)))
+    default = by['daemon-default'].get('control', {})
+    dependency = (default.get('raw_returncode') == 1 and by['session-default'].get('raw_returncode') == 127
+                  and by['daemon-default']['status'] == by['session-default']['status'] == 'fail')
+    return {'legacy_alias': 'legacy-alias-reproduced' if reproduced else 'legacy-alias-not-reproduced',
+            'compiled_default': 'compiled-default-dependency-observed' if dependency else 'compiled-default-dependency-not-observed',
+            'self_include_causality_proven': False}
 
 
 def run_dbus_decomposition(rt, original_failed, dbus_state):
-    """Run after the original five stages; never change their argv or first failure."""
+    """Always retain native differentials after the five launch stages."""
     from rs9.nix_proot_launch import classify_failure, redact_text
     from rs9.nix_proot_stderr import stream_diagnostic
+    from rs9.nix_proot_dbus_command import dbus_session_command
     facts = rt.facts
     python = [facts['python'], '-I', '-S', '-B', '-c']
     daemon = [facts['dbus_daemon'], '--nofork', '--nopidfile', '--print-address=1']
@@ -317,20 +355,28 @@ def run_dbus_decomposition(rt, original_failed, dbus_state):
         ('run-session-version', [facts['dbus_run_session'], '--version'], '/tmp'),
         ('socket-controls', [*python, SOCKET_PROBE_SOURCE], '/tmp'),
         ('daemon-default', [*python, DAEMON_PROBE_SOURCE, json.dumps([*daemon, '--session'])], '/tmp'),
-        ('daemon-explicit', [*python, DAEMON_PROBE_SOURCE, json.dumps([*daemon, '--config-file=/etc/dbus-1/session.conf'])], '/tmp'),
+        ('daemon-explicit', [*python, DAEMON_PROBE_SOURCE, json.dumps([*daemon, '--config-file=' + facts['dbus_session_config']])], '/tmp'),
         ('daemon-minimal', [*python, DAEMON_PROBE_SOURCE, json.dumps(daemon), 'minimal-no-includes'], '/tmp'),
-        ('session-tmp', [facts['dbus_run_session'], '--', *python, SESSION_PROBE_SOURCE], '/tmp'),
-        ('session-root', [facts['dbus_run_session'], '--', *python, SESSION_PROBE_SOURCE], '/'),
-        ('session-explicit', [facts['dbus_run_session'], '--dbus-daemon=' + facts['dbus_daemon'],
-                              '--config-file=/etc/dbus-1/session.conf', '--', *python, dbus_state], '/tmp'),
+        ('session-tmp', [*dbus_session_command(facts), *python, SESSION_PROBE_SOURCE], '/tmp'),
+        ('session-root', [*dbus_session_command(facts), *python, SESSION_PROBE_SOURCE], '/'),
+        ('session-explicit', [*dbus_session_command(facts), *python, dbus_state], '/tmp'),
+        ('session-default', [facts['dbus_run_session'], '--', *python, dbus_state], '/tmp'),
+        ('daemon-legacy-alias', [*python, DAEMON_PROBE_SOURCE, json.dumps([*daemon, '--session'])], '/tmp'),
+        ('session-legacy-alias', [facts['dbus_run_session'], '--', *python, dbus_state], '/tmp'),
     ]
     host_binds = tuple(str(p) for p in (rt.layout.tmp_dir, rt.layout.cache_dir, rt.layout.loader_tmp,
                                        rt.layout.etc_dir, *rt.layout.workspaces))
     rows = []
+    alias_rt = _legacy_alias_runtime(rt)
     for label, command, cwd in commands:
-        run = rt.run('dbus-control-' + label, command, timeout=15, cwd=cwd)
+        control_rt = alias_rt if label in ('daemon-legacy-alias', 'session-legacy-alias') else rt
+        run = control_rt.run('dbus-control-' + label, command, timeout=15, cwd=cwd)
         digest = _digest(json.dumps(command).encode())
         row = {'stage': label, 'guest_cwd_policy': cwd, 'argv_sha256': digest,
+               'diagnostic_only': True, 'qualification_authority': False,
+               'config_variant': ('legacy-alias-reproduction' if control_rt is alias_rt else
+                   'compiled-default' if label in ('daemon-default', 'session-default') else
+                   'pinned-full-policy' if label in ('daemon-explicit', 'session-tmp', 'session-root', 'session-explicit') else 'none'),
                'stage_argv': [redact_text(arg, host_binds) for arg in command],
                'status': 'pass' if not run.error and run.returncode == 0 else 'fail',
                **classify_failure(run)}
@@ -344,7 +390,7 @@ def run_dbus_decomposition(rt, original_failed, dbus_state):
             row['control'] = daemon_control(run, stage=label, argv_sha256=digest, host_binds=host_binds, closure=rt.closure)
             row['status'] = 'pass' if row['control']['status'] == 'observed' else row['control']['status']
             control = row['control']
-            row['lifecycle'] = observed_survivors(rt, [{'pid': control.get('child_pid'),
+            row['lifecycle'] = observed_survivors(control_rt, [{'pid': control.get('child_pid'),
                                                        'starttime': control.get('child_starttime')}])
         elif label == 'socket-controls':
             row['control'] = socket_control(run)
@@ -354,7 +400,16 @@ def run_dbus_decomposition(rt, original_failed, dbus_state):
             if row['status'] == 'pass' and row['control']['status'] != 'observed':
                 row['status'] = 'unobserved'
         rows.append(row)
+    cause = decomposition_cause(rows, original_failed)
+    findings = differential_findings(rows)
+    # The default-path dependency is inferred from run-16/18 controls, not pinned
+    # build flags. Requiring it can under-report support for the alias hypothesis.
+    supported = (cause == 'explicit-store-config-accepted' and findings['legacy_alias'] == 'legacy-alias-reproduced'
+                 and findings['compiled_default'] == 'compiled-default-dependency-observed')
     return {'schema': 'rs9.dbus-decomposition.v1', 'stages': rows,
-            'dbus_cause': decomposition_cause(rows, original_failed),
+            'dbus_cause': cause, 'differential_findings': findings,
+            'hypothesis_status': 'supported-by-controls' if supported else 'blocking-or-inconclusive',
+            'original_pinned_stage_failed': bool(original_failed),
+            'maximum_control_seconds': len(commands) * 15,
             'cause_scope': 'control-boundary-only', 'qualification_authority': False,
             'application_qualified': False, 'status': 'diagnostic-only'}

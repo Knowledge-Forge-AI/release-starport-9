@@ -1,0 +1,268 @@
+{
+  "complete_architecture_records_inspected": true,
+  "config_bytes": 3561,
+  "config_sha256_both_architectures": "206f009ddcf909422f3651c687b4623a5780fb7486c6d650e5332f57c00d6be1",
+  "files": [
+    {
+      "bytes": 3942,
+      "name": "MANAGER-REVIEW.md",
+      "sha256": "b3643384778a2a7b8f5d6d59d0782b04e8a27a440725f4226e845cabdfec953c"
+    },
+    {
+      "bytes": 2255,
+      "name": "CONTINUATION.md",
+      "sha256": "6568565cccf65ca427e4597e2023a9ec25392a2ba38dde11072580837fd16861"
+    },
+    {
+      "bytes": 6077,
+      "name": "first-failure-summary.json",
+      "sha256": "773b30c562be5f397aed987cf5c29426970dc127e98255b830e986460a576409"
+    },
+    {
+      "bytes": 194973,
+      "name": "proot-x86_64-linux.json",
+      "sha256": "cad6bb289d71b2bd54e4c9de9e3a7a602a848442bec8bfd65805d72df6ffdab7"
+    },
+    {
+      "bytes": 195000,
+      "name": "proot-aarch64-linux.json",
+      "sha256": "60ad0f3ec84ef878763b38e4642a58b1a481d13b528f8e5b8e9e4b3a346f125c"
+    },
+    {
+      "bytes": 3133784,
+      "name": "hosted-summary.json",
+      "sha256": "95230b9afddb796314f8a16840401eb3dc6dee5b405cc368b68f390103c764c6"
+    },
+    {
+      "bytes": 144354,
+      "name": "manager-packet.json",
+      "sha256": "8ef1aee185c5a7a0c2a2f2bcf4664a490409871f10ec47c540f25aefa3abae36"
+    },
+    {
+      "bytes": 937810,
+      "name": "packet-result.zip",
+      "sha256": "d730205880409a3c2420089296bb1d17dd0473072b5d50c9ecb0c1ff7f2c3512"
+    },
+    {
+      "bytes": 875704,
+      "name": "operator-result.zip",
+      "sha256": "5186ff9a71823e15df749edc4609bf22114aadeda990cb192555f93e39602969"
+    }
+  ],
+  "hosted_run_id": 38179471636,
+  "native_findings": [
+    {
+      "application_qualified": false,
+      "minimal_no_includes": {
+        "application_qualified": false,
+        "rc": 0,
+        "status": "pass"
+      },
+      "original_dbus_session": {
+        "cause": "unclassified",
+        "rc": 127,
+        "status": "fail",
+        "stderr_bytes": 149,
+        "stderr_sha256": "0ec60ba3c9a8f40bcb28f68c2c8588971c49dfe0553eccd358eeb4041faa2d1b"
+      },
+      "root_self_include_observed": true,
+      "signal_control": {
+        "gate_reason": "guest-signal-status-not-propagated",
+        "gate_status": "fail",
+        "stages": [
+          {
+            "raw_returncode": 0,
+            "reason": null,
+            "stage": "arguments",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": 0,
+            "reason": null,
+            "stage": "exit-0",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": 7,
+            "reason": null,
+            "stage": "exit-7",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": 42,
+            "reason": null,
+            "stage": "exit-42",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": 255,
+            "reason": null,
+            "stage": "exit-255",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": 255,
+            "reason": "guest-signal-status-not-propagated",
+            "stage": "raw-signal-death",
+            "status": "fail"
+          },
+          {
+            "raw_returncode": 255,
+            "reason": "guest-signal-status-not-propagated",
+            "stage": "wait-signal-death",
+            "status": "fail"
+          },
+          {
+            "raw_returncode": 255,
+            "reason": null,
+            "stage": "wait-deliberate-255",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": 0,
+            "reason": null,
+            "stage": "orphan",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": null,
+            "reason": "sigterm-did-not-terminate-wrapper",
+            "stage": "external-sigterm",
+            "status": "fail"
+          }
+        ]
+      },
+      "socket_controls": "pass",
+      "standard_daemon_default": {
+        "rc": 1,
+        "status": "fail",
+        "stderr_bytes": 95,
+        "stderr_sha256": "883c3e6e3edaa90fd0861a210d5abf0319d51f00a37bc515ac37008d3accbc94"
+      },
+      "standard_daemon_explicit": {
+        "rc": 1,
+        "status": "fail",
+        "stderr_bytes": 95,
+        "stderr_sha256": "35bc06cf3113c2c1434cef21eee8c2ee276b8b73a57295e3b5855b355d8114a0"
+      },
+      "standard_session_file_sha256": "206f009ddcf909422f3651c687b4623a5780fb7486c6d650e5332f57c00d6be1",
+      "system": "x86_64-linux"
+    },
+    {
+      "application_qualified": false,
+      "minimal_no_includes": {
+        "application_qualified": false,
+        "rc": 0,
+        "status": "pass"
+      },
+      "original_dbus_session": {
+        "cause": "unclassified",
+        "rc": 127,
+        "status": "fail",
+        "stderr_bytes": 149,
+        "stderr_sha256": "55bbecb345a67e1a01e395cd64a8188f5da21fb7399f5729812d8208915e3a12"
+      },
+      "root_self_include_observed": true,
+      "signal_control": {
+        "gate_reason": "guest-signal-status-not-propagated",
+        "gate_status": "fail",
+        "stages": [
+          {
+            "raw_returncode": 0,
+            "reason": null,
+            "stage": "arguments",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": 0,
+            "reason": null,
+            "stage": "exit-0",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": 7,
+            "reason": null,
+            "stage": "exit-7",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": 42,
+            "reason": null,
+            "stage": "exit-42",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": 255,
+            "reason": null,
+            "stage": "exit-255",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": 255,
+            "reason": "guest-signal-status-not-propagated",
+            "stage": "raw-signal-death",
+            "status": "fail"
+          },
+          {
+            "raw_returncode": 255,
+            "reason": "guest-signal-status-not-propagated",
+            "stage": "wait-signal-death",
+            "status": "fail"
+          },
+          {
+            "raw_returncode": 255,
+            "reason": null,
+            "stage": "wait-deliberate-255",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": 0,
+            "reason": null,
+            "stage": "orphan",
+            "status": "pass"
+          },
+          {
+            "raw_returncode": null,
+            "reason": "sigterm-did-not-terminate-wrapper",
+            "stage": "external-sigterm",
+            "status": "fail"
+          }
+        ]
+      },
+      "socket_controls": "pass",
+      "standard_daemon_default": {
+        "rc": 1,
+        "status": "fail",
+        "stderr_bytes": 95,
+        "stderr_sha256": "7e84c9416adf9432f3d2139085c3f72686d9c057fc6643314706a138d818f605"
+      },
+      "standard_daemon_explicit": {
+        "rc": 1,
+        "status": "fail",
+        "stderr_bytes": 95,
+        "stderr_sha256": "42b2fe070e43298af217575e45a7bae0861b63dfdf79f760e4a0b53d1c1c678d"
+      },
+      "standard_session_file_sha256": "206f009ddcf909422f3651c687b4623a5780fb7486c6d650e5332f57c00d6be1",
+      "system": "aarch64-linux"
+    }
+  ],
+  "production_enabled": false,
+  "public_main": {
+    "fresh_remote_check": "unobserved-dns-resolution-failed",
+    "local_tracking_ref_matches_parent": true,
+    "manager_prior_check": "matched-parent-before-dispatch"
+  },
+  "publication_authority": false,
+  "schema": "rs9.cont20-input-evidence.v1",
+  "source_parent": "02cd47b2e1f25c3168d53fce983d1a6cf3403674",
+  "stderr_content_inferred_from_sha": false,
+  "stderr_raw_selected_bytes_available": false,
+  "verification": {
+    "full_package_reauthentication": false,
+    "manifests": 18,
+    "omitted_objects": 323,
+    "present_objects": 147,
+    "selected_records": 171,
+    "status": "verified"
+  }
+}

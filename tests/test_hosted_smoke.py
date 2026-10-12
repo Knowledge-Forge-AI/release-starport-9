@@ -754,3 +754,73 @@ class SmokeEnvironmentTests(unittest.TestCase):
                     self.assertEqual(caught.exception.code, "APPLICATION_SMOKE")
                     self.assertNotIn("diagnostic_sha256", caught.exception.details)
                     self.assertFalse((work / "diagnostics/application-smoke-diagnostic.json").is_file())
+
+    def test_verify_nebular_runtime_threads_session_bus_argv(self):
+        """verify_nebular_runtime passes validated session_bus_argv to execute_application_smoke."""
+        root_dir = "/nix/store/00000000000000000000000000001023-dbus-1.14.10"
+        pinned_argv = [
+            f"{root_dir}/bin/dbus-run-session",
+            f"--dbus-daemon={root_dir}/bin/dbus-daemon",
+            f"--config-file={root_dir}/share/dbus-1/session.conf",
+            "--",
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp).resolve()
+            root = work / "runtime"
+            (root / "bin").mkdir(parents=True)
+            (root / "bin/tfsb-studio-service").write_bytes(b"bin")
+            (root / "lib/sidecar-payload").mkdir(parents=True)
+            (root / "lib/sidecar-payload/manifest.json").write_bytes(b"[]")
+            scratch = work / "smoke"
+            scratch.mkdir()
+            (scratch / "native-rc-smoke.mjs").write_text("// smoke fixture\n")
+            (scratch / "sidecar-common.mjs").write_text("// common fixture\n")
+            prepared = {"scratch": scratch, "tools": scratch, "source": scratch, "records": []}
+
+            with patch("rs9.hosted_smoke.verifier_import_preflight", return_value={"status": "pass"}), \
+                 patch("rs9.hosted_smoke._run_verifier", return_value=({"status": "pass"}, {"status": "pass"})), \
+                 patch("rs9.application_smoke_diagnostic.execute_application_smoke", return_value=[{"scenario": "C"}]) as mock_smoke:
+                res = verify_nebular_runtime(root, prepared, "x86_64-linux", session_bus_argv=pinned_argv)
+                self.assertEqual(res["scenarios"], [{"scenario": "C"}])
+                mock_smoke.assert_called_once()
+                self.assertEqual(mock_smoke.call_args.kwargs["session_bus_argv"], pinned_argv)
+
+    def test_verify_nebular_runtime_default_session_bus_argv_is_none(self):
+        """verify_nebular_runtime defaults session_bus_argv to None."""
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp).resolve()
+            root = work / "runtime"
+            (root / "bin").mkdir(parents=True)
+            (root / "bin/tfsb-studio-service").write_bytes(b"bin")
+            (root / "lib/sidecar-payload").mkdir(parents=True)
+            (root / "lib/sidecar-payload/manifest.json").write_bytes(b"[]")
+            scratch = work / "smoke"
+            scratch.mkdir()
+            (scratch / "native-rc-smoke.mjs").write_text("// smoke fixture\n")
+            (scratch / "sidecar-common.mjs").write_text("// common fixture\n")
+            prepared = {"scratch": scratch, "tools": scratch, "source": scratch, "records": []}
+
+            with patch("rs9.hosted_smoke.verifier_import_preflight", return_value={"status": "pass"}), \
+                 patch("rs9.hosted_smoke._run_verifier", return_value=({"status": "pass"}, {"status": "pass"})), \
+                 patch("rs9.application_smoke_diagnostic.execute_application_smoke", return_value=[{"scenario": "C"}]) as mock_smoke:
+                res = verify_nebular_runtime(root, prepared, "x86_64-linux")
+                self.assertEqual(res["scenarios"], [{"scenario": "C"}])
+                mock_smoke.assert_called_once()
+                self.assertIsNone(mock_smoke.call_args.kwargs["session_bus_argv"])
+
+    def test_verify_nebular_runtime_rejects_malicious_session_bus_argv(self):
+        """verify_nebular_runtime validates and rejects malicious session_bus_argv immediately."""
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp).resolve()
+            root = work / "runtime"
+            (root / "bin").mkdir(parents=True)
+            (root / "bin/tfsb-studio-service").write_bytes(b"bin")
+            (root / "lib/sidecar-payload").mkdir(parents=True)
+            (root / "lib/sidecar-payload/manifest.json").write_bytes(b"[]")
+            scratch = work / "smoke"
+            scratch.mkdir()
+            prepared = {"scratch": scratch, "tools": scratch, "source": scratch, "records": []}
+
+            with self.assertRaises(ContractError) as caught:
+                verify_nebular_runtime(root, prepared, "x86_64-linux", session_bus_argv=["invalid"])
+            self.assertEqual(caught.exception.code, "NIX_PROOT_DBUS")

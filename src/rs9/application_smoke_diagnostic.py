@@ -190,7 +190,10 @@ def _bounded_run(argv, *, env, timeout):
         return result
 
 
-def _command(prepared, platform, scenario, launch_root, evidence, *, extras):
+def _command(prepared, platform, scenario, launch_root, evidence, *, extras, session_bus_argv=None):
+    if session_bus_argv is not None:
+        from rs9.nix_proot_dbus_command import validate_session_bus_argv
+        session_bus_argv = validate_session_bus_argv(session_bus_argv)
     command = ["node", str(prepared["tools"] / "native-rc-smoke.mjs"), "--platform", platform,
         "--scenario", scenario, "--launch-root", str(launch_root),
         "--checkout", str(prepared.get("checkout", prepared["source"])),
@@ -199,12 +202,16 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras):
         display = ["xvfb-run", "-a"]
         if extras:
             display += ["-e", str(evidence / "xvfb-error.log")]
-        command = [*display, "dbus-run-session", "--", *command]
+        dbus_cmd = session_bus_argv if session_bus_argv is not None else ["dbus-run-session", "--"]
+        command = [*display, *dbus_cmd, *command]
     return command
 
 
-def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, extras, timeout=240):
-    command = _command(prepared, platform, scenario, launch_root, evidence, extras=extras)
+def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, extras, timeout=240, session_bus_argv=None):
+    if session_bus_argv is not None:
+        from rs9.nix_proot_dbus_command import validate_session_bus_argv
+        session_bus_argv = validate_session_bus_argv(session_bus_argv)
+    command = _command(prepared, platform, scenario, launch_root, evidence, extras=extras, session_bus_argv=session_bus_argv)
     start = time.monotonic()
     error, rc, out, err = None, None, b"", b""
     sizes, cleanup_error, child_reaped = None, None, None
@@ -244,7 +251,10 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
 
 
 def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
-               scratch, timeout=240):
+               scratch, timeout=240, session_bus_argv=None):
+    if session_bus_argv is not None:
+        from rs9.nix_proot_dbus_command import validate_session_bus_argv
+        session_bus_argv = validate_session_bus_argv(session_bus_argv)
     evidence = scratch / ("evidence-replay-" + scenario)
     try:
         evidence.mkdir(mode=0o777)
@@ -252,7 +262,7 @@ def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
     except OSError:
         return "replay-not-run", {"status": "replay-not-run", "reason_token": "fresh-evidence-unavailable"}
     prepared = {"tools": tools, "source": checkout, "checkout": checkout}
-    fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, True, timeout)
+    fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, True, timeout, session_bus_argv=session_bus_argv)
     label = "replay-reproduced" if fields["failed"] else "replay-passed"
     if fields["error"] == "harness-error" or fields["cleanup_error"]:
         label = "replay-not-run"
@@ -272,10 +282,10 @@ def _failure_details(fields, *, extras, receipt_name):
     return details
 
 
-def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, env, fields, not_run):
+def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, env, fields, not_run, session_bus_argv=None):
     _, replay = run_replay(scenario=scenario, platform=platform, launch_root=launch_root,
         checkout=prepared.get("checkout", prepared["source"]), tools=prepared["tools"], prefix=prefix,
-        env=env, scratch=prepared["scratch"])
+        env=env, scratch=prepared["scratch"], session_bus_argv=session_bus_argv)
     record = {"schema": "rs9.application-smoke-diagnostic.v1alpha1", "system": system,
         "product": "theme-forge-nebular-fusion", "substage": "application_smoke",
         "scenario": scenario, "cause": fields["cause"], "status": "fail", "gate_status": "fail",
@@ -301,7 +311,10 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
     return digest(raw)
 
 
-def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=None, diagnostic_extras=False):
+def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=None, diagnostic_extras=False, session_bus_argv=None):
+    if session_bus_argv is not None:
+        from rs9.nix_proot_dbus_command import validate_session_bus_argv
+        session_bus_argv = validate_session_bus_argv(session_bus_argv)
     platform = "darwin-arm64" if system == "aarch64-darwin" else "linux-arm64" if system == "aarch64-linux" else "linux-x64"
     scenarios = ["A"] if platform == "darwin-arm64" else ["B"] if platform == "linux-arm64" else ["C", "C-signal"]
     extras = bool(diagnostic_extras and system == "x86_64-linux")
@@ -312,12 +325,12 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
     for index, scenario in enumerate(scenarios):
         # Keep the qualification attempt comparable with run 15/16. Only a
         # separate diagnostic replay uses the instrumented process/argv path.
-        fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, False)
+        fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, False, session_bus_argv=session_bus_argv)
         if fields["failed"]:
             details = _failure_details(fields, extras=extras, receipt_name=platform+"-"+scenario+".run.json")
             if extras:
                 details["diagnostic_sha256"] = _retain_failure(prepared, system, platform, scenario,
-                    launch_root, prefix, env, fields, scenarios[index+1:])
+                    launch_root, prefix, env, fields, scenarios[index+1:], session_bus_argv=session_bus_argv)
             raise ContractError("APPLICATION_SMOKE", "Released application-aware smoke failed", details=details)
         runs.append({"scenario": scenario, "receipt_sha256": fields["receipt"]["sha256"],
                      "executable_sha256": fields["receipt"]["executable_sha256"]})

@@ -309,7 +309,7 @@ class NixProotStderrTests(unittest.TestCase):
         self.assertEqual(res["excerpt_status"], "withheld")
         self.assertNotIn("excerpt", res)
 
-    def test_dbus_cause_unclassified_no_recollection_template(self):
+    def test_dbus_observed_text_redacted_without_recollection_template(self):
         raw = b"dbus-daemon[1234]: cannot open /etc/dbus-1/session.conf: No such file or directory\n"
         res = stream_diagnostic(
             raw,
@@ -320,8 +320,34 @@ class NixProotStderrTests(unittest.TestCase):
         self.assertEqual(res["origin"], "dbus-daemon")
         self.assertEqual(res["cause_token"], "unclassified")
         self.assertEqual(res["errno_token"], "ENOENT")
-        self.assertEqual(res["excerpt_status"], "withheld")
-        self.assertNotIn("excerpt", res)
+        self.assertEqual(res["excerpt_status"], "present")
+        self.assertEqual(res['excerpt_basis'], 'redacted-observed-text')
+        self.assertNotIn('/etc/dbus-1/session.conf', res['excerpt'])
+        self.assertNotIn('1234', res['excerpt'])
+
+    def test_circular_include_cause_requires_safe_observed_substring(self):
+        raw = b"dbus-daemon[42]: Circular inclusion of file '/etc/dbus-1/session.conf'\n"
+        result = stream_diagnostic(raw, stage='dbus-only', argv_sha256='a'*64, returncode=1)
+        self.assertEqual(result['cause_token'], 'dbus-config-circular-include')
+        self.assertEqual(result['cause_basis'], 'observed-substring')
+        self.assertIn('<path>', result['excerpt'])
+        for unsafe in (raw + b'unknown continuation\n', raw.replace(b'Circular', b'circular'),
+                       raw + b'dbus-daemon[42]: password=plain\n',
+                       b'dbus-daemon[42]: ' + b'x'*201 + b'\n',
+                       raw + b'dbus-daemon[42]: \tinvalid\n'):
+            with self.subTest(raw_sha256=hashlib.sha256(unsafe).hexdigest()):
+                result = stream_diagnostic(unsafe, stage='dbus-only', argv_sha256='a'*64, returncode=1)
+                self.assertNotEqual(result['cause_token'], 'dbus-config-circular-include')
+                self.assertNotIn('cause_basis', result)
+
+    def test_dbus_unrecognised_unicode_and_non_dbus_stage_withhold(self):
+        for raw in (b'dbus-daemon[42]: failure\nprivate continuation\n',
+                    'dbus-daemon[42]: \u00e9chec\n'.encode()):
+            result = stream_diagnostic(raw, stage='dbus-only', argv_sha256='a'*64, returncode=1)
+            self.assertNotIn('excerpt', result)
+        result = stream_diagnostic(b'dbus-daemon[42]: failure\n', stage='display-only',
+                                   argv_sha256='a'*64, returncode=1)
+        self.assertNotIn('excerpt', result)
 
     def test_oversize_excerpt_withheld(self):
         line = "xvfb-run: line 83: getopt: command not found " + ("A" * 50) + "\n"

@@ -2,6 +2,37 @@
 
 Status: PRoot dependency class authorized for a candidate-only experiment; product runtime not selected or qualified.
 
+## CONT20 legacy-include correction
+
+The CONT18 singleton alias is superseded for the experimental guest. Run 18
+shows that the pinned main session file includes `/etc/dbus-1/session.conf`,
+making an alias there recursive. Leave the optional legacy directory/file
+absent and select the exact store main with `--config-file`, also selecting the
+pinned daemon explicitly. Preserve its full policy bytes, digest and transitive
+include behavior. Audit ancestor cycles and symlink escapes fail closed; absent
+standard optional includes remain valid. This source topology correction does
+not prove native daemon acceptance. Minimal deny-only controls and alias
+reproductions remain diagnostics and cannot qualify the application.
+
+CONT18 introduced that alias to address run 16's missing
+`/etc/dbus-1/session.conf` failure. Removing it re-exposes the expected missing
+legacy file for callers using the daemon's built-in default: original baseline
+stages, `main_baseline`, and any bus started by the released application itself.
+Baseline receipts are diagnostic with `gate_relevant: false`; their expected
+failure in a future run 19 must not be treated as a new regression or new causal
+evidence. The repaired experimental session selects the store main explicitly.
+The built-in default path is inferred from run-16/18 behavior, not verified from
+the pinned build flags. Application-spawned buses remain an open native question.
+
+The native guest wait record distinguishes deliberate exit 255 from SIGTERM/15,
+but the raw wrapper still reports 255 for signal death. Outer-target delivery
+also fails despite separate process-group handler success and an observed
+PRoot ignored SIGTERM mask. Keep the gate failing without remapping, a privileged
+helper or new signal targets. The optional direct tracer attribution arm is
+deferred. Required Linux FHS gates, sandboxing and all readiness/publication
+flags remain intact. See [CONT20](../live1-native-client-cont20.md) for evidence,
+review dispositions and the remaining native questions.
+
 ## CONT18 diagnostic amendment
 
 Run 16 narrowed D-Bus startup failure to missing guest

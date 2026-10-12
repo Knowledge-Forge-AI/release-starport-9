@@ -117,8 +117,8 @@ class LaunchDiagnostics(unittest.TestCase):
                 return subprocess.CompletedProcess(argv, 127 if "dbus-run-session" in argv else 0, b"", b"getopt: command not found")
             rt = self.runtime(Path(temp), runner)
             result = run_launch_chain(rt)
-            baseline_main = calls[-2]
-            baseline_smoke = calls[-1]
+            baseline_main = next(argv for argv in calls if 'xvfb-run' in argv and '-w' in argv)
+            baseline_smoke = next(argv for argv in calls if 'xvfb-run' in argv and '-w' not in argv)
             i = baseline_main.index("xvfb-run")
             self.assertEqual(baseline_main[i:i + 4], ["xvfb-run", "-a", "dbus-run-session", "--"])
             self.assertIn("-w", baseline_main)
@@ -127,6 +127,37 @@ class LaunchDiagnostics(unittest.TestCase):
             self.assertNotIn("-w", baseline_smoke)
             self.assertEqual(len(result["stages"]), 5)
             self.assertFalse(result["qualification_authority"])
+
+    def test_expected_default_baselines_do_not_mask_pinned_stage_success(self):
+        with tempfile.TemporaryDirectory() as temp:
+            def runner(argv, **kwargs):
+                return subprocess.CompletedProcess(argv,127 if 'dbus-run-session' in argv else 0,b'',b'')
+            rt=self.runtime(Path(temp),runner)
+            with patch('rs9.nix_proot_launch.guest_audit',return_value={'status':'observed','files':[]}), \
+                 patch('rs9.nix_proot_dbus_probe.run_dbus_decomposition',return_value={'status':'diagnostic-only'}) as controls:
+                result=run_launch_chain(rt)
+            self.assertIsNone(result['first_failure'])
+            self.assertEqual(result['status'],'observed')
+            self.assertEqual([row['status'] for row in result['stages']],['pass','pass','pass','fail','fail'])
+            self.assertEqual([row['gate_relevant'] for row in result['stages']],[True,True,True,False,False])
+            controls.assert_called_once()
+            self.assertIs(controls.call_args.args[1],False)
+            self.assertFalse(result['qualification_authority'])
+
+    def test_pinned_and_bare_observer_forms_are_distinct(self):
+        with tempfile.TemporaryDirectory() as temp:
+            calls=[]
+            def runner(argv, **kwargs):
+                calls.append(argv)
+                return subprocess.CompletedProcess(argv,127,b'',b'')
+            rt=self.runtime(Path(temp),runner)
+            for pinned in (True,False):
+                observe_native(rt,'/released/main',label='main',expected=[],root_is_elf=True,
+                               display=True,pinned_display=pinned)
+            self.assertIn('--config-file='+rt.facts['dbus_session_config'],calls[0])
+            self.assertIn('--dbus-daemon='+rt.facts['dbus_daemon'],calls[0])
+            self.assertNotIn('--config-file='+rt.facts['dbus_session_config'],calls[1])
+            self.assertEqual(calls[1][calls[1].index('xvfb-run'):][:4],['xvfb-run','-a','dbus-run-session','--'])
 
     def test_latency_same_prefix_and_failed_samples_do_not_become_success(self):
         with tempfile.TemporaryDirectory() as temp:

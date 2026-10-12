@@ -230,10 +230,13 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
     def smoke(_released):
         if "baseline" not in state:
             raise ContractError("SIDECAR_BASELINE", "Pre-probe PRoot runtime identity required")
-        # Released verifier and application smoke run unchanged; only the guest prefix differs.
+        # Released bytes stay intact; this lane selects the pinned full session
+        # config explicitly. A compiled default at the legacy override is inferred
+        # from run-16/18 behavior; the pinned build flags have not been verified.
+        from rs9.nix_proot_dbus_command import dbus_session_command
         guest_prefix, _, _ = proot_guest_prefix(facts, layout, closure, env=env, cwd=None)
         return verify_nebular_runtime(state["root"], state["prepared"], system, [*prefix, *guest_prefix], env,
-                                      baseline=state["baseline"])
+                                      baseline=state["baseline"], session_bus_argv=dbus_session_command(facts))
 
     evaluation = evaluate_proot_experiment(runtime, recipe, materialize=materialize, smoke=smoke,
                                            closure_size_bytes=closure_size)

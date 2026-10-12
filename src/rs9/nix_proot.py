@@ -35,6 +35,7 @@ from typing import Any, Callable, NamedTuple
 from rs9.errors import ContractError, safe_details
 from rs9.nix_proot_launch import classify_failure, measure_proot_latency, run_launch_chain
 from rs9.nix_proot_layers import capture_bounded_stderr, check_layer_survival, observe_descendant_layers
+from rs9.nix_proot_dbus_command import dbus_session_command
 
 SCHEMA = "rs9.nix-proot-evaluation.v2"
 FACTS_SCHEMA = "rs9.nix-proot-facts.v3"
@@ -76,7 +77,7 @@ _STORE = re.compile(r"/nix/store/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]+(?:/[A-
 _STORE_TOP = re.compile(r"/nix/store/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]+")
 _GUEST_SENTINELS = ("/etc/os-release", "/etc/ld.so.cache", "/lib/x86_64-linux-gnu", "/lib/aarch64-linux-gnu",
                     "/usr/lib", "/usr/share", "/var/lib/dpkg")
-_GUEST_ETC = frozenset({"passwd", "group", "nsswitch.conf", "hosts", "dbus-1"})
+_GUEST_ETC = frozenset({"passwd", "group", "nsswitch.conf", "hosts"})
 
 
 def verify_pinned_proot(content: bytes | str | Path) -> dict[str, Any]:
@@ -487,11 +488,9 @@ def probe_no_userns_ptrace(rt: GuestRuntime) -> dict[str, Any]:
     code = ("import json,os\n"
             "with open('/tmp/rs9-translation-nonce') as stream: nonce=stream.read()\n"
             f"sentinels={list(_GUEST_SENTINELS)!r}\n"
-            f"expected_config={rt.facts['dbus_session_config']!r}\n"
             "dbus_dir='/etc/dbus-1';dbus_config=dbus_dir+'/session.conf'\n"
-            "dbus_ok=(os.path.isdir(dbus_dir) and not os.path.islink(dbus_dir) and "
-            "sorted(os.listdir(dbus_dir))==['session.conf'] and "
-            "os.path.isfile(dbus_config) and os.path.realpath(dbus_config)==expected_config)\n"
+            "dbus_ok=(not os.path.lexists(dbus_dir) and not os.path.lexists(dbus_config) "
+            "and os.path.realpath('/etc')=='/etc')\n"
             "print(json.dumps({'userns':os.readlink('/proc/self/ns/user'),'uid':os.getuid(),'nonce':nonce,"
             "'visible':[p for p in sentinels if os.path.exists(p)],'etc':sorted(os.listdir('/etc')),'dbus_ok':dbus_ok}))\n")
     run = rt.run(name, [rt.facts["python"], "-I", "-S", "-B", "-c", code])
@@ -512,7 +511,7 @@ def probe_no_userns_ptrace(rt: GuestRuntime) -> dict[str, Any]:
         return _result(name, "not-run", "host-userns-unreadable", userns_policy=policy)
     etc = doc["etc"]
     unexpected = sorted(set(etc) - _GUEST_ETC) if isinstance(etc, list) and all(isinstance(p, str) for p in etc) else ["unparseable"]
-    dbus_exact = isinstance(etc, list) and "dbus-1" in etc and doc.get("dbus_ok") is True
+    dbus_exact = isinstance(etc, list) and "dbus-1" not in etc and doc.get("dbus_ok") is True
     visible = doc["visible"] if isinstance(doc["visible"], list) else ["unparseable"]
     checks = {"userns_inode_equal": doc["userns"] == host_userns, "uid_equal": doc["uid"] == os.getuid(),
               "tmp_translated": doc["nonce"] == nonce, "host_paths_hidden": not visible,
@@ -691,8 +690,8 @@ def observe_native(rt: GuestRuntime, exe: str, *, label: str, expected: list[str
     command = [rt.facts["python"], "-I", "-S", "-B", "/tmp/rs9-observer.py", f"/tmp/rs9-observe-{label}.json"]
     if display:
         xvfb = (rt.facts.get("xvfb_run") if pinned_display else None) or "xvfb-run"
-        dbus = (rt.facts.get("dbus_run_session") if pinned_display else None) or "dbus-run-session"
-        command = [xvfb, "-a", dbus, "--", *command]
+        session = dbus_session_command(rt.facts) if pinned_display else ["dbus-run-session", "--"]
+        command = [xvfb, "-a", *session, *command]
     run = rt.run("observe-" + label, command, timeout=hold + 90, cwd="/tmp")
     if run.error or run.returncode != 0:
         host_binds = tuple(str(b) for b in (

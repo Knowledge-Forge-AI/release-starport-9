@@ -185,9 +185,11 @@ class NixSourceTests(unittest.TestCase):
         self.assertIn("rootPaths", self.recipe)
         self.assertIn('closure_paths_file = "${closure}/store-paths";', self.recipe)
         self.assertIn(': > "$out/etc/passwd"', self.recipe)
-        self.assertIn('mkdir -p "$out/etc/dbus-1"', self.recipe)
+        self.assertNotIn('mkdir -p "$out/etc/dbus-1"', self.recipe)
         self.assertIn('test -f "${pkgs.dbus}/share/dbus-1/session.conf" || exit 1', self.recipe)
-        self.assertIn('ln -s "${pkgs.dbus}/share/dbus-1/session.conf" "$out/etc/dbus-1/session.conf"', self.recipe)
+        self.assertNotIn('"$out/etc/dbus-1/session.conf"', self.recipe)
+        self.assertIn('sha256sum -c -', self.recipe)
+        self.assertIn('builtins.readFile ../src/rs9/nix_proot_dbus_pin.py', self.recipe)
         self.assertNotIn("ln -s /etc", self.recipe)
 
     def test_experiment_is_a_separate_linux_only_output_that_legacy_outputs_never_reach(self):
@@ -430,7 +432,7 @@ class GuestCase(unittest.TestCase):
         if "rs9-translation-nonce" in text:
             nonce = (self.layout.tmp_dir / "rs9-translation-nonce").read_text()
             body = {"userns": "user:[4026531837]", "uid": os.getuid(), "nonce": nonce, "visible": [],
-                    "etc": ["dbus-1", "group", "hosts", "nsswitch.conf", "passwd"], "dbus_ok": True}
+                    "etc": ["group", "hosts", "nsswitch.conf", "passwd"], "dbus_ok": True}
             return completed(argv, 0, json.dumps(body).encode())
         if "readlink('/proc/self/exe')" in text:
             return completed(argv, 0, json.dumps({"exe": self.facts["python"]}).encode())
@@ -521,18 +523,27 @@ class GuestCase(unittest.TestCase):
 
 
 class TranslationProbeTests(GuestCase):
-    def test_dbus_directory_requires_exact_guest_readback(self):
+    def test_legacy_absence_requires_exact_guest_readback(self):
         for exact in (False, None, "true"):
             def malformed(argv, exact=exact):
                 nonce = (self.layout.tmp_dir / "rs9-translation-nonce").read_text()
                 body = {"userns": "user:[4026531837]", "uid": os.getuid(), "nonce": nonce,
-                        "visible": [], "etc": ["dbus-1", "passwd"], "dbus_ok": exact}
+                        "visible": [], "etc": ["passwd"], "dbus_ok": exact}
                 return completed(argv, 0, json.dumps(body).encode())
             self.overrides = {"rs9-translation-nonce": malformed}
             with self.subTest(exact=exact):
                 row = probe_no_userns_ptrace(self.rt)
                 self.assertEqual(row["status"], "fail")
                 self.assertIs(row["details"]["etc_closed"], False)
+
+    def test_present_legacy_directory_never_passes_with_forged_absence_boolean(self):
+        def malformed(argv):
+            nonce = (self.layout.tmp_dir / "rs9-translation-nonce").read_text()
+            body = {"userns": "user:[4026531837]", "uid": os.getuid(), "nonce": nonce,
+                    "visible": [], "etc": ["dbus-1", "passwd"], "dbus_ok": True}
+            return completed(argv, 0, json.dumps(body).encode())
+        self.overrides = {"rs9-translation-nonce": malformed}
+        self.assertEqual(probe_no_userns_ptrace(self.rt)["status"], "fail")
 
     def test_same_userns_inode_and_translated_paths_pass(self):
         row = probe_no_userns_ptrace(self.rt)
@@ -668,7 +679,8 @@ class ObserverTests(GuestCase):
         observe_native(self.rt, "/cache/launcher", label="main", expected=[], root_is_elf=False, display=True,
                        until_webkit=True)
         tail = self.calls[-1][self.calls[-1].index(self.facts["xvfb_run"]):]
-        self.assertEqual(tail[:4], [self.facts["xvfb_run"], "-a", self.facts["dbus_run_session"], "--"])
+        from rs9.nix_proot_dbus_command import dbus_session_command
+        self.assertEqual(tail[:6], [self.facts["xvfb_run"], "-a", *dbus_session_command(self.facts)])
         observe_native(self.rt, "/cache/launcher", label="main", expected=[], root_is_elf=False, display=True,
                        until_webkit=True, pinned_display=False)
         tail_baseline = self.calls[-1][self.calls[-1].index("xvfb-run"):]
@@ -1050,6 +1062,24 @@ class EvaluationTests(GuestCase):
         with patch("rs9.nix_proot.observe_native", side_effect=observe):
             evaluate_proot_experiment(self.rt, None, materialize=lambda: released)
         self.assertEqual(labels, ["main", "main_baseline"])
+
+    def test_repaired_dbus_never_hides_signal_and_webkit_failures(self):
+        self.released_observations()
+        self.observations['main']['processes'] = self.observations['main']['processes'][:2]
+        self.overrides['SIG_DFL'] = lambda argv: completed(argv, 255)
+        released = {'elfs': ['/c/a'], 'sea': '/c/sidecar', 'launcher': '/c/launch', 'launcher_is_elf': False}
+        repaired = {'status': 'observed', 'first_failure': None, 'qualification_authority': False,
+                    'dbus_decomposition': {'dbus_cause': 'explicit-store-config-accepted', 'qualification_authority': False}}
+        with patch('rs9.nix_proot.run_launch_chain', return_value=repaired):
+            result = evaluate_proot_experiment(self.rt, None, materialize=lambda: released,
+                smoke=lambda r: {'sidecar': {'verified': True}, 'scenarios': [{'scenario': 'C'}]})
+        gates = {g['name']: g for g in result['gates']}
+        self.assertEqual(list(gates), list(GATES))
+        self.assertEqual(gates['proot-args-exit-signals']['reason'], 'guest-signal-status-not-propagated')
+        self.assertEqual(gates['proot-webkit-sandbox-state']['status'], 'fail')
+        self.assertEqual(result['status'], 'diagnostic-fail')
+        self.assertFalse(result['application_qualified'])
+        self.assertFalse(result['qualification_authority'])
 
     def test_failed_release_materialization_fails_dependent_gates_with_its_code(self):
         def broken():
