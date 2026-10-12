@@ -733,6 +733,105 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
             self.assertEqual(called_cmd[2], "-e")
             self.assertEqual(called_cmd[4:8], pinned_argv)
 
+    def test_exit_code_signal_distinction_143_255_and_negative(self):
+        """143 and 255 are classified as exits, negative returncode is outer signal only."""
+        for rc, expected_exit, expected_sig, expected_cause in [
+            (143, 143, None, "process-nonzero"),
+            (255, 255, None, "process-nonzero"),
+            (-15, None, 15, "process-signal"),
+            (-9, None, 9, "process-signal"),
+        ]:
+            with self.subTest(rc=rc):
+                def fake_run(cmd, **kwargs):
+                    return SimpleNamespace(returncode=rc, stdout=b"out", stderr=b"err")
+
+                with patch("subprocess.run", side_effect=fake_run):
+                    with self.assertRaises(ContractError) as caught:
+                        execute_application_smoke(
+                            prepared=self.prepared,
+                            system="x86_64-linux",
+                            launch_root=self.launch_root,
+                            diagnostic_extras=False,
+                        )
+                obs = getattr(caught.exception, "smoke_observation", None)
+                self.assertIsNotNone(obs)
+                self.assertEqual(obs["raw_returncode"], rc)
+                self.assertEqual(obs["exit_code"], expected_exit)
+                self.assertEqual(obs["signal"], expected_sig)
+                self.assertEqual(obs["cause"], expected_cause)
+                self.assertEqual(obs["stdout_bytes"], 3)
+                self.assertEqual(obs["stderr_bytes"], 3)
+                self.assertEqual(obs["stdout_sha256"], digest(b"out"))
+                self.assertEqual(obs["stderr_sha256"], digest(b"err"))
+                self.assertTrue(obs["stream_capture_complete"])
+
+    def test_single_attempt_preserves_original_argv_and_runner(self):
+        """Qualification attempt preserves original subprocess.run argv and runner with single attempt."""
+        calls = []
+        def fake_run(cmd, **kwargs):
+            calls.append(list(cmd))
+            return SimpleNamespace(returncode=1, stdout=b"", stderr=b"generic error")
+
+        with patch("subprocess.run", side_effect=fake_run) as mock_run, \
+             patch("rs9.application_smoke_diagnostic._bounded_run") as mock_bounded:
+            with self.assertRaises(ContractError) as caught:
+                execute_application_smoke(
+                    prepared=self.prepared,
+                    system="x86_64-linux",
+                    launch_root=self.launch_root,
+                    diagnostic_extras=False,
+                )
+
+        # Exactly 1 call (single attempt, NO replay)
+        self.assertEqual(len(calls), 1)
+        mock_bounded.assert_not_called()
+        self.assertEqual(mock_run.call_count, 1)
+
+        # Verify argv structure
+        cmd = calls[0]
+        self.assertEqual(cmd[0], "xvfb-run")
+        self.assertEqual(cmd[1], "-a")
+        self.assertEqual(cmd[2], "dbus-run-session")
+        self.assertEqual(cmd[3], "--")
+        self.assertEqual(cmd[4], "node")
+        self.assertTrue(cmd[5].endswith("native-rc-smoke.mjs"))
+        self.assertIn("--scenario", cmd)
+        self.assertEqual(cmd[cmd.index("--scenario") + 1], "C")
+        self.assertIn("--platform", cmd)
+        self.assertEqual(cmd[cmd.index("--platform") + 1], "linux-x64")
+
+        # Smoke observation is carried on the exception
+        obs = caught.exception.smoke_observation
+        self.assertEqual(obs["scenario"], "C")
+        self.assertEqual(obs["cause"], "process-nonzero")
+        self.assertEqual(obs["raw_returncode"], 1)
+        self.assertEqual(obs["exit_code"], 1)
+        self.assertIsNone(obs["signal"])
+
+    def test_production_non_container_optional_behavior(self):
+        """Non-container / production environment without container_client succeeds or records failure cleanly."""
+        prepared_non_container = {
+            "scratch": self.scratch,
+            "tools": self.tools,
+            "source": self.work / "source",
+            "checkout": self.work / "source",
+            "records": [],
+            # container_client is intentionally absent
+        }
+
+        # Failure without container_client
+        with patch("subprocess.run", return_value=SimpleNamespace(returncode=2, stdout=b"", stderr=b"fail")):
+            with self.assertRaises(ContractError) as caught:
+                execute_application_smoke(
+                    prepared=prepared_non_container,
+                    system="x86_64-linux",
+                    launch_root=self.launch_root,
+                    diagnostic_extras=False,
+                )
+            self.assertEqual(caught.exception.code, "APPLICATION_SMOKE")
+            self.assertIsNotNone(caught.exception.smoke_observation)
+            self.assertEqual(caught.exception.smoke_observation["exit_code"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

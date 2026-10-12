@@ -1,0 +1,443 @@
+{
+  "authorization": {
+    "automatic_retry": false,
+    "full_live1_qualification": false,
+    "production_enabled": false,
+    "publication_authority": false
+  },
+  "hosted_run20_authorized": false,
+  "hosted_verdict": "not-qualified",
+  "manager_status": "not-qualified",
+  "observations": {
+    "error": "required-gates-unsatisfied",
+    "pages_tls": {
+      "class": "certificate-verify-failed",
+      "code": 62,
+      "stage": "tls",
+      "state": "unknown"
+    },
+    "readback_byte_comparison": {
+      "name": "readback-byte-comparison",
+      "reason": "observations-recorded-with-unknown-or-metadata-only-states",
+      "status": "not-run"
+    }
+  },
+  "original_run19_proot": {
+    "aarch64-linux": {
+      "archive_bytes": 20888,
+      "archive_sha256": "059795fca038de1db1cc1f2ae81760caa68daf3c02ca11e4ac16554a3e549998",
+      "cause": "unobserved",
+      "completed_runtime_gates": 0,
+      "execution_error": "NIX_EXECUTION",
+      "execution_error_detail": {
+        "exit_code": 1,
+        "stage": "nix-proot",
+        "stderr_sha256": "22e9f552d47188b27cece10ee14234d83239ed1cf4442f2e3da331b3f15a67f2",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "substage": "nix-build",
+        "tool": "nix"
+      },
+      "gate_statuses": {
+        "proot-args-exit-signals": "fail",
+        "proot-closure-resolution": "fail",
+        "proot-descendant-interpreter": "fail",
+        "proot-executable-self": "fail",
+        "proot-in-guest-offline": "fail",
+        "proot-no-userns-ptrace": "fail",
+        "proot-pinned-derivation": "fail",
+        "proot-verifier-smoke": "fail",
+        "proot-webkit-sandbox-state": "fail"
+      },
+      "native_stderr_text_retained": false
+    },
+    "x86_64-linux": {
+      "archive_bytes": 20866,
+      "archive_sha256": "f0cd5ce91649aa7b140f7c6ed12d8fc44450c64a123941092eade2c16c9eb74f",
+      "cause": "unobserved",
+      "completed_runtime_gates": 0,
+      "execution_error": "NIX_EXECUTION",
+      "execution_error_detail": {
+        "exit_code": 1,
+        "stage": "nix-proot",
+        "stderr_sha256": "647c00f7c5889b071541d0e89f4de11f7adf4bb1a79c9bd3a34ba21caaef2a35",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "substage": "nix-build",
+        "tool": "nix"
+      },
+      "gate_statuses": {
+        "proot-args-exit-signals": "fail",
+        "proot-closure-resolution": "fail",
+        "proot-descendant-interpreter": "fail",
+        "proot-executable-self": "fail",
+        "proot-in-guest-offline": "fail",
+        "proot-no-userns-ptrace": "fail",
+        "proot-pinned-derivation": "fail",
+        "proot-verifier-smoke": "fail",
+        "proot-webkit-sandbox-state": "fail"
+      },
+      "native_stderr_text_retained": false
+    }
+  },
+  "packet_hashes": {
+    "first-failure-summary.json": "914416e66b2329ebeaa6667e9aaca8649e6976b199f14a0ae908c2959335a497",
+    "hosted-summary.json": "7b061fbd0e07014d52be61d9f59b91556a5b45757d3ad1bc993533753bbad814",
+    "manager-packet.json": "189eff15ef7bdf80ba1b1cc1a80f52284f8c937f3c1cf6863a0ac9b60470f55b",
+    "operator-result.zip": "edfaaf8d3ff6afc297b7cc76e73115ceb940414eb3d32dd209eb6d20e253f6e2",
+    "packet-result.zip": "196f7ae9055439db010cb7d7b3cf45674ee06fa4c5456508261ffaf506664df0"
+  },
+  "pages_comparison": {
+    "inference": "Matching recorded runner and sidecar identities do not prove matching dependency versions or smoke context. Provisioned image/setup hashes differ; cause remains unobserved.",
+    "run18": {
+      "pages": {
+        "failed_gates": [],
+        "image_sha256": "4436a5254e480d8cf622f521982fc4aa9c4e3a5c396c772950d9afab074f8737",
+        "install": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "ebc2d7bd9c73a6e20b75969c88ceaf857bc5a19b011ef78c6489178cba65bef9",
+            "stdout_sha256": "4fdfa389351435dd4e3fbaa5979059b543c8efded5bbd28d622df0e36e4dd170"
+          }
+        ],
+        "passing_gates": 112,
+        "query": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_sha256": "7ebcecf6e094ed60ae8478f2fb38acdb45aec0c4fd3d57e791e4ca3c63df153a"
+          }
+        ],
+        "runner": {
+          "architecture": "x86_64",
+          "image_os": "ubuntu24",
+          "image_version": "20261004.327.1",
+          "kernel": "6.17.0-1022-azure",
+          "os": "Linux",
+          "tools": {
+            "docker": "Docker version 28.0.4, build b8034c0",
+            "dpkg-deb": "Debian 'dpkg-deb' package archive backend version 1.22.6 (amd64).",
+            "gpg": "gpg (GnuPG) 2.4.4",
+            "node": "v22.23.3",
+            "python": "3.12.3",
+            "rpm": "RPM version 4.18.2"
+          }
+        },
+        "setup_sha256": "66aa2919670176a50f09d7d0fe73455bc683258ccb181dd36548a15349264615",
+        "smoke_error": null
+      },
+      "standalone": {
+        "failed_gates": [],
+        "image_sha256": "5ab45630c517ba165b8582fb231b5b662e3fe6d5c851d1c156fef5ca0f34d373",
+        "install": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "ebc2d7bd9c73a6e20b75969c88ceaf857bc5a19b011ef78c6489178cba65bef9",
+            "stdout_sha256": "4fdfa389351435dd4e3fbaa5979059b543c8efded5bbd28d622df0e36e4dd170"
+          }
+        ],
+        "passing_gates": 41,
+        "query": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_sha256": "7ebcecf6e094ed60ae8478f2fb38acdb45aec0c4fd3d57e791e4ca3c63df153a"
+          }
+        ],
+        "runner": {
+          "architecture": "x86_64",
+          "image_os": "ubuntu24",
+          "image_version": "20261004.327.1",
+          "kernel": "6.17.0-1022-azure",
+          "os": "Linux",
+          "tools": {
+            "docker": "Docker version 28.0.4, build b8034c0",
+            "dpkg-deb": "Debian 'dpkg-deb' package archive backend version 1.22.6 (amd64).",
+            "gpg": "gpg (GnuPG) 2.4.4",
+            "node": "v22.23.3",
+            "python": "3.12.3",
+            "rpm": "RPM version 4.18.2"
+          }
+        },
+        "setup_sha256": "493e435c97e03926876d3f4cf956a19019c82e96b86f8570b1b224c0127d1301",
+        "smoke_error": null
+      }
+    },
+    "run19": {
+      "pages": {
+        "failed_gates": [
+          "pages-client.apt.theme-forge-nebular-fusion.client",
+          "pages-client.apt"
+        ],
+        "image_sha256": "3996305b55c2c93337c7a166902e3692e9ed9c445d5af386716179f5f608356a",
+        "install": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "ebc2d7bd9c73a6e20b75969c88ceaf857bc5a19b011ef78c6489178cba65bef9",
+            "stdout_sha256": "4fdfa389351435dd4e3fbaa5979059b543c8efded5bbd28d622df0e36e4dd170"
+          }
+        ],
+        "passing_gates": 110,
+        "query": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_sha256": "7ebcecf6e094ed60ae8478f2fb38acdb45aec0c4fd3d57e791e4ca3c63df153a"
+          }
+        ],
+        "runner": {
+          "architecture": "x86_64",
+          "image_os": "ubuntu24",
+          "image_version": "20261004.327.1",
+          "kernel": "6.17.0-1022-azure",
+          "os": "Linux",
+          "tools": {
+            "docker": "Docker version 28.0.4, build b8034c0",
+            "dpkg-deb": "Debian 'dpkg-deb' package archive backend version 1.22.6 (amd64).",
+            "gpg": "gpg (GnuPG) 2.4.4",
+            "node": "v22.23.3",
+            "python": "3.12.3",
+            "rpm": "RPM version 4.18.2"
+          }
+        },
+        "setup_sha256": "751fad5019434ca0a505bf13e887c544e1867caf26a4578d595815a548ded394",
+        "smoke_error": "APPLICATION_SMOKE"
+      },
+      "standalone": {
+        "failed_gates": [],
+        "image_sha256": "6516bde2987b91a2bc893836a7032ef824df01f7a8211f3e55fcd149f406fa8d",
+        "install": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "ebc2d7bd9c73a6e20b75969c88ceaf857bc5a19b011ef78c6489178cba65bef9",
+            "stdout_sha256": "4fdfa389351435dd4e3fbaa5979059b543c8efded5bbd28d622df0e36e4dd170"
+          }
+        ],
+        "passing_gates": 41,
+        "query": [
+          {
+            "executed": true,
+            "exit_code": 0,
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_sha256": "7ebcecf6e094ed60ae8478f2fb38acdb45aec0c4fd3d57e791e4ca3c63df153a"
+          }
+        ],
+        "runner": {
+          "architecture": "x86_64",
+          "image_os": "ubuntu24",
+          "image_version": "20261004.327.1",
+          "kernel": "6.17.0-1022-azure",
+          "os": "Linux",
+          "tools": {
+            "docker": "Docker version 28.0.4, build b8034c0",
+            "dpkg-deb": "Debian 'dpkg-deb' package archive backend version 1.22.6 (amd64).",
+            "gpg": "gpg (GnuPG) 2.4.4",
+            "node": "v22.23.3",
+            "python": "3.12.3",
+            "rpm": "RPM version 4.18.2"
+          }
+        },
+        "setup_sha256": "2b0242a6da341e3f4e38e1a74e147431b19c3dca665e019b5f54eca51469c7b2",
+        "smoke_error": null
+      }
+    },
+    "runtime_dependency_versions_retained": false,
+    "sidecars": {
+      "pages": {
+        "expected_manifest_sha256": null,
+        "import_preflight": {
+          "exit_code": 0,
+          "node_version": "22.22.1",
+          "status": "pass",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_sha256": "edaecb32e33d412deac150095807f7e14d13a3db53b73081693d86500cd24169"
+        },
+        "mismatch_counts": {
+          "bytes": 0,
+          "dir_mode": 0,
+          "directory_mode": 0,
+          "extra": 0,
+          "file_mode": 0,
+          "missing": 0,
+          "symlink": 0,
+          "type": 0
+        },
+        "record_sha256": "38028025bf8d758155a2ab5047be25cffe62691f17ca31ad833b2d63ab1bac53",
+        "runtime_root_sha256": "e77c193bf8aaff138391bbdb36ba3bda6c4aba35a15ea58c64ad1bf0aa88a569",
+        "sidecar_binary_sha256": "fde6a4bf8d0562f7751d1a2d6cb9b417c4cfe107bbcb0aa3e9a24e125e348f48",
+        "sidecar_manifest_sha256": "8ed81e1cbd1b54323dada7b3275efc4392b8332f1ecfbc96fb6b20d7d36d4979",
+        "verifier": {
+          "exit_code": 0,
+          "status": "pass",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_sha256": "1cd3291151064675c2d145cf88b6b915d5d714b88483e74878e21dc06ccb110a"
+        }
+      },
+      "standalone": {
+        "expected_manifest_sha256": null,
+        "import_preflight": {
+          "exit_code": 0,
+          "node_version": "22.22.1",
+          "status": "pass",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_sha256": "edaecb32e33d412deac150095807f7e14d13a3db53b73081693d86500cd24169"
+        },
+        "mismatch_counts": {
+          "bytes": 0,
+          "dir_mode": 0,
+          "directory_mode": 0,
+          "extra": 0,
+          "file_mode": 0,
+          "missing": 0,
+          "symlink": 0,
+          "type": 0
+        },
+        "record_sha256": "38028025bf8d758155a2ab5047be25cffe62691f17ca31ad833b2d63ab1bac53",
+        "runtime_root_sha256": "e77c193bf8aaff138391bbdb36ba3bda6c4aba35a15ea58c64ad1bf0aa88a569",
+        "sidecar_binary_sha256": "fde6a4bf8d0562f7751d1a2d6cb9b417c4cfe107bbcb0aa3e9a24e125e348f48",
+        "sidecar_manifest_sha256": "8ed81e1cbd1b54323dada7b3275efc4392b8332f1ecfbc96fb6b20d7d36d4979",
+        "verifier": {
+          "exit_code": 0,
+          "status": "pass",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_sha256": "1cd3291151064675c2d145cf88b6b915d5d714b88483e74878e21dc06ccb110a"
+        }
+      }
+    },
+    "smoke_stdout_stderr_retained": false
+  },
+  "plan_review": {
+    "findings_disposition": [
+      "1: amend to actual last inventory stage, test pre-install and post-remove",
+      "2: amend to outer process only; exit 143/255 remain exits; null signal is not propagation proof",
+      "3: amend to shared optional callback, prove default producer error details unchanged and writer failure nonmasking",
+      "4: accept guest-root builder-failed classification, no digest-mismatch inference without log evidence",
+      "5: amend to isolated offline image dependency probe outside inventories and receipts marks",
+      "6: accept unchanged original subprocess runner and argv; observation does not qualify non-container callers",
+      "7: defer local evaluation: installed 2.31.5 differs from lane-pinned 2.31.2; no store import/eval performed",
+      "8: verifier/original artifacts and real CONT20 delta inspected; seven incumbents identified; shell DNS unavailable initially, fresh connector remote main matched at pre-final"
+    ],
+    "outcome": "reviewed_with_findings"
+  },
+  "prior_run18_proot": {
+    "aarch64-linux": {
+      "application_qualified": false,
+      "dbus_main_sha256": "206f009ddcf909422f3651c687b4623a5780fb7486c6d650e5332f57c00d6be1",
+      "evaluation_sha256": "60ad0f3ec84ef878763b38e4642a58b1a481d13b528f8e5b8e9e4b3a346f125c",
+      "gate_statuses": {
+        "proot-args-exit-signals": "fail",
+        "proot-closure-resolution": "pass",
+        "proot-descendant-interpreter": "fail",
+        "proot-executable-self": "fail",
+        "proot-in-guest-offline": "pass",
+        "proot-no-userns-ptrace": "pass",
+        "proot-pinned-derivation": "pass",
+        "proot-verifier-smoke": "fail",
+        "proot-webkit-sandbox-state": "fail"
+      },
+      "qualification_authority": false,
+      "root_self_include_observed": true,
+      "self_include_causality_proven": false
+    },
+    "x86_64-linux": {
+      "application_qualified": false,
+      "dbus_main_sha256": "206f009ddcf909422f3651c687b4623a5780fb7486c6d650e5332f57c00d6be1",
+      "evaluation_sha256": "cad6bb289d71b2bd54e4c9de9e3a7a602a848442bec8bfd65805d72df6ffdab7",
+      "gate_statuses": {
+        "proot-args-exit-signals": "fail",
+        "proot-closure-resolution": "pass",
+        "proot-descendant-interpreter": "fail",
+        "proot-executable-self": "fail",
+        "proot-in-guest-offline": "pass",
+        "proot-no-userns-ptrace": "pass",
+        "proot-pinned-derivation": "pass",
+        "proot-verifier-smoke": "fail",
+        "proot-webkit-sandbox-state": "fail"
+      },
+      "qualification_authority": false,
+      "root_self_include_observed": true,
+      "self_include_causality_proven": false
+    }
+  },
+  "production_promotion_blockers": [
+    "linux-wheel-production-promotion-compatibility-unproven",
+    "rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"
+  ],
+  "proposal": {
+    "bytes": 14354,
+    "disposition": "amend",
+    "observed_stage_deltas": [],
+    "original_scope_preserved": true,
+    "schema": "agent-phase-plan-material-v1",
+    "sha256": "9d8532f81bcea478fbe2d612699a4be12207a9d349ec1941dc67f0136e901237"
+  },
+  "required_nix": {
+    "aarch64-linux": {
+      "error": "NIX_FHS_USERNS",
+      "reason": "uid-map-denied",
+      "substage": "nix-fhs-runtime-smoke",
+      "userns_policy": "restricted"
+    },
+    "x86_64-linux": {
+      "error": "NIX_FHS_USERNS",
+      "reason": "uid-map-denied",
+      "substage": "nix-fhs-runtime-smoke",
+      "userns_policy": "restricted"
+    }
+  },
+  "schema": "rs9.cont21-input-evidence.v1",
+  "seven_incumbent_integration_tests": {
+    "module": "tests.test_hosted_container_smoke.DisjointFilesystemTests",
+    "names": [
+      "test_real_guest_only_reads_and_commands_succeed",
+      "test_guest_source_readback_detects_changed_transport",
+      "test_unexpected_guest_exception_is_returned_without_private_message",
+      "test_smoke_nonzero_timeout_and_missing_receipt_have_distinct_evidence",
+      "test_malformed_diagnostic_preserves_primary_guest_failure",
+      "test_cleanup_runs_after_smoke_failure_and_preserves_primary_error",
+      "test_output_binding_and_symlink_cannot_qualify"
+    ]
+  },
+  "source_custody": {
+    "base": "0bb571c09777a9ba041313b2b8d3a4b6370bd4a1",
+    "branch": "main",
+    "remote_parity": {
+      "connector_readback": {
+        "branch": "main",
+        "head": "0bb571c09777a9ba041313b2b8d3a4b6370bd4a1",
+        "method": "github-connector-GET-branches-main",
+        "observed_in_stage": "work-pre-final",
+        "tree": "90b79b0d537ba6e83e70d4f8d2f4d838f73edc61"
+      },
+      "fresh_check": "matched-via-connector-at-pre-final",
+      "manager_preceding_check": "matched",
+      "prework_connector_check": false,
+      "shell_check": "unavailable-dns",
+      "source_only_authority": true
+    }
+  },
+  "source_diagnosis": {
+    "dbus_pin_changed": false,
+    "linux_build_run": false,
+    "local_nix_version": "2.31.5",
+    "missing_staged_pin_reproduced": true,
+    "nix_expression_changed": false,
+    "run19_root_cause": "unobserved",
+    "source_pinned_local_eval": "unavailable",
+    "source_pinned_nix_version": "2.31.2"
+  },
+  "verification": {
+    "bulk_binaries_independently_authenticated": false,
+    "independent_inner_upload_byte_identical": true,
+    "manifests": 18,
+    "omitted_objects": 323,
+    "present_objects": 143,
+    "selected_records": 167,
+    "status": "verified"
+  }
+}

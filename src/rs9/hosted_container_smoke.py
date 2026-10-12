@@ -159,10 +159,30 @@ def _accept_container_output(binding, receipt):
         code = doc.get("code", "SMOKE_EXECUTION")
         if not isinstance(code, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", code):
             code = "SMOKE_EXECUTION"
-        raise ContractError(code, "Installed client verifier/smoke failed", details={
+        smoke_obs = doc.get("smoke_observation")
+        validated_obs = None
+        diagnostic_sha = None
+        if smoke_obs or code == "APPLICATION_SMOKE":
+            from rs9.pages_smoke_diagnostic import validate_smoke_observation, retain_host_smoke_diagnostic
+            validated_obs = validate_smoke_observation(smoke_obs)
+            prepared = binding.get("prepared")
+            if prepared and "scratch" in prepared:
+                try:
+                    diag_dir = Path(prepared["scratch"]).parent / "diagnostics"
+                    diagnostic_sha = retain_host_smoke_diagnostic(diag_dir, validated_obs, family=binding["family"], system=binding["system"])
+                except Exception:
+                    pass
+
+        err_details = {
             "exit_code": receipt.exit_code, "stdout_sha256": receipt.stdout_sha256,
             "stderr_sha256": receipt.stderr_sha256,
-            **safe_details(doc.get("details", {})), "family": binding["family"], "stage": "smoke"})
+            **safe_details(doc.get("details", {})), "family": binding["family"], "stage": "smoke"}
+        err = ContractError(code, "Installed client verifier/smoke failed", details=err_details)
+        if validated_obs and isinstance(diagnostic_sha, str):
+            err = err.with_details(diagnostic_sha256=diagnostic_sha)
+        if validated_obs:
+            err.smoke_observation = validated_obs
+        raise err
     result = doc.get("result")
     if (not isinstance(result, dict) or result.get("sidecar", {}).get("verified") is not True
             or not isinstance(result.get("scenarios"), list) or not result["scenarios"]
@@ -252,6 +272,9 @@ def guest_main():
         elif error.code == "SIDECAR_REPRESENTATION":
             details.update(cause="installed-runtime", missing_path="runtime/sidecar-representation")
         result.update(code=error.code, details=safe_details(details))
+        smoke_obs = getattr(error, "smoke_observation", None)
+        if smoke_obs:
+            result["smoke_observation"] = smoke_obs
     except OSError as error:
         result.update(code="SMOKE_RESOURCE", details=_logical_io(error))
     except subprocess.TimeoutExpired as error:

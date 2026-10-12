@@ -46,18 +46,34 @@ def fhs_runtime_smoke(runtime, system, prefix, env):
     return {"name": "nix-fhs-runtime-smoke", "status": "pass", "details": details}
 
 
-def command(argv, *, cwd=None, env=None, timeout=3600):
+def _observe_failure(callback, stderr, details, *, complete):
+    if callback is None:
+        return details
+    try:
+        extra = safe_details(callback(stderr, dict(details), complete=complete))
+    except Exception:
+        # Optional diagnostic custody must never mask the original producer error.
+        extra = {"diagnostic_token": "diagnostic-unavailable"}
+    return {**details, **{k: v for k, v in extra.items()
+                        if k in {"diagnostic_token", "diagnostic_sha256", "missing_path"}}}
+
+
+def command(argv, *, cwd=None, env=None, timeout=3600, on_failure=None):
     details = {"tool": Path(argv[0]).name, "substage": "nix-" + argv[1]}
     try:
         result = subprocess.run(argv, cwd=cwd, env=env, capture_output=True, timeout=timeout)
     except subprocess.TimeoutExpired as error:
-        raise ContractError("TOOL_TIMEOUT", "Hosted Nix tool timed out", details={**details,
-            "stdout_sha256": digest(error.stdout or b""), "stderr_sha256": digest(error.stderr or b"")}) from None
+        failed = {**details, "stdout_sha256": digest(error.stdout or b""),
+                  "stderr_sha256": digest(error.stderr or b"")}
+        raise ContractError("TOOL_TIMEOUT", "Hosted Nix tool timed out", details=_observe_failure(
+            on_failure, error.stderr, failed, complete=False)) from None
     except OSError:
         raise ContractError("TOOL_EXECUTION", "Hosted Nix tool unavailable", details=details) from None
     if result.returncode:
-        raise ContractError("NIX_EXECUTION", "Hosted Nix tool failed", details={**details,
-            "exit_code": result.returncode, "stdout_sha256": digest(result.stdout), "stderr_sha256": digest(result.stderr)})
+        failed = {**details, "exit_code": result.returncode, "stdout_sha256": digest(result.stdout),
+                  "stderr_sha256": digest(result.stderr)}
+        raise ContractError("NIX_EXECUTION", "Hosted Nix tool failed", details=_observe_failure(
+            on_failure, result.stderr, failed, complete=True))
     return result.stdout
 
 

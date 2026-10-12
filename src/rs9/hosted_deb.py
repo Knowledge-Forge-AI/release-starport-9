@@ -567,6 +567,7 @@ class ClientContainer:
         self.mounts = list(mounts)
         self.name = f"rs9-client-{uuid.uuid4().hex[:12]}"
         self.last_diagnostics: dict[str, Any] = {}
+        self.last_inventory_stage: str | None = None
 
     def __enter__(self) -> ClientContainer:
         command = ["docker", "run", "-d", "--name", self.name, "--platform", self.platform, "--network", "none"]
@@ -601,6 +602,7 @@ class ClientContainer:
         return ["docker", "exec", "-i", "--user", CLIENT_USER, "-e", "HOME=/tmp", self.name]
 
     def inventory(self, stage: str | None = None) -> dict[str, str]:
+        self.last_inventory_stage = stage
         self.last_diagnostics = {}
         res = run_and_parse(
             self,
@@ -742,8 +744,9 @@ def _cleanup_installed_client(client, spec, product, label, before, family):
     except (ContractError,NativePrerequisiteUnavailable,OSError) as error:
         rows.append(_gate(label+".inventory","fail",_family_error(error)))
         evidence["inventory_clean"]=False
-        evidence.update(error=_family_error(error), safe_cause=_family_error(error), counters=getattr(client,"last_diagnostics",{}).get("counters",{}))
-        rows.append(_gate(label+".client","fail",_family_error(error),family=family,stage="post-remove",safe_cause=_family_error(error),counters=evidence["counters"]))
+        counters_source = getattr(client, "last_inventory_stage", None) or "post-remove"
+        evidence.update(error=_family_error(error), safe_cause=_family_error(error), counters=getattr(client,"last_diagnostics",{}).get("counters",{}), counters_source=counters_source)
+        rows.append(_gate(label+".client","fail",_family_error(error),family=family,stage="post-remove",safe_cause=_family_error(error),counters=evidence["counters"],counters_source=counters_source))
     status=_fold(rows)
     evidence["cleanup"]={"status":status,"uninstall_status":rows[0]["status"],"inventory_status":rows[1]["status"]}
     rows.append(_gate(label+".cleanup",status))
@@ -790,6 +793,11 @@ def client_cycle(
                 from rs9.hosted_container_smoke import prepare_container_smoke
                 container_smoke = prepare_container_smoke(smoke, system, family)
                 mounts.extend(container_smoke["mounts"])
+                from rs9.pages_smoke_diagnostic import extract_smoke_context
+                product_evidence["smoke_context"] = extract_smoke_context(container_smoke)
+                if family == "apt":
+                    from rs9.pages_smoke_diagnostic import probe_apt_runtime_image
+                    product_evidence["apt_image_probe"] = probe_apt_runtime_image(host, image, platform=platform)
             with ClientContainer(host, image, platform, mounts, family) as client_ctx:
                 client = client_ctx
                 if container_smoke:
@@ -946,18 +954,40 @@ def client_cycle(
                         product_evidence["inventory_stats"]=stats
                         if family == "dnf" and "inventory_policy" in product_evidence:
                             product_evidence["inventory_policy"]["pre_install_excluded_files"] = stats.get("pre-install", {}).get("counters", {}).get("excluded_files")
+                counters_source = (getattr(client, "last_inventory_stage", None) or "post-remove") if client is not None else None
                 evidence[product] = {**product_evidence, "family": family, "stage": "post-remove"}
+                if counters_source:
+                    evidence[product]["counters_source"] = counters_source
         except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
             err_family = (err.details.get("family") if isinstance(err, ContractError) and err.details else None) or family
             err_stage = (err.details.get("stage") if isinstance(err, ContractError) and err.details else None) or current_stage
             safe_cause = _family_error(err)
             diag = getattr(client, "last_diagnostics", {}) if client is not None else {}
             err_counters = (err.details.get("counters") if isinstance(err, ContractError) and err.details else None) or diag.get("counters", {})
+            from rs9.pages_smoke_diagnostic import determine_counters_source
+            counters_source = determine_counters_source(client, err, err_stage)
             gate_extra = {
                 "family": err_family,
                 "stage": err_stage,
                 "safe_cause": safe_cause,
             }
+            if counters_source:
+                gate_extra["counters_source"] = counters_source
+            smoke_obs = getattr(err, "smoke_observation", None)
+            if err_stage != "smoke":
+                smoke_obs = None
+            if err_stage == "smoke":
+                smoke_failure = {"code": err.code, **safe_details(err.details)} if isinstance(err, ContractError) else {"code": "TOOL_EXECUTION"}
+                gate_extra["smoke_failure"] = smoke_failure
+                product_evidence["smoke_failure"] = smoke_failure
+            if smoke_obs and err_stage == "smoke":
+                from rs9.pages_smoke_diagnostic import validate_smoke_observation
+                smoke_obs = validate_smoke_observation(smoke_obs)
+                gate_extra["smoke_observation"] = smoke_obs
+                if "scenario" in smoke_obs:
+                    gate_extra["scenario"] = smoke_obs["scenario"]
+                if "cause" in smoke_obs:
+                    gate_extra["cause"] = smoke_obs["cause"]
             gate_extra["counters"] = err_counters or {}
             gate_extra["max"] = (err.details or {}).get("max", {}) if isinstance(err, ContractError) else {}
             if isinstance(err, ContractError):
@@ -984,6 +1014,10 @@ def client_cycle(
             }
             evidence.setdefault("positive_controls", {})[product] = failed_control
             evidence[product]["counters"] = err_counters or {}
+            if counters_source:
+                evidence[product]["counters_source"] = counters_source
+            if smoke_obs:
+                evidence[product]["smoke_observation"] = smoke_obs
             evidence[product]["max"] = gate_extra["max"]
             if "inventory_failure" in gate_extra:
                 evidence[product]["inventory_failure"] = gate_extra["inventory_failure"]

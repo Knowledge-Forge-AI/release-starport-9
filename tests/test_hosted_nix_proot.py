@@ -90,6 +90,9 @@ class HostedNixProotExecuteTests(unittest.TestCase):
             {"version": "2.31.2", "system": "x86_64-linux", "sha256": INSTALLER, "status": "pass"}))
         self.work = self.scratch / "work"
         self.work.mkdir()
+        (self.work / "nix").mkdir()
+        for relative in ("flake.nix", "nix/nebular-proot-experiment.nix"):
+            (self.work / relative).write_bytes((ROOT / relative).read_bytes())
         self.facts = make_facts()
         self.closure = closure_for(self.facts)
         self.facts_file = self.scratch / "facts.json"

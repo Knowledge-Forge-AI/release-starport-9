@@ -1,0 +1,452 @@
+{
+  "after_full_suites": "Producer full suites precede review; closeout source/test corrections qualified only by scoped terminal tests",
+  "closeout": {
+    "cumulative_product_paths": 17,
+    "dispatcher_finalization": "Pending dispatcher; provider did not alter index, stage, commit or publish",
+    "disposition": "amend",
+    "finding_dispositions": [
+      {
+        "disposition": "amend",
+        "id": 1,
+        "rationale": "Add Nix 2.31.2 source-derived opening-file and Cannot-build/builder-exit formats and adversarial controls; no claim of native emitted output or run19 causality"
+      },
+      {
+        "disposition": "defer",
+        "id": 2,
+        "rationale": "Structural staging defect is reproduced; installed Nix 2.31.5 differs from pinned 2.31.2. Linux evaluation/build, store-file and full-policy digest checks remain unrun"
+      },
+      {
+        "disposition": "accept",
+        "id": 3,
+        "rationale": "Disclose additive shared wheel/DEB/RPM/pacman error serialization changes, process-signal reason and omitted absent values; gate outcomes and original attempt unchanged"
+      },
+      {
+        "disposition": "amend",
+        "id": 4,
+        "rationale": "Connected Pages control uses real verify_container_nebular/output validator/diagnostic writer with scripted guest receipts; only Nebular APT client and aggregate fail; signing-dependent assembled-tree test remains skipped"
+      },
+      {
+        "disposition": "amend",
+        "id": 5,
+        "rationale": "Repair None inventory-stage fallback; retain documented exclusive first failure per family, with no overwrite or gate-success conversion"
+      },
+      {
+        "disposition": "amend",
+        "id": 6,
+        "rationale": "Unique probe container name and bounded exact removal in finally; timeout/removal-failure controls; unconfirmed cleanup retained without qualification authority"
+      }
+    ],
+    "independent_review_after_terminal_edits": false,
+    "input_verifier": {
+      "manifests": 18,
+      "omitted_objects": 323,
+      "omitted_objects_independently_authenticated": false,
+      "present_objects": 143,
+      "selected_records": 167,
+      "status": "verified"
+    },
+    "native_verification": "No source-pinned local evaluation, Linux build, runtime/application smoke, hosted workflow, or diagnostic replay executed",
+    "original_proot_reinspection": "Both run19 originals: NIX_EXECUTION/nix-build/exit 1, empty stdout hash and stderr digest only; run18 retained evaluations: four passing/five failing runtime gates each",
+    "post_review_edited_paths": [
+      "docs/live1-native-client-cont21.md",
+      "evidence/live1/cont21-verification.json",
+      "operators/live1/candidate-manifest.json",
+      "src/rs9/hosted_deb.py",
+      "src/rs9/nix_build_diagnostic.py",
+      "src/rs9/pages_smoke_diagnostic.py",
+      "tests/test_nix_build_diagnostic.py",
+      "tests/test_pages_smoke_diagnostic.py"
+    ],
+    "preservation": {
+      "index_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "index_unchanged": true,
+      "protected_count": 508,
+      "protected_inventory_sha256": "ae590e389af257fe72f7c0b73add838cd44b4151fadfcb1f3d953cd2df28ff48",
+      "seven_incumbent_tests": true,
+      "unchanged_outside_candidate_delta": true
+    },
+    "prior_stage_deltas": "All 17 supplied source product additions/modifications accepted with terminal amendments; operational metadata and unrelated .serena state preserved",
+    "reviewed_candidate_tree": "46e6956fed6523b8c272d9d1f51185837cf2b421",
+    "scoped_source_tests": [
+      {
+        "elapsed_seconds": 23.99,
+        "error_ids": [],
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "modules": [
+          "tests.test_nix_build_diagnostic",
+          "tests.test_hosted_nix",
+          "tests.test_hosted_nix_proot",
+          "tests.test_nix_proot_dbus_cont20",
+          "tests.test_nix_proot_dbus_command",
+          "tests.test_nix_proot_dbus_probe",
+          "tests.test_nix_proot_audit",
+          "tests.test_nix_proot_signals_cont19",
+          "tests.test_nix_proot_layers",
+          "tests.test_nix_proot_stderr",
+          "tests.test_nix_proot_processes",
+          "tests.test_nix_proot_wait",
+          "tests.test_nix_proot_launch",
+          "tests.test_nix_proot",
+          "tests.test_application_smoke_diagnostic",
+          "tests.test_hosted_smoke",
+          "tests.test_hosted_container_smoke",
+          "tests.test_pages_smoke_diagnostic",
+          "tests.test_hosted_deb",
+          "tests.test_hosted_wheel_clients",
+          "tests.test_rpm_client_runtime"
+        ],
+        "skip_ids": [
+          "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt",
+          "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+        ],
+        "skips": 2,
+        "success": true,
+        "tests": 517,
+        "umask": "022",
+        "unraisable_exceptions": [],
+        "warnings_policy": "error"
+      },
+      {
+        "elapsed_seconds": 23.068,
+        "error_ids": [],
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "modules": [
+          "tests.test_nix_build_diagnostic",
+          "tests.test_hosted_nix",
+          "tests.test_hosted_nix_proot",
+          "tests.test_nix_proot_dbus_cont20",
+          "tests.test_nix_proot_dbus_command",
+          "tests.test_nix_proot_dbus_probe",
+          "tests.test_nix_proot_audit",
+          "tests.test_nix_proot_signals_cont19",
+          "tests.test_nix_proot_layers",
+          "tests.test_nix_proot_stderr",
+          "tests.test_nix_proot_processes",
+          "tests.test_nix_proot_wait",
+          "tests.test_nix_proot_launch",
+          "tests.test_nix_proot",
+          "tests.test_application_smoke_diagnostic",
+          "tests.test_hosted_smoke",
+          "tests.test_hosted_container_smoke",
+          "tests.test_pages_smoke_diagnostic",
+          "tests.test_hosted_deb",
+          "tests.test_hosted_wheel_clients",
+          "tests.test_rpm_client_runtime"
+        ],
+        "skip_ids": [
+          "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt",
+          "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family"
+        ],
+        "skips": 2,
+        "success": true,
+        "tests": 517,
+        "umask": "077",
+        "unraisable_exceptions": [],
+        "warnings_policy": "error"
+      }
+    ],
+    "source_custody_tests": [
+      {
+        "error_ids": [],
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "skips": 0,
+        "success": true,
+        "tests": 13,
+        "umask": "022",
+        "warnings_policy": "error"
+      },
+      {
+        "error_ids": [],
+        "errors": 0,
+        "failure_ids": [],
+        "failures": 0,
+        "skips": 0,
+        "success": true,
+        "tests": 13,
+        "umask": "077",
+        "warnings_policy": "error"
+      }
+    ],
+    "source_suite_scope": "Affected Nix, smoke, installed-client modules only; complete suite not rerun after review",
+    "source_test_inventory_sha256": "5368894b90cdf4c1801c13b3456749678bb13295c7e875e3965ce3f76591fc59",
+    "stage": "closeout",
+    "terminal_custody_checks": "13 inventory/readiness/hygiene tests passed per umask before this final evidence update; final exact inventory/flags/delta/source-preservation checks are reported in the terminal result",
+    "upstream_format_references": [
+      "https://github.com/NixOS/nix/blob/2.31.2/src/libutil/file-system.cc",
+      "https://github.com/NixOS/nix/blob/2.31.2/src/libstore/unix/build/derivation-builder.cc",
+      "https://github.com/NixOS/nix/blob/2.31.2/src/libutil/unix/processes.cc"
+    ],
+    "verification_iterations": "Source-derived format and timeout-cleanup controls failed before correction; connected-control scratch identity corrected; both complete diagnostic modules then passed 30 tests",
+    "worker": {
+      "reason": "Small tightly coupled terminal corrections; no further substantive review permitted",
+      "status": "declined"
+    }
+  },
+  "corrected_intermediate_failures": [
+    "Incumbent bare test import requires tests import root; corrected runner, incumbent body unchanged",
+    "Pages synthetic DNF absence control requires exact rpm absence stdout; corrected fixture",
+    "Candidate manifest initial changed-path list omitted its own newly modified path; regenerated inventory before full suites"
+  ],
+  "focused_evidence": {
+    "integrated_focused_before_last_edits": {
+      "errors": 0,
+      "failures": 0,
+      "skips": 1,
+      "tests": 205
+    },
+    "nix_related": {
+      "errors": 0,
+      "failures": 0,
+      "tests": 291,
+      "umask": "022"
+    }
+  },
+  "full_live1_qualification": false,
+  "full_source_suites": [
+    {
+      "elapsed_seconds": 89.813,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "passed": 2032,
+      "platform": "Darwin",
+      "python": "3.13.12",
+      "runner_tests": 2053,
+      "skip_ids": [
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported",
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read",
+        "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available",
+        "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+        "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+        "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+        "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux",
+        "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux",
+        "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt",
+        "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+        "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+        "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive",
+        "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references",
+        "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available",
+        "setUpClass (tests.test_signing_fixture.SigningFixtureTests)"
+      ],
+      "skips": 22,
+      "source_test_inventory_sha256": "4c28acbe28911fc08da356bfe07dc9bce20805dcd2861e7ee833d45a171c5ad7",
+      "success": true,
+      "umask": "022",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    },
+    {
+      "elapsed_seconds": 91.696,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "passed": 2032,
+      "platform": "Darwin",
+      "python": "3.13.12",
+      "runner_tests": 2053,
+      "skip_ids": [
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported",
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read",
+        "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available",
+        "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+        "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+        "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+        "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux",
+        "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux",
+        "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt",
+        "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+        "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+        "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive",
+        "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references",
+        "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available",
+        "setUpClass (tests.test_signing_fixture.SigningFixtureTests)"
+      ],
+      "skips": 22,
+      "source_test_inventory_sha256": "4c28acbe28911fc08da356bfe07dc9bce20805dcd2861e7ee833d45a171c5ad7",
+      "success": true,
+      "umask": "077",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    }
+  ],
+  "full_source_suites_state": "producer-before-pre-final-review-and-terminal-amendments",
+  "hosted_run20_authorized": false,
+  "limits": [
+    "Run19 causal stderr text absent",
+    "Omitted bulk binaries not independently authenticated",
+    "Pages smoke cause unobserved",
+    "Initial shell remote check failed; connector parity verified later at pre-final",
+    "Terminal edits did not receive an additional independent review; pinned native build and native Pages smoke remain unrun"
+  ],
+  "native_execution": {
+    "diagnostic_replay": false,
+    "linux_nix_build": false,
+    "native_pages_smoke": false,
+    "required_nix_gates": "still-unqualified",
+    "source_pinned_local_nix_eval": "unavailable-version-mismatch"
+  },
+  "parent_verification": {
+    "nix_first_build": "one failing build after metadata; no runtime and no replay",
+    "outer_process_controls": "Real exit 255 versus real SIGTERM; exit 143 remains exit",
+    "pages_family_orchestration": "Exactly Nebular APT client and aggregate APT fail; other clients pass",
+    "passing_control": "No failure fields and all clients pass",
+    "required_gate_outcomes": "Unchanged; diagnostic evidence never qualifies"
+  },
+  "production_enabled": false,
+  "proposal_disposition": "amend",
+  "publication_authority": false,
+  "published_linux_nix_ready": false,
+  "python_structure": {
+    "decision": "Scoped extension of existing diagnostic responsibility in legacy hosted modules; new projection and custody helpers are separate modules. No unrelated refactor.",
+    "files": [
+      {
+        "after_physical_lines": 421,
+        "before_physical_lines": 405,
+        "path": "src/rs9/hosted_nix.py"
+      },
+      {
+        "after_physical_lines": 272,
+        "before_physical_lines": 261,
+        "path": "src/rs9/hosted_nix_proot.py"
+      },
+      {
+        "after_physical_lines": 147,
+        "before_physical_lines": 0,
+        "path": "src/rs9/nix_build_diagnostic.py"
+      },
+      {
+        "after_physical_lines": 359,
+        "before_physical_lines": 337,
+        "path": "src/rs9/application_smoke_diagnostic.py"
+      },
+      {
+        "after_physical_lines": 309,
+        "before_physical_lines": 286,
+        "path": "src/rs9/hosted_container_smoke.py"
+      },
+      {
+        "after_physical_lines": 2227,
+        "before_physical_lines": 2193,
+        "path": "src/rs9/hosted_deb.py"
+      },
+      {
+        "after_physical_lines": 178,
+        "before_physical_lines": 0,
+        "path": "src/rs9/pages_smoke_diagnostic.py"
+      }
+    ],
+    "measurement": "APG fallback physical line counts"
+  },
+  "remaining_native_gates": {
+    "experimental_proot": "build-and-runtime-unproven",
+    "foundation3": {
+      "blocked_plans": 16,
+      "production_receipts": 0
+    },
+    "pages_apt_nebular": "APPLICATION_SMOKE-unresolved",
+    "promotion_restrictions": [
+      "linux-wheel-production-promotion-compatibility-unproven",
+      "rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"
+    ],
+    "public_https": "hostname-verification-62-state-unknown",
+    "raw_rpmlint": "exit-64",
+    "required_linux_nix": "NIX_FHS_USERNS/uid-map-denied-both-systems"
+  },
+  "remote_parity": {
+    "branch": "main",
+    "head": "0bb571c09777a9ba041313b2b8d3a4b6370bd4a1",
+    "method": "github-connector-GET-branches-main",
+    "observed_in_stage": "closeout-GET-branches-main-confirmed",
+    "tree": "90b79b0d537ba6e83e70d4f8d2f4d838f73edc61"
+  },
+  "review": {
+    "additional_review": false,
+    "external_reviewer_invoked": false,
+    "plan": "reviewed_with_findings-advisory",
+    "post_review_edits": [
+      "docs/live1-native-client-cont21.md",
+      "evidence/live1/cont21-verification.json",
+      "operators/live1/candidate-manifest.json",
+      "src/rs9/hosted_deb.py",
+      "src/rs9/nix_build_diagnostic.py",
+      "src/rs9/pages_smoke_diagnostic.py",
+      "tests/test_nix_build_diagnostic.py",
+      "tests/test_pages_smoke_diagnostic.py"
+    ],
+    "pre_final": "reviewed_with_findings-advisory-dispatcher-owned",
+    "terminal_disposition": "amend"
+  },
+  "schema": "rs9.cont21-verification.v1",
+  "seven_incumbent_tests": {
+    "bodies_ast_unchanged": true,
+    "count": 7,
+    "module": "tests.test_hosted_container_smoke.DisjointFilesystemTests",
+    "names": [
+      "test_real_guest_only_reads_and_commands_succeed",
+      "test_guest_source_readback_detects_changed_transport",
+      "test_unexpected_guest_exception_is_returned_without_private_message",
+      "test_smoke_nonzero_timeout_and_missing_receipt_have_distinct_evidence",
+      "test_malformed_diagnostic_preserves_primary_guest_failure",
+      "test_cleanup_runs_after_smoke_failure_and_preserves_primary_error",
+      "test_output_binding_and_symlink_cannot_qualify"
+    ]
+  },
+  "source_suite_command": "rtk python3 -B -W error -c <inline unittest discovery, process-local umask, src/tests/project import roots> 022|077",
+  "source_tests_inventory_sha256": "4c28acbe28911fc08da356bfe07dc9bce20805dcd2861e7ee833d45a171c5ad7",
+  "source_tests_inventory_sha256_state": "producer-before-terminal-amendments",
+  "status": "bounded-terminal-source-candidate",
+  "terminal_artifact_check": "Producer and closeout source-custody tests retained separately; final evidence update regenerates inventory and leaves exact final readback to the terminal result",
+  "terminal_scoped_checks": {
+    "errors": 0,
+    "failures": 0,
+    "git_diff_check": "pass",
+    "modules": [
+      "tests.test_candidate_inventory",
+      "tests.test_candidate_readiness",
+      "tests.test_hygiene"
+    ],
+    "tests": 13,
+    "umask": "077",
+    "warnings_policy": "error"
+  },
+  "test_loader": "unittest.defaultTestLoader.discover tests/test_*.py with top_level_dir=project",
+  "tooling": {
+    "environment_changed": false,
+    "gain": "tracking-database-unavailable-in-sandbox",
+    "rewrite_check": "ask-policy-rewrite-observed",
+    "rtk_version": "0.43.0"
+  },
+  "warning_policy": "error",
+  "worker": {
+    "cleanup_proven": true,
+    "effective_model": "not-observed",
+    "internal_checkpoint": false,
+    "kind": "gemini",
+    "parent_disposition": "partial-adopted-with-amendments",
+    "requested_profile": "gemini-3.8-flash-high",
+    "status": "used"
+  }
+}

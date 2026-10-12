@@ -287,3 +287,71 @@ class DisjointFilesystemTests(unittest.TestCase):
         path.symlink_to(self.binding['prepared']['source']/'tools/sidecar-common.mjs')
         with self.assertRaises(ContractError):
             verify_container_nebular(Client(),self.binding,user='65534:65534')
+
+    def test_smoke_observation_carried_and_validated_host_side(self):
+        """Hostile observation in guest result.json is validated and retained in host diagnostics."""
+        diag_dir = Path(self.binding['prepared']['scratch']).parent / 'diagnostics'
+        hostile_obs = {
+            "scenario": "C", "cause": "dbus-session-failure", "raw_returncode": 127,
+            "stdout_bytes": 0, "stderr_bytes": 55, "stdout_sha256": "0" * 64,
+            "stderr_sha256": "1" * 64, "stream_capture_complete": True,
+            "log_categories": ["dbus-session-conf-missing", "invalid_cat"],
+            "problem_codes": ["valid_code", "/private/operator/secret"],
+            "raw_output": "untrusted raw process string",
+            "elapsed_ms": 250,
+        }
+        res_data = {
+            "schema": SCHEMA, "request_sha256": self.binding["request_sha256"],
+            "family": "pacman", "system": "x86_64-linux", "uid": 65534,
+            "status": "fail", "code": "APPLICATION_SMOKE",
+            "details": {"reason_token": "process-nonzero"},
+            "smoke_observation": hostile_obs,
+        }
+        (self.binding['output'] / 'result.json').write_bytes(canonical(res_data))
+
+        class Client:
+            def exec(self, argv, **kwargs):
+                return CommandReceipt(argv, 2, b"", b"", executed=True)
+
+        with self.assertRaises(ContractError) as caught:
+            verify_container_nebular(Client(), self.binding, user='65534:65534')
+
+        self.assertEqual(caught.exception.code, 'APPLICATION_SMOKE')
+        obs = getattr(caught.exception, "smoke_observation", None)
+        self.assertIsNotNone(obs)
+        self.assertEqual(obs["cause"], "dbus-session-failure")
+        self.assertEqual(obs["scenario"], "C")
+        self.assertEqual(obs["raw_returncode"], 127)
+        self.assertEqual(obs["exit_code"], 127)
+        self.assertIsNone(obs["signal"])
+        self.assertEqual(obs["log_categories"], ["dbus-session-conf-missing"])
+        self.assertEqual(obs["problem_codes"], ["valid_code", "withheld-token"])
+        self.assertNotIn("raw_output", obs)
+
+        # Host diagnostic artifact was written
+        self.assertTrue((diag_dir / "application-smoke-failure-pacman.json").is_file())
+        retained = json.loads((diag_dir / "application-smoke-failure-pacman.json").read_bytes())
+        self.assertEqual(retained["schema"], "rs9.application-smoke-diagnostic.v1alpha1")
+        self.assertEqual(retained["cause"], "dbus-session-failure")
+
+    def test_writer_failure_cannot_mask_original_smoke(self):
+        """Host diagnostic writer failure (e.g. disk write failure) cannot mask primary smoke failure."""
+        res_data = {
+            "schema": SCHEMA, "request_sha256": self.binding["request_sha256"],
+            "family": "pacman", "system": "x86_64-linux", "uid": 65534,
+            "status": "fail", "code": "APPLICATION_SMOKE",
+            "details": {"reason_token": "process-nonzero"},
+            "smoke_observation": {"scenario": "C", "cause": "process-nonzero", "raw_returncode": 1},
+        }
+        (self.binding['output'] / 'result.json').write_bytes(canonical(res_data))
+
+        class Client:
+            def exec(self, argv, **kwargs):
+                return CommandReceipt(argv, 2, b"", b"", executed=True)
+
+        with patch("rs9.pages_smoke_diagnostic.retain_host_smoke_diagnostic", side_effect=Exception("Disk full")):
+            with self.assertRaises(ContractError) as caught:
+                verify_container_nebular(Client(), self.binding, user='65534:65534')
+
+        self.assertEqual(caught.exception.code, 'APPLICATION_SMOKE')
+        self.assertIsNotNone(caught.exception.smoke_observation)
