@@ -50,8 +50,8 @@ def extract_log_categories(stdout, stderr, exit_code=None):
     return sorted(set(categories)) or ["unclassified"]
 
 
-def classify_smoke_cause(*, exit_code, timed_out, receipt_error, log_categories,
-                         has_problems=False, receipt_status=None):
+def classify_smoke_cause(*, exit_code=None, signal=None, timed_out=False, receipt_error=None,
+                         log_categories=(), has_problems=False, receipt_status=None):
     if timed_out:
         return "process-timeout"
     if "dbus-session-conf-missing" in log_categories or "dbus-daemon-error" in log_categories:
@@ -63,6 +63,8 @@ def classify_smoke_cause(*, exit_code, timed_out, receipt_error, log_categories,
             return category
     if "module-not-found" in log_categories:
         return "harness-error"
+    if signal is not None:
+        return "process-signal"
     if exit_code is not None and exit_code < 0:
         return "process-signal"
     if exit_code:
@@ -227,21 +229,30 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
         error, out, err = "process-timeout", expired.output or b"", expired.stderr or b""
     except OSError:
         error = "harness-error"
-    fields = {"scenario": scenario, "raw_returncode": rc, "exit_code": rc if rc is not None and rc >= 0 else None,
-        "signal": -rc if rc is not None and rc < 0 else None, "elapsed_ms": int((time.monotonic()-start)*1000),
+    if rc is not None and rc < 0:
+        sig_val = -rc
+        ec_val = None
+    elif rc is not None and rc >= 0:
+        sig_val = None
+        ec_val = rc
+    else:
+        sig_val = None
+        ec_val = None
+    fields = {"scenario": scenario, "raw_returncode": rc, "exit_code": ec_val,
+        "signal": sig_val, "elapsed_ms": int((time.monotonic()-start)*1000),
         "stdout_bytes": sizes[0] if sizes else len(out), "stderr_bytes": sizes[1] if sizes else len(err),
         "stdout_sha256": digest(out), "stderr_sha256": digest(err),
-        "stream_capture_complete": error != "process-output-limit", "error": error,
+        "stream_capture_complete": error not in {"process-output-limit", "process-timeout", "harness-error"}, "error": error,
         "cleanup_error": cleanup_error, "child_reaped": child_reaped,
         "log_categories": extract_log_categories(out, err, rc)}
     record, receipt_error, codes = read_and_validate_receipt(evidence / (platform+"-"+scenario+".run.json"), fields)
     fields["receipt"] = sanitize_receipt_summary(record, fields.pop("receipt_identity"))
     fields["receipt_error"], fields["problem_codes"] = receipt_error, codes
-    fields["cause"] = error or classify_smoke_cause(exit_code=rc, timed_out=False, receipt_error=receipt_error,
+    fields["cause"] = error or classify_smoke_cause(exit_code=ec_val, signal=sig_val, timed_out=(error == "process-timeout"), receipt_error=receipt_error,
         log_categories=fields["log_categories"], has_problems=bool(codes))
     if cleanup_error and fields["cause"] == "unknown":
         fields["cause"] = "process-cleanup-failure"
-    fields["reason_token"] = error or ("process-nonzero" if rc else receipt_error) or cleanup_error or "pass"
+    fields["reason_token"] = error or ("process-signal" if sig_val is not None else ("process-nonzero" if ec_val else receipt_error)) or cleanup_error or "pass"
     fields["failed"] = bool(error or rc != 0 or receipt_error or cleanup_error)
     if extras:
         raw, meta, log_error = _read_regular(evidence / "xvfb-error.log", MAX_LOG)
@@ -271,14 +282,21 @@ def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
 
 def _failure_details(fields, *, extras, receipt_name):
     keys = ("exit_code", "stdout_sha256", "stderr_sha256", "reason_token")
-    details = {k: fields[k] for k in keys}
-    if fields["error"] == "process-timeout":
+    details = {k: fields[k] for k in keys if fields.get(k) is not None}
+    if fields.get("error") == "process-timeout":
         details["exception_type"] = "TimeoutExpired"
-        details.pop("exit_code")
+        details.pop("exit_code", None)
     if extras:
         details.update(scenario=fields["scenario"], cause=fields["cause"])
-    elif fields["reason_token"] == "receipt-missing":
+    elif fields.get("reason_token") == "receipt-missing":
         details.update(cause="smoke-evidence", missing_path="output/evidence/" + receipt_name)
+    else:
+        if fields.get("scenario"):
+            details["scenario"] = fields["scenario"]
+        if fields.get("cause"):
+            details["cause"] = fields["cause"]
+    details.setdefault("scenario", fields["scenario"])
+    details["elapsed_ms"] = fields["elapsed_ms"]
     return details
 
 
@@ -327,11 +345,15 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
         # separate diagnostic replay uses the instrumented process/argv path.
         fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, False, session_bus_argv=session_bus_argv)
         if fields["failed"]:
+            from rs9.pages_smoke_diagnostic import validate_smoke_observation
+            observation = validate_smoke_observation(fields)
             details = _failure_details(fields, extras=extras, receipt_name=platform+"-"+scenario+".run.json")
             if extras:
                 details["diagnostic_sha256"] = _retain_failure(prepared, system, platform, scenario,
                     launch_root, prefix, env, fields, scenarios[index+1:], session_bus_argv=session_bus_argv)
-            raise ContractError("APPLICATION_SMOKE", "Released application-aware smoke failed", details=details)
+            err = ContractError("APPLICATION_SMOKE", "Released application-aware smoke failed", details=details)
+            err.smoke_observation = observation
+            raise err
         runs.append({"scenario": scenario, "receipt_sha256": fields["receipt"]["sha256"],
                      "executable_sha256": fields["receipt"]["executable_sha256"]})
     return runs

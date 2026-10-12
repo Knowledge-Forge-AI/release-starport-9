@@ -1,5 +1,6 @@
 """Hosted execution for the experimental Linux PRoot Nebular runtime evaluation (candidate-only, diagnostic)."""
 import json
+from functools import partial
 import os
 from pathlib import Path
 import time
@@ -12,6 +13,7 @@ from rs9.hosted_platforms import select_payload
 from rs9.hosted_smoke import prepare_smoke, snapshot_nebular_runtime, verify_nebular_runtime
 from rs9.materialize import resolve_launcher
 from rs9.nix_installer import get_installer_pin
+from rs9.nix_build_diagnostic import experiment_source_identity, retain_failure, stage_experiment_pin
 from rs9.nix_proot import (
     GuestRuntime,
     evaluate_proot_experiment,
@@ -146,23 +148,32 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
         raise ContractError("NIX_INSTALLER", "Installer differs from source-pinned checksum")
 
     source, capture_input, _products = prepare_input(context)
+    staged_pin = stage_experiment_pin(repository, source)
+    provenance = {"system": system, "pin_file": staged_pin,
+                  "nixpkgs_revision": targets["nixpkgs_revision"],
+                  "nixpkgs_nar_hash": targets["nixpkgs_nar_hash"],
+                  "installer_sha256": expected_pin,
+                  "staged_source": experiment_source_identity(repository, source)}
+    on_failure = partial(retain_failure, diagnostic_root, provenance)
     overrides = [
         "--override-input", "rs9-capture", "path:" + str(capture_input),
         "--override-input", "nixpkgs", "github:NixOS/nixpkgs/" + targets["nixpkgs_revision"],
     ]
-    metadata = json.loads(command(["nix", "flake", "metadata", "--json", *overrides, str(source)], timeout=600))
+    metadata = json.loads(command(["nix", "flake", "metadata", "--json", *overrides, str(source)],
+                                  timeout=600, on_failure=on_failure))
     locked = metadata["locks"]["nodes"]["nixpkgs"]["locked"]
     if locked["rev"] != targets["nixpkgs_revision"] or locked["narHash"] != targets["nixpkgs_nar_hash"]:
         raise ContractError("NIX_PIN", "Actual fetched nixpkgs identity differs from source")
 
     # Only the experimental output is built; legacy candidates, checks and Darwin outputs are never evaluated here.
     attr = str(source) + "#experiments." + system + "." + EXPERIMENT
-    built = json.loads(command(["nix", "build", "--json", "--no-link", *overrides, attr], timeout=3600))
+    built = json.loads(command(["nix", "build", "--json", "--no-link", *overrides, attr],
+                               timeout=3600, on_failure=on_failure))
     if not isinstance(built, list) or len(built) != 1 or "out" not in built[0]["outputs"]:
         raise ContractError("NIX_OUTPUT", "One actual experimental output required")
     out_path = built[0]["outputs"]["out"]
     facts_built = json.loads(command(["nix", "build", "--json", "--no-link", *overrides, attr + ".runtimeFacts"],
-                                     timeout=600))
+                                     timeout=600, on_failure=on_failure))
     if not isinstance(facts_built, list) or len(facts_built) != 1:
         raise ContractError("NIX_PROOT_FACTS", "One pinned facts output required")
     try:

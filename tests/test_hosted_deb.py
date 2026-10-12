@@ -2177,6 +2177,84 @@ class Repair1PublicModesAndAptReadabilityTests(unittest.TestCase):
         all_readable_f = all(a.get("readable") is True for t in apt_targets_f for a in t.get("ancestors", []) if a.get("path") == t.get("target"))
         self.assertFalse(all_readable_f)
 
+    def test_counters_source_records_actual_inventory_stage_before_and_after_install(self):
+        """Review findings: test both before/after-install inventory failures record counters_source."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td).resolve()
+            # 1. Before-install inventory failure
+            docker_pre = ScriptedDocker(fail_pre_inventory=True)
+            host_pre = hd.RecordingRunner(host_runner(docker_pre, ExecutedMock))
+            spec = hd.apt_spec(root / "apt", root / "key.gpg", "amd64", public_fingerprint="A" * 40)
+            spec["query"] = lambda p: ["dpkg-query", "-W", p]
+            rows_pre, ev_pre = hd.client_cycle(
+                host_pre, spec, image="fixture", platform="linux/amd64",
+                products=[hd.REQUIRED_PRODUCTS[0]], repository=root, prefix="apt-client"
+            )
+            prod_pre = ev_pre[hd.REQUIRED_PRODUCTS[0]]
+            self.assertEqual(prod_pre["stage"], "pre-install")
+            self.assertEqual(prod_pre["counters_source"], "pre-install")
+            gate_pre = next(r for r in rows_pre if r["name"].endswith(".client"))
+            self.assertEqual(gate_pre["counters_source"], "pre-install")
+
+            # 2. After-install inventory failure in cleanup
+            docker_post = ScriptedDocker(fail_post_inventory=True)
+            host_post = hd.RecordingRunner(host_runner(docker_post, ExecutedMock))
+            rows_post, ev_post = hd.client_cycle(
+                host_post, spec, image="fixture", platform="linux/amd64",
+                products=[hd.REQUIRED_PRODUCTS[0]], repository=root, prefix="apt-client"
+            )
+            prod_post = ev_post[hd.REQUIRED_PRODUCTS[0]]
+            self.assertEqual(prod_post["counters_source"], "post-remove")
+            gate_post = next(r for r in rows_post if r["name"].endswith(".client"))
+            self.assertEqual(gate_post["counters_source"], "post-remove")
+
+    def test_smoke_failure_records_counters_source_post_remove_and_original_client_gate(self):
+        """Review findings: smoke failure triggers cleanup post-remove, overwriting last_diagnostics; original client gate fails."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td).resolve()
+            docker = ScriptedDocker()
+            host = hd.RecordingRunner(host_runner(docker, ExecutedMock))
+            spec = hd.apt_spec(root / "apt", root / "key.gpg", "amd64", public_fingerprint="A" * 40)
+            spec["query"] = lambda p: ["dpkg-query", "-W", p]
+
+            binding = {
+                "output": root / "output", "request_sha256": "0" * 64, "family": "apt",
+                "system": "x86_64-linux", "mounts": [],
+                "prepared": {"scratch": root / "smoke", "source": root, "tools": root, "records": []}
+            }
+            binding["output"].mkdir(parents=True, exist_ok=True)
+            binding["prepared"]["scratch"].mkdir(parents=True, exist_ok=True)
+
+            smoke_err = ContractError("APPLICATION_SMOKE", "Smoke failed", details={"scenario": "C", "cause": "dbus-session-failure"})
+            smoke_err.smoke_observation = {
+                "scenario": "C", "cause": "dbus-session-failure", "raw_returncode": 127,
+                "exit_code": 127, "signal": None, "stdout_bytes": 0, "stderr_bytes": 30,
+                "stdout_sha256": "0" * 64, "stderr_sha256": "1" * 64, "stream_capture_complete": True,
+                "log_categories": ["dbus-session-conf-missing"], "problem_codes": [], "elapsed_ms": 100,
+                "reason_token": "dbus-session-failure",
+            }
+
+            with patch("rs9.hosted_container_smoke.prepare_container_smoke", return_value=binding), \
+                 patch("rs9.hosted_container_smoke.verify_container_nebular", side_effect=smoke_err), \
+                 patch("rs9.hosted_deb.execute_probes", return_value=[]):
+                rows, evidence = hd.client_cycle(
+                    host, spec, image="fixture", platform="linux/amd64",
+                    products=[hd.NATIVE_PRODUCT], repository=root, prefix="apt-client",
+                    smoke={"fixture": True}, system="x86_64-linux"
+                )
+
+            failed = [r for r in rows if r["status"] == "fail"]
+            # Preserve the original client-cycle gate set.
+            self.assertEqual(len(failed), 1)
+            failed_names = {r["name"] for r in failed}
+            self.assertEqual(failed_names, {
+                f"apt-client.{hd.NATIVE_PRODUCT}.client",
+            })
+
+            product = evidence[hd.NATIVE_PRODUCT]
+            self.assertEqual(product["counters_source"], "post-remove")
+            self.assertEqual(product["smoke_observation"]["cause"], "dbus-session-failure")
+
 
 if __name__ == "__main__":
     unittest.main()
