@@ -5,23 +5,21 @@
   "bootstrap_role": "migration-configuration-only-not-fresh-release-authority",
   "candidate_adoption_ready": false,
   "changed_paths": [
-    "docs/live1-native-client-cont21.md",
-    "evidence/live1/cont21-input-evidence.json",
-    "evidence/live1/cont21-verification.json",
+    "docs/live1-native-client-cont22.md",
+    "evidence/live1/cont22-input-evidence.json",
+    "evidence/live1/cont22-verification.json",
     "operators/live1/candidate-manifest.json",
     "src/rs9/application_smoke_diagnostic.py",
     "src/rs9/hosted_container_smoke.py",
     "src/rs9/hosted_deb.py",
-    "src/rs9/hosted_nix.py",
-    "src/rs9/hosted_nix_proot.py",
-    "src/rs9/nix_build_diagnostic.py",
+    "src/rs9/nix_proot.py",
+    "src/rs9/nix_proot_runtime_diagnostic.py",
+    "src/rs9/nix_proot_signals.py",
     "src/rs9/pages_smoke_diagnostic.py",
-    "tests/test_application_smoke_diagnostic.py",
-    "tests/test_hosted_container_smoke.py",
-    "tests/test_hosted_deb.py",
-    "tests/test_hosted_nix_proot.py",
-    "tests/test_nix_build_diagnostic.py",
-    "tests/test_pages_smoke_diagnostic.py"
+    "src/rs9/smoke_stream_tokens.py",
+    "tests/test_cont22_diagnostics.py",
+    "tests/test_nix_proot_runtime_diagnostic.py",
+    "tests/test_smoke_stream_tokens.py"
   ],
   "configuration_hashes": [
     {
@@ -458,6 +456,13 @@
       "size": 12704
     },
     {
+      "git_blob": "cd2b77b3e1f98f0d1385c12c603ff3e5078bac61",
+      "mode": "100644",
+      "path": "docs/live1-native-client-cont22.md",
+      "sha256": "c1ba0e065239cb6259667e9d981d96d167610a9260bbe63b82b4949a7d3a84b8",
+      "size": 10883
+    },
+    {
       "git_blob": "2910bb27b786a3b59b36a3d8e1ceba8e6b1b0eea",
       "mode": "100644",
       "path": "docs/live1-native-client-cont9.md",
@@ -764,6 +769,20 @@
       "path": "evidence/live1/cont21-verification.json",
       "sha256": "e83cd4cd984c26e8105c5b446b73eb91d394d01db6132a1b08e709ee0850def1",
       "size": 21152
+    },
+    {
+      "git_blob": "5591547e04999ab792116891caadb163ef4afc3f",
+      "mode": "100644",
+      "path": "evidence/live1/cont22-input-evidence.json",
+      "sha256": "a34842261b9353acbdae30f0c8d9e3c66f4dd3f9dd0d682cf891029d76aa182d",
+      "size": 24431
+    },
+    {
+      "git_blob": "d769c6410b918ec3972b03ce9eb4f5a18635dc40",
+      "mode": "100644",
+      "path": "evidence/live1/cont22-verification.json",
+      "sha256": "a08e11103829aa2938b263765405d52034d37bea1761d2c4d80d7b50c2a6a1b8",
+      "size": 34682
     },
     {
       "git_blob": "8d6235ee7a9deb7807cabed204ddf0ce280369aa",
@@ -1312,11 +1331,11 @@
       "size": 17893
     },
     {
-      "git_blob": "1f345f21f3c4eb9676da3dad5ab33bb9d67a78ef",
+      "git_blob": "ca96a2a9e6775547994d3b3dc082de8edd5d4a39",
       "mode": "100644",
       "path": "src/rs9/application_smoke_diagnostic.py",
-      "sha256": "bfc058b7dc5a084b7fe77e06819a31cbb409d2d5b015488eb65ed6661887ef3f",
-      "size": 18545
+      "sha256": "56f72112ff84b20e5254fc985ee0cae5c34d5bb54285fbe07c4bc5b06976fe91",
+      "size": 19024
     },
     {
       "git_blob": "85207de59d37210203f4f6ebbf220b29f623be41",
@@ -1585,11 +1604,11 @@
       "size": 13581
     },
     {
-      "git_blob": "fe8606d1bc18a672381497e2d81edc65a940d302",
+      "git_blob": "946aaeb8e7d72d4be2d84a15dad37fc20b847563",
       "mode": "100644",
       "path": "src/rs9/hosted_container_smoke.py",
-      "sha256": "5ccab01ed405ed0608453f300915039b0e768e9f8369e6684a1d5e283bd965c1",
-      "size": 17440
+      "sha256": "4537802de31015d54160f44dec278ed7e8f95c93bc595625eb79acdb3e525ccb",
+      "size": 17466
     },
     {
       "git_blob": "7626beeda1761e6487a7e11ca3e8e030e998f710",
@@ -1606,11 +1625,11 @@
       "size": 9165
     },
     {
-      "git_blob": "f7461fb77f791f836ffa8de5c3059b83f504a3a5",
+      "git_blob": "49d25085734512811f0ccda0b2c3adb759278ca3",
       "mode": "100644",
       "path": "src/rs9/hosted_deb.py",
-      "sha256": "982f692b91a9186a78c8921bbe3012f32264dd6d8251bc43c23f084da6da54a2",
-      "size": 122566
+      "sha256": "146004abc4ac55e82fb5c9819d885301e0e9ecb65bce47304c28133f090c29d5",
+      "size": 122581
     },
     {
       "git_blob": "cde2e0fc7bb8c79ef43a49e94d79da89485779e8",
@@ -1753,11 +1772,11 @@
       "size": 8064
     },
     {
-      "git_blob": "811983c979542c565f03ac9880435141bf3d886c",
+      "git_blob": "d8edd17040447a99fee12cd5bb60d8663cd1df35",
       "mode": "100644",
       "path": "src/rs9/nix_proot.py",
-      "sha256": "a118825eacfa4d85fa37cb7f3b611697ce776412016815c49d3ed71ed2320b83",
-      "size": 69583
+      "sha256": "9982c11dbb20183f2a45c56931f0d5a73126bd7d1296f1f948ad30beb6db1e6c",
+      "size": 70697
     },
     {
       "git_blob": "760038815fbfc8ecd811958fb8fc5da160e90469",
@@ -1809,11 +1828,18 @@
       "size": 14577
     },
     {
-      "git_blob": "3390c45b84ee13bef487d5de3bb6658032cbf2c2",
+      "git_blob": "c067c834fc574f07acf16d4d7efd6ea4b1cf4f7b",
+      "mode": "100644",
+      "path": "src/rs9/nix_proot_runtime_diagnostic.py",
+      "sha256": "6b8e02c0a121055f9e7069d0a7cbbfeec35e2b38e43bc1dd0c881729233c1faf",
+      "size": 2726
+    },
+    {
+      "git_blob": "b2ace83c535ec3be9c42fd6d67357c0b4420c39f",
       "mode": "100644",
       "path": "src/rs9/nix_proot_signals.py",
-      "sha256": "92c256355fb029169cea26e3bc405214037679fcbe2381e869682322c87f2609",
-      "size": 6900
+      "sha256": "7458b23bde538ea4083b82af308348407af02cf7099170216f2e658fad1c583a",
+      "size": 7103
     },
     {
       "git_blob": "69820abf0cbeaade575c469d4a4c38dfcb2c041a",
@@ -1893,11 +1919,11 @@
       "size": 19183
     },
     {
-      "git_blob": "480ed134af4e2552b9c216c2756c4d83802bde02",
+      "git_blob": "a237ecc048d8aff84dcbc7ad0dc262268495f8f5",
       "mode": "100644",
       "path": "src/rs9/pages_smoke_diagnostic.py",
-      "sha256": "5cb39d4f165c8ebc1f274f261bf45ba4ccf1b46ef1f2d8e482958ed71d61a6c5",
-      "size": 8700
+      "sha256": "e976801a00cf8b1d3524f523bca0d85e8e243e35b7021444da9115d9b5aac45c",
+      "size": 9580
     },
     {
       "git_blob": "a9b2a4f7187fa214e14be25020cfe790b57ba1b7",
@@ -2094,6 +2120,13 @@
       "path": "src/rs9/signing_preflight.py",
       "sha256": "9271de29ef76977ffc24f66b9b4a7df7a9ab91e27170d52af72e5edbc5edb060",
       "size": 4608
+    },
+    {
+      "git_blob": "89a99f6d7b472f8003ccc516b4bdfcb2ced49c65",
+      "mode": "100644",
+      "path": "src/rs9/smoke_stream_tokens.py",
+      "sha256": "040598ae3cffc857c71456c61593945c552c8ee45ce3142ab496c41cea3a3676",
+      "size": 10009
     },
     {
       "git_blob": "48f4e607e4800d37b7949374df4349251251862f",
@@ -2803,6 +2836,13 @@
       "size": 15888
     },
     {
+      "git_blob": "314ef9fd345b7b50e26151cd443f0ba9d8d753ed",
+      "mode": "100644",
+      "path": "tests/test_cont22_diagnostics.py",
+      "sha256": "8397df863493970683b6ffb67a10c0cf044ff25a02b9a2b65910af063effe744",
+      "size": 10875
+    },
+    {
       "git_blob": "590da4c6a1b0fadb9549ca2ab9eada4c21fdec18",
       "mode": "100644",
       "path": "tests/test_contract.py",
@@ -3193,6 +3233,13 @@
       "path": "tests/test_nix_proot_processes.py",
       "sha256": "b042c8664bb269739882dd947c486f547551600bede6f889bf6f87bdcce3fca2",
       "size": 8747
+    },
+    {
+      "git_blob": "c67fc9f005d72ed74ac1e4719cc46265d85fefd2",
+      "mode": "100644",
+      "path": "tests/test_nix_proot_runtime_diagnostic.py",
+      "sha256": "ae19130f443a9dd517342f2f89c4acb5e8b5dff9051b1835bdd2fb211603215b",
+      "size": 5514
     },
     {
       "git_blob": "3e9829370b1af985b568f6e6874fb4e95829f3a8",
@@ -3671,6 +3718,13 @@
       "size": 8508
     },
     {
+      "git_blob": "1ac2d5c76328f0edaf1b4164c2b4238daabd8055",
+      "mode": "100644",
+      "path": "tests/test_smoke_stream_tokens.py",
+      "sha256": "9603e236919b1611728607267b8a2a58056a972ab239c50b6f232c878d36a8da",
+      "size": 8139
+    },
+    {
       "git_blob": "9712afa6ec48bad7d6ba212859c877b0749931c9",
       "mode": "100644",
       "path": "tests/test_theme_forge_parity.py",
@@ -3715,8 +3769,8 @@
   ],
   "inventory_scope": "complete product source excluding this manifest and preserved unrelated local state",
   "kind": "non-production-hosted-source-candidate",
-  "parent": "0bb571c09777a9ba041313b2b8d3a4b6370bd4a1",
-  "phase_outcome": "source-staging-repaired-original-failure-custody-native-causes-unobserved",
+  "parent": "0f76dbb3a7b6f0a194b440d03c9044589a603d56",
+  "phase_outcome": "diagnostic-only-original-failures-retained-native-causes-unresolved",
   "production_enabled": false,
   "production_ready": false,
   "publication_authority": false,
@@ -3745,8 +3799,8 @@
     "schema": "rs9.live1-candidate-readiness.v1alpha1",
     "source_adoption_scope": "partial-diagnostic"
   },
-  "review_status": "dispatcher-reviews-advisory-terminal-amended-with-post-review-edits",
+  "review_status": "reviewed-with-advisory-findings-terminal-amendments-not-re-reviewed",
   "schema": "rs9.live1-source-candidate-inventory.v1alpha2",
-  "task": "CONT21 experimental Nix staged pin repair and original Pages APT smoke diagnostics",
+  "task": "CONT22 original APT smoke and fail-closed PRoot runtime diagnostics",
   "terminal_disposition": "amend"
 }

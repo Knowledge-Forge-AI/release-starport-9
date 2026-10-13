@@ -1165,7 +1165,19 @@ def probe_bwrap_mechanism(rt: GuestRuntime) -> dict[str, Any]:
     token = ("userns-denied" if "namespace" in text or "operation not permitted" in text else
              "no-such-file" if "no such file" in text else "unclassified" if run.returncode else "none")
     return {"exit_code": run.returncode, "diagnostic_token": token, "stderr_sha256": _sha(run.stderr),
-            "timed_out": run.error == "timeout"}
+            "timed_out": run.error == "timeout", **_bwrap_stream_observation(run)}
+
+
+def _bwrap_stream_observation(run):
+    # A standalone helper control is not evidence of a WebKit bwrap spawn.
+    from rs9.smoke_stream_tokens import stream_tokens
+    try:
+        observation = stream_tokens(run.stderr, complete=not run.error)
+        observation["stage"] = "standalone-bwrap-control-stderr"
+        return {"probe_scope": "standalone-bwrap-control", "qualification_authority": False,
+                "stderr_observation": observation}
+    except Exception:
+        return {}
 
 
 def probe_webkit_sandbox_state(rt: GuestRuntime, main: dict[str, Any] | None, mechanism: dict[str, Any] | None = None
@@ -1201,6 +1213,11 @@ def probe_webkit_sandbox_state(rt: GuestRuntime, main: dict[str, Any] | None, me
                "baseline_matches_proot_acceleration": baseline_matches,
                "sandbox_diagnostics_confounded": True, "nnp_seccomp_confounded": True,
                "sandbox_enabled_evidence": "bwrap-parent-observation"}
+    from rs9.nix_proot_runtime_diagnostic import webkit_conditions
+    try:
+        details.update(webkit_conditions(web, sandboxed))
+    except Exception:
+        pass
     # PRoot can install these flags independently on tracees. They are a
     # consistency check, never evidence of WebKit's own seccomp filter.
     if (len(sandboxed) != len(web) or any(w.get("no_new_privs") != 1 or w.get("seccomp") != 2 for w in web)):
@@ -1208,7 +1225,7 @@ def probe_webkit_sandbox_state(rt: GuestRuntime, main: dict[str, Any] | None, me
     return _result(name, "pass", **details, **base)
 
 
-def probe_verifier_and_smoke(smoke: Callable[[], dict[str, Any]] | None) -> dict[str, Any]:
+def probe_verifier_and_smoke(smoke: Callable[[], dict[str, Any]] | None, *, system=None) -> dict[str, Any]:
     """Gate proot-verifier-smoke: the released verifier and unchanged smoke, run through the guest by the caller."""
     name = "proot-verifier-smoke"
     if smoke is None:
@@ -1216,7 +1233,15 @@ def probe_verifier_and_smoke(smoke: Callable[[], dict[str, Any]] | None) -> dict
     try:
         evidence = smoke()
     except ContractError as error:
-        return _result(name, "fail", error.code, **_public(error))
+        details = _public(error)
+        observation = getattr(error, "smoke_observation", None)
+        if observation:
+            from rs9.pages_smoke_diagnostic import validate_smoke_observation
+            try:
+                details["original_smoke_observation"] = validate_smoke_observation(observation, system=system)
+            except Exception:
+                pass
+        return _result(name, "fail", error.code, **details)
     except (OSError, KeyError, ValueError, TypeError, subprocess.SubprocessError):
         return _result(name, "fail", "verifier-smoke-execution-failed")
     if not isinstance(evidence, dict) or evidence.get("sidecar", {}).get("verified") is not True or not evidence.get("scenarios"):
@@ -1269,7 +1294,7 @@ def evaluate_proot_experiment(
     if released is None:
         verifier = _result("proot-verifier-smoke", *(release_problem or ("not-run", "payload-materialization-absent")))
     else:
-        verifier = probe_verifier_and_smoke((lambda: smoke(released)) if smoke else None)
+        verifier = probe_verifier_and_smoke((lambda: smoke(released)) if smoke else None, system=rt.facts["system"])
 
     elfs: list[str] | None = None
     if released is None:

@@ -1,0 +1,654 @@
+{
+  "artifact_changes_after_full_suites": [
+    "docs/live1-native-client-cont22.md",
+    "evidence/live1/cont22-verification.json",
+    "operators/live1/candidate-manifest.json"
+  ],
+  "attended_gates_satisfied": false,
+  "boundedness_correction": {
+    "focused_success": true,
+    "focused_tests": 24,
+    "pre_final_review_already_occurred": false,
+    "reason": "Do not split oversized or incomplete stderr to count lines; preserve truthful unknown UTF-8 and line counts in projection",
+    "source_paths": [
+      "src/rs9/smoke_stream_tokens.py",
+      "tests/test_smoke_stream_tokens.py"
+    ]
+  },
+  "changed_file_count": 15,
+  "closeout_focused_verification": {
+    "elapsed_seconds": 9.562,
+    "error_ids": [],
+    "errors": 0,
+    "failure_ids": [],
+    "failures": 0,
+    "inventory_method": "SHA256 of JSON [relative path, SHA256] rows, src then tests sorted Python files",
+    "skip_ids": [],
+    "skips": 0,
+    "source_test_inventory_sha256": "15591b832759607368908e1a0856288ba327f75498eb59337811674707f4ccda",
+    "success": true,
+    "tests": 109,
+    "umask": "022",
+    "unraisable_exceptions": [],
+    "warnings_policy": "error"
+  },
+  "closeout_initial_verification": [
+    {
+      "errors": 2,
+      "failures": 0,
+      "reason": "Missing src import path; corrected command setup",
+      "scope": "Focused invocation before source path setup",
+      "tests": 2
+    },
+    {
+      "errors": 1,
+      "failures": 0,
+      "reason": "Missing tests import path; corrected command setup",
+      "scope": "Focused invocation before incumbent test import path setup",
+      "tests": 93
+    },
+    {
+      "cause": "Candidate manifest had not yet been regenerated after terminal source amendments",
+      "elapsed_seconds": 85.437,
+      "error_ids": [
+        "tests.test_adoption_scratch.AdoptionScratchTests.test_live_checkout_verification_preserves_real_index_contents",
+        "tests.test_candidate_inventory.CandidateInventoryTests.test_manifest_matches_full_live_product_delta"
+      ],
+      "errors": 2,
+      "failures": 0,
+      "skips": 22,
+      "success": false,
+      "tests": 2080
+    }
+  ],
+  "closeout_preservation": {
+    "index_sha256": "6eb5cda37ccffa7b82c58280e0a30ed3f8fc5adb60a3e885adfef2e6e36bbb9e",
+    "index_unchanged": true,
+    "local_state_unchanged": true,
+    "method": "SHA256 of JSON rows from physical source bytes and modes; excludes 15 cumulative phase paths; local-state trees separately hashed",
+    "modes_sha256": "d45904c2280abfff02b3e86261992f27653bb659d8c253798d3bd45d378e5fd6",
+    "modes_unchanged": true,
+    "protected_count": 518,
+    "protected_inventory_sha256": "fd93578d3cd2ce28511e58aa8f67a0c76253d8269846cde94a1a22851686baec",
+    "protected_unchanged": true,
+    "state": {
+      ".scratch": {
+        "files": 163,
+        "sha256": "b83e2436cf64e6af2bed0aab719321886ad6bcdf36996c653ad88a665e9835a9"
+      },
+      ".serena": {
+        "files": 3,
+        "sha256": "acbf11f7f03817f10bbf6a0d431e08cc12204fe3b27878c55267239117daf67e"
+      }
+    }
+  },
+  "closeout_red_green": {
+    "corrected_errors": 0,
+    "corrected_failures": 0,
+    "corrected_tests": 2,
+    "initial_import_errors": 2,
+    "reproduced_errors": 1,
+    "reproduced_failures": 1,
+    "reproduced_tests": 2
+  },
+  "closeout_unresolved_concerns": [
+    "Native APT and PRoot causes remain unresolved; no deterministic harness repair established",
+    "Container token classifications are guest-asserted self-consistency; host-runner privacy filtering limits diagnostic yield",
+    "323 omitted bulk objects remain unauthenticated; 22 native, release, archive, GPG and platform integration skips per umask",
+    "No Linux native replay or hosted workflow executed; required Nix and experimental runtime gates remain failing"
+  ],
+  "closeout_workers": {
+    "reason": "Small coupled terminal corrections and verification performed locally",
+    "status": "declined"
+  },
+  "completion_boundary": "Diagnostic-only source closeout; Git commit, publication, archive finalization and any hosted-run21 decision belong to dispatcher or manager",
+  "final_tree_reporting": "Computed complete candidate Git tree and manifest SHA256 printed in producer response; not embedded recursively in inventory/evidence",
+  "focused_verification": {
+    "broader_before_hygiene_correction": {
+      "correction": "Assemble synthetic private-path test input at runtime; no literal private path in retained product",
+      "errors": 0,
+      "failures": 1,
+      "skips": 1,
+      "tests": 215
+    },
+    "correction": "Resolve temporary fixture directories through macOS symlink parents; physical-path refusal retained",
+    "errors": 0,
+    "failures": 0,
+    "initial_errors": 1,
+    "initial_failures": 2,
+    "initial_tests": 200,
+    "new_tests_after_correction": 22,
+    "terminal_new_and_hygiene_success": true,
+    "terminal_new_and_hygiene_tests": 28
+  },
+  "full_live1_qualification": false,
+  "full_source_suites": [
+    {
+      "elapsed_seconds": 85.83,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "inventory_method": "SHA256 of JSON [relative path, SHA256] rows, src then tests sorted Python files",
+      "skip_ids": [
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported",
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read",
+        "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available",
+        "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+        "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+        "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+        "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux",
+        "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux",
+        "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt",
+        "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+        "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+        "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive",
+        "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references",
+        "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available",
+        "setUpClass (tests.test_signing_fixture.SigningFixtureTests)"
+      ],
+      "skips": 22,
+      "source_test_inventory_sha256": "15591b832759607368908e1a0856288ba327f75498eb59337811674707f4ccda",
+      "success": true,
+      "tests": 2080,
+      "umask": "022",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    },
+    {
+      "elapsed_seconds": 84.905,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "inventory_method": "SHA256 of JSON [relative path, SHA256] rows, src then tests sorted Python files",
+      "skip_ids": [
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported",
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read",
+        "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available",
+        "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+        "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+        "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+        "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux",
+        "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux",
+        "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt",
+        "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+        "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+        "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive",
+        "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references",
+        "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available",
+        "setUpClass (tests.test_signing_fixture.SigningFixtureTests)"
+      ],
+      "skips": 22,
+      "source_test_inventory_sha256": "15591b832759607368908e1a0856288ba327f75498eb59337811674707f4ccda",
+      "success": true,
+      "tests": 2080,
+      "umask": "077",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    }
+  ],
+  "full_source_suites_before_boundedness_correction": [
+    {
+      "elapsed_seconds": 86.939,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "skip_ids": [
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported",
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read",
+        "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available",
+        "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+        "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+        "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+        "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux",
+        "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux",
+        "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt",
+        "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+        "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+        "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive",
+        "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references",
+        "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available",
+        "setUpClass (tests.test_signing_fixture.SigningFixtureTests)"
+      ],
+      "skips": 22,
+      "source_test_inventory_sha256": "f3d426333ee33807ef4945922fb287b4849a386505bcc45eaeab923235b4021b",
+      "success": true,
+      "test_scope": "Complete source suite by unittest discovery; scripted external boundaries and available native local controls",
+      "tests": 2079,
+      "umask": "022",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    },
+    {
+      "elapsed_seconds": 83.564,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "skip_ids": [
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported",
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read",
+        "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available",
+        "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+        "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+        "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+        "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux",
+        "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux",
+        "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt",
+        "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+        "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+        "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive",
+        "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references",
+        "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available",
+        "setUpClass (tests.test_signing_fixture.SigningFixtureTests)"
+      ],
+      "skips": 22,
+      "source_test_inventory_sha256": "f3d426333ee33807ef4945922fb287b4849a386505bcc45eaeab923235b4021b",
+      "success": true,
+      "test_scope": "Complete source suite by unittest discovery; scripted external boundaries and available native local controls",
+      "tests": 2079,
+      "umask": "077",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    }
+  ],
+  "git_diff_check": "pass",
+  "hosted_run21_authorized": false,
+  "incoming_stage_deltas": "15 cumulative product paths accepted with six terminally amended paths; no exclusions or deletions",
+  "native_execution": {
+    "elf_inspection": false,
+    "hosted_workflow": false,
+    "linux_application_smoke": false,
+    "linux_nix_build": false,
+    "replay": false,
+    "required_nix_gates": "NIX_FHS_USERNS-both-systems-downstream-not-run"
+  },
+  "original_scope": "Causal first-failure APT observations and fail-closed PRoot runtime diagnostics for existing releases",
+  "plan_review_dispositions": [
+    {
+      "disposition": "accept",
+      "evidence": "Packet verified; outer and nested ZIP CRC passed; fixed-message comparison and directory/log absence recorded",
+      "id": 1
+    },
+    {
+      "disposition": "amend",
+      "evidence": "Failure-only after-outcome collection, independent exception boundaries, primary-field allowlist and shared passing controls",
+      "id": 2
+    },
+    {
+      "disposition": "amend",
+      "evidence": "Optional host-system parameter passed at production projections; idempotent binding mismatch and closed projection",
+      "id": 3
+    },
+    {
+      "disposition": "defer",
+      "evidence": "Optional-package extension omitted; original query preserved",
+      "id": 4
+    },
+    {
+      "disposition": "accept",
+      "evidence": "Distinct APT and PRoot stream identities; race remains not tested",
+      "id": 5
+    },
+    {
+      "disposition": "amend",
+      "evidence": "Existing WebKit predicates only; informational helper scope; ELF/API-call inspection deferred",
+      "id": 6
+    },
+    {
+      "disposition": "amend",
+      "evidence": "Ignored-and-surviving PRoot observations; forwarding cause unresolved, no specific blocker layer inferred",
+      "id": 7
+    },
+    {
+      "disposition": "accept",
+      "evidence": "Native execution and future hosted run remain unauthorized and untested",
+      "id": 8
+    }
+  ],
+  "preservation": {
+    "head": "0f76dbb3a7b6f0a194b440d03c9044589a603d56",
+    "incumbent_test_methods_ast_unchanged": true,
+    "index_sha256": "6eb5cda37ccffa7b82c58280e0a30ed3f8fc5adb60a3e885adfef2e6e36bbb9e",
+    "index_unchanged": true,
+    "local_state_unchanged": true,
+    "modes_sha256": "91bf9bc2acf31226cb116a108f4f8fe7e91715ac0305d8847582055860a06017",
+    "modes_unchanged": true,
+    "original_failure_evidence_unchanged": true,
+    "protected_count": 516,
+    "protected_inventory_sha256": "892bb46b0917268099f8be913a8ef6c8dcc3b346eabc3acff8fcb6009d144b51",
+    "protected_unchanged": true,
+    "state": {
+      ".scratch": {
+        "files": 163,
+        "present": true,
+        "sha256": "e539e58ed83ed3743d9f1f2365ad350f7d189d672f13f100d34fa8c23a96e893"
+      },
+      ".serena": {
+        "files": 3,
+        "present": true,
+        "sha256": "aad6abf3ffde5eb0da3838bbac66de358d85315118570f1f22516a1b0a85e9a4"
+      }
+    },
+    "tracked_modes_unchanged": true,
+    "tree": "f068a6fded04cf6e1abcb686d3be42972947fdcd",
+    "unrelated_state_unchanged": true,
+    "verified_inputs_unchanged": true
+  },
+  "producer_full_source_suites": [
+    {
+      "elapsed_seconds": 86.229,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "skip_ids": [
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported",
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read",
+        "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available",
+        "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+        "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+        "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+        "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux",
+        "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux",
+        "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt",
+        "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+        "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+        "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive",
+        "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references",
+        "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available",
+        "setUpClass (tests.test_signing_fixture.SigningFixtureTests)"
+      ],
+      "skips": 22,
+      "source_test_inventory_sha256": "bca13737050b6a64089d0fd5146d4ed95447ac25fdcdbf32905da840cf4d83cf",
+      "success": true,
+      "test_scope": "Complete source suite by unittest discovery; scripted external boundaries and available native local controls",
+      "tests": 2079,
+      "umask": "022",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    },
+    {
+      "elapsed_seconds": 88.424,
+      "error_ids": [],
+      "errors": 0,
+      "failure_ids": [],
+      "failures": 0,
+      "skip_ids": [
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_raw_invalid_utf8_path_roundtrip_where_supported",
+        "tests.test_client_inventory.ClientInventoryScannerFailuresTests.test_socket_and_arbitrary_symlink_targets_are_never_read",
+        "tests.test_dnf_trust_negatives.DnfTrustTests.test_real_gnupg_signature_value_mutation_if_available",
+        "tests.test_hosted_deb.PagesLaneTests.test_assembled_tree_is_exact_scanned_signed_and_client_tested_per_family",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_reference_tree_and_byte_comparison",
+        "tests.test_live_nebular.LiveNebularTests.test_captured_release_bytes_and_deterministic_goldens",
+        "tests.test_live_nebular.LiveNebularTests.test_reference_semantic_facts_detect_material_recipe_drift",
+        "tests.test_live_stellar_burst.LiveCoreCaptureTests.test_both_real_release_captures_replay_through_same_core",
+        "tests.test_live_stellar_burst.LiveStellarTests.test_reauthenticate_live_bytes_and_deterministic_records",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_darwin",
+        "tests.test_nix_installer.OfficialArchiveTests.test_aarch64_linux",
+        "tests.test_nix_installer.OfficialArchiveTests.test_x86_64_linux",
+        "tests.test_nix_proot_processes.RuntimeProcessTests.test_linux_forced_kill_has_no_signal_compatibility_receipt",
+        "tests.test_pages_candidate.PagesCandidateTests.test_construct_candidate_signed_tree_with_fixture",
+        "tests.test_repo_apt.FixtureSigningAndClientTests.test_real_gnupg_fixture_signs_and_rejects_every_tamper",
+        "tests.test_rpm_filesystem_controls.RpmFilesystemControls.test_distinct_unprivileged_writer_negative_and_owner_aligned_positive",
+        "tests.test_rpm_metadata.RPMRepodataFormatVerifyTests.test_actual_kit_six_xml_zst_repomd_references_regression",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_exact_captured_pairs_match_derived_fixture_without_modifying_bytes",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_native_pinned_repeated_source_and_binary_bytes_converge",
+        "tests.test_rpm_noarch_reproducibility.NoarchReproducibilityTests.test_reference_readback_with_run12_references",
+        "tests.test_rpm_repository_ownership.SignMetadataTests.test_sign_metadata_with_real_gpg_when_available",
+        "setUpClass (tests.test_signing_fixture.SigningFixtureTests)"
+      ],
+      "skips": 22,
+      "source_test_inventory_sha256": "bca13737050b6a64089d0fd5146d4ed95447ac25fdcdbf32905da840cf4d83cf",
+      "success": true,
+      "test_scope": "Complete source suite by unittest discovery; scripted external boundaries and available native local controls",
+      "tests": 2079,
+      "umask": "077",
+      "unraisable_exceptions": [],
+      "warnings_policy": "error"
+    }
+  ],
+  "producer_incoming_stage_deltas": "none-recorded",
+  "production_enabled": false,
+  "production_receipts": 0,
+  "promotion_restrictions": [
+    "linux-wheel-production-promotion-compatibility-unproven",
+    "rpm-lint-policy-exceptions-not-raw-clean-not-fedora-qualified"
+  ],
+  "proposal_binding": {
+    "bytes": 19827,
+    "sha256": "34f91478e51118ecfd06e2f7a3fe30a45de5f7ece66fb4a6e910e2cd48ec746f"
+  },
+  "proposal_disposition": "amend",
+  "protected_callable_ast_checks": {
+    "src/rs9/application_smoke_diagnostic.py:_command": true,
+    "src/rs9/application_smoke_diagnostic.py:classify_smoke_cause": true,
+    "src/rs9/application_smoke_diagnostic.py:read_and_validate_receipt": true,
+    "src/rs9/hosted_container_smoke.py:guest_main": true,
+    "src/rs9/hosted_container_smoke.py:prepare_container_smoke": true,
+    "src/rs9/nix_proot.py:_external_sigterm": true,
+    "src/rs9/nix_proot.py:guest_environment": true,
+    "src/rs9/nix_proot.py:proot_command_argv": true,
+    "src/rs9/pages_smoke_diagnostic.py:parse_runtime_packages": true,
+    "src/rs9/pages_smoke_diagnostic.py:probe_apt_runtime_image": true
+  },
+  "publication_authority": false,
+  "published_linux_nix_ready": false,
+  "python_structure": {
+    "closeout_callable_statement_counts": {
+      "stream_tokens": 16,
+      "validate_stream_tokens": 15
+    },
+    "closeout_measurement": "APG fallback physical lines and owned recursive statement nodes; six added diagnostic lines; no new runtime responsibility",
+    "decision": "Existing diagnostic responsibility only; separate bounded modules; no launch or runtime repair; rollback additive fields and hooks",
+    "files": [
+      {
+        "path": "src/rs9/smoke_stream_tokens.py",
+        "physical_lines": 196
+      },
+      {
+        "path": "src/rs9/nix_proot_runtime_diagnostic.py",
+        "physical_lines": 46
+      },
+      {
+        "path": "src/rs9/application_smoke_diagnostic.py",
+        "physical_lines": 367
+      },
+      {
+        "path": "src/rs9/pages_smoke_diagnostic.py",
+        "physical_lines": 192
+      },
+      {
+        "path": "src/rs9/nix_proot.py",
+        "physical_lines": 1399
+      },
+      {
+        "path": "src/rs9/hosted_deb.py",
+        "physical_lines": 2227
+      }
+    ],
+    "level": "Orange-scoped-legacy-exception",
+    "measurement": "APG fallback physical line counts"
+  },
+  "remote_parity": {
+    "head": "0f76dbb3a7b6f0a194b440d03c9044589a603d56",
+    "method": "github-connector-GET-branches-main",
+    "observed": "closeout-terminal-verification",
+    "tree": "f068a6fded04cf6e1abcb686d3be42972947fdcd"
+  },
+  "review": {
+    "closer": "amend",
+    "external_reviewer_invoked": false,
+    "internal_worker_is_dispatcher_checkpoint": false,
+    "plan": "reviewed_with_findings-advisory",
+    "post_pre_final_review_modified_paths": [
+      "docs/live1-native-client-cont22.md",
+      "evidence/live1/cont22-verification.json",
+      "operators/live1/candidate-manifest.json",
+      "src/rs9/smoke_stream_tokens.py",
+      "tests/test_cont22_diagnostics.py",
+      "tests/test_smoke_stream_tokens.py"
+    ],
+    "pre_final": "reviewed_with_findings-advisory",
+    "pre_final_advisory_findings": 6,
+    "pre_final_blocking_findings": 0,
+    "pre_final_bound_tree": "436064e4a31fa3b20d8c4b61e07c5304aea39a8c",
+    "pre_final_manifest_sha256": "a3fea62c5a6faa20d741cfa028fab6b8c34b443d34430a63d8a0073b4724f16b",
+    "terminal_amendments_independently_reviewed": false,
+    "terminal_review_policy": "Dispatcher-bound terminal amendments; no additional substantive review authorized"
+  },
+  "schema": "rs9.cont22-verification.v1",
+  "skip_limitations": "22 skips per mask: native/release/reference/archive/GPG and platform-dependent integration controls. No new native release qualification is inferred.",
+  "source_changes_after_full_suites": [],
+  "source_repair": {
+    "changes": "diagnostic-only",
+    "deterministic_native_cause_established": false,
+    "original_outcomes_preserved": true,
+    "source_owned_causal_harness_defect_established": false
+  },
+  "source_suite_command": "rtk proxy python3 -B -W error -c <process-local unittest runner>",
+  "source_suite_setup": "Process-local umask 022/077; sys.path src/tests; PYTHONPATH src; bytecode disabled; unittest.defaultTestLoader.discover('tests', top_level_dir='.')",
+  "source_test_inventory_method": "SHA256 of JSON [relative path, SHA256] rows, src then tests sorted Python files",
+  "source_test_inventory_sha256": "15591b832759607368908e1a0856288ba327f75498eb59337811674707f4ccda",
+  "stage": "closeout",
+  "status": "terminal-amended-source-checkpoint",
+  "terminal_artifact_tests": {
+    "scope": "Live candidate inventory, real-index preservation and artifact hygiene; reconfirmed after terminal document and metadata regeneration",
+    "success": true,
+    "tests_per_umask": 6,
+    "umasks": [
+      "022",
+      "077"
+    ],
+    "warnings_policy": "error"
+  },
+  "terminal_custody_checks": [
+    {
+      "check_count": 13,
+      "checks": {
+        "authenticated-packet-copies": true,
+        "candidate-modes-preserved": true,
+        "complete-candidate-census-and-delta": true,
+        "document-review-and-bwrap-differentiation": true,
+        "git-index-preserved": true,
+        "manifest-current-bytes-and-modes": true,
+        "original-apt-scenarios-and-nonzero-failures": true,
+        "original-failure-evidence-preserved": true,
+        "pinned-dbus-and-launch-callables-preserved": true,
+        "post-review-scope-bounded": true,
+        "production-flags-and-promotion-blockers": true,
+        "protected-product-bytes-preserved": true,
+        "scratch-and-serena-preserved": true
+      },
+      "success": true,
+      "umask": "022"
+    },
+    {
+      "check_count": 13,
+      "checks": {
+        "authenticated-packet-copies": true,
+        "candidate-modes-preserved": true,
+        "complete-candidate-census-and-delta": true,
+        "document-review-and-bwrap-differentiation": true,
+        "git-index-preserved": true,
+        "manifest-current-bytes-and-modes": true,
+        "original-apt-scenarios-and-nonzero-failures": true,
+        "original-failure-evidence-preserved": true,
+        "pinned-dbus-and-launch-callables-preserved": true,
+        "post-review-scope-bounded": true,
+        "production-flags-and-promotion-blockers": true,
+        "protected-product-bytes-preserved": true,
+        "scratch-and-serena-preserved": true
+      },
+      "success": true,
+      "umask": "077"
+    }
+  ],
+  "terminal_custody_reporting": "Repeated against the final metadata and manifest; final tree and manifest digest reported in terminal result to avoid recursive identities",
+  "terminal_disposition": "amend",
+  "tooling": {
+    "dependency_changes": false,
+    "gain": "tracking-database-unavailable-in-sandbox",
+    "persistent_scratch_created": false,
+    "rewrite_check": "ask-policy-rewrite-observed",
+    "rtk_version": "0.43.0",
+    "temporary_state": "process-local tests use platform temporary directories; existing scratch retained"
+  },
+  "work_review_dispositions": [
+    {
+      "disposition": "amend",
+      "id": 1,
+      "rationale": "Narrow shared passing-control test to systems; remove unused family label; qualify incumbent consumer and native coverage"
+    },
+    {
+      "disposition": "accept",
+      "id": 2,
+      "rationale": "Document container tokens as guest-asserted self-consistency, distinct from Docker host stderr authentication"
+    },
+    {
+      "disposition": "amend",
+      "id": 3,
+      "rationale": "Complete stderr without newline is unterminated; no observed truncation is inferred"
+    },
+    {
+      "disposition": "amend",
+      "id": 4,
+      "rationale": "Retain eight-token cap with bounded tokens_omitted; reject hostile counts and duplicate-token overflow"
+    },
+    {
+      "disposition": "accept",
+      "id": 5,
+      "rationale": "Document per-system helper tokens and hashes; separate aarch64 missing-file hypothesis; exact native cause unresolved"
+    },
+    {
+      "disposition": "accept",
+      "id": 6,
+      "rationale": "Keep privacy withholding; document reduced host-runner diagnostic yield and test synthetic runner-path refusal"
+    }
+  ],
+  "worker": {
+    "cleanup_proven": true,
+    "effective_model": "not-observed",
+    "kind": "gemini",
+    "parent_disposition": "partial-adopt-observations-reject-unproved-causal-attribution",
+    "requested_profile": "gemini-3.8-flash-high",
+    "status": "used"
+  }
+}
