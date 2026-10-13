@@ -123,5 +123,10 @@ def probe_signals(rt, external_sigterm, reap):
     if failed:
         # Keep historical top-level failure details while retaining later stages.
         details.update(failed["details"])
+        from rs9.nix_proot_runtime_diagnostic import signal_observations
+        try:
+            details["causal_observations"] = signal_observations(details)
+        except Exception:
+            pass
         return {"name": name, "status": "fail", "reason": failed.get("reason"), "details": details}
     return {"name": name, "status": "pass", "details": details}

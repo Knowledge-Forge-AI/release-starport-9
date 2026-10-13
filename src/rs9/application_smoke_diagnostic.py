@@ -254,6 +254,14 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
         fields["cause"] = "process-cleanup-failure"
     fields["reason_token"] = error or ("process-signal" if sig_val is not None else ("process-nonzero" if ec_val else receipt_error)) or cleanup_error or "pass"
     fields["failed"] = bool(error or rc != 0 or receipt_error or cleanup_error)
+    if fields["failed"] and not extras:
+        # Optional observations happen after the original outcome is fixed.
+        from rs9.smoke_stream_tokens import collect_failure_diagnostics
+        try:
+            diagnostic = collect_failure_diagnostics(err, dict(fields), evidence, platform, scenario)
+            fields.update({k: diagnostic[k] for k in ("stderr_diagnostic", "evidence_inventory") if k in diagnostic})
+        except Exception:
+            pass
     if extras:
         raw, meta, log_error = _read_regular(evidence / "xvfb-error.log", MAX_LOG)
         fields["display_log"] = {**meta, "error": log_error,
@@ -346,7 +354,7 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
         fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, False, session_bus_argv=session_bus_argv)
         if fields["failed"]:
             from rs9.pages_smoke_diagnostic import validate_smoke_observation
-            observation = validate_smoke_observation(fields)
+            observation = validate_smoke_observation(fields, system=system)
             details = _failure_details(fields, extras=extras, receipt_name=platform+"-"+scenario+".run.json")
             if extras:
                 details["diagnostic_sha256"] = _retain_failure(prepared, system, platform, scenario,

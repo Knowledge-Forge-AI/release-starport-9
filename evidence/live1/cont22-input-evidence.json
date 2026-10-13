@@ -1,0 +1,796 @@
+{
+  "apt_comparison": [
+    {
+      "apt_image_probe": {
+        "cleanup": "complete",
+        "image_sha256": "2c51310177fa19637373a6c6b2a9eb79e2eaf713196f35ef80b704e2875cca0c",
+        "qualification_authority": false,
+        "status": "unavailable",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "7d790431727f07535d2ebd82955030d48cfb1783b81c9de06736f7db1db3c094"
+      },
+      "context": "standalone-apt",
+      "passing_scenarios": [],
+      "run": 20,
+      "smoke_context": {
+        "cache_scope": "fresh-client-container",
+        "dbus": "fresh-dbus-run-session",
+        "display": "fresh-xvfb-run",
+        "family": "apt",
+        "manifest_sha256": "2ea9768f45528fd8513faab24383635e0d1ffcc86ff60a9df3c908335c32b563",
+        "network": "none",
+        "request_sha256": "f7eea29061e22707bf38947b0577b68289c4ae7e9aa9f023a2b7684c08dc2bb9",
+        "source_records_sha256": "f7f04c641ffc64d7802f82a04d93d45101213470e832164db32a382ec3d2c750",
+        "system": "x86_64-linux",
+        "timeout_seconds": 240,
+        "uid": 65534
+      },
+      "smoke_gate_status": "fail",
+      "smoke_observation": {
+        "cause": "process-nonzero",
+        "elapsed_ms": 6147,
+        "exit_code": 1,
+        "log_categories": [
+          "unclassified"
+        ],
+        "problem_codes": [],
+        "process_scope": "outermost-smoke-process",
+        "raw_returncode": 1,
+        "reason_token": "process-nonzero",
+        "receipt_error": "receipt-missing",
+        "scenario": "C",
+        "signal": null,
+        "stderr_bytes": 97,
+        "stderr_sha256": "74321a45144b837ebc71a285eb26f4d88ee2499ae4bb83134ed35c18904ad490",
+        "stdout_bytes": 0,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stream_capture_complete": true
+      },
+      "system": "amd64"
+    },
+    {
+      "apt_image_probe": {
+        "cleanup": "complete",
+        "image_sha256": "b7d9dbc0c6238fa8de80c8aa02ae99aec03c02426b8e9d04d2cfd4bccc0d7987",
+        "qualification_authority": false,
+        "status": "unavailable",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "8bb8383b514bfe2149774053650ee3e583b82783412a4760ec34e448831f3fd1"
+      },
+      "context": "standalone-apt",
+      "passing_scenarios": [],
+      "run": 20,
+      "smoke_context": {
+        "cache_scope": "fresh-client-container",
+        "dbus": "fresh-dbus-run-session",
+        "display": "fresh-xvfb-run",
+        "family": "apt",
+        "manifest_sha256": "4c23d945757dadb74d9cadd7af1c3b3d6ef117b74a6e69883ad0cd17bcf1a729",
+        "network": "none",
+        "request_sha256": "964f87533980d74d0364e5ade8b0cf37bffa3c8fb38266a1e64c95f9e982b8f6",
+        "source_records_sha256": "f7f04c641ffc64d7802f82a04d93d45101213470e832164db32a382ec3d2c750",
+        "system": "aarch64-linux",
+        "timeout_seconds": 240,
+        "uid": 65534
+      },
+      "smoke_gate_status": "fail",
+      "smoke_observation": {
+        "cause": "process-nonzero",
+        "elapsed_ms": 5888,
+        "exit_code": 1,
+        "log_categories": [
+          "unclassified"
+        ],
+        "problem_codes": [],
+        "process_scope": "outermost-smoke-process",
+        "raw_returncode": 1,
+        "reason_token": "process-nonzero",
+        "receipt_error": "receipt-missing",
+        "scenario": "B",
+        "signal": null,
+        "stderr_bytes": 97,
+        "stderr_sha256": "a7562a866e0f427712cba33f84a687eb489680f903cc09bb220513602df37aab",
+        "stdout_bytes": 0,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stream_capture_complete": true
+      },
+      "system": "arm64"
+    },
+    {
+      "apt_image_probe": {
+        "cleanup": "complete",
+        "image_sha256": "e37dd257458eed550b959979ef71cc9fad014b5e646cc3582df3edb62365c2e9",
+        "qualification_authority": false,
+        "status": "unavailable",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "7d790431727f07535d2ebd82955030d48cfb1783b81c9de06736f7db1db3c094"
+      },
+      "context": "pages-apt",
+      "passing_scenarios": [
+        {
+          "executable_sha256": "6efc9c12ff9148f9e20763c620b7abb1712c614fc796b1577e01913488c658e0",
+          "receipt_sha256": "8caa1135a4cd54ad74871634d7a96ed5c48e86e751e6859e5f820dfeb147154d",
+          "scenario": "C"
+        },
+        {
+          "executable_sha256": "6efc9c12ff9148f9e20763c620b7abb1712c614fc796b1577e01913488c658e0",
+          "receipt_sha256": "55770e766fb403ed01f41bf35aae8b9a40e2573d5a6f5dabf86a43176fe89881",
+          "scenario": "C-signal"
+        }
+      ],
+      "run": 20,
+      "smoke_context": {
+        "cache_scope": "fresh-client-container",
+        "dbus": "fresh-dbus-run-session",
+        "display": "fresh-xvfb-run",
+        "family": "apt",
+        "manifest_sha256": "2ea9768f45528fd8513faab24383635e0d1ffcc86ff60a9df3c908335c32b563",
+        "network": "none",
+        "request_sha256": "f7eea29061e22707bf38947b0577b68289c4ae7e9aa9f023a2b7684c08dc2bb9",
+        "source_records_sha256": "f7f04c641ffc64d7802f82a04d93d45101213470e832164db32a382ec3d2c750",
+        "system": "x86_64-linux",
+        "timeout_seconds": 240,
+        "uid": 65534
+      },
+      "smoke_gate_status": "pass",
+      "system": "generation"
+    },
+    {
+      "context": "standalone-apt",
+      "passing_scenarios": [
+        {
+          "executable_sha256": "6efc9c12ff9148f9e20763c620b7abb1712c614fc796b1577e01913488c658e0",
+          "receipt_sha256": "80e1c53e7c73d0b026bb06b63899ef3a1244c5c805832932b18f3c3413f4622b",
+          "scenario": "C"
+        },
+        {
+          "executable_sha256": "6efc9c12ff9148f9e20763c620b7abb1712c614fc796b1577e01913488c658e0",
+          "receipt_sha256": "1fa5e144479c164a4e55f6c6209729417d4f0ff1ba5083df8af3e754ae379202",
+          "scenario": "C-signal"
+        }
+      ],
+      "run": 19,
+      "smoke_gate_status": "pass",
+      "system": "amd64"
+    },
+    {
+      "context": "standalone-apt",
+      "passing_scenarios": [
+        {
+          "executable_sha256": "5c182d28c02f2d6ea09ed130625ef899a8d0fe4ca080df775d72cdd6cd43b743",
+          "receipt_sha256": "30bd1cc7ca42320fb96a8b3f2353550e0368624d91e66710a149f0cbb6a14158",
+          "scenario": "B"
+        }
+      ],
+      "run": 19,
+      "smoke_gate_status": "pass",
+      "system": "arm64"
+    },
+    {
+      "context": "pages-apt",
+      "passing_scenarios": [],
+      "run": 19,
+      "smoke_gate_status": "fail",
+      "system": "generation"
+    }
+  ],
+  "apt_original_failures": [
+    {
+      "cause": "process-nonzero",
+      "diagnostic_replay": false,
+      "family": "apt",
+      "gate_status": "fail",
+      "initial_run": {
+        "cause": "process-nonzero",
+        "elapsed_ms": 6147,
+        "exit_code": 1,
+        "log_categories": [
+          "unclassified"
+        ],
+        "problem_codes": [],
+        "process_scope": "outermost-smoke-process",
+        "raw_returncode": 1,
+        "reason_token": "process-nonzero",
+        "receipt_error": "receipt-missing",
+        "scenario": "C",
+        "signal": null,
+        "stderr_bytes": 97,
+        "stderr_sha256": "74321a45144b837ebc71a285eb26f4d88ee2499ae4bb83134ed35c18904ad490",
+        "stdout_bytes": 0,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stream_capture_complete": true
+      },
+      "origin": "original-producer-attempt",
+      "product": "theme-forge-nebular-fusion",
+      "scenario": "C",
+      "schema": "rs9.application-smoke-diagnostic.v1alpha1",
+      "single_attempt": true,
+      "status": "fail",
+      "system": "x86_64-linux"
+    },
+    {
+      "cause": "process-nonzero",
+      "diagnostic_replay": false,
+      "family": "apt",
+      "gate_status": "fail",
+      "initial_run": {
+        "cause": "process-nonzero",
+        "elapsed_ms": 5888,
+        "exit_code": 1,
+        "log_categories": [
+          "unclassified"
+        ],
+        "problem_codes": [],
+        "process_scope": "outermost-smoke-process",
+        "raw_returncode": 1,
+        "reason_token": "process-nonzero",
+        "receipt_error": "receipt-missing",
+        "scenario": "B",
+        "signal": null,
+        "stderr_bytes": 97,
+        "stderr_sha256": "a7562a866e0f427712cba33f84a687eb489680f903cc09bb220513602df37aab",
+        "stdout_bytes": 0,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stream_capture_complete": true
+      },
+      "origin": "original-producer-attempt",
+      "product": "theme-forge-nebular-fusion",
+      "scenario": "B",
+      "schema": "rs9.application-smoke-diagnostic.v1alpha1",
+      "single_attempt": true,
+      "status": "fail",
+      "system": "aarch64-linux"
+    }
+  ],
+  "evidence_proven": [
+    "APT stderr digests differ across C/x64 and B/arm64",
+    "PRoot stderr digests equal each other and differ from both APT originals",
+    "PRoot emitted stdout; APT originals did not",
+    "Run20 standalone amd64 and Pages apt smoke context hashes are equal",
+    "Run20 standalone amd64 and Pages apt dpkg query stdout digests are equal; probe status unavailable",
+    "Run20 standalone amd64 and Pages apt runtime image digests differ",
+    "Original pinned D-Bus stage succeeded; legacy/default controls failed",
+    "Outer delivery handler absent; three surviving layers; PRoot SIGTERM ignored bit observed",
+    "Group control handler observed; zero survivors; cannot satisfy outer contract",
+    "WebKit process observed without bwrap parent; NNP/seccomp confounded"
+  ],
+  "gate_matrix": [
+    {
+      "fail": 0,
+      "lane": "pins",
+      "not_run": 0,
+      "pass": 3,
+      "run": 20,
+      "system": "generation"
+    },
+    {
+      "fail": 0,
+      "lane": "authenticate",
+      "not_run": 0,
+      "pass": 2,
+      "run": 20,
+      "system": "generation"
+    },
+    {
+      "fail": 0,
+      "lane": "wheels",
+      "not_run": 1,
+      "pass": 23,
+      "run": 20,
+      "system": "aarch64-darwin"
+    },
+    {
+      "fail": 0,
+      "lane": "wheels",
+      "not_run": 0,
+      "pass": 26,
+      "run": 20,
+      "system": "x86_64-linux"
+    },
+    {
+      "fail": 0,
+      "lane": "wheels",
+      "not_run": 0,
+      "pass": 26,
+      "run": 20,
+      "system": "aarch64-linux"
+    },
+    {
+      "fail": 0,
+      "lane": "nix",
+      "not_run": 0,
+      "pass": 12,
+      "run": 20,
+      "system": "aarch64-darwin"
+    },
+    {
+      "fail": 1,
+      "lane": "nix",
+      "not_run": 4,
+      "pass": 8,
+      "run": 20,
+      "system": "x86_64-linux"
+    },
+    {
+      "fail": 1,
+      "lane": "nix",
+      "not_run": 4,
+      "pass": 8,
+      "run": 20,
+      "system": "aarch64-linux"
+    },
+    {
+      "fail": 0,
+      "lane": "pacman",
+      "not_run": 0,
+      "pass": 40,
+      "run": 20,
+      "system": "x86_64-linux"
+    },
+    {
+      "fail": 0,
+      "lane": "rpm",
+      "not_run": 0,
+      "pass": 50,
+      "run": 20,
+      "system": "x86_64-linux"
+    },
+    {
+      "fail": 0,
+      "lane": "rpm",
+      "not_run": 0,
+      "pass": 50,
+      "run": 20,
+      "system": "aarch64-linux"
+    },
+    {
+      "fail": 2,
+      "lane": "deb",
+      "not_run": 0,
+      "pass": 39,
+      "run": 20,
+      "system": "amd64"
+    },
+    {
+      "fail": 2,
+      "lane": "deb",
+      "not_run": 0,
+      "pass": 39,
+      "run": 20,
+      "system": "arm64"
+    },
+    {
+      "fail": 0,
+      "lane": "pages",
+      "not_run": 0,
+      "pass": 112,
+      "run": 20,
+      "system": "generation"
+    },
+    {
+      "fail": 0,
+      "lane": "observe",
+      "not_run": 1,
+      "pass": 1,
+      "run": 20,
+      "system": "generation"
+    },
+    {
+      "fail": 0,
+      "lane": "foundation3",
+      "not_run": 0,
+      "pass": 2,
+      "run": 20,
+      "system": "generation"
+    },
+    {
+      "fail": 0,
+      "lane": "pins",
+      "not_run": 0,
+      "pass": 3,
+      "run": 19,
+      "system": "generation"
+    },
+    {
+      "fail": 0,
+      "lane": "authenticate",
+      "not_run": 0,
+      "pass": 2,
+      "run": 19,
+      "system": "generation"
+    },
+    {
+      "fail": 0,
+      "lane": "wheels",
+      "not_run": 1,
+      "pass": 23,
+      "run": 19,
+      "system": "aarch64-darwin"
+    },
+    {
+      "fail": 0,
+      "lane": "wheels",
+      "not_run": 0,
+      "pass": 26,
+      "run": 19,
+      "system": "x86_64-linux"
+    },
+    {
+      "fail": 0,
+      "lane": "wheels",
+      "not_run": 0,
+      "pass": 26,
+      "run": 19,
+      "system": "aarch64-linux"
+    },
+    {
+      "fail": 0,
+      "lane": "nix",
+      "not_run": 0,
+      "pass": 12,
+      "run": 19,
+      "system": "aarch64-darwin"
+    },
+    {
+      "fail": 1,
+      "lane": "nix",
+      "not_run": 4,
+      "pass": 8,
+      "run": 19,
+      "system": "x86_64-linux"
+    },
+    {
+      "fail": 1,
+      "lane": "nix",
+      "not_run": 4,
+      "pass": 8,
+      "run": 19,
+      "system": "aarch64-linux"
+    },
+    {
+      "fail": 0,
+      "lane": "pacman",
+      "not_run": 0,
+      "pass": 40,
+      "run": 19,
+      "system": "x86_64-linux"
+    },
+    {
+      "fail": 0,
+      "lane": "rpm",
+      "not_run": 0,
+      "pass": 50,
+      "run": 19,
+      "system": "x86_64-linux"
+    },
+    {
+      "fail": 0,
+      "lane": "rpm",
+      "not_run": 0,
+      "pass": 50,
+      "run": 19,
+      "system": "aarch64-linux"
+    },
+    {
+      "fail": 0,
+      "lane": "deb",
+      "not_run": 0,
+      "pass": 41,
+      "run": 19,
+      "system": "amd64"
+    },
+    {
+      "fail": 0,
+      "lane": "deb",
+      "not_run": 0,
+      "pass": 41,
+      "run": 19,
+      "system": "arm64"
+    },
+    {
+      "fail": 2,
+      "lane": "pages",
+      "not_run": 0,
+      "pass": 110,
+      "run": 19,
+      "system": "generation"
+    },
+    {
+      "fail": 0,
+      "lane": "observe",
+      "not_run": 1,
+      "pass": 1,
+      "run": 19,
+      "system": "generation"
+    },
+    {
+      "fail": 0,
+      "lane": "foundation3",
+      "not_run": 0,
+      "pass": 2,
+      "run": 19,
+      "system": "generation"
+    }
+  ],
+  "hosted_run21_authorized": false,
+  "hypotheses": [
+    "APT dependency or runner environment difference; equal probed dpkg stream hashes weigh against drift within that queried set",
+    "APT uncaught setup, cleanup or receipt-persistence failure; exact upstream stage unresolved",
+    "Timing, concurrency or cleanup race; not tested and not labeled flakiness",
+    "PRoot ignores delivery and collapses root tracee signal status; sudo relay/monitor behavior not independently established",
+    "WebKit sandbox not requested, helper ancestry missed, or host userns policy; no API call or spawn cause established",
+    "Ubuntu host AppArmor userns restriction may relate to required NIX_FHS_USERNS; not established for WebKit"
+  ],
+  "not_tested": [
+    "Native products on Linux",
+    "APT first-failure stderr text identification",
+    "Omitted bulk binaries or runtime ELF symbol/API calls",
+    "Hosted run21 or diagnostic replay",
+    "Exact bwrap helper failure and WebKit spawn/userns causality",
+    "Post-change native positive matrix"
+  ],
+  "offline_fixed_message_comparison": {
+    "candidates": [
+      {
+        "bytes": 45,
+        "sha256": "bdea74811118ff22365766eecb8877e643aa26ee15461018f2d6ef167ab245ec"
+      },
+      {
+        "bytes": 38,
+        "sha256": "a0c94c21e77bd30eacd8b37ba2cfcdba18235a6a61a96d18fcc715910ff962f3"
+      },
+      {
+        "bytes": 39,
+        "sha256": "43fff63babbf427f78d59bf3733ba55e435830f2bc4c49d329d4110b386aafc2"
+      },
+      {
+        "bytes": 48,
+        "sha256": "25a34f1489d301b9d8772258ec57ccb48d12c5ed3faea2bdf6dc397abbbdbae7"
+      },
+      {
+        "bytes": 48,
+        "sha256": "70906e1ca1e7edcc7eeb8c3ab914e594e28246b800c1166251bbc343fefd5802"
+      },
+      {
+        "bytes": 40,
+        "sha256": "a622cc0386f085c49573142a0f9b4aaeace0f50b0e523bd4ec1c2fc05330405e"
+      },
+      {
+        "bytes": 42,
+        "sha256": "7bdd9b40040866f921179d46d5d1268bfde453675d9e0841d19d3b1d5e5d3b43"
+      }
+    ],
+    "limit": "Fixed throws and scenario/platform forms only; dynamic messages and raw stderr unavailable",
+    "original_apt_hash_match": false
+  },
+  "production_enabled": false,
+  "proot_comparison": [
+    {
+      "application_qualified": false,
+      "fail": 3,
+      "pass": 6,
+      "qualification_authority": false,
+      "signal": {
+        "deliberate_exit_255_verified": true,
+        "delivery_layers": [
+          "sudo",
+          "offline-host-prefix",
+          "proot",
+          "guest-handler"
+        ],
+        "forwarding_cause": "unresolved",
+        "group_handler_observed": true,
+        "group_survivor_count": 0,
+        "outer_handler_observed": false,
+        "outer_survivor_count": 3,
+        "proot_sigterm_ignored": true,
+        "raw_returncode": 255
+      },
+      "smoke": {
+        "cause": "process-nonzero",
+        "elapsed_ms": 3413,
+        "exit_code": 1,
+        "reason_token": "process-nonzero",
+        "scenario": "C",
+        "stderr_sha256": "3155a79b3bde639bc6a3d266bcbc6a0c47b67111aa6cabac7dc86a15abc09377",
+        "stdout_sha256": "1ab7628a71ed46f5bc8cc0402d0304150b5211be50206c9f33722ad44a8e0a67"
+      },
+      "system": "x86_64-linux",
+      "webkit": {
+        "baseline_matches_proot_acceleration": true,
+        "baseline_no_new_privs": 1,
+        "baseline_seccomp": 2,
+        "bwrap_mechanism": {
+          "diagnostic_token": "unclassified",
+          "exit_code": 1,
+          "stderr_sha256": "72c3b399fde2c46a921f589c0ffaf501a5a8e08d14f66c9719506e6d8e9e70ac",
+          "timed_out": false
+        },
+        "bwrap_process_count": 0,
+        "nnp_seccomp_confounded": true,
+        "no_new_privs": [
+          1
+        ],
+        "sandbox_diagnostics_confounded": true,
+        "sandbox_disabled_by_experiment": false,
+        "sandbox_enabled_evidence": "bwrap-parent-observation",
+        "sandboxed_web_processes": 0,
+        "seccomp": [
+          2
+        ],
+        "web_process_count": 1
+      }
+    },
+    {
+      "application_qualified": false,
+      "fail": 3,
+      "pass": 6,
+      "qualification_authority": false,
+      "signal": {
+        "deliberate_exit_255_verified": true,
+        "delivery_layers": [
+          "sudo",
+          "offline-host-prefix",
+          "proot",
+          "guest-handler"
+        ],
+        "forwarding_cause": "unresolved",
+        "group_handler_observed": true,
+        "group_survivor_count": 0,
+        "outer_handler_observed": false,
+        "outer_survivor_count": 3,
+        "proot_sigterm_ignored": true,
+        "raw_returncode": 255
+      },
+      "smoke": {
+        "cause": "process-nonzero",
+        "elapsed_ms": 3268,
+        "exit_code": 1,
+        "reason_token": "process-nonzero",
+        "scenario": "B",
+        "stderr_sha256": "3155a79b3bde639bc6a3d266bcbc6a0c47b67111aa6cabac7dc86a15abc09377",
+        "stdout_sha256": "987b1e0afd708bfb1e5f731419bab205338258ce05572e9075aa9e2c2a90e87c"
+      },
+      "system": "aarch64-linux",
+      "webkit": {
+        "baseline_matches_proot_acceleration": true,
+        "baseline_no_new_privs": 1,
+        "baseline_seccomp": 2,
+        "bwrap_mechanism": {
+          "diagnostic_token": "no-such-file",
+          "exit_code": 1,
+          "stderr_sha256": "343bc964ed6df3c607e03e0ab769f346121faeeb376fa922db99abb7d80f0613",
+          "timed_out": false
+        },
+        "bwrap_process_count": 0,
+        "nnp_seccomp_confounded": true,
+        "no_new_privs": [
+          1
+        ],
+        "sandbox_diagnostics_confounded": true,
+        "sandbox_disabled_by_experiment": false,
+        "sandbox_enabled_evidence": "bwrap-parent-observation",
+        "sandboxed_web_processes": 0,
+        "seccomp": [
+          2
+        ],
+        "web_process_count": 1
+      }
+    }
+  ],
+  "publication_authority": false,
+  "released_source_readback": {
+    "authenticated_sha256_and_size_match": true,
+    "commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+    "method": "github-connector-base64-readback-and-local-rehash",
+    "smoke_git_blob": "c8ca125b644fb05c2c44c2d792ed8da5465c525b",
+    "snapshot_git_blob": "eac902d742a4a07a6a13573109a86ea4b3301a1e"
+  },
+  "released_source_records": [
+    {
+      "path": "tools/fs-snapshot.mjs",
+      "sha256": "a85cd9e81602ddc585baa4164f98707debe5158d260130e489431e9ae699bbde",
+      "size": 10936
+    },
+    {
+      "path": "tools/native-rc-smoke.mjs",
+      "sha256": "3d1eb991bd586dbb90e926049b516549e7518c0851c2e90ecbcc4e20838963f2",
+      "size": 23213
+    }
+  ],
+  "schema": "rs9.cont22-input-evidence.v1",
+  "source_proven": [
+    "Smoke argv agrees with authenticated released CLI and scenario/platform map",
+    "Release run receipt is written at end after inner catch and scratch cleanup",
+    "Inner caught failures normally write run receipt and stdout; uncaught setup, cleanup or persistence failure can bypass both",
+    "No original APT argv/environment/container lifetime/provision-list change from run19 source to run20",
+    "No source-owned causal harness repair established"
+  ],
+  "status": "authenticated-offline-comparison",
+  "verified_inputs": {
+    "artifact_manifests": 18,
+    "base_commit": "0f76dbb3a7b6f0a194b440d03c9044589a603d56",
+    "base_tree": "f068a6fded04cf6e1abcb686d3be42972947fdcd",
+    "extracted_files": {
+      "apt-amd64-nebular-smoke-failure.json": {
+        "bytes": 972,
+        "sha256": "8b67aa4211fa3540071d6877f25ad5fdeca72210a933d4a0675d49d9e02daf01"
+      },
+      "apt-arm64-nebular-smoke-failure.json": {
+        "bytes": 973,
+        "sha256": "cec6ce47593a6916a26b56d46a3d8505ea72a98e05580c84f8f0d5ae1f202dec"
+      },
+      "hosted-summary.json": {
+        "bytes": 3070943,
+        "sha256": "b5d71228c72ddb4325ea8afde7f9106783c423bfec0336f7a18aa1aba2d669aa"
+      },
+      "manager-packet.json": {
+        "bytes": 144930,
+        "sha256": "210fd7395d2c1fcb2cd31f19a502ec8187c282fd1829720a31d5a02e2f54ef5b"
+      },
+      "pages-origin-diagnostic.json": {
+        "bytes": 915,
+        "sha256": "0a6de80384788f675d6a55221c0e2fd540327006db297360a03848f0c8cae4d4"
+      },
+      "prior-hosted-summary.json": {
+        "bytes": 3094372,
+        "sha256": "7b061fbd0e07014d52be61d9f59b91556a5b45757d3ad1bc993533753bbad814"
+      },
+      "prior-manager-packet.json": {
+        "bytes": 145644,
+        "sha256": "189eff15ef7bdf80ba1b1cc1a80f52284f8c937f3c1cf6863a0ac9b60470f55b"
+      },
+      "proot-aarch64-linux-evaluation.json": {
+        "bytes": 199127,
+        "sha256": "ad8e4819e5ae257b5e62266bf1cffcf763bfc1bf5a86fc49243974e5e9433315"
+      },
+      "proot-x86_64-linux-evaluation.json": {
+        "bytes": 199089,
+        "sha256": "14e3e166a01837ace801a6c6bfe3ac815c5268c8099884d4b33bf00a77530ec6"
+      },
+      "run20-wrapper-output.json": {
+        "bytes": 197,
+        "sha256": "590073819e79c2e8035b37aa61385c5b583913af1f390f6f2d93af7b59299102"
+      }
+    },
+    "hosted_run_id": 38199953016,
+    "included_selected_objects": 149,
+    "omitted_manifest_objects": 323,
+    "operator_result": {
+      "bytes": 844484,
+      "sha256": "ed222ec55d55b1043d546f395a6bc1bd6e535cf459a15fcb079a8c5af8e741e0"
+    },
+    "prior_commit": "0bb571c09777a9ba041313b2b8d3a4b6370bd4a1",
+    "prior_operator_result": {
+      "bytes": 832612,
+      "sha256": "edfaaf8d3ff6afc297b7cc76e73115ceb940414eb3d32dd209eb6d20e253f6e2"
+    },
+    "prior_run_id": 38192627940,
+    "prior_tree": "90b79b0d537ba6e83e70d4f8d2f4d838f73edc61",
+    "production_enabled": false,
+    "publication_authority": false,
+    "qualification_authority": false,
+    "schema": "rs9.cont22-verified-inputs.v1",
+    "selected_count": 173,
+    "selected_zip": {
+      "bytes": 900975,
+      "sha256": "3412ad0f8454d970c842d0c6826a9b813cd8088d6f3c0d880f49bbf97d4d0ba1"
+    }
+  },
+  "zip_inventory": [
+    {
+      "archive": "run20-operator-result.zip",
+      "crc": "pass",
+      "outer_sha256": "ed222ec55d55b1043d546f395a6bc1bd6e535cf459a15fcb079a8c5af8e741e0",
+      "selected_member_count": 174,
+      "smoke_script_or_work_directory_or_raw_logs_present": false
+    },
+    {
+      "archive": "prior-run19-operator-result.zip",
+      "crc": "pass",
+      "outer_sha256": "edfaaf8d3ff6afc297b7cc76e73115ceb940414eb3d32dd209eb6d20e253f6e2",
+      "selected_member_count": 168,
+      "smoke_script_or_work_directory_or_raw_logs_present": false
+    }
+  ]
+}

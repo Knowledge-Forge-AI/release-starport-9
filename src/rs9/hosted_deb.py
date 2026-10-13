@@ -982,7 +982,7 @@ def client_cycle(
                 product_evidence["smoke_failure"] = smoke_failure
             if smoke_obs and err_stage == "smoke":
                 from rs9.pages_smoke_diagnostic import validate_smoke_observation
-                smoke_obs = validate_smoke_observation(smoke_obs)
+                smoke_obs = validate_smoke_observation(smoke_obs, system=system)
                 gate_extra["smoke_observation"] = smoke_obs
                 if "scenario" in smoke_obs:
                     gate_extra["scenario"] = smoke_obs["scenario"]

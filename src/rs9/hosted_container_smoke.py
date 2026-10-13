@@ -164,7 +164,7 @@ def _accept_container_output(binding, receipt):
         diagnostic_sha = None
         if smoke_obs or code == "APPLICATION_SMOKE":
             from rs9.pages_smoke_diagnostic import validate_smoke_observation, retain_host_smoke_diagnostic
-            validated_obs = validate_smoke_observation(smoke_obs)
+            validated_obs = validate_smoke_observation(smoke_obs, system=binding["system"])
             prepared = binding.get("prepared")
             if prepared and "scratch" in prepared:
                 try:

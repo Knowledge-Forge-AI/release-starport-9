@@ -44,7 +44,7 @@ def _problem_codes(raw):
     return result
 
 
-def validate_smoke_observation(raw):
+def validate_smoke_observation(raw, *, system=None):
     """Project hostile JSON with no invented hashes, counts, success or signal."""
     raw = raw if isinstance(raw, dict) else {}
     rc = raw.get("raw_returncode")
@@ -58,7 +58,10 @@ def validate_smoke_observation(raw):
     categories = raw.get("log_categories")
     categories = categories[:16] if isinstance(categories, list) else []
     categories = sorted({v for v in categories if isinstance(v, str) and v in SAFE_LOG_CATEGORIES})
-    return {"scenario": _closed(raw.get("scenario"), SCENARIOS, "unknown"), "cause": cause,
+    scenario = _closed(raw.get("scenario"), SCENARIOS, "unknown")
+    allowed = {"x86_64-linux": {"C", "C-signal"}, "aarch64-linux": {"B"}, "aarch64-darwin": {"A"}}
+    mismatch = raw.get("binding_mismatch") is True or (system is not None and scenario not in allowed.get(system, set()))
+    result = {"scenario": "unknown" if mismatch else scenario, "cause": cause,
             "process_scope": "outermost-smoke-process", "raw_returncode": rc,
             "exit_code": rc if rc is not None and rc >= 0 else None,
             "signal": -rc if rc is not None and rc < 0 else None,
@@ -67,6 +70,17 @@ def validate_smoke_observation(raw):
             "problem_codes": _problem_codes(raw.get("problem_codes")),
             "elapsed_ms": _integer(raw.get("elapsed_ms"), 7 * 86400 * 1000),
             "reason_token": _closed(raw.get("reason_token"), CAUSE_CATEGORIES, "unknown")}
+    if mismatch:
+        result["binding_mismatch"] = True
+    from rs9.smoke_stream_tokens import validate_stream_tokens, validate_inventory
+    stream = validate_stream_tokens(raw.get("stderr_diagnostic"), sha256=hashes["stderr_sha256"],
+        byte_count=counts["stderr_bytes"], complete=complete, mismatch=mismatch)
+    inventory = validate_inventory(raw.get("evidence_inventory"), mismatch=mismatch)
+    if stream is not None:
+        result["stderr_diagnostic"] = stream
+    if inventory is not None:
+        result["evidence_inventory"] = inventory
+    return result
 
 
 def retain_host_smoke_diagnostic(directory, observation, *, family, system):
@@ -74,7 +88,7 @@ def retain_host_smoke_diagnostic(directory, observation, *, family, system):
     try:
         if family not in {"apt", "dnf", "pacman"} or system not in {"x86_64-linux", "aarch64-linux"}:
             return None
-        observation = validate_smoke_observation(observation)
+        observation = validate_smoke_observation(observation, system=system)
         record = {"schema": "rs9.application-smoke-diagnostic.v1alpha1", "family": family, "system": system,
                   "product": "theme-forge-nebular-fusion", "status": "fail", "gate_status": "fail",
                   "origin": "original-producer-attempt", "single_attempt": True, "diagnostic_replay": False,
