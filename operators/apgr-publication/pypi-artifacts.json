@@ -1,0 +1,35 @@
+{
+  "schema": "rs9.pypi-artifacts.v1alpha2",
+  "project": "agentic-praxis-grimoire",
+  "version": "0.13.0",
+  "repository": "Knowledge-Forge-AI/agentic-praxis-grimoire",
+  "release_tag": "v0.13.0",
+  "artifacts": [
+    {
+      "name": "agentic_praxis_grimoire-0.13.0-py3-none-manylinux_2_17_aarch64.whl",
+      "size": 4013951,
+      "sha256": "8035795fef2442914a3c7309376c2d356f8082c30cdb7480bf990547326064ff",
+      "url": "https://github.com/Knowledge-Forge-AI/agentic-praxis-grimoire/releases/download/v0.13.0/agentic_praxis_grimoire-0.13.0-py3-none-manylinux_2_17_aarch64.whl"
+    },
+    {
+      "name": "agentic_praxis_grimoire-0.13.0-py3-none-manylinux_2_17_x86_64.whl",
+      "size": 4357859,
+      "sha256": "fc94a8f8358ae12d4feff58e4bad0c525d19b6792cb0646233a311563ebaca1b",
+      "url": "https://github.com/Knowledge-Forge-AI/agentic-praxis-grimoire/releases/download/v0.13.0/agentic_praxis_grimoire-0.13.0-py3-none-manylinux_2_17_x86_64.whl"
+    },
+    {
+      "name": "agentic_praxis_grimoire-0.13.0.tar.gz",
+      "size": 2559474,
+      "sha256": "b318065cde5bd6016cab6475c53ad2926bb345b5e47298fabdd2abdb2198ffa6",
+      "url": "https://github.com/Knowledge-Forge-AI/agentic-praxis-grimoire/releases/download/v0.13.0/agentic_praxis_grimoire-0.13.0.tar.gz"
+    }
+  ],
+  "excluded": [
+    {
+      "name": "agentic_praxis_grimoire-0.13.0-py3-none-macosx_11_0_arm64.whl",
+      "reason": "APGR7_PYTHON_MACHO",
+      "size": 4158387,
+      "sha256": "3b39a9bf6b4b0c87bef11bb3679f70638010cf300038696c8768a06d3abf8a33"
+    }
+  ]
+}

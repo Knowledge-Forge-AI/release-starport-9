@@ -31,6 +31,7 @@ def safe_details(details):
                     "parent_mode", "target_mode"})
     allowed.update({"path", "path_sha256"})
     allowed.update({"scenario", "diagnostic_sha256"})
+    allowed.add("stream_custody")
     result, dropped = {}, False
     if not isinstance(details, dict):
         return {}
@@ -40,6 +41,13 @@ def safe_details(details):
             continue
         if key not in allowed:
             dropped = True
+            continue
+        if key == "stream_custody":
+            from rs9.bounded_process import valid_stream_custody
+            if valid_stream_custody(value):
+                result[key] = {**value, "stdout": dict(value["stdout"]), "stderr": dict(value["stderr"])}
+            else:
+                dropped = True
             continue
         if key == "field_path":
             # JSON pointer components name logical fields, never host locations.
