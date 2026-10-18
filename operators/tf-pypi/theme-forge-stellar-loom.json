@@ -1,0 +1,22 @@
+{
+  "schema": "rs9.tf-pypi-intake.v1",
+  "project": "theme-forge-stellar-loom",
+  "version": "0.4.0",
+  "workflow": "rs9-tfsl-pypi-publish.yml",
+  "asset": "knowledge-forge-ai-theme-forge-stellar-loom-0.4.0.tgz",
+  "size": 273462,
+  "sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+  "npm_name": "@knowledge-forge-ai/theme-forge-stellar-loom",
+  "source_commit": "d6f3cc457ee68224cef06e9599c9d2401057c618",
+  "bins": {
+    "tfsl": "bin/tfsl.js",
+    "tfsl-batch": "bin/tfsl-batch.js"
+  },
+  "node": ">=22",
+  "license": "AGPL-3.0-or-later",
+  "source_status": "READY",
+  "withheld": [],
+  "qualified_platforms": [
+    "darwin-arm64"
+  ]
+}

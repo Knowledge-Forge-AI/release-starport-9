@@ -1,0 +1,148 @@
+name: RS9 theme-forge-solar-sail PyPI Publish
+run-name: 'RS9 theme-forge-solar-sail ${{ inputs.mode }} / ${{ inputs.dispatch_id }}'
+
+on:
+  push:
+    branches: [rs9-tf-pypi-hostqual1]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Execution mode'
+        required: true
+        type: choice
+        options:
+          - qualify
+          - publish
+        default: qualify
+      dispatch_id:
+        description: 'Unique attended intent correlation; not publication authority'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rs9-tfss-pypi-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build_verify:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9-tf-pypi-hostqual1'
+    name: Build and Verify Candidate Artifacts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Build and verify package distributions
+        env:
+          PYTHONPATH: src
+        run: python3 -B -m rs9.tf_pypi_publish build --project theme-forge-solar-sail --output dist --target darwin-arm64
+
+      - name: Stage verified artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pypi-artifacts
+          path: dist/
+          retention-days: 1
+          if-no-files-found: error
+
+  native_consumer:
+    name: Native macOS ARM64 installed consumer
+    needs: [build_verify]
+    runs-on: macos-15
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+      - name: Set up Python 3.13
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - name: Set up Node 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Download the same run's verified distributions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pypi-artifacts
+          path: dist/
+      - name: Test exact wheel and sdist with networking denied
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFY_COMMIT: '${{ github.sha }}'
+        shell: bash
+        run: |
+          set -euo pipefail
+          PHYSICAL_TMP="$(python3 -c 'import os,tempfile; print(os.path.realpath(tempfile.gettempdir()))')"
+          export TMPDIR="$PHYSICAL_TMP" TMP="$PHYSICAL_TMP" TEMP="$PHYSICAL_TMP"
+          PHYSICAL_RUNNER_TEMP="$(python3 -c 'import os; print(os.path.realpath(os.environ["RUNNER_TEMP"]))')"
+          mkdir -p "$PHYSICAL_RUNNER_TEMP/tf-consumer-report"
+          /usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' \
+            python3 -B -m rs9.tf_pypi_hosted qualify --project theme-forge-solar-sail \
+            --dist "$GITHUB_WORKSPACE/dist" --work "$PHYSICAL_RUNNER_TEMP/tf-consumer" \
+            --report "$PHYSICAL_RUNNER_TEMP/tf-consumer-report/result.json" \
+            --expected-commit "$QUALIFY_COMMIT"
+      - name: Preserve native consumer result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-consumer-theme-forge-solar-sail
+          path: '${{ runner.temp }}/tf-consumer-report/'
+          retention-days: 14
+          if-no-files-found: error
+
+  publish:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.mode == 'publish'
+    name: Trusted Publishing to PyPI
+    needs: [build_verify, native_consumer]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/p/theme-forge-solar-sail
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Download staged artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pypi-artifacts
+          path: dist/
+
+      - name: Verify artifact integrity and select only missing files
+        id: missing
+        env:
+          PYTHONPATH: src
+        run: python3 -B -m rs9.tf_pypi_publish select-missing --project theme-forge-solar-sail --dist dist --upload-dir upload >> "$GITHUB_OUTPUT"
+
+      - name: Publish package distributions to PyPI
+        if: steps.missing.outputs.upload == 'true'
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e
+        with:
+          packages-dir: upload/
+
+      - name: Read back published PyPI state
+        env:
+          PYTHONPATH: src
+        run: python3 -B -m rs9.tf_pypi_publish readback --project theme-forge-solar-sail --dist dist

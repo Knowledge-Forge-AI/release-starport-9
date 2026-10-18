@@ -1,0 +1,21 @@
+{
+  "schema": "rs9.tf-pypi-candidate-set.v1",
+  "project": "theme-forge-stellar-loom",
+  "version": "0.4.0",
+  "publication_admitted": false,
+  "files": [
+    {
+      "filename": "theme_forge_stellar_loom-0.4.0-py3-none-macosx_11_0_arm64.whl",
+      "size": 1554570,
+      "sha256": "43014810ee584a8cd474e044ba4fcc3c978cf8b7de50fe3978fe9ec933a1d792",
+      "logical_sha256": "8283d8ac49ee2773b51ec380c336de988076d460e559bea2b964ed648fafb5eb"
+    },
+    {
+      "filename": "theme_forge_stellar_loom-0.4.0.tar.gz",
+      "size": 481338,
+      "sha256": "5ac377a01eedc85200a76a813d572633cb3ca93ee999be4dbbc5f48ad1e7acde",
+      "logical_sha256": "c537c91e58b9b079f18a351698554dffe9ecf088befba033b5e566b2c3a37844"
+    }
+  ],
+  "set_sha256": "452e65e9f0b4e937afc4b3e50bd3fa38cc93be5f4feecca531c85f9791e23bed"
+}
