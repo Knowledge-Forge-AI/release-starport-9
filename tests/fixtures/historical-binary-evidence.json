@@ -1,0 +1,21 @@
+{
+  "schema": "rs9.historical-binary-evidence.v1",
+  "files": [
+    {
+      "path": "evidence/operational/apgr7-builder-env1-closeout-review.zip",
+      "size": 139992,
+      "sha256": "39415c521b4511066d060e2bc87954d917d37475f944164bd8613d193eb3dfa8",
+      "mode": "100644",
+      "provenance_commit": "ce95c781933be648555955edad76dc34f5323e10",
+      "reason": "Immutable historical review evidence containing bounded text members; not controller or adoption authority."
+    },
+    {
+      "path": "evidence/operational/apgr7-builder-env1-review.zip",
+      "size": 49130,
+      "sha256": "658094665459a86101ff3a0e074f0b18b326a9b36d458274ae02be5602e385b3",
+      "mode": "100644",
+      "provenance_commit": "ce95c781933be648555955edad76dc34f5323e10",
+      "reason": "Immutable historical review evidence containing bounded text members; not controller or adoption authority."
+    }
+  ]
+}

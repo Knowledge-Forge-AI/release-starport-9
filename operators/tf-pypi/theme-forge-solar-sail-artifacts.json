@@ -1,0 +1,21 @@
+{
+  "schema": "rs9.tf-pypi-candidate-set.v1",
+  "project": "theme-forge-solar-sail",
+  "version": "0.2.1",
+  "publication_admitted": false,
+  "files": [
+    {
+      "filename": "theme_forge_solar_sail-0.2.1-py3-none-macosx_11_0_arm64.whl",
+      "size": 525052,
+      "sha256": "250728886c4dc48a7f1c2e2401f5003c67004522213605b132704589895da314",
+      "logical_sha256": "a5de89c7f855365d92736a1c7f586401716f5d6fe9c48a613f673600867d74ee"
+    },
+    {
+      "filename": "theme_forge_solar_sail-0.2.1.tar.gz",
+      "size": 317483,
+      "sha256": "6ed334378f705b6f7027e85e7ba29d61c8ba0d51bf07873b1731ba311d7f89af",
+      "logical_sha256": "c7289eb984ef8e2786e0980a28be4fb5d83f5d781681ca0d4ea490a8bdbe93ed"
+    }
+  ],
+  "set_sha256": "fcde62f45ee4f1fec92530b524c1eca2090790815c14cb1076fd227fb3fb8e77"
+}
