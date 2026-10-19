@@ -1352,12 +1352,16 @@ def prepare_hosted_inputs(
     eff_client = _github_client(client)
     captures_root = out / "captures"
     captures_root.mkdir()
+    nebular_root = captures_root / "nebular"
+    stellar_root = captures_root / "stellar"
     try:
+        nebular_root.mkdir()
         neb_rows = capture_generation(
-            root, captures_root / "nebular", project=PROJECT, client=eff_client
+            root, nebular_root, project=PROJECT, client=eff_client
         )
+        stellar_root.mkdir()
         stl_rows = capture_generation(
-            root, captures_root / "stellar", project=STELLAR_PROJECT, client=eff_client
+            root, stellar_root, project=STELLAR_PROJECT, client=eff_client
         )
         neb_cap, neb_intent, neb_prof = neb_rows[0]
         stl_cap, stl_intent, stl_prof = stl_rows[0]
@@ -1390,8 +1394,8 @@ def prepare_hosted_inputs(
         fail("PREPARE_CLOSURE_MISMATCH")
 
     return {
-        "nebular_capture_dir": str(captures_root / "nebular" / PROJECT),
-        "stellar_capture_dir": str(captures_root / "stellar" / STELLAR_PROJECT),
+        "nebular_capture_dir": str(nebular_root / PROJECT),
+        "stellar_capture_dir": str(stellar_root / STELLAR_PROJECT),
         "closure_dir": str(closure_root),
         "records_sha256": prepared["records_sha256"],
     }

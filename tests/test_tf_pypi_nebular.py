@@ -38,6 +38,7 @@ from rs9.tf_pypi_nebular import (
     READBACK_SCHEDULE_SECONDS,
     SANDBOX_PROFILE,
     STELLAR_FIXTURE_PREFIX,
+    STELLAR_PROJECT,
     SUPERSEDED_PRELIMINARY_SHA256,
     SYSTEM,
     VERSION,
@@ -56,6 +57,7 @@ from rs9.tf_pypi_nebular import (
     load_approval,
     main,
     parser,
+    prepare_hosted_inputs,
     probe_network_denial,
     project_state,
     readback,
@@ -1926,6 +1928,382 @@ class NebularPyPIContractTests(unittest.TestCase):
         for forbidden in ("publish", "upload", "dispatch", "promote", "admit"):
             with patch("sys.stderr", io.StringIO()), self.assertRaises(SystemExit):
                 parser().parse_args([forbidden])
+
+    def _run_prepare_hosted_inputs_with_boundary(
+        self,
+        out_dir: Path,
+        *,
+        fail_project: str | None = None,
+        fail_code: str = "FETCH_FAILED",
+        smoke_error: Exception | None = None,
+        release_hash_overrides: dict[str, str] | None = None,
+        profile_hash_overrides: dict[str, str] | None = None,
+        closure_records_sha256: str | None = None,
+        via_cli: bool = False,
+    ) -> tuple[dict[str, object], dict[str, list[object]]]:
+        from rs9.candidate import configuration_rows
+        from rs9.errors import ContractError
+        from rs9.scratch import physical_directory
+
+        intents_by_project = {
+            intent["project"]["id"]: intent
+            for _, intent in configuration_rows(ROOT)
+        }
+        auth_doc = self.committed_approval["authentication"]
+        release_hashes = {
+            PROJECT: auth_doc["nebular"]["release_record_sha256"],
+            STELLAR_PROJECT: auth_doc["stellar_fixture"]["release_record_sha256"],
+        }
+        if release_hash_overrides:
+            release_hashes.update(release_hash_overrides)
+
+        profile_hashes = {
+            PROJECT: auth_doc["nebular"]["profile_result_sha256"],
+            STELLAR_PROJECT: auth_doc["stellar_fixture"]["profile_result_sha256"],
+        }
+        if profile_hash_overrides:
+            profile_hashes.update(profile_hash_overrides)
+
+        expected_closure_sha = (
+            closure_records_sha256
+            if closure_records_sha256 is not None
+            else self.committed_approval["verifier_closure"]["records_sha256"]
+        )
+
+        events: dict[str, list[object]] = {
+            "captures": [],
+            "smoke": [],
+            "bind": [],
+        }
+
+        class NoNetworkClient:
+            def __getattr__(self, name: str) -> object:
+                raise AssertionError(f"unexpected network client access: {name}")
+
+        no_net_client = NoNetworkClient()
+
+        def fake_capture_release(selection: object, target: Path, client: object = None) -> None:
+            parent_dir = physical_directory(Path(target).parent)
+            target_dir = physical_directory(target)
+            self.assertEqual(target_dir.parent, parent_dir)
+            project_id = target_dir.name
+            events["captures"].append((project_id, target_dir))
+            if fail_project == project_id:
+                raise ContractError(fail_code, "simulated capture failure")
+            (target_dir / "captured.json").write_bytes(
+                canonical({"captured": True, "project": project_id})
+            )
+
+        def fake_authenticate_release(selection: object, target: Path) -> object:
+            target_dir = physical_directory(target)
+            project_id = target_dir.name
+            meta = (
+                auth_doc["nebular"]
+                if project_id == PROJECT
+                else auth_doc["stellar_fixture"]
+            )
+            record = {
+                "project": project_id,
+                "repository": {"full_name": meta["repository"]},
+                "release": {"tag_name": meta["tag"]},
+                "tag": {
+                    "name": meta["tag"],
+                    "commit": meta["tag_commit"],
+                    "tree": meta["tag_tree"],
+                },
+                "assets": [],
+                "payloads": [],
+                "source_files": [],
+            }
+            return type(
+                "FakeCapture",
+                (),
+                {"project_id": project_id, "record": record},
+            )()
+
+        def fake_load_bootstrap(
+            manifest: Path, capture: object, approved_manifests: object = None
+        ) -> dict[str, object]:
+            project_id = getattr(capture, "project_id")
+            return copy.deepcopy(intents_by_project[project_id])
+
+        def fake_evaluate_profile(
+            capture: object,
+            profile_id: str,
+            intent: dict[str, object],
+            corroboration: object = None,
+        ) -> dict[str, object]:
+            project_id = getattr(capture, "project_id")
+            return {
+                "project": project_id,
+                "profile": profile_id,
+                "sections": {
+                    "license": {
+                        "expression": EXPECTED_LICENSE_EXPRESSION,
+                        "status": "consistent",
+                    }
+                },
+            }
+
+        def fake_prepare_smoke(
+            neb_cap: object,
+            captures_rows: list[tuple[object, dict[str, object], dict[str, object]]],
+            eff_client: object,
+            closure_root: Path,
+            label: str | None = None,
+        ) -> dict[str, object]:
+            c_root = Path(closure_root)
+            events["smoke"].append(
+                (
+                    c_root,
+                    [getattr(c, "project_id") for c, _, _ in captures_rows],
+                    label,
+                )
+            )
+            if smoke_error is not None:
+                raise smoke_error
+            c_root.mkdir(parents=True, exist_ok=True)
+            (c_root / "source-bindings.json").write_bytes(b"[]\n")
+            return {"scratch": c_root, "label": label}
+
+        def fake_bind_prepared_closure(
+            closure_root: Path, neb_cap: object, stl_cap: object
+        ) -> dict[str, str]:
+            c_root = physical_directory(closure_root)
+            events["bind"].append(
+                (
+                    c_root,
+                    getattr(neb_cap, "project_id"),
+                    getattr(stl_cap, "project_id"),
+                )
+            )
+            return {"records_sha256": expected_closure_sha}
+
+        with (
+            patch("rs9.candidate.capture_release", side_effect=fake_capture_release),
+            patch(
+                "rs9.candidate.authenticate_release",
+                side_effect=fake_authenticate_release,
+            ),
+            patch("rs9.candidate.assert_release_expectations"),
+            patch("rs9.candidate.load_bootstrap", side_effect=fake_load_bootstrap),
+            patch("rs9.candidate.require_configuration_authority"),
+            patch("rs9.candidate.capture_supplemental"),
+            patch(
+                "rs9.candidate.evaluate_profile", side_effect=fake_evaluate_profile
+            ),
+            patch(
+                "rs9.tf_pypi_nebular.prepare_smoke", side_effect=fake_prepare_smoke
+            ),
+            patch(
+                "rs9.tf_pypi_nebular.authenticated_record_hash",
+                side_effect=lambda cap: release_hashes[getattr(cap, "project_id")],
+            ),
+            patch(
+                "rs9.tf_pypi_nebular.record_sha256",
+                side_effect=lambda prof: profile_hashes[prof["project"]],
+            ),
+            patch(
+                "rs9.tf_pypi_nebular.bind_prepared_closure",
+                side_effect=fake_bind_prepared_closure,
+            ),
+            patch(
+                "rs9.tf_pypi_nebular._github_client", return_value=no_net_client
+            ),
+        ):
+            if via_cli:
+                stdout_buf = io.BytesIO()
+                stdout_wrapper = io.TextIOWrapper(stdout_buf, encoding="utf-8")
+                with patch("sys.stdout", stdout_wrapper):
+                    rc = main(["prepare", "--output", str(out_dir)])
+                    stdout_wrapper.flush()
+                self.assertEqual(rc, 0)
+                return json.loads(stdout_buf.getvalue().decode("utf-8")), events
+            result = prepare_hosted_inputs(
+                out_dir, repository=ROOT, client=no_net_client
+            )
+            return result, events
+
+    def test_prepare_hosted_inputs_allocates_fresh_capture_roots(self) -> None:
+        from rs9.candidate import capture_generation
+        from rs9.errors import ContractError
+        from rs9.scratch import physical_directory
+
+        # Strict-boundary control: real capture_generation rejects missing and non-empty directories
+        missing_root = self.root / "missing-capture-root"
+        with self.assertRaises(ContractError) as ctx_missing:
+            capture_generation(ROOT, missing_root, project=PROJECT)
+        self.assertEqual(ctx_missing.exception.code, "INVALID_DIRECTORY")
+
+        nonempty_root = self.root / "nonempty-capture-root"
+        nonempty_root.mkdir()
+        (nonempty_root / "marker.txt").write_text("occupied\n", encoding="utf-8")
+        with self.assertRaises(ContractError) as ctx_nonempty:
+            capture_generation(ROOT, nonempty_root, project=PROJECT)
+        self.assertEqual(ctx_nonempty.exception.code, "OUTPUT_NOT_EMPTY")
+
+        # Production prepare_hosted_inputs allocates fresh physical nebular and stellar capture roots
+        out_dir = self.root / "tfnf-inputs"
+        result, events = self._run_prepare_hosted_inputs_with_boundary(out_dir)
+
+        neb_root = out_dir / "captures" / "nebular"
+        stl_root = out_dir / "captures" / "stellar"
+        closure_root = out_dir / "verifier-closure"
+        self.assertEqual(physical_directory(neb_root), neb_root)
+        self.assertEqual(physical_directory(stl_root), stl_root)
+        self.assertEqual(
+            sorted(p.name for p in neb_root.iterdir()),
+            sorted([PROJECT, "summary"]),
+        )
+        self.assertEqual(
+            sorted(p.name for p in stl_root.iterdir()),
+            sorted([STELLAR_PROJECT, "summary"]),
+        )
+
+        neb_summary = json.loads(
+            (neb_root / "summary" / "authentication.json").read_text(encoding="utf-8")
+        )
+        stl_summary = json.loads(
+            (stl_root / "summary" / "authentication.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            neb_summary["schema"], "rs9.candidate-authentication.v1alpha1"
+        )
+        self.assertFalse(neb_summary["production_enabled"])
+        self.assertEqual(
+            [row["project"] for row in neb_summary["projects"]], [PROJECT]
+        )
+        self.assertEqual(
+            [row["project"] for row in stl_summary["projects"]], [STELLAR_PROJECT]
+        )
+
+        self.assertEqual(
+            events["captures"],
+            [
+                (PROJECT, neb_root / PROJECT),
+                (STELLAR_PROJECT, stl_root / STELLAR_PROJECT),
+            ],
+        )
+        self.assertEqual(
+            events["smoke"],
+            [(closure_root, [PROJECT, STELLAR_PROJECT], "darwin-arm64")],
+        )
+        self.assertEqual(
+            events["bind"],
+            [(closure_root, PROJECT, STELLAR_PROJECT)],
+        )
+        self.assertTrue((neb_root / PROJECT / "captured.json").is_file())
+        self.assertTrue((stl_root / STELLAR_PROJECT / "captured.json").is_file())
+        self.assertEqual(
+            result,
+            {
+                "nebular_capture_dir": str(neb_root / PROJECT),
+                "stellar_capture_dir": str(stl_root / STELLAR_PROJECT),
+                "closure_dir": str(closure_root),
+                "records_sha256": self.committed_approval["verifier_closure"][
+                    "records_sha256"
+                ],
+            },
+        )
+
+        # CLI prepare subcommand exercises the same allocation contract
+        cli_out = self.root / "tfnf-cli-inputs"
+        cli_result, cli_events = self._run_prepare_hosted_inputs_with_boundary(
+            cli_out, via_cli=True
+        )
+        self.assertEqual(
+            [proj for proj, _ in cli_events["captures"]],
+            [PROJECT, STELLAR_PROJECT],
+        )
+        self.assertEqual(
+            cli_result["nebular_capture_dir"],
+            str(cli_out / "captures" / "nebular" / PROJECT),
+        )
+        self.assertEqual(
+            cli_result["stellar_capture_dir"],
+            str(cli_out / "captures" / "stellar" / STELLAR_PROJECT),
+        )
+
+    def test_prepare_hosted_inputs_refuses_nonempty_output(self) -> None:
+        out_dir = self.root / "nonempty-prepare"
+        out_dir.mkdir()
+        (out_dir / "existing.txt").write_text("keep\n", encoding="utf-8")
+
+        with patch("rs9.candidate.capture_release") as mock_capture:
+            with self.assertRaises(AdmissionError) as ctx:
+                prepare_hosted_inputs(out_dir, repository=ROOT)
+        self.assertEqual(ctx.exception.code, "TF_PYPI_PREPARE_NOT_EMPTY")
+        self.assertEqual(str(ctx.exception), "TF_PYPI_PREPARE_NOT_EMPTY")
+        mock_capture.assert_not_called()
+        self.assertFalse((out_dir / "captures").exists())
+        self.assertEqual([p.name for p in out_dir.iterdir()], ["existing.txt"])
+
+    def test_prepare_hosted_inputs_propagates_capture_failure(self) -> None:
+        from rs9.errors import ContractError
+
+        # (a) Nebular capture failure maps to TF_PYPI_PREPARE_<CODE> and never allocates stellar
+        out_neb_fail = self.root / "prepare-neb-fail"
+        with self.assertRaises(AdmissionError) as ctx_neb:
+            self._run_prepare_hosted_inputs_with_boundary(
+                out_neb_fail, fail_project=PROJECT, fail_code="FETCH_FAILED"
+            )
+        self.assertEqual(ctx_neb.exception.code, "TF_PYPI_PREPARE_FETCH_FAILED")
+        self.assertEqual(str(ctx_neb.exception), "TF_PYPI_PREPARE_FETCH_FAILED")
+        self.assertTrue((out_neb_fail / "captures" / "nebular").is_dir())
+        self.assertFalse((out_neb_fail / "captures" / "stellar").exists())
+        self.assertFalse((out_neb_fail / "verifier-closure").exists())
+
+        # (b) Stellar capture failure after Nebular succeeds maps to TF_PYPI_PREPARE_<CODE> before smoke/bind
+        out_stl_fail = self.root / "prepare-stl-fail"
+        with self.assertRaises(AdmissionError) as ctx_stl:
+            self._run_prepare_hosted_inputs_with_boundary(
+                out_stl_fail, fail_project=STELLAR_PROJECT, fail_code="FETCH_FAILED"
+            )
+        self.assertEqual(ctx_stl.exception.code, "TF_PYPI_PREPARE_FETCH_FAILED")
+        self.assertEqual(str(ctx_stl.exception), "TF_PYPI_PREPARE_FETCH_FAILED")
+        self.assertTrue((out_stl_fail / "captures" / "nebular" / PROJECT / "captured.json").is_file())
+        self.assertTrue((out_stl_fail / "captures" / "stellar").is_dir())
+        self.assertFalse((out_stl_fail / "verifier-closure").exists())
+
+        # (c) Verifier-closure smoke failure maps to TF_PYPI_PREPARE_<CODE>
+        out_smoke_fail = self.root / "prepare-smoke-fail"
+        with self.assertRaises(AdmissionError) as ctx_smoke:
+            self._run_prepare_hosted_inputs_with_boundary(
+                out_smoke_fail,
+                smoke_error=ContractError("SMOKE_SOURCE", "simulated closure failure"),
+            )
+        self.assertEqual(ctx_smoke.exception.code, "TF_PYPI_PREPARE_SMOKE_SOURCE")
+        self.assertEqual(str(ctx_smoke.exception), "TF_PYPI_PREPARE_SMOKE_SOURCE")
+
+    def test_prepare_hosted_inputs_auth_and_closure_mismatch(self) -> None:
+        # (a) Stellar release record or profile hash mismatch -> TF_PYPI_PREPARE_AUTH_MISMATCH before bind_prepared_closure
+        out_auth_bad = self.root / "prepare-auth-mismatch"
+        with self.assertRaises(AdmissionError) as ctx_auth:
+            self._run_prepare_hosted_inputs_with_boundary(
+                out_auth_bad,
+                release_hash_overrides={STELLAR_PROJECT: "0" * 64},
+            )
+        self.assertEqual(ctx_auth.exception.code, "TF_PYPI_PREPARE_AUTH_MISMATCH")
+        self.assertEqual(str(ctx_auth.exception), "TF_PYPI_PREPARE_AUTH_MISMATCH")
+
+        out_prof_bad = self.root / "prepare-prof-mismatch"
+        with self.assertRaises(AdmissionError) as ctx_prof:
+            self._run_prepare_hosted_inputs_with_boundary(
+                out_prof_bad,
+                profile_hash_overrides={STELLAR_PROJECT: "0" * 64},
+            )
+        self.assertEqual(ctx_prof.exception.code, "TF_PYPI_PREPARE_AUTH_MISMATCH")
+        self.assertEqual(str(ctx_prof.exception), "TF_PYPI_PREPARE_AUTH_MISMATCH")
+
+        # (b) Verifier closure records_sha256 mismatch -> TF_PYPI_PREPARE_CLOSURE_MISMATCH
+        out_closure_bad = self.root / "prepare-closure-mismatch"
+        with self.assertRaises(AdmissionError) as ctx_closure:
+            self._run_prepare_hosted_inputs_with_boundary(
+                out_closure_bad,
+                closure_records_sha256="f" * 64,
+            )
+        self.assertEqual(ctx_closure.exception.code, "TF_PYPI_PREPARE_CLOSURE_MISMATCH")
+        self.assertEqual(str(ctx_closure.exception), "TF_PYPI_PREPARE_CLOSURE_MISMATCH")
 
 
 if __name__ == "__main__":
