@@ -224,6 +224,7 @@ def build_synthetic_approved_wheel(
     w_path.write_bytes(wheel_bytes)
 
     synth_approval = copy.deepcopy(base_approval)
+    synth_approval["publication_admitted"] = False
     synth_approval["payload_asset"]["size"] = len(payload_bytes)
     synth_approval["payload_asset"]["sha256"] = payload_sha
     synth_approval["license_files"] = [
@@ -328,16 +329,17 @@ class NebularPyPIContractTests(unittest.TestCase):
         self.assertEqual([r["path"] for r in doc["license_files"]], list(EXPECTED_LICENSE_FILES))
         self.assertFalse(doc["commercial_license_authority"]["shipped_in_wheel"])
         self.assertFalse(doc["builder_can_publish"])
-        self.assertFalse(doc["publication_admitted"])
+        self.assertIs(type(doc["publication_admitted"]), bool)
         self.assertEqual(len(doc["files"]), 1)
         self.assertEqual(doc["files"][0]["filename"], EXPECTED_WHEEL_FILENAME)
         self.assertLess(doc["files"][0]["size"], PYPI_DEFAULT_FILE_LIMIT)
         self.assertEqual(len(doc["members"]), EXPECTED_MEMBER_COUNT)
 
-        # set_sha256 is invariant when flipping publication_admitted
-        admitted_copy = dict(doc, publication_admitted=True)
-        self.assertEqual(compute_set_sha256(admitted_copy), doc["set_sha256"])
-        validate_approval_schema(admitted_copy)
+        # set_sha256 is invariant across both boolean publication_admitted states
+        for admitted_state in (False, True):
+            state_copy = dict(doc, publication_admitted=admitted_state)
+            self.assertEqual(compute_set_sha256(state_copy), doc["set_sha256"])
+            validate_approval_schema(state_copy)
 
         # Superseded preliminary wheel SHA-256 is explicitly recorded and rejected as active
         self.assertEqual(
@@ -2304,6 +2306,711 @@ class NebularPyPIContractTests(unittest.TestCase):
             )
         self.assertEqual(ctx_closure.exception.code, "TF_PYPI_PREPARE_CLOSURE_MISMATCH")
         self.assertEqual(str(ctx_closure.exception), "TF_PYPI_PREPARE_CLOSURE_MISMATCH")
+
+    def test_synthetic_fixtures_independent_of_committed_admission(self) -> None:
+        admitted_base = copy.deepcopy(self.committed_approval)
+        admitted_base["publication_admitted"] = True
+        self.assertEqual(
+            compute_set_sha256(admitted_base),
+            self.committed_approval["set_sha256"],
+        )
+
+        dist_dir = self.root / "dist_from_admitted_base"
+        w_path, synth_app = build_synthetic_approved_wheel(admitted_base, dist_dir)
+        self.assertTrue(w_path.is_file())
+        self.assertFalse(synth_app["publication_admitted"])
+        self.assertFalse(synth_app["builder_can_publish"])
+
+        verified_dormant = verify_approved(
+            dist_dir, approval=synth_app, require_admitted=False
+        )
+        self.assertFalse(verified_dormant["publication_admitted"])
+        self.assertFalse(verified_dormant["builder_can_publish"])
+
+        with self.assertRaises(AdmissionError) as ctx_refuse:
+            verify_approved(dist_dir, approval=synth_app, require_admitted=True)
+        self.assertEqual(ctx_refuse.exception.code, "TF_PYPI_PUBLICATION_NOT_ADMITTED")
+
+        def forbidden_get(url: str) -> bytes:
+            raise AssertionError(f"Unexpected network call to {url}")
+
+        with self.assertRaises(AdmissionError) as ctx_select:
+            select_missing(
+                dist_dir,
+                self.root / "upload_withheld_from_admitted_base",
+                approval=synth_app,
+                get=forbidden_get,
+            )
+        self.assertEqual(ctx_select.exception.code, "TF_PYPI_PUBLICATION_NOT_ADMITTED")
+
+        synth_admitted = dict(synth_app, publication_admitted=True)
+        self.assertEqual(compute_set_sha256(synth_admitted), synth_app["set_sha256"])
+        validate_approval_schema(synth_admitted)
+        verified_admitted = verify_approved(
+            dist_dir, approval=synth_admitted, require_admitted=True
+        )
+        self.assertTrue(verified_admitted["publication_admitted"])
+        self.assertFalse(verified_admitted["builder_can_publish"])
+
+    def _run_qualify_cli(
+        self,
+        runtime_effect: object,
+        *,
+        approval: dict[str, object] | None = None,
+        label: str = "run",
+    ) -> tuple[int, dict[str, object], bytes, str, str, dict[str, int]]:
+        import rs9.tf_pypi_nebular as tfnf_mod
+
+        run_root = self.root / f"qualify_{label}"
+        dist_dir = run_root / "dist"
+        _, synth_app = build_synthetic_approved_wheel(self.committed_approval, dist_dir)
+        eff_approval = copy.deepcopy(approval) if approval is not None else synth_app
+
+        work_dir = run_root / "work"
+        neb_cap_dir = run_root / "neb-cap"
+        stl_cap_dir = run_root / "stl-cap"
+        closure_dir = run_root / "closure"
+        for d in (neb_cap_dir, stl_cap_dir, closure_dir):
+            d.mkdir(parents=True, exist_ok=True)
+        report_path = run_root / "report" / "result.json"
+        expected_commit = "4330b3351032f6114016a2d2252487da55150e8b"
+
+        auth_doc = eff_approval["authentication"]  # type: ignore[index]
+        release_hashes = {
+            PROJECT: auth_doc["nebular"]["release_record_sha256"],  # type: ignore[index]
+            STELLAR_PROJECT: auth_doc["stellar_fixture"]["release_record_sha256"],  # type: ignore[index]
+        }
+        profile_hashes = {
+            PROJECT: auth_doc["nebular"]["profile_result_sha256"],  # type: ignore[index]
+            STELLAR_PROJECT: auth_doc["stellar_fixture"]["profile_result_sha256"],  # type: ignore[index]
+        }
+        closure_sha = eff_approval["verifier_closure"]["records_sha256"]  # type: ignore[index]
+
+        events = {
+            "lifecycle_calls": 0,
+            "runtime_calls": 0,
+            "probe_calls": 0,
+            "snapshot_calls": 0,
+        }
+
+        def fake_auth_captured(
+            cap_dir: Path, *, project: str, repository: Path | None = None
+        ) -> tuple[object, dict[str, object], dict[str, object]]:
+            cap = type("FakeCap", (), {"project_id": project, "record": {}})()
+            return cap, {"project": {"id": project}}, {"project": project}
+
+        def fake_bind_closure(
+            c_dir: Path,
+            neb_cap: object,
+            stl_cap: object,
+            *,
+            scratch_dir: Path | None = None,
+        ) -> dict[str, object]:
+            return {
+                "tools": closure_dir / "tools",
+                "source": closure_dir / "source",
+                "scratch": scratch_dir or (run_root / "smoke"),
+                "records_sha256": closure_sha,
+            }
+
+        def fake_run_probes(
+            command_name: str,
+            bin_path: Path,
+            *,
+            repository: Path,
+            prefix: object,
+            env: dict[str, str],
+            system: str,
+            substage: str,
+            after_probe: object = None,
+        ) -> list[dict[str, str]]:
+            events["probe_calls"] += 1
+            if callable(after_probe):
+                after_probe()
+            return [{"command": command_name, "status": "pass"}]
+
+        def fake_snapshot_runtime(
+            runtime_root: Path, prepared: dict[str, object], system: str
+        ) -> dict[str, object]:
+            events["snapshot_calls"] += 1
+            return {
+                "actual_member_count": 1656,
+                "runtime_root_sha256": "1" * 64,
+                "members": [],
+            }
+
+        def fake_verify_runtime(
+            runtime_root: Path,
+            prepared: dict[str, object],
+            system: str,
+            prefix: object,
+            env: dict[str, str],
+            *,
+            baseline: dict[str, object],
+            diagnostic_extras: bool = False,
+        ) -> dict[str, object]:
+            events["runtime_calls"] += 1
+            self.assertEqual(system, SYSTEM)
+            self.assertFalse(diagnostic_extras)
+            if isinstance(runtime_effect, BaseException):
+                raise runtime_effect
+            if callable(runtime_effect):
+                return runtime_effect(
+                    runtime_root,
+                    prepared,
+                    system,
+                    prefix,
+                    env,
+                    baseline=baseline,
+                    diagnostic_extras=diagnostic_extras,
+                )
+            return runtime_effect  # type: ignore[return-value]
+
+        def fake_offline_lifecycle(
+            wheel_path: Path,
+            *,
+            distribution_name: str,
+            commands_to_test: dict[str, dict[str, object]],
+            venv_dir: Path,
+            cache_dir: Path,
+        ) -> dict[str, object]:
+            events["lifecycle_calls"] += 1
+            app_dir = (
+                Path(cache_dir)
+                / "entries"
+                / "41d9eaa1b7930efe1edaa33a600491bd9073da42f27445983fd4da88596995ba"
+                / "payload"
+                / "Theme Forge Nebular Fusion.app"
+            )
+            app_dir.mkdir(parents=True, exist_ok=True)
+            spec = commands_to_test["tfnf"]
+            verifier = spec["verifier"]
+            cmd_env = {
+                **dict(spec["env"]),  # type: ignore[arg-type]
+                "THEME_FORGE_CACHE_DIR": str(cache_dir),
+            }
+            bin_path = Path(venv_dir) / "bin" / "tfnf"
+            ver_res = verifier(bin_path, (), cmd_env)  # type: ignore[misc]
+            return {
+                "installed_and_verified": True,
+                "clean_uninstall_verified": True,
+                "command_results": {"tfnf": {"verifier": ver_res}},
+            }
+
+        import contextlib
+
+        stdout_buf = io.StringIO()
+        stderr_buf = io.StringIO()
+        patches = (
+            patch.object(tfnf_mod.platform, "system", return_value="Darwin"),
+            patch.object(tfnf_mod.platform, "machine", return_value="arm64"),
+            patch.object(
+                tfnf_mod,
+                "source_tree_state",
+                return_value={
+                    "head_commit": expected_commit,
+                    "worktree_clean": True,
+                    "dirty_paths_count": 0,
+                },
+            ),
+            patch.object(tfnf_mod, "verify_approved", return_value=eff_approval),
+            patch.object(tfnf_mod.shutil, "which", return_value="/usr/local/bin/node"),
+            patch.object(
+                tfnf_mod, "operator_home", return_value=run_root / "operator_home"
+            ),
+            patch.object(
+                tfnf_mod,
+                "snapshot_host_state",
+                return_value={"targets": [], "sha256": "0" * 64},
+            ),
+            patch.object(
+                tfnf_mod,
+                "host_state_public_summary",
+                return_value={"target_count": 63, "sha256": "0" * 64},
+            ),
+            patch.object(
+                tfnf_mod,
+                "probe_network_denial",
+                return_value={"network_disabled": True},
+            ),
+            patch.object(
+                tfnf_mod,
+                "verify_ps_observer",
+                return_value={"path": "/bin/ps", "self_pid_probe_passed": True},
+            ),
+            patch.object(
+                tfnf_mod, "authenticate_captured", side_effect=fake_auth_captured
+            ),
+            patch.object(
+                tfnf_mod,
+                "authenticated_record_hash",
+                side_effect=lambda cap: release_hashes[getattr(cap, "project_id")],
+            ),
+            patch.object(
+                tfnf_mod,
+                "record_sha256",
+                side_effect=lambda prof: profile_hashes[prof["project"]],
+            ),
+            patch.object(
+                tfnf_mod, "bind_prepared_closure", side_effect=fake_bind_closure
+            ),
+            patch.object(
+                tfnf_mod,
+                "verify_harness_targets",
+                return_value={"target_count": 63, "verified": True},
+            ),
+            patch.object(tfnf_mod, "bind_commands"),
+            patch.object(
+                tfnf_mod,
+                "verify_python39_refusal",
+                return_value={"status": "pass", "client_python": "3.9.6"},
+            ),
+            patch.object(
+                tfnf_mod.subprocess, "check_output", return_value=b"v22.22.2\n"
+            ),
+            patch.object(
+                tfnf_mod,
+                "verifier_import_preflight",
+                return_value={"status": "pass"},
+            ),
+            patch.object(tfnf_mod, "run_probes", side_effect=fake_run_probes),
+            patch.object(
+                tfnf_mod,
+                "snapshot_nebular_runtime",
+                side_effect=fake_snapshot_runtime,
+            ),
+            patch.object(
+                tfnf_mod, "verify_nebular_runtime", side_effect=fake_verify_runtime
+            ),
+            patch.object(
+                tfnf_mod,
+                "verify_offline_venv_lifecycle",
+                side_effect=fake_offline_lifecycle,
+            ),
+            patch("sys.stdout", stdout_buf),
+            patch("sys.stderr", stderr_buf),
+        )
+        with contextlib.ExitStack() as stack:
+            for ctx in patches:
+                stack.enter_context(ctx)
+            rc = main(
+                [
+                    "qualify",
+                    "--dist",
+                    str(dist_dir),
+                    "--work",
+                    str(work_dir),
+                    "--nebular-capture",
+                    str(neb_cap_dir),
+                    "--stellar-capture",
+                    str(stl_cap_dir),
+                    "--closure",
+                    str(closure_dir),
+                    "--report",
+                    str(report_path),
+                    "--expected-commit",
+                    expected_commit,
+                    "--require-clean",
+                ]
+            )
+
+        self.assertTrue(report_path.is_file())
+        report_bytes = report_path.read_bytes()
+        report_doc = json.loads(report_bytes.decode("utf-8"))
+        return (
+            rc,
+            report_doc,
+            report_bytes,
+            stdout_buf.getvalue(),
+            stderr_buf.getvalue(),
+            events,
+        )
+
+    def test_qualify_cli_preserves_valid_darwin_scenario_a_smoke_observation(self) -> None:
+        from rs9.errors import ContractError
+        from rs9.pages_smoke_diagnostic import validate_smoke_observation
+
+        raw_fields = {
+            "scenario": "A",
+            "raw_returncode": 1,
+            "exit_code": 1,
+            "signal": None,
+            "elapsed_ms": 1840,
+            "stdout_bytes": 128,
+            "stderr_bytes": 64,
+            "stdout_sha256": "a" * 64,
+            "stderr_sha256": "b" * 64,
+            "stream_capture_complete": True,
+            "log_categories": ["assertion"],
+            "receipt_error": "receipt-failed",
+            "problem_codes": ["SMOKE_ASSERTION_FAILED"],
+            "cause": "assertion",
+            "reason_token": "process-nonzero",
+            "stderr_diagnostic": {
+                "stage": "original-smoke-process-stderr",
+                "bytes": 64,
+                "sha256": "b" * 64,
+                "line_count": 2,
+                "utf8_valid": True,
+                "tokens": ["node-type-error"],
+                "tokens_omitted": 0,
+                "withheld_reason": None,
+            },
+            "evidence_inventory": {
+                "stage": "after-original-smoke-before-client-cleanup",
+                "status": "observed",
+                "artifacts": [
+                    {
+                        "kind": "run.json",
+                        "bytes": 512,
+                        "regular": True,
+                        "symlink": False,
+                    },
+                    {
+                        "kind": "stderr.log",
+                        "bytes": 64,
+                        "regular": True,
+                        "symlink": False,
+                    },
+                ],
+                "entries_observed": 2,
+                "unlisted": 0,
+            },
+        }
+        validated_obs = validate_smoke_observation(raw_fields, system=SYSTEM)
+        smoke_err = ContractError(
+            "APPLICATION_SMOKE",
+            "Released application-aware smoke failed",
+            details={"scenario": "A", "cause": "assertion", "exit_code": 1},
+        )
+        smoke_err.smoke_observation = validated_obs  # type: ignore[attr-defined]
+
+        rc, report, _, stdout_text, stderr_text, events = self._run_qualify_cli(
+            smoke_err, label="valid_scenario_a"
+        )
+        self.assertEqual(rc, 1)
+        self.assertEqual(stderr_text, "")
+        self.assertEqual(
+            events,
+            {
+                "lifecycle_calls": 1,
+                "runtime_calls": 1,
+                "probe_calls": 1,
+                "snapshot_calls": 1,
+            },
+        )
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(report["error_code"], "TF_PYPI_RUNTIME_APPLICATION_SMOKE")
+        self.assertFalse(report["can_publish"])
+        self.assertFalse(report["publication_admitted"])
+        self.assertEqual(report["public_writes"], 0)
+        for absent_key in ("gates", "lifecycle", "runtime_verification", "error_type"):
+            self.assertNotIn(absent_key, report)
+        self.assertIn("smoke_observation", report)
+        self.assertEqual(
+            report["smoke_observation"],
+            {
+                "status": "observed",
+                "reason": None,
+                "origin": "original-producer-attempt",
+                "single_attempt": True,
+                "diagnostic_replay": False,
+                "cause_is_observation_not_root_cause": True,
+                "observation": validated_obs,
+            },
+        )
+        observed_payload = report["smoke_observation"]["observation"]  # type: ignore[index]
+        self.assertEqual(observed_payload["scenario"], "A")
+        self.assertEqual(observed_payload["cause"], "assertion")
+        self.assertNotIn("binding_mismatch", observed_payload)
+        self.assertEqual(
+            json.loads(stdout_text),
+            {
+                "can_publish": False,
+                "project": PROJECT,
+                "publication_admitted": False,
+                "status": "failed",
+            },
+        )
+
+    def test_qualify_cli_smoke_observation_absent_invalid_and_oversized_fallbacks(self) -> None:
+        from rs9.errors import ContractError
+        from rs9.pages_smoke_diagnostic import validate_smoke_observation
+        import rs9.tf_pypi_nebular as tfnf_mod
+
+        base_unavailable = {
+            "status": "unavailable",
+            "origin": "original-producer-attempt",
+            "single_attempt": True,
+            "diagnostic_replay": False,
+            "cause_is_observation_not_root_cause": True,
+        }
+
+        # 1. Absent observation (missing attribute and explicit None)
+        err_no_attr = ContractError("APPLICATION_SMOKE", "smoke failed")
+        err_none = ContractError("APPLICATION_SMOKE", "smoke failed")
+        err_none.smoke_observation = None  # type: ignore[attr-defined]
+        for idx, err_case in enumerate((err_no_attr, err_none)):
+            rc, report, _, _, _, events = self._run_qualify_cli(
+                err_case, label=f"absent_{idx}"
+            )
+            self.assertEqual(rc, 1)
+            self.assertEqual(events["runtime_calls"], 1)
+            self.assertEqual(report["error_code"], "TF_PYPI_RUNTIME_APPLICATION_SMOKE")
+            self.assertEqual(
+                report["smoke_observation"],
+                {**base_unavailable, "reason": "absent"},
+            )
+            self.assertNotIn("observation", report["smoke_observation"])  # type: ignore[arg-type]
+
+        # 2. Invalid observation (non-dict, empty/malformed dict, NaN, and validator exception)
+        for idx, bad_obs in enumerate(
+            (
+                "corrupt-observation",
+                12345,
+                ["list-observation"],
+                {},
+                {"unexpected": "shape"},
+                {"scenario": 123, "cause": None},
+                {"scenario": "A", "cause": "process-nonzero", "elapsed_ms": float("nan")},
+            )
+        ):
+            err_bad = ContractError("APPLICATION_SMOKE", "smoke failed")
+            err_bad.smoke_observation = bad_obs  # type: ignore[attr-defined]
+            rc, report, _, _, _, events = self._run_qualify_cli(
+                err_bad, label=f"invalid_{idx}"
+            )
+            self.assertEqual(rc, 1)
+            self.assertEqual(events["runtime_calls"], 1)
+            self.assertEqual(report["error_code"], "TF_PYPI_RUNTIME_APPLICATION_SMOKE")
+            self.assertNotIn("error_type", report)
+            self.assertEqual(
+                report["smoke_observation"],
+                {**base_unavailable, "reason": "invalid"},
+            )
+
+        valid_obs = validate_smoke_observation(
+            {"scenario": "A", "cause": "process-nonzero", "raw_returncode": 1},
+            system=SYSTEM,
+        )
+        err_val_raises = ContractError("APPLICATION_SMOKE", "smoke failed")
+        err_val_raises.smoke_observation = valid_obs  # type: ignore[attr-defined]
+        with patch(
+            "rs9.pages_smoke_diagnostic.validate_smoke_observation",
+            side_effect=RuntimeError("validator failed"),
+        ):
+            rc, report, _, _, _, _ = self._run_qualify_cli(
+                err_val_raises, label="invalid_validator_raises"
+            )
+        self.assertEqual(rc, 1)
+        self.assertEqual(report["error_code"], "TF_PYPI_RUNTIME_APPLICATION_SMOKE")
+        self.assertNotIn("error_type", report)
+        self.assertEqual(
+            report["smoke_observation"],
+            {**base_unavailable, "reason": "invalid"},
+        )
+
+        # 3. Oversized observation (both via patched ceiling and via >8 KiB raw payload)
+        err_over_cap = ContractError("APPLICATION_SMOKE", "smoke failed")
+        err_over_cap.smoke_observation = valid_obs  # type: ignore[attr-defined]
+        with patch.object(
+            tfnf_mod, "SMOKE_OBSERVATION_MAX_BYTES", 64, create=True
+        ):
+            rc, report, _, _, _, _ = self._run_qualify_cli(
+                err_over_cap, label="oversized_cap"
+            )
+        self.assertEqual(rc, 1)
+        self.assertEqual(report["error_code"], "TF_PYPI_RUNTIME_APPLICATION_SMOKE")
+        self.assertEqual(
+            report["smoke_observation"],
+            {**base_unavailable, "reason": "oversized"},
+        )
+        self.assertNotIn("observation", report["smoke_observation"])  # type: ignore[arg-type]
+
+        err_over_raw = ContractError("APPLICATION_SMOKE", "smoke failed")
+        err_over_raw.smoke_observation = {  # type: ignore[attr-defined]
+            **valid_obs,
+            "oversize_payload": "x" * 10000,
+        }
+        rc, report, _, _, _, _ = self._run_qualify_cli(
+            err_over_raw, label="oversized_raw"
+        )
+        self.assertEqual(rc, 1)
+        self.assertEqual(report["error_code"], "TF_PYPI_RUNTIME_APPLICATION_SMOKE")
+        self.assertEqual(
+            report["smoke_observation"],
+            {**base_unavailable, "reason": "oversized"},
+        )
+        self.assertNotIn("observation", report["smoke_observation"])  # type: ignore[arg-type]
+
+    def test_qualify_cli_strips_hostile_sentinels_and_preserves_non_smoke_and_admitted_invariants(
+        self,
+    ) -> None:
+        from rs9.errors import ContractError
+        from rs9.pages_smoke_diagnostic import validate_smoke_observation
+
+        priv_home = "/" + "Users/" + "sentinel-operator-home"
+        priv_tok = "ghp" + "_" + "S" * 36
+        raw_argv = "--secret-flag=SENTINEL_ARGV_VALUE"
+        raw_stdout = "SENTINEL_RAW_STDOUT_STREAM"
+        raw_stderr = "SENTINEL_RAW_STDERR_STREAM"
+        raw_ps = "99999 /Applications/SentinelProcess.app"
+        exc_msg_sentinel = "SENTINEL_EXCEPTION_MESSAGE_TEXT"
+        exc_detail_sentinel = "SENTINEL_EXC_DETAILS_FIELD"
+        bad_cause_sentinel = "SENTINEL_UNLISTED_CAUSE"
+        bad_problem_sentinel = "SENTINEL_PROBLEM /private/path"
+
+        hostile_obs = {
+            "scenario": "C",
+            "cause": bad_cause_sentinel,
+            "raw_returncode": -15,
+            "stdout_bytes": 32,
+            "stderr_bytes": 48,
+            "stdout_sha256": "c" * 64,
+            "stderr_sha256": "d" * 64,
+            "stream_capture_complete": True,
+            "log_categories": ["webkit-crash", raw_stdout],
+            "receipt_error": "SENTINEL_RECEIPT_ERROR",
+            "problem_codes": [bad_problem_sentinel, priv_tok, "VALID_PROBLEM_CODE_1"],
+            "elapsed_ms": 950,
+            "reason_token": bad_cause_sentinel,
+            "argv": ["node", raw_argv, priv_home],
+            "stdout": raw_stdout,
+            "stderr": raw_stderr,
+            "ps_output": raw_ps,
+            "home": priv_home,
+            "authorization": f"Bearer {priv_tok}",
+            "path": priv_home,
+        }
+        hostile_err = ContractError(
+            "APPLICATION_SMOKE",
+            exc_msg_sentinel,
+            details={
+                "detail_sentinel": exc_detail_sentinel,
+                "path": priv_home,
+                "argv": [raw_argv],
+            },
+        )
+        hostile_err.smoke_observation = hostile_obs  # type: ignore[attr-defined]
+
+        # Run with an admitted approval manifest to also prove no admission/publication promotion on failure
+        _, synth_app = build_synthetic_approved_wheel(
+            self.committed_approval, self.root / "dist_admitted_check"
+        )
+        admitted_app = dict(synth_app, publication_admitted=True)
+
+        rc, report, report_bytes, stdout_text, stderr_text, events = (
+            self._run_qualify_cli(
+                hostile_err, approval=admitted_app, label="hostile_sentinels"
+            )
+        )
+        self.assertEqual(rc, 1)
+        self.assertEqual(events["runtime_calls"], 1)
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(report["error_code"], "TF_PYPI_RUNTIME_APPLICATION_SMOKE")
+        self.assertFalse(report["can_publish"])
+        self.assertFalse(report["publication_admitted"])
+        self.assertEqual(report["public_writes"], 0)
+
+        smoke_rec = report["smoke_observation"]
+        self.assertEqual(smoke_rec["status"], "observed")  # type: ignore[index]
+        self.assertIsNone(smoke_rec["reason"])  # type: ignore[index]
+        obs = smoke_rec["observation"]  # type: ignore[index]
+        self.assertEqual(obs, validate_smoke_observation(hostile_obs, system=SYSTEM))
+        self.assertEqual(obs["scenario"], "unknown")
+        self.assertTrue(obs["binding_mismatch"])
+        self.assertEqual(obs["cause"], "unknown")
+        self.assertEqual(obs["reason_token"], "unknown")
+        self.assertIsNone(obs["receipt_error"])
+        self.assertEqual(obs["raw_returncode"], -15)
+        self.assertIsNone(obs["exit_code"])
+        self.assertEqual(obs["signal"], 15)
+        self.assertEqual(obs["log_categories"], ["webkit-crash"])
+        self.assertEqual(
+            obs["problem_codes"],
+            ["withheld-token", "withheld-token", "VALID_PROBLEM_CODE_1"],
+        )
+
+        all_sentinels = (
+            priv_home,
+            priv_tok,
+            raw_argv,
+            raw_stdout,
+            raw_stderr,
+            raw_ps,
+            exc_msg_sentinel,
+            exc_detail_sentinel,
+            bad_cause_sentinel,
+            bad_problem_sentinel,
+            "SENTINEL_RECEIPT_ERROR",
+        )
+        combined_output = (
+            report_bytes.decode("utf-8") + "\n" + stdout_text + "\n" + stderr_text
+        )
+        for sentinel in all_sentinels:
+            self.assertNotIn(sentinel, combined_output)
+
+        # Also verify hostile-sentinel stripping on the native Darwin Scenario A path
+        hostile_obs_a = dict(hostile_obs, scenario="A")
+        hostile_err_a = ContractError(
+            "APPLICATION_SMOKE",
+            exc_msg_sentinel,
+            details={
+                "detail_sentinel": exc_detail_sentinel,
+                "path": priv_home,
+                "argv": [raw_argv],
+            },
+        )
+        hostile_err_a.smoke_observation = hostile_obs_a  # type: ignore[attr-defined]
+        rc_a, report_a, bytes_a, stdout_a, stderr_a, events_a = (
+            self._run_qualify_cli(
+                hostile_err_a, approval=admitted_app, label="hostile_sentinels_scenario_a"
+            )
+        )
+        self.assertEqual(rc_a, 1)
+        self.assertEqual(events_a["runtime_calls"], 1)
+        self.assertEqual(report_a["error_code"], "TF_PYPI_RUNTIME_APPLICATION_SMOKE")
+        obs_a = report_a["smoke_observation"]["observation"]  # type: ignore[index]
+        self.assertEqual(obs_a, validate_smoke_observation(hostile_obs_a, system=SYSTEM))
+        self.assertEqual(obs_a["scenario"], "A")
+        self.assertNotIn("binding_mismatch", obs_a)
+        self.assertEqual(obs_a["cause"], "unknown")
+        self.assertEqual(obs_a["reason_token"], "unknown")
+        self.assertEqual(
+            obs_a["problem_codes"],
+            ["withheld-token", "withheld-token", "VALID_PROBLEM_CODE_1"],
+        )
+        combined_output_a = (
+            bytes_a.decode("utf-8") + "\n" + stdout_a + "\n" + stderr_a
+        )
+        for sentinel in all_sentinels:
+            self.assertNotIn(sentinel, combined_output_a)
+
+        # Non-smoke runtime ContractError does not emit smoke_observation even if attribute is present
+        non_smoke_err = ContractError(
+            "SIDECAR_VERIFIER",
+            exc_msg_sentinel,
+            details={"detail_sentinel": exc_detail_sentinel},
+        )
+        non_smoke_err.smoke_observation = hostile_obs  # type: ignore[attr-defined]
+        rc_ns, report_ns, bytes_ns, stdout_ns, stderr_ns, events_ns = (
+            self._run_qualify_cli(
+                non_smoke_err, approval=admitted_app, label="non_smoke_error"
+            )
+        )
+        self.assertEqual(rc_ns, 1)
+        self.assertEqual(events_ns["runtime_calls"], 1)
+        self.assertEqual(report_ns["status"], "failed")
+        self.assertEqual(report_ns["error_code"], "TF_PYPI_RUNTIME_SIDECAR_VERIFIER")
+        self.assertFalse(report_ns["can_publish"])
+        self.assertFalse(report_ns["publication_admitted"])
+        self.assertEqual(report_ns["public_writes"], 0)
+        self.assertNotIn("smoke_observation", report_ns)
+        for sentinel in (exc_msg_sentinel, exc_detail_sentinel, priv_home, priv_tok):
+            self.assertNotIn(
+                sentinel,
+                bytes_ns.decode("utf-8") + "\n" + stdout_ns + "\n" + stderr_ns,
+            )
 
 
 if __name__ == "__main__":

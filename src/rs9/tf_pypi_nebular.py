@@ -2392,7 +2392,14 @@ def qualify(
                 diagnostic_extras=False,
             )
         except ContractError as exc:
-            fail(f"RUNTIME_{exc.code}")
+            try:
+                fail(f"RUNTIME_{exc.code}")
+            except AdmissionError as err:
+                if exc.code == "APPLICATION_SMOKE":
+                    err.smoke_observation = smoke_failure_observation(
+                        getattr(exc, "smoke_observation", None)
+                    )  # type: ignore[attr-defined]
+                raise
 
         scenarios = runtime_ver.get("scenarios", [])
         if (
@@ -2524,6 +2531,90 @@ def qualify(
         "publication_admitted": bool(approved.get("publication_admitted", False)),
         "public_writes": 0,
     }
+
+
+SMOKE_OBSERVATION_MAX_BYTES = 8 * 1024
+_SMOKE_UNAVAILABLE_REASONS = frozenset({"absent", "invalid", "oversized"})
+
+
+def smoke_failure_observation(raw: Any) -> dict[str, Any]:
+    """Closed, bounded record of the original failed smoke attempt; never raises or replaces the failure.
+
+    Enforces local pre-validation structural and UTF-8 size checks (requiring non-empty string
+    scenario/cause and enforcing SMOKE_OBSERVATION_MAX_BYTES on both raw input before validation
+    and the validated projection).
+    """
+    record: dict[str, Any] = {
+        "status": "unavailable",
+        "reason": "absent",
+        "origin": "original-producer-attempt",
+        "single_attempt": True,
+        "diagnostic_replay": False,
+        "cause_is_observation_not_root_cause": True,
+    }
+    base_keys = set(record.keys())
+    if isinstance(raw, dict) and raw.get("origin") == "original-producer-attempt":
+        if (
+            raw.get("status") == "unavailable"
+            and raw.get("reason") in _SMOKE_UNAVAILABLE_REASONS
+            and set(raw.keys()) == base_keys
+            and raw.get("single_attempt") is True
+            and raw.get("diagnostic_replay") is False
+            and raw.get("cause_is_observation_not_root_cause") is True
+        ):
+            return dict(record, reason=raw["reason"])
+        if (
+            raw.get("status") == "observed"
+            and raw.get("reason") is None
+            and set(raw.keys()) == (base_keys | {"observation"})
+            and raw.get("single_attempt") is True
+            and raw.get("diagnostic_replay") is False
+            and raw.get("cause_is_observation_not_root_cause") is True
+        ):
+            raw = raw.get("observation")
+        else:
+            return dict(record, reason="invalid")
+    elif raw is None:
+        return record
+    if (
+        not isinstance(raw, dict)
+        or not isinstance(raw.get("scenario"), str)
+        or not raw["scenario"].strip()
+        or not isinstance(raw.get("cause"), str)
+        or not raw["cause"].strip()
+    ):
+        return dict(record, reason="invalid")
+    try:
+        raw_encoded = json.dumps(
+            raw,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+            default=str,
+        ).encode("utf-8")
+    except Exception:
+        return dict(record, reason="invalid")
+    if len(raw_encoded) > SMOKE_OBSERVATION_MAX_BYTES:
+        return dict(record, reason="oversized")
+    try:
+        from rs9.pages_smoke_diagnostic import validate_smoke_observation
+
+        observation = validate_smoke_observation(raw, system=SYSTEM)
+        if not isinstance(observation, dict) or not observation:
+            return dict(record, reason="invalid")
+        encoded = json.dumps(
+            observation,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("utf-8")
+    except Exception:
+        return dict(record, reason="invalid")
+    if len(encoded) > SMOKE_OBSERVATION_MAX_BYTES:
+        return dict(record, reason="oversized")
+    return dict(record, status="observed", reason=None, observation=observation)
 
 
 def write_report(path: str | Path, record: Mapping[str, Any]) -> None:
@@ -2843,6 +2934,10 @@ def main(
             if hasattr(error, "gate"):
                 report["status"] = "blocked"
                 report["blocked_gate"] = getattr(error, "gate")
+            elif error.code == "TF_PYPI_RUNTIME_APPLICATION_SMOKE":
+                report["smoke_observation"] = smoke_failure_observation(
+                    getattr(error, "smoke_observation", None)
+                )
         except Exception as error:
             report["error_type"] = type(error).__name__
         try:
