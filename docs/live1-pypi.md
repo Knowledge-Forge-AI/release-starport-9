@@ -66,9 +66,9 @@ For each absent project, an authorized PyPI account must use the pending GitHub 
 
 | PyPI project name | Owner | Repository | Workflow filename | Environment |
 |---|---|---|---|---|
-| theme-forge-stellar-burst | Knowledge-Forge-AI | release-starport-9 | rs9-pypi-publish.yml | pypi |
-| theme-forge-stellar-loom | Knowledge-Forge-AI | release-starport-9 | rs9-pypi-publish.yml | pypi |
-| theme-forge-solar-sail | Knowledge-Forge-AI | release-starport-9 | rs9-pypi-publish.yml | pypi |
-| theme-forge-nebular-fusion | Knowledge-Forge-AI | release-starport-9 | rs9-pypi-publish.yml | pypi |
+| theme-forge-stellar-burst | Knowledge-Forge-AI | release-starport-9 | rs9-tfsb-pypi-publish.yml | pypi |
+| theme-forge-stellar-loom | Knowledge-Forge-AI | release-starport-9 | rs9-tfsl-pypi-publish.yml | pypi |
+| theme-forge-solar-sail | Knowledge-Forge-AI | release-starport-9 | rs9-tfss-pypi-publish.yml | pypi |
+| theme-forge-nebular-fusion | Knowledge-Forge-AI | release-starport-9 | rs9-tfnf-pypi-publish.yml | pypi |
 
-For an existing project, a project owner configures the same GitHub publisher on its Publishing page. The protected pypi environment and dedicated production workflow are future manual/preflight work. The candidate workflow has no OIDC permission or publisher binding.
+For an existing project, a project owner configures the same GitHub publisher on its Publishing page. See [tf-pypi-first3.md](tf-pypi-first3.md) for the first three Node CLI adapters and [tf-pypi-nebular.md](tf-pypi-nebular.md) ([ADR 0019](adr/0019-nebular-native-pypi-publisher.md)) for the native Darwin ARM64 `theme-forge-nebular-fusion` `0.6.1` publisher (`Requires-Python: >=3.10`, `publication_admitted: false`).

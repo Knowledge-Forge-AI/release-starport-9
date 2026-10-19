@@ -67,6 +67,55 @@ def extract_darwin_minimum_version(plist_bytes: bytes) -> tuple[int, int]:
     return max((11, 0), (major, minor))
 
 
+TOP_LEVEL_PLIST_RE = re.compile(r"(?:\./)?(?:[^/]+\.app/)?Contents/Info\.plist")
+
+
+def _extract_plist_from_payload_tar(payload_archive_bytes: bytes) -> bytes:
+    """Extract the single top-level bundle Contents/Info.plist from a Darwin payload archive."""
+    plist_bytes: bytes | None = None
+    try:
+        with gzip.GzipFile(fileobj=io.BytesIO(payload_archive_bytes)) as gz, tarfile.open(
+            fileobj=gz, mode="r|"
+        ) as tf:
+            for member in tf:
+                if TOP_LEVEL_PLIST_RE.fullmatch(member.name):
+                    if not member.isfile():
+                        raise ContractError(
+                            "INVALID_PLIST",
+                            "Top-level Contents/Info.plist must be a regular file",
+                        )
+                    if plist_bytes is not None:
+                        raise ContractError(
+                            "INVALID_PLIST",
+                            "Duplicate top-level Contents/Info.plist in Darwin application bundle",
+                        )
+                    extracted = tf.extractfile(member)
+                    if extracted is None:
+                        raise ContractError(
+                            "INVALID_PLIST",
+                            "Unable to extract top-level Contents/Info.plist",
+                        )
+                    data = extracted.read(256 * 1024 + 1)
+                    if len(data) > 256 * 1024:
+                        raise ContractError(
+                            "INVALID_PLIST",
+                            "Top-level Contents/Info.plist exceeds 256 KiB bound",
+                        )
+                    plist_bytes = data
+    except ContractError:
+        raise
+    except Exception as exc:
+        raise ContractError(
+            "INVALID_ARCHIVE", "Failed reading Darwin archive members"
+        ) from exc
+
+    if plist_bytes is None:
+        raise ContractError(
+            "INVALID_PLIST", "Missing Contents/Info.plist in Darwin application bundle"
+        )
+    return plist_bytes
+
+
 def resolve_native_darwin_tag(plist_bytes: bytes, platform_tag: str | None = None) -> str:
     """Resolve and validate truthful Darwin wheel platform tag.
 
@@ -400,21 +449,7 @@ def build_native_wheel(
     if is_linux_target:
         wheel_tag = resolve_native_linux_candidate_tag(resolved_target_platform, platform_tag)
     else:
-        plist_bytes: bytes | None = None
-        try:
-            with gzip.GzipFile(fileobj=io.BytesIO(payload_archive_bytes)) as gz, tarfile.open(fileobj=gz, mode="r|") as tf:
-                for member in tf:
-                    if member.name.endswith("/Contents/Info.plist") or member.name == "Contents/Info.plist":
-                        extracted = tf.extractfile(member)
-                        if extracted is not None:
-                            plist_bytes = extracted.read()
-                        break
-        except Exception as exc:
-            raise ContractError("INVALID_ARCHIVE", "Failed reading Darwin archive members") from exc
-
-        if plist_bytes is None:
-            raise ContractError("INVALID_PLIST", "Missing Contents/Info.plist in Darwin application bundle")
-
+        plist_bytes = _extract_plist_from_payload_tar(payload_archive_bytes)
         wheel_tag = resolve_native_darwin_tag(plist_bytes, platform_tag)
 
     # 5. Licenses
@@ -511,7 +546,7 @@ def build_native_wheel(
         f"Summary: {summary_text}",
         "License-Expression: AGPL-3.0-or-later",
     ] + [f"License-File: {k}" for k in sorted(licenses_dict.keys())] + [
-        "Requires-Python: >=3.9",
+        "Requires-Python: >=3.10",
         "Description-Content-Type: text/plain",
         "",
         desc,

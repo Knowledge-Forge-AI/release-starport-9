@@ -126,12 +126,13 @@ publisher; it does not qualify any other project or platform.
 
 ## Nebular second batch
 
-theme-forge-nebular-fusion remains deferred with no workflow, upload or pending
-record mutation. After a first-wave upload has exact readback and owner-confirmed
-pending-to-active conversion, the operator may use the freed slot for
-rs9-tfnf-pypi-publish.yml under the same repository and pypi environment. A separate
-authenticated-input qualification and independent review must precede that workflow
-and upload. Never delete an existing pending record merely to make space.
+The pending Trusted Publisher for `theme-forge-nebular-fusion` (`0.6.1`, workflow
+`rs9-tfnf-pypi-publish.yml`, environment `pypi`) is now registered, and its native
+Darwin ARM64 wheel-only publisher (`theme_forge_nebular_fusion-0.6.1-py3-none-macosx_13_0_arm64.whl`,
+`Requires-Python: >=3.10`) is prepared in `src/rs9/tf_pypi_nebular.py` with
+`publication_admitted: false` in `operators/tf-pypi/theme-forge-nebular-fusion-artifacts.json`.
+See [tf-pypi-nebular.md](tf-pypi-nebular.md) and
+[ADR 0019](adr/0019-nebular-native-pypi-publisher.md).
 
 ## ADMISSION3 checkpoint recovery
 
