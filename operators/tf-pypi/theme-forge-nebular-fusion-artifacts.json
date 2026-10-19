@@ -206,7 +206,7 @@
     "size": 47079690
   },
   "project": "theme-forge-nebular-fusion",
-  "publication_admitted": false,
+  "publication_admitted": true,
   "pypi_size_limit": {
     "below_default_limit": true,
     "candidate_size_bytes": 46792720,
