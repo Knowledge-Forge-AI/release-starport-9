@@ -72,7 +72,9 @@ def validate_smoke_observation(raw, *, system=None):
             "reason_token": _closed(raw.get("reason_token"), CAUSE_CATEGORIES, "unknown")}
     if mismatch:
         result["binding_mismatch"] = True
-    from rs9.smoke_stream_tokens import validate_stream_tokens, validate_inventory
+    from rs9.smoke_stream_tokens import (
+        validate_inner_stream_tokens, validate_inventory, validate_run_record, validate_stream_tokens,
+    )
     stream = validate_stream_tokens(raw.get("stderr_diagnostic"), sha256=hashes["stderr_sha256"],
         byte_count=counts["stderr_bytes"], complete=complete, mismatch=mismatch)
     inventory = validate_inventory(raw.get("evidence_inventory"), mismatch=mismatch)
@@ -80,6 +82,15 @@ def validate_smoke_observation(raw, *, system=None):
         result["stderr_diagnostic"] = stream
     if inventory is not None:
         result["evidence_inventory"] = inventory
+    if system == "aarch64-darwin" or (system is None and (scenario == "A" or mismatch)):
+        run_record = validate_run_record(raw.get("harness_run_record"), inventory=inventory, mismatch=mismatch)
+        inner_stream = validate_inner_stream_tokens(
+            raw.get("inner_stderr_diagnostic"), inventory=inventory, mismatch=mismatch
+        )
+        if run_record is not None:
+            result["harness_run_record"] = run_record
+        if inner_stream is not None:
+            result["inner_stderr_diagnostic"] = inner_stream
     return result
 
 

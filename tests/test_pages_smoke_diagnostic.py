@@ -397,6 +397,89 @@ class PagesSmokeDiagnosticUnitTests(unittest.TestCase):
         err = ContractError("INVENTORY_LIMIT", "Limit exceeded", details={"stage": "pre-install"})
         self.assertEqual(determine_counters_source(None, err, "pre-install"), "pre-install")
 
+    def test_validate_smoke_observation_triple_idempotence_and_darwin_only_projection(self):
+        from rs9.smoke_stream_tokens import (
+            evidence_inventory, project_run_record, read_inner_stderr, stream_tokens,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ev = Path(tmp).resolve()
+            run_bytes = (
+                b'{"status":"fail","receipt":{"steps":[{"id":"app-shell","ok":true},'
+                b'{"id":"host-start","ok":false}]},"problems":["receipt schema"]}'
+            )
+            inner_bytes = b"TypeError: inner error\n"
+            (ev / "darwin-arm64-A.run.json").write_bytes(run_bytes)
+            (ev / "darwin-arm64-A.stderr.log").write_bytes(inner_bytes)
+
+            inv = evidence_inventory(ev, "darwin-arm64", "A")
+            run_rec = project_run_record(
+                json.loads(run_bytes),
+                {"present": True, "bytes": len(run_bytes), "sha256": digest(run_bytes)},
+            )
+            inner_rec = read_inner_stderr(ev, "darwin-arm64", "A")
+            raw_darwin = {
+                "scenario": "A",
+                "cause": "process-nonzero",
+                "raw_returncode": 1,
+                "stdout_bytes": 427,
+                "stderr_bytes": 0,
+                "stdout_sha256": "a" * 64,
+                "stderr_sha256": digest(b""),
+                "stream_capture_complete": True,
+                "log_categories": ["unclassified"],
+                "receipt_error": "receipt-failed",
+                "problem_codes": ["withheld-token"],
+                "elapsed_ms": 9382,
+                "reason_token": "process-nonzero",
+                "stderr_diagnostic": stream_tokens(b"", complete=True),
+                "evidence_inventory": inv,
+                "harness_run_record": run_rec,
+                "inner_stderr_diagnostic": inner_rec,
+            }
+
+            # Triple validation on Darwin Scenario A is idempotent
+            p1 = validate_smoke_observation(raw_darwin, system="aarch64-darwin")
+            p2 = validate_smoke_observation(p1, system="aarch64-darwin")
+            p3 = validate_smoke_observation(p2, system="aarch64-darwin")
+            self.assertIn("harness_run_record", p1)
+            self.assertIn("inner_stderr_diagnostic", p1)
+            self.assertEqual(p1["harness_run_record"]["status"], "observed")
+            self.assertEqual(p1["inner_stderr_diagnostic"]["tokens"], ["node-type-error"])
+            self.assertEqual(p1, p2)
+            self.assertEqual(p2, p3)
+
+            # System mismatch on Darwin produces persistent binding-mismatch fixed point across 3 passes
+            mismatched_input = {**raw_darwin, "scenario": "C"}
+            m1 = validate_smoke_observation(mismatched_input, system="aarch64-darwin")
+            m2 = validate_smoke_observation(m1, system="aarch64-darwin")
+            m3 = validate_smoke_observation(m2, system="aarch64-darwin")
+            self.assertTrue(m1["binding_mismatch"])
+            self.assertEqual(m1["harness_run_record"]["status"], "unavailable")
+            self.assertEqual(m1["harness_run_record"]["withheld_reason"], "binding-mismatch")
+            self.assertEqual(m1["inner_stderr_diagnostic"]["withheld_reason"], "binding-mismatch")
+            self.assertEqual(m1["inner_stderr_diagnostic"]["tokens"], [])
+            self.assertEqual(m1, m2)
+            self.assertEqual(m2, m3)
+
+            # Absent new keys on Darwin keep exact legacy key set
+            legacy_input = {
+                k: v for k, v in raw_darwin.items()
+                if k not in ("harness_run_record", "inner_stderr_diagnostic")
+            }
+            legacy_out = validate_smoke_observation(legacy_input, system="aarch64-darwin")
+            self.assertNotIn("harness_run_record", legacy_out)
+            self.assertNotIn("inner_stderr_diagnostic", legacy_out)
+
+            # Hostile Linux inputs carrying Darwin projections drop them completely
+            for linux_sys, linux_scen in (("x86_64-linux", "C"), ("aarch64-linux", "B")):
+                hostile_linux = {**raw_darwin, "scenario": linux_scen}
+                baseline_linux = {**legacy_input, "scenario": linux_scen}
+                self.assertEqual(
+                    validate_smoke_observation(hostile_linux, system=linux_sys),
+                    validate_smoke_observation(baseline_linux, system=linux_sys),
+                )
+
 
 class PagesNebularControlTests(unittest.TestCase):
     """Failing Pages Nebular all-other-clients-pass and all-pass controls, incumbent gates, one attempt."""

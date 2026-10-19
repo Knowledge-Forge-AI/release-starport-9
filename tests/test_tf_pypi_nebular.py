@@ -3012,6 +3012,436 @@ class NebularPyPIContractTests(unittest.TestCase):
                 bytes_ns.decode("utf-8") + "\n" + stdout_ns + "\n" + stderr_ns,
             )
 
+    def test_qualify_cli_end_to_end_darwin_scenario_a_receipt_and_inner_stderr_projection(
+        self,
+    ) -> None:
+        from rs9.application_smoke_diagnostic import execute_application_smoke
+        from rs9.pages_smoke_diagnostic import validate_smoke_observation
+
+        priv_home = "/" + "Users/" + "private-runner-home/Library/Caches"
+        priv_tok = "ghp" + "_" + "R" * 36
+        priv_email = "runner.secret@example.com"
+        step_detail_sentinel = "SENTINEL_STEP_DETAIL_PAYLOAD"
+        step_via_sentinel = "SENTINEL_STEP_VIA_CHANNEL"
+        unlisted_step_sentinel = "SENTINEL_DYNAMIC_STEP_ID"
+
+        outer_stdout = (
+            b'{"label":"darwin-arm64-A","status":"fail","problems":['
+            + b"x" * 370
+            + b"]}\n"
+        )
+        self.assertEqual(len(outer_stdout), 427)
+        inner_stderr_private = (
+            f"Error: {priv_home} {priv_tok}\n".encode("utf-8")[:43] + b"\n"
+        )
+        self.assertEqual(len(inner_stderr_private), 44)
+
+        run_doc = {
+            "schema": "nebular.native-rc-smoke-run-v1",
+            "label": "darwin-arm64-A",
+            "platform": "darwin-arm64",
+            "scenario": "A",
+            "status": "fail",
+            "executable": {"sha256": "a" * 64, "size": 2048},
+            "receipt": {
+                "sha256": "b" * 64,
+                "status": "fail",
+                "steps": [
+                    {
+                        "id": "app-shell",
+                        "ok": True,
+                        "via": step_via_sentinel,
+                        "detail": step_detail_sentinel,
+                    },
+                    {"id": "host-start", "ok": True},
+                    {"id": "host-status", "ok": False, "detail": priv_home},
+                    {"id": "project-open", "ok": "not-a-bool"},
+                    {"id": "brand-read", "ok": True},
+                    {"id": "brand-read", "ok": False},
+                    {"id": unlisted_step_sentinel, "ok": True},
+                ],
+            },
+            # Synthetic 8-problem Scenario A fixture exercising authenticated runSmoke forms
+            # (unretained publish2 inner problem strings remain unknown; cause is UNKNOWN).
+            "problems": [
+                "the application did not exit within its bound and was killed",
+                "orphan candidate processes remained: 4101, 4102",
+                "application exit code 1 signal null",
+                "receipt pid 4101 is not the launched process 4100",
+                f"receipt status fail: {step_detail_sentinel} {priv_home}",
+                f"required step host-status failed: {priv_email} {priv_tok}",
+                "the candidate executable changed during the smoke run",
+                f"harness error: {priv_home} {priv_tok}",
+            ],
+            "pad": "",
+        }
+        base_run = (json.dumps(run_doc, indent=2) + "\n").encode("utf-8")
+        run_doc["pad"] = "z" * (1779 - len(base_run))
+        run_bytes = (json.dumps(run_doc, indent=2) + "\n").encode("utf-8")
+        self.assertEqual(len(run_bytes), 1779)
+        receipt_bytes = b"{" + b" " * 1711 + b"}"
+        self.assertEqual(len(receipt_bytes), 1713)
+
+        subproc_calls: list[list[str]] = []
+
+        def fake_subproc(cmd: list[str], **kwargs: object) -> object:
+            subproc_calls.append(list(cmd))
+            ev_dir = Path(cmd[cmd.index("--evidence") + 1])
+            (ev_dir / "darwin-arm64-A.receipt.json").write_bytes(receipt_bytes)
+            (ev_dir / "darwin-arm64-A.run.json").write_bytes(run_bytes)
+            (ev_dir / "darwin-arm64-A.stderr.log").write_bytes(inner_stderr_private)
+            (ev_dir / "darwin-arm64-A.stdout.log").write_bytes(b"")
+            return type(
+                "Completed",
+                (),
+                {"returncode": 1, "stdout": outer_stdout, "stderr": b""},
+            )()
+
+        def runtime_effect(
+            runtime_root: Path,
+            prepared: dict[str, object],
+            system: str,
+            prefix: object,
+            env: dict[str, str],
+            *,
+            baseline: dict[str, object],
+            diagnostic_extras: bool = False,
+        ) -> dict[str, object]:
+            Path(str(prepared["scratch"])).mkdir(parents=True, exist_ok=True)
+            with patch(
+                "rs9.application_smoke_diagnostic.subprocess.run",
+                side_effect=fake_subproc,
+            ):
+                execute_application_smoke(
+                    prepared=prepared,
+                    system=system,
+                    launch_root=runtime_root,
+                    prefix=prefix,  # type: ignore[arg-type]
+                    env=env,
+                    diagnostic_extras=diagnostic_extras,
+                )
+            return {}
+
+        rc, report, report_bytes, stdout_text, stderr_text, events = (
+            self._run_qualify_cli(runtime_effect, label="e2e_darwin_projection")
+        )
+        self.assertEqual(rc, 1)
+        self.assertEqual(len(subproc_calls), 1)
+        self.assertEqual(events["runtime_calls"], 1)
+        self.assertEqual(events["lifecycle_calls"], 1)
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(report["error_code"], "TF_PYPI_RUNTIME_APPLICATION_SMOKE")
+        self.assertFalse(report["can_publish"])
+        self.assertFalse(report["publication_admitted"])
+        self.assertEqual(report["public_writes"], 0)
+
+        smoke_wrapper = report["smoke_observation"]
+        self.assertEqual(smoke_wrapper["status"], "observed")  # type: ignore[index]
+        self.assertIsNone(smoke_wrapper["reason"])  # type: ignore[index]
+        obs = smoke_wrapper["observation"]  # type: ignore[index]
+        self.assertEqual(obs, validate_smoke_observation(obs, system=SYSTEM))
+        self.assertEqual(obs["scenario"], "A")
+        self.assertEqual(obs["stdout_bytes"], 427)
+        self.assertEqual(obs["stderr_bytes"], 0)
+        self.assertEqual(obs["problem_codes"], ["withheld-token"] * 8)
+
+        self.assertIn("harness_run_record", obs)
+        run_proj = obs["harness_run_record"]
+        self.assertEqual(run_proj["stage"], "original-harness-run-record")
+        self.assertEqual(run_proj["status"], "observed")
+        self.assertEqual(run_proj["bytes"], 1779)
+        self.assertEqual(run_proj["sha256"], hashlib.sha256(run_bytes).hexdigest())
+        self.assertEqual(run_proj["steps_entries_observed"], 7)
+        self.assertEqual(run_proj["steps_unlisted"], 1)
+        self.assertEqual(run_proj["steps_omitted"], 0)
+        step_states = {s["id"]: s["state"] for s in run_proj["steps"]}
+        self.assertEqual(
+            step_states,
+            {
+                "app-shell": "pass",
+                "host-start": "pass",
+                "host-status": "fail",
+                "project-open": "unknown",
+                "brand-read": "duplicate",
+                "theme-lab-compile": "missing",
+                "app-theme-status": "missing",
+                "app-theme-compile": "missing",
+                "brand-system-view": "missing",
+                "host-status-final": "missing",
+            },
+        )
+        self.assertEqual(
+            run_proj["problems"],
+            {
+                "total": 8,
+                "scanned": 8,
+                "categories": [
+                    {"category": "application-bound-killed", "count": 1},
+                    {"category": "application-exit-nonzero", "count": 1},
+                    {"category": "candidate-executable-changed", "count": 1},
+                    {"category": "harness-error", "count": 1},
+                    {"category": "orphan-candidate-processes", "count": 1},
+                    {"category": "receipt-pid-mismatch", "count": 1},
+                    {"category": "receipt-status", "count": 1},
+                    {"category": "required-step", "count": 1},
+                ],
+                "unrecognized": 0,
+                "non_string": 0,
+                "unavailable": 0,
+            },
+        )
+
+        self.assertIn("inner_stderr_diagnostic", obs)
+        inner_proj = obs["inner_stderr_diagnostic"]
+        self.assertEqual(inner_proj["stage"], "original-inner-application-stderr")
+        self.assertEqual(inner_proj["bytes"], 44)
+        self.assertEqual(
+            inner_proj["sha256"], hashlib.sha256(inner_stderr_private).hexdigest()
+        )
+        self.assertNotEqual(inner_proj["sha256"], obs["stderr_sha256"])
+        self.assertTrue(inner_proj["complete"])
+        self.assertEqual(inner_proj["tokens"], [])
+        self.assertEqual(inner_proj["withheld_reason"], "private")
+
+        combined = (
+            report_bytes.decode("utf-8") + "\n" + stdout_text + "\n" + stderr_text
+        )
+        for sentinel in (
+            priv_home,
+            priv_tok,
+            priv_email,
+            step_detail_sentinel,
+            step_via_sentinel,
+            unlisted_step_sentinel,
+        ):
+            self.assertNotIn(sentinel, combined)
+
+    def test_qualify_cli_maximal_projected_smoke_observation_within_8kib_cap_and_fault_isolation(
+        self,
+    ) -> None:
+        from rs9.application_smoke_diagnostic import (
+            SAFE_LOG_CATEGORIES,
+            execute_application_smoke,
+        )
+        from rs9.errors import ContractError
+        from rs9.pages_smoke_diagnostic import validate_smoke_observation
+        from rs9.smoke_stream_tokens import (
+            INNER_STAGE,
+            KINDS,
+            PROBLEM_CATEGORIES,
+            RUN_STAGE,
+            SCENARIO_A_STEPS,
+            STAGE,
+            TOKENS,
+        )
+        import rs9.tf_pypi_nebular as tfnf_mod
+
+        longest_tokens = sorted(
+            sorted(TOKENS, key=len, reverse=True)[:8]
+        )
+        all_cats = sorted(PROBLEM_CATEGORIES.values())
+        self.assertEqual(len(all_cats), 22)
+        max_raw_obs = {
+            "scenario": "A",
+            "cause": "process-cleanup-failure",
+            "raw_returncode": 255,
+            "stdout_bytes": 2**63 - 1,
+            "stderr_bytes": 65536,
+            "stdout_sha256": "f" * 64,
+            "stderr_sha256": "e" * 64,
+            "stream_capture_complete": True,
+            "log_categories": sorted(SAFE_LOG_CATEGORIES),
+            "receipt_error": "receipt-malformed",
+            "problem_codes": ["A" * 64 for _ in range(16)],
+            "elapsed_ms": 7 * 86400 * 1000,
+            "reason_token": "process-cleanup-failure",
+            "stderr_diagnostic": {
+                "stage": STAGE,
+                "bytes": 65536,
+                "sha256": "e" * 64,
+                "line_count": 65536,
+                "utf8_valid": True,
+                "tokens": longest_tokens,
+                "tokens_omitted": len(TOKENS) - 8,
+                "withheld_reason": None,
+            },
+            "evidence_inventory": {
+                "stage": "after-original-smoke-before-client-cleanup",
+                "status": "limit-exceeded",
+                "artifacts": [
+                    {
+                        "kind": "receipt.json",
+                        "bytes": 2**63 - 1,
+                        "regular": True,
+                        "symlink": False,
+                    },
+                    {
+                        "kind": "run.json",
+                        "bytes": 1048576,
+                        "regular": True,
+                        "symlink": False,
+                    },
+                    {
+                        "kind": "stderr.log",
+                        "bytes": 65536,
+                        "regular": True,
+                        "symlink": False,
+                    },
+                    {
+                        "kind": "stdout.log",
+                        "bytes": 2**63 - 1,
+                        "regular": True,
+                        "symlink": False,
+                    },
+                ],
+                "entries_observed": 32,
+                "unlisted": 28,
+            },
+            "harness_run_record": {
+                "stage": RUN_STAGE,
+                "status": "observed",
+                "withheld_reason": None,
+                "bytes": 1048576,
+                "sha256": "d" * 64,
+                "steps": [{"id": s, "state": "duplicate"} for s in SCENARIO_A_STEPS],
+                "steps_entries_observed": 64,
+                "steps_unlisted": 44,
+                "steps_omitted": 1048576,
+                "problems": {
+                    "total": 1048576,
+                    "scanned": 64,
+                    "categories": [{"category": c, "count": 2} for c in all_cats],
+                    "unrecognized": 10,
+                    "non_string": 10,
+                    "unavailable": 0,
+                },
+            },
+            "inner_stderr_diagnostic": {
+                "stage": INNER_STAGE,
+                "bytes": 65536,
+                "sha256": "c" * 64,
+                "complete": True,
+                "read_error": None,
+                "line_count": 65536,
+                "utf8_valid": True,
+                "tokens": longest_tokens,
+                "tokens_omitted": len(TOKENS) - 8,
+                "withheld_reason": None,
+            },
+        }
+        raw_compact = json.dumps(
+            max_raw_obs,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("utf-8")
+        validated_max = validate_smoke_observation(max_raw_obs, system=SYSTEM)
+        self.assertEqual(validated_max["harness_run_record"]["status"], "observed")
+        self.assertIsNone(validated_max["harness_run_record"]["withheld_reason"])
+        self.assertEqual(
+            len(validated_max["harness_run_record"]["problems"]["categories"]),
+            len(all_cats),
+        )
+        self.assertEqual(
+            validated_max["harness_run_record"]["problems"]["unavailable"], 0
+        )
+        self.assertTrue(validated_max["inner_stderr_diagnostic"]["complete"])
+        self.assertIsNone(validated_max["inner_stderr_diagnostic"]["withheld_reason"])
+        self.assertEqual(
+            validated_max["inner_stderr_diagnostic"]["tokens"], longest_tokens
+        )
+        self.assertEqual(validated_max["stderr_diagnostic"]["tokens"], longest_tokens)
+        self.assertEqual(
+            validated_max["evidence_inventory"]["status"], "limit-exceeded"
+        )
+        self.assertEqual(
+            validated_max["harness_run_record"], max_raw_obs["harness_run_record"]
+        )
+        self.assertEqual(
+            validated_max["inner_stderr_diagnostic"],
+            max_raw_obs["inner_stderr_diagnostic"],
+        )
+        self.assertEqual(
+            validated_max["stderr_diagnostic"], max_raw_obs["stderr_diagnostic"]
+        )
+        self.assertEqual(
+            validated_max["evidence_inventory"], max_raw_obs["evidence_inventory"]
+        )
+        val_compact = json.dumps(
+            validated_max,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("utf-8")
+        val_pretty = json.dumps(
+            validated_max,
+            sort_keys=True,
+            indent=2,
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("utf-8")
+        self.assertLessEqual(len(raw_compact), tfnf_mod.SMOKE_OBSERVATION_MAX_BYTES)
+        self.assertLessEqual(len(val_compact), tfnf_mod.SMOKE_OBSERVATION_MAX_BYTES)
+        self.assertLessEqual(len(val_pretty), tfnf_mod.SMOKE_OBSERVATION_MAX_BYTES)
+
+        err_max = ContractError("APPLICATION_SMOKE", "maximal smoke failure")
+        err_max.smoke_observation = max_raw_obs  # type: ignore[attr-defined]
+        rc, report, _, _, _, _ = self._run_qualify_cli(err_max, label="max_cap_ok")
+        self.assertEqual(rc, 1)
+        self.assertEqual(report["error_code"], "TF_PYPI_RUNTIME_APPLICATION_SMOKE")
+        self.assertEqual(report["smoke_observation"]["status"], "observed")  # type: ignore[index]
+        self.assertEqual(
+            report["smoke_observation"]["observation"], validated_max  # type: ignore[index]
+        )
+
+        # Projector crash isolation through full CLI path
+        def crashing_runtime(
+            runtime_root: Path,
+            prepared: dict[str, object],
+            system: str,
+            prefix: object,
+            env: dict[str, str],
+            *,
+            baseline: dict[str, object],
+            diagnostic_extras: bool = False,
+        ) -> dict[str, object]:
+            Path(str(prepared["scratch"])).mkdir(parents=True, exist_ok=True)
+            with patch(
+                "rs9.application_smoke_diagnostic.subprocess.run",
+                return_value=type(
+                    "Completed", (), {"returncode": 1, "stdout": b"", "stderr": b""}
+                )(),
+            ), patch(
+                "rs9.smoke_stream_tokens.project_run_record",
+                side_effect=RuntimeError("projector failed"),
+            ), patch(
+                "rs9.smoke_stream_tokens.read_inner_stderr",
+                side_effect=RuntimeError("inner reader failed"),
+            ):
+                execute_application_smoke(
+                    prepared=prepared,
+                    system=system,
+                    launch_root=runtime_root,
+                    prefix=prefix,  # type: ignore[arg-type]
+                    env=env,
+                    diagnostic_extras=diagnostic_extras,
+                )
+            return {}
+
+        rc_crash, report_crash, _, _, _, _ = self._run_qualify_cli(
+            crashing_runtime, label="projector_crash_isolated"
+        )
+        self.assertEqual(rc_crash, 1)
+        self.assertEqual(
+            report_crash["error_code"], "TF_PYPI_RUNTIME_APPLICATION_SMOKE"
+        )
+        self.assertEqual(report_crash["smoke_observation"]["status"], "observed")  # type: ignore[index]
+        obs_crash = report_crash["smoke_observation"]["observation"]  # type: ignore[index]
+        self.assertNotIn("harness_run_record", obs_crash)
+        self.assertNotIn("inner_stderr_diagnostic", obs_crash)
+
 
 if __name__ == "__main__":
     unittest.main()

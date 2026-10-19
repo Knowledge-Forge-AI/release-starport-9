@@ -12,11 +12,86 @@ MAX_BYTES = 64 * 1024
 MAX_ENTRIES = 32
 MAX_TOKENS = 8
 STAGE = "original-smoke-process-stderr"
+INNER_STAGE = "original-inner-application-stderr"
+RUN_STAGE = "original-harness-run-record"
 INVENTORY_STAGE = "after-original-smoke-before-client-cleanup"
+MAX_STEP_ENTRIES = 64
+MAX_PROBLEMS = 64
+SCENARIO_A_STEPS = (
+    "app-shell",
+    "host-start",
+    "host-status",
+    "project-open",
+    "brand-read",
+    "theme-lab-compile",
+    "app-theme-status",
+    "app-theme-compile",
+    "brand-system-view",
+    "host-status-final",
+)
+STEP_STATES = frozenset({"pass", "fail", "unknown", "missing", "duplicate"})
+RUN_WITHHELD = frozenset({
+    "receipt-missing",
+    "receipt-invalid",
+    "receipt-oversize",
+    "receipt-corrupt",
+    "receipt-malformed",
+    "invalid-observation",
+    "binding-mismatch",
+})
+INNER_READ_ERRORS = frozenset({"missing", "symlink", "nonregular", "oversize", "read-error"})
+# Closed problem inventory from the root-authenticated harness (runSmoke / judgeReceipt).
+PROBLEM_CATEGORIES = {
+    "no receipt was written": "receipt-not-written",
+    "receipt mode ": "receipt-mode-mismatch",
+    "receipt schema": "receipt-schema",
+    "receipt scenario ": "receipt-scenario-mismatch",
+    "receipt status ": "receipt-status",
+    "receipt pid ": "receipt-pid-mismatch",
+    "receipt target ": "receipt-target-mismatch",
+    "the running executable is not the candidate executable": "running-executable-mismatch",
+    "required step ": "required-step",
+    "receipt signal expectation": "receipt-signal-expectation",
+    "the application did not exit within its bound and was killed": "application-bound-killed",
+    "orphan candidate processes remained: ": "orphan-candidate-processes",
+    "the signal scenario never reached its signal point": "signal-point-not-reached",
+    "no sidecar was running when the application was terminated": "signal-sidecar-not-running",
+    "application ended by ": "signal-termination-mismatch",
+    "application exit code ": "application-exit-nonzero",
+    "the derived asset was not written to the case-exact project": "derived-asset-not-written",
+    "the case-distinct sibling project was modified": "sibling-project-modified",
+    "read-only fixture ": "read-only-fixture-modified",
+    "persistent user state changed: ": "persistent-user-state-changed",
+    "the candidate executable changed during the smoke run": "candidate-executable-changed",
+    "harness error: ": "harness-error",
+}
+_EXACT_PROBLEM_FORMS = frozenset({
+    "no receipt was written",
+    "receipt schema",
+    "the running executable is not the candidate executable",
+    "receipt signal expectation",
+    "the application did not exit within its bound and was killed",
+    "the signal scenario never reached its signal point",
+    "no sidecar was running when the application was terminated",
+    "the derived asset was not written to the case-exact project",
+    "the case-distinct sibling project was modified",
+    "the candidate executable changed during the smoke run",
+})
+_PROBLEM_SUFFIXES = {
+    "application ended by ": " instead of SIGTERM",
+    "read-only fixture ": " was modified",
+}
+_ORDERED_PROBLEM_PREFIXES = tuple(
+    sorted(PROBLEM_CATEGORIES.items(), key=lambda kv: len(kv[0]), reverse=True)
+)
+_PROBLEM_CATEGORY_SET = frozenset(PROBLEM_CATEGORIES.values())
 WITHHELD = frozenset({"empty", "oversize", "invalid-utf8", "private", "incomplete",
                       "truncated", "unterminated", "control-bytes", "invalid-observation", "binding-mismatch"})
-# Fixed forms from the bound release's native-rc-smoke.mjs and fs-snapshot.mjs.
-# Their authenticated identities and the offline message comparison live in CONT22 evidence.
+# Outer process stderr Error.message lines frozen from CONT22 ("candidate executable is not
+# executable" is thrown before runSmoke's try block to outer stderr; in the authenticated
+# harness, copyProject/prepareFixtures run inside runSmoke's try block so the two fixture
+# throws surface in result.problems under "harness error: ", while their FIXED entries remain
+# inherited CONT22 outer-stderr mappings).
 FIXED = {
     "candidate executable is not executable": "release-executable-not-executable",
     "maintained core fixture project name changed": "release-fixture-project-changed",
@@ -69,12 +144,11 @@ def _withheld_stream(raw, complete):
     return None, text
 
 
-def stream_tokens(raw, *, complete):
-    """Classify captured bytes only; messages, paths and dynamic values never leave."""
+def _classify_stream(raw, *, stage, complete):
     reason, text = _withheld_stream(raw, complete)
     utf8_valid = None if reason in {"incomplete", "oversize"} else reason != "invalid-utf8"
     line_count = None if reason in {"incomplete", "oversize"} else len(raw.splitlines())
-    result = {"stage": STAGE, "bytes": len(raw), "sha256": digest(raw),
+    result = {"stage": stage, "bytes": len(raw), "sha256": digest(raw),
               "line_count": line_count, "utf8_valid": utf8_valid,
               "tokens": [], "tokens_omitted": 0, "withheld_reason": reason}
     if reason:
@@ -89,6 +163,11 @@ def stream_tokens(raw, *, complete):
     result["tokens"] = sorted(tokens)[:MAX_TOKENS]
     result["tokens_omitted"] = max(0, len(tokens) - MAX_TOKENS)
     return result
+
+
+def stream_tokens(raw, *, complete):
+    """Classify captured bytes only; messages, paths and dynamic values never leave."""
+    return _classify_stream(raw, stage=STAGE, complete=complete)
 
 
 def validate_stream_tokens(raw, *, sha256, byte_count, complete, mismatch=False):
@@ -182,7 +261,402 @@ def validate_inventory(raw, *, mismatch=False):
             "entries_observed": raw["entries_observed"], "unlisted": raw["unlisted"]}
 
 
-def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario):
+def _unavailable_run(reason, byte_count=None, sha256=None):
+    return {
+        "stage": RUN_STAGE,
+        "status": "unavailable",
+        "withheld_reason": reason,
+        "bytes": byte_count,
+        "sha256": sha256,
+        "steps": [{"id": s, "state": "unknown"} for s in SCENARIO_A_STEPS],
+        "steps_entries_observed": 0,
+        "steps_unlisted": 0,
+        "steps_omitted": 0,
+        "problems": {
+            "total": None,
+            "scanned": 0,
+            "categories": [],
+            "unrecognized": 0,
+            "non_string": 0,
+            "unavailable": 1,
+        },
+    }
+
+
+def project_run_record(record, identity=None, *, receipt_error=None):
+    """Project already-read Scenario A .run.json into closed step states and problem counts."""
+    meta = identity if isinstance(identity, dict) else {}
+    raw_bytes = meta.get("bytes")
+    byte_count = raw_bytes if type(raw_bytes) is int and 0 <= raw_bytes <= 2**63 - 1 else None
+    raw_sha = meta.get("sha256")
+    sha256 = raw_sha if isinstance(raw_sha, str) and re.fullmatch(r"[0-9a-f]{64}", raw_sha) else None
+    if not isinstance(record, dict):
+        reason = receipt_error if isinstance(receipt_error, str) and receipt_error in RUN_WITHHELD else "receipt-malformed"
+        if reason in {"receipt-missing", "receipt-invalid"}:
+            return _unavailable_run(reason)
+        if reason == "receipt-oversize":
+            return _unavailable_run(reason, byte_count=byte_count)
+        return _unavailable_run(reason, byte_count=byte_count, sha256=sha256)
+    if byte_count is None or not 0 < byte_count <= 1024 * 1024 or sha256 is None:
+        return _unavailable_run("invalid-observation")
+    inner_receipt = record.get("receipt")
+    raw_steps = inner_receipt.get("steps") if isinstance(inner_receipt, dict) else None
+    if isinstance(raw_steps, list):
+        window = raw_steps[:MAX_STEP_ENTRIES]
+        steps_entries_observed = len(window)
+        steps_omitted = max(0, len(raw_steps) - MAX_STEP_ENTRIES)
+        steps_unlisted = 0
+        seen = {}
+        for item in window:
+            if not isinstance(item, dict) or not isinstance(item.get("id"), str) or item["id"] not in SCENARIO_A_STEPS:
+                steps_unlisted += 1
+                continue
+            sid = item["id"]
+            ok = item.get("ok")
+            state = ("pass" if ok else "fail") if type(ok) is bool else "unknown"
+            seen[sid] = "duplicate" if sid in seen else state
+        default_state = "unknown" if steps_omitted > 0 else "missing"
+        steps = [{"id": s, "state": seen.get(s, default_state)} for s in SCENARIO_A_STEPS]
+    else:
+        steps_entries_observed = 0
+        steps_unlisted = 0
+        steps_omitted = 0
+        steps = [{"id": s, "state": "unknown"} for s in SCENARIO_A_STEPS]
+    raw_problems = record.get("problems")
+    if isinstance(raw_problems, list):
+        total = len(raw_problems)
+        prob_window = raw_problems[:MAX_PROBLEMS]
+        scanned = len(prob_window)
+        counts = {}
+        unrecognized = 0
+        non_string = 0
+        for item in prob_window:
+            if not isinstance(item, str):
+                non_string += 1
+                continue
+            for prefix, category in _ORDERED_PROBLEM_PREFIXES:
+                if prefix in _EXACT_PROBLEM_FORMS:
+                    matched = item == prefix
+                elif prefix in _PROBLEM_SUFFIXES:
+                    suffix = _PROBLEM_SUFFIXES[prefix]
+                    matched = (
+                        item.startswith(prefix)
+                        and item.endswith(suffix)
+                        and len(item) > len(prefix) + len(suffix)
+                    )
+                else:
+                    matched = item.startswith(prefix)
+                if matched:
+                    counts[category] = counts.get(category, 0) + 1
+                    break
+            else:
+                unrecognized += 1
+        categories = [{"category": c, "count": counts[c]} for c in sorted(counts)]
+        unavailable = 0
+    else:
+        total = None
+        scanned = 0
+        categories = []
+        unrecognized = 0
+        non_string = 0
+        unavailable = 1
+    return {
+        "stage": RUN_STAGE,
+        "status": "observed",
+        "withheld_reason": None,
+        "bytes": byte_count,
+        "sha256": sha256,
+        "steps": steps,
+        "steps_entries_observed": steps_entries_observed,
+        "steps_unlisted": steps_unlisted,
+        "steps_omitted": steps_omitted,
+        "problems": {
+            "total": total,
+            "scanned": scanned,
+            "categories": categories,
+            "unrecognized": unrecognized,
+            "non_string": non_string,
+            "unavailable": unavailable,
+        },
+    }
+
+
+def validate_run_record(raw, *, inventory=None, mismatch=False):
+    """Idempotent closed validator for Scenario A harness_run_record bound to evidence_inventory."""
+    if not isinstance(raw, dict):
+        return None
+    fallback_reason = "binding-mismatch" if mismatch else "invalid-observation"
+    expected_keys = {
+        "stage", "status", "withheld_reason", "bytes", "sha256",
+        "steps", "steps_entries_observed", "steps_unlisted", "steps_omitted", "problems",
+    }
+    if set(raw.keys()) != expected_keys or raw.get("stage") != RUN_STAGE:
+        return _unavailable_run(fallback_reason)
+    status = raw.get("status")
+    reason = raw.get("withheld_reason")
+    byte_count = raw.get("bytes")
+    sha256 = raw.get("sha256")
+    steps = raw.get("steps")
+    obs_cnt = raw.get("steps_entries_observed")
+    unl_cnt = raw.get("steps_unlisted")
+    omi_cnt = raw.get("steps_omitted")
+    probs = raw.get("problems")
+    if (not (byte_count is None or type(byte_count) is int and 0 <= byte_count <= 2**63 - 1) or
+            not (sha256 is None or isinstance(sha256, str) and bool(re.fullmatch(r"[0-9a-f]{64}", sha256))) or
+            not isinstance(steps, list) or len(steps) != len(SCENARIO_A_STEPS) or
+            any(not isinstance(s, dict) or set(s.keys()) != {"id", "state"} or
+                s.get("id") != SCENARIO_A_STEPS[i] or not isinstance(s.get("state"), str) or s["state"] not in STEP_STATES
+                for i, s in enumerate(steps)) or
+            any(type(v) is not int for v in (obs_cnt, unl_cnt, omi_cnt)) or
+            not (0 <= obs_cnt <= MAX_STEP_ENTRIES and 0 <= unl_cnt <= obs_cnt and 0 <= omi_cnt <= 1024 * 1024) or
+            (omi_cnt > 0 and (obs_cnt != MAX_STEP_ENTRIES or any(s["state"] == "missing" for s in steps))) or
+            not isinstance(probs, dict) or
+            set(probs.keys()) != {"total", "scanned", "categories", "unrecognized", "non_string", "unavailable"}):
+        return _unavailable_run(fallback_reason)
+    recognized_entries = obs_cnt - unl_cnt
+    min_required_entries = sum(1 if s["state"] in {"pass", "fail"} else 2 if s["state"] == "duplicate" else 0 for s in steps)
+    if min_required_entries > recognized_entries:
+        return _unavailable_run(fallback_reason)
+    total = probs.get("total")
+    scanned = probs.get("scanned")
+    cats = probs.get("categories")
+    unrec = probs.get("unrecognized")
+    nonstr = probs.get("non_string")
+    unavail = probs.get("unavailable")
+    if (any(type(v) is not int for v in (scanned, unrec, nonstr, unavail)) or
+            unavail not in (0, 1) or
+            (unavail == 0 and (type(total) is not int or not (0 <= total <= 1024 * 1024 and 0 <= scanned <= MAX_PROBLEMS and scanned == min(total, MAX_PROBLEMS)))) or
+            (unavail == 1 and (total is not None or scanned != 0)) or
+            not (0 <= unrec <= scanned and 0 <= nonstr <= scanned) or
+            not isinstance(cats, list) or len(cats) > len(_PROBLEM_CATEGORY_SET) or
+            any(not isinstance(c, dict) or set(c.keys()) != {"category", "count"} or
+                not isinstance(c.get("category"), str) or c["category"] not in _PROBLEM_CATEGORY_SET or
+                type(c.get("count")) is not int or not 1 <= c["count"] <= scanned
+                for c in cats) or
+            [c["category"] for c in cats] != sorted({c["category"] for c in cats}) or
+            sum(c["count"] for c in cats) + unrec + nonstr != scanned):
+        return _unavailable_run(fallback_reason)
+    if status == "observed":
+        if reason is not None or type(byte_count) is not int or not 0 < byte_count <= 1024 * 1024 or sha256 is None:
+            return _unavailable_run(fallback_reason)
+    elif status == "unavailable":
+        if (not isinstance(reason, str) or reason not in RUN_WITHHELD or
+                obs_cnt != 0 or unl_cnt != 0 or omi_cnt != 0 or
+                any(s["state"] != "unknown" for s in steps) or
+                unavail != 1 or
+                (reason in {"invalid-observation", "binding-mismatch", "receipt-missing", "receipt-invalid"} and
+                 (byte_count is not None or sha256 is not None)) or
+                (reason == "receipt-oversize" and sha256 is not None)):
+            return _unavailable_run(fallback_reason)
+    else:
+        return _unavailable_run(fallback_reason)
+    if mismatch:
+        return _unavailable_run("binding-mismatch")
+    if isinstance(inventory, dict) and inventory.get("status") == "observed":
+        run_art = next((a for a in inventory.get("artifacts", ()) if isinstance(a, dict) and a.get("kind") == "run.json"), None)
+        if status == "observed":
+            if (run_art is None or run_art.get("regular") is not True or
+                    run_art.get("symlink") is not False or run_art.get("bytes") != byte_count):
+                return _unavailable_run("binding-mismatch")
+        elif reason == "receipt-missing":
+            if run_art is not None:
+                return _unavailable_run("binding-mismatch")
+        elif reason == "receipt-oversize":
+            if (run_art is None or run_art.get("regular") is not True or run_art.get("symlink") is not False or
+                    (byte_count is not None and run_art.get("bytes") != byte_count)):
+                return _unavailable_run("binding-mismatch")
+        elif reason in {"receipt-corrupt", "receipt-malformed"} and byte_count is not None:
+            if (run_art is None or run_art.get("regular") is not True or
+                    run_art.get("symlink") is not False or run_art.get("bytes") != byte_count):
+                return _unavailable_run("binding-mismatch")
+    return {
+        "stage": RUN_STAGE,
+        "status": status,
+        "withheld_reason": reason,
+        "bytes": byte_count,
+        "sha256": sha256,
+        "steps": [{"id": s["id"], "state": s["state"]} for s in steps],
+        "steps_entries_observed": obs_cnt,
+        "steps_unlisted": unl_cnt,
+        "steps_omitted": omi_cnt,
+        "problems": {
+            "total": total,
+            "scanned": scanned,
+            "categories": [{"category": c["category"], "count": c["count"]} for c in cats],
+            "unrecognized": unrec,
+            "non_string": nonstr,
+            "unavailable": unavail,
+        },
+    }
+
+
+def _unavailable_inner(read_error, withheld_reason, byte_count=None):
+    return {
+        "stage": INNER_STAGE,
+        "bytes": byte_count,
+        "sha256": None,
+        "complete": False,
+        "read_error": read_error,
+        "line_count": None,
+        "utf8_valid": None,
+        "tokens": [],
+        "tokens_omitted": 0,
+        "withheld_reason": withheld_reason,
+    }
+
+
+def read_inner_stderr(directory, platform, scenario):
+    """Physical no-follow descriptor read of original inner application stderr."""
+    directory = Path(directory)
+    try:
+        if any(p.is_symlink() for p in (directory, *directory.parents)):
+            return _unavailable_inner("symlink", "symlink")
+        dir_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except FileNotFoundError:
+        return _unavailable_inner("missing", "missing")
+    except OSError:
+        return _unavailable_inner("read-error", "read-error")
+    try:
+        name = f"{platform}-{scenario}.stderr.log"
+        try:
+            linfo = os.lstat(name, dir_fd=dir_fd)
+        except FileNotFoundError:
+            return _unavailable_inner("missing", "missing")
+        except OSError:
+            return _unavailable_inner("read-error", "read-error")
+        if stat.S_ISLNK(linfo.st_mode):
+            return _unavailable_inner("symlink", "symlink")
+        if not stat.S_ISREG(linfo.st_mode):
+            return _unavailable_inner("nonregular", "nonregular")
+        try:
+            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
+            with os.fdopen(fd, "rb") as stream:
+                info = os.fstat(stream.fileno())
+                if not stat.S_ISREG(info.st_mode):
+                    return _unavailable_inner("nonregular", "nonregular")
+                if info.st_size > MAX_BYTES:
+                    return _unavailable_inner("oversize", "oversize", byte_count=info.st_size)
+                raw = stream.read(MAX_BYTES + 1)
+        except OSError:
+            return _unavailable_inner("read-error", "read-error")
+        if len(raw) > MAX_BYTES:
+            return _unavailable_inner("oversize", "oversize", byte_count=len(raw))
+    finally:
+        os.close(dir_fd)
+    classified = _classify_stream(raw, stage=INNER_STAGE, complete=True)
+    return {
+        "stage": INNER_STAGE,
+        "bytes": classified["bytes"],
+        "sha256": classified["sha256"],
+        "complete": True,
+        "read_error": None,
+        "line_count": classified["line_count"],
+        "utf8_valid": classified["utf8_valid"],
+        "tokens": classified["tokens"],
+        "tokens_omitted": classified["tokens_omitted"],
+        "withheld_reason": classified["withheld_reason"],
+    }
+
+
+def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False):
+    """Idempotent closed validator for original inner application stderr bound to evidence_inventory."""
+    if not isinstance(raw, dict):
+        return None
+    fallback_reason = "binding-mismatch" if mismatch else "invalid-observation"
+    expected_keys = {
+        "stage", "bytes", "sha256", "complete", "read_error",
+        "line_count", "utf8_valid", "tokens", "tokens_omitted", "withheld_reason",
+    }
+    if set(raw.keys()) != expected_keys or raw.get("stage") != INNER_STAGE:
+        return _unavailable_inner(None, fallback_reason)
+    byte_count = raw.get("bytes")
+    sha256 = raw.get("sha256")
+    complete = raw.get("complete")
+    read_error = raw.get("read_error")
+    line_count = raw.get("line_count")
+    utf8_valid = raw.get("utf8_valid")
+    tokens = raw.get("tokens")
+    omitted = raw.get("tokens_omitted")
+    reason = raw.get("withheld_reason")
+    if type(complete) is not bool:
+        return _unavailable_inner(None, fallback_reason)
+    if complete:
+        valid_complete = (
+            read_error is None and
+            type(byte_count) is int and 0 <= byte_count <= MAX_BYTES and
+            isinstance(sha256, str) and bool(re.fullmatch(r"[0-9a-f]{64}", sha256)) and
+            type(line_count) is int and 0 <= line_count <= MAX_BYTES and
+            type(utf8_valid) is bool and
+            isinstance(tokens, list) and len(tokens) <= MAX_TOKENS and
+            all(isinstance(t, str) and t in TOKENS for t in tokens) and
+            tokens == sorted(set(tokens)) and
+            type(omitted) is int and 0 <= omitted <= len(TOKENS) - MAX_TOKENS and
+            (omitted == 0 or reason is None and len(tokens) == MAX_TOKENS) and
+            (reason is None or isinstance(reason, str) and reason in {"empty", "invalid-utf8", "private", "control-bytes", "unterminated"})
+        )
+        if not valid_complete:
+            return _unavailable_inner(None, fallback_reason)
+        if reason is None and (utf8_valid is not True or byte_count == 0):
+            return _unavailable_inner(None, fallback_reason)
+        if reason is not None:
+            if tokens or omitted != 0:
+                return _unavailable_inner(None, fallback_reason)
+            if reason == "empty" and (byte_count != 0 or sha256 != digest(b"") or line_count != 0 or utf8_valid is not True):
+                return _unavailable_inner(None, fallback_reason)
+            if reason == "invalid-utf8" and (byte_count == 0 or utf8_valid is not False):
+                return _unavailable_inner(None, fallback_reason)
+            if reason in {"private", "control-bytes", "unterminated"} and (byte_count == 0 or utf8_valid is not True):
+                return _unavailable_inner(None, fallback_reason)
+    else:
+        if (sha256 is not None or line_count is not None or utf8_valid is not None or
+                tokens != [] or omitted != 0):
+            return _unavailable_inner(None, fallback_reason)
+        if isinstance(read_error, str) and read_error in INNER_READ_ERRORS and reason == read_error:
+            if read_error == "oversize":
+                if type(byte_count) is not int or not MAX_BYTES < byte_count <= 2**63 - 1:
+                    return _unavailable_inner(None, fallback_reason)
+            elif byte_count is not None:
+                return _unavailable_inner(None, fallback_reason)
+        elif read_error is None and isinstance(reason, str) and reason in {"invalid-observation", "binding-mismatch", "incomplete"} and byte_count is None:
+            pass
+        else:
+            return _unavailable_inner(None, fallback_reason)
+    if mismatch:
+        return _unavailable_inner(None, "binding-mismatch")
+    if isinstance(inventory, dict) and inventory.get("status") == "observed":
+        err_art = next((a for a in inventory.get("artifacts", ()) if isinstance(a, dict) and a.get("kind") == "stderr.log"), None)
+        if complete:
+            if (err_art is None or err_art.get("regular") is not True or
+                    err_art.get("symlink") is not False or err_art.get("bytes") != byte_count):
+                return _unavailable_inner(None, "binding-mismatch")
+        elif read_error == "missing":
+            if err_art is not None:
+                return _unavailable_inner(None, "binding-mismatch")
+        elif read_error == "symlink":
+            if err_art is not None and err_art.get("symlink") is not True:
+                return _unavailable_inner(None, "binding-mismatch")
+        elif read_error == "nonregular":
+            if err_art is None or err_art.get("regular") is not False or err_art.get("symlink") is not False:
+                return _unavailable_inner(None, "binding-mismatch")
+        elif read_error == "oversize":
+            if (err_art is None or err_art.get("regular") is not True or
+                    err_art.get("symlink") is not False or err_art.get("bytes") != byte_count):
+                return _unavailable_inner(None, "binding-mismatch")
+    return {
+        "stage": INNER_STAGE,
+        "bytes": byte_count,
+        "sha256": sha256,
+        "complete": complete,
+        "read_error": read_error,
+        "line_count": line_count,
+        "utf8_valid": utf8_valid,
+        "tokens": list(tokens),
+        "tokens_omitted": omitted,
+        "withheld_reason": reason,
+    }
+
+
+def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, record=None):
     """Each optional observation fails independently after the gate outcome is fixed."""
     result = {}
     try:
@@ -193,4 +667,15 @@ def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario):
         result["evidence_inventory"] = evidence_inventory(evidence, platform, scenario)
     except Exception:
         pass
+    if platform == "darwin-arm64" and scenario == "A":
+        try:
+            result["harness_run_record"] = project_run_record(
+                record, fields.get("receipt"), receipt_error=fields.get("receipt_error")
+            )
+        except Exception:
+            pass
+        try:
+            result["inner_stderr_diagnostic"] = read_inner_stderr(evidence, platform, scenario)
+        except Exception:
+            pass
     return result

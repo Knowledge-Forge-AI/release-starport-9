@@ -832,6 +832,184 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
             self.assertIsNotNone(caught.exception.smoke_observation)
             self.assertEqual(caught.exception.smoke_observation["exit_code"], 2)
 
+    def test_darwin_scenario_a_projects_original_run_record_and_distinct_inner_stderr_without_replay(self):
+        """Darwin Scenario A failure projects the already-read .run.json and inner stderr.log with no replay."""
+        outer_stdout = b'{"label":"darwin-arm64-A","status":"fail","problems":[' + b"x" * 370 + b"]}\n"
+        self.assertEqual(len(outer_stdout), 427)
+        inner_stderr = ("Error: /" + "Users/" + "op/secret-inner-stderr-44b!!!\n").encode("utf-8")
+        self.assertEqual(len(inner_stderr), 44)
+
+        run_payload = {
+            "schema": "nebular.native-rc-smoke-run-v1",
+            "label": "darwin-arm64-A",
+            "platform": "darwin-arm64",
+            "scenario": "A",
+            "status": "fail",
+            "executable": {"sha256": "a" * 64, "size": 1000},
+            "receipt": {
+                "sha256": "b" * 64,
+                "status": "fail",
+                "steps": [
+                    {"id": "app-shell", "ok": True, "via": "ipc", "ms": 12},
+                    {"id": "host-start", "ok": True, "via": "ipc", "ms": 15},
+                    {"id": "host-status", "ok": True, "via": "ipc", "ms": 4},
+                    {"id": "project-open", "ok": False, "via": "ipc", "detail": "SENTINEL_PROJECT_OPEN_DETAIL"},
+                    {"id": "brand-read", "ok": 1},
+                    {"id": "theme-lab-compile", "ok": True},
+                    {"id": "theme-lab-compile", "ok": False},
+                    {"id": "unlisted-dynamic-step", "ok": True},
+                ],
+            },
+            # Synthetic 8-problem Scenario A fixture exercising authenticated runSmoke forms
+            # (unretained publish2 inner problem strings remain unknown; cause is UNKNOWN).
+            "problems": [
+                "application exit code 1 signal null",
+                "receipt mode 644",
+                "receipt status fail: SENTINEL_RECEIPT_FAILURE",
+                "receipt target x86_64-apple-darwin",
+                "the running executable is not the candidate executable",
+                "required step project-open failed: SENTINEL_STEP_PROBLEM",
+                "read-only fixture core-minimal was modified",
+                "persistent user state changed: /" + "Users/" + "op/Library/Caches/secret",
+            ],
+            "padding": "",
+        }
+        base_run_bytes = (json.dumps(run_payload, indent=2) + "\n").encode("utf-8")
+        run_payload["padding"] = "p" * (1779 - len(base_run_bytes))
+        run_bytes = (json.dumps(run_payload, indent=2) + "\n").encode("utf-8")
+        self.assertEqual(len(run_bytes), 1779)
+        receipt_bytes = b"{" + b" " * 1711 + b"}"
+        self.assertEqual(len(receipt_bytes), 1713)
+
+        def fake_darwin_run(cmd, **kwargs):
+            evidence = Path(cmd[cmd.index("--evidence") + 1])
+            (evidence / "darwin-arm64-A.receipt.json").write_bytes(receipt_bytes)
+            (evidence / "darwin-arm64-A.run.json").write_bytes(run_bytes)
+            (evidence / "darwin-arm64-A.stderr.log").write_bytes(inner_stderr)
+            (evidence / "darwin-arm64-A.stdout.log").write_bytes(b"")
+            return SimpleNamespace(returncode=1, stdout=outer_stdout, stderr=b"")
+
+        with patch("subprocess.run", side_effect=fake_darwin_run) as run_mock, \
+             patch("rs9.application_smoke_diagnostic._bounded_run") as bounded_mock, \
+             patch("rs9.application_smoke_diagnostic.run_replay") as replay_mock:
+            with self.assertRaises(ContractError) as caught:
+                execute_application_smoke(
+                    prepared=self.prepared,
+                    system="aarch64-darwin",
+                    launch_root=self.launch_root,
+                    diagnostic_extras=True,
+                )
+
+        run_mock.assert_called_once()
+        bounded_mock.assert_not_called()
+        replay_mock.assert_not_called()
+        self.assertFalse((self.scratch / "evidence-replay-A").exists())
+        self.assertFalse((self.work / "diagnostics").exists())
+
+        err = caught.exception
+        self.assertEqual(err.code, "APPLICATION_SMOKE")
+        self.assertEqual(err.details["scenario"], "A")
+        self.assertEqual(err.details["cause"], "process-nonzero")
+        self.assertEqual(err.details["exit_code"], 1)
+        self.assertEqual(err.details["stdout_sha256"], digest(outer_stdout))
+        self.assertEqual(err.details["stderr_sha256"], digest(b""))
+
+        obs = err.smoke_observation
+        self.assertEqual(obs["scenario"], "A")
+        self.assertEqual(obs["cause"], "process-nonzero")
+        self.assertEqual(obs["stdout_bytes"], 427)
+        self.assertEqual(obs["stderr_bytes"], 0)
+        self.assertEqual(obs["stderr_sha256"], digest(b""))
+        self.assertEqual(obs["problem_codes"], ["withheld-token"] * 8)
+
+        # Outer stderr identity vs inner stderr identity
+        self.assertEqual(obs["stderr_diagnostic"]["stage"], "original-smoke-process-stderr")
+        self.assertEqual(obs["stderr_diagnostic"]["bytes"], 0)
+        self.assertEqual(obs["stderr_diagnostic"]["sha256"], digest(b""))
+        self.assertEqual(obs["stderr_diagnostic"]["withheld_reason"], "empty")
+
+        self.assertIn("inner_stderr_diagnostic", obs)
+        inner = obs["inner_stderr_diagnostic"]
+        self.assertEqual(inner["stage"], "original-inner-application-stderr")
+        self.assertEqual(inner["bytes"], 44)
+        self.assertEqual(inner["sha256"], digest(inner_stderr))
+        self.assertNotEqual(inner["sha256"], obs["stderr_sha256"])
+        self.assertTrue(inner["complete"])
+        self.assertIsNone(inner["read_error"])
+        self.assertEqual(inner["tokens"], [])
+        self.assertEqual(inner["withheld_reason"], "private")
+
+        self.assertIn("harness_run_record", obs)
+        run_rec = obs["harness_run_record"]
+        self.assertEqual(run_rec["stage"], "original-harness-run-record")
+        self.assertEqual(run_rec["status"], "observed")
+        self.assertIsNone(run_rec["withheld_reason"])
+        self.assertEqual(run_rec["bytes"], 1779)
+        self.assertEqual(run_rec["sha256"], digest(run_bytes))
+        self.assertEqual(run_rec["steps_entries_observed"], 8)
+        self.assertEqual(run_rec["steps_unlisted"], 1)
+        self.assertEqual(run_rec["steps_omitted"], 0)
+        step_map = {s["id"]: s["state"] for s in run_rec["steps"]}
+        self.assertEqual(step_map["app-shell"], "pass")
+        self.assertEqual(step_map["project-open"], "fail")
+        self.assertEqual(step_map["brand-read"], "unknown")
+        self.assertEqual(step_map["theme-lab-compile"], "duplicate")
+        self.assertEqual(step_map["app-theme-status"], "missing")
+        self.assertEqual(run_rec["problems"], {
+            "total": 8,
+            "scanned": 8,
+            "categories": [
+                {"category": "application-exit-nonzero", "count": 1},
+                {"category": "persistent-user-state-changed", "count": 1},
+                {"category": "read-only-fixture-modified", "count": 1},
+                {"category": "receipt-mode-mismatch", "count": 1},
+                {"category": "receipt-status", "count": 1},
+                {"category": "receipt-target-mismatch", "count": 1},
+                {"category": "required-step", "count": 1},
+                {"category": "running-executable-mismatch", "count": 1},
+            ],
+            "unrecognized": 0,
+            "non_string": 0,
+            "unavailable": 0,
+        })
+        serialized = json.dumps(obs)
+        for sentinel in (
+            "SENTINEL_PROJECT_OPEN_DETAIL",
+            "SENTINEL_RECEIPT_FAILURE",
+            "SENTINEL_STEP_PROBLEM",
+            "secret-inner-stderr",
+            "unlisted-dynamic-step",
+        ):
+            self.assertNotIn(sentinel, serialized)
+
+    def test_darwin_projector_fault_and_linux_non_emission_preserve_primary_failure(self):
+        """Projector exceptions on Darwin and Linux runs preserve primary APPLICATION_SMOKE outcome."""
+        with patch("subprocess.run", return_value=SimpleNamespace(returncode=1, stdout=b"", stderr=b"")), \
+             patch("rs9.smoke_stream_tokens.project_run_record", side_effect=RuntimeError("projector boom")):
+            with self.assertRaises(ContractError) as caught_darwin:
+                execute_application_smoke(
+                    prepared=self.prepared,
+                    system="aarch64-darwin",
+                    launch_root=self.launch_root,
+                )
+        self.assertEqual(caught_darwin.exception.code, "APPLICATION_SMOKE")
+        obs_darwin = caught_darwin.exception.smoke_observation
+        self.assertNotIn("harness_run_record", obs_darwin)
+        self.assertIn("inner_stderr_diagnostic", obs_darwin)
+
+        for linux_sys in ("x86_64-linux", "aarch64-linux"):
+            with self.subTest(system=linux_sys), \
+                 patch("subprocess.run", return_value=SimpleNamespace(returncode=1, stdout=b"", stderr=b"")):
+                with self.assertRaises(ContractError) as caught_linux:
+                    execute_application_smoke(
+                        prepared=self.prepared,
+                        system=linux_sys,
+                        launch_root=self.launch_root,
+                    )
+            obs_linux = caught_linux.exception.smoke_observation
+            self.assertNotIn("harness_run_record", obs_linux)
+            self.assertNotIn("inner_stderr_diagnostic", obs_linux)
+
 
 if __name__ == "__main__":
     unittest.main()
