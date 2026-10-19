@@ -258,8 +258,10 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
         # Optional observations happen after the original outcome is fixed.
         from rs9.smoke_stream_tokens import collect_failure_diagnostics
         try:
-            diagnostic = collect_failure_diagnostics(err, dict(fields), evidence, platform, scenario)
-            fields.update({k: diagnostic[k] for k in ("stderr_diagnostic", "evidence_inventory") if k in diagnostic})
+            diagnostic = collect_failure_diagnostics(err, dict(fields), evidence, platform, scenario, record=record)
+            fields.update({k: diagnostic[k] for k in (
+                "stderr_diagnostic", "evidence_inventory", "harness_run_record", "inner_stderr_diagnostic"
+            ) if k in diagnostic})
         except Exception:
             pass
     if extras:
