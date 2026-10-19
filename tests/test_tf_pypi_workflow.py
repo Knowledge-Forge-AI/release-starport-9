@@ -21,11 +21,12 @@ class Output:
 
 class WorkflowTests(unittest.TestCase):
     def test_no_unqualified_first_wave_or_nebular_publisher(self):
+        from rs9.tf_pypi_nebular import workflow_text as nebular_workflow_text
         workflows = ROOT / ".github/workflows"
         for product in PRODUCTS:
             pin = load_pin(product)
             self.assertEqual((workflows / pin["workflow"]).exists(), pin["source_status"] == "READY")
-        self.assertFalse((workflows / "rs9-tfnf-pypi-publish.yml").exists())
+        self.assertEqual((workflows / "rs9-tfnf-pypi-publish.yml").read_text(), nebular_workflow_text())
         self.assertEqual(hashlib.sha256((workflows / "rs9-pypi-publish.yml").read_bytes()).hexdigest(),
                          "d248edcab45a912f76ca04289d46a4fdd8de91f53d86780a6f2539a667004e3a")
 

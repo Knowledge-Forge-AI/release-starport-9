@@ -1,0 +1,213 @@
+name: RS9 theme-forge-nebular-fusion PyPI Publish
+run-name: 'RS9 theme-forge-nebular-fusion ${{ inputs.mode }} / ${{ inputs.dispatch_id }}'
+
+on:
+  push:
+    branches: [rs9-tfnf-pypi-hostqual1]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Execution mode'
+        required: true
+        type: choice
+        options:
+          - qualify
+          - publish
+        default: qualify
+      dispatch_id:
+        description: 'Unique attended intent correlation; not publication authority'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rs9-tfnf-pypi-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build_verify:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9-tfnf-pypi-hostqual1'
+    name: Build and Verify Native Darwin Wheel
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Build and verify candidate wheel
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular build \
+            --output dist --scratch "${{ runner.temp }}/tfnf-build"
+
+      - name: Stage verified wheel artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pypi-artifacts
+          path: dist/
+          retention-days: 1
+          if-no-files-found: error
+
+  native_consumer:
+    name: Native macOS ARM64 installed consumer and Scenario A
+    needs: [build_verify]
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Download the same run's verified wheel
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pypi-artifacts
+          path: '${{ runner.temp }}/tfnf-dist'
+
+      - name: Prepare authenticated captures and verifier closure outside network denial
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular prepare \
+            --output "${{ runner.temp }}/tfnf-inputs"
+
+      - name: Qualify installed wheel and Darwin Scenario A under network denial
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFY_COMMIT: '${{ github.sha }}'
+          SUPERVISOR_PYTHON: '${{ steps.setup_python.outputs.python-path }}'
+        shell: bash
+        run: |
+          set -euo pipefail
+          PHYSICAL_TMP="$("$SUPERVISOR_PYTHON" -c 'import os,tempfile; print(os.path.realpath(tempfile.gettempdir()))')"
+          export TMPDIR="$PHYSICAL_TMP" TMP="$PHYSICAL_TMP" TEMP="$PHYSICAL_TMP"
+          PHYSICAL_RUNNER_TEMP="$("$SUPERVISOR_PYTHON" -c 'import os; print(os.path.realpath(os.environ["RUNNER_TEMP"]))')"
+          mkdir -p "$PHYSICAL_RUNNER_TEMP/tfnf-consumer-report"
+          /usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)(allow process-exec (with no-sandbox) (literal "/bin/ps"))' \
+            "$SUPERVISOR_PYTHON" -B -m rs9.tf_pypi_nebular qualify \
+            --dist "$PHYSICAL_RUNNER_TEMP/tfnf-dist" \
+            --work "$PHYSICAL_RUNNER_TEMP/tfnf-consumer" \
+            --nebular-capture "$PHYSICAL_RUNNER_TEMP/tfnf-inputs/captures/nebular/theme-forge-nebular-fusion" \
+            --stellar-capture "$PHYSICAL_RUNNER_TEMP/tfnf-inputs/captures/stellar/theme-forge-stellar-burst" \
+            --closure "$PHYSICAL_RUNNER_TEMP/tfnf-inputs/verifier-closure" \
+            --python39 /usr/bin/python3 \
+            --report "$PHYSICAL_RUNNER_TEMP/tfnf-consumer-report/result.json" \
+            --expected-commit "$QUALIFY_COMMIT" \
+            --require-clean
+
+      - name: Preserve native consumer result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-consumer-theme-forge-nebular-fusion
+          path: '${{ runner.temp }}/tfnf-consumer-report/'
+          retention-days: 14
+          if-no-files-found: error
+
+  publish:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.mode == 'publish'
+    name: Trusted Publishing to PyPI
+    needs: [build_verify, native_consumer]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: rs9-tfnf-pypi-publish-main
+      cancel-in-progress: false
+    environment:
+      name: pypi
+      url: https://pypi.org/p/theme-forge-nebular-fusion
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Download staged artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pypi-artifacts
+          path: dist/
+
+      - name: Verify artifact integrity and select only missing files
+        id: missing
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+          RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED: ${{ vars.RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular select-missing \
+            --dist dist --upload-dir upload \
+            --attempt-marker "${{ runner.temp }}/tfnf-upload-attempt.json" >> "$GITHUB_OUTPUT"
+
+      - name: Re-verify staged upload artifact against approval before upload
+        if: steps.missing.outputs.upload == 'true'
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular verify-upload \
+            --dist dist --upload-dir upload
+
+      - name: Publish package distribution to PyPI
+        if: steps.missing.outputs.upload == 'true'
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e
+        with:
+          packages-dir: upload/
+          verify-metadata: true
+          print-hash: true
+          skip-existing: false
+          attestations: false
+
+      - name: Read back published PyPI state
+        if: always() && (steps.missing.outputs.upload == 'true' || steps.missing.outputs.state == 'published-exact')
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular readback --dist dist

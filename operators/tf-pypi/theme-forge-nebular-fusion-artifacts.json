@@ -1,0 +1,248 @@
+{
+  "authentication": {
+    "bootstrap_sha256": "93081d30cb2eedb88eb6248653177ab03570dbd51f7047293e25670d860b8e64",
+    "nebular": {
+      "profile": "tauri-desktop-archive.v1alpha2",
+      "profile_result_sha256": "508f5b7c3d7cb5aa7bd645bf00c8aaf38a065f2b1a45bc077ae8a7fc9168d083",
+      "project": "theme-forge-nebular-fusion",
+      "release_record_sha256": "d12fd5f0fdbfcc4771c2f8538d7d9b2c6d2ae745473ea578f3eb0130e4b2c108",
+      "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+      "tag": "v0.6.1",
+      "tag_commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+      "tag_tree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b"
+    },
+    "stellar_fixture": {
+      "profile": "npm-package-archive.v1alpha1",
+      "profile_result_sha256": "43a6cce905e2fef3722c3ed23088e3ecd010932cf5cf855a393426005c3b1910",
+      "project": "theme-forge-stellar-burst",
+      "release_record_sha256": "4341b1edc15530c60634f5aaac7bc82b49f4f4dad74c99e7023f00999a57b5dc",
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+      "tag": "v0.6.1",
+      "tag_commit": "a3e89683f92b8240c800ed303c866e7b12aa3277",
+      "tag_tree": "158bd6d03b21d747385fb25f49e6e148d62043c8"
+    }
+  },
+  "builder_can_publish": false,
+  "builder_environment": {
+    "cross_zlib_verified_versions": [
+      "1.2.12",
+      "1.3.2"
+    ],
+    "python_minor": "3.13",
+    "python_version": "3.13.12",
+    "zlib_version": "1.3.2"
+  },
+  "command": "tfnf",
+  "commercial_license_authority": {
+    "path": "COMMERCIAL-LICENSE.md",
+    "sha256": "3f5ea7c51359c8d4310e061686980c674151b20924f6cd2bb59d657566e6c30f",
+    "shipped_in_wheel": false,
+    "size": 933
+  },
+  "distribution": "theme-forge-nebular-fusion",
+  "embedded_helpers": {
+    "rs9/__init__.py": "be6ddccd46c6d9ef47ddc53e68442038b35017d91f107883a5a84a4b4cd5ed4f",
+    "rs9/archives.py": "d7f0a24caf58fd86c6d681a1083afd24660b86131e65dc799f80f7dfbb188786",
+    "rs9/errors.py": "90e823801097b2eabac8c5839bdc4c165e4c91f8e080834237478dacb3a1ead4",
+    "rs9/materialize.py": "35d22477c8bc643f9ef227c18ad43b92724b2df1a5843bc8c921b5156a789064",
+    "rs9/scratch.py": "d99938f98a84653fa955b234ce4e6e0fddc6bd61402b72ccd5f16f4eac5a077c",
+    "rs9/security.py": "ebe616f8d7d38af51a966829eb48b11423a5177dd271159a29633cc0ca00e42c"
+  },
+  "environment": "pypi",
+  "files": [
+    {
+      "filename": "theme_forge_nebular_fusion-0.6.1-py3-none-macosx_13_0_arm64.whl",
+      "logical_sha256": "58ab244a0dabdf797dbe4c1d02b43c0d9082656ce7a7222c8c07b016b230cab6",
+      "sha256": "7f38708f9e82216b27165769785b378f5b17480a8a7a594f07adf6273e737c20",
+      "size": 46792720
+    }
+  ],
+  "license_expression": "AGPL-3.0-or-later",
+  "license_files": [
+    {
+      "path": "LICENSE",
+      "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+      "size": 34460
+    },
+    {
+      "path": "NOTICE",
+      "sha256": "9b7be934e0a179a7c48446139334470964057c198d49ec8e149c3101f78778f2",
+      "size": 604
+    }
+  ],
+  "macos_minimum_version": "13.0",
+  "members": [
+    {
+      "compressed_size": 287,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion-0.6.1.dist-info/METADATA",
+      "sha256": "53f3a6ec605391cfbe2941cb07ac49aa43cddad2ef9cf0837dff87194f1e127c",
+      "size": 445
+    },
+    {
+      "compressed_size": 902,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion-0.6.1.dist-info/RECORD",
+      "sha256": "0143725b01b45a3cb01537c9280f3dc16d43b313aeefb146b76d05734997b81d",
+      "size": 1824
+    },
+    {
+      "compressed_size": 100,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion-0.6.1.dist-info/WHEEL",
+      "sha256": "589faef5c00a027d511aebf9762bd128d11603db642ddedcb5d7dae4c90afaf1",
+      "size": 101
+    },
+    {
+      "compressed_size": 69,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion-0.6.1.dist-info/entry_points.txt",
+      "sha256": "1d76d83633f8dd141737beb51a9e65eb56378150ba35050bfae4b3b20e12309e",
+      "size": 71
+    },
+    {
+      "compressed_size": 11586,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion-0.6.1.dist-info/licenses/LICENSE",
+      "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+      "size": 34460
+    },
+    {
+      "compressed_size": 343,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion-0.6.1.dist-info/licenses/NOTICE",
+      "sha256": "9b7be934e0a179a7c48446139334470964057c198d49ec8e149c3101f78778f2",
+      "size": 604
+    },
+    {
+      "compressed_size": 106,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion/__init__.py",
+      "sha256": "c0ea22f2ece23c169e6a630cf027912b265e25c8b258ab4ac558a3db934c2798",
+      "size": 125
+    },
+    {
+      "compressed_size": 45,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion/_isolated/rs9/__init__.py",
+      "sha256": "be6ddccd46c6d9ef47ddc53e68442038b35017d91f107883a5a84a4b4cd5ed4f",
+      "size": 46
+    },
+    {
+      "compressed_size": 2661,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion/_isolated/rs9/archives.py",
+      "sha256": "d7f0a24caf58fd86c6d681a1083afd24660b86131e65dc799f80f7dfbb188786",
+      "size": 9304
+    },
+    {
+      "compressed_size": 2623,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion/_isolated/rs9/errors.py",
+      "sha256": "90e823801097b2eabac8c5839bdc4c165e4c91f8e080834237478dacb3a1ead4",
+      "size": 11247
+    },
+    {
+      "compressed_size": 6258,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion/_isolated/rs9/materialize.py",
+      "sha256": "35d22477c8bc643f9ef227c18ad43b92724b2df1a5843bc8c921b5156a789064",
+      "size": 26985
+    },
+    {
+      "compressed_size": 2816,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion/_isolated/rs9/scratch.py",
+      "sha256": "d99938f98a84653fa955b234ce4e6e0fddc6bd61402b72ccd5f16f4eac5a077c",
+      "size": 9087
+    },
+    {
+      "compressed_size": 3425,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion/_isolated/rs9/security.py",
+      "sha256": "ebe616f8d7d38af51a966829eb48b11423a5177dd271159a29633cc0ca00e42c",
+      "size": 13287
+    },
+    {
+      "compressed_size": 2993,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion/_rs9/provenance.json",
+      "sha256": "d976d21a6a7faaf31e460189a4e80534ad3e307de8f84bf8e3ed59e60954074a",
+      "size": 9511
+    },
+    {
+      "compressed_size": 1262,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion/launcher.py",
+      "sha256": "4daf8b1aff7506cab7afd225a7defdd9024fe3632c5ec3d318f18191c7cb1ef2",
+      "size": 2777
+    },
+    {
+      "compressed_size": 57216,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion/payload/manifest.json",
+      "sha256": "0264193bc4a1fb73f56a99e96e3aeb77a56006224307409a1e204fecfbb1abb1",
+      "size": 421718
+    },
+    {
+      "compressed_size": 46696900,
+      "mode": 420,
+      "path": "theme_forge_nebular_fusion/payload/theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+      "sha256": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be",
+      "size": 47079690
+    }
+  ],
+  "payload_asset": {
+    "executable_path": "Theme Forge Nebular Fusion.app/Contents/MacOS/theme-forge-nebular-fusion",
+    "executable_sha256": "663c60a675165287e3157a279988bcd4bce556cf3c2a69d4bfd5ab937f60d867",
+    "github_asset_id": 601953438,
+    "id": "darwin-arm64",
+    "launcher_path": "Theme Forge Nebular Fusion.app/Contents/Resources/bin/tfnf",
+    "launcher_sha256": "ed7e87d3873dc16fd48fde6e5d354f3b52b1a2c41462a49b0f9f6101ca0ece3f",
+    "member_count": 1656,
+    "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+    "payload_manifest_sha256": "41d9eaa1b7930efe1edaa33a600491bd9073da42f27445983fd4da88596995ba",
+    "sha256": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be",
+    "size": 47079690
+  },
+  "project": "theme-forge-nebular-fusion",
+  "publication_admitted": false,
+  "pypi_size_limit": {
+    "below_default_limit": true,
+    "candidate_size_bytes": 46792720,
+    "default_limit_bytes": 100000000,
+    "headroom_bytes": 53207280,
+    "project_limit_status": "unread-while-pending"
+  },
+  "python_floor_basis": {
+    "analysis_scope": "static-syntax-and-runtime-annotation-analysis-plus-lazy-import-reachability",
+    "decisive_construct": "src/rs9/scratch.py:92 evaluated int | None union annotation without postponed annotations",
+    "executed_interpreters": {
+      "3.10_to_3.12": "not-executed-locally",
+      "3.13.12": "full-installed-lifecycle-sidecar-and-darwin-scenario-a-passed",
+      "3.9.6": "refused-by-pip-requires-python-before-install"
+    },
+    "static_floor": "3.10"
+  },
+  "requires_python": ">=3.10",
+  "schema": "rs9.tf-pypi-native-candidate.v1alpha1",
+  "set_sha256": "5b306dfabae76d597263ea2ddd563d7d11211b252eba910eca45672a0a939284",
+  "superseded_candidates": [
+    {
+      "filename": "theme_forge_nebular_fusion-0.6.1-py3-none-macosx_13_0_arm64.whl",
+      "reason": "requires-python-overstated-as-3.9",
+      "sha256": "7d2bcbee182e496fa6221e1b2dad75e7899373aba7801f17a16a838f843ae82c",
+      "size": 46792719
+    }
+  ],
+  "system": "aarch64-darwin",
+  "verifier_closure": {
+    "file_count": 91,
+    "records_sha256": "bc8075c4ab1a8587ba9f1abeaef024aa894cc6403b0466e35c5022ff387980f9",
+    "source_bindings_sha256": "f7f04c641ffc64d7802f82a04d93d45101213470e832164db32a382ec3d2c750",
+    "total_bytes": 1220132
+  },
+  "version": "0.6.1",
+  "wheel_tag": "py3-none-macosx_13_0_arm64",
+  "workflow": "rs9-tfnf-pypi-publish.yml"
+}

@@ -522,7 +522,7 @@ class WheelNativeTests(unittest.TestCase):
         self.assertEqual(res.filename, "theme_forge_nebular_fusion-0.6.1-py3-none-linux_x86_64.whl")
 
     def test_darwin_wheel_tag_reflects_actual_plist_floor(self) -> None:
-        """Darwin wheel tag dynamically reads deployment floor from Info.plist, not hardcoded 11.0."""
+        """Darwin wheel tag dynamically reads deployment floor from top-level Info.plist and rejects nested/duplicate plists."""
         arc_bytes = make_darwin_archive(make_standard_darwin_entries(min_os="13.0.0"))
         res = build_native_wheel(
             "theme-forge-nebular-fusion",
@@ -533,6 +533,73 @@ class WheelNativeTests(unittest.TestCase):
         )
         self.assertEqual(res.tag, "py3-none-macosx_13_0_arm64")
         self.assertEqual(res.filename, "theme_forge_nebular_fusion-0.6.1-py3-none-macosx_13_0_arm64.whl")
+
+        # Nested framework Info.plist appearing BEFORE top-level bundle Info.plist is ignored
+        nested_plist = plistlib.dumps({"LSMinimumSystemVersion": "11.0.0"})
+        std_entries = make_standard_darwin_entries(min_os="13.0.0")
+        root = "Theme Forge Nebular Fusion.app"
+        nested_first_entries = [
+            (f"{root}/Contents/Frameworks", b"", 0o755, tarfile.DIRTYPE, ""),
+            (f"{root}/Contents/Frameworks/Helper.framework", b"", 0o755, tarfile.DIRTYPE, ""),
+            (f"{root}/Contents/Frameworks/Helper.framework/Contents", b"", 0o755, tarfile.DIRTYPE, ""),
+            (f"{root}/Contents/Frameworks/Helper.framework/Contents/Info.plist", nested_plist, 0o644, tarfile.REGTYPE, ""),
+            *std_entries,
+        ]
+        res_nested_first = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=make_darwin_archive(nested_first_entries),
+            system="aarch64-darwin",
+            output_dir=self.root / "out_darwin_nested_first",
+        )
+        self.assertEqual(res_nested_first.tag, "py3-none-macosx_13_0_arm64")
+
+        # Nested-only Info.plist without top-level Info.plist fails closed
+        no_top_entries = [
+            e for e in nested_first_entries if e[0] != f"{root}/Contents/Info.plist"
+        ]
+        with self.assertRaises(ContractError) as ctx_no_top:
+            build_native_wheel(
+                "theme-forge-nebular-fusion",
+                "0.6.1",
+                archive_bytes=make_darwin_archive(no_top_entries),
+                system="aarch64-darwin",
+                output_dir=self.root / "out_darwin_no_top",
+            )
+        self.assertEqual(ctx_no_top.exception.code, "INVALID_PLIST")
+
+        # Duplicate top-level bundle Info.plist fails closed (ARCHIVE_ROOT on raw archive, INVALID_PLIST in plist loop)
+        dup_top_entries = [
+            *std_entries,
+            ("OtherBundle.app", b"", 0o755, tarfile.DIRTYPE, ""),
+            ("OtherBundle.app/Contents", b"", 0o755, tarfile.DIRTYPE, ""),
+            ("OtherBundle.app/Contents/Info.plist", nested_plist, 0o644, tarfile.REGTYPE, ""),
+        ]
+        dup_arc_bytes = make_darwin_archive(dup_top_entries)
+        with self.assertRaises(ContractError) as ctx_dup_raw:
+            build_native_wheel(
+                "theme-forge-nebular-fusion",
+                "0.6.1",
+                archive_bytes=dup_arc_bytes,
+                system="aarch64-darwin",
+                output_dir=self.root / "out_darwin_dup_raw",
+            )
+        self.assertEqual(ctx_dup_raw.exception.code, "ARCHIVE_ROOT")
+
+        from rs9.archives import inspect_archive
+        std_arc_file = self.root / "std_darwin.tar.gz"
+        std_arc_file.write_bytes(arc_bytes)
+        std_manifest = inspect_archive(std_arc_file, commands={})
+        with self.assertRaises(ContractError) as ctx_dup_top:
+            build_native_wheel(
+                "theme-forge-nebular-fusion",
+                "0.6.1",
+                archive_bytes=dup_arc_bytes,
+                manifest=std_manifest,
+                system="aarch64-darwin",
+                output_dir=self.root / "out_darwin_dup_top",
+            )
+        self.assertEqual(ctx_dup_top.exception.code, "INVALID_PLIST")
 
     def test_legacy_target_platform_triple_conversion(self) -> None:
         """Legacy target_platform triple is converted at API boundary; invalid triple rejected."""
@@ -546,3 +613,90 @@ class WheelNativeTests(unittest.TestCase):
                 output_dir=self.root / "out_invalid_triple",
             )
         self.assertEqual(ctx.exception.code, "INVALID_ARCHITECTURE")
+
+    def test_requires_python_310_static_floor_and_lazy_import_reachability(self) -> None:
+        """Verify Requires-Python: >=3.10 metadata, static 3.10 AST/stdlib floor in helpers, and unreachable lazy imports."""
+        import ast
+        from email.parser import BytesParser
+
+        arc_bytes = make_darwin_archive(make_standard_darwin_entries(min_os="13.0.0"))
+        res = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.6.1",
+            archive_bytes=arc_bytes,
+            system="aarch64-darwin",
+            output_dir=self.root / "out_py310",
+        )
+        forbidden_311_modules = {"tomllib", "wsgiref.types"}
+        forbidden_311_symbols = {
+            "StrEnum",
+            "Self",
+            "Never",
+            "assert_never",
+            "TaskGroup",
+            "file_digest",
+            "UTC",
+            "chdir",
+            "cbrt",
+            "exp2",
+        }
+        with zipfile.ZipFile(res.wheel_path) as zf:
+            meta_raw = zf.read("theme_forge_nebular_fusion-0.6.1.dist-info/METADATA")
+            meta_msg = BytesParser().parsebytes(meta_raw)
+            self.assertEqual(meta_msg.get("Requires-Python"), ">=3.10")
+
+            python_members = [
+                name for name in zf.namelist() if name.endswith(".py")
+            ]
+            self.assertEqual(len(python_members), 8)
+
+            bitor_without_future: list[str] = []
+            called_attrs_or_names: set[str] = set()
+            imported_modules: set[str] = set()
+            referenced_symbols: set[str] = set()
+
+            for member in python_members:
+                src = zf.read(member).decode("utf-8")
+                tree = ast.parse(src, filename=member, feature_version=(3, 10))
+                has_future_annotations = any(
+                    isinstance(node, ast.ImportFrom)
+                    and node.module == "__future__"
+                    and any(alias.name == "annotations" for alias in node.names)
+                    for node in tree.body
+                )
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        for alias in node.names:
+                            imported_modules.add(alias.name)
+                    elif isinstance(node, ast.ImportFrom):
+                        if node.module:
+                            imported_modules.add(node.module)
+                        for alias in node.names:
+                            referenced_symbols.add(alias.name)
+                    elif isinstance(node, ast.Attribute):
+                        referenced_symbols.add(node.attr)
+                    elif isinstance(node, ast.FunctionDef):
+                        for arg in node.args.args + node.args.kwonlyargs:
+                            if (
+                                isinstance(arg.annotation, ast.BinOp)
+                                and isinstance(arg.annotation.op, ast.BitOr)
+                                and not has_future_annotations
+                            ):
+                                bitor_without_future.append(f"{member}:{node.name}:{arg.arg}")
+                    elif isinstance(node, ast.Call):
+                        if isinstance(node.func, ast.Name):
+                            called_attrs_or_names.add(node.func.id)
+                        elif isinstance(node.func, ast.Attribute):
+                            called_attrs_or_names.add(node.func.attr)
+
+            self.assertIn(
+                "theme_forge_nebular_fusion/_isolated/rs9/scratch.py:__init__:file_mode",
+                bitor_without_future,
+            )
+            self.assertNotIn("public_receipt", called_attrs_or_names)
+            self.assertEqual(imported_modules & forbidden_311_modules, set())
+            self.assertEqual(referenced_symbols & forbidden_311_symbols, set())
+
+
+if __name__ == "__main__":
+    unittest.main()
