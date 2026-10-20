@@ -4,11 +4,12 @@ import tempfile
 from pathlib import Path
 import unittest
 
-from rs9.tf_pypi_archive import AdmissionError, canonical, fail, read_tar, sha256
+from rs9.tf_pypi_archive import AdmissionError, canonical, fail, physical_bytes, read_tar, sha256
 from rs9.tf_pypi_backend import write_tar
-from rs9.tf_pypi_model import (PRODUCTS, admit_bytes, intake, load_pin, pure_payload,
-                              strict_json, validate_pin)
-from tests.tf_pypi_fixtures import fixture
+from rs9.tf_pypi_intake import asset_url
+from rs9.tf_pypi_model import (DISTRIBUTIONS, PRODUCTS, TARGETS, admit_bytes, build_pin,
+                              intake, load_pin, pure_payload, strict_json, validate_pin)
+from tests.tf_pypi_fixtures import ROOT, fixture
 
 
 class ModelTests(unittest.TestCase):
@@ -18,12 +19,92 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "TF_PYPI_" + code)
 
     def test_frozen_pins_three_only_blocked(self):
-        for product in PRODUCTS:
+        expected_versions = {
+            "theme-forge-stellar-burst": ("0.6.1", "0.6.1.post1"),
+            "theme-forge-stellar-loom": ("0.4.0", "0.4.0.post1"),
+            "theme-forge-solar-sail": ("0.2.1", "0.2.1.post1"),
+        }
+        for product, (upstream, dist_ver) in expected_versions.items():
             pin = load_pin(product)
+            self.assertEqual(pin["schema"], "rs9.tf-pypi-intake.v2")
+            self.assertEqual(pin["version"], upstream)
+            self.assertEqual(pin["distribution_version"], dist_ver)
+            self.assertEqual(DISTRIBUTIONS[product], dist_ver)
+            self.assertEqual(pin["candidate_platforms"], list(TARGETS))
+            self.assertEqual(pin["qualified_platforms"], [])
             self.assertIn(pin["source_status"], {"READY", "BLOCKED"})
             self.assertEqual(bool(pin["withheld"]), pin["source_status"] == "BLOCKED")
             self.assertEqual(validate_pin(pin), pin)
         self.error("PRODUCT", load_pin, "theme-forge-nebular-fusion")
+
+    def test_distribution_version_and_platform_pin_negatives(self):
+        pin = load_pin("theme-forge-stellar-loom")
+        for bad_dv in ("0.4.0", "0.4.0.post2", "0.6.1.post1", "0.2.1.post1", "1.0.0.post1", "", None):
+            with self.subTest(distribution_version=bad_dv):
+                self.error("PIN", validate_pin, {**pin, "distribution_version": bad_dv})
+        missing_dv = dict(pin)
+        missing_dv.pop("distribution_version")
+        self.error("PIN", validate_pin, missing_dv)
+        self.error("PIN", validate_pin, {**pin, "schema": "rs9.tf-pypi-intake.v1"})
+        for bad_candidates in (
+            ["darwin-arm64"],
+            ["darwin-arm64", "linux-x64-gnu", "linux-arm64-gnu"],
+            ["darwin-arm64", "linux-arm64-gnu", "linux-x64-gnu", "darwin-x64"],
+        ):
+            with self.subTest(candidate_platforms=bad_candidates):
+                self.error("PIN", validate_pin, {**pin, "candidate_platforms": bad_candidates})
+        for bad_qualified in (
+            ["darwin-x64"],
+            ["win32-x64"],
+            ["darwin-arm64", "darwin-arm64"],
+            "darwin-arm64",
+        ):
+            with self.subTest(qualified_platforms=bad_qualified):
+                self.error("PIN", validate_pin, {**pin, "qualified_platforms": bad_qualified})
+        self.assertEqual(
+            validate_pin({**pin, "qualified_platforms": list(TARGETS)})["qualified_platforms"],
+            list(TARGETS),
+        )
+        blocked = {
+            **pin,
+            "qualified_platforms": list(TARGETS),
+            "source_status": "BLOCKED",
+            "withheld": ["awaiting native matrix receipts"],
+        }
+        self.assertEqual(build_pin(blocked), {**blocked, "qualified_platforms": []})
+
+    def test_upstream_package_json_and_asset_url_reject_post_suffix(self):
+        for project in PRODUCTS:
+            pin = load_pin(project)
+            url = asset_url(pin)
+            self.assertIn(f"/releases/download/v{pin['version']}/{pin['asset']}", url)
+            self.assertNotIn("post", url)
+            bad_pin, bad_data = fixture(project, changes={"version": pin["distribution_version"]})
+            self.error("VERSION", admit_bytes, bad_pin, bad_data, bad_pin["asset"])
+
+    def test_legacy_artifact_approvals_stay_immutable(self):
+        expected = {
+            "theme-forge-stellar-burst": (
+                "0.6.1",
+                "773583c0a629945ae25adffe78014828de90ab72b2da78f91a1c20b88be819bf",
+            ),
+            "theme-forge-stellar-loom": (
+                "0.4.0",
+                "452e65e9f0b4e937afc4b3e50bd3fa38cc93be5f4feecca531c85f9791e23bed",
+            ),
+            "theme-forge-solar-sail": (
+                "0.2.1",
+                "fcde62f45ee4f1fec92530b524c1eca2090790815c14cb1076fd227fb3fb8e77",
+            ),
+        }
+        for project, (upstream_version, expected_sha) in expected.items():
+            path = ROOT / "operators/tf-pypi" / f"{project}-artifacts.json"
+            manifest = strict_json(physical_bytes(path))
+            self.assertEqual(manifest["schema"], "rs9.tf-pypi-candidate-set.v1")
+            self.assertEqual(manifest["project"], project)
+            self.assertEqual(manifest["version"], upstream_version)
+            self.assertEqual(len(manifest["files"]), 2)
+            self.assertEqual(manifest["set_sha256"], expected_sha)
 
     def test_each_synthetic_manifest_and_command_set_admitted(self):
         for project in PRODUCTS:
