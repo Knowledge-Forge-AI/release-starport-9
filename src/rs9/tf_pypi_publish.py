@@ -14,14 +14,13 @@ from urllib.parse import urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
 from rs9.tf_pypi_archive import AdmissionError, canonical, fail, physical_bytes
-from rs9.tf_pypi_backend import build_pair
+from rs9.tf_pypi_backend import build_aggregate
 from rs9.tf_pypi_closure import DEPENDENCIES, admit_dependency, load_dependencies
+from rs9.tf_pypi_hosted import admit_matrix
 from rs9.tf_pypi_intake import NoRedirect, download
 from rs9.tf_pypi_model import PRODUCTS, intake, load_pin, strict_json, validate_pin
 from rs9.tf_pypi_remote import PublicReader, exact_state
-from rs9.tf_pypi_verify import verify_pair
-
-DEFAULT_TARGET = "darwin-arm64"
+from rs9.tf_pypi_verify import verify_aggregate
 
 
 def dependency_url(dep_pin):
@@ -84,8 +83,12 @@ def fetch_dependencies(directory=None, *, opener=None):
 
 def approval_path(pin):
     """Return the path to the operator-approved artifacts manifest."""
+    if isinstance(pin, str):
+        pin = load_pin(pin)
+    else:
+        validate_pin(pin)
     root = Path(__file__).resolve().parents[2]
-    return root / "operators/tf-pypi" / f"{pin['project']}-artifacts.json"
+    return root / "operators/tf-pypi" / f"{pin['project']}-{pin['distribution_version']}-artifacts.json"
 
 
 def load_approval(pin):
@@ -101,8 +104,8 @@ def load_approval(pin):
     return strict_json(data)
 
 
-def verify_approved(pin, dist, target=DEFAULT_TARGET):
-    """Verify local dist directory exactly matches the committed approved artifacts."""
+def verify_approved(pin, dist):
+    """Verify local dist directory exactly matches the committed approved aggregate."""
     if isinstance(pin, str):
         pin = load_pin(pin)
     else:
@@ -110,14 +113,14 @@ def verify_approved(pin, dist, target=DEFAULT_TARGET):
     if pin.get("source_status") != "READY":
         fail("SOURCE_NOT_READY")
     approved = load_approval(pin)
-    actual = verify_pair(pin, dist, target=target)
+    actual = verify_aggregate(pin, dist)
     if actual != approved and {**actual, "publication_admitted": True} != approved:
         fail("APPROVAL_MISMATCH")
     return approved
 
 
-def build(pin, output=Path("dist"), inputs=None, target=DEFAULT_TARGET, opener=None):
-    """Build candidate distribution pair with deterministic cross-target builder."""
+def build(pin, output=Path("dist"), inputs=None, opener=None):
+    """Build candidate distribution aggregate with deterministic cross-target builder."""
     if isinstance(pin, str):
         pin = load_pin(pin)
     else:
@@ -136,17 +139,36 @@ def build(pin, output=Path("dist"), inputs=None, target=DEFAULT_TARGET, opener=N
             dependencies = {dep["asset"]: fetch_dependency(dep, opener=opener) for dep in DEPENDENCIES}
         else:
             dependencies = None
-    build_pair(pin, data, output, dependencies=dependencies, target=target)
-    return verify_approved(pin, output, target=target)
+    build_aggregate(pin, data, output, dependencies=dependencies)
+    return verify_aggregate(pin, output)
 
 
-def select_missing(pin, dist=Path("dist"), upload_dir=Path("upload"), target=DEFAULT_TARGET, get=None):
-    """Verify local approved dist, check exact remote state, and copy only missing approved files."""
+def select_missing(
+    pin,
+    dist=Path("dist"),
+    upload_dir=Path("upload"),
+    receipts=None,
+    expected_commit=None,
+    run_id=None,
+    run_attempt=None,
+    get=None,
+):
+    """Verify local approved dist, admit three-host matrix, check exact remote state, and copy only missing files."""
     if isinstance(pin, str):
         pin = load_pin(pin)
     else:
         validate_pin(pin)
-    approved = verify_approved(pin, dist, target=target)
+    if pin.get("source_status") != "READY":
+        fail("SOURCE_NOT_READY")
+    if pin.get("qualified_platforms") != pin.get("candidate_platforms"):
+        fail("PLATFORM_UNQUALIFIED")
+    approved = verify_approved(pin, dist)
+    if approved.get("publication_admitted") is not True:
+        fail("PUBLICATION_NOT_ADMITTED")
+    if receipts is None:
+        fail("HOSTED_MATRIX_RECEIPTS")
+    admit_matrix(pin, dist, receipts, expected_commit, run_id, run_attempt)
+
     dist = Path(dist)
     upload_dir = Path(upload_dir)
 
@@ -167,7 +189,7 @@ def select_missing(pin, dist=Path("dist"), upload_dir=Path("upload"), target=DEF
 
     if state in ("unknown", "conflict"):
         fail(f"REMOTE_{state.upper()}")
-    if state not in ("published-exact", "incomplete", "absent"):
+    if state not in ("published-exact", "incomplete", "absent", "version-absent"):
         fail("REMOTE_UNKNOWN")
 
     approved_names = {record["filename"] for record in approved["files"]}
@@ -185,21 +207,106 @@ def select_missing(pin, dist=Path("dist"), upload_dir=Path("upload"), target=DEF
     return {"upload": bool(missing), "state": state, "missing": missing}
 
 
-def readback(pin, dist=Path("dist"), target=DEFAULT_TARGET, get=None):
-    """Read back remote PyPI state against approved candidate dist; must be published-exact."""
+def readback(pin, dist=Path("dist"), get=None):
+    """Read back remote PyPI state against approved candidate aggregate; must be published-exact."""
     if isinstance(pin, str):
         pin = load_pin(pin)
     else:
         validate_pin(pin)
-    approved = verify_approved(pin, dist, target=target)
+    approved = verify_approved(pin, dist)
     dist = Path(dist)
     local = {record["filename"]: physical_bytes(dist / record["filename"]) for record in approved["files"]}
 
     state_info = exact_state(pin, local, get=get)
     state = state_info.get("state")
     if state == "published-exact":
-        return {"project": pin["project"], "version": pin["version"], "state": "published-exact"}
-    fail(f"READBACK_{state.upper().replace('-', '_')}")
+        return {
+            "project": pin["project"],
+            "version": pin["distribution_version"],
+            "upstream_version": pin["version"],
+            "state": "published-exact",
+        }
+    fail(f"READBACK_{(state or 'unknown').upper().replace('-', '_')}")
+
+
+def _native_qualify_job(job_id, job_name, runner, project, target, sandbox=False):
+    qualify_prefix = (
+        "/usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' \\\n            "
+        if sandbox else ""
+    )
+    return f"""  {job_id}:
+    name: {job_name}
+    needs: [build_verify]
+    runs-on: {runner}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{{{ github.sha }}}}'
+          persist-credentials: false
+      - name: Set up Python 3.13
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - name: Set up Node 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Download the same run's verified distributions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pypi-artifacts
+          path: dist/
+      - name: Test exact wheel and sdist with networking denied
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFY_COMMIT: '${{{{ github.sha }}}}'
+          QUALIFY_RUN_ID: '${{{{ github.run_id }}}}'
+          QUALIFY_RUN_ATTEMPT: '${{{{ github.run_attempt }}}}'
+        shell: bash
+        run: |
+          set -euo pipefail
+          PHYSICAL_TMP="$(python3 -c 'import os,tempfile; print(os.path.realpath(tempfile.gettempdir()))')"
+          export TMPDIR="$PHYSICAL_TMP" TMP="$PHYSICAL_TMP" TEMP="$PHYSICAL_TMP"
+          PHYSICAL_RUNNER_TEMP="$(python3 -c 'import os; print(os.path.realpath(os.environ["RUNNER_TEMP"]))')"
+          mkdir -p "$PHYSICAL_RUNNER_TEMP/tf-consumer-report"
+          {qualify_prefix}python3 -B -m rs9.tf_pypi_hosted qualify --project {project} \\
+            --target {target} \\
+            --dist "$GITHUB_WORKSPACE/dist" --work "$PHYSICAL_RUNNER_TEMP/tf-consumer" \\
+            --report "$PHYSICAL_RUNNER_TEMP/tf-consumer-report/result.json" \\
+            --expected-commit "$QUALIFY_COMMIT" \\
+            --run-id "$QUALIFY_RUN_ID" --run-attempt "$QUALIFY_RUN_ATTEMPT"
+      - name: Preserve native consumer result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-consumer-{project}-{target}
+          path: '${{{{ runner.temp }}}}/tf-consumer-report/'
+          retention-days: 14
+          if-no-files-found: error"""
+
+
+def _receipt_download_steps(project):
+    return f"""      - name: Download darwin-arm64 consumer receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: native-consumer-{project}-darwin-arm64
+          path: receipts/darwin-arm64/
+      - name: Download linux-arm64-gnu consumer receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: native-consumer-{project}-linux-arm64-gnu
+          path: receipts/linux-arm64-gnu/
+      - name: Download linux-x64-gnu consumer receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: native-consumer-{project}-linux-x64-gnu
+          path: receipts/linux-x64-gnu/"""
 
 
 def workflow_text(pin):
@@ -211,6 +318,19 @@ def workflow_text(pin):
     project = pin["project"]
     workflow_name = pin["workflow"]
     concurrency_group = workflow_name[:-4] if workflow_name.endswith(".yml") else workflow_name
+    darwin_job = _native_qualify_job(
+        "native_darwin_arm64", "Native macOS ARM64 installed consumer",
+        "macos-15", project, "darwin-arm64", sandbox=True,
+    )
+    linux_arm_job = _native_qualify_job(
+        "native_linux_arm64", "Native Linux ARM64 GNU installed consumer",
+        "ubuntu-24.04-arm", project, "linux-arm64-gnu", sandbox=False,
+    )
+    linux_x64_job = _native_qualify_job(
+        "native_linux_x64", "Native Linux x86_64 GNU installed consumer",
+        "ubuntu-24.04", project, "linux-x64-gnu", sandbox=False,
+    )
+    receipt_downloads = _receipt_download_steps(project)
 
     return f"""name: RS9 {project} PyPI Publish
 run-name: 'RS9 {project} ${{{{ inputs.mode }}}} / ${{{{ inputs.dispatch_id }}}}'
@@ -256,7 +376,7 @@ jobs:
       - name: Build and verify package distributions
         env:
           PYTHONPATH: src
-        run: python3 -B -m rs9.tf_pypi_publish build --project {project} --output dist --target darwin-arm64
+        run: python3 -B -m rs9.tf_pypi_publish build --project {project} --output dist
 
       - name: Stage verified artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -266,11 +386,17 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  native_consumer:
-    name: Native macOS ARM64 installed consumer
-    needs: [build_verify]
-    runs-on: macos-15
-    timeout-minutes: 20
+{darwin_job}
+
+{linux_arm_job}
+
+{linux_x64_job}
+
+  qualification_gate:
+    name: Three-host qualification gate
+    needs: [build_verify, native_darwin_arm64, native_linux_arm64, native_linux_x64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -279,50 +405,24 @@ jobs:
         with:
           ref: '${{{{ github.sha }}}}'
           persist-credentials: false
-      - name: Set up Python 3.13
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.13'
-      - name: Set up Node 22
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
-        with:
-          node-version: '22'
-          package-manager-cache: false
-      - name: Download the same run's verified distributions
+      - name: Download staged artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: pypi-artifacts
           path: dist/
-      - name: Test exact wheel and sdist with networking denied
+{receipt_downloads}
+      - name: Admit three-host native matrix receipts
         env:
           PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
           QUALIFY_COMMIT: '${{{{ github.sha }}}}'
-        shell: bash
-        run: |
-          set -euo pipefail
-          PHYSICAL_TMP="$(python3 -c 'import os,tempfile; print(os.path.realpath(tempfile.gettempdir()))')"
-          export TMPDIR="$PHYSICAL_TMP" TMP="$PHYSICAL_TMP" TEMP="$PHYSICAL_TMP"
-          PHYSICAL_RUNNER_TEMP="$(python3 -c 'import os; print(os.path.realpath(os.environ["RUNNER_TEMP"]))')"
-          mkdir -p "$PHYSICAL_RUNNER_TEMP/tf-consumer-report"
-          /usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' \\
-            python3 -B -m rs9.tf_pypi_hosted qualify --project {project} \\
-            --dist "$GITHUB_WORKSPACE/dist" --work "$PHYSICAL_RUNNER_TEMP/tf-consumer" \\
-            --report "$PHYSICAL_RUNNER_TEMP/tf-consumer-report/result.json" \\
-            --expected-commit "$QUALIFY_COMMIT"
-      - name: Preserve native consumer result
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: native-consumer-{project}
-          path: '${{{{ runner.temp }}}}/tf-consumer-report/'
-          retention-days: 14
-          if-no-files-found: error
+          QUALIFY_RUN_ID: '${{{{ github.run_id }}}}'
+          QUALIFY_RUN_ATTEMPT: '${{{{ github.run_attempt }}}}'
+        run: python3 -B -m rs9.tf_pypi_hosted admit --project {project} --dist dist --receipts receipts --expected-commit "$QUALIFY_COMMIT" --run-id "$QUALIFY_RUN_ID" --run-attempt "$QUALIFY_RUN_ATTEMPT"
 
   publish:
     if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.mode == 'publish'
     name: Trusted Publishing to PyPI
-    needs: [build_verify, native_consumer]
+    needs: [build_verify, native_darwin_arm64, native_linux_arm64, native_linux_x64, qualification_gate]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment:
@@ -343,12 +443,16 @@ jobs:
         with:
           name: pypi-artifacts
           path: dist/
+{receipt_downloads}
 
       - name: Verify artifact integrity and select only missing files
         id: missing
         env:
           PYTHONPATH: src
-        run: python3 -B -m rs9.tf_pypi_publish select-missing --project {project} --dist dist --upload-dir upload >> "$GITHUB_OUTPUT"
+          QUALIFY_COMMIT: '${{{{ github.sha }}}}'
+          QUALIFY_RUN_ID: '${{{{ github.run_id }}}}'
+          QUALIFY_RUN_ATTEMPT: '${{{{ github.run_attempt }}}}'
+        run: python3 -B -m rs9.tf_pypi_publish select-missing --project {project} --dist dist --upload-dir upload --receipts receipts --expected-commit "$QUALIFY_COMMIT" --run-id "$QUALIFY_RUN_ID" --run-attempt "$QUALIFY_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
       - name: Publish package distributions to PyPI
         if: steps.missing.outputs.upload == 'true'
@@ -372,18 +476,19 @@ def parser():
     build_cmd.add_argument("--project", choices=sorted(PRODUCTS), required=True)
     build_cmd.add_argument("--output", type=Path, default=Path("dist"))
     build_cmd.add_argument("--inputs", type=Path, default=None)
-    build_cmd.add_argument("--target", default=DEFAULT_TARGET)
 
     missing_cmd = sub.add_parser("select-missing")
     missing_cmd.add_argument("--project", choices=sorted(PRODUCTS), required=True)
     missing_cmd.add_argument("--dist", type=Path, default=Path("dist"))
     missing_cmd.add_argument("--upload-dir", type=Path, default=Path("upload"))
-    missing_cmd.add_argument("--target", default=DEFAULT_TARGET)
+    missing_cmd.add_argument("--receipts", type=Path, required=True)
+    missing_cmd.add_argument("--expected-commit", required=True)
+    missing_cmd.add_argument("--run-id", default="1")
+    missing_cmd.add_argument("--run-attempt", default="1")
 
     readback_cmd = sub.add_parser("readback")
     readback_cmd.add_argument("--project", choices=sorted(PRODUCTS), required=True)
     readback_cmd.add_argument("--dist", type=Path, default=Path("dist"))
-    readback_cmd.add_argument("--target", default=DEFAULT_TARGET)
 
     workflow_cmd = sub.add_parser("workflow")
     workflow_cmd.add_argument("--project", choices=sorted(PRODUCTS), required=True)
@@ -398,15 +503,24 @@ def main(argv=None, *, get=None, opener=None):
         pin = load_pin(args.project)
         op = args.operation
         if op == "build":
-            result = build(pin, output=args.output, inputs=args.inputs, target=args.target, opener=opener)
+            result = build(pin, output=args.output, inputs=args.inputs, opener=opener)
             sys.stdout.buffer.write(canonical(result))
             return 0
         if op == "select-missing":
-            res = select_missing(pin, dist=args.dist, upload_dir=args.upload_dir, target=args.target, get=get)
+            res = select_missing(
+                pin,
+                dist=args.dist,
+                upload_dir=args.upload_dir,
+                receipts=args.receipts,
+                expected_commit=args.expected_commit,
+                run_id=args.run_id,
+                run_attempt=args.run_attempt,
+                get=get,
+            )
             sys.stdout.write(f"upload={'true' if res['upload'] else 'false'}\nstate={res['state']}\n")
             return 0
         if op == "readback":
-            res = readback(pin, dist=args.dist, target=args.target, get=get)
+            res = readback(pin, dist=args.dist, get=get)
             sys.stdout.write(f"state={res['state']}\n")
             return 0
         if op == "workflow":

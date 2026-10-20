@@ -12,6 +12,12 @@ PRODUCTS = {
         "tfsl": "bin/tfsl.js", "tfsl-batch": "bin/tfsl-batch.js"}),
     "theme-forge-solar-sail": ("0.2.1", "tfss", {"tfss": "bin/tfss.js"}),
 }
+DISTRIBUTIONS = {
+    "theme-forge-stellar-burst": "0.6.1.post1",
+    "theme-forge-stellar-loom": "0.4.0.post1",
+    "theme-forge-solar-sail": "0.2.1.post1",
+}
+TARGETS = ("darwin-arm64", "linux-arm64-gnu", "linux-x64-gnu")
 LEGAL = ("LICENSE", "NOTICE", "COMMERCIAL-LICENSE.md")
 NATIVE_MAGIC = (b"\x7fELF", b"MZ", b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf",
                 b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca", b"\xca\xfe\xba\xbf",
@@ -39,27 +45,30 @@ def validate_pin(pin):
     if not isinstance(pin, dict) or pin.get("project") not in PRODUCTS:
         fail("PRODUCT")
     project = pin["project"]
-    allowed = {"schema", "project", "version", "workflow", "npm_name", "bins", "node",
-               "license", "asset", "sha256", "size", "source_commit", "source_status",
-               "withheld", "qualified_platforms", "dependencies"}
+    allowed = {"schema", "project", "version", "distribution_version", "workflow",
+               "npm_name", "bins", "node", "license", "asset", "sha256", "size",
+               "source_commit", "source_status", "withheld", "candidate_platforms",
+               "qualified_platforms", "dependencies"}
     if set(pin) - allowed:
         fail("PIN")
     version, short, bins = PRODUCTS[project]
-    expected = {"version": version, "workflow": f"rs9-{short}-pypi-publish.yml",
+    expected = {"schema": "rs9.tf-pypi-intake.v2", "version": version,
+                "distribution_version": DISTRIBUTIONS[project],
+                "workflow": f"rs9-{short}-pypi-publish.yml",
                 "npm_name": "@knowledge-forge-ai/" + project, "bins": bins,
                 "node": ">=22", "license": "AGPL-3.0-or-later",
-                "asset": f"knowledge-forge-ai-{project}-{version}.tgz"}
+                "asset": f"knowledge-forge-ai-{project}-{version}.tgz",
+                "candidate_platforms": list(TARGETS)}
     if any(pin.get(k) != v for k, v in expected.items()):
         fail("PIN")
     if (not re.fullmatch(r"[0-9a-f]{64}", str(pin.get("sha256", "")))
             or type(pin.get("size")) is not int or not 0 < pin["size"] <= 32 * 1024**2
             or not re.fullmatch(r"[0-9a-f]{40}", str(pin.get("source_commit", "")))):
         fail("PIN")
-    platforms = pin.get("qualified_platforms", [])
+    platforms = pin.get("qualified_platforms")
     if (not isinstance(platforms, list) or any(not isinstance(p, str) for p in platforms)
             or len(platforms) != len(set(platforms))
-            or any(p not in {"darwin-arm64", "darwin-x64", "linux-arm64-gnu", "linux-x64-gnu"}
-                   for p in platforms)):
+            or any(p not in TARGETS for p in platforms)):
         fail("PIN")
     if pin.get("source_status") not in {"READY", "BLOCKED"}:
         fail("PIN")
@@ -76,6 +85,11 @@ def validate_pin(pin):
                     or not re.fullmatch(r"sha512-[A-Za-z0-9+/]{86}==", dep["integrity"])):
                 fail("PIN")
     return pin
+
+
+def build_pin(pin):
+    validate_pin(pin)
+    return {**pin, "qualified_platforms": []}
 
 
 def load_pin(project):
