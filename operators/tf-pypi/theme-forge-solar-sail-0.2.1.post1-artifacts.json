@@ -30,7 +30,7 @@
     }
   ],
   "project": "theme-forge-solar-sail",
-  "publication_admitted": false,
+  "publication_admitted": true,
   "schema": "rs9.tf-pypi-candidate-aggregate.v1",
   "set_sha256": "ab4e300e982f977bb6e088c55e3ed9b2178dcb7820d792c75d6621c89284232f",
   "targets": [

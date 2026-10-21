@@ -30,7 +30,7 @@
     }
   ],
   "project": "theme-forge-stellar-burst",
-  "publication_admitted": false,
+  "publication_admitted": true,
   "schema": "rs9.tf-pypi-candidate-aggregate.v1",
   "set_sha256": "ad62a204f4869516a71b3a178e0af8603237cde4cdb7a1ea62acafdfaa2892eb",
   "targets": [

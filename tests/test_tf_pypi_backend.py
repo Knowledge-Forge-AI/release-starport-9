@@ -207,16 +207,39 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, "TF_PYPI_DESCRIPTION")
 
     def test_aggregate_build_verify_host_views_and_sdist_qualification_invariance(self):
+        # The committed pin is already qualified, so derive genuinely distinct inputs here.
+        original = copy.deepcopy(self.pin)
+        unqualified = copy.deepcopy(self.pin)
+        unqualified["qualified_platforms"] = []
+        qualified_pin = qualified(self.pin)
+        self.assertIs(type(unqualified["qualified_platforms"]), list)
+        self.assertIs(type(qualified_pin["qualified_platforms"]), list)
+        self.assertEqual(unqualified["qualified_platforms"], [])
+        self.assertEqual(qualified_pin["qualified_platforms"], list(TARGETS))
+        self.assertNotEqual(unqualified["qualified_platforms"], qualified_pin["qualified_platforms"])
+
+        def rest(pin):
+            return {key: value for key, value in pin.items() if key != "qualified_platforms"}
+
+        self.assertEqual(set(unqualified), set(qualified_pin))
+        self.assertEqual(rest(unqualified), rest(qualified_pin))
+        self.assertEqual(rest(unqualified), rest(self.pin))
+        unqualified_before = copy.deepcopy(unqualified)
+        qualified_before = copy.deepcopy(qualified_pin)
+
         one = self.root / "agg_unqualified"
         two = self.root / "agg_qualified"
-        agg_one = aggregate(self.pin, self.data, one)
-        agg_two = aggregate(qualified(self.pin), self.data, two)
+        agg_one = aggregate(unqualified, self.data, one)
+        agg_two = aggregate(qualified_pin, self.data, two)
+        self.assertEqual(self.pin, original)
+        self.assertEqual(unqualified, unqualified_before)
+        self.assertEqual(qualified_pin, qualified_before)
         self.assertEqual(agg_one, agg_two)
         self.assertEqual(agg_one["schema"], "rs9.tf-pypi-candidate-aggregate.v1")
         self.assertEqual(agg_one["version"], self.pin["distribution_version"])
         self.assertEqual(agg_one["upstream_version"], self.pin["version"])
         self.assertEqual(agg_one["targets"], list(TARGETS))
-        self.assertFalse(agg_one["publication_admitted"])
+        self.assertIs(agg_one["publication_admitted"], False)
         self.assertEqual(len(agg_one["files"]), 4)
         self.assertEqual({p.name: p.read_bytes() for p in one.iterdir()},
                          {p.name: p.read_bytes() for p in two.iterdir()})

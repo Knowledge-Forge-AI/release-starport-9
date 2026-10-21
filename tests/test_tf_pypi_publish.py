@@ -47,8 +47,8 @@ COMMIT = "a" * 40
 RUN_ID = "12345"
 COMMITTED_POST1_APPROVALS = {
     "theme-forge-solar-sail": {
-        "file_sha256": "97ad74e693084af86e76d9fdab720a36ad633091604315da306a5b2de2dc100f",
-        "file_size": 1663,
+        "file_sha256": "2871d2f44cf8d10058aaddda15424b8e8ca51c48fd6ef0c734f86c414e580551",
+        "file_size": 1662,
         "set_sha256": "ab4e300e982f977bb6e088c55e3ed9b2178dcb7820d792c75d6621c89284232f",
         "filenames": [
             "theme_forge_solar_sail-0.2.1.post1-py3-none-macosx_11_0_arm64.whl",
@@ -58,8 +58,8 @@ COMMITTED_POST1_APPROVALS = {
         ],
     },
     "theme-forge-stellar-burst": {
-        "file_sha256": "a08dcbb02b25c53d93d7a7e6d1a77659ef96a87f3c4270c298a244f138921cd5",
-        "file_size": 1682,
+        "file_sha256": "a55d83eb09529d5bd4b8100bf31bfac004f252876d29654f15586eada4a57914",
+        "file_size": 1681,
         "set_sha256": "ad62a204f4869516a71b3a178e0af8603237cde4cdb7a1ea62acafdfaa2892eb",
         "filenames": [
             "theme_forge_stellar_burst-0.6.1.post1-py3-none-macosx_13_0_arm64.whl",
@@ -69,8 +69,8 @@ COMMITTED_POST1_APPROVALS = {
         ],
     },
     "theme-forge-stellar-loom": {
-        "file_sha256": "8a87c76fb58ce4e48102bb67934b48866a10621e956a3ed03d7c6165d23da08b",
-        "file_size": 1676,
+        "file_sha256": "c2d0dbf8170f21b4e71397427d58ae27db9f6b020f5b8268db4fb4cfebfbfda6",
+        "file_size": 1675,
         "set_sha256": "ff1645157c98f199501707ff01761b4abf8291ad6ad8f6088b2d081edc9943be",
         "filenames": [
             "theme_forge_stellar_loom-0.4.0.post1-py3-none-macosx_11_0_arm64.whl",
@@ -207,7 +207,7 @@ class StaticContractTests(unittest.TestCase):
             self.assertEqual(record["upstream_version"], pin["version"])
             self.assertEqual(record["targets"], pin["candidate_platforms"])
             self.assertEqual(record["targets"], list(TARGETS))
-            self.assertIs(record["publication_admitted"], False)
+            self.assertIs(record["publication_admitted"], True)
 
             files = record["files"]
             self.assertEqual(len(files), 4)
@@ -615,14 +615,20 @@ class ApprovalAndVerificationTests(unittest.TestCase):
 
     def test_false_unqualified_candidates_still_build_and_qualify(self):
         for product in sorted(PRODUCTS):
-            real_pin = load_pin(product)
-            self.assertEqual(real_pin["qualified_platforms"], [])
-            committed = load_approval(real_pin)
-            self.assertIs(committed["publication_admitted"], False)
-            with patch("rs9.tf_pypi_publish.exact_state", side_effect=AssertionError("remote called")), \
+            committed_pin = load_pin(product)
+            self.assertEqual(committed_pin["qualified_platforms"], list(TARGETS))
+            candidate_pin = copy.deepcopy(committed_pin)
+            candidate_pin["qualified_platforms"] = []
+            committed_approval = load_approval(committed_pin)
+            candidate_approval = copy.deepcopy(committed_approval)
+            candidate_approval["publication_admitted"] = False
+            self.assertEqual({**candidate_approval, "publication_admitted": True}, committed_approval)
+            # Platform veto (tf_pypi_publish.py:163) fires before approval read; loader patch is an ordering guard.
+            with patch("rs9.tf_pypi_publish.exact_state", side_effect=AssertionError("remote called")) as remote, \
+                    patch("rs9.tf_pypi_publish.load_approval", return_value=candidate_approval) as loader, \
                     self.assertRaises(AdmissionError) as cm:
                 select_missing(
-                    real_pin,
+                    candidate_pin,
                     dist=self.root / "unused-dist",
                     upload_dir=self.root / "unused-upload",
                     receipts=self.root / "unused-receipts",
@@ -631,7 +637,11 @@ class ApprovalAndVerificationTests(unittest.TestCase):
                     run_attempt="1",
                 )
             self.assertEqual(cm.exception.code, "TF_PYPI_PLATFORM_UNQUALIFIED")
+            remote.assert_not_called()
+            loader.assert_not_called()
+            self.assertFalse((self.root / "unused-upload").exists())
 
+        self.pin["qualified_platforms"] = []
         self.assertEqual(self.pin["qualified_platforms"], [])
         inputs = self.root / "inputs"
         inputs.mkdir()

@@ -100,6 +100,7 @@ class PlatformTests(unittest.TestCase):
     def test_three_candidate_targets_build_with_unqualified_pin_and_reject_others(self):
         for project in ("theme-forge-stellar-loom", "theme-forge-solar-sail"):
             pin, data = fixture(project)
+            pin["qualified_platforms"] = []
             self.assertEqual(pin["qualified_platforms"], [])
             package = names(pin)[0]
             for target in TARGETS:
