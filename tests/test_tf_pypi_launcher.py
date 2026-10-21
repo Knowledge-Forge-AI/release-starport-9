@@ -64,7 +64,7 @@ class LauncherTests(unittest.TestCase):
         # This exercises pip and Node, but never the released Theme Forge product.
         try:
             launcher.node_binary()
-            host_system()
+            system = host_system()
         except (RuntimeError, AdmissionError):
             self.skipTest("compatible local Python/Node/POSIX host unavailable")
         with tempfile.TemporaryDirectory() as directory:
@@ -73,7 +73,8 @@ class LauncherTests(unittest.TestCase):
                 pin, data = fixture(project)
                 dist = root / project / "dist"
                 build_pair(pin, data, dist)
-                receipt = smoke(pin, dist, root / project / "consumer", functional=False)
+                receipt = smoke(pin, dist, root / project / "consumer", functional=False,
+                                offline_linux=system.endswith("-linux"))
                 self.assertEqual(len(receipt["lifecycle"]), 2)
                 self.assertTrue(receipt["offline_isolation"]["network_disabled"])
                 self.assertFalse(receipt["publication_admitted"])
