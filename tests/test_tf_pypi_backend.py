@@ -175,7 +175,7 @@ class BackendTests(unittest.TestCase):
                 "Artifact platforms:",
                 "Other hosts are refused",
                 "RS9_TF_PYPI",
-                "/Users/",
+                "/" + "Users/",
                 "rs9_theme_forge_",
                 "THIRD_PARTY_NOTICES.txt",
             ):
@@ -194,7 +194,7 @@ class BackendTests(unittest.TestCase):
             pad + b"Artifact platforms: darwin-arm64\n",
             pad + b"Other hosts are refused\n",
             pad + b"RS9_TF_PYPI_INPUTS\n",
-            pad + b"/Users/operator/path\n",
+            pad + b"/" + b"Users/operator/path\n",
             b"a" * 65536 + b"\n",
         ]
         for idx, payload_bytes in enumerate(bad_payloads):

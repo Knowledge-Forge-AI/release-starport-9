@@ -97,11 +97,18 @@ class SafeTarInfo(tarfile.TarInfo):
         obj.raw_name = obj.name
         return obj
 
+    def _proc_member(self, tar):
+        # Newer readers bypass frombuf; record this header's own name before PAX/GNU names apply.
+        self.raw_name = self.name
+        return super()._proc_member(tar)
+
 
 def _member_path(member, root):
     if not (member.isfile() or member.isdir()) or member.linkname or member.sparse is not None:
         fail("LINK")
-    raw_name = getattr(member, "raw_name", member.name)
+    raw_name = getattr(member, "raw_name", None)
+    if not isinstance(raw_name, str):
+        fail("ARCHIVE")
     pax_path = member.pax_headers.get("path") if member.pax_headers else None
     for name in (member.name, raw_name):
         _validate_safe_path(name, is_dir=member.isdir())

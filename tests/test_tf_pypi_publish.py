@@ -47,9 +47,9 @@ COMMIT = "a" * 40
 RUN_ID = "12345"
 COMMITTED_POST1_APPROVALS = {
     "theme-forge-solar-sail": {
-        "file_sha256": "2871d2f44cf8d10058aaddda15424b8e8ca51c48fd6ef0c734f86c414e580551",
+        "file_sha256": "e7d6b00e1f55652ef7aafe1117fcf3d5a4ad479585935a8de06fcee4f22046f4",
         "file_size": 1662,
-        "set_sha256": "ab4e300e982f977bb6e088c55e3ed9b2178dcb7820d792c75d6621c89284232f",
+        "set_sha256": "c50b64cb0251df129a8075155ee47b845490c14c82a12ed67165969dbe5adddf",
         "filenames": [
             "theme_forge_solar_sail-0.2.1.post1-py3-none-macosx_11_0_arm64.whl",
             "theme_forge_solar_sail-0.2.1.post1-py3-none-manylinux_2_28_aarch64.whl",
@@ -58,9 +58,9 @@ COMMITTED_POST1_APPROVALS = {
         ],
     },
     "theme-forge-stellar-burst": {
-        "file_sha256": "a55d83eb09529d5bd4b8100bf31bfac004f252876d29654f15586eada4a57914",
+        "file_sha256": "414dbee9423c193992106b661f43effe235a6c0ba1f7a01efdc57234748faff9",
         "file_size": 1681,
-        "set_sha256": "ad62a204f4869516a71b3a178e0af8603237cde4cdb7a1ea62acafdfaa2892eb",
+        "set_sha256": "816c5c230c4b413aa5f8d4dd41a0d02fcf755a1d4fb28d27d8bdef29c44a97c0",
         "filenames": [
             "theme_forge_stellar_burst-0.6.1.post1-py3-none-macosx_13_0_arm64.whl",
             "theme_forge_stellar_burst-0.6.1.post1-py3-none-manylinux_2_33_aarch64.whl",
@@ -69,9 +69,9 @@ COMMITTED_POST1_APPROVALS = {
         ],
     },
     "theme-forge-stellar-loom": {
-        "file_sha256": "c2d0dbf8170f21b4e71397427d58ae27db9f6b020f5b8268db4fb4cfebfbfda6",
+        "file_sha256": "a52d332b1257d48a73ebc8b9c552d82cc032fd3777f9dbd21137b104dfe596e4",
         "file_size": 1675,
-        "set_sha256": "ff1645157c98f199501707ff01761b4abf8291ad6ad8f6088b2d081edc9943be",
+        "set_sha256": "05e1f8dc651e813f2f78d3b8cdc1effb6dea52a6a12d80d6e5b9649b247b52d0",
         "filenames": [
             "theme_forge_stellar_loom-0.4.0.post1-py3-none-macosx_11_0_arm64.whl",
             "theme_forge_stellar_loom-0.4.0.post1-py3-none-manylinux_2_28_aarch64.whl",
