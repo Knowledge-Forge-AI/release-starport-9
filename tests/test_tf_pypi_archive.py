@@ -1,5 +1,6 @@
 """Tests for tf_pypi_archive stdlib-only hostile-archive and file reader."""
 
+import contextlib
 import gzip
 import hashlib
 import io
@@ -9,9 +10,11 @@ import stat
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from rs9.tf_pypi_archive import (
     AdmissionError,
+    SafeTarInfo,
     canonical,
     fail,
     physical_bytes,
@@ -518,6 +521,199 @@ class TfPypiArchiveTests(unittest.TestCase):
                 read_tar(archive_bad)
             except AdmissionError as e:
                 self.assertNotIn("/secret/admin/token.txt", str(e))
+
+
+POSIX_MAGIC = b"ustar\x0000"
+GNU_MAGIC = b"ustar  \x00"
+LONG_NAME = "package/" + "a" * 120 + ".py"
+
+
+def make_tar(entries, fmt=tarfile.PAX_FORMAT, global_headers=None) -> bytes:
+    """Uncompressed synthetic tar of (name, pax_headers) regular members holding b"content"."""
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w", format=fmt, pax_headers=global_headers) as tf:
+        for name, pax_headers in entries:
+            ti = tarfile.TarInfo(name)
+            ti.mode = 0o644
+            ti.size = len(b"content")
+            if pax_headers:
+                ti.pax_headers = pax_headers
+            tf.addfile(ti, io.BytesIO(b"content"))
+    return buf.getvalue()
+
+
+def _unhooked_frombuf(cls, buf, encoding, errors):
+    # Real header parsing without SafeTarInfo's legacy frombuf capture.
+    return tarfile.TarInfo.frombuf.__func__(cls, buf, encoding, errors)
+
+
+class _RawHeaderChecks:
+    """Fixture premises read from literal 512-byte blocks, never through tarfile or SafeTarInfo."""
+
+    def assert_raw_header(self, tar, offset, *, name, typeflag, magic, prefix=b""):
+        block = tar[offset:offset + 512]
+        self.assertEqual(len(block), 512)
+        stored = int(block[148:156].split(b"\x00")[0].strip(), 8)
+        self.assertEqual(stored, sum(block[:148]) + 8 * 0x20 + sum(block[156:]))
+        self.assertEqual(block[0:100], name.ljust(100, b"\x00"))
+        self.assertEqual(block[156:157], typeflag)
+        self.assertEqual(block[257:265], magic)
+        self.assertEqual(block[345:500], prefix.ljust(155, b"\x00"))
+        return int(block[124:136].split(b"\x00")[0].strip(), 8)
+
+    def assert_extended_member(self, tar, *, meta_name, typeflag, magic, payload, raw):
+        # Metadata header at 0, its payload at 512, regular member header at 1024, data at 1536.
+        size = self.assert_raw_header(tar, 0, name=meta_name, typeflag=typeflag, magic=magic)
+        self.assertEqual(size, len(payload))
+        self.assertEqual(tar[512:1024], payload.ljust(512, b"\x00"))
+        self.assertEqual(self.assert_raw_header(tar, 1024, name=raw, typeflag=b"0", magic=magic), 7)
+        self.assertEqual(tar[1536:1543], b"content")
+
+    def pax_tar(self, name, path, *, raw, payload, global_header=False):
+        if global_header:
+            tar = make_tar([(name, None)], global_headers={"path": path})
+        else:
+            tar = make_tar([(name, {"path": path} if path is not None else None)])
+        self.assertEqual(int(payload.split(b" ", 1)[0]), len(payload))
+        self.assert_extended_member(tar, meta_name=b"././@PaxHeader", typeflag=b"g" if global_header else b"x",
+                                    magic=POSIX_MAGIC, payload=payload, raw=raw)
+        return tar
+
+    def gnu_tar(self, raw_override=None):
+        tar = bytearray(make_tar([(LONG_NAME, None)], fmt=tarfile.GNU_FORMAT))
+        if raw_override is not None:
+            block = tar[1024:1536]
+            block[0:100] = raw_override.ljust(100, b"\x00")
+            block[148:156] = b" " * 8
+            block[148:156] = b"%06o\x00 " % sum(block)
+            tar[1024:1536] = block
+        payload = LONG_NAME.encode() + b"\x00"
+        self.assertEqual(len(payload), 132)
+        raw = raw_override if raw_override is not None else b"package/" + b"a" * 92
+        self.assert_extended_member(bytes(tar), meta_name=b"././@LongLink", typeflag=b"L",
+                                    magic=GNU_MAGIC, payload=payload, raw=raw)
+        return bytes(tar)
+
+    def assert_refused(self, tar, code):
+        with self.assertRaises(AdmissionError) as ctx:
+            read_tar(gzip.compress(tar, mtime=0))
+        self.assertEqual(ctx.exception.code, code)
+
+    def assert_admitted(self, tar, expected):
+        self.assertEqual(read_tar(gzip.compress(tar, mtime=0)), expected)
+
+
+class _RawProvenanceScenarios(_RawHeaderChecks):
+    # Exact TF_PYPI_PATH codes follow current _member_path order: safe-path checks precede comparisons.
+
+    def test_pax_safe_raw_unsafe_effective_refused(self):
+        tar = self.pax_tar("package/short.txt", "../../etc/passwd", raw=b"package/short.txt",
+                           payload=b"25 path=../../etc/passwd\n")
+        self.assert_refused(tar, "TF_PYPI_PATH")
+
+    def test_pax_unsafe_raw_hidden_by_safe_effective_refused(self):
+        tar = self.pax_tar("../../etc/passwd", "package/safe.txt", raw=b"../../etc/passwd",
+                           payload=b"25 path=package/safe.txt\n")
+        self.assert_refused(tar, "TF_PYPI_PATH")
+
+    def test_pax_short_raw_effective_conflict_refused(self):
+        tar = self.pax_tar("package/a.py", "package/b.py", raw=b"package/a.py",
+                           payload=b"21 path=package/b.py\n")
+        self.assert_refused(tar, "TF_PYPI_ARCHIVE")
+
+    def test_pax_congruent_short_path_accepted(self):
+        tar = self.pax_tar("package/a.py", "package/a.py", raw=b"package/a.py",
+                           payload=b"21 path=package/a.py\n")
+        self.assert_admitted(tar, {"package/a.py": (b"content", 0o644)})
+
+    def test_pax_global_path_conflict_refused(self):
+        tar = self.pax_tar("package/a.py", "package/b.py", raw=b"package/a.py",
+                           payload=b"21 path=package/b.py\n", global_header=True)
+        self.assert_refused(tar, "TF_PYPI_ARCHIVE")
+
+    def test_pax_legitimate_long_path_accepted(self):
+        tar = self.pax_tar(LONG_NAME, None, raw=b"package/" + b"a" * 92,
+                           payload=b"141 path=" + LONG_NAME.encode() + b"\n")
+        self.assert_admitted(tar, {LONG_NAME: (b"content", 0o644)})
+
+    def test_pax_long_raw_prefix_mismatch_refused(self):
+        tar = self.pax_tar("package/" + "x" * 100, "package/" + "y" * 120, raw=b"package/" + b"x" * 92,
+                           payload=b"138 path=package/" + b"y" * 120 + b"\n")
+        self.assert_refused(tar, "TF_PYPI_ARCHIVE")
+
+    def test_gnu_long_name_accepted(self):
+        self.assert_admitted(self.gnu_tar(), {LONG_NAME: (b"content", 0o644)})
+
+    def test_gnu_long_name_raw_prefix_mismatch_refused(self):
+        self.assert_refused(self.gnu_tar(b"package/" + b"z" * 92), "TF_PYPI_ARCHIVE")
+
+    def test_ustar_prefix_long_name_accepted(self):
+        name = "package/" + "d" * 60 + "/" + "f" * 60 + ".py"
+        tar = make_tar([(name, None)], fmt=tarfile.USTAR_FORMAT)
+        size = self.assert_raw_header(tar, 0, name=b"f" * 60 + b".py", typeflag=b"0", magic=POSIX_MAGIC,
+                                      prefix=b"package/" + b"d" * 60)
+        self.assertEqual(size, 7)
+        self.assertEqual(tar[512:519], b"content")
+        self.assert_admitted(tar, {name: (b"content", 0o644)})
+
+
+class TfPypiArchiveRawProvenanceTests(_RawProvenanceScenarios, unittest.TestCase):
+    """Scenarios on this interpreter's own reader route; the route depends on its tarfile dispatch."""
+
+
+class TfPypiArchiveSimulatedHookBypassTests(_RawProvenanceScenarios, unittest.TestCase):
+    """Simulated reader-hook bypass: frombuf records nothing; real tar processing is unchanged.
+
+    This is not a run on a different interpreter.
+    """
+
+    def setUp(self):
+        patcher = patch.object(SafeTarInfo, "frombuf", classmethod(_unhooked_frombuf))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_bypass_premise_frombuf_records_no_raw_name(self):
+        tar = make_tar([("package/a.py", None)])
+        self.assert_raw_header(tar, 0, name=b"package/a.py", typeflag=b"0", magic=POSIX_MAGIC)
+        member = SafeTarInfo.frombuf(tar[:512], "utf-8", "surrogateescape")
+        self.assertEqual(member.name, "package/a.py")
+        self.assertFalse(hasattr(member, "raw_name"))
+
+
+class TfPypiArchiveMissingProvenanceTests(_RawHeaderChecks, unittest.TestCase):
+    """Both raw-name captures removed, so members reach the real read_tar without provenance."""
+
+    @contextlib.contextmanager
+    def without_provenance(self):
+        with patch.object(SafeTarInfo, "frombuf", classmethod(_unhooked_frombuf)):
+            with patch.object(SafeTarInfo, "_proc_member", tarfile.TarInfo._proc_member):
+                yield
+
+    def congruent_pax_tar(self):
+        return self.pax_tar("package/a.py", "package/a.py", raw=b"package/a.py",
+                            payload=b"21 path=package/a.py\n")
+
+    def test_missing_provenance_premise_reader_records_no_raw_name(self):
+        tar = self.congruent_pax_tar()
+        with self.without_provenance():
+            with tarfile.open(fileobj=io.BytesIO(tar), mode="r:", tarinfo=SafeTarInfo) as archive:
+                members = archive.getmembers()
+        self.assertEqual([m.name for m in members], ["package/a.py"])
+        self.assertTrue(all(isinstance(m, SafeTarInfo) for m in members))
+        self.assertFalse(any(hasattr(m, "raw_name") for m in members))
+
+    def test_missing_raw_provenance_refuses_plain_member(self):
+        tar = make_tar([("package/a.py", None)])
+        self.assert_raw_header(tar, 0, name=b"package/a.py", typeflag=b"0", magic=POSIX_MAGIC)
+        self.assert_admitted(tar, {"package/a.py": (b"content", 0o644)})
+        with self.without_provenance():
+            self.assert_refused(tar, "TF_PYPI_ARCHIVE")
+
+    def test_missing_raw_provenance_refuses_congruent_pax_member(self):
+        tar = self.congruent_pax_tar()
+        self.assert_admitted(tar, {"package/a.py": (b"content", 0o644)})
+        with self.without_provenance():
+            self.assert_refused(tar, "TF_PYPI_ARCHIVE")
 
 
 if __name__ == "__main__":

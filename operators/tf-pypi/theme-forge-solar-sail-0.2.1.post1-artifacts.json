@@ -23,8 +23,8 @@
     },
     {
       "filename": "theme_forge_solar_sail-0.2.1.post1.tar.gz",
-      "logical_sha256": "2c68867aa4ab9a498c0f66d13a0bacd1e4dec5c88f4800d43279b065c7bcf881",
-      "sha256": "86c74b0649376d4ae50e521db9d2ea7b62af0eba9847d224347315efe593d6ee",
+      "logical_sha256": "fff60b357aa0ff87f7aecead90caefbbcf9b0e157a845a15289d788a29c2c8a8",
+      "sha256": "5e05094473ffbf5532794eeca6057e7c4b36ded9cd604ad5a6e4744359c118f5",
       "size": 399413,
       "target": null
     }
@@ -32,7 +32,7 @@
   "project": "theme-forge-solar-sail",
   "publication_admitted": true,
   "schema": "rs9.tf-pypi-candidate-aggregate.v1",
-  "set_sha256": "ab4e300e982f977bb6e088c55e3ed9b2178dcb7820d792c75d6621c89284232f",
+  "set_sha256": "c50b64cb0251df129a8075155ee47b845490c14c82a12ed67165969dbe5adddf",
   "targets": [
     "darwin-arm64",
     "linux-arm64-gnu",

@@ -23,8 +23,8 @@
     },
     {
       "filename": "theme_forge_stellar_loom-0.4.0.post1.tar.gz",
-      "logical_sha256": "4e0c0ed8921629087dcd590be84cde291116f86512be99323f316303d9168383",
-      "sha256": "dc2e03996a9e12ed837a0300d343937619c092be721c662756850bdb4c172e4e",
+      "logical_sha256": "0b513595dca90cb9d264d324c1a43f9c471558676506933b5e93eb40657aae09",
+      "sha256": "0adff7029c25dfece5ced1755f4ee0f3367c5e321046aa3d0efbf8aaa488dd6c",
       "size": 563263,
       "target": null
     }
@@ -32,7 +32,7 @@
   "project": "theme-forge-stellar-loom",
   "publication_admitted": true,
   "schema": "rs9.tf-pypi-candidate-aggregate.v1",
-  "set_sha256": "ff1645157c98f199501707ff01761b4abf8291ad6ad8f6088b2d081edc9943be",
+  "set_sha256": "05e1f8dc651e813f2f78d3b8cdc1effb6dea52a6a12d80d6e5b9649b247b52d0",
   "targets": [
     "darwin-arm64",
     "linux-arm64-gnu",

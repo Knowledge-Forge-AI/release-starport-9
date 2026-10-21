@@ -23,8 +23,8 @@
     },
     {
       "filename": "theme_forge_stellar_burst-0.6.1.post1.tar.gz",
-      "logical_sha256": "bdb712d626e8f98ea9d694d9f0b9735e34fc7b33efa5744100878d396d89af1b",
-      "sha256": "e5c7c17cb6365b5a902b16d65e44bd7f1b46fc1e5a9dcbba950d5e208b3acf56",
+      "logical_sha256": "2f4f5163ff6c37be55afc8b011901e17f0300bb48c6b1a359306ac93a0d771d9",
+      "sha256": "7054a234418343d93ca1647c28afdaa189a058d3eec7e6bee33289c56c0a603e",
       "size": 1249398,
       "target": null
     }
@@ -32,7 +32,7 @@
   "project": "theme-forge-stellar-burst",
   "publication_admitted": true,
   "schema": "rs9.tf-pypi-candidate-aggregate.v1",
-  "set_sha256": "ad62a204f4869516a71b3a178e0af8603237cde4cdb7a1ea62acafdfaa2892eb",
+  "set_sha256": "816c5c230c4b413aa5f8d4dd41a0d02fcf755a1d4fb28d27d8bdef29c44a97c0",
   "targets": [
     "darwin-arm64",
     "linux-arm64-gnu",

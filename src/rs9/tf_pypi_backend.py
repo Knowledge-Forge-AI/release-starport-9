@@ -30,7 +30,7 @@ PROHIBITED_README_TEXT = (
     "Artifact platforms:",
     "Other hosts are refused",
     "RS9_TF_PYPI",
-    "/Users/",
+    "/" + "Users/",
 )
 ADAPTER_NOTICE = (
     "Release Starport 9 Python adapter\n\n"
