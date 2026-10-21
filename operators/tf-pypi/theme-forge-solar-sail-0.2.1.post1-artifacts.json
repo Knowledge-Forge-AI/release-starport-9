@@ -1,0 +1,43 @@
+{
+  "files": [
+    {
+      "filename": "theme_forge_solar_sail-0.2.1.post1-py3-none-macosx_11_0_arm64.whl",
+      "logical_sha256": "d4d1bd16f415c171e3ecb810914392e09a7c5b2f4ab3aa36f3072948507cede6",
+      "sha256": "d3d9f05d97af809703aa762bcc4ca9ab5d1c08b41bf28c99aedcd34c85964385",
+      "size": 550332,
+      "target": "darwin-arm64"
+    },
+    {
+      "filename": "theme_forge_solar_sail-0.2.1.post1-py3-none-manylinux_2_28_aarch64.whl",
+      "logical_sha256": "2c56d82a9fe2e65daee7d5b82d5b14d991a2e8f9fe0cd1416701ee8f1142a2e6",
+      "sha256": "e838b5359c3c6eb5b4bbf54aa0c3e2bcbd2296029e19a1865157151ef285d32f",
+      "size": 550364,
+      "target": "linux-arm64-gnu"
+    },
+    {
+      "filename": "theme_forge_solar_sail-0.2.1.post1-py3-none-manylinux_2_28_x86_64.whl",
+      "logical_sha256": "964fbb4bad28e843b8a81abc9ec6c5ba24fa36b2cad3fdcd2f472342280328da",
+      "sha256": "fc149840b54f255728433e1eeeae14f4bfbf7dccd51a46a4c1447e0b84c30f11",
+      "size": 550359,
+      "target": "linux-x64-gnu"
+    },
+    {
+      "filename": "theme_forge_solar_sail-0.2.1.post1.tar.gz",
+      "logical_sha256": "2c68867aa4ab9a498c0f66d13a0bacd1e4dec5c88f4800d43279b065c7bcf881",
+      "sha256": "86c74b0649376d4ae50e521db9d2ea7b62af0eba9847d224347315efe593d6ee",
+      "size": 399413,
+      "target": null
+    }
+  ],
+  "project": "theme-forge-solar-sail",
+  "publication_admitted": true,
+  "schema": "rs9.tf-pypi-candidate-aggregate.v1",
+  "set_sha256": "ab4e300e982f977bb6e088c55e3ed9b2178dcb7820d792c75d6621c89284232f",
+  "targets": [
+    "darwin-arm64",
+    "linux-arm64-gnu",
+    "linux-x64-gnu"
+  ],
+  "upstream_version": "0.2.1",
+  "version": "0.2.1.post1"
+}

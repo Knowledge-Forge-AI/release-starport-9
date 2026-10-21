@@ -4,6 +4,7 @@ import json
 import errno
 from pathlib import Path
 import platform
+import shutil
 import subprocess
 import sys
 import venv
@@ -14,6 +15,12 @@ from rs9.tf_pypi_verify import verify_pair
 from rs9.tf_pypi_platform import host_key
 from rs9.tf_pypi_probes import functional_probes
 from rs9.tf_pypi_probes import receipt
+
+_CONSUMER_ENV_KEYS = (
+    "HOME", "LANG", "LC_ALL", "PATH", "PIP_CONFIG_FILE",
+    "PIP_DISABLE_PIP_VERSION_CHECK", "PIP_NO_CACHE_DIR", "PIP_NO_INDEX",
+    "PYTHONDONTWRITEBYTECODE", "TEMP", "THEME_FORGE_NODE_BIN", "TMP", "TMPDIR",
+)
 
 
 def host_system():
@@ -28,9 +35,28 @@ def host_system():
     return supported[key]
 
 
+def _expand_prefix(prefix, env):
+    if not prefix:
+        return ()
+    raw = list(prefix)
+    if raw and raw[0] == "sudo":
+        raw[0] = (shutil.which("sudo", path=env.get("PATH"))
+                  or shutil.which("sudo", path="/usr/bin:/bin")
+                  or "/usr/bin/sudo")
+    if "/usr/bin/env" in raw:
+        raw = raw[:raw.index("/usr/bin/env")]
+        assignments = [
+            f"{k}={env[k]}" for k in _CONSUMER_ENV_KEYS
+            if k in env and isinstance(env[k], str)
+        ]
+        raw.extend(["/usr/bin/env", "-i", *assignments])
+    return tuple(raw)
+
+
 def _run(argv, env, *, prefix=(), input=b""):
+    effective_prefix = _expand_prefix(prefix, env)
     try:
-        result = subprocess.run([*prefix, *map(str, argv)], env=env, input=input,
+        result = subprocess.run([*effective_prefix, *map(str, argv)], env=env, input=input,
                                 capture_output=True, timeout=90, cwd=env.get("HOME"))
     except (OSError, subprocess.SubprocessError):
         fail("CONSUMER_PROCESS")
@@ -97,7 +123,8 @@ def node_negatives(pin, root, env, prefix):
 
 def smoke(pin, dist, work, *, offline_linux=False, functional=True):
     """Receipts describe only the current host; never mark source READY."""
-    manifest = verify_pair(pin, dist)
+    target = host_key()
+    manifest = verify_pair(pin, dist, target=target)
     system = host_system()
     node = node_binary()
     work, dist = Path(work).resolve(), Path(dist).resolve()
@@ -111,7 +138,7 @@ def smoke(pin, dist, work, *, offline_linux=False, functional=True):
         if not system.endswith("-linux"):
             fail("UNSUPPORTED_HOST")
         from rs9.hosted_commands import linux_runtime_prefix
-        prefix = linux_runtime_prefix(env)
+        prefix = _expand_prefix(linux_runtime_prefix(env), env)
         probe = ("import socket\ns=socket.socket();s.settimeout(1)\ntry:s.connect(('1.1.1.1',443))"
                  "\nexcept OSError:print('blocked')\nelse:print('connected')\nfinally:s.close()")
         result = _success([sys.executable, "-I", "-c", probe], env, prefix=prefix)
@@ -141,7 +168,7 @@ def smoke(pin, dist, work, *, offline_linux=False, functional=True):
         _success([*pip, "uninstall", "--yes", pin["project"]], env, prefix=prefix)
         if _inventory(root) != before:
             fail("UNINSTALL")
-    return {"project": pin["project"], "system": system, "python": platform.python_version(),
+    return {"project": pin["project"], "target": target, "system": system, "python": platform.python_version(),
             "node": _success([node, "--version"], env).stdout.decode().strip(),
             "set_sha256": manifest["set_sha256"], "lifecycle": records,
             "offline_isolation": isolation, "functional": functional,
@@ -167,13 +194,16 @@ dns.lookup('registry.npmjs.org',(e)=>console.log(e?e.code:'DNS_CONNECTED'));
 """
     a = _success([python, '-I', '-B', '-c', py], env, prefix=prefix)
     b = _success([node, '-e', js], env, prefix=prefix)
+    has_unshare_net = "unshare" in prefix and "--net" in prefix
     try:
         facts = json.loads(a.stdout)
-        permitted_errors = {errno.EPERM, errno.EACCES}
+        permitted_errors = {errno.EPERM, errno.EACCES} | ({errno.ENETUNREACH} if has_unshare_net else set())
         if facts.get('1.1.1.1') not in permitted_errors or not facts.get('registry.npmjs.org'):
             fail('OFFLINE_ISOLATION')
         tokens = b.stdout.decode().splitlines()
-        if not ({'EPERM', 'EACCES'} & set(tokens)) or not ({'ENOTFOUND', 'EAI_AGAIN', 'EPERM', 'EACCES'} & set(tokens)):
+        tcp_tokens = {'EPERM', 'EACCES'} | ({'ENETUNREACH'} if has_unshare_net else set())
+        dns_tokens = {'ENOTFOUND', 'EAI_AGAIN', 'EPERM', 'EACCES'} | ({'ENETUNREACH'} if has_unshare_net else set())
+        if not (tcp_tokens & set(tokens)) or not (dns_tokens & set(tokens)):
             fail('OFFLINE_ISOLATION')
         if any(x in tokens for x in ['TCP_CONNECTED', 'TCP_TIMEOUT', 'DNS_CONNECTED']):
             fail('OFFLINE_ISOLATION')

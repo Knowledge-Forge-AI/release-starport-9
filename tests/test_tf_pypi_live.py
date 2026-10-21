@@ -43,6 +43,13 @@ class RealBytesTests(unittest.TestCase):
     def setUp(self):
         self.inputs = live_inputs(self)
 
+    def _assert_matches_committed_approval(self, product, candidate):
+        # Exact aggregate identity; only the committed admission permission is normalized.
+        approved = load_approval(product)
+        self.assertIs(approved["publication_admitted"], True)
+        self.assertIs(candidate["publication_admitted"], False)
+        self.assertEqual(candidate, {**approved, "publication_admitted": False})
+
     def test_all_three_intakes(self):
         for product in PRODUCTS:
             pin = load_pin(product)
@@ -52,9 +59,11 @@ class RealBytesTests(unittest.TestCase):
     def test_all_three_real_builds_match_committed_approved_artifacts(self):
         for product in PRODUCTS:
             with self.subTest(project=product), tempfile.TemporaryDirectory() as directory:
-                # build verifies against the real committed approval, without a mock.
-                approved = build(product, output=Path(directory).resolve() / "dist", inputs=self.inputs)
-                self.assertEqual(approved["project"], product)
+                # build/verify establishes exact byte identity and returns a nonadmitted candidate
+                # aggregate; it neither authorizes publication nor compares the committed admission.
+                candidate = build(product, output=Path(directory).resolve() / "dist", inputs=self.inputs)
+                self.assertEqual(candidate["project"], product)
+                self._assert_matches_committed_approval(product, candidate)
 
     def test_linux_download_fixture_rebuilds_exact_darwin_artifacts_without_execution(self):
         # This exercises CI's download branch with authenticated retained bytes.
@@ -85,8 +94,8 @@ class RealBytesTests(unittest.TestCase):
                 patch("socket.socket", side_effect=AssertionError("network attempted")):
             for product in PRODUCTS:
                 with self.subTest(product=product), tempfile.TemporaryDirectory() as directory:
-                    approved = build(product, output=Path(directory).resolve() / "dist", opener=Opener())
-                    self.assertEqual(approved, load_approval(product))
+                    candidate = build(product, output=Path(directory).resolve() / "dist", opener=Opener())
+                    self._assert_matches_committed_approval(product, candidate)
         self.assertCountEqual(requests, bodies)
 
     def test_pure_products_real_build_and_current_host_lifecycle(self):

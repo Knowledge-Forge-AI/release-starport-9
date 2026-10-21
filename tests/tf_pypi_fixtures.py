@@ -6,8 +6,9 @@ import os
 from pathlib import Path
 
 from rs9.tf_pypi_archive import sha256
-from rs9.tf_pypi_backend import write_tar
+from rs9.tf_pypi_backend import build_aggregate, write_tar
 from rs9.tf_pypi_model import load_pin
+from rs9.tf_pypi_verify import verify_aggregate
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -43,3 +44,14 @@ def fixture(project="theme-forge-stellar-loom", *, changes=None, extra=None):
     data = write_tar(files, "package")
     pin.update(size=len(data), sha256=sha256(data))
     return pin, data
+
+
+def qualified(pin):
+    result = copy.deepcopy(pin)
+    result["qualified_platforms"] = list(result["candidate_platforms"])
+    return result
+
+
+def aggregate(pin, data, root, dependencies=None):
+    build_aggregate(pin, data, root, dependencies=dependencies)
+    return verify_aggregate(pin, root)

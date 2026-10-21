@@ -1,7 +1,8 @@
 {
-  "schema": "rs9.tf-pypi-intake.v1",
+  "schema": "rs9.tf-pypi-intake.v2",
   "project": "theme-forge-stellar-burst",
   "version": "0.6.1",
+  "distribution_version": "0.6.1.post1",
   "workflow": "rs9-tfsb-pypi-publish.yml",
   "asset": "knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
   "size": 644313,
@@ -16,8 +17,15 @@
   "license": "AGPL-3.0-or-later",
   "source_status": "READY",
   "withheld": [],
+  "candidate_platforms": [
+    "darwin-arm64",
+    "linux-arm64-gnu",
+    "linux-x64-gnu"
+  ],
   "qualified_platforms": [
-    "darwin-arm64"
+    "darwin-arm64",
+    "linux-arm64-gnu",
+    "linux-x64-gnu"
   ],
   "dependencies": [
     {

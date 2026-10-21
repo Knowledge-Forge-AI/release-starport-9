@@ -6,14 +6,15 @@ import argparse
 from pathlib import Path
 import sys
 
-from rs9.tf_pypi_archive import AdmissionError, canonical
-from rs9.tf_pypi_backend import build_pair
+from rs9.tf_pypi_archive import AdmissionError, canonical, fail
+from rs9.tf_pypi_backend import build_aggregate
 from rs9.tf_pypi_closure import load_dependencies
 from rs9.tf_pypi_consumer import smoke
 from rs9.tf_pypi_intake import fetch
 from rs9.tf_pypi_model import PRODUCTS, intake, load_pin, logical_identity
+from rs9.tf_pypi_platform import host_key
 from rs9.tf_pypi_remote import project_state
-from rs9.tf_pypi_verify import verify_pair
+from rs9.tf_pypi_verify import host_view, verify_aggregate
 
 
 def parser():
@@ -43,7 +44,8 @@ def main(argv=None):
         operation = args.operation
         if operation == "status":
             remote = project_state(pin) if args.remote else "not-read"
-            result = {"project": pin["project"], "version": pin["version"], "source": pin["source_status"],
+            result = {"project": pin["project"], "version": pin["distribution_version"],
+                      "upstream_version": pin["version"], "source": pin["source_status"],
                       "reasons": pin["withheld"], "remote": remote, "publication_admitted": False}
             sys.stdout.buffer.write(canonical(result))
             return 1 if remote in {"unknown", "conflict", "present-unverified"} else 0
@@ -55,12 +57,17 @@ def main(argv=None):
                       "source": "BLOCKED", "publication_admitted": False}
             if operation == "build":
                 dependencies = load_dependencies(args.inputs) if pin["project"] == "theme-forge-stellar-burst" else {}
-                build_pair(pin, data, args.output, dependencies)
-                result = verify_pair(pin, args.output)
+                build_aggregate(pin, data, args.output, dependencies)
+                result = verify_aggregate(pin, args.output)
         elif operation == "verify":
-            result = verify_pair(pin, args.dist)
+            result = verify_aggregate(pin, args.dist)
         else:
-            result = smoke(pin, args.dist, args.work, offline_linux=args.offline_linux)
+            work_root = Path(args.work)
+            if work_root.exists() or work_root.is_symlink():
+                fail("CONSUMER_WORK_DIR")
+            view_dir = work_root / "view"
+            host_view(pin, args.dist, host_key(), view_dir)
+            result = smoke(pin, view_dir, work_root / "consumer", offline_linux=args.offline_linux)
         sys.stdout.buffer.write(canonical(result))
         return 0
     except AdmissionError as error:
