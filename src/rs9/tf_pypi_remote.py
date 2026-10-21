@@ -1,4 +1,5 @@
 """Read-only PyPI state classifier. There is deliberately no upload operation."""
+import re
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
@@ -15,6 +16,29 @@ def _public_url(url, hosts):
     if (parsed.scheme != "https" or parsed.hostname not in hosts or parsed.username
             or parsed.password or parsed.port not in (None, 443) or parsed.query or parsed.fragment):
         fail("REMOTE_UNKNOWN")
+
+
+def _normalize_version(value):
+    if not isinstance(value, str):
+        return ""
+    folded = value.strip().casefold()
+    if folded.startswith("v"):
+        folded = folded[1:]
+    if folded.startswith("0!"):
+        folded = folded[2:]
+    match = re.fullmatch(
+        r"([0-9]+(?:\.[0-9]+)*)(?:[-_.]*(?:post|rev|r)[-_.]*([0-9]*)|-([0-9]+))?",
+        folded,
+    )
+    if match:
+        release = ".".join(str(int(part)) for part in match.group(1).split("."))
+        if match.group(2) is not None:
+            post_num = int(match.group(2)) if match.group(2) else 0
+            return f"{release}.post{post_num}"
+        if match.group(3) is not None:
+            return f"{release}.post{int(match.group(3))}"
+        return release
+    return folded
 
 
 class PublicReader:
@@ -43,6 +67,7 @@ def project_state(pin, get=None):
     """A remote project alone cannot establish ownership or trusted publication."""
     validate_pin(pin)
     get = get or PublicReader().get
+    dv = pin["distribution_version"]
     url = "https://pypi.org/pypi/" + pin["project"] + "/json"
     try:
         obj = strict_json(get(url))
@@ -50,17 +75,29 @@ def project_state(pin, get=None):
             return "unknown"
         if not isinstance(obj.get("info"), dict) or obj["info"].get("name") != pin["project"]:
             return "conflict"
-        return "present-unverified" if pin["version"] in obj["releases"] else "conflict"
+        releases = obj["releases"]
+        if dv in releases:
+            return "present-unverified"
+        norm_dv = _normalize_version(dv)
+        if any(_normalize_version(key) == norm_dv for key in releases):
+            return "conflict"
     except AdmissionError as error:
         return "absent" if error.code == "TF_PYPI_REMOTE_ABSENT" else "unknown"
+    version_url = "https://pypi.org/pypi/" + pin["project"] + "/" + dv + "/json"
+    try:
+        get(version_url)
+    except AdmissionError as error:
+        return "version-absent" if error.code == "TF_PYPI_REMOTE_ABSENT" else "unknown"
+    return "unknown"
 
 
 def _version_rows(pin, get):
-    url = "https://pypi.org/pypi/" + pin["project"] + "/" + pin["version"] + "/json"
+    dv = pin["distribution_version"]
+    url = "https://pypi.org/pypi/" + pin["project"] + "/" + dv + "/json"
     obj = strict_json(get(url))
     if not isinstance(obj, dict) or not isinstance(obj.get("info"), dict):
         fail("REMOTE_UNKNOWN")
-    expected = {"name": pin["project"], "version": pin["version"]}
+    expected = {"name": pin["project"], "version": dv}
     if any(obj["info"].get(key) != value for key, value in expected.items()):
         fail("REMOTE_CONFLICT")
     rows = obj.get("urls")
@@ -96,7 +133,7 @@ def exact_state(pin, local, get=None):
     get = get or PublicReader().get
     state = project_state(pin, get)
     if state != "present-unverified":
-        return {"state": state, "missing": sorted(local) if state == "absent" else []}
+        return {"state": state, "missing": sorted(local) if state in ("absent", "version-absent") else []}
     try:
         seen = set()
         for row in _version_rows(pin, get):
