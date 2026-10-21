@@ -31,7 +31,7 @@ class ModelTests(unittest.TestCase):
             self.assertEqual(pin["distribution_version"], dist_ver)
             self.assertEqual(DISTRIBUTIONS[product], dist_ver)
             self.assertEqual(pin["candidate_platforms"], list(TARGETS))
-            self.assertEqual(pin["qualified_platforms"], [])
+            self.assertEqual(pin["qualified_platforms"], list(TARGETS))
             self.assertIn(pin["source_status"], {"READY", "BLOCKED"})
             self.assertEqual(bool(pin["withheld"]), pin["source_status"] == "BLOCKED")
             self.assertEqual(validate_pin(pin), pin)

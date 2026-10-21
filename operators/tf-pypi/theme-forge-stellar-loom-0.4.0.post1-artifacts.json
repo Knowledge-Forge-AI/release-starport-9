@@ -30,7 +30,7 @@
     }
   ],
   "project": "theme-forge-stellar-loom",
-  "publication_admitted": false,
+  "publication_admitted": true,
   "schema": "rs9.tf-pypi-candidate-aggregate.v1",
   "set_sha256": "ff1645157c98f199501707ff01761b4abf8291ad6ad8f6088b2d081edc9943be",
   "targets": [
