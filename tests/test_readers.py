@@ -3,6 +3,7 @@ import unittest
 
 from rs9.errors import ContractError
 from rs9.readers import _normalized_npm_bin
+from tests.test_pypi_observe import BURST, LOOM, SOLAR, ProjectionFixtures
 
 
 class NormalizedNpmBinTests(unittest.TestCase):
@@ -606,6 +607,171 @@ class ApprovedStateOverBoundedFetchTests(unittest.TestCase):
                 self.assertEqual((result["state"], result["code"]), ("unknown", code))
                 self.assertEqual(fetch.failures, [token])
                 self.assertNotIn(MARKER, repr(result))
+
+
+OBSERVATION_KEYS = {"schema", "destination", "subject", "desired_identity_sha256", "expected_components", "state",
+                    "readback", "source", "reader", "observed_at", "remote", "revisions", "diagnostics", "contribution"}
+
+
+class PypiDistributionReaderTests(ProjectionFixtures, unittest.TestCase):
+    """read_pypi_distribution over authenticated projections; remote classification itself is S1a-tested."""
+
+    def read(self, case, fetch, projection=None):
+        from rs9.readers import read_pypi_distribution
+        projection = projection or self.build(case)
+        with self.pinned(case):
+            return projection, read_pypi_distribution(projection, fetch=fetch)
+
+    def assert_observation(self, case, projection, observation, state, code):
+        from rs9.readers import has_live_proof
+        from rs9.release_core import digest
+        from rs9.scratch import canonical
+        row = case["row"]
+        self.assertTrue(has_live_proof(observation))
+        self.assertEqual(set(observation), OBSERVATION_KEYS)
+        self.assertEqual((observation["state"], observation["source"]), (state, "live-read"))
+        self.assertEqual(observation["reader"], {"id": "pypi-distribution", "version": "v1alpha1"})
+        self.assertEqual(observation["destination"], {"id": "pypi", "adapter": "pypi", "mode": "direct"})
+        self.assertEqual(observation["subject"], {"package": row["distribution"]["name"],
+                                                  "version": row["distribution"]["version"], "revision": None})
+        self.assertEqual(observation["expected_components"],
+                         {name: digest(body) for name, body in sorted(case["bodies"].items())})
+        self.assertEqual(observation["desired_identity_sha256"], projection.identity)
+        self.assertIn(code, [item["code"] for item in observation["diagnostics"]])
+        serialized = canonical(dict(observation)).decode()
+        for forbidden in ("ownership", "upload", "bodies", MARKER):
+            self.assertNotIn(forbidden, serialized)
+
+    def test_registered_reader_version(self):
+        from rs9.readers import READERS
+        self.assertEqual(READERS["pypi-distribution"], "v1alpha1")
+
+    def test_exact_distribution_for_each_kind(self):
+        for case in (self.first_wave_case(SOLAR), self.first_wave_case(BURST), self.first_wave_case(LOOM), self.nebular_case()):
+            fetch, calls = self.fetch_for(case)
+            projection, observation = self.read(case, fetch)
+            with self.subTest(project=case["project"]):
+                self.assert_observation(case, projection, observation, "exact", "pypi-distribution-exact")
+                self.assertEqual(observation["readback"]["content_identity_sha256"], projection.identity)
+                self.assertEqual(observation["readback"]["level"], "full")
+                self.assertTrue(all(url in calls for url in fetch.responses))
+
+    def test_exact_through_the_bounded_adapter(self):
+        from rs9.readers import _PypiBoundedFetch
+        case = self.first_wave_case()
+        fetch, _calls = self.fetch_for(case)
+        outcomes = {url: (lambda url=url, data=data: FakePypiResponse(
+            [data], url=url, headers=[("Content-Length", str(len(data)))])) for url, data in fetch.responses.items()}
+        adapter = _PypiBoundedFetch(opener=FakePypiOpener(outcomes))
+        projection, observation = self.read(case, adapter)
+        self.assert_observation(case, projection, observation, "exact", "pypi-distribution-exact")
+        self.assertEqual(adapter.failures, [])
+
+    def test_absent_project_and_version_stay_distinct_and_unsatisfied(self):
+        for missing, code in ((("project",), "pypi-project-absent"),
+                              (("version",), "pypi-distribution-version-absent")):
+            case = self.first_wave_case()
+            fetch, calls = self.fetch_for(case, missing=missing)
+            projection, observation = self.read(case, fetch)
+            with self.subTest(missing=missing):
+                self.assert_observation(case, projection, observation, "absent", code)
+                self.assertEqual(observation["readback"]["presence"], "absent")
+                self.assertEqual((observation["readback"]["components"],
+                                  observation["readback"]["content_identity_sha256"]), ({}, None))
+                self.assertFalse(any("files.pythonhosted.org" in url for url in calls))
+
+    def test_incomplete_has_null_identity(self):
+        case = self.first_wave_case()
+        fetch, _calls = self.fetch_for(case, listed=sorted(case["bodies"])[1:])
+        projection, observation = self.read(case, fetch)
+        self.assert_observation(case, projection, observation, "incomplete", "pypi-file-missing")
+        self.assertIsNone(observation["readback"]["content_identity_sha256"])
+        self.assertEqual(len(observation["readback"]["components"]), len(case["bodies"]) - 1)
+
+    def test_conflict_identity_is_computed_never_desired(self):
+        from rs9.records import record_sha256
+        case = self.first_wave_case()
+        name = min(case["bodies"])
+        changed = bytearray(case["bodies"][name])
+        changed[-1] ^= 1
+        fetch, _calls = self.fetch_for(case, served={name: bytes(changed)})
+        projection, observation = self.read(case, fetch)
+        self.assert_observation(case, projection, observation, "conflict", "pypi-bytes-differ")
+        readback = observation["readback"]
+        self.assertEqual(readback["content_identity_sha256"],
+                         record_sha256({"conflict": "pypi-bytes-differ", "observed": readback["components"]}))
+        self.assertNotEqual(readback["content_identity_sha256"], projection.identity)
+
+    def test_transport_failures_are_unknown_with_closed_tokens(self):
+        import ssl
+        from urllib.error import URLError
+
+        from rs9.readers import _PypiBoundedFetch
+        cert = ssl.SSLCertVerificationError(1, MARKER)
+        cert.verify_code = 20
+        project_url = "https://pypi.org/pypi/theme-forge-solar-sail/json"
+        for raised, code, verify in ((URLError(cert), "pypi-tls-certificate-verify-failed", True),
+                                     (ContractError("READER_REDIRECT", MARKER), "pypi-transport-unknown", False)):
+            case = self.first_wave_case()
+            adapter = _PypiBoundedFetch(opener=FakePypiOpener({project_url: raised}))
+            projection, observation = self.read(case, adapter)
+            with self.subTest(code=code):
+                self.assert_observation(case, projection, observation, "unknown", code)
+                self.assertEqual((observation["readback"]["authenticated"], observation["readback"]["transport"]),
+                                 (False, "unknown"))
+                codes = [item["code"] for item in observation["diagnostics"]]
+                self.assertEqual("pypi-tls-verify-code" in codes, verify)
+
+    def test_trust_input_failures_propagate_before_any_fetch(self):
+        def capture(case):
+            case["capture"].record["tag"]["commit"] = "9" * 40
+
+        def approval(case):
+            path = case["repo"] / case["row"]["distribution"]["approval_path"]
+            path.write_bytes(path.read_bytes() + b"\n")
+
+        def record(case):
+            from rs9.pypi_observe import PROJECTION_RECORD_PATH
+            from tests.test_pypi_observe import write
+            write(case["repo"], PROJECTION_RECORD_PATH, (case["repo"] / PROJECTION_RECORD_PATH).read_bytes() + b"\n")
+
+        def lineage(case):
+            from rs9.nebular_lineage import FORWARD_RECORD_PATH
+            path = case["repo"] / FORWARD_RECORD_PATH
+            path.write_bytes(path.read_bytes() + b"\n")
+
+        for make, mutate, code in ((self.first_wave_case, capture, "PYPI_PROJECTION_CAPTURE"),
+                                   (self.first_wave_case, approval, "PYPI_PROJECTION_APPROVAL"),
+                                   (self.first_wave_case, record, "PYPI_PROJECTION_RECORD"),
+                                   (self.nebular_case, lineage, "PYPI_PROJECTION_LINEAGE")):
+            case = make()
+            projection = self.build(case)
+            mutate(case)
+            fetch, calls = self.fetch_for(case)
+            with self.subTest(mutation=mutate.__name__), self.assertRaises(ContractError) as caught:
+                self.read(case, fetch, projection)
+            self.assertEqual(caught.exception.code, code)
+            self.assertEqual(calls, [])
+        case = self.first_wave_case()
+        fetch, calls = self.fetch_for(case)
+        with self.assertRaises(ContractError) as caught:
+            self.read(case, fetch, self.build(case).public_facts())
+        self.assertEqual((caught.exception.code, calls), ("PYPI_PROJECTION_RECORD", []))
+
+    def test_provenance_failure_after_download_propagates(self):
+        drifted = "https://github.com/Knowledge-Forge-AI/" + SOLAR + "/tree/" + "f" * 40
+
+        def current_source(target, parts):
+            parts["metadata"][2] = ("Project-URL", "Source, " + drifted)
+
+        def candidate(parts, capture):
+            parts["provenance"]["can_publish"] = True
+        for case in (self.first_wave_case(wheel=current_source), self.nebular_case(wheel=candidate)):
+            fetch, calls = self.fetch_for(case)
+            with self.subTest(project=case["project"]), self.assertRaises(ContractError) as caught:
+                self.read(case, fetch)
+            self.assertEqual(caught.exception.code, "PYPI_PROJECTION_PROVENANCE")
+            self.assertTrue(any("files.pythonhosted.org" in url for url in calls))
 
 
 if __name__ == "__main__":

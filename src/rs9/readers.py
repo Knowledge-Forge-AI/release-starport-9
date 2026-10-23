@@ -25,6 +25,7 @@ _LIVE_PROOF = object()
 READERS = {
     "pypi-json-files": "v1alpha1",
     "pypi-project": "v1alpha1",
+    "pypi-distribution": "v1alpha1",
     "npm-registry": "v1alpha1",
     "homebrew-formula": "v1alpha1",
     "pages-http": "v1alpha1",
@@ -285,6 +286,55 @@ class _PypiBoundedFetch:
         if declared is None:
             return (None, "limit", False) if total > limit else (b"".join(chunks), None, False)
         return (b"".join(chunks), None, False) if total == declared else (None, "incomplete-body", False)
+
+
+_PYPI_DISTRIBUTION_MESSAGES = {
+    "published-exact": "Approved file set, bytes and embedded provenance verified",
+    "absent": "PyPI project is absent",
+    "version-absent": "Approved distribution version is absent",
+    "incomplete": "Approved distribution file is not listed",
+    "conflict": "Remote distribution differs from the approved file set",
+    "unknown": "PyPI readback incomplete or unavailable",
+}
+
+
+def read_pypi_distribution(projection, *, fetch=None):
+    """Observer-only exact read of one projected PyPI distribution; grants no upload or ownership authority.
+
+    Trust-input failures (every PYPI_PROJECTION_* code, including provenance raised after a
+    download) propagate and are never diagnostics. Only remote outcomes become states.
+    """
+    from rs9.pypi_observe import verify_distribution_provenance, verify_pypi_projection
+    from rs9.tf_pypi_remote import approved_state
+    inputs = verify_pypi_projection(projection)
+    adapter = _PypiBoundedFetch() if fetch is None else fetch
+    result = approved_state(inputs.project, inputs.version, inputs.approved, adapter)
+    state, code, observed = result["state"], result["code"], result["observed"]
+    readback = {"authenticated": False, "transport": "unknown", "presence": "unknown",
+                "components": {}, "content_identity_sha256": None, "level": "none"}
+    if state == "published-exact":
+        # Exactness requires provenance; its failure is a contradiction of trust inputs, not a remote state.
+        verify_distribution_provenance(projection, result["bodies"])
+        readback.update(authenticated=True, transport="ok", presence="present", components=observed,
+                        content_identity_sha256=inputs.identity, level="full")
+    elif state in ("absent", "version-absent"):
+        readback.update(authenticated=True, transport="ok", presence="absent", level="full")
+    elif state == "incomplete":
+        readback.update(authenticated=True, transport="ok", presence="present", components=observed, level="full")
+    elif state == "conflict":
+        # A computed conflict identity: a different schema can never equal the desired identity.
+        readback.update(authenticated=True, transport="ok", presence="present", components=observed,
+                        content_identity_sha256=record_sha256({"conflict": code, "observed": observed}),
+                        level="full")
+    diagnostics = [{"code": code, "message": _PYPI_DISTRIBUTION_MESSAGES.get(state, _PYPI_DISTRIBUTION_MESSAGES["unknown"])}]
+    verify_code = adapter.tls_verify_code if isinstance(adapter, _PypiBoundedFetch) else None
+    if state == "unknown" and type(verify_code) is int and 0 <= verify_code <= 1000:
+        diagnostics.append({"code": "pypi-tls-verify-code", "message": f"TLS verify code {verify_code}"})
+    return _make_live_observation(
+        {"id": "pypi", "adapter": "pypi", "mode": "direct"},
+        {"package": inputs.project, "version": inputs.version, "revision": None},
+        inputs.expected, inputs.identity, readback=readback,
+        reader={"id": "pypi-distribution", "version": "v1alpha1"}, diagnostics=diagnostics)
 
 
 def read_pypi(output):
