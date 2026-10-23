@@ -12,21 +12,77 @@ from urllib.parse import quote
 from rs9.errors import ContractError, safe_details
 from rs9.github import PublicClient
 from rs9.hosted_platforms import select_payload
-from rs9.readers import read_pypi_project, read_npm, read_homebrew, read_pages
+from rs9.observation import validate_observation
+from rs9.pypi_observe import build_pypi_projection
+from rs9.readers import has_live_proof, read_pypi_distribution, read_npm, read_homebrew, read_pages
 from rs9.records import record_sha256, build_semantic_content_identity
 from rs9.scratch import canonical
 from rs9.product_classes import get_product_class, NATIVE_DESKTOP
 from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
 from rs9.spdx import validate_spdx_expression
 
+PYPI_ROW_KEYS = frozenset({"project", "adapter", "mode", "observation", "projection_facts", "ownership",
+                           "upload_authority"})
+PYPI_FACTS_KEYS = frozenset({"schema", "record_sha256", "row", "files", "desired_identity_sha256"})
+PYPI_FACTS_ROW_KEYS = frozenset({"application", "binding_asset", "distribution", "intake", "lineage", "project"})
+PYPI_FACTS_SCHEMA = "rs9.pypi-projection-facts.v1alpha1"
+PYPI_DESTINATION = {"id": "pypi", "adapter": "pypi", "mode": "direct"}
+PYPI_READER = {"id": "pypi-distribution", "version": "v1alpha1"}
+_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+_PYPI_FILE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,255}\Z")
+
 
 def readback_satisfied(row):
     state = row["observation"].get("state")
-    if row["adapter"] == "pypi":
-        return state in {"absent", "exact"}
     if row["adapter"] == "pages":
         return state == "absent"
     return state == "exact"
+
+
+def validate_pypi_hosted_row(row, project):
+    """Closed observer-only PyPI hosted row; ownership and upload facts never enter the observation."""
+    try:
+        if type(row) is not dict or set(row) != PYPI_ROW_KEYS:
+            raise ValueError
+        if (row["project"] != project or row["adapter"] != "pypi" or row["mode"] != "observe-only"
+                or type(row["ownership"]) is not dict or row["ownership"] != {"state": "unattested"}
+                or row["upload_authority"] is not False):
+            raise ValueError
+        facts = row["projection_facts"]
+        if (type(facts) is not dict or set(facts) != PYPI_FACTS_KEYS or facts["schema"] != PYPI_FACTS_SCHEMA
+                or not all(isinstance(facts[key], str) and _SHA256.fullmatch(facts[key])
+                           for key in ("record_sha256", "desired_identity_sha256"))):
+            raise ValueError
+        files = facts["files"]
+        if (type(files) is not dict or not files
+                or not all(isinstance(name, str) and _PYPI_FILE_NAME.fullmatch(name)
+                           and isinstance(sha, str) and _SHA256.fullmatch(sha) for name, sha in files.items())):
+            raise ValueError
+        facts_row = facts["row"]
+        if type(facts_row) is not dict or set(facts_row) != PYPI_FACTS_ROW_KEYS or facts_row["project"] != project:
+            raise ValueError
+        distribution = facts_row["distribution"]
+        name, version = distribution["name"], distribution["version"]
+        if name != project or not isinstance(version, str):
+            raise ValueError
+        observation = row["observation"]
+        if not has_live_proof(observation) or observation["reader"] != PYPI_READER:
+            raise ValueError
+        validate_observation(observation, PYPI_DESTINATION, {"package": name, "version": version, "revision": None},
+                             files, facts["desired_identity_sha256"])
+    except ContractError as error:
+        raise ContractError("PYPI_HOSTED_ROW", "PyPI hosted row is not the closed observer-only envelope",
+                            details={"underlying_code": error.code}) from None
+    except (AttributeError, KeyError, TypeError, ValueError):
+        raise ContractError("PYPI_HOSTED_ROW", "PyPI hosted row is not the closed observer-only envelope") from None
+    return row
+
+
+def pypi_hosted_row(project, projection, observation):
+    """Fresh envelope: public projection facts only; no capture, token, body or upload operation."""
+    return validate_pypi_hosted_row({"project": project, "adapter": "pypi", "mode": "observe-only",
+                                     "observation": observation, "projection_facts": projection.public_facts(),
+                                     "ownership": {"state": "unattested"}, "upload_authority": False}, project)
 
 
 def select_brew_payload(capture):
@@ -259,6 +315,7 @@ def execute(context):
     if not isinstance(captures, (list, tuple)) or len(captures) != 4:
         raise ContractError("OBSERVATION_CAPTURE", "Fresh complete generation required", details={"substage": "capture-validation"})
     client = context.get("client") or PublicClient()
+    repository = context.get("repository")
     tap = "Knowledge-Forge-AI/homebrew-tap"
     ref = None
     default_branch = None
@@ -285,6 +342,8 @@ def execute(context):
             observation = reader(*args, **kwargs)
         except ContractError as error:
             detail = safe_details({"product": project, "destination": destination, "substage": "destination-read", "code": error.code, **error.details})
+            if isinstance(error.code, str) and error.code.startswith("PYPI_PROJECTION_"):
+                raise error.with_details(**detail) from None
             diagnostics.append(detail)
             (diagnostic_dir / "observe-destinations.json").write_bytes(canonical(diagnostics))
             raise error.with_details(**detail) from None
@@ -307,7 +366,23 @@ def execute(context):
                 or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", capture.record["repository"]["full_name"])):
             raise ContractError("OBSERVATION_RECORD", "Authenticated release identity differs from the intended version",
                                 details={"substage": "record-validation"})
-        observations.append({"project": project, "adapter": "pypi", "observation": read_destination(project, "pypi", read_pypi_project, project, version)})
+        # A fresh projection per capture; its trust failures are lane failures, never remote states.
+        pypi_details = {"product": project, "destination": "pypi", "substage": "pypi-projection"}
+        try:
+            if not isinstance(repository, Path):
+                raise ContractError("OBSERVATION_CAPTURE", "A physical repository root is required for PyPI projection")
+            pypi_projection = build_pypi_projection(repository, capture, intent, profile)
+        except ContractError as error:
+            if not (isinstance(error.code, str) and error.code.startswith("PYPI_PROJECTION_")):
+                record_diagnostic(project, "pypi", "pypi-projection", error.code)
+            raise error.with_details(**pypi_details, code=error.code) from None
+        # No fetch argument: production keeps the reader's fresh bounded live adapter.
+        pypi_observation = read_destination(project, "pypi", read_pypi_distribution, pypi_projection)
+        try:
+            observations.append(pypi_hosted_row(project, pypi_projection, pypi_observation))
+        except ContractError as error:
+            record_diagnostic(project, "pypi", "pypi-hosted-row", error.code)
+            raise error.with_details(**{**pypi_details, "substage": "pypi-hosted-row"}, code=error.code) from None
 
         try:
             projection = authenticated_npm_projection(capture, intent, profile)

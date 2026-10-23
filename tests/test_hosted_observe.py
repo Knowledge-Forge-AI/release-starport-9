@@ -4,28 +4,82 @@ Verifies real release_core record shape regression, tap-head failure handling,
 platform selection, and fail-closed schema boundaries.
 """
 import base64
+import contextlib
 import copy
 import hashlib
 import json
 import re
 from pathlib import Path
 import tempfile
+import types
 import unittest
+from typing import ClassVar
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError, URLError
 import http.client
 
+from rs9 import hosted_observe, pypi_observe, readers
 from rs9.errors import ContractError
 from rs9.homebrew_formula import formula_class_name
 from rs9.hosted_observe import authenticated_npm_projection, execute, homebrew_generation_facts, readback_satisfied, select_brew_payload
 from rs9.profiles import selection_for_intent
+from rs9.records import record_sha256
 from rs9.release_core import authenticate_release
 from rs9.scratch import canonical
+from tests import test_pypi_observe as pypi_fixtures
+from tests import test_readers as reader_fixtures
 from tests.release_fixtures import package_evidence
 from tests.shadow_fixtures import fixture_evidence
 from tests.test_build_native import create_cli_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
+BURST, LOOM, SOLAR, NEBULAR = (pypi_fixtures.BURST, pypi_fixtures.LOOM, pypi_fixtures.SOLAR,
+                               pypi_fixtures.NEBULAR)
+# Admitted application -> distribution projection; Nebular stays on the published 0.6.1 wheel.
+PYPI_VERSIONS = {BURST: "0.6.1.post1", LOOM: "0.4.0.post1", SOLAR: "0.2.1.post1", NEBULAR: "0.6.1"}
+PYPI_ROW_KEYS = {"project", "adapter", "mode", "observation", "projection_facts", "ownership", "upload_authority"}
+
+
+class _PypiSeamFixture(pypi_fixtures.ProjectionFixtures, unittest.TestCase):
+    """Owns genuine S1b projection and reader fixtures for non-PyPI-focused tests."""
+
+
+@contextlib.contextmanager
+def pypi_seam():
+    """Use genuine S1b capabilities while retaining synthetic non-PyPI capture purposes."""
+    fixture = _PypiSeamFixture()
+    cases = {}
+    calls = types.SimpleNamespace(builds=[], reads=[])
+
+    def case_for(project):
+        if project not in cases:
+            cases[project] = (fixture.nebular_case() if project == NEBULAR
+                              else fixture.first_wave_case(project))
+        return cases[project]
+
+    def build(repository, capture, intent, profile):
+        project = intent["project"]["id"]
+        case = case_for(project)
+        with fixture.pinned(case):
+            projection = pypi_observe.build_pypi_projection(
+                case["repo"], case["capture"], case["intent"], case["profile"])
+        calls.builds.append((repository, project))
+        return projection
+
+    def read(projection):
+        project = projection.public_facts()["row"]["project"]
+        case = case_for(project)
+        fetch, _fetched = fixture.fetch_for(case)
+        calls.reads.append(projection)
+        with fixture.pinned(case):
+            return readers.read_pypi_distribution(projection, fetch=fetch)
+
+    try:
+        with patch("rs9.hosted_observe.build_pypi_projection", side_effect=build), \
+             patch("rs9.hosted_observe.read_pypi_distribution", side_effect=read):
+            yield calls
+    finally:
+        fixture.doCleanups()
 
 
 class HostedReadbackTests(unittest.TestCase):
@@ -174,11 +228,13 @@ class HostedReadbackTests(unittest.TestCase):
             for state in ("unknown", "incomplete", "absent", "conflict"):
                 self.assertFalse(readback_satisfied(self.row(adapter, state)))
 
-    def test_pypi_absence_does_not_attest_a_deployed_pages_site(self):
-        self.assertTrue(readback_satisfied(self.row("pypi", "absent")))
+    def test_pypi_requires_exact_and_absence_does_not_attest_pages(self):
+        self.assertTrue(readback_satisfied(self.row("pypi", "exact")))
+        for state in ("absent", "incomplete", "conflict", "unknown"):
+            with self.subTest(state=state):
+                self.assertFalse(readback_satisfied(self.row("pypi", state)))
         self.assertTrue(readback_satisfied(self.row("pages", "absent")))
         self.assertFalse(readback_satisfied(self.row("pages", "exact")))
-        self.assertFalse(readback_satisfied(self.row("pypi", "incomplete")))
 
     def test_exact_reference_reaches_real_planner_noop_with_fresh_profile(self):
         from datetime import datetime, timezone
@@ -282,10 +338,10 @@ class HostedObserveExecutionTests(unittest.TestCase):
             captures[0][2]["sections"]["license"]["expression"] = "MIT"
             blobs = {f"Formula/{intent['project']['id']}.rb": "b" * 40 for _, intent, _ in captures}
             with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "c" * 40, blobs)), \
-                 patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                 pypi_seam(), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
                  self.assertRaises(ContractError) as caught:
-                execute({"captures": captures, "scratch": scratch, "client": MagicMock()})
+                execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": MagicMock()})
             expected = {"product": "theme-forge-stellar-burst", "destination": "homebrew",
                         "substage": "homebrew-generation-facts", "code": "LICENSE_AUTHORITY"}
             self.assertEqual(caught.exception.details, expected)
@@ -308,7 +364,7 @@ class HostedObserveExecutionTests(unittest.TestCase):
 
             client = MagicMock()
             client.json.return_value = {"sha": "c" * 40}
-            context = {"captures": captures, "client": client, "scratch": scratch}
+            context = {"repository": ROOT, "captures": captures, "client": client, "scratch": scratch}
 
             formula_blobs = {
                 f"Formula/{p}.rb": "b" * 40
@@ -316,11 +372,10 @@ class HostedObserveExecutionTests(unittest.TestCase):
             }
 
             with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "c" * 40, formula_blobs)), \
-                 patch("rs9.hosted_observe.read_pypi_project") as pypi_mock, \
+                 pypi_seam(), \
                  patch("rs9.hosted_observe.read_npm") as npm_mock, \
                  patch("rs9.hosted_observe.read_homebrew") as brew_mock, \
                  patch("rs9.hosted_observe.read_pages") as pages_mock:
-                pypi_mock.return_value = {"state": "absent"}
                 npm_mock.return_value = {"state": "exact"}
                 brew_mock.return_value = {"state": "exact"}
                 pages_mock.return_value = {"state": "absent"}
@@ -375,10 +430,10 @@ class HostedObserveExecutionTests(unittest.TestCase):
                     (capture.root / "npm/metadata.json").unlink()
             client = MagicMock()
             client.json.return_value = None
-            with patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+            with pypi_seam(), \
                  patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}) as npm:
-                execute({"captures": captures, "scratch": scratch, "client": client})
+                execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": client})
             # 3 CLI packages performed npm readback despite unrelated native payload
             self.assertEqual(npm.call_count, 3)
             rows = json.loads((scratch / "destination-observations.json").read_bytes())["observations"]
@@ -403,9 +458,9 @@ class HostedObserveExecutionTests(unittest.TestCase):
             first_capture.archives["package-dup"] = first_capture.archives[first_capture.record["payloads"][0]["id"]]
 
             client = MagicMock()
-            with patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+            with pypi_seam(), \
                  self.assertRaises(ContractError) as caught:
-                execute({"captures": captures, "scratch": scratch, "client": client})
+                execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": client})
             self.assertEqual(caught.exception.code, "OBSERVATION_IDENTITY")
             diags = json.loads((scratch / "diagnostics/observe-destinations.json").read_bytes())
             self.assertEqual(diags[-1]["destination"], "npm")
@@ -432,11 +487,11 @@ class HostedObserveExecutionTests(unittest.TestCase):
                     payload["commands"][command]["path"] = "package/bin/wrong.js"
                 client = MagicMock()
                 client.json.return_value = None
-                with patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                with pypi_seam(), \
                      patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}), \
                      patch("rs9.hosted_observe.read_npm", return_value={"state": "unknown"}) as npm, \
                      self.assertRaises(ContractError) as caught:
-                    execute({"captures": captures, "scratch": scratch, "client": client})
+                    execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": client})
                 self.assertEqual(caught.exception.code, "OBSERVATION_IDENTITY")
                 npm.assert_not_called()
                 diagnostics = json.loads((scratch / "diagnostics/observe-destinations.json").read_bytes())
@@ -457,11 +512,11 @@ class HostedObserveExecutionTests(unittest.TestCase):
                 for p in ("theme-forge-stellar-burst", "theme-forge-stellar-loom", "theme-forge-solar-sail", "theme-forge-nebular-fusion")
             }
             with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, formula_blobs)), \
-                 patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                 pypi_seam(), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "unknown"}), \
                  patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}), \
                  patch("rs9.hosted_observe.read_homebrew") as brew:
-                result = execute({"captures": captures, "scratch": scratch, "client": MagicMock()})
+                result = execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": MagicMock()})
             brew.assert_not_called()
             rows = json.loads((scratch / "destination-observations.json").read_bytes())["observations"]
             self.assertEqual(len(rows), 13)
@@ -486,11 +541,11 @@ class HostedObserveExecutionTests(unittest.TestCase):
             formula = ('class Example < Formula\n  url "' + url + '"\n  sha256 "' + payload["sha256"] + '"\n  version "0.6.1"\nend\n').encode()
             client = MagicMock()
             client.json.return_value = {"sha": "c" * 40}
-            with patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+            with pypi_seam(), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
                  patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}), \
                  patch("rs9.readers._get", return_value=formula):
-                result = execute({"captures": captures, "scratch": scratch, "client": client})
+                result = execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": client})
             rows = json.loads((scratch / "destination-observations.json").read_bytes())["observations"]
             self.assertTrue(all(r["observation"]["state"] == "unknown" for r in rows if r["adapter"] == "homebrew"))
             self.assertEqual(result["gates"][1]["status"], "not-run")
@@ -519,9 +574,9 @@ class HostedObserveExecutionTests(unittest.TestCase):
                     client.json.side_effect = failure
                 else:
                     client.json.return_value = failure
-                context = {"captures": captures, "client": client, "scratch": scratch}
+                context = {"repository": ROOT, "captures": captures, "client": client, "scratch": scratch}
 
-                with patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                with pypi_seam(), \
                      patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
                      patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}):
                     result = execute(context)
@@ -640,9 +695,9 @@ class HostedObserveExecutionTests(unittest.TestCase):
 
             client = MagicMock()
             client.json.side_effect = mock_client_json
-            context = {"captures": captures, "client": client, "scratch": scratch}
+            context = {"repository": ROOT, "captures": captures, "client": client, "scratch": scratch}
 
-            with patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+            with pypi_seam(), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
                  patch("rs9.hosted_observe.read_homebrew", return_value={"state": "exact"}), \
                  patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}):
@@ -701,11 +756,11 @@ class HostedObserveExecutionTests(unittest.TestCase):
             client.json.return_value = {"default_branch": "main", "sha": "e" * 40}
 
             with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, blobs)), \
-                 patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                 pypi_seam(), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
                  patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}), \
                  patch("rs9.readers._get", side_effect=mock_get):
-                result = execute({"captures": captures, "scratch": scratch, "client": client})
+                result = execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": client})
 
             self.assertEqual(result["gates"][0]["status"], "pass")
             self.assertEqual(result["gates"][1]["status"], "pass")
@@ -769,11 +824,11 @@ class HostedObserveExecutionTests(unittest.TestCase):
             client.json.return_value = {"sha": "e" * 40}
 
             with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, blobs)), \
-                 patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                 pypi_seam(), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
                  patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}), \
                  patch("rs9.readers._get", side_effect=mock_get):
-                result = execute({"captures": captures, "scratch": scratch, "client": client})
+                result = execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": client})
 
             doc = json.loads((scratch / "destination-observations.json").read_bytes())
             first_brew = [r for r in doc["observations"] if r["adapter"] == "homebrew"][0]
@@ -824,11 +879,11 @@ class HostedObserveExecutionTests(unittest.TestCase):
             client.json.return_value = {"default_branch": "main", "sha": "a" * 40}
 
             with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "a" * 40, blobs)), \
-                 patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                 pypi_seam(), \
                  patch("rs9.hosted_observe.read_npm", side_effect=mock_npm), \
                  patch("rs9.hosted_observe.read_homebrew", return_value={"state": "exact"}), \
                  patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}):
-                result = execute({"captures": captures, "scratch": scratch, "client": client})
+                result = execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": client})
 
             doc = json.loads((scratch / "destination-observations.json").read_bytes())
             burst_brew = [r for r in doc["observations"] if r["project"] == "theme-forge-stellar-burst" and r["adapter"] == "homebrew"][0]
@@ -882,11 +937,11 @@ class HostedObserveExecutionTests(unittest.TestCase):
                 client.json.return_value = {"default_branch": "main", "sha": "b" * 40}
 
                 with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "b" * 40, blobs)), \
-                     patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                     pypi_seam(), \
                      patch("rs9.hosted_observe.read_npm", side_effect=mock_npm), \
                      patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}), \
                      patch("rs9.readers._get", side_effect=mock_get):
-                    result = execute({"captures": captures, "scratch": scratch, "client": client})
+                    result = execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": client})
 
                 doc = json.loads((scratch / "destination-observations.json").read_bytes())
                 loom_brew = [r for r in doc["observations"] if r["project"] == "theme-forge-stellar-loom" and r["adapter"] == "homebrew"][0]
@@ -938,11 +993,11 @@ class HostedObserveExecutionTests(unittest.TestCase):
             client.json.return_value = {"default_branch": "main", "sha": "c" * 40}
 
             with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "c" * 40, blobs)), \
-                 patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                 pypi_seam(), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
                  patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}), \
                  patch("rs9.readers._get", side_effect=mock_get):
-                result = execute({"captures": captures, "scratch": scratch, "client": client})
+                result = execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": client})
 
             doc = json.loads((scratch / "destination-observations.json").read_bytes())
             sail_brew = [r for r in doc["observations"] if r["project"] == "theme-forge-solar-sail" and r["adapter"] == "homebrew"][0]
@@ -979,11 +1034,11 @@ class HostedObserveExecutionTests(unittest.TestCase):
             client.json.return_value = {"default_branch": "main", "sha": "d" * 40}
 
             with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "d" * 40, blobs)), \
-                 patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                 pypi_seam(), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
                  patch("rs9.hosted_observe.read_pages", return_value={"state": "absent"}), \
                  patch("rs9.readers._get", side_effect=mock_get_b):
-                result = execute({"captures": captures, "scratch": scratch, "client": client})
+                result = execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": client})
 
             doc = json.loads((scratch / "destination-observations.json").read_bytes())
             sail_brew = [r for r in doc["observations"] if r["project"] == "theme-forge-solar-sail" and r["adapter"] == "homebrew"][0]
@@ -1027,11 +1082,11 @@ class HostedObserveExecutionTests(unittest.TestCase):
             }
 
             with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, blobs)), \
-                 patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                 pypi_seam(), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
                  patch("rs9.hosted_observe.read_pages", return_value=pages_obs), \
                  patch("rs9.readers._get", side_effect=mock_get):
-                result = execute({"captures": captures, "scratch": scratch, "client": client})
+                result = execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": client})
 
             # Gate 0 passes, but aggregate gate 1 remains blocked (not-run) because Pages is unknown
             self.assertEqual(result["gates"][0]["status"], "pass")
@@ -1056,9 +1111,15 @@ class HostedObserveExecutionTests(unittest.TestCase):
             self.assertEqual(destinations["homebrew"]["exact_count"], 4)
             self.assertEqual(len(destinations["homebrew"]["planner_noops"]), 4)
 
+            # PyPI is satisfied only by four exact distribution readbacks
+            self.assertTrue(destinations["pypi"]["satisfied"])
+            self.assertEqual(destinations["pypi"]["exact_count"], 4)
+            self.assertEqual(destinations["pypi"]["planner_noops"], [])
+
             # Total 8 npm/Homebrew planner noops preserved
             self.assertEqual(len(details["planner_noops"]), 8)
-            self.assertEqual(len(details["exact_observations"]), 8)
+            # 12 exact observations (4 pypi + 4 npm + 4 brew); Pages is unknown
+            self.assertEqual(len(details["exact_observations"]), 12)
             # 12 satisfied observations (4 pypi + 4 npm + 4 brew)
             self.assertEqual(len(details["satisfied_observations"]), 12)
 
@@ -1132,12 +1193,12 @@ class HostedObserveExecutionTests(unittest.TestCase):
             }
 
             with patch("rs9.hosted_observe.tap_snapshot", return_value=("main", "e" * 40, blobs)), \
-                 patch("rs9.hosted_observe.read_pypi_project", return_value={"state": "absent"}), \
+                 pypi_seam(), \
                  patch("rs9.hosted_observe.read_npm", return_value={"state": "exact"}), \
                  patch("rs9.hosted_observe.read_pages", return_value=pages_obs), \
                  patch("rs9.pages_origin.diagnose_pages_origin", return_value=synth_diag), \
                  patch("rs9.readers._get", side_effect=mock_get):
-                result = execute({"captures": captures, "scratch": scratch, "client": client})
+                result = execute({"repository": ROOT, "captures": captures, "scratch": scratch, "client": client})
 
             # Invariant: Diagnostic absent state NEVER feeds observation or hosted authority.
             # Pages observation remains unknown, and aggregate gate 1 remains blocked (not-run).
@@ -1161,3 +1222,318 @@ class HostedObserveExecutionTests(unittest.TestCase):
                 "class": "authenticated-404",
                 "code": 404,
             })
+
+
+class HostedPypiProjectionTests(pypi_fixtures.ProjectionFixtures, unittest.TestCase):
+    """Hosted PyPI wiring over real S1b captures, projections and reader; injected fetch only, offline."""
+
+    ORDER = (BURST, LOOM, SOLAR, NEBULAR)
+    PAGES_UNKNOWN: ClassVar[dict[str, object]] = {"state": "unknown", "diagnostics": [
+        {"code": "pages-tls-error", "message": "TLS verification failed: certificate-verify-failed"}]}
+    UNKNOWN_REASON = "observations-recorded-with-unknown-or-metadata-only-states"
+    CONFLICT_REASON = "identity-conflict-or-required-target-absent"
+
+    def setUp(self):
+        origin = patch("rs9.pages_origin.diagnose_pages_origin", return_value={
+            "schema": "rs9.pages-origin-diagnostic.v1alpha1",
+            "target": "rs9.knowledge-forge.ai", "path": "CNAME",
+            "state": "unknown", "stage": "dns", "class": "dns-unknown",
+            "code": None, "origin_verified": False, "diagnostics": [],
+        })
+        origin.start()
+        self.addCleanup(origin.stop)
+
+    def four_cases(self, overrides=None):
+        """Four real S1b cases sharing one repository and one merged reviewed-record stand-in."""
+        overrides = overrides or {}
+        cases = [self.first_wave_case(project, **overrides.get(project, {})) for project in (BURST, LOOM, SOLAR)]
+        nebular = self.nebular_case(**overrides.get(NEBULAR, {}))
+        repo = nebular["repo"]
+        for case in cases:
+            for relative in (case["row"]["intake"]["pin_path"], case["row"]["distribution"]["approval_path"]):
+                self.assertFalse((repo / relative).exists())
+                pypi_fixtures.write(repo, relative, (case["repo"] / relative).read_bytes())
+        cases.append(nebular)
+        rows = {case["project"]: case["row"] for case in cases}
+
+        def merge(record):
+            record["rows"] = [copy.deepcopy(rows[row["project"]]) for row in record["rows"]]
+        self.write_record(nebular, mutate=merge)
+        for case in cases:
+            case.update(repo=repo, record=nebular["record"], record_sha=nebular["record_sha"],
+                        lineage_pins=nebular["lineage_pins"])
+        return cases
+
+    def run_hosted(self, cases, *, fetch_options=None, seam=True, extra=(), expect_error=False):
+        """Real build and real reader; the read seam only injects each project's offline fetch."""
+        fetch_options = fetch_options or {}
+        calls = types.SimpleNamespace(builds=[], reads=[], observations={}, fetches={
+            case["project"]: self.fetch_for(case, **fetch_options.get(case["project"], {})) for case in cases})
+        real_build = pypi_observe.build_pypi_projection
+
+        def build(repository, capture, intent, profile):
+            projection = real_build(repository, capture, intent, profile)
+            calls.builds.append(((repository, capture, intent, profile), projection))
+            return projection
+
+        def read(*args, **kwargs):
+            calls.reads.append((args, kwargs))
+            project = args[0].public_facts()["row"]["project"]
+            observation = readers.read_pypi_distribution(*args, fetch=calls.fetches[project][0], **kwargs)
+            calls.observations[project] = observation
+            return observation
+
+        context = {"repository": cases[0]["repo"], "scratch": self.fixture_dir(), "client": MagicMock(),
+                   "captures": [(case["capture"], case["intent"], case["profile"]) for case in cases]}
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(self.pinned(cases[0]))
+            stack.enter_context(patch("rs9.hosted_observe.build_pypi_projection", side_effect=build))
+            if seam:
+                stack.enter_context(patch("rs9.hosted_observe.read_pypi_distribution", side_effect=read))
+            stack.enter_context(patch("rs9.hosted_observe.authenticated_npm_projection", return_value=None))
+            stack.enter_context(patch("rs9.hosted_observe.read_pages", return_value=self.PAGES_UNKNOWN))
+            for item in extra:
+                stack.enter_context(item)
+            if not expect_error:
+                return execute(context), context, calls
+            with self.assertRaises(ContractError) as caught:
+                execute(context)
+        return caught.exception, context, calls
+
+    def rows(self, context):
+        return json.loads((context["scratch"] / "destination-observations.json").read_bytes())["observations"]
+
+    def diagnostics(self, context, project):
+        diagnostics = json.loads((context["scratch"] / "diagnostics/observe-destinations.json").read_bytes())
+        return [item for item in diagnostics if item["product"] == project and item["destination"] == "pypi"]
+
+    def test_four_admitted_distributions_are_exact_in_closed_hosted_rows(self):
+        cases = self.four_cases()
+        result, context, calls = self.run_hosted(cases)
+        doc = json.loads((context["scratch"] / "destination-observations.json").read_bytes())
+        rows = doc["observations"]
+        self.assertEqual([(row["project"], row["adapter"]) for row in rows],
+                         [(project, adapter) for project in self.ORDER for adapter in ("pypi", "npm", "homebrew")]
+                         + [("generation", "pages")])
+        self.assertEqual((doc["production_enabled"], doc["publication_receipts"]), (False, []))
+        self.assertEqual([build[0][2]["project"]["id"] for build in calls.builds], list(self.ORDER))
+        for case, (_inputs, projection) in zip(cases, calls.builds):
+            project = case["project"]
+            row = next(row for row in rows if row["project"] == project and row["adapter"] == "pypi")
+            observation = calls.observations[project]
+            with self.subTest(project=project):
+                self.assertEqual(set(row), PYPI_ROW_KEYS)
+                self.assertEqual((row["adapter"], row["mode"], row["ownership"], row["upload_authority"]),
+                                 ("pypi", "observe-only", {"state": "unattested"}, False))
+                self.assertEqual(row["projection_facts"], projection.public_facts())
+                self.assertEqual(set(row["projection_facts"]), set(hosted_observe.PYPI_FACTS_KEYS))
+                self.assertEqual(row["observation"], json.loads(canonical(dict(observation))))
+                self.assertEqual(set(row["observation"]), reader_fixtures.OBSERVATION_KEYS)
+                serialized = canonical(row["observation"]).decode()
+                for forbidden in ("ownership", "upload", "unattested"):
+                    self.assertNotIn(forbidden, serialized)
+                reader_fixtures.PypiDistributionReaderTests.assert_observation(
+                    self, case, projection, observation, "exact", "pypi-distribution-exact")
+                self.assertEqual(row["observation"]["subject"]["version"], PYPI_VERSIONS[project])
+                if project != NEBULAR:
+                    self.assertNotEqual(case["intent"]["version"], PYPI_VERSIONS[project])
+                fetch, fetched = calls.fetches[project]
+                self.assertTrue(all(url in fetched for url in fetch.responses))
+        pypi = result["details"]["destinations"]["pypi"]
+        self.assertEqual((pypi["satisfied"], pypi["exact_count"], pypi["satisfied_count"], pypi["total_count"]),
+                         (True, 4, 4, 4))
+        self.assertEqual(pypi["states"], {project: "exact" for project in self.ORDER})
+        self.assertEqual(pypi["planner_noops"], [])
+        self.assertEqual(result["gates"][1], {"name": "readback-byte-comparison", "status": "not-run",
+                                              "reason": self.UNKNOWN_REASON})
+        self.assertEqual(result["details"]["production_receipt_count"], 0)
+        self.assertEqual(len(result["details"]["states"]), 13)
+
+    def test_fresh_projection_and_reader_per_capture(self):
+        cases = self.four_cases()
+        _result, context, calls = self.run_hosted(cases)
+        self.assertEqual((len(calls.builds), len(calls.reads)), (4, 4))
+        for case, ((repository, capture, intent, profile), projection), (args, kwargs) in zip(
+                cases, calls.builds, calls.reads):
+            with self.subTest(project=case["project"]):
+                self.assertIs(repository, context["repository"])
+                self.assertIs(capture, case["capture"])
+                self.assertIs(intent, case["intent"])
+                self.assertIs(profile, case["profile"])
+                self.assertIs(type(projection), pypi_observe.PypiProjection)
+                self.assertEqual(len(args), 1)
+                self.assertIs(args[0], projection)
+                self.assertEqual(kwargs, {})
+        _again, _context, again = self.run_hosted(cases)
+        self.assertEqual(len(again.builds), 4)
+        for (_old_inputs, old), (_new_inputs, new) in zip(calls.builds, again.builds):
+            self.assertIsNot(old, new)
+            self.assertEqual(old.public_facts(), new.public_facts())
+
+    def test_production_reader_uses_one_fresh_bounded_adapter_per_read(self):
+        cases = self.four_cases()
+        responses = {}
+        for case in cases:
+            responses.update(self.fetch_for(case)[0].responses)
+        outcomes = {url: (lambda url=url, data=data: reader_fixtures.FakePypiResponse(
+            [data], url=url, headers=[("Content-Length", str(len(data)))])) for url, data in responses.items()}
+        openers = []
+
+        def opener(*handlers):
+            openers.append(reader_fixtures.FakePypiOpener(outcomes))
+            return openers[-1]
+        result, _context, _calls = self.run_hosted(cases, seam=False,
+                                                   extra=[patch("rs9.readers.build_opener", side_effect=opener)])
+        self.assertEqual(len(openers), 4)
+        self.assertEqual(result["details"]["destinations"]["pypi"]["states"], {project: "exact" for project in self.ORDER})
+        requests = [request for item in openers for request in item.requests]
+        self.assertEqual({url for url, _agent, _timeout in requests}, set(responses))
+        self.assertTrue(all((agent, timeout) == ("RS9-readback-v1alpha1", 20) for _url, agent, timeout in requests))
+
+    def test_non_exact_pypi_states_are_distinct_and_unsatisfied(self):
+        cases = self.four_cases()
+        bodies = cases[2]["bodies"]
+        name = min(bodies)
+        changed = bytearray(bodies[name])
+        changed[-1] ^= 1
+        variants = (
+            ({"missing": ("project",)}, "absent", "pypi-project-absent", "fail"),
+            ({"missing": ("version",)}, "absent", "pypi-distribution-version-absent", "fail"),
+            ({"listed": sorted(bodies)[1:]}, "incomplete", "pypi-file-missing", "fail"),
+            ({"served": {name: bytes(changed)}}, "conflict", "pypi-bytes-differ", "fail"),
+            ({"served": {name: bodies[name] + b"x"}}, "unknown", "pypi-limit", "not-run"),
+        )
+        for options, state, code, gate in variants:
+            result, context, calls = self.run_hosted(cases, fetch_options={SOLAR: options})
+            with self.subTest(code=code):
+                observation = calls.observations[SOLAR]
+                self.assertEqual(observation["state"], state)
+                self.assertIn(code, [item["code"] for item in observation["diagnostics"]])
+                pypi = result["details"]["destinations"]["pypi"]
+                self.assertEqual(pypi["states"], {**{project: "exact" for project in self.ORDER}, SOLAR: state})
+                self.assertEqual((pypi["satisfied"], pypi["satisfied_count"], pypi["exact_count"]), (False, 3, 3))
+                self.assertNotIn(SOLAR + ":pypi", result["details"]["satisfied_observations"])
+                self.assertEqual(result["gates"][1]["status"], gate)
+                self.assertEqual(result["gates"][1]["reason"],
+                                 self.CONFLICT_REASON if gate == "fail" else self.UNKNOWN_REASON)
+                self.assertEqual([item.get("state") for item in self.diagnostics(context, SOLAR)], [state])
+
+    def test_homebrew_conflict_keeps_gate_fail_with_four_exact_pypi(self):
+        cases = self.four_cases()
+        drift = patch("rs9.hosted_observe.tap_snapshot",
+                      side_effect=ContractError("HOMEBREW_FORMULA_SCHEMA", "Maintained formula inventory drift"))
+        result, _context, _calls = self.run_hosted(cases, extra=[drift])
+        destinations = result["details"]["destinations"]
+        self.assertTrue(destinations["pypi"]["satisfied"])
+        self.assertEqual(destinations["pypi"]["exact_count"], 4)
+        self.assertEqual(destinations["homebrew"]["states"], {project: "conflict" for project in self.ORDER})
+        self.assertEqual((result["gates"][1]["status"], result["gates"][1]["reason"]), ("fail", self.CONFLICT_REASON))
+
+    def test_projection_trust_failures_are_lane_failures_before_fetch(self):
+        def approval(cases):
+            path = cases[2]["repo"] / cases[2]["row"]["distribution"]["approval_path"]
+            path.write_bytes(path.read_bytes() + b"\n")
+            return SOLAR, "PYPI_PROJECTION_APPROVAL"
+
+        def lineage(cases):
+            path = cases[3]["repo"] / pypi_fixtures.lineage.FORWARD_RECORD_PATH
+            path.write_bytes(path.read_bytes() + b"\n")
+            return NEBULAR, "PYPI_PROJECTION_LINEAGE"
+        for mutate in (approval, lineage):
+            cases = self.four_cases()
+            project, code = mutate(cases)
+            error, context, calls = self.run_hosted(cases, expect_error=True)
+            with self.subTest(mutation=mutate.__name__):
+                required = {"product": project, "destination": "pypi", "substage": "pypi-projection", "code": code}
+                self.assertEqual(error.code, code)
+                self.assertEqual({key: error.details.get(key) for key in required}, required)
+                self.assertLessEqual(set(error.details), set(required) | {"underlying_code"})
+                self.assertEqual(calls.fetches[project][1], [])
+                self.assertNotIn(project, calls.observations)
+                self.assertFalse((context["scratch"] / "destination-observations.json").exists())
+                self.assertEqual(self.diagnostics(context, project), [])
+
+    def test_post_download_provenance_failure_is_a_lane_failure(self):
+        drifted = "https://github.com/Knowledge-Forge-AI/" + SOLAR + "/tree/" + "f" * 40
+
+        def current_source(target, parts):
+            parts["metadata"][2] = ("Project-URL", "Source, " + drifted)
+        cases = self.four_cases({SOLAR: {"wheel": current_source}})
+        error, context, calls = self.run_hosted(cases, expect_error=True)
+        self.assertEqual(error.code, "PYPI_PROJECTION_PROVENANCE")
+        self.assertEqual({key: error.details.get(key) for key in ("product", "destination", "substage", "code")},
+                         {"product": SOLAR, "destination": "pypi", "substage": "destination-read",
+                          "code": "PYPI_PROJECTION_PROVENANCE"})
+        self.assertTrue(any("files.pythonhosted.org" in url for url in calls.fetches[SOLAR][1]))
+        self.assertNotIn(SOLAR, calls.observations)
+        self.assertFalse((context["scratch"] / "destination-observations.json").exists())
+        self.assertEqual(self.diagnostics(context, SOLAR), [])
+
+    def test_hosted_row_envelope_rejects_unknown_keys_and_malformed_facts(self):
+        case = self.first_wave_case(SOLAR)
+        projection = self.build(case)
+        fetch, _fetched = self.fetch_for(case)
+        with self.pinned(case):
+            observation = readers.read_pypi_distribution(projection, fetch=fetch)
+        validate = hosted_observe.validate_pypi_hosted_row
+        row = hosted_observe.pypi_hosted_row(SOLAR, projection, observation)
+        self.assertEqual(set(row), PYPI_ROW_KEYS)
+        self.assertIs(row["observation"], observation)
+        self.assertIs(validate(row, SOLAR), row)
+        name = next(iter(row["projection_facts"]["files"]))
+        # Key closure of the observation itself: a re-proofed record with an injected key.
+        forged = readers.LiveObservation({**observation, "ownership": {"state": "attested"}})
+        forged._proof, forged._hash = readers._LIVE_PROOF, record_sha256(forged)
+        self.assertTrue(readers.has_live_proof(forged))
+
+        def facts(change):
+            def apply(candidate):
+                candidate["projection_facts"] = copy.deepcopy(candidate["projection_facts"])
+                change(candidate["projection_facts"])
+            return apply
+        mutations = {
+            "extra-key": lambda r: r.update(receipt=None),
+            "missing-key": lambda r: r.pop("ownership"),
+            "adapter": lambda r: r.update(adapter="npm"),
+            "mode": lambda r: r.update(mode="direct"),
+            "ownership-attested": lambda r: r.update(ownership={"state": "attested"}),
+            "ownership-extra": lambda r: r.update(ownership={"state": "unattested", "owner": "x"}),
+            "upload-true": lambda r: r.update(upload_authority=True),
+            "upload-zero": lambda r: r.update(upload_authority=0),
+            "upload-none": lambda r: r.update(upload_authority=None),
+            "facts-extra": facts(lambda f: f.update(capture=None)),
+            "facts-schema": facts(lambda f: f.update(schema="rs9.pypi-projection-facts.v2")),
+            "facts-digest": facts(lambda f: f.update(record_sha256="X" * 64)),
+            "facts-files-empty": facts(lambda f: f.update(files={})),
+            "facts-files-drift": facts(lambda f: f["files"].update({name: "0" * 64})),
+            "facts-identity-drift": facts(lambda f: f.update(desired_identity_sha256="e" * 64)),
+            "facts-row-extra": facts(lambda f: f["row"].update(upload=True)),
+            "facts-row-project": facts(lambda f: f["row"].update(project=BURST)),
+            "plain-observation": lambda r: r.update(observation=json.loads(canonical(dict(observation)))),
+            "forged-ownership-observation": lambda r: r.update(observation=forged),
+        }
+        underlying = {"facts-files-drift": "SUBJECT_MISMATCH", "facts-identity-drift": "SUBJECT_MISMATCH",
+                      "forged-ownership-observation": "RECORD_SCHEMA"}
+        for label, mutate in mutations.items():
+            candidate = dict(row)
+            mutate(candidate)
+            with self.subTest(label=label), self.assertRaises(ContractError) as caught:
+                validate(candidate, SOLAR)
+            self.assertEqual(caught.exception.code, "PYPI_HOSTED_ROW")
+            self.assertEqual(caught.exception.details.get("underlying_code"), underlying.get(label))
+        for other in ((row, BURST), (types.MappingProxyType(row), SOLAR)):
+            with self.subTest(other=type(other[0]).__name__), self.assertRaises(ContractError) as caught:
+                validate(*other)
+            self.assertEqual(caught.exception.code, "PYPI_HOSTED_ROW")
+        self.assertIs(validate(row, SOLAR), row)
+
+    def test_hosted_observe_uses_only_the_projection_reader_seams(self):
+        self.assertFalse(hasattr(hosted_observe, "read_pypi_project"))
+        self.assertNotIn("read_pypi_project", Path(hosted_observe.__file__).read_text())
+        self.assertIs(hosted_observe.read_pypi_distribution, readers.read_pypi_distribution)
+        self.assertIs(hosted_observe.build_pypi_projection, pypi_observe.build_pypi_projection)
+        # Hosted constants must not drift from their owners.
+        self.assertEqual(hosted_observe.PYPI_FACTS_SCHEMA, pypi_observe._FACTS_SCHEMA)
+        self.assertEqual(readers.READERS[hosted_observe.PYPI_READER["id"]], hosted_observe.PYPI_READER["version"])
+        self.assertEqual(set(hosted_observe.PYPI_FACTS_ROW_KEYS), set(pypi_fixtures.REAL_ROWS[SOLAR]))
+        self.assertEqual(set(hosted_observe.PYPI_ROW_KEYS), PYPI_ROW_KEYS)
