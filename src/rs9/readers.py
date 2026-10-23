@@ -145,6 +145,148 @@ def _get(url, hosts, limit, headers=None):
         return data
 
 
+_PYPI_FETCH_MAX = 256 * 1024 ** 2
+_PYPI_FETCH_CHUNK = 1024 ** 2
+_PYPI_JSON_PATH = re.compile(r"/pypi/[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)?/json")
+_PYPI_FILE_PATH = re.compile(r"(?:/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)+")
+
+
+class _ClosingNoRedirect(NoRedirect):
+    """Refuse redirects after closing the 3xx response that urllib would otherwise leave open."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        try:
+            fp.close()
+        finally:
+            super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _pypi_fetch_url_allowed(url):
+    if not isinstance(url, str) or not re.fullmatch(r"[\x21-\x7e]+", url) or any(c in url for c in "?#@%\\"):
+        return False
+    try:
+        parsed = urlsplit(url)
+        port = parsed.port
+    except ValueError:
+        return False
+    if (parsed.scheme != "https" or port not in (None, 443) or parsed.username or parsed.password
+            or parsed.query or parsed.fragment or any(seg in (".", "..") for seg in parsed.path.split("/"))):
+        return False
+    if parsed.hostname == "pypi.org":
+        return bool(_PYPI_JSON_PATH.fullmatch(parsed.path))
+    return parsed.hostname == "files.pythonhosted.org" and bool(_PYPI_FILE_PATH.fullmatch(parsed.path))
+
+
+class _PypiBoundedFetch:
+    """Per-call PyPI fetch(url, limit) -> complete bytes of at most limit, for the observer only.
+
+    Each failure appends exactly one closed token and raises the code-only REMOTE_ABSENT (404 at
+    the exact requested URL) or REMOTE_UNKNOWN. Exception, response and URL text are never kept.
+    """
+
+    def __init__(self, opener=None):
+        self._opener = opener if opener is not None else build_opener(ProxyHandler({}), _ClosingNoRedirect())
+        self.failures = []
+        self.tls_verify_code = None
+
+    def __call__(self, url, limit):
+        from rs9.tf_pypi_remote import _ObserverAdmissionError
+        body, token, absent = self._read(url, limit)
+        if token is None:
+            return body
+        self.failures.append(token)
+        raise _ObserverAdmissionError("TF_PYPI_REMOTE_ABSENT" if absent else "TF_PYPI_REMOTE_UNKNOWN", token) from None
+
+    @staticmethod
+    def _status_token(status):
+        return f"http-{status}" if type(status) is int and 100 <= status <= 599 else "http-unknown"
+
+    def _transport_token(self, error):
+        unwrapped = unwrap_transport_error(error)
+        if isinstance(unwrapped, HTTPException):
+            return "protocol"
+        if isinstance(unwrapped, (ssl.SSLError, getattr(ssl, "CertificateError", ()))):
+            self.tls_verify_code = extract_tls_verify_code(unwrapped)
+            tls_class = classify_tls_error(unwrapped)
+            return "tls-" + (tls_class if tls_class in TLS_CLASSES else "transport-error")
+        if isinstance(unwrapped, (TimeoutError, socket.timeout)):
+            return "timeout"
+        return "transport"
+
+    def _read(self, url, limit):
+        if type(limit) is not int or not 0 < limit <= _PYPI_FETCH_MAX:
+            return None, "limit", False
+        if not _pypi_fetch_url_allowed(url):
+            return None, "url-authority", False
+        try:
+            scan_for_credentials(url)
+        except ContractError:
+            return None, "credential-scan", False
+        try:
+            response = self._opener.open(Request(url, headers={"User-Agent": "RS9-readback-v1alpha1"}), timeout=20)
+        except HTTPError as error:
+            try:
+                status, error_url = error.code, _http_error_url(error)
+            finally:
+                error.close()
+            return None, self._status_token(status), status == 404 and type(error_url) is str and error_url == url
+        except ContractError as error:
+            if error.code != "READER_REDIRECT":
+                raise
+            return None, "redirect", False
+        except HTTPException:
+            return None, "protocol", False
+        except (URLError, OSError) as error:
+            return None, self._transport_token(error), False
+        try:
+            result = self._body(response, url, limit)
+        except HTTPException:
+            result = None, "protocol", False
+        except (URLError, OSError) as error:
+            result = None, self._transport_token(error), False
+        finally:
+            close_token = self._close(response)
+        # A close failure discards an otherwise complete body; the first failure token wins.
+        return result if result[1] is not None or close_token is None else (None, close_token, False)
+
+    def _close(self, response):
+        try:
+            response.close()
+        except HTTPException:
+            return "protocol"
+        except OSError as error:
+            return self._transport_token(error)
+        return None
+
+    def _body(self, response, url, limit):
+        status = getattr(response, "status", None)
+        if status != 200:
+            return None, self._status_token(status), False
+        if response.geturl() != url:
+            return None, "url-authority", False
+        lengths = response.headers.get_all("Content-Length") or []
+        if len(lengths) > 1 or (lengths and not re.fullmatch(r"[0-9]{1,20}", str(lengths[0]).strip(" \t"))):
+            return None, "protocol", False
+        declared = int(lengths[0]) if lengths else None
+        if declared is not None and declared > limit:
+            return None, "limit", False
+        # Never request more than limit + 1 bytes; a declared length needs one further empty read.
+        target = limit if declared is None else declared
+        chunks, total = [], 0
+        while total <= target:
+            want = min(_PYPI_FETCH_CHUNK, target + 1 - total)
+            chunk = response.read(want)
+            if type(chunk) is not bytes or len(chunk) > want:
+                return None, "protocol", False
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        if declared is None:
+            return (None, "limit", False) if total > limit else (b"".join(chunks), None, False)
+        return (b"".join(chunks), None, False) if total == declared else (None, "incomplete-body", False)
+
+
 def read_pypi(output):
     """Validate release metadata and every published file, including surplus files.
 
