@@ -14,6 +14,8 @@ from rs9.errors import ContractError
 from rs9.scratch import canonical
 
 WORKFLOW_NAME = "rs9-pypi-publish.yml"
+COMMIT_OWNER_NAME = "Samuel Leighton Lair"
+COMMIT_OWNER_EMAIL = "sam.lair@knowledge-forge.ai"
 REPOSITORY = "Knowledge-Forge-AI/release-starport-9"
 DEFAULT_BRANCH = "main"
 ENVIRONMENT_NAME = "pypi"
@@ -257,7 +259,22 @@ def deploy_workflow(io, *, root=None, execute=False, journal=None, after_reconci
     context = {"phase": "before-ref-request", "old_head": old, "closure_sha256": closure["closure_sha256"]}
     journal.start("pypi", "workflow-deployment", context=context)
     tree = mutate(io, "git/trees", {"base_tree": doc["commit"]["tree"]["sha"], "tree": entries})
-    commit = mutate(io, "git/commits", {"message": "Deploy reviewed APGR PyPI workflow closure", "tree": tree["sha"], "parents": [old]})
+    identity = {"name": COMMIT_OWNER_NAME, "email": COMMIT_OWNER_EMAIL}
+    commit = mutate(io, "git/commits", {
+        "message": "Deploy reviewed APGR PyPI workflow closure",
+        "tree": tree["sha"], "parents": [old],
+        "author": identity, "committer": identity,
+    })
+    commit_sha = commit.get("sha") if isinstance(commit, Mapping) else None
+    if not isinstance(commit_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", commit_sha):
+        raise ContractError("APGR7_DEPLOY_IDENTITY", "Created deployment commit identity unavailable")
+    committed = api(io, "git/commits/" + commit_sha)
+    if not isinstance(committed, Mapping) or committed.get("sha") != commit_sha or any(
+        not isinstance(committed.get(role), Mapping)
+        or any(committed[role].get(key) != value for key, value in identity.items())
+        for role in ("author", "committer")
+    ):
+        raise ContractError("APGR7_DEPLOY_IDENTITY", "Deployment commit must use the repository owner for both roles")
     if head(io)[0] != old:
         raise ContractError("APGR7_DEPLOY_UNCERTAIN", "Default branch changed; reconcile deployment, never overwrite")
     ref_context = {**context, "phase": "ref-requested", "proposed_head": commit["sha"]}
