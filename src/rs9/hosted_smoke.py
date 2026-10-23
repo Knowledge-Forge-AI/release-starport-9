@@ -2,14 +2,20 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import stat
 import subprocess
+from pathlib import Path
 
 from rs9.errors import ContractError, safe_details
 from rs9.hosted_commands import runtime_environment
-from rs9.release_core import authenticated_tree, authenticated_record_hash, digest
+from rs9.nebular_lineage import (
+    CURRENT_COMMIT,
+    CURRENT_TREE,
+    HISTORICAL_COMMIT,
+    HISTORICAL_TREE,
+)
+from rs9.release_core import authenticated_record_hash, authenticated_tree, digest
 from rs9.scratch import canonical
 from rs9.security import validate_safe_relative_posix_path
 
@@ -50,7 +56,34 @@ def tagged_files(capture, client, output, prefixes, *, paths=(), role="verifier-
 
 # platform-targets.mjs reads this file at import time. Unknown tagged closures
 # require a reviewed binding; never substitute an ambient checkout's metadata.
-VERIFIER_SUPPORT = {"49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e": ("package.json",)}
+VERIFIER_SUPPORT = {
+    HISTORICAL_COMMIT: ("package.json",),
+    CURRENT_COMMIT: ("package.json",),
+}
+VERIFIER_SUPPORT_TREES = {
+    HISTORICAL_COMMIT: HISTORICAL_TREE,
+    CURRENT_COMMIT: CURRENT_TREE,
+}
+
+
+def _reviewed_verifier_support(capture):
+    """Return support paths only for an exact reviewed commit/tree pair."""
+    tag = capture.record.get("tag") if isinstance(capture.record, dict) else None
+    if not isinstance(tag, dict):
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Tagged verifier identity is missing",
+                            details={"substage": "verifier-closure", "reason": "tag-identity-missing"})
+    commit = tag.get("commit")
+    if not isinstance(commit, str):
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Tagged verifier support closure is unreviewed",
+                            details={"substage": "verifier-closure", "reason": "unknown-tag-closure"})
+    support = VERIFIER_SUPPORT.get(commit)
+    if support is None:
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Tagged verifier support closure is unreviewed",
+                            details={"substage": "verifier-closure", "reason": "unknown-tag-closure"})
+    if tag.get("tree") != VERIFIER_SUPPORT_TREES[commit]:
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Tagged verifier tree is not the reviewed closure",
+                            details={"substage": "verifier-closure", "reason": "tag-tree-mismatch"})
+    return support
 
 
 def _safe_label(value):
@@ -66,10 +99,7 @@ def prepare_smoke(capture, captures, client, scratch, label=None):
     scratch.mkdir(parents=True, exist_ok=True)
     source = scratch / "source"
     source.mkdir()
-    support = VERIFIER_SUPPORT.get(capture.record["tag"]["commit"])
-    if support is None:
-        raise ContractError("SIDECAR_HARNESS_IMPORT", "Tagged verifier support closure is unreviewed",
-                            details={"substage": "verifier-closure", "reason": "unknown-tag-closure"})
+    support = _reviewed_verifier_support(capture)
     records = tagged_files(capture, client, source, ("tools/", "apps/studio/tools/"))
     records += tagged_files(capture, client, source, (), paths=support, role="verifier-support")
     for row in records:

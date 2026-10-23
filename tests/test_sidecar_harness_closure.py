@@ -2,16 +2,23 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import shutil
 import tempfile
-from types import SimpleNamespace
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from rs9.errors import ContractError
-from rs9.hosted_smoke import (VERIFIER_SUPPORT, prepare_smoke, tagged_files,
-    verifier_import_preflight, verify_nebular_runtime, expected_runtime_members)
+from rs9.hosted_smoke import (
+    VERIFIER_SUPPORT,
+    VERIFIER_SUPPORT_TREES,
+    expected_runtime_members,
+    prepare_smoke,
+    tagged_files,
+    verifier_import_preflight,
+    verify_nebular_runtime,
+)
 from rs9.release_core import digest
 from rs9.scratch import canonical
 
@@ -30,7 +37,8 @@ class ClosureTests(unittest.TestCase):
                 "package.json": b'{"version":"0.6.1"}',
                 "docs/examples/v0.4/brand-system/core-minimal/project.toml": b"fixture=true"}
         tag = next(iter(VERIFIER_SUPPORT))
-        capture = SimpleNamespace(record={"repository": {"full_name": "fixture/nebular"}, "tag": {"commit": tag}})
+        capture = SimpleNamespace(record={"repository": {"full_name": "fixture/nebular"},
+                                          "tag": {"commit": tag, "tree": VERIFIER_SUPPORT_TREES[tag]}})
         fixture = SimpleNamespace(record={"repository": {"full_name": "fixture/burst"}, "tag": {"commit": "a" * 40}})
         client = SimpleNamespace(get=lambda url, **kw: data[url.split("/", 6)[-1]])
         tree = {"tree": [entry(p, v) for p, v in data.items()]}
@@ -62,6 +70,59 @@ class ClosureTests(unittest.TestCase):
             with self.assertRaises(ContractError) as caught:
                 prepare_smoke(capture, [], None, out / "unknown")
             self.assertEqual(caught.exception.details["reason"], "unknown-tag-closure")
+
+    def test_current_and_historical_support_require_the_reviewed_tree(self):
+        data = {"tools/sidecar-common.mjs": b"export function verifyDistribution(){}",
+                "tools/sidecar-verify.mjs": b"export function verifySidecar(){}",
+                "tools/native-rc-smoke.mjs": b"export const smoke=true;",
+                "package.json": b'{"version":"0.6.1"}',
+                "docs/examples/v0.4/brand-system/core-minimal/project.toml": b"fixture=true"}
+        fixture = SimpleNamespace(record={"repository": {"full_name": "fixture/burst"},
+                                          "tag": {"commit": "a" * 40}})
+        client = SimpleNamespace(get=lambda url, **kw: data[url.split("/", 6)[-1]])
+        tree_rows = {"tree": [entry(path, value) for path, value in data.items()]}
+        for commit, expected_tree in VERIFIER_SUPPORT_TREES.items():
+            with self.subTest(commit=commit):
+                capture = SimpleNamespace(record={"repository": {"full_name": "fixture/nebular"},
+                                                  "tag": {"commit": commit, "tree": expected_tree}})
+                with tempfile.TemporaryDirectory() as tmp, patch("rs9.hosted_smoke.authenticated_record_hash"), \
+                        patch("rs9.hosted_smoke.authenticated_tree", return_value=tree_rows):
+                    result = prepare_smoke(capture, [(fixture, {"project": {"id": "theme-forge-stellar-burst"}}, {})],
+                                           client, Path(tmp) / "smoke")
+                    rows = json.loads((result["scratch"] / "source-bindings.json").read_bytes())
+                    support_rows = [row for row in rows if row["role"] == "verifier-support"]
+                    self.assertEqual([row["path"] for row in support_rows], ["package.json"])
+                    self.assertEqual(support_rows[0]["tag_commit"], commit)
+
+    def test_known_commit_with_wrong_tree_and_tampered_support_fail_closed(self):
+        for commit, expected_tree in VERIFIER_SUPPORT_TREES.items():
+            with self.subTest(commit=commit), tempfile.TemporaryDirectory() as tmp:
+                capture = SimpleNamespace(record={"repository": {"full_name": "fixture/nebular"},
+                                                  "tag": {"commit": commit, "tree": "0" * 40}})
+                with self.assertRaises(ContractError) as caught:
+                    prepare_smoke(capture, [], None, Path(tmp) / "wrong-tree")
+                self.assertEqual(caught.exception.details["reason"], "tag-tree-mismatch")
+
+                data = {"tools/sidecar-common.mjs": b"export function verifyDistribution(){}",
+                        "tools/sidecar-verify.mjs": b"export function verifySidecar(){}",
+                        "tools/native-rc-smoke.mjs": b"export const smoke=true;",
+                        "package.json": b'{"version":"forged"}'}
+                fixture = SimpleNamespace(record={"repository": {"full_name": "fixture/burst"},
+                                                  "tag": {"commit": "a" * 40}})
+                tree_data = {"tools/sidecar-common.mjs": b"export function verifyDistribution(){}",
+                             "tools/sidecar-verify.mjs": b"export function verifySidecar(){}",
+                             "tools/native-rc-smoke.mjs": b"export const smoke=true;",
+                             "package.json": b'{"version":"0.6.1"}',
+                             "docs/examples/v0.4/brand-system/core-minimal/project.toml": b"fixture=true"}
+                capture.record["tag"]["tree"] = expected_tree
+                client = SimpleNamespace(get=lambda url, **kw: data[url.split("/", 6)[-1]])
+                tree = {"tree": [entry(path, value) for path, value in tree_data.items()]}
+                with patch("rs9.hosted_smoke.authenticated_record_hash"), \
+                        patch("rs9.hosted_smoke.authenticated_tree", return_value=tree):
+                    with self.assertRaises(ContractError) as caught:
+                        prepare_smoke(capture, [(fixture, {"project": {"id": "theme-forge-stellar-burst"}}, {})],
+                                      client, Path(tmp) / "tampered")
+                self.assertEqual(caught.exception.code, "SMOKE_SOURCE")
 
     def test_transported_members_are_bound_before_runtime_evidence(self):
         members = [{"path": "app", "type": "directory", "mode": 0o755}]
