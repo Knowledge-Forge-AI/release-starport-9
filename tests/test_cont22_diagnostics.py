@@ -1,4 +1,5 @@
 """Original-attempt behavior and host system binding across shared smoke consumers."""
+from contextlib import ExitStack
 import json
 from pathlib import Path
 import subprocess
@@ -172,3 +173,287 @@ class HostBoundaryTests(unittest.TestCase):
         self.assertEqual(projected["scenario"], "unknown")
         self.assertEqual(projected["stderr_diagnostic"]["tokens"], [])
         self.assertNotIn("private-response-text", json.dumps(projected))
+
+
+class LinuxProblemCategoryFlowTests(unittest.TestCase):
+    PRIV = "/" + "home/" + "private-runner/work"
+    RUN_BYTES = json.dumps({"status": "fail", "executable": {"sha256": "a" * 64}, "problems": [
+        "receipt status fail: " + PRIV,
+        "required step project-open failed: " + PRIV + " SENTINEL_PROBLEM",
+        "application ended by exit 1 instead of SIGTERM",
+        "unrecognized SENTINEL_UNKNOWN " + PRIV,
+        7,
+    ]}).encode()
+    PASS_BYTES = json.dumps({"status": "pass", "problems": [], "executable": {"sha256": "a" * 64}}).encode()
+    MISSING = object()
+    SENTINELS = ("private-runner", "SENTINEL_PROBLEM", "SENTINEL_UNKNOWN", "project-open", "SIGTERM")
+    CASES = (("x86_64-linux", "linux-x64", "C", {"C": 1}),
+             ("x86_64-linux", "linux-x64", "C-signal", {"C": 0, "C-signal": 1}),
+             ("aarch64-linux", "linux-arm64", "B", {"B": 1}))
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name).resolve()
+        scratch = self.root / "scratch"
+        scratch.mkdir()
+        self.prepared = {"scratch": scratch, "tools": self.root / "tools", "source": self.root / "source"}
+
+    def envelope(self, system, scenario):
+        from rs9.smoke_stream_tokens import CATEGORY_SCHEMA, CATEGORY_STAGE
+        return {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "system": system, "scenario": scenario,
+                "receipt": {"bytes": len(self.RUN_BYTES), "sha256": digest(self.RUN_BYTES)},
+                "problems": {"total": 5, "scanned": 5, "categories": [
+                    {"category": "receipt-status", "count": 1}, {"category": "required-step", "count": 1},
+                    {"category": "signal-termination-mismatch", "count": 1}],
+                    "unrecognized": 1, "non_string": 1, "omitted": 0, "unavailable": 0}}
+
+    def runner(self, platform, codes, payload=None):
+        def run(argv, **kwargs):
+            scenario = argv[argv.index("--scenario") + 1]
+            path = Path(argv[argv.index("--evidence") + 1]) / (platform + "-" + scenario + ".run.json")
+            data = self.PASS_BYTES if not codes[scenario] else self.RUN_BYTES if payload is None else payload
+            if data is self.MISSING:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(data)
+            return SimpleNamespace(returncode=codes[scenario], stdout=b"", stderr=b"x" * 96 + b"\n")
+        return run
+
+    def failure(self, system, platform, codes, *patches, payload=None, **kwargs):
+        with ExitStack() as stack:
+            stack.enter_context(patch("rs9.application_smoke_diagnostic.subprocess.run",
+                                      side_effect=self.runner(platform, codes, payload)))
+            replay = stack.enter_context(patch("rs9.application_smoke_diagnostic.run_replay",
+                                               return_value=("replay-reproduced", {"status": "replay-reproduced"})))
+            for extra in patches:
+                stack.enter_context(extra)
+            with self.assertRaises(ContractError) as caught:
+                execute_application_smoke(prepared=self.prepared, system=system, launch_root=self.root, **kwargs)
+        return caught.exception, replay
+
+    @staticmethod
+    def without(doc, *keys):
+        return {k: v for k, v in doc.items() if k not in {"elapsed_ms", *keys}}
+
+    def test_linux_categories_flow_from_original_read_through_reprojection_and_retention(self):
+        for system, platform, scenario, codes in self.CASES:
+            with self.subTest(system=system, scenario=scenario):
+                error, replay = self.failure(system, platform, codes)
+                replay.assert_not_called()
+                obs = error.smoke_observation
+                self.assertEqual(error.code, "APPLICATION_SMOKE")
+                self.assertEqual(obs["harness_problem_categories"], self.envelope(system, scenario))
+                self.assertEqual(obs["receipt"], {"bytes": len(self.RUN_BYTES), "sha256": digest(self.RUN_BYTES)})
+                self.assertEqual((obs["scenario"], obs["cause"], obs["reason_token"], obs["raw_returncode"],
+                                  obs["receipt_error"]), (scenario, "process-nonzero", "process-nonzero", 1, "receipt-failed"))
+                self.assertNotIn("harness_run_record", obs)
+                self.assertNotIn("inner_stderr_diagnostic", obs)
+                run_row = [a for a in obs["evidence_inventory"]["artifacts"] if a["kind"] == "run.json"]
+                self.assertEqual(run_row, [{"kind": "run.json", "bytes": len(self.RUN_BYTES),
+                                            "regular": True, "symlink": False}])
+                p2 = validate_smoke_observation(obs, system=system)
+                p3 = validate_smoke_observation(p2, system=system)
+                self.assertEqual(p2, obs)
+                self.assertEqual(p3, p2)
+                with tempfile.TemporaryDirectory() as tmp:
+                    directory = Path(tmp).resolve()
+                    sha = retain_host_smoke_diagnostic(directory, obs, family="apt", system=system)
+                    retained = (directory / "application-smoke-failure-apt.json").read_bytes()
+                self.assertEqual(digest(retained), sha)
+                initial = json.loads(retained)["initial_run"]
+                self.assertEqual(initial["harness_problem_categories"], obs["harness_problem_categories"])
+                self.assertEqual(initial["receipt"], obs["receipt"])
+                for sentinel in self.SENTINELS:
+                    self.assertNotIn(sentinel, json.dumps(obs))
+                    self.assertNotIn(sentinel.encode(), retained)
+
+    def test_classification_never_changes_original_outcome_or_masks_failure(self):
+        from rs9.smoke_stream_tokens import CATEGORY_SCHEMA, CATEGORY_STAGE
+        system, platform, scenario, codes = self.CASES[0]
+        baseline, _ = self.failure(system, platform, codes)
+        added = ("harness_problem_categories", "receipt")
+        withheld = {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "withheld_reason": "invalid-observation"}
+        producer_fault, _ = self.failure(system, platform, codes, patch(
+            "rs9.smoke_stream_tokens.project_problem_categories", side_effect=RuntimeError("private boom")))
+        consumer_fault, _ = self.failure(system, platform, codes, patch(
+            "rs9.smoke_stream_tokens.validate_problem_categories", side_effect=RuntimeError("private boom")))
+        for name, error in (("producer", producer_fault), ("consumer", consumer_fault)):
+            with self.subTest(fault=name):
+                self.assertEqual(error.code, baseline.code)
+                self.assertEqual(self.without(error.details), self.without(baseline.details))
+                self.assertEqual(self.without(error.smoke_observation, *added),
+                                 self.without(baseline.smoke_observation, *added))
+                self.assertNotIn("receipt", error.smoke_observation)
+                self.assertNotIn("private boom", json.dumps(error.smoke_observation))
+        self.assertNotIn("harness_problem_categories", producer_fault.smoke_observation)
+        self.assertEqual(consumer_fault.smoke_observation["harness_problem_categories"], withheld)
+        obs = baseline.smoke_observation
+        forged = self.envelope(system, scenario)
+        forged["receipt"]["sha256"] = "f" * 64
+        raw_text = self.envelope(system, scenario)
+        raw_text["problems"]["categories"][0]["category"] = "receipt status fail: " + self.PRIV
+        bool_count = self.envelope(system, scenario)
+        bool_count["problems"]["categories"][0]["count"] = True
+        other_system = self.envelope("aarch64-linux", "B")
+        hostile_cases = (("string", "receipt status fail", "invalid-observation"),
+                         ("list", [], "invalid-observation"),
+                         ("schema-only", {"schema": CATEGORY_SCHEMA}, "invalid-observation"),
+                         ("private-withheld", {**withheld, "withheld_reason": self.PRIV}, "invalid-observation"),
+                         ("raw-text-category", raw_text, "invalid-observation"),
+                         ("bool-count", bool_count, "invalid-observation"),
+                         ("forged-sha", forged, "binding-mismatch"),
+                         ("other-system", other_system, "binding-mismatch"))
+        for name, hostile, reason in hostile_cases:
+            with self.subTest(hostile=name):
+                projected = validate_smoke_observation({**obs, "harness_problem_categories": hostile}, system=system)
+                self.assertEqual(projected["harness_problem_categories"]["withheld_reason"], reason)
+                self.assertNotIn("receipt", projected)
+                self.assertEqual(self.without(projected, *added), self.without(obs, *added))
+                for key in ("cause", "reason_token", "raw_returncode", "receipt_error", "problem_codes", "scenario"):
+                    self.assertEqual(projected[key], obs[key])
+                self.assertNotIn(self.PRIV, json.dumps(projected))
+
+    def test_absent_optional_field_and_unreadable_receipt_add_no_keys(self):
+        for system, platform, scenario, codes in self.CASES:
+            for name, payload in (("receipt-missing", self.MISSING), ("receipt-corrupt", b"{" + self.PRIV.encode())):
+                with self.subTest(system=system, scenario=scenario, receipt=name):
+                    error, _ = self.failure(system, platform, codes, payload=payload)
+                    obs = error.smoke_observation
+                    self.assertEqual(error.code, "APPLICATION_SMOKE")
+                    self.assertEqual((obs["scenario"], obs["receipt_error"], obs["cause"], obs["raw_returncode"]),
+                                     (scenario, name, "process-nonzero", 1))
+                    self.assertNotIn("harness_problem_categories", obs)
+                    self.assertNotIn("receipt", obs)
+                    self.assertNotIn("private-runner", json.dumps(obs))
+        plain = BindingTests().observation()
+        self.assertNotIn("harness_problem_categories", validate_smoke_observation(plain, system="aarch64-linux"))
+        # A top-level identity without the optional field is never carried forward.
+        forged = validate_smoke_observation({**plain, "receipt": {"bytes": 1, "sha256": "a" * 64}}, system="aarch64-linux")
+        self.assertNotIn("receipt", forged)
+        self.assertNotIn("harness_problem_categories", forged)
+
+    def test_wrong_system_withholds_and_non_linux_consumers_ignore_field(self):
+        system, platform, _scenario, codes = self.CASES[0]
+        error, _ = self.failure(system, platform, codes)
+        obs = error.smoke_observation
+        swapped = validate_smoke_observation(obs, system="aarch64-linux")
+        self.assertTrue(swapped["binding_mismatch"])
+        self.assertEqual(swapped["scenario"], "unknown")
+        self.assertEqual(swapped["harness_problem_categories"]["withheld_reason"], "binding-mismatch")
+        self.assertEqual(set(swapped["harness_problem_categories"]), {"schema", "stage", "withheld_reason"})
+        self.assertNotIn("receipt", swapped)
+        self.assertEqual(validate_smoke_observation(swapped, system="aarch64-linux"), swapped)
+        for other in ("aarch64-darwin", None):
+            with self.subTest(system=other):
+                projected = validate_smoke_observation(obs, system=other)
+                self.assertNotIn("harness_problem_categories", projected)
+                self.assertNotIn("receipt", projected)
+
+    def test_diagnostic_extras_initial_run_keeps_bounded_field_without_masking(self):
+        system, platform, scenario, codes = self.CASES[0]
+        error, replay = self.failure(system, platform, codes, diagnostic_extras=True)
+        replay.assert_called_once()
+        self.assertEqual(error.code, "APPLICATION_SMOKE")
+        self.assertEqual(error.details["cause"], "process-nonzero")
+        raw = (self.root / "diagnostics" / "application-smoke-diagnostic.json").read_bytes()
+        self.assertEqual(error.details["diagnostic_sha256"], digest(raw))
+        self.assertLessEqual(len(raw), 60 * 1024)
+        initial = json.loads(raw)["initial_run"]
+        self.assertEqual(initial["harness_problem_categories"], self.envelope(system, scenario))
+        self.assertEqual(error.smoke_observation["harness_problem_categories"], self.envelope(system, scenario))
+        for sentinel in self.SENTINELS:
+            self.assertNotIn(sentinel.encode(), raw)
+
+    def test_missing_or_uncorroborated_inventory_never_retains_positive_categories(self):
+        from rs9.smoke_stream_tokens import (
+            CATEGORY_SCHEMA,
+            CATEGORY_STAGE,
+            INVENTORY_STAGE,
+            MAX_ENTRIES,
+        )
+        system, platform, _scenario, codes = self.CASES[0]
+        original, _ = self.failure(system, platform, codes)
+        obs = original.smoke_observation
+        withheld = {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "withheld_reason": "binding-mismatch"}
+        unavailable = {"stage": INVENTORY_STAGE, "status": "unavailable", "artifacts": [],
+                       "entries_observed": 0, "unlisted": 0}
+        outside_window = {**unavailable, "status": "limit-exceeded", "entries_observed": MAX_ENTRIES,
+                          "unlisted": MAX_ENTRIES}
+        for name, inventory in (("absent", None), ("unavailable", unavailable), ("outside-window", outside_window)):
+            with self.subTest(inventory=name):
+                raw = dict(obs)
+                if inventory is None:
+                    raw.pop("evidence_inventory", None)
+                else:
+                    raw["evidence_inventory"] = inventory
+                projected = validate_smoke_observation(raw, system=system)
+                self.assertEqual(projected["harness_problem_categories"], withheld)
+                self.assertNotIn("receipt", projected)
+                for key in ("cause", "reason_token", "raw_returncode", "receipt_error", "problem_codes", "scenario"):
+                    self.assertEqual(projected[key], obs[key])
+                self.assertEqual(validate_smoke_observation(projected, system=system), projected)
+
+    def test_optional_category_growth_cannot_mask_original_at_diagnostic_cap(self):
+        from rs9.application_smoke_diagnostic import _retain_failure
+        from rs9.scratch import canonical
+        system, platform, scenario, codes = self.CASES[0]
+        original, _ = self.failure(system, platform, codes, diagnostic_extras=True)
+        path = self.root / "diagnostics" / "application-smoke-diagnostic.json"
+        full = json.loads(path.read_bytes())
+        initial = full["initial_run"]
+        reduced = {**full, "initial_run": {k: v for k, v in initial.items() if k != "harness_problem_categories"}}
+        limit = len(canonical(reduced))
+        self.assertGreater(len(canonical(full)), limit)
+        with patch("rs9.application_smoke_diagnostic.run_replay", return_value=("replay-reproduced", full["replay"])) as replay, \
+                patch("rs9.application_smoke_diagnostic.MAX_DIAGNOSTIC", limit):
+            sha = _retain_failure(self.prepared, system, platform, scenario, self.root, (), None,
+                                  initial, full["scenarios_not_run"])
+        replay.assert_called_once()
+        retained = path.read_bytes()
+        self.assertEqual(retained, canonical(reduced))
+        self.assertEqual(digest(retained), sha)
+        self.assertLessEqual(len(retained), limit)
+        self.assertIn("harness_problem_categories", initial)
+        self.assertIn("harness_problem_categories", original.smoke_observation)
+        self.assertEqual(original.code, "APPLICATION_SMOKE")
+        self.assertEqual(original.details["cause"], "process-nonzero")
+        with patch("rs9.application_smoke_diagnostic.run_replay", return_value=("replay-reproduced", full["replay"])), \
+                patch("rs9.application_smoke_diagnostic.MAX_DIAGNOSTIC", limit - 1), \
+                self.assertRaisesRegex(ContractError, "Smoke diagnostic bound exceeded"):
+            _retain_failure(self.prepared, system, platform, scenario, self.root, (), None,
+                            initial, full["scenarios_not_run"])
+
+    def test_host_boundary_retains_matching_field_and_withholds_swapped_scenario(self):
+        from rs9.build_native import CommandReceipt
+        from rs9.hosted_container_smoke import SCHEMA, _accept_container_output
+        from tests.test_hosted_container_smoke import DisjointFilesystemTests
+        fixture = DisjointFilesystemTests()
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        binding = fixture.binding
+        system = binding["system"]
+        case = next(c for c in self.CASES if c[0] == system)
+        _, platform, scenario, codes = case
+        guest = self.failure(system, platform, codes)[0].smoke_observation
+        swapped_scenario = next(c[2] for c in self.CASES if c[0] == system and c[2] != scenario)
+        for name, obs, positive in (("matching", guest, True),
+                                    ("swapped", {**guest, "scenario": swapped_scenario}, False),
+                                    ("other-system-scenario", {**guest, "scenario": "B"}, False)):
+            with self.subTest(case=name):
+                doc = {"schema": SCHEMA, "request_sha256": binding["request_sha256"],
+                       "family": binding["family"], "system": system, "uid": 65534,
+                       "status": "fail", "code": "APPLICATION_SMOKE", "smoke_observation": obs}
+                (binding["output"] / "result.json").write_text(json.dumps(doc))
+                with self.assertRaises(ContractError) as caught:
+                    _accept_container_output(binding, CommandReceipt(["guest"], 1, b"", b"", executed=True))
+                self.assertEqual(caught.exception.code, "APPLICATION_SMOKE")
+                projected = caught.exception.smoke_observation
+                self.assertEqual(projected["cause"], guest["cause"])
+                self.assertEqual(projected["raw_returncode"], guest["raw_returncode"])
+                if positive:
+                    self.assertEqual(projected["harness_problem_categories"], guest["harness_problem_categories"])
+                    self.assertEqual(projected["receipt"], guest["receipt"])
+                else:
+                    self.assertEqual(projected["harness_problem_categories"]["withheld_reason"], "binding-mismatch")
+                    self.assertNotIn("receipt", projected)

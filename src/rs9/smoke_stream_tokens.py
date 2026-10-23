@@ -85,6 +85,22 @@ _ORDERED_PROBLEM_PREFIXES = tuple(
     sorted(PROBLEM_CATEGORIES.items(), key=lambda kv: len(kv[0]), reverse=True)
 )
 _PROBLEM_CATEGORY_SET = frozenset(PROBLEM_CATEGORIES.values())
+# Separately versioned Linux B/C category-only envelope; distinct from Darwin harness_run_record.
+CATEGORY_SCHEMA = "rs9.original-smoke-problem-categories.v1alpha1"
+CATEGORY_STAGE = "original-harness-problem-categories"
+CATEGORY_WITHHELD = frozenset({"invalid-observation", "binding-mismatch"})
+_CATEGORY_BINDINGS = frozenset({
+    ("x86_64-linux", "linux-x64", "C"),
+    ("x86_64-linux", "linux-x64", "C-signal"),
+    ("aarch64-linux", "linux-arm64", "B"),
+})
+_CATEGORY_SCENARIOS = {"x86_64-linux": frozenset({"C", "C-signal"}), "aarch64-linux": frozenset({"B"})}
+_CATEGORY_KEYS = frozenset({"schema", "stage", "system", "scenario", "receipt", "problems"})
+_CATEGORY_PROBLEM_KEYS = frozenset({"total", "scanned", "categories", "unrecognized", "non_string",
+                                    "omitted", "unavailable"})
+_RECEIPT_SUMMARY_KEYS = frozenset({"present", "bytes", "sha256", "status", "problem_codes",
+                                   "problem_count", "executable_sha256"})
+_CATEGORY_RECEIPT_ERRORS = frozenset({"receipt-missing", "receipt-invalid", "receipt-oversize", "receipt-corrupt"})
 WITHHELD = frozenset({"empty", "oversize", "invalid-utf8", "private", "incomplete",
                       "truncated", "unterminated", "control-bytes", "invalid-observation", "binding-mismatch"})
 # Outer process stderr Error.message lines frozen from CONT22 ("candidate executable is not
@@ -322,44 +338,6 @@ def project_run_record(record, identity=None, *, receipt_error=None):
         steps_unlisted = 0
         steps_omitted = 0
         steps = [{"id": s, "state": "unknown"} for s in SCENARIO_A_STEPS]
-    raw_problems = record.get("problems")
-    if isinstance(raw_problems, list):
-        total = len(raw_problems)
-        prob_window = raw_problems[:MAX_PROBLEMS]
-        scanned = len(prob_window)
-        counts = {}
-        unrecognized = 0
-        non_string = 0
-        for item in prob_window:
-            if not isinstance(item, str):
-                non_string += 1
-                continue
-            for prefix, category in _ORDERED_PROBLEM_PREFIXES:
-                if prefix in _EXACT_PROBLEM_FORMS:
-                    matched = item == prefix
-                elif prefix in _PROBLEM_SUFFIXES:
-                    suffix = _PROBLEM_SUFFIXES[prefix]
-                    matched = (
-                        item.startswith(prefix)
-                        and item.endswith(suffix)
-                        and len(item) > len(prefix) + len(suffix)
-                    )
-                else:
-                    matched = item.startswith(prefix)
-                if matched:
-                    counts[category] = counts.get(category, 0) + 1
-                    break
-            else:
-                unrecognized += 1
-        categories = [{"category": c, "count": counts[c]} for c in sorted(counts)]
-        unavailable = 0
-    else:
-        total = None
-        scanned = 0
-        categories = []
-        unrecognized = 0
-        non_string = 0
-        unavailable = 1
     return {
         "stage": RUN_STAGE,
         "status": "observed",
@@ -370,14 +348,47 @@ def project_run_record(record, identity=None, *, receipt_error=None):
         "steps_entries_observed": steps_entries_observed,
         "steps_unlisted": steps_unlisted,
         "steps_omitted": steps_omitted,
-        "problems": {
-            "total": total,
-            "scanned": scanned,
-            "categories": categories,
-            "unrecognized": unrecognized,
-            "non_string": non_string,
-            "unavailable": unavailable,
-        },
+        "problems": _classify_problems(record.get("problems")),
+    }
+
+
+def _classify_problems(raw_problems):
+    """Closed category counts over the bounded prefix; no problem text leaves."""
+    if not isinstance(raw_problems, list):
+        return {"total": None, "scanned": 0, "categories": [], "unrecognized": 0,
+                "non_string": 0, "unavailable": 1}
+    prob_window = raw_problems[:MAX_PROBLEMS]
+    counts = {}
+    unrecognized = 0
+    non_string = 0
+    for item in prob_window:
+        if not isinstance(item, str):
+            non_string += 1
+            continue
+        for prefix, category in _ORDERED_PROBLEM_PREFIXES:
+            if prefix in _EXACT_PROBLEM_FORMS:
+                matched = item == prefix
+            elif prefix in _PROBLEM_SUFFIXES:
+                suffix = _PROBLEM_SUFFIXES[prefix]
+                matched = (
+                    item.startswith(prefix)
+                    and item.endswith(suffix)
+                    and len(item) > len(prefix) + len(suffix)
+                )
+            else:
+                matched = item.startswith(prefix)
+            if matched:
+                counts[category] = counts.get(category, 0) + 1
+                break
+        else:
+            unrecognized += 1
+    return {
+        "total": len(raw_problems),
+        "scanned": len(prob_window),
+        "categories": [{"category": c, "count": counts[c]} for c in sorted(counts)],
+        "unrecognized": unrecognized,
+        "non_string": non_string,
+        "unavailable": 0,
     }
 
 
@@ -488,6 +499,147 @@ def validate_run_record(raw, *, inventory=None, mismatch=False):
             "unavailable": unavail,
         },
     }
+
+
+def _receipt_identity(raw):
+    """Exact same-read {bytes, sha256}, or None; never a guessed or partial identity."""
+    if not isinstance(raw, dict):
+        return None
+    byte_count, sha256 = raw.get("bytes"), raw.get("sha256")
+    if (type(byte_count) is not int or not 0 < byte_count <= 1024 * 1024 or
+            not isinstance(sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", sha256)):
+        return None
+    return {"bytes": byte_count, "sha256": sha256}
+
+
+def _withheld_categories(reason):
+    # The single failure representation: no system, receipt, counts or exception text.
+    return {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "withheld_reason": reason}
+
+
+def project_problem_categories(record, identity, *, system, platform, scenario):
+    """Category-only Linux B/C projection of the already-read original .run.json; no reread."""
+    if (not all(isinstance(v, str) for v in (system, platform, scenario)) or
+            (system, platform, scenario) not in _CATEGORY_BINDINGS or not isinstance(record, dict)):
+        return None
+    if not isinstance(identity, dict) or identity.get("present") is not True:
+        return None
+    receipt = _receipt_identity(identity)
+    if receipt is None:
+        return None
+    problems = _classify_problems(record.get("problems"))
+    total = problems["total"]
+    return {
+        "schema": CATEGORY_SCHEMA,
+        "stage": CATEGORY_STAGE,
+        "system": system,
+        "scenario": scenario,
+        "receipt": receipt,
+        "problems": {
+            "total": total,
+            "scanned": problems["scanned"],
+            "categories": problems["categories"],
+            "unrecognized": problems["unrecognized"],
+            "non_string": problems["non_string"],
+            "omitted": 0 if total is None else total - problems["scanned"],
+            "unavailable": problems["unavailable"],
+        },
+    }
+
+
+def _closed_categories(raw):
+    """Exact positive envelope structure and count closure, or None; binding is separate."""
+    if not isinstance(raw, dict) or set(raw) != _CATEGORY_KEYS:
+        return None
+    system, scenario, receipt, probs = raw["system"], raw["scenario"], raw["receipt"], raw["problems"]
+    if (raw["schema"] != CATEGORY_SCHEMA or raw["stage"] != CATEGORY_STAGE or
+            not isinstance(system, str) or system not in _CATEGORY_SCENARIOS or
+            not isinstance(scenario, str) or scenario not in _CATEGORY_SCENARIOS[system] or
+            not isinstance(receipt, dict) or set(receipt) != {"bytes", "sha256"} or
+            _receipt_identity(receipt) is None or
+            not isinstance(probs, dict) or set(probs) != _CATEGORY_PROBLEM_KEYS):
+        return None
+    total, scanned, cats = probs["total"], probs["scanned"], probs["categories"]
+    unrec, nonstr, omitted, unavail = (probs[k] for k in ("unrecognized", "non_string", "omitted", "unavailable"))
+    if any(type(v) is not int for v in (scanned, unrec, nonstr, omitted, unavail)) or not isinstance(cats, list):
+        return None
+    if unavail == 1:
+        if total is not None or scanned or unrec or nonstr or omitted or cats:
+            return None
+    elif unavail == 0:
+        if (type(total) is not int or not 0 <= total <= 1024 * 1024 or
+                scanned != min(total, MAX_PROBLEMS) or omitted != total - scanned):
+            return None
+    else:
+        return None
+    if (not (0 <= unrec <= scanned and 0 <= nonstr <= scanned) or len(cats) > len(_PROBLEM_CATEGORY_SET) or
+            any(not isinstance(c, dict) or set(c) != {"category", "count"} or
+                not isinstance(c["category"], str) or c["category"] not in _PROBLEM_CATEGORY_SET or
+                type(c["count"]) is not int or not 1 <= c["count"] <= scanned
+                for c in cats)):
+        return None
+    names = [c["category"] for c in cats]
+    if names != sorted(set(names)) or sum(c["count"] for c in cats) + unrec + nonstr != scanned:
+        return None
+    return {
+        "schema": CATEGORY_SCHEMA,
+        "stage": CATEGORY_STAGE,
+        "system": system,
+        "scenario": scenario,
+        "receipt": {"bytes": receipt["bytes"], "sha256": receipt["sha256"]},
+        "problems": {
+            "total": total,
+            "scanned": scanned,
+            "categories": [{"category": c["category"], "count": c["count"]} for c in cats],
+            "unrecognized": unrec,
+            "non_string": nonstr,
+            "omitted": omitted,
+            "unavailable": unavail,
+        },
+    }
+
+
+def _observation_receipt(raw):
+    """First-pass descriptor summary (present: True) or a prior positive {bytes, sha256} only."""
+    if not isinstance(raw, dict):
+        return None
+    keys = set(raw)
+    if keys == {"bytes", "sha256"} or ("present" in keys and raw["present"] is True and keys <= _RECEIPT_SUMMARY_KEYS):
+        return _receipt_identity(raw)
+    return None
+
+
+def _inventory_binds(inventory, raw_inventory, byte_count):
+    """Length/type corroboration only; the inventory schema carries no digest."""
+    if not isinstance(raw_inventory, dict) or not isinstance(inventory, dict):
+        return False
+    if inventory.get("status") not in {"observed", "limit-exceeded"}:
+        return False
+    rows = [a for a in inventory.get("artifacts", ()) if a.get("kind") == "run.json"]
+    # Missing or outside the bounded window is uncorroborated, never a positive binding.
+    return (len(rows) == 1 and rows[0]["regular"] is True and rows[0]["symlink"] is False and
+            rows[0]["bytes"] == byte_count)
+
+
+def validate_problem_categories(raw, *, system, scenario, receipt, receipt_error=None,
+                                inventory=None, raw_inventory=None, mismatch=False):
+    """Idempotent closed Linux B/C category envelope bound to the observation's same-read receipt."""
+    if raw is None:
+        return None
+    if (isinstance(raw, dict) and set(raw) == {"schema", "stage", "withheld_reason"} and
+            raw["schema"] == CATEGORY_SCHEMA and raw["stage"] == CATEGORY_STAGE and
+            isinstance(raw["withheld_reason"], str) and raw["withheld_reason"] in CATEGORY_WITHHELD):
+        return _withheld_categories("binding-mismatch" if mismatch else raw["withheld_reason"])
+    closed = _closed_categories(raw)
+    if closed is None:
+        return _withheld_categories("binding-mismatch" if mismatch else "invalid-observation")
+    observed = _observation_receipt(receipt)
+    if (mismatch or closed["system"] != system or closed["scenario"] != scenario or
+            observed is None or observed != closed["receipt"] or
+            isinstance(receipt_error, str) and receipt_error in _CATEGORY_RECEIPT_ERRORS or
+            not _inventory_binds(inventory, raw_inventory, closed["receipt"]["bytes"])):
+        return _withheld_categories("binding-mismatch")
+    return closed
 
 
 def _unavailable_inner(read_error, withheld_reason, byte_count=None):
@@ -656,7 +808,7 @@ def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False):
     }
 
 
-def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, record=None):
+def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, record=None, *, system=None):
     """Each optional observation fails independently after the gate outcome is fixed."""
     result = {}
     try:
@@ -678,4 +830,12 @@ def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, re
             result["inner_stderr_diagnostic"] = read_inner_stderr(evidence, platform, scenario)
         except Exception:
             pass
+    try:
+        categories = project_problem_categories(
+            record, fields.get("receipt"), system=system, platform=platform, scenario=scenario
+        )
+        if categories is not None:
+            result["harness_problem_categories"] = categories
+    except Exception:
+        pass
     return result
