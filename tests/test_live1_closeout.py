@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 from rs9.bootstrap import require_configuration_authority, require_release_configuration
 from rs9.errors import ContractError
 from rs9.ingestion import authenticate
-from rs9.operator import authenticate_generation, assert_release_expectations, checked_checkout
+from rs9.operator import BOOTSTRAP, authenticate_generation, assert_release_expectations, checked_checkout
 from rs9.profiles import selection_for_intent
 from rs9.release_core import authenticate_release, digest
 from rs9.scratch import canonical
@@ -83,7 +83,7 @@ class CloseoutAuthorityTests(unittest.TestCase):
         source = Path(__file__).resolve().parents[1]
         repository = self.root / "repository"
         shutil.copytree(source / "bootstrap", repository / "bootstrap")
-        manifest_path = repository / "bootstrap/pre-rs9/theme-forge-live1/manifest.json"
+        manifest_path = repository / BOOTSTRAP
         row = json.loads(manifest_path.read_bytes())["projects"][0]
         intent_path = manifest_path.parent / row["configuration"] / "intent.json"
         changed = json.loads(intent_path.read_bytes())

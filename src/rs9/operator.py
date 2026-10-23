@@ -15,7 +15,7 @@ from rs9.records import record_sha256, snapshot
 from rs9.release_core import authenticate_release, capture_release, digest, authenticated_tree, authenticated_release_metadata, read_evidence
 from rs9.scratch import ConfinedWriter, canonical, physical_directory
 
-BOOTSTRAP = "bootstrap/pre-rs9/theme-forge-live1/manifest.json"
+BOOTSTRAP = "bootstrap/pre-rs9/theme-forge-live1/manifest-author-aligned.json"
 EXPECTATIONS = "operators/live1/expectations.json"
 
 

@@ -2,8 +2,11 @@
 
 Status: implemented loader; real-release qualification pending.
 
-`bootstrap/pre-rs9/theme-forge-live1/manifest.json` is the sole LIVE1 configuration
-authority. Its schema is `rs9.bootstrap-tenant-manifest.v1alpha1`, with
+`bootstrap/pre-rs9/theme-forge-live1/manifest-author-aligned.json` is the current
+LIVE1 configuration authority. The historical
+`bootstrap/pre-rs9/theme-forge-live1/manifest.json` remains byte-identical
+archival evidence for the CONT5 legal/readback guard and is not a current
+selector. Both manifests use the schema `rs9.bootstrap-tenant-manifest.v1alpha1`, with
 `bootstrap-pre-rs9=true`, `release-contains-rs9=false`, `scope=exact-generation`
 and `future-releases=forbidden`. The manifest makes no claim that a release
 contained these files.
@@ -36,7 +39,11 @@ before selecting network requests or creating per-project evidence directories.
 
 The example Nebular `.rs9/` files are historical examples. Operators must not
 merge them with bootstrap configuration or silently choose between authorities.
-Bootstrap hash and all four config hashes are in the candidate inventory.
+The historical manifest hash and all four config hashes are in the frozen
+candidate inventory; the forward manifest has no adoption inventory yet. The
+current forward manifest SHA-256 is
+`f31bd4ddc1caf0f591b1d8447c1bf694ffa822994fc5f88bb346a3292227bf78`; this is a
+review identifier only, not a production approval.
 
 Manifest `license_authority.files` records tagged source authority evidence.
 When present, the loader requires every listed authority file to be selected by
