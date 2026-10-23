@@ -5,21 +5,20 @@
   "bootstrap_role": "migration-configuration-only-not-fresh-release-authority",
   "candidate_adoption_ready": false,
   "changed_paths": [
-    "docs/live1-native-client-cont22.md",
-    "evidence/live1/cont22-input-evidence.json",
-    "evidence/live1/cont22-verification.json",
+    "config/forward/pypi-observe/v1alpha1/projection.json",
+    "docs/evaluations/rs9-pypi-observe-forward-source-design1.md",
     "operators/live1/candidate-manifest.json",
-    "src/rs9/application_smoke_diagnostic.py",
-    "src/rs9/hosted_container_smoke.py",
-    "src/rs9/hosted_deb.py",
-    "src/rs9/nix_proot.py",
-    "src/rs9/nix_proot_runtime_diagnostic.py",
-    "src/rs9/nix_proot_signals.py",
-    "src/rs9/pages_smoke_diagnostic.py",
-    "src/rs9/smoke_stream_tokens.py",
-    "tests/test_cont22_diagnostics.py",
-    "tests/test_nix_proot_runtime_diagnostic.py",
-    "tests/test_smoke_stream_tokens.py"
+    "src/rs9/hosted_observe.py",
+    "src/rs9/pypi_observe.py",
+    "src/rs9/readers.py",
+    "src/rs9/tf_pypi_nebular_successor.py",
+    "src/rs9/tf_pypi_remote.py",
+    "src/rs9/wheel_nebular_successor.py",
+    "tests/test_hosted_observe.py",
+    "tests/test_pypi_observe.py",
+    "tests/test_readers.py",
+    "tests/test_tf_pypi_nebular_successor.py",
+    "tests/test_tf_pypi_remote.py"
   ],
   "configuration_hashes": [
     {
@@ -55,6 +54,41 @@
       "path": ".github/workflows/rs9-candidate-tests.yml",
       "sha256": "0b5582b18bcb561257239d9fa6512e9c8b8852d4d46ddd21b343a01abdc1cab7",
       "size": 16985
+    },
+    {
+      "git_blob": "f0db1040cb0838a15dac8606dd04cda47cbe371d",
+      "mode": "100644",
+      "path": ".github/workflows/rs9-pypi-publish.yml",
+      "sha256": "d2a32395721beafc8b9999db7bbb57a5bfb30e7737af2cb0b2b46ef5dd1f5447",
+      "size": 2799
+    },
+    {
+      "git_blob": "4964ed677d4c0855030cb4a918f11270f43d0bb2",
+      "mode": "100644",
+      "path": ".github/workflows/rs9-tfnf-pypi-publish.yml",
+      "sha256": "9b63b49498f65012b55f71b75a08a5801249f3be319f1349dc639b437f19e740",
+      "size": 7948
+    },
+    {
+      "git_blob": "2362f0aa590c17ae2d9f53e9c82859e214c543e6",
+      "mode": "100644",
+      "path": ".github/workflows/rs9-tfsb-pypi-publish.yml",
+      "sha256": "c8b8a8e7f1ff455d956ed17cb57dfd5e01afe35b5a98b1e59dd643b75a87e410",
+      "size": 13423
+    },
+    {
+      "git_blob": "c275a2b2e147d213d5c2be2250fb9bc5b3135f64",
+      "mode": "100644",
+      "path": ".github/workflows/rs9-tfsl-pypi-publish.yml",
+      "sha256": "980618ae843f51f27e9eab462d8a5a58cfd43a1d98153e347a8c55f19d41260a",
+      "size": 13404
+    },
+    {
+      "git_blob": "34871202ab7c3c049355f7c7bbc98de304c078e5",
+      "mode": "100644",
+      "path": ".github/workflows/rs9-tfss-pypi-publish.yml",
+      "sha256": "524928f0b30596190946260dd724b7e3c302a0312865eee1b5eeff39d98cdb20",
+      "size": 13366
     },
     {
       "git_blob": "9d74da639047e169406ced6a5f7cfc71b1e56dc4",
@@ -106,11 +140,18 @@
       "size": 4962
     },
     {
-      "git_blob": "ae4aedfe76a88c68d55d4f78225862cf177ce621",
+      "git_blob": "de8fa306e2090f432a83841974f615e00627885d",
       "mode": "100644",
       "path": "bootstrap/pre-rs9/theme-forge-live1/README.md",
-      "sha256": "0b9d6b44242ab444b69ee7752d1c9412bd91a54644242a893b5e76e95096a19d",
-      "size": 1790
+      "sha256": "ae24c8c5cadea501248591449d81018077acd9a32cba29ddfbde1ec0c524016c",
+      "size": 2238
+    },
+    {
+      "git_blob": "85502c73fc568bb86b99b3646c7b430e950965af",
+      "mode": "100644",
+      "path": "bootstrap/pre-rs9/theme-forge-live1/manifest-author-aligned.json",
+      "sha256": "f31bd4ddc1caf0f591b1d8447c1bf694ffa822994fc5f88bb346a3292227bf78",
+      "size": 3194
     },
     {
       "git_blob": "66f90af07935f0557ecb52ac765ed4b3ba3d42cf",
@@ -176,6 +217,20 @@
       "size": 1251
     },
     {
+      "git_blob": "ec7cb1eebc52b4ecc130e14ac0b818698ed05eb8",
+      "mode": "100644",
+      "path": "config/forward/pypi-observe/v1alpha1/projection.json",
+      "sha256": "ee166d0e73d079f3f2c127d24128a5f282bace6d57ab1e2d7149f9acf6bf1bab",
+      "size": 6752
+    },
+    {
+      "git_blob": "de4049bd50549775b5b470a45499411e875aadff",
+      "mode": "100644",
+      "path": "config/forward/theme-forge-nebular-fusion/v0.6.1-lineage/reconciliation.json",
+      "sha256": "358da4d0d607aeb2ba8d2ab77131054a5c45165692e72d1f316d8d47b01ce5f9",
+      "size": 3849
+    },
+    {
       "git_blob": "50e10ced855fdebecffbad982886ffc1bd80906f",
       "mode": "100644",
       "path": "docs/README.md",
@@ -239,6 +294,34 @@
       "size": 14216
     },
     {
+      "git_blob": "bbbe8025f819a179755ffa99cea76c1256b2b3a7",
+      "mode": "100644",
+      "path": "docs/adr/0016-theme-forge-pypi-node-distribution-adapter.md",
+      "sha256": "f0d7988485f2eef60ab9179a257fff6cc763e98ccfcb0f98cd94b1f952d0f33e",
+      "size": 10473
+    },
+    {
+      "git_blob": "7443200432de1a0917d69058f7dfec628f48ee0c",
+      "mode": "100644",
+      "path": "docs/adr/0017-theme-forge-pypi-real-qualification.md",
+      "sha256": "1a63f0c4b5a0b7bdf7b20f5bbe1544f696a156a33d765825b746a3bf7d0df72f",
+      "size": 6284
+    },
+    {
+      "git_blob": "a86d055462c941af58502b16bca442bfe5ee0b71",
+      "mode": "100644",
+      "path": "docs/adr/0018-historical-binary-evidence-and-frozen-controller-test-roots.md",
+      "sha256": "b8f201322605769f48fb5247ea8cbf952d571d0aa7fc727d251a24d6466444ad",
+      "size": 3197
+    },
+    {
+      "git_blob": "2668c97ddb53fa9d095141ef5dd5f317721ad3a8",
+      "mode": "100644",
+      "path": "docs/adr/0019-nebular-native-pypi-publisher.md",
+      "sha256": "1a4d827b6075b7fcd956de8c249d915d30bae4e6c3defaf8a6a19e325d4e4fa3",
+      "size": 10450
+    },
+    {
       "git_blob": "4771f5c9106f0fb52f088102d08eefd58d41a68f",
       "mode": "100644",
       "path": "docs/apgr-v0.13.0-readiness.md",
@@ -286,6 +369,13 @@
       "path": "docs/architecture/theme-forge-extraction-inventory.md",
       "sha256": "02f7d5bef6246481c629c96fafc5893ddc15ced00e57b7aeac003bb66d8b53c1",
       "size": 11617
+    },
+    {
+      "git_blob": "49782178dc1921d769b8371d4a8b5b649438b398",
+      "mode": "100644",
+      "path": "docs/evaluations/rs9-pypi-observe-forward-source-design1.md",
+      "sha256": "70ef82427a4bbb98169d2e7e23bf8469c2fa4b44a12598da89a6e5bf1a2d9c61",
+      "size": 46907
     },
     {
       "git_blob": "7df6880d8f3d45a4803ad7592822ea5e72aa18d5",
@@ -477,11 +567,11 @@
       "size": 1329
     },
     {
-      "git_blob": "d1b1bc996d1cc76376e089d9375900c3b5f20cbe",
+      "git_blob": "1448523c5c3f90dafc959498082f7c5c87fa6791",
       "mode": "100644",
       "path": "docs/live1-pypi.md",
-      "sha256": "6be7b9369b99bf7bd9e4721e7dd1fb8e0466349886d7fa16f335407df90465bb",
-      "size": 5206
+      "sha256": "dfc1c2ab4f451f5d9069bfd68f14dc9d1b0ce79ad7e1986dd51b2063120b1b44",
+      "size": 5376
     },
     {
       "git_blob": "d806c867fc39b0668a33c7536760f0bbd9e557be",
@@ -498,11 +588,11 @@
       "size": 4493
     },
     {
-      "git_blob": "384276c422f9fcbf4be060bc5bba49066adc2cfe",
+      "git_blob": "e86a2109f22210fa30b1c327cc979b2d4d82c3e6",
       "mode": "100644",
       "path": "docs/specs/rs9-bootstrap-tenant-v1alpha1.md",
-      "sha256": "5ca6608e2e7d6a6e6adaf2e47058c33b75519c61deb60cf2fb075e8d10c9f4c7",
-      "size": 3434
+      "sha256": "ce7c06594a626ea1fec6eeb12a718f883cf041fc936d2a0bf61ae574ee06da14",
+      "size": 3884
     },
     {
       "git_blob": "6e8079cdaf71f61ae6bf1a8c81143e1405855321",
@@ -580,6 +670,27 @@
       "path": "docs/specs/rs9-retry-idempotence-v1alpha1.md",
       "sha256": "09402c356314c08eb66401cff98bf5884342805720909235454c5958f8c06ea9",
       "size": 5754
+    },
+    {
+      "git_blob": "63c9c0b43419c40f2ac864e78c363746182df3c2",
+      "mode": "100644",
+      "path": "docs/tf-pypi-first3.md",
+      "sha256": "07b8ef9bc48d126c84789037187305f3d7002fc798afa19518da5a417ed317f8",
+      "size": 11923
+    },
+    {
+      "git_blob": "c3f7edb451cad383b7061be78e8b3886d9c8c27f",
+      "mode": "100644",
+      "path": "docs/tf-pypi-hosted-qualification.md",
+      "sha256": "c657ec2b2402790bafcede9c1006143c6dc01a2a56755bc72759255c4edbaac8",
+      "size": 2255
+    },
+    {
+      "git_blob": "6bf895ee738a5a386e3d6a9c73c5d0ea36c13340",
+      "mode": "100644",
+      "path": "docs/tf-pypi-nebular.md",
+      "sha256": "fd3ea24931a28744c65d722141361d6bb1d3d6cebb7cf36ebd5223fa30ee2f42",
+      "size": 10107
     },
     {
       "git_blob": "29f3fdf735edcb8089bafec264e486ecad2e7ff4",
@@ -1128,6 +1239,20 @@
       "size": 206
     },
     {
+      "git_blob": "c38fbe026332c2aa4fa0dc06012f46606f75ad5d",
+      "mode": "100644",
+      "path": "operators/apgr-publication/pypi-artifacts-v0.13.1.json",
+      "sha256": "7bde0d4baa35337770880ab26606ab32bbfba43bb5574a56396596a51d173a1b",
+      "size": 1664
+    },
+    {
+      "git_blob": "c9432a4868e58e7568a886e333806df703194892",
+      "mode": "100644",
+      "path": "operators/apgr-publication/pypi-artifacts.json",
+      "sha256": "ef5e96f5ffd45b10b85ee2db22cebc677d7027b79f5ba5a3247f52c55c76df8d",
+      "size": 1538
+    },
+    {
       "git_blob": "699014aaac82f3cb3aa712fe0480b11615beb334",
       "mode": "100644",
       "path": "operators/live1/RUNBOOK.md",
@@ -1156,10 +1281,10 @@
       "size": 5916
     },
     {
-      "git_blob": "a0cc9228426e49f13706bafe3d07b8ef4055c747",
+      "git_blob": "930e902f3e44cd458b93f06862328aacf3fca8cb",
       "mode": "100644",
       "path": "operators/live1/expectations.json",
-      "sha256": "324852491060c3f051814368b28073840a0ce4635e12be3e5f25d85c44749268",
+      "sha256": "6314aaa3e1a2f1765cdf5fce7cb97944d81567c2f12943ab976668dc7820d76e",
       "size": 3426
     },
     {
@@ -1303,6 +1428,104 @@
       "size": 2145
     },
     {
+      "git_blob": "cfcdd6f25eefe1b477a70bf85f8b573caaf66960",
+      "mode": "100644",
+      "path": "operators/tf-pypi/descriptions/nebular-fusion.md",
+      "sha256": "997b3be0d975eaa98b33bab1be7e7ec64b4ceaebd0bd67a891b1b297e3190471",
+      "size": 5802
+    },
+    {
+      "git_blob": "487bd13783daea84baa9a965914401932c0e5293",
+      "mode": "100644",
+      "path": "operators/tf-pypi/descriptions/solar-sail.md",
+      "sha256": "f7bf082f4ab1fc9bd0f95510941324c12e9a5c2c2c0ae8b6593ee241129380e3",
+      "size": 25693
+    },
+    {
+      "git_blob": "3041b337ece3bab5abc5090fb23b5b0eaaaa8991",
+      "mode": "100644",
+      "path": "operators/tf-pypi/descriptions/stellar-burst.md",
+      "sha256": "9424e25eda527a51af65ece8ae60763c619082c6fa25531189e850aa2e06c1cd",
+      "size": 26160
+    },
+    {
+      "git_blob": "e8b90606bde657bc7acb8de3dd71e6c9a53dc3b8",
+      "mode": "100644",
+      "path": "operators/tf-pypi/descriptions/stellar-loom.md",
+      "sha256": "ba5185c9a8558a609c789ae085e41c5f601e2380d0f8ef2f5a017ad003715731",
+      "size": 27723
+    },
+    {
+      "git_blob": "145d221ba976e266ba038c2a682bc42d5df47cf0",
+      "mode": "100644",
+      "path": "operators/tf-pypi/theme-forge-nebular-fusion-artifacts.json",
+      "sha256": "bac462430273c4449485a70189d26e9ed090e1859cd8161ed14844a084122a89",
+      "size": 9483
+    },
+    {
+      "git_blob": "e691263ddbacb9e00d53e9ec5ac87fb6d2102bcc",
+      "mode": "100644",
+      "path": "operators/tf-pypi/theme-forge-solar-sail-0.2.1.post1-artifacts.json",
+      "sha256": "e7d6b00e1f55652ef7aafe1117fcf3d5a4ad479585935a8de06fcee4f22046f4",
+      "size": 1662
+    },
+    {
+      "git_blob": "04e6c08d0cbbd9370751dcc80e54c5b2a7f84112",
+      "mode": "100644",
+      "path": "operators/tf-pypi/theme-forge-solar-sail-artifacts.json",
+      "sha256": "db71bfcb796cd9b2e64383af2371c53123b44e3567210721bd65a5ca2f8f9686",
+      "size": 800
+    },
+    {
+      "git_blob": "95c22206bb952bb64302acf6dd9b1060cd928e0c",
+      "mode": "100644",
+      "path": "operators/tf-pypi/theme-forge-solar-sail.json",
+      "sha256": "00ce9b1290a29cbd5d22873a9c074fa9a28449c4a8b74a776fe4fb4f3f3550eb",
+      "size": 803
+    },
+    {
+      "git_blob": "081313fd8492448233757504841a3ad8a39f2f83",
+      "mode": "100644",
+      "path": "operators/tf-pypi/theme-forge-stellar-burst-0.6.1.post1-artifacts.json",
+      "sha256": "414dbee9423c193992106b661f43effe235a6c0ba1f7a01efdc57234748faff9",
+      "size": 1681
+    },
+    {
+      "git_blob": "af0b0083c3698328eeb3996a2ad78781d7f698fd",
+      "mode": "100644",
+      "path": "operators/tf-pypi/theme-forge-stellar-burst-artifacts.json",
+      "sha256": "8acb8ae29dbb1f7f3806b6de750a4b5e10e4903279e7219d706017cf8555f7f6",
+      "size": 811
+    },
+    {
+      "git_blob": "01fbbbfc3587c40b68eac5352b954140e490c7e8",
+      "mode": "100644",
+      "path": "operators/tf-pypi/theme-forge-stellar-burst.json",
+      "sha256": "e54a3c298782aa412158f0054270b7560c399234e40fd0fbb8f3b9004cd8fa75",
+      "size": 2183
+    },
+    {
+      "git_blob": "f8ff6c3412421e7ac37f8b654092d101e695d088",
+      "mode": "100644",
+      "path": "operators/tf-pypi/theme-forge-stellar-loom-0.4.0.post1-artifacts.json",
+      "sha256": "a52d332b1257d48a73ebc8b9c552d82cc032fd3777f9dbd21137b104dfe596e4",
+      "size": 1675
+    },
+    {
+      "git_blob": "869fb01608439e68a81b0089f11e6c65264f0e4d",
+      "mode": "100644",
+      "path": "operators/tf-pypi/theme-forge-stellar-loom-artifacts.json",
+      "sha256": "10dfd42cb9bdb88aeee939b4caa77f286d30958f318158d95829454fbef822a2",
+      "size": 807
+    },
+    {
+      "git_blob": "d39f73af3a4c085b47ad092843cb47327a96b4c5",
+      "mode": "100644",
+      "path": "operators/tf-pypi/theme-forge-stellar-loom.json",
+      "sha256": "91a0f9090bf04a2a0986686ae4d24cea6587759d5446e1923e48765c3c36636c",
+      "size": 848
+    },
+    {
       "git_blob": "0db84f149d60b5d635979e397854b21e9e68481b",
       "mode": "100644",
       "path": "src/rs9/__init__.py",
@@ -1324,18 +1547,67 @@
       "size": 3294
     },
     {
-      "git_blob": "546a7ff1e87e137d02d444ceba45973fef1f657a",
+      "git_blob": "0dad610af091368ea99427560e84502744ce092e",
       "mode": "100644",
       "path": "src/rs9/adopt_candidate.py",
-      "sha256": "4caada274afe3d03f68865cebd4f44538ff0bffd05a7e329ff57d9c89db7cb1a",
-      "size": 17893
+      "sha256": "73e94b73acab34ffcac52834de43c53ad6900dec6cad0b07912b9451d7da56c1",
+      "size": 19830
     },
     {
-      "git_blob": "ca96a2a9e6775547994d3b3dc082de8edd5d4a39",
+      "git_blob": "6f1615e87d43dead81477540e694fec277cb15d1",
+      "mode": "100644",
+      "path": "src/rs9/apgr7_common.py",
+      "sha256": "32b98bbc6c1392c2bec2b4c39c0f6c29f9ad03991ae0cb43cb747e3d93ff152a",
+      "size": 2938
+    },
+    {
+      "git_blob": "61c33a7b9cd1e2fa22b02a791671a91498c306f8",
+      "mode": "100644",
+      "path": "src/rs9/apgr7_io.py",
+      "sha256": "7571441899b0af78751a6157dbea6b5f160a227129cf602eb12dc44b36b8e8b7",
+      "size": 6232
+    },
+    {
+      "git_blob": "5eb10904a3dc98b3f1d4745921ef74cda0f99598",
+      "mode": "100644",
+      "path": "src/rs9/apgr7_pypi.py",
+      "sha256": "2332220474e46e551e24bebe4e69ef1a7f6370a549203dce29eb23b8ba6a7be8",
+      "size": 20683
+    },
+    {
+      "git_blob": "ce5261c365c62591bc0c99d5c29e1dc24f850de8",
+      "mode": "100644",
+      "path": "src/rs9/apgr7_pypi_deploy.py",
+      "sha256": "28950e58842b0798bc7b27a8f1479f687559cbd0240a039a95ab0d21bac9292f",
+      "size": 17494
+    },
+    {
+      "git_blob": "dcc705e5e0912ba2a0015d49fd5406091cfa0703",
+      "mode": "100644",
+      "path": "src/rs9/apgr7_pypi_runs.py",
+      "sha256": "3aaec89296c2d593c5b72422a5b84f56c631b89c63878c872a4dcf9a46394127",
+      "size": 9063
+    },
+    {
+      "git_blob": "55b0f80a306c26f3ea97ba14a198bf2755c30333",
+      "mode": "100644",
+      "path": "src/rs9/apgr7_pypi_workflow.py",
+      "sha256": "9a84b636e03ac484582cbb139261f3afa7d3bf2b55a09a967a4b793a4e949a87",
+      "size": 6592
+    },
+    {
+      "git_blob": "18763895c311f2ee0932646eb5c79b79496fefba",
+      "mode": "100644",
+      "path": "src/rs9/apgr7_python.py",
+      "sha256": "dcd13eada565716cec6d754def856b3772de54962e64eb67a642cb0ea757cd3e",
+      "size": 18463
+    },
+    {
+      "git_blob": "548359bea094fa51cfd4a7eda7799d28330e0f88",
       "mode": "100644",
       "path": "src/rs9/application_smoke_diagnostic.py",
-      "sha256": "56f72112ff84b20e5254fc985ee0cae5c34d5bb54285fbe07c4bc5b06976fe91",
-      "size": 19024
+      "sha256": "a138bb333e42bf0da0654f6d014f9b2fb083bc87141307f8aaaafbd581a4e9bf",
+      "size": 19118
     },
     {
       "git_blob": "85207de59d37210203f4f6ebbf220b29f623be41",
@@ -1357,6 +1629,13 @@
       "path": "src/rs9/bootstrap.py",
       "sha256": "42ef6586a4286ec3e00208306e1cd67b254136d74f83191f55ad6f625f7f26c5",
       "size": 7503
+    },
+    {
+      "git_blob": "bb300a560cf2fe41f76fc365a35b48cfcea73657",
+      "mode": "100644",
+      "path": "src/rs9/bounded_process.py",
+      "sha256": "7f18375e0e3709e28e902fdab6c4e3c089c60552de682b0f10fa5776e6a7e1ce",
+      "size": 8520
     },
     {
       "git_blob": "a668f651e955535431d0fa0978844502d1c4919c",
@@ -1401,11 +1680,11 @@
       "size": 27870
     },
     {
-      "git_blob": "0322cbe83dc2f9fcf47691f0dffa818c15528880",
+      "git_blob": "5557aba39cce43a8d0544c9bd5046e29b38923bb",
       "mode": "100644",
       "path": "src/rs9/candidate.py",
-      "sha256": "07f01fb6771ab1dd95780b87399b7c101b2d50cacbe67cf087395e0a53b5720e",
-      "size": 6431
+      "sha256": "0196d7f0e72a8b38ee9f487788afd6a15a87f2ed79498d83371a04ed165d3ac1",
+      "size": 6779
     },
     {
       "git_blob": "a13233bc74e8ad7d5269d9ed19ad1a9c4b6e15e8",
@@ -1534,11 +1813,11 @@
       "size": 19568
     },
     {
-      "git_blob": "964748f62a61ec7c4f393eb5a18abf0a7e00a5de",
+      "git_blob": "64f67f7ae7f1a65eb5887271870010293d47de6e",
       "mode": "100644",
       "path": "src/rs9/errors.py",
-      "sha256": "6beb2f7923fe15273029970bb189cf829246aa312ea93aa4d087b92b605a1eb1",
-      "size": 10892
+      "sha256": "90e823801097b2eabac8c5839bdc4c165e4c91f8e080834237478dacb3a1ead4",
+      "size": 11247
     },
     {
       "git_blob": "f3d20f59b568465e798a0f5a3c886841ba57769a",
@@ -1625,11 +1904,11 @@
       "size": 9165
     },
     {
-      "git_blob": "49d25085734512811f0ccda0b2c3adb759278ca3",
+      "git_blob": "94778b09f42fd0f145a5c77bf5e44d2b1bbda5f4",
       "mode": "100644",
       "path": "src/rs9/hosted_deb.py",
-      "sha256": "146004abc4ac55e82fb5c9819d885301e0e9ecb65bce47304c28133f090c29d5",
-      "size": 122581
+      "sha256": "5930e881bb04f81df0fb16761e37fc6d3671ff6e70c56a60ef0d04ca641dbf25",
+      "size": 122651
     },
     {
       "git_blob": "cde2e0fc7bb8c79ef43a49e94d79da89485779e8",
@@ -1660,11 +1939,11 @@
       "size": 13862
     },
     {
-      "git_blob": "372402b0c96d7f3d2bef7c33b327ffe7656d2878",
+      "git_blob": "f3065a528f8b25a4a45b26409eeab2d3c43ab01c",
       "mode": "100644",
       "path": "src/rs9/hosted_observe.py",
-      "sha256": "3102239989b7051bf3a326b8a2bd3f3545d6ec8d69d43db83220cef76b120af5",
-      "size": 27347
+      "sha256": "8b3e2a61d821ed64fe9c3b5c9791da57d125fdf0c968da7dc2d0dcb24ed49038",
+      "size": 32217
     },
     {
       "git_blob": "8b08ae38ffb51b034c1b76338744c4c905edac4e",
@@ -1695,11 +1974,11 @@
       "size": 6680
     },
     {
-      "git_blob": "0995140895737b704fa2c08ee0c4d5627009102b",
+      "git_blob": "a86849dd04fc4cc506ca312690ef680814dc7ba6",
       "mode": "100644",
       "path": "src/rs9/hosted_smoke.py",
-      "sha256": "c2240f854daaa35fccdc41264537b715562cab646fca2df0da69e93409eb2070",
-      "size": 42884
+      "sha256": "b206dc39483aca618d0def4bced88cfc21352fd058db84aa6f5074ad0f6d535c",
+      "size": 44140
     },
     {
       "git_blob": "59b52f9c7bb9f5543fab4b57984a3f3ac395dd83",
@@ -1737,6 +2016,13 @@
       "size": 5624
     },
     {
+      "git_blob": "426775883a1a9f7856342954b51926c5f5ddb0ed",
+      "mode": "100644",
+      "path": "src/rs9/macho.py",
+      "sha256": "eb3cee946020b8b505e88234122bf0fa22d6add2c96950ef44dda548cf18d710",
+      "size": 2757
+    },
+    {
       "git_blob": "47512b7d90798c4d983dcdaf9769e9289d110b5f",
       "mode": "100644",
       "path": "src/rs9/materialize.py",
@@ -1744,11 +2030,25 @@
       "size": 26985
     },
     {
-      "git_blob": "553179d7f4898388ffd570880de2b8fc0bbb877b",
+      "git_blob": "1fb5fca8ab4c49d741e5e8ea00c2828473267357",
       "mode": "100644",
       "path": "src/rs9/nebular_callers.py",
-      "sha256": "c54c3850dfb9c523eccc46752002b289f964a664d74f092b2144c3525d0ca4a4",
-      "size": 30762
+      "sha256": "c995f6c7a7b0ce079c90733e48e489e409d03a80b9b7a8edf2445bdbeccba782",
+      "size": 32068
+    },
+    {
+      "git_blob": "b6db6edc083a3857b8f10cb764a19bf2cbb6f8d2",
+      "mode": "100644",
+      "path": "src/rs9/nebular_host_state.py",
+      "sha256": "cff7bbfa533c5db567bc355271949de4d4b56ce0cb88aec7567b2ca243b988d2",
+      "size": 14201
+    },
+    {
+      "git_blob": "d95cf97e3e73af54b2a5e909f488f7949813091d",
+      "mode": "100644",
+      "path": "src/rs9/nebular_lineage.py",
+      "sha256": "d0a4d390f244888b2c88c945d841ea836b55bb45c318a378f74a4398f9363958",
+      "size": 18010
     },
     {
       "git_blob": "a1d7f1223ad6f5898535e20cae68b7c75cd816b3",
@@ -1884,11 +2184,11 @@
       "size": 7416
     },
     {
-      "git_blob": "679d4bab08610a4b3146cd6d86fd8f6456891003",
+      "git_blob": "271c8da8650de04694bc2ac119901ef5cc838168",
       "mode": "100644",
       "path": "src/rs9/operator.py",
-      "sha256": "88bd709342eae9de95184ecfbf993834e091751002bc8c9ca593629f183c7a2f",
-      "size": 7907
+      "sha256": "b3399967d09d628c67be4493db6565a44f75acf0cd088e96d99c717725463b57",
+      "size": 8264
     },
     {
       "git_blob": "338b8527045dc2b5115ee0ee653cff0bbd9ebec5",
@@ -1919,11 +2219,11 @@
       "size": 19183
     },
     {
-      "git_blob": "a237ecc048d8aff84dcbc7ad0dc262268495f8f5",
+      "git_blob": "39ff534fe3cbfb0379b8d4b25b75f17ffa03eb9d",
       "mode": "100644",
       "path": "src/rs9/pages_smoke_diagnostic.py",
-      "sha256": "e976801a00cf8b1d3524f523bca0d85e8e243e35b7021444da9115d9b5aac45c",
-      "size": 9580
+      "sha256": "92d93c31769589dbe35f47b561c10d847940a0189aa2961e78f80b0195a7f230",
+      "size": 10186
     },
     {
       "git_blob": "a9b2a4f7187fa214e14be25020cfe790b57ba1b7",
@@ -1940,11 +2240,11 @@
       "size": 8778
     },
     {
-      "git_blob": "a26798d2cd006a3e431997ee60d6eaa0f9df6e19",
+      "git_blob": "7300cee8bdb4f6050607e019ccf746517864ecfe",
       "mode": "100644",
       "path": "src/rs9/profiles.py",
-      "sha256": "5a260df99a986b8bcb3551c43e96817e46115f5e2dca9a83c2e55427b007b4ae",
-      "size": 28300
+      "sha256": "a7f9cd3331e1880d9cc03b164cfc4ed2aa385435e94c0b777ce014e83985ca5f",
+      "size": 29609
     },
     {
       "git_blob": "09ad71377437eed45ab153ed5d8ba3b9d4fcc071",
@@ -1961,6 +2261,13 @@
       "size": 11046
     },
     {
+      "git_blob": "d56a7b30b9f76c7cd76b30c776e96b568f105ed0",
+      "mode": "100644",
+      "path": "src/rs9/pypi_observe.py",
+      "sha256": "6f78d70c7b0aa19d522ba7ded964f7e4b1834bf4525736d5d053d2c50d391054",
+      "size": 42600
+    },
+    {
       "git_blob": "f1ec3abbf7723200362001f3907df9c810eb0a94",
       "mode": "100644",
       "path": "src/rs9/qualification.py",
@@ -1968,11 +2275,11 @@
       "size": 6311
     },
     {
-      "git_blob": "ff4370cb921ee29728e53e5591c8c623ecdae4d9",
+      "git_blob": "df53783f945642cc8d0806318bdb16a595e0c964",
       "mode": "100644",
       "path": "src/rs9/readers.py",
-      "sha256": "d78ad4737dc060087d1f08b77e774902d9ef5cf16b90bd2abbe1fe06fdba9ad4",
-      "size": 47882
+      "sha256": "60aca80732259728d3fb714c5ee2a946e50032169dd12aae170bc5fab11ef165",
+      "size": 57266
     },
     {
       "git_blob": "5f6e1940cab5b6050817e19734ca62cb0a28691c",
@@ -2122,11 +2429,11 @@
       "size": 4608
     },
     {
-      "git_blob": "89a99f6d7b472f8003ccc516b4bdfcb2ced49c65",
+      "git_blob": "6354e146eb39b109e20567cb969b90b4258222b1",
       "mode": "100644",
       "path": "src/rs9/smoke_stream_tokens.py",
-      "sha256": "040598ae3cffc857c71456c61593945c552c8ee45ce3142ab496c41cea3a3676",
-      "size": 10009
+      "sha256": "74a57c5529d2400f19e0100d32d2237606ff4747dddb5f8e678651a4e3686164",
+      "size": 33039
     },
     {
       "git_blob": "48f4e607e4800d37b7949374df4349251251862f",
@@ -2134,6 +2441,125 @@
       "path": "src/rs9/spdx.py",
       "sha256": "7c02de64807fdc57c7828f081430ce745da55d5444581c9fc1333ae6e6d3f054",
       "size": 5116
+    },
+    {
+      "git_blob": "1299d4e700692a2bcf2826d327bb5b1250a53536",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_archive.py",
+      "sha256": "4ef2de36a51ffe93c954807efa342430cbc778df591e622e6c40195bce4535e8",
+      "size": 9879
+    },
+    {
+      "git_blob": "de4f7c30eaded6a75a7b46f6ec3f538a3ba8069d",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_backend.py",
+      "sha256": "51f7faa27c0bc62d1576adfa59e845fbad3fbf2bb783074f75aeb0cfac1143ec",
+      "size": 15448
+    },
+    {
+      "git_blob": "15b7665c75eac3de6f44315e2476933622c77a30",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_closure.py",
+      "sha256": "57052dd91b9f20980f4e4b1b09a3d23212455abc711342a9815ef806d051c3cb",
+      "size": 10824
+    },
+    {
+      "git_blob": "c95e98d2d781de158248c692a8691951c1dc0ffe",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_consumer.py",
+      "sha256": "8a49d7d59cb7afcbd882ff3269db2ffec6b2afe6db59be7b865654cd0a58b410",
+      "size": 9872
+    },
+    {
+      "git_blob": "70c7762785e1deabcefd235de88a9bc8f2b3b7b1",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_hosted.py",
+      "sha256": "d04cf07d8cd1ef5b3aaddbcd80dee6b8f1e10f3c5c49e98f4e31e6f16b9a7fda",
+      "size": 12306
+    },
+    {
+      "git_blob": "2fe7aa703f43b48dce11f517281b72a6db9ec21e",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_intake.py",
+      "sha256": "b57a5ae416f49d69b2dfb3a7d2be46a99c1eb204ffd0c2ee4d1ad7f29d19f759",
+      "size": 2588
+    },
+    {
+      "git_blob": "07162fea6554a5b1e16306b7d13c128d496a8601",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_launcher.py",
+      "sha256": "d9c03f819838884b69ee7944f5baf12e8266316edf4cb58e8e0e73d44def73fe",
+      "size": 2838
+    },
+    {
+      "git_blob": "ad65d584a9a1e18a04b1b3a14edb91184127beac",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_model.py",
+      "sha256": "f34802554aeb97df899469fd1f7b5325f383409436c2a548e5d669cb7d5ed6f4",
+      "size": 6873
+    },
+    {
+      "git_blob": "29f9aa54ab5d2e445dab1654dea742b030c5ad99",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_native.py",
+      "sha256": "d4010c0181ad899e6aa2ef2965e6b29e7786c8722a81d26864c71e6d61fd55ec",
+      "size": 30720
+    },
+    {
+      "git_blob": "1b0fafb2a1ca96fe1b8d1551ca950d9a001817f4",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_nebular.py",
+      "sha256": "e07133e1ac5d054d22f8325b327c6853e9f6d79c20f433924b7074b26aef3b0b",
+      "size": 114054
+    },
+    {
+      "git_blob": "b8d272e4ea911490b0fe4e7716c571b1fe5c570b",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_nebular_successor.py",
+      "sha256": "800a3fabdd028f8d852dd59a94410e8219fb85be54a8622757c0e76347344705",
+      "size": 44305
+    },
+    {
+      "git_blob": "b6b4382c89291266f6f0464a6359de0e8aabf684",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_platform.py",
+      "sha256": "b08755fa4b0e849a68bb4893b6a0c7819547f9816f18c788f33e76e041d3e3ec",
+      "size": 1956
+    },
+    {
+      "git_blob": "ceec9238fc83858ae597d2c95f15c2e549c3bf8c",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_probes.py",
+      "sha256": "23c7c0f5517101696fd56e1b143a349acea3bf1d2bf0b35d563ff4a5a0f936d0",
+      "size": 6090
+    },
+    {
+      "git_blob": "c9ce7d3cb27a878c4c2f4d1b4f16df3441da2095",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_publish.py",
+      "sha256": "f0bb441e09783d3d42fb4949c3ffbc398a14de70bf1b76f417550e9072b43b9b",
+      "size": 20160
+    },
+    {
+      "git_blob": "93792a227f4914378283730281ff4228aff63def",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_remote.py",
+      "sha256": "b8dba9740698238b1072978c2b80dbda9bbc88dc1a3352c51c267a56fd5dbaf4",
+      "size": 15237
+    },
+    {
+      "git_blob": "664f641819dfa67ea8f69092ec3a32d64caf38b8",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_verify.py",
+      "sha256": "f6e92c56afdf4acad74e7873037b593f7e2c5f0997537b8f8bc50e9d6285e01d",
+      "size": 9475
+    },
+    {
+      "git_blob": "d072a42f94fb66a3f529d78f1a881e365fc72014",
+      "mode": "100644",
+      "path": "src/rs9/tf_pypi_workflow.py",
+      "sha256": "4f2a546f9329bf5a2b822dca8cfb6e3e4dbead8011f3045b0a45bc114ff47ed6",
+      "size": 3769
     },
     {
       "git_blob": "e32302a58874d80f90ee571065b88eab8a71e9f3",
@@ -2164,11 +2590,18 @@
       "size": 14868
     },
     {
-      "git_blob": "57fdcb1936a720a6c1795c8985aedb4932597367",
+      "git_blob": "cadc058870e24966b887a1ef4d6165a488ed593d",
       "mode": "100644",
       "path": "src/rs9/wheel_native.py",
-      "sha256": "0254d8514c504f6cab5958a9e8945c1f07b4189d574e956ca7d1d64766a59138",
-      "size": 28306
+      "sha256": "665e11f05006d485358be876ac23064e8294d8d276c819befe89a896eb56c164",
+      "size": 29636
+    },
+    {
+      "git_blob": "93cc844c95bd9731a84f3093416ef2a39f5df394",
+      "mode": "100644",
+      "path": "src/rs9/wheel_nebular_successor.py",
+      "sha256": "75767fbc4e01dc3a026f21ef121232e349b39bbca8649b3d7d2c5256059d3195",
+      "size": 36007
     },
     {
       "git_blob": "1439d2938ab93fa909a07383e3d72c78ceaf2a82",
@@ -2183,6 +2616,13 @@
       "path": "tests/elf_builder.py",
       "sha256": "26c865f721d5fc1fcd78ceecdb01921d7dee500acb1783bb4eec3a23b4fe703f",
       "size": 16314
+    },
+    {
+      "git_blob": "32eba84956f45a5c506bb1bfef47bbdc57c8dceb",
+      "mode": "100644",
+      "path": "tests/fixtures/historical-binary-evidence.json",
+      "sha256": "1afadbb56f369d42d3b1cb17b18c1ddaf97d6ea84120df384a52a64cab22ce80",
+      "size": 893
     },
     {
       "git_blob": "9e1664b290dafaa377161e275b7f7d2116e65596",
@@ -2703,11 +3143,25 @@
       "size": 23637
     },
     {
-      "git_blob": "d66ca3b7fc681ebfb794e932eb01a715bce2ba83",
+      "git_blob": "960ff91320b2a0a828188ea45c0f33377584d9a4",
+      "mode": "100644",
+      "path": "tests/test_apgr7_pypi_deploy.py",
+      "sha256": "268aa2e0bf856292c356ee7d2a05941b5991e7f2ee751ab288339ec339b52cbd",
+      "size": 4717
+    },
+    {
+      "git_blob": "ec88600edf77be0976453ec4dc4eae58debbb204",
+      "mode": "100644",
+      "path": "tests/test_apgr7_pypi_profiles.py",
+      "sha256": "179aebfb22bd7596064305297eaf375c8cd48702412a2fc1d2b337dc7d847150",
+      "size": 20349
+    },
+    {
+      "git_blob": "7d604ed097245bb6fccb5e66e6fc04f01c88af09",
       "mode": "100644",
       "path": "tests/test_application_smoke_diagnostic.py",
-      "sha256": "e018128ebf2e2777a0484254c58cabcf3a9538089d4e70fa50c5d8820743186c",
-      "size": 41960
+      "sha256": "d3e353417b98516ac4a51e1e7bc9427ace47951b29d4e59245d3ea7df54470a2",
+      "size": 51353
     },
     {
       "git_blob": "83db166e8c52d7e5cc959e305b16270c2877550c",
@@ -2729,6 +3183,13 @@
       "path": "tests/test_archives.py",
       "sha256": "7a985bd54d60b4f97c91a5726e98d3a752a669972d43db138426ca9fe1276445",
       "size": 3201
+    },
+    {
+      "git_blob": "0eab865277626f4abf0fcc2f6d0881bbda58092b",
+      "mode": "100644",
+      "path": "tests/test_author_aligned_bootstrap.py",
+      "sha256": "05069a35019b161844e83b8275d05a49ac5c6fabf32c8de52d1629d894d72d8e",
+      "size": 3416
     },
     {
       "git_blob": "a208fe2fe8f5350fc8bf9788c0545c74aa290058",
@@ -2766,11 +3227,11 @@
       "size": 33667
     },
     {
-      "git_blob": "537e3b4b9443004547a8ed5573867b12b9912360",
+      "git_blob": "4067c1a8d1bbffcf688ae57a365a49d7ad6270e6",
       "mode": "100644",
       "path": "tests/test_candidate_adoption.py",
-      "sha256": "c3e89852807ff2da6c9ec2a25c9cdb7f13f6f15e9b0fcebbf2e36321fc16fb5c",
-      "size": 14032
+      "sha256": "5adee5858e729373a4a5865184cd8bc5318845507e1030d1d32109201b4a73e9",
+      "size": 26718
     },
     {
       "git_blob": "e4565eaa528c8616b6094d09645095f9ea0ed1c5",
@@ -2822,11 +3283,11 @@
       "size": 8271
     },
     {
-      "git_blob": "9c56adead6cca99e5ca3cda3f05600980a554a49",
+      "git_blob": "c00875bd94b6b30f883d1e3790eb5b8a14dd2e90",
       "mode": "100644",
       "path": "tests/test_collect_candidate.py",
-      "sha256": "473876790abff529dde7e407654b1524560283bb00f97c69d159fbe291d30b49",
-      "size": 33184
+      "sha256": "ae519cf7f33e04b3453b053e45cc244c45dec358aeaa8a1c725dcaf9806a485a",
+      "size": 33775
     },
     {
       "git_blob": "f3520b196558944906e06b367742ba578dcf664e",
@@ -2983,11 +3444,11 @@
       "size": 10923
     },
     {
-      "git_blob": "3723ef0d1638a952ad92f7d3db192dbcdc5af921",
+      "git_blob": "d5d4b441f53ea03949d258ab34e20657dd4d569c",
       "mode": "100644",
       "path": "tests/test_hosted_deb.py",
-      "sha256": "51e93c3624a844ff3ebfebf6a52dd3f1e5f10509a82a2ab0fee14f46701eb15d",
-      "size": 126552
+      "sha256": "a9590eb4f63dd36c5fba612af250f1955701c9263e2570e532aabf7f61ad7d0c",
+      "size": 127427
     },
     {
       "git_blob": "4ad7de82bc0ee6d05a614bad3ed8c718bc11ea98",
@@ -3025,11 +3486,11 @@
       "size": 19938
     },
     {
-      "git_blob": "233858610ac55bb2a5dfb563a8884049f343bd2d",
+      "git_blob": "591e77810dcc01418f6bca393c2c77539a6d5a89",
       "mode": "100644",
       "path": "tests/test_hosted_observe.py",
-      "sha256": "ab93da27d3af7a08efc390e53fadac2db3342066e48a10506591a78938dffa95",
-      "size": 70918
+      "sha256": "d90bef131c478620295860b4ac2a1bd3f08ab3004057400c1e0823c0d95d128b",
+      "size": 92649
     },
     {
       "git_blob": "1c3f6b9a2d78d5b99706a042013258af6a2c54ca",
@@ -3088,11 +3549,11 @@
       "size": 26768
     },
     {
-      "git_blob": "0d914fcb73b612e2f498971d3d3efcc93087d60d",
+      "git_blob": "2bb397e9d76fbe8f1f7c0c05e8efd9ab4f8d09e5",
       "mode": "100644",
       "path": "tests/test_hygiene.py",
-      "sha256": "285c90343625d0697692edf4c314f7394be279b8812daaf394804a4c5dbd2096",
-      "size": 2775
+      "sha256": "24d49d9b2ee3dd62f6a4f8be7ff572e1cc2b8a6912c55aebdcd2ebfab60623b0",
+      "size": 12275
     },
     {
       "git_blob": "7013a8775aba7c4e4fa9a2de320dbe4011144eee",
@@ -3102,11 +3563,11 @@
       "size": 8942
     },
     {
-      "git_blob": "032667d19a0e7f90ad10f8026eaecd002c02e0db",
+      "git_blob": "35244789183e5b44b00b65b25398eeb7215288f5",
       "mode": "100644",
       "path": "tests/test_live1_closeout.py",
-      "sha256": "c08e3d5c71c7d88a38541e5bd31400224e2a0bbe909dbf438784e3c6a617da3d",
-      "size": 7978
+      "sha256": "3d4e8648aad78f9fff1ec33e8b80d75e4cef7a0e95d9d15405caf92a2659bd2d",
+      "size": 7947
     },
     {
       "git_blob": "5632ff21526b0eec25d94a4e585aacf8208af7cd",
@@ -3144,11 +3605,18 @@
       "size": 40008
     },
     {
-      "git_blob": "5ea3fc89d85769f25968cc053d7896053e003b43",
+      "git_blob": "cb4d75b15788158067898e823d771b01d2b7621c",
       "mode": "100644",
       "path": "tests/test_nebular_callers.py",
-      "sha256": "151b5d48fb06f3899a60ed8fef90ee463988c47718e3fa93f7f7256d6efd00ea",
-      "size": 10184
+      "sha256": "72fcae6231d2dbdf6d6a1a085354759618cea3b410299f774cbcc41a8383724d",
+      "size": 13593
+    },
+    {
+      "git_blob": "6ac26fc97077ccccbf51e900f6529681a7ff5e45",
+      "mode": "100644",
+      "path": "tests/test_nebular_host_state.py",
+      "sha256": "3a6013babd606afc205d2038268a192c32ecb6fc3746811b3424f3f7706ad8b9",
+      "size": 8318
     },
     {
       "git_blob": "987a34db82d54ba8a9bd9e6a838b055cc0513a11",
@@ -3156,6 +3624,13 @@
       "path": "tests/test_nebular_legal_boundary.py",
       "sha256": "b15839f1c299bde5141b31502591820b491061c83534b6e500589ef1c5c2f487",
       "size": 29205
+    },
+    {
+      "git_blob": "a53503b69dd0d074a7f6318810bba34b437c0baa",
+      "mode": "100644",
+      "path": "tests/test_nebular_lineage.py",
+      "sha256": "009f2703191a65e297d0dc182823b28a9201a0d30ea589568e3519a875139575",
+      "size": 27227
     },
     {
       "git_blob": "5b2cbb4ea5923638796e3b823b0acefe4794558b",
@@ -3340,11 +3815,11 @@
       "size": 17421
     },
     {
-      "git_blob": "7ba1eebe387a77173786f49f2c625803cd271a5e",
+      "git_blob": "4e3783df96ea58728f78b477ea29305493b52b33",
       "mode": "100644",
       "path": "tests/test_pages_smoke_diagnostic.py",
-      "sha256": "6800e72227718ec20aa709c6f9f4738fffa4d77d840f5b507c5b7fd6f54af3ca",
-      "size": 28854
+      "sha256": "b27fbc1beb5b9984daeac3a738e8b5845d35db5155a7d36f39a0e9b83506e6dd",
+      "size": 33238
     },
     {
       "git_blob": "c9cc52efeb57112d25df5e96a2b15b71e3ffc7a7",
@@ -3382,6 +3857,13 @@
       "size": 10557
     },
     {
+      "git_blob": "7a9159d46299efd88156f92ffdcc041915148596",
+      "mode": "100644",
+      "path": "tests/test_pypi_observe.py",
+      "sha256": "fd1e91669f4ebf9868381ce22dd5a8af0c98464830d63b0123ca3b13e1f03d0e",
+      "size": 51751
+    },
+    {
       "git_blob": "adb19682ae7caa505779e9341a21153bf6133b5a",
       "mode": "100644",
       "path": "tests/test_qualification_trust.py",
@@ -3389,11 +3871,11 @@
       "size": 8104
     },
     {
-      "git_blob": "e4dec266c456d7845aab1953ce31f1697f72a391",
+      "git_blob": "61702861b329c9a982251cfc72e39ed11acdc149",
       "mode": "100644",
       "path": "tests/test_readers.py",
-      "sha256": "a3e1381f080d5451272cd4dc862e5bf6c3094a7e3e3a6642eaba2075c4dbe39f",
-      "size": 9857
+      "sha256": "5edb10005a229a86e86a431cb0968e59d7917679d7e9fceaa43f90227dc088f1",
+      "size": 38800
     },
     {
       "git_blob": "47aec6c468cbe5c0bb284b6b609c4d98aa160ebc",
@@ -3697,11 +4179,11 @@
       "size": 15951
     },
     {
-      "git_blob": "4af8cec1e105836348b8eb7ad82bd96ceda8d353",
+      "git_blob": "2138eb9312969461542a5b3c902d80cee47a7010",
       "mode": "100644",
       "path": "tests/test_sidecar_harness_closure.py",
-      "sha256": "acb90920e6c5e2f831df3e619436a3983b942a1aecefa8f2e1dee800d84844e4",
-      "size": 8591
+      "sha256": "80ca8742c589ceb37f6d39ead1569c19773d5dec92381c9a752b6095a19192a0",
+      "size": 12959
     },
     {
       "git_blob": "da9d97ff5e6d573607db6db95e6f5a95b0627c3e",
@@ -3718,11 +4200,123 @@
       "size": 8508
     },
     {
-      "git_blob": "1ac2d5c76328f0edaf1b4164c2b4238daabd8055",
+      "git_blob": "bbc8237c49e7f9278dc072d2c4991d299a97b710",
       "mode": "100644",
       "path": "tests/test_smoke_stream_tokens.py",
-      "sha256": "9603e236919b1611728607267b8a2a58056a972ab239c50b6f232c878d36a8da",
-      "size": 8139
+      "sha256": "3aa66dd8289527939ca03726bac8092119a05034747d06a7ff0fd890555c2c22",
+      "size": 32548
+    },
+    {
+      "git_blob": "5bbca60b0f646a64b4ba6ed7b338c0115de2e727",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_archive.py",
+      "sha256": "151b050e9a4dcfb3ce095b0ac9c5d8e4e0e9d6f1b4d0aa8be712922bb83128ac",
+      "size": 30932
+    },
+    {
+      "git_blob": "c8c3486682cf9fa2b084b7664e8e16ac91a5852b",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_backend.py",
+      "sha256": "6bda7654ff24197d2fc0afb6dba593bca6fe52fb17f8a0ee2980ff66f70767fe",
+      "size": 26637
+    },
+    {
+      "git_blob": "6ec2e416d5a5384a9754d0265c3f8f1465c62b12",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_closure.py",
+      "sha256": "5d7f1e0257c06d6a06cd9b412bff0770dd677a5cd0bea71cae0a8d80f3f0ddcd",
+      "size": 25291
+    },
+    {
+      "git_blob": "617df62d88d74feee9206b551ccb666e70b654e8",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_custody.py",
+      "sha256": "55c003b0bc932835d6d65d2489be99cd7cb8c217a00ddfa50c59593c2dbd58a9",
+      "size": 2527
+    },
+    {
+      "git_blob": "c1b506303ca41c8ceb52251e805449a0dc1ef59d",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_hosted.py",
+      "sha256": "2800af2b5f2111cfae1dfcc16c1bee1eec3c6c5ddf1107569e1c5113b8377a76",
+      "size": 26067
+    },
+    {
+      "git_blob": "91d3b2fb70cda5ff6ab368766b966b91c94bb2a0",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_intake.py",
+      "sha256": "6b870bd388909e82d671830b687cd7609afae99d6d2db8f62038ded5365b4d3a",
+      "size": 2726
+    },
+    {
+      "git_blob": "13f01aaea49b9b6cda9490d5245e00d8e72d980d",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_launcher.py",
+      "sha256": "3b676a8506767fc550f4f18e57fe5c4a3c7b5ec976d8c31d918689c901a60667",
+      "size": 4294
+    },
+    {
+      "git_blob": "d1b0bf202224ce96ac802331050e81bde8565905",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_live.py",
+      "sha256": "90654cca5b2cbd01fe488f54823724a7f0293aa9d89e53871be916aa647a92d0",
+      "size": 5998
+    },
+    {
+      "git_blob": "bd851896a4d9c11a39bae763d0896f5116fc26eb",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_model.py",
+      "sha256": "aef4194cd8dce7f32e96c87442a58c5140155c5d78b7009b83dc9070b6a256ad",
+      "size": 9822
+    },
+    {
+      "git_blob": "7edbf5153617325c1a03c7bab744ecab75edd4d1",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_native.py",
+      "sha256": "4da7ccc4e3ac7c7a49e9dfbf45155eea68ee839e6130c6e25227be0119d9cf8a",
+      "size": 22236
+    },
+    {
+      "git_blob": "8bcb98adeda33ffbbe3d6e9f8b07407212ed8c85",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_nebular.py",
+      "sha256": "d49d9691be24d3993c53642dc2f38d1a4f93244d6c93dce060e8d3e293699405",
+      "size": 151014
+    },
+    {
+      "git_blob": "4a1ba6cbb229c6699bfd6bb541f18847d35e6ce7",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_nebular_successor.py",
+      "sha256": "4387b8b5ac7999a19ca82a3503fa6443a56bf98feae810f0e0f3ff80e7d4b705",
+      "size": 23449
+    },
+    {
+      "git_blob": "ca3f830708c13ee1cbfba63bc6c6bf74835d9b71",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_platform.py",
+      "sha256": "f5c33c0ee1429514b6ba2fd5326c8b1fa4a10de546578aa7644aab08e37b87e3",
+      "size": 11711
+    },
+    {
+      "git_blob": "2f2c01bfc42365e92bac61a5ff7d6d8bd1dd8638",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_publish.py",
+      "sha256": "ed15f62455b29da6cddd9a245260bd526ee92d9377f294d4edde6c93c7396843",
+      "size": 64243
+    },
+    {
+      "git_blob": "a86fcfdda8103b8db2654fe3e4b4b9b74e468054",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_remote.py",
+      "sha256": "c70df0c9a76db426114a28520c23859b420ebd422c46c612ba7896f921568501",
+      "size": 32292
+    },
+    {
+      "git_blob": "2950a60bff7be1ebc8aa2676ba1ddca01c48cdec",
+      "mode": "100644",
+      "path": "tests/test_tf_pypi_workflow.py",
+      "sha256": "8de47cfa67d109128e48040bb236f1dcf6bfcd001b3e3199adf702c59245d02a",
+      "size": 7665
     },
     {
       "git_blob": "9712afa6ec48bad7d6ba212859c877b0749931c9",
@@ -3753,11 +4347,18 @@
       "size": 23188
     },
     {
-      "git_blob": "5e128e22e894b5cd0beb524ab629098e27cfe4b1",
+      "git_blob": "86a68fe16594f814f1de76e111e846728fb2010f",
       "mode": "100644",
       "path": "tests/test_wheel_native.py",
-      "sha256": "0d48a3edf20ee7acc264bdc4483b42d248d763eaf13a3bffcb45493de7cbf4ef",
-      "size": 25034
+      "sha256": "4b75083fd6de8c7b5f2c9e02ebb709e3f4a7c33184f1015e075721f16d9df79b",
+      "size": 32218
+    },
+    {
+      "git_blob": "205346011ed76f5dd452785c7ef812a6b49820ab",
+      "mode": "100644",
+      "path": "tests/test_wheel_nebular_successor.py",
+      "sha256": "c7507cd6f5fe8af4dd98eff69f34990e7b32a2a70cc8a22dfd182b8e0c6ea95a",
+      "size": 23578
     },
     {
       "git_blob": "f21921fe6d1a57240fbc010188be37b266737f90",
@@ -3765,12 +4366,19 @@
       "path": "tests/test_workflow_static.py",
       "sha256": "0fbf52797e9b21272755fee55a2547df695f91a532b345db5ddd899713e574a5",
       "size": 12324
+    },
+    {
+      "git_blob": "e9f95ca58d5d90f281a02fd1f8c34ca08f7f55b0",
+      "mode": "100644",
+      "path": "tests/tf_pypi_fixtures.py",
+      "sha256": "4efb271f2d50f2f8aab57b2b8d61da61c50c862a3cc746df80d89386d44ba2d9",
+      "size": 2265
     }
   ],
   "inventory_scope": "complete product source excluding this manifest and preserved unrelated local state",
   "kind": "non-production-hosted-source-candidate",
-  "parent": "0f76dbb3a7b6f0a194b440d03c9044589a603d56",
-  "phase_outcome": "diagnostic-only-original-failures-retained-native-causes-unresolved",
+  "parent": "261ee29d0fe6772f2aa1d07640cb6f47dcf140dc",
+  "phase_outcome": "source-only-observer-correction-original-native-and-pages-failures-retained",
   "production_enabled": false,
   "production_ready": false,
   "publication_authority": false,
@@ -3799,8 +4407,8 @@
     "schema": "rs9.live1-candidate-readiness.v1alpha1",
     "source_adoption_scope": "partial-diagnostic"
   },
-  "review_status": "reviewed-with-advisory-findings-terminal-amendments-not-re-reviewed",
+  "review_status": "current-source-independent-review-and-parent-acceptance-required",
   "schema": "rs9.live1-source-candidate-inventory.v1alpha2",
-  "task": "CONT22 original APT smoke and fail-closed PRoot runtime diagnostics",
+  "task": "RS9 PyPI observer forward-source candidate",
   "terminal_disposition": "amend"
 }
