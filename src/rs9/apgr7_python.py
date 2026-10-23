@@ -81,8 +81,9 @@ def assess_sdist_fallback(
     wheel_tags = [a["tag"] for a in artifacts if a.get("kind") == "wheel" and a.get("tag")]
     excluded_names = [e["name"] for e in excluded]
     has_sdist = any(a.get("kind") == "sdist" or a.get("name", "").endswith((".tar.gz", ".tgz")) for a in artifacts)
+    excluded_note = " (including excluded macOS arm64)" if excluded_names else ""
     consequences = [
-        "Clients on platforms without pre-compiled wheels (including excluded macOS arm64) fall back to sdist installation",
+        f"Clients on platforms without pre-compiled wheels{excluded_note} fall back to sdist installation",
         "Sdist installation has not been executed on macOS; build backend requirements and failure mode remain unqualified",
         "Runtime Python compatibility requires Requires-Python to include target runtimes such as Python 3.12",
         "Other distribution routes require their own independent publication and native installation readbacks",
@@ -241,14 +242,24 @@ def _wheel_native(zf, namelist, expected_tag):
         parse_elf_native(bin_data, "x86_64")
     elif "manylinux_2_17_aarch64" in expected_tag:
         parse_elf_native(bin_data, "aarch64")
-    elif "macosx_11_0_arm64" in expected_tag:
+    elif expected_tag in {"py3-none-macosx_11_0_arm64", "py3-none-macosx_12_0_arm64"}:
         macho_info = parse_macho_arm64(bin_data)
         major, minor = macho_info["deployment_minimum"]
-        # macosx_11_0 advertises a minimum of macOS 11.0, not 12.0.
-        if (major, minor) > (11, 0):
+        deployment_minimum = (major, minor)
+        if expected_tag == "py3-none-macosx_11_0_arm64":
+            # Preserve the historical v0.13.0 contract: the 11.0 wheel may
+            # target an earlier Darwin minimum, but never a newer one.
+            if deployment_minimum > (11, 0):
+                raise ContractError(
+                    "APGR7_PYTHON_MACHO",
+                    f"Mach-O deployment minimum {deployment_minimum} exceeds macOS 11.0 wheel ceiling",
+                )
+        elif deployment_minimum != (12, 0):
+            # The v0.13.1 Darwin artifact is deliberately exact: its wheel
+            # floor and native deployment minimum must both be macOS 12.0.
             raise ContractError(
                 "APGR7_PYTHON_MACHO",
-                f"Mach-O deployment minimum ({major}, {minor}) exceeds supported macOS arm64 ceiling",
+                f"Mach-O deployment minimum {deployment_minimum} does not equal macOS 12.0 wheel floor",
             )
 
 
@@ -274,7 +285,18 @@ def verify_wheel(
     expected_tag = "-".join(parts[-3:])
     if normalize_project_name(dist_name) != normalize_project_name(expected_project) or dist_ver != expected_version:
         raise ContractError("APGR7_PYTHON_IDENTITY", "Wheel filename identity differs")
-    if expected_tag not in {"py3-none-manylinux_2_17_x86_64", "py3-none-manylinux_2_17_aarch64", "py3-none-macosx_11_0_arm64"}:
+    versioned_tags = {
+        "0.13.0": "py3-none-macosx_11_0_arm64",
+        "0.13.1": "py3-none-macosx_12_0_arm64",
+    }
+    allowed_tags = {
+        "py3-none-manylinux_2_17_x86_64",
+        "py3-none-manylinux_2_17_aarch64",
+    }
+    darwin_tag = versioned_tags.get(expected_version)
+    if darwin_tag:
+        allowed_tags.add(darwin_tag)
+    if expected_tag not in allowed_tags:
         raise ContractError("APGR7_PYTHON_METADATA", "Unselected wheel platform")
 
     with zipfile.ZipFile(io.BytesIO(body), "r") as zf:

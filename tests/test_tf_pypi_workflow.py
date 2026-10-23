@@ -32,8 +32,10 @@ class WorkflowTests(unittest.TestCase):
             pin = load_pin(product)
             self.assertEqual((workflows / pin["workflow"]).exists(), pin["source_status"] == "READY")
         self.assertEqual((workflows / "rs9-tfnf-pypi-publish.yml").read_text(), nebular_workflow_text())
+        # APGR v0.13.1 intentionally adds an explicit release-version input;
+        # this guard pins that reviewed workflow revision.
         self.assertEqual(hashlib.sha256((workflows / "rs9-pypi-publish.yml").read_bytes()).hexdigest(),
-                         "d248edcab45a912f76ca04289d46a4fdd8de91f53d86780a6f2539a667004e3a")
+                         "d2a32395721beafc8b9999db7bbb57a5bfb30e7737af2cb0b2b46ef5dd1f5447")
 
     def test_registered_first_wave_workflows_are_byte_identical_to_generator(self):
         workflows = ROOT / ".github/workflows"
