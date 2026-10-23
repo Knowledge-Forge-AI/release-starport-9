@@ -8,34 +8,96 @@ from typing import Any
 from urllib.parse import quote
 
 from rs9.apgr7_common import PROFILES, result, stop
-from rs9.apgr7_python import assess_sdist_fallback, check_requires_python, normalize_project_name, verify_artifact
+from rs9.apgr7_python import (
+    assess_sdist_fallback,
+    check_requires_python,
+    normalize_project_name,
+    verify_artifact,
+)
 from rs9.errors import ContractError
 from rs9.scratch import canonical
 
 WORKFLOW_NAME = "rs9-pypi-publish.yml"
 REPOSITORY = "Knowledge-Forge-AI/release-starport-9"
-EXPECTED_ARTIFACT_COUNT = 3
+DEFAULT_VERSION = "0.13.0"
+SUPPORTED_VERSIONS = ("0.13.0", "0.13.1")
+PROJECT_NAME = "agentic-praxis-grimoire"
+
+# The historical profile is deliberately kept byte-for-byte compatible with
+# the original manifest.  The v0.13.1 manifest is a separate, future input;
+# it must be created from read-back release bytes before this profile can run.
+PYPI_PROFILES = {
+    "0.13.0": {
+        "manifest": "operators/apgr-publication/pypi-artifacts.json",
+        "release_tag": "v0.13.0",
+        "artifact_names": (
+            "agentic_praxis_grimoire-0.13.0-py3-none-manylinux_2_17_aarch64.whl",
+            "agentic_praxis_grimoire-0.13.0-py3-none-manylinux_2_17_x86_64.whl",
+            "agentic_praxis_grimoire-0.13.0.tar.gz",
+        ),
+        "excluded": ((
+            "agentic_praxis_grimoire-0.13.0-py3-none-macosx_11_0_arm64.whl",
+            "APGR7_PYTHON_MACHO",
+        ),),
+    },
+    "0.13.1": {
+        "manifest": "operators/apgr-publication/pypi-artifacts-v0.13.1.json",
+        "release_tag": "v0.13.1",
+        "artifact_names": (
+            "agentic_praxis_grimoire-0.13.1-py3-none-macosx_12_0_arm64.whl",
+            "agentic_praxis_grimoire-0.13.1-py3-none-manylinux_2_17_aarch64.whl",
+            "agentic_praxis_grimoire-0.13.1-py3-none-manylinux_2_17_x86_64.whl",
+            "agentic_praxis_grimoire-0.13.1.tar.gz",
+        ),
+        "excluded": (),
+    },
+}
 
 
-def verify(binding: Any) -> list[dict[str, Any]]:
-    """Verify approved 3 APGR release artifacts and verify macos wheel exclusion defect."""
+def profile_for_version(version: str = DEFAULT_VERSION) -> dict[str, Any]:
+    if not isinstance(version, str) or version not in PYPI_PROFILES:
+        raise ContractError("APGR7_PYPI_VERSION", "Only APGR versions 0.13.0 and 0.13.1 are supported")
+    return PYPI_PROFILES[version]
+
+
+def resolve_version(binding: Any | None = None, version: str | None = None) -> str:
+    declared = None
+    if binding is not None:
+        sidecar = getattr(binding, "sidecar", {})
+        declared = sidecar.get("pypi", {}).get("version")
+    selected = version if version is not None else (declared or DEFAULT_VERSION)
+    profile_for_version(selected)
+    if declared is not None and declared != selected:
+        raise ContractError("APGR7_PYPI_VERSION", "Sidecar and selected APGR release versions differ")
+    return selected
+
+
+def manifest_path(version: str = DEFAULT_VERSION) -> str:
+    return profile_for_version(version)["manifest"]
+
+
+def verify(binding: Any, version: str | None = None) -> list[dict[str, Any]]:
+    """Verify the selected closed APGR release profile and its exact bytes."""
+    version = resolve_version(binding, version)
+    profile = profile_for_version(version)
     pypi_conf = binding.sidecar.get("pypi", {})
     project = pypi_conf.get("project")
-    if not project or normalize_project_name(project) != "agentic-praxis-grimoire":
+    if not project or normalize_project_name(project) != PROJECT_NAME:
         raise ContractError("APGR7_PYPI_CONFIG", "PyPI project must be agentic-praxis-grimoire")
 
     artifacts = pypi_conf.get("artifacts", [])
-    if len(artifacts) != EXPECTED_ARTIFACT_COUNT:
+    expected_names = set(profile["artifact_names"])
+    if len(artifacts) != len(expected_names) or {a.get("name") for a in artifacts} != expected_names:
         raise ContractError(
             "APGR7_PYPI_SCOPE",
-            f"Expected exactly {EXPECTED_ARTIFACT_COUNT} PyPI release artifacts, got {len(artifacts)}",
+            f"Expected the exact {version} PyPI artifact set, got {len(artifacts)}",
         )
 
     excluded = pypi_conf.get("excluded", [])
-    if len(excluded) != 1:
+    if len(excluded) != len(profile["excluded"]):
         raise ContractError(
             "APGR7_PYPI_CONFIG",
-            f"Expected exactly 1 excluded PyPI artifact, got {len(excluded)}",
+            f"Expected the exact {version} exclusion set, got {len(excluded)}",
         )
 
     license_conf = binding.sidecar.get("license", {})
@@ -66,7 +128,7 @@ def verify(binding: Any) -> list[dict[str, Any]]:
             )
 
         try:
-            info = verify_artifact(name, body, expected_project=project, expected_version="0.13.0",
+            info = verify_artifact(name, body, expected_project=project, expected_version=version,
                                    expected_license=license_expr)
         except ContractError as error:
             raise error.with_details(asset=name) from None
@@ -80,58 +142,73 @@ def verify(binding: Any) -> list[dict[str, Any]]:
             "python_compatibility": {"3." + str(minor): check_requires_python(info["metadata"].get("Requires-Python", ""), (3, minor)) for minor in (12, 13, 14)},
         })
 
-    # Verify excluded defective macos wheel and verify its defect remains APGR7_PYTHON_MACHO
-    excl = excluded[0]
-    excl_name = excl.get("name")
-    if excl_name != "agentic_praxis_grimoire-0.13.0-py3-none-macosx_11_0_arm64.whl":
-        raise ContractError("APGR7_PYPI_CONFIG", f"Unexpected excluded artifact: {excl_name}")
-    if excl.get("reason") != "APGR7_PYTHON_MACHO":
-        raise ContractError("APGR7_PYPI_CONFIG", f"Excluded reason must be APGR7_PYTHON_MACHO, got {excl.get('reason')}")
+    # The v0.13.0 exclusion remains a historical, byte-bound defect record.
+    # v0.13.1 has no exclusion because its corrected Darwin wheel is uploadable.
+    if profile["excluded"]:
+        excl = excluded[0]
+        excl_name = excl.get("name")
+        expected_excl_name, expected_reason = profile["excluded"][0]
+        if excl_name != expected_excl_name:
+            raise ContractError("APGR7_PYPI_CONFIG", f"Unexpected excluded artifact: {excl_name}")
+        if excl.get("reason") != expected_reason:
+            raise ContractError("APGR7_PYPI_CONFIG", f"Excluded reason must be {expected_reason}, got {excl.get('reason')}")
 
-    excl_body = binding.asset(excl_name)
-    if len(excl_body) != excl.get("size"):
-        raise ContractError("APGR7_PYPI_SIZE", f"Excluded asset {excl_name} size mismatch")
-    if hashlib.sha256(excl_body).hexdigest() != excl.get("sha256"):
-        raise ContractError("APGR7_PYPI_DIGEST", f"Excluded asset {excl_name} SHA256 mismatch")
+        excl_body = binding.asset(excl_name)
+        if len(excl_body) != excl.get("size"):
+            raise ContractError("APGR7_PYPI_SIZE", f"Excluded asset {excl_name} size mismatch")
+        if hashlib.sha256(excl_body).hexdigest() != excl.get("sha256"):
+            raise ContractError("APGR7_PYPI_DIGEST", f"Excluded asset {excl_name} SHA256 mismatch")
 
-    try:
-        verify_artifact(excl_name, excl_body, expected_project=project, expected_version="0.13.0",
-                        expected_license=license_expr)
-        raise ContractError("APGR7_PYPI_EXCLUSION", "Excluded defective artifact unexpectedly passed verification")
-    except ContractError as err:
-        if err.code != "APGR7_PYTHON_MACHO":
-            raise ContractError("APGR7_PYPI_EXCLUSION", f"Excluded artifact failed with {err.code}, expected APGR7_PYTHON_MACHO")
+        try:
+            verify_artifact(excl_name, excl_body, expected_project=project, expected_version=version,
+                            expected_license=license_expr)
+            raise ContractError("APGR7_PYPI_EXCLUSION", "Excluded defective artifact unexpectedly passed verification")
+        except ContractError as err:
+            if err.code != expected_reason:
+                raise ContractError("APGR7_PYPI_EXCLUSION", f"Excluded artifact failed with {err.code}, expected {expected_reason}")
 
     return sorted(verified, key=lambda r: r["name"])
 
 
-def verify_pins(binding=None, pins_doc=None):
-    """The frozen source owns production pins; an explicit document is a test seam."""
+def verify_pins(binding=None, pins_doc=None, version: str | None = None):
+    """Verify the selected immutable manifest; an explicit document is a test seam."""
     from rs9.records import closed
+    version = resolve_version(binding, version)
+    profile = profile_for_version(version)
     if pins_doc is None:
-        pins_doc = Path(__file__).resolve().parents[2] / "operators/apgr-publication/pypi-artifacts.json"
-    pins = json.loads(pins_doc.read_bytes()) if isinstance(pins_doc, Path) else pins_doc
+        pins_doc = Path(__file__).resolve().parents[2] / profile["manifest"]
+    try:
+        pins = json.loads(pins_doc.read_bytes()) if isinstance(pins_doc, Path) else pins_doc
+    except FileNotFoundError:
+        raise ContractError("APGR7_PYPI_PINS_MISSING", f"Versioned APGR {version} pins are not present") from None
+    if not isinstance(pins, dict):
+        raise ContractError("APGR7_PYPI_PIN_DRIFT", "Pinned artifact document must be an object")
     closed(pins, {"schema", "project", "version", "repository", "release_tag", "artifacts", "excluded"})
-    if (pins["schema"] != "rs9.pypi-artifacts.v1alpha2" or pins["project"] != "agentic-praxis-grimoire" or pins["version"] != "0.13.0"
-            or pins["repository"] != "Knowledge-Forge-AI/agentic-praxis-grimoire" or pins["release_tag"] != "v0.13.0"):
+    if (pins["schema"] != "rs9.pypi-artifacts.v1alpha2" or pins["project"] != PROJECT_NAME or pins["version"] != version
+            or pins["repository"] != "Knowledge-Forge-AI/agentic-praxis-grimoire" or pins["release_tag"] != profile["release_tag"]):
         raise ContractError("APGR7_PYPI_PIN_DRIFT", "Committed pin schema or release differs")
-    prefix = "agentic_praxis_grimoire-0.13.0"
-    names = {prefix + s for s in ("-py3-none-manylinux_2_17_aarch64.whl", "-py3-none-manylinux_2_17_x86_64.whl", ".tar.gz")}
-    if len(pins["artifacts"]) != 3 or {r["name"] for r in pins["artifacts"]} != names or len(pins["excluded"]) != 1:
-        raise ContractError("APGR7_PYPI_SCOPE", "Only the approved immutable three-file subset is uploadable")
+    names = set(profile["artifact_names"])
+    if len(pins["artifacts"]) != len(names) or {r.get("name") for r in pins["artifacts"]} != names:
+        raise ContractError("APGR7_PYPI_SCOPE", f"Only the approved immutable {version} artifact set is uploadable")
+    if len(pins["excluded"]) != len(profile["excluded"]):
+        raise ContractError("APGR7_PYPI_SCOPE", f"Only the approved immutable {version} exclusion set is valid")
     selected = []
     for row in pins["artifacts"]:
         closed(row, {"name", "size", "sha256", "url"})
-        if row["url"] != "https://github.com/Knowledge-Forge-AI/agentic-praxis-grimoire/releases/download/v0.13.0/" + row["name"]:
+        if row["url"] != f"https://github.com/Knowledge-Forge-AI/agentic-praxis-grimoire/releases/download/{profile['release_tag']}/" + row["name"]:
             raise ContractError("APGR7_PYPI_SCOPE", "Fixed immutable release URL required")
         selected.append({k: row[k] for k in ("name", "size", "sha256")})
-    excluded = pins["excluded"][0]
-    closed(excluded, {"name", "size", "sha256", "reason"})
-    if excluded["name"] != prefix + "-py3-none-macosx_11_0_arm64.whl" or excluded["reason"] != "APGR7_PYTHON_MACHO":
-        raise ContractError("APGR7_PYPI_PIN_DRIFT", "Defective macOS wheel remains explicitly excluded")
+    if profile["excluded"]:
+        excluded = pins["excluded"][0]
+        closed(excluded, {"name", "size", "sha256", "reason"})
+        expected_excl_name, expected_reason = profile["excluded"][0]
+        if excluded["name"] != expected_excl_name or excluded["reason"] != expected_reason:
+            raise ContractError("APGR7_PYPI_PIN_DRIFT", "Defective macOS wheel remains explicitly excluded")
     if binding is not None:
         conf = binding.sidecar["pypi"]
-        if sorted(selected, key=lambda r: r["name"]) != sorted(conf["artifacts"], key=lambda r: r["name"]) or pins["excluded"] != conf["excluded"]:
+        if (conf.get("version") not in (None, version)
+                or sorted(selected, key=lambda r: r["name"]) != sorted(conf["artifacts"], key=lambda r: r["name"])
+                or pins["excluded"] != conf["excluded"]):
             raise ContractError("APGR7_PYPI_PIN_DRIFT", "Committed selection differs from authenticated sidecar")
     return pins
 
@@ -199,17 +276,17 @@ def _observe_files(binding, io, verified_artifacts, remote_by_name):
 
 
 def _observe_destination(
-    binding: Any, io: Any, verified_artifacts: list[dict[str, Any]]
+    binding: Any, io: Any, verified_artifacts: list[dict[str, Any]], version: str
 ) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]]]:
     """Query PyPI JSON API and download published files to compare bytes."""
     project = binding.sidecar["pypi"]["project"]
-    url = f"https://pypi.org/pypi/{quote(project, safe='')}/0.13.0/json"
+    url = f"https://pypi.org/pypi/{quote(project, safe='')}/{version}/json"
 
     try:
         doc = io.json(url)
     except ContractError as err:
         if err.code == "REMOTE_ABSENT":
-            # Version 0.13.0 does not exist on PyPI
+            # The selected version does not exist on PyPI yet.
             subjects = [
                 {
                     "name": art["name"],
@@ -332,26 +409,34 @@ def _observe_destination(
     return "blocked", subjects, stops
 
 
-def prepare(binding: Any, io: Any) -> dict[str, Any]:
+def prepare(binding: Any, io: Any, *, version: str | None = None) -> dict[str, Any]:
     """Prepare PyPI publication: verify local artifacts, check remote presence, return roster row."""
+    declared = getattr(binding, "sidecar", {}).get("pypi", {}).get("version")
+    selected = version if version is not None else (
+        declared if declared in SUPPORTED_VERSIONS else DEFAULT_VERSION if declared is None else None
+    )
     try:
-        verify_pins(binding, getattr(io, "pypi_pins", None))
-        verified_artifacts = verify(binding)
+        selected = resolve_version(binding, version)
+        verify_pins(binding, getattr(io, "pypi_pins", None), selected)
+        verified_artifacts = verify(binding, selected)
     except ContractError as error:
         remedy = ("Resolve this exact upstream artifact's metadata/native compatibility; preserve immutable release bytes.")
-        return result("pypi", PROFILES["pypi"], "blocked", stops=[stop(error.code,
+        row = result("pypi", PROFILES["pypi"], "blocked", stops=[stop(error.code,
             [error.details["asset"]] if "asset" in error.details else [],
             remedy)])
+        row["version"] = selected
+        row["manifest"] = manifest_path(selected) if selected in SUPPORTED_VERSIONS else None
+        return row
 
     # Compute prepared artifacts ledger digest
     ledger_bytes = canonical({
         "project": binding.sidecar["pypi"]["project"],
-        "version": "0.13.0",
+        "version": selected,
         "artifacts": verified_artifacts,
     })
     prepared_sha256 = hashlib.sha256(ledger_bytes).hexdigest()
 
-    state, subjects, stops = _observe_destination(binding, io, verified_artifacts)
+    state, subjects, stops = _observe_destination(binding, io, verified_artifacts, selected)
 
     row = result(
         "pypi",
@@ -359,10 +444,12 @@ def prepare(binding: Any, io: Any) -> dict[str, Any]:
         state,
         subjects=subjects,
         stops=stops,
-        observed_version="0.13.0" if state == "exact" else None,
+        observed_version=selected if state == "exact" else None,
         verified_bytes=state == "exact",
     )
     row["prepared_sha256"] = prepared_sha256
+    row["version"] = selected
+    row["manifest"] = manifest_path(selected)
     row["excluded_artifacts"] = binding.sidecar["pypi"]["excluded"]
     row["sdist_fallback"] = assess_sdist_fallback(
         verified_artifacts,
@@ -371,15 +458,19 @@ def prepare(binding: Any, io: Any) -> dict[str, Any]:
     return row
 
 
-def publish(binding, io, prepared_row, *, ready=False, journal=None):
+def publish(binding, io, prepared_row, *, ready=False, journal=None, version: str | None = None):
     """Only the protected deployed workflow can acquire publication custody."""
     from rs9.apgr7_pypi_deploy import dispatch_workflow
-    current = prepare(binding, io)
+    row_version = (prepared_row or {}).get("version")
+    selected = resolve_version(binding, version if version is not None else row_version)
+    if prepared_row and prepared_row.get("version") not in (None, selected):
+        raise ContractError("APGR7_PYPI_VERSION", "Prepared row and selected APGR release versions differ")
+    current = prepare(binding, io, version=selected)
     if current["state"] not in ("publish-ready", "incomplete"):
         return current
     operation = dispatch_workflow(io, ready=ready, journal=journal,
                                   confirmed=getattr(io, "pypi_publisher_confirmed", False),
-                                  prepared_sha256=current["prepared_sha256"])
+                                  prepared_sha256=current["prepared_sha256"], version=selected)
     current["state"] = operation["state"]
     current["stops"].extend(operation.get("stops", []))
     for field in ("transport_receipt", "handoff"):

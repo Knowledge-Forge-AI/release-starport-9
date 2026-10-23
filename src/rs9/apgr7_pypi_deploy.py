@@ -6,10 +6,17 @@ import hashlib
 import json
 import re
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from rs9.apgr7_common import stop
+from rs9.apgr7_pypi import (
+    DEFAULT_VERSION,
+    manifest_path,
+    profile_for_version,
+    resolve_version,
+)
 from rs9.errors import ContractError
 from rs9.scratch import canonical
 
@@ -20,8 +27,14 @@ REPOSITORY = "Knowledge-Forge-AI/release-starport-9"
 DEFAULT_BRANCH = "main"
 ENVIRONMENT_NAME = "pypi"
 PROJECT_NAME = "agentic-praxis-grimoire"
-PINS_REL_PATH = "operators/apgr-publication/pypi-artifacts.json"
+PINS_REL_PATH = manifest_path(DEFAULT_VERSION)
 WORKFLOW_REL_PATH = ".github/workflows/rs9-pypi-publish.yml"
+
+
+def _selected_version(version: str | None = None) -> str:
+    selected = DEFAULT_VERSION if version is None else version
+    profile_for_version(selected)
+    return selected
 
 
 def _find_repo_root(root: Path | None = None) -> Path:
@@ -57,8 +70,9 @@ def _closure_imports(tree, src_dir):
     return queue
 
 
-def readback_transitive_import_closure(root: Path | None = None) -> dict[str, Any]:
+def readback_transitive_import_closure(root: Path | None = None, *, version: str | None = None) -> dict[str, Any]:
     """Statically determine and read back the transitive import closure for workflow execution."""
+    version = _selected_version(version)
     repo_root = _find_repo_root(root)
     src_dir = repo_root / "src"
 
@@ -100,8 +114,10 @@ def readback_transitive_import_closure(root: Path | None = None) -> dict[str, An
                 "sha256": hashlib.sha256(content).hexdigest(),
             })
 
-    # Include pins manifest and workflow file
-    for extra_rel in (PINS_REL_PATH, WORKFLOW_REL_PATH, "src/rs9/__init__.py"):
+    # Include only the selected immutable pins manifest and workflow file.  A
+    # future profile is intentionally absent until its real release bytes have
+    # been read back and pinned.
+    for extra_rel in (manifest_path(version), WORKFLOW_REL_PATH, "src/rs9/__init__.py"):
         extra_abs = repo_root / extra_rel
         if not extra_abs.is_file():
             raise ContractError("APGR7_DEPLOY_CLOSURE", f"Required closure file missing: {extra_rel}")
@@ -122,6 +138,7 @@ def readback_transitive_import_closure(root: Path | None = None) -> dict[str, An
         "files": files_record,
         "closure_sha256": closure_sha256,
         "file_count": len(files_record),
+        "version": version,
     }
 
 
@@ -160,8 +177,9 @@ def check_publisher_confirmation(io=None, *, confirmed=None, **unused):
             "basis": "attended-attestation-not-registry-proof", "stops": [] if value else [stop("pypi-publisher-unconfirmed", [PROJECT_NAME], "Confirm existing Trusted Publisher repository/workflow/environment configuration separately.")]}
 
 
-def check_deployment_status(io, *, root=None, **unused):
-    closure = readback_transitive_import_closure(root)
+def check_deployment_status(io, *, root=None, version: str | None = None, **unused):
+    version = _selected_version(version)
+    closure = readback_transitive_import_closure(root, version=version)
     state, sha = "unknown", None
     try:
         sha, _ = head(io)
@@ -189,7 +207,8 @@ def check_deployment_status(io, *, root=None, **unused):
         stops.append(stop("workflow-closure-" + state, [WORKFLOW_NAME], "Deploy the exact workflow and full verifier import closure, then read back terminal bytes."))
     return {"deployment_state": state, "head_sha": sha, "workflow_deployed": state == "deployed-exact",
             "transitive_closure": closure, "protected_environment": env, "publisher_confirmation": publisher,
-            "ready_to_dispatch": state == "deployed-exact" and env["protected"] and publisher["publisher_confirmed"], "stops": stops}
+            "ready_to_dispatch": state == "deployed-exact" and env["protected"] and publisher["publisher_confirmed"],
+            "version": version, "stops": stops}
 
 
 def mutate(io, endpoint, document, method="POST", *, command_returned=None):
@@ -207,14 +226,17 @@ def mutate(io, endpoint, document, method="POST", *, command_returned=None):
     return json.loads(proc["stdout"])
 
 
-def deployment_reconciliation(io, journal, *, root=None):
+def deployment_reconciliation(io, journal, *, root=None, version: str | None = None):
     """Recover in the same journal; pre-ref failures never changed the branch."""
-    observed = check_deployment_status(io, root=root)
+    version = _selected_version(version)
+    observed = check_deployment_status(io, root=root, version=version)
     if journal and "workflow-deployment" in journal.unresolved("pypi"):
+        context = journal.context("pypi", "workflow-deployment") or {}
+        if context.get("version", DEFAULT_VERSION) != version:
+            raise ContractError("APGR7_PYPI_VERSION", "Deployment journal and selected APGR release versions differ")
         if observed["deployment_state"] == "deployed-exact":
             journal.finish("pypi", "workflow-deployment", "exact")
         else:
-            context = journal.context("pypi", "workflow-deployment") or {}
             # Before PATCH there is no branch write. Once PATCH starts, neither
             # process return (including gh network errors), a malformed response,
             # nor an old branch readback proves non-publication. Older
@@ -230,20 +252,23 @@ def deployment_reconciliation(io, journal, *, root=None):
     return observed
 
 
-def deploy_workflow(io, *, root=None, execute=False, journal=None, after_reconcile=None, **unused):
-    closure = readback_transitive_import_closure(root)
+def deploy_workflow(io, *, root=None, execute=False, journal=None, after_reconcile=None,
+                    version: str | None = None, **unused):
+    version = _selected_version(version)
+    closure = readback_transitive_import_closure(root, version=version)
     plan = {"basis": "workflow-deployment-plan", "executed": False, "closure": closure,
+            "version": version,
             "operations": ["gh api POST git/trees (base_tree plus exact closure)", "gh api POST git/commits (one parent)", "gh api PATCH git/refs/heads/main (force=false)", "read back all closure bytes at resulting main commit"]}
     if not execute:
         return plan
     if journal is not None and journal.unresolved("pypi") and after_reconcile:
-        observed = deployment_reconciliation(io, journal, root=root)
+        observed = deployment_reconciliation(io, journal, root=root, version=version)
         row = {"state": observed["deployment_state"], "subjects": [
             {"name": "workflow-deployment", "state": "absent" if observed.get("retry_safe") else "unknown"}]}
         journal.release_absent("pypi", after_reconcile, row)
     if journal is None or journal.unresolved("pypi"):
         raise ContractError("APGR7_RECONCILE", "Persistent journal with no unresolved PyPI operation required")
-    observed = check_deployment_status(io, root=root)
+    observed = check_deployment_status(io, root=root, version=version)
     if observed["deployment_state"] == "deployed-exact":
         return {**plan, "basis": "authenticated-deployment-noop", "deployment_readback": observed}
     if observed["deployment_state"] == "unknown":
@@ -256,7 +281,8 @@ def deploy_workflow(io, *, root=None, execute=False, journal=None, after_reconci
         if len(body) != row["size"] or hashlib.sha256(body).hexdigest() != row["sha256"]:
             raise ContractError("APGR7_DEPLOY_CLOSURE", "Deployment source changed before write intent")
         entries.append({"path": row["path"], "mode": "100644", "type": "blob", "content": body.decode()})
-    context = {"phase": "before-ref-request", "old_head": old, "closure_sha256": closure["closure_sha256"]}
+    context = {"phase": "before-ref-request", "old_head": old, "closure_sha256": closure["closure_sha256"],
+               "version": version}
     journal.start("pypi", "workflow-deployment", context=context)
     tree = mutate(io, "git/trees", {"base_tree": doc["commit"]["tree"]["sha"], "tree": entries})
     identity = {"name": COMMIT_OWNER_NAME, "email": COMMIT_OWNER_EMAIL}
@@ -283,7 +309,7 @@ def deploy_workflow(io, *, root=None, execute=False, journal=None, after_reconci
         journal.record_context("pypi", "workflow-deployment", {**ref_context, "phase": "ref-command-returned"})
     mutate(io, "git/refs/heads/main", {"sha": commit["sha"], "force": False}, "PATCH",
            command_returned=command_returned)
-    observed = check_deployment_status(io, root=root)
+    observed = check_deployment_status(io, root=root, version=version)
     if observed["deployment_state"] == "deployed-exact":
         journal.finish("pypi", "workflow-deployment", "exact")
     return {**plan, "executed": True, "deployment_readback": observed}
@@ -292,19 +318,25 @@ def deploy_workflow(io, *, root=None, execute=False, journal=None, after_reconci
 from rs9.apgr7_pypi_runs import bind_run_status, dispatch_workflow, recover_dispatch
 
 
-def pypi_deploy_operation(binding, io, *, stage=None, ready=False, journal=None, after_reconcile=None, **unused):
+def pypi_deploy_operation(binding, io, *, stage=None, ready=False, journal=None,
+                          after_reconcile=None, version: str | None = None, **unused):
     binding.require_unchanged()
+    version = resolve_version(binding, version)
     stage = stage or io.pypi_stage
     if stage == "deploy-status":
-        return deployment_reconciliation(io, journal)
+        return deployment_reconciliation(io, journal, version=version)
     if stage == "deploy":
-        return deploy_workflow(io, execute=ready, journal=journal, after_reconcile=after_reconcile)
+        return deploy_workflow(io, execute=ready, journal=journal, after_reconcile=after_reconcile,
+                               version=version)
     if stage == "dispatch":
         from rs9.apgr7_pypi import prepare
+        prepared = prepare(binding, io, version=version)
+        if "prepared_sha256" not in prepared:
+            return prepared
         return dispatch_workflow(io, ready=ready, journal=journal, confirmed=io.pypi_publisher_confirmed,
-                                 prepared_sha256=prepare(binding, io)["prepared_sha256"])
+                                 prepared_sha256=prepared["prepared_sha256"], version=version)
     if stage == "dispatch-status":
-        return recover_dispatch(io, journal)
+        return recover_dispatch(io, journal, version=version)
     if stage == "run-status":
-        return bind_run_status(io, io.pypi_run_id, journal=journal)
+        return bind_run_status(io, io.pypi_run_id, journal=journal, version=version)
     raise ContractError("APGR7_STAGE", "Select a PyPI operation")

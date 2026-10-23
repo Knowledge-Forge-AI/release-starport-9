@@ -1,9 +1,16 @@
 name: RS9 PyPI Publish
-run-name: 'RS9 PyPI ${{ inputs.prepared_sha256 }} / ${{ inputs.dispatch_id }}'
+run-name: 'RS9 PyPI ${{ inputs.release_version }} / ${{ inputs.prepared_sha256 }} / ${{ inputs.dispatch_id }}'
 
 on:
   workflow_dispatch:
     inputs:
+      release_version:
+        description: 'Closed APGR release profile to publish'
+        required: true
+        type: choice
+        options:
+          - '0.13.0'
+          - '0.13.1'
       prepared_sha256:
         description: 'Correlation digest only; committed artifact pins own the upload set'
         required: false
@@ -35,7 +42,8 @@ jobs:
       - name: Download and verify exact pinned artifacts
         env:
           PYTHONPATH: src
-        run: python3 -B -m rs9.apgr7_pypi_workflow download
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: python3 -B -m rs9.apgr7_pypi_workflow download --version "$RELEASE_VERSION"
 
       - name: Stage verified artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -73,7 +81,8 @@ jobs:
         id: missing
         env:
           PYTHONPATH: src
-        run: python3 -B -m rs9.apgr7_pypi_workflow select-missing >> "$GITHUB_OUTPUT"
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: python3 -B -m rs9.apgr7_pypi_workflow select-missing --version "$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Publish package distributions to PyPI
         if: steps.missing.outputs.upload == 'true'
