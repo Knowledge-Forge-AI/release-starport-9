@@ -28,6 +28,7 @@ from rs9.hosted_platforms import (
     system_from_target_triple,
 )
 from rs9.materialize import parse_manifest_members
+from rs9.nebular_lineage import verify_forward_lineage_proof
 from rs9.records import record_sha256
 from rs9.release_core import ReleaseCapture, authenticated_record_hash, digest
 from rs9.scratch import canonical
@@ -428,6 +429,39 @@ def main_tfnf() -> None:
     return source.encode("utf-8")
 
 
+def _successor_init_bytes() -> bytes:
+    return (
+        '"""Theme Forge Nebular Fusion Python successor package."""\n'
+        f"__version__ = {DISTRIBUTION_VERSION!r}\n"
+        f"__upstream_version__ = {APPLICATION_VERSION!r}\n"
+        f"__product_id__ = {PRODUCT_ID!r}\n"
+    ).encode()
+
+
+def _successor_metadata_bytes(description: bytes) -> bytes:
+    return (
+        "Metadata-Version: 2.4\n"
+        f"Name: {DISTRIBUTION_NAME}\n"
+        f"Version: {DISTRIBUTION_VERSION}\n"
+        "Summary: Theme Forge Nebular Fusion application distribution for Python 3\n"
+        f"License-Expression: {LICENSE_EXPRESSION}\n"
+        + "".join(f"License-File: {name}\n" for name in sorted(LEGAL_FILES))
+        + "Requires-Python: >=3.10\n"
+        "Description-Content-Type: text/markdown\n\n"
+    ).encode("utf-8") + description
+
+
+def _successor_wheel_info_bytes(wheel_tag: str) -> bytes:
+    return (
+        "Wheel-Version: 1.0\nGenerator: rs9-nebular-successor (1.0)\n"
+        f"Root-Is-Purelib: false\nTag: {wheel_tag}\n"
+    ).encode()
+
+
+def _successor_entry_points_bytes() -> bytes:
+    return f"[console_scripts]\ntfnf = {PACKAGE_NAME}.launcher:main_tfnf\n".encode()
+
+
 def _base_entries(wheel_path: Path) -> tuple[dict[str, bytes], str]:
     with zipfile.ZipFile(wheel_path) as archive:
         names = archive.namelist()
@@ -473,6 +507,8 @@ def build_successor_wheel(
     profile_result: dict[str, Any] | None = None,
     rs9_source_commit: str | None = None,
     rs9_source_tree: str | None = None,
+    lineage_proof: Any | None = None,
+    lineage_intent: Mapping[str, Any] | None = None,
     fixture_only: bool = False,
     candidate_only: bool = False,
     deterministic_timestamp: tuple[int, int, int, int, int, int] | None = None,
@@ -490,6 +526,10 @@ def build_successor_wheel(
         raise _error("FIXTURE_AUTHORITY", "Fixture mode cannot accept an authenticated capture")
     if fixture_only and profile_result is not None:
         raise _error("FIXTURE_AUTHORITY", "Fixture mode cannot accept authenticated profile claims")
+    if (lineage_proof is None) != (lineage_intent is None):
+        raise _error("LINEAGE_REQUIRED", "Forward lineage proof and its bound intent must be supplied together")
+    if fixture_only and (lineage_proof is not None or lineage_intent is not None):
+        raise _error("FIXTURE_AUTHORITY", "Fixture mode cannot consume an authenticated forward lineage proof")
     if not fixture_only and (archive_path is not None or archive_bytes is not None):
         raise _error("PROVENANCE_REQUIRED", "Raw archives are fixture-only; authenticated capture is required")
     if not fixture_only and (launcher_path is not None or gui_path is not None):
@@ -497,6 +537,11 @@ def build_successor_wheel(
 
     effective_system, target_triple, is_linux, family = _resolve_target(system, target_platform, platform_tag, candidate_only)
     release_hash, release_identity = _capture_identity(capture, fixture_only)
+    forward_lineage = None
+    if lineage_proof is not None:
+        if capture is None or lineage_intent is None:
+            raise _error("LINEAGE_REQUIRED", "Authenticated forward lineage inputs are incomplete")
+        forward_lineage = verify_forward_lineage_proof(capture, lineage_proof, intent=lineage_intent)
     rs9_source = _rs9_source_binding(rs9_source_commit, rs9_source_tree, fixture_only)
     legal = _legal_files(capture, fixture_only, license_files)
     description_name, description = _description_bytes(description_path)
@@ -586,27 +631,10 @@ def build_successor_wheel(
     dist_info = f"{dist_name}-{DISTRIBUTION_VERSION}.dist-info"
     wheel_tag = legacy.tag
     wheel_filename = f"{dist_name}-{DISTRIBUTION_VERSION}-{wheel_tag}.whl"
-    init_bytes = (
-        '"""Theme Forge Nebular Fusion Python successor package."""\n'
-        f"__version__ = {DISTRIBUTION_VERSION!r}\n"
-        f"__upstream_version__ = {APPLICATION_VERSION!r}\n"
-        f"__product_id__ = {PRODUCT_ID!r}\n"
-    ).encode()
-    metadata = (
-        "Metadata-Version: 2.4\n"
-        f"Name: {DISTRIBUTION_NAME}\n"
-        f"Version: {DISTRIBUTION_VERSION}\n"
-        "Summary: Theme Forge Nebular Fusion application distribution for Python 3\n"
-        f"License-Expression: {LICENSE_EXPRESSION}\n"
-        + "".join(f"License-File: {name}\n" for name in sorted(LEGAL_FILES))
-        + "Requires-Python: >=3.10\n"
-        "Description-Content-Type: text/markdown\n\n"
-    ).encode("utf-8") + description
-    wheel_info = (
-        "Wheel-Version: 1.0\nGenerator: rs9-nebular-successor (1.0)\n"
-        f"Root-Is-Purelib: false\nTag: {wheel_tag}\n"
-    ).encode()
-    entry_points = f"[console_scripts]\ntfnf = {PACKAGE_NAME}.launcher:main_tfnf\n".encode()
+    init_bytes = _successor_init_bytes()
+    metadata = _successor_metadata_bytes(description)
+    wheel_info = _successor_wheel_info_bytes(wheel_tag)
+    entry_points = _successor_entry_points_bytes()
     profile_result_sha256 = record_sha256(profile_result) if isinstance(profile_result, Mapping) else None
     license_facts = _profile_license_facts(profile_result)
     provenance = {
@@ -616,6 +644,7 @@ def build_successor_wheel(
         "application_version": APPLICATION_VERSION,
         "distribution_version": DISTRIBUTION_VERSION,
         "source_identity": release_identity,
+        "forward_lineage": forward_lineage,
         "rs9_source": rs9_source,
         "release_record_sha256": release_hash,
         "wheel_tag": wheel_tag,
