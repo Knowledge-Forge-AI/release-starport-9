@@ -426,7 +426,8 @@ class InventoryTests(unittest.TestCase):
         inventory_entry("var/lib/dpkg", "dir"), inventory_entry("var/lib/dpkg/status", sha="b" * 64),
         inventory_entry("usr/share/icons/hicolor/icon-theme.cache", sha="c" * 64),
         inventory_entry("var/cache/apt", "dir"), inventory_entry("var/lib/dnf/history.sqlite", sha="d" * 64),
-        inventory_entry("etc/pacman.d/gnupg/pubring.gpg", sha="e" * 64)])
+        inventory_entry("etc/pacman.d/gnupg/pubring.gpg", sha="e" * 64),
+        inventory_entry("usr/share/applications/mimeinfo.cache", sha="f" * 64)])
 
     def test_parse_reads_files_dirs_and_symlinks_and_drops_only_documented_state(self):
         apt = hd.parse_inventory(self.SAMPLE, "apt")
@@ -437,8 +438,13 @@ class InventoryTests(unittest.TestCase):
                          "usr/share/icons/hicolor/icon-theme.cache", ""):
             self.assertNotIn(excluded, apt)
         self.assertIn("var/lib/dnf/history.sqlite", apt)  # another family's state is not excused for apt
-        self.assertNotIn("var/lib/dnf/history.sqlite", hd.parse_inventory(self.SAMPLE, "dnf"))
-        self.assertNotIn("etc/pacman.d/gnupg/pubring.gpg", hd.parse_inventory(self.SAMPLE, "pacman"))
+        self.assertIn("usr/share/applications/mimeinfo.cache", apt)
+        dnf = hd.parse_inventory(self.SAMPLE, "dnf")
+        self.assertNotIn("var/lib/dnf/history.sqlite", dnf)
+        self.assertIn("usr/share/applications/mimeinfo.cache", dnf)
+        pacman = hd.parse_inventory(self.SAMPLE, "pacman")
+        self.assertNotIn("usr/share/applications/mimeinfo.cache", pacman)
+        self.assertNotIn("etc/pacman.d/gnupg/pubring.gpg", pacman)
         self.assertIn("etc/pacman.d/gnupg/pubring.gpg", apt)
 
     def test_unparseable_lines_fail_closed(self):
@@ -452,6 +458,16 @@ class InventoryTests(unittest.TestCase):
             self.assertTrue(hd.inventory_excluded("apt", path), path)
         for path in ("usr/bin/tfsl", "usr/lib/theme-forge-stellar-loom/bin/run.js", "etc/hostname", "var/lib/other"):
             self.assertFalse(hd.inventory_excluded("apt", path), path)
+        self.assertTrue(hd.inventory_excluded("pacman", "usr/share/applications/mimeinfo.cache"))
+        for path in (
+            "usr/share/applications/mimeinfo.cache.bak",
+            "usr/share/applications/other.desktop",
+            "usr/share/icons/hicolor/mimeinfo.cache",
+            "usr/bin/tfsl",
+        ):
+            self.assertFalse(hd.inventory_excluded("pacman", path), path)
+        for family in ("apt", "dnf"):
+            self.assertFalse(hd.inventory_excluded(family, "usr/share/applications/mimeinfo.cache"), family)
 
 
 class ClientSpecTests(unittest.TestCase):

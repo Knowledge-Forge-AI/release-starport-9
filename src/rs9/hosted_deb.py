@@ -122,7 +122,10 @@ INVENTORY_EXCLUDES: dict[str, list[re.Pattern[str]]] = {
         r"^var/cache/debconf(/.*)?$", r"^var/cache/ldconfig(/.*)?$", *_COMMON_EXCLUDES)],
     "dnf": [re.compile(p) for p in (
         r"^var/lib/dnf(/.*)?$", r"^var/cache/libdnf5(/.*)?$", r"^var/lib/rpm-state(/.*)?$", *_COMMON_EXCLUDES)],
-    "pacman": [re.compile(p) for p in (r"^etc/pacman\.d/gnupg(/.*)?$", *_COMMON_EXCLUDES)],
+    "pacman": [re.compile(p) for p in (
+        r"^etc/pacman\.d/gnupg(/.*)?$",
+        r"^usr/share/applications/mimeinfo\.cache$",
+        *_COMMON_EXCLUDES)],
 }
 
 from rs9.client_inventory import parse_inventory as parse_client_inventory, run_and_parse
