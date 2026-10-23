@@ -167,10 +167,12 @@ def record_corroboration_failure(corroboration, error):
     corroboration.update(npm_corroboration=state, error=error.code)
 
 
-def evaluate_profile(capture, profile, intent, *, roles=None, corroboration=None):
+def evaluate_profile(capture, profile, intent, *, roles=None, corroboration=None, lineage_correction=None):
     release_hash = authenticated_record_hash(capture)
     if profile not in PROFILE_ROLES:
         raise ContractError("EVIDENCE_PROFILE", "Unknown RS9-owned evidence profile")
+    if lineage_correction is not None and profile == PACKAGE_PROFILE:
+        raise ContractError("LINEAGE_PROFILE", "Forward Nebular lineage correction requires a desktop profile")
     expected_policy = "npm-package-bin" if profile == PACKAGE_PROFILE else "native-executable"
     if any(p.get("command_policy", "native-executable") != expected_policy for p in capture.record["payloads"]):
         raise ContractError("EVIDENCE_PROFILE", "Profile and captured command execution policy disagree")
@@ -185,7 +187,7 @@ def evaluate_profile(capture, profile, intent, *, roles=None, corroboration=None
             raise ContractError("EVIDENCE_ROLES", "Profile roles must bind selected authenticated assets")
     try:
         sections = (_evaluate_tauri(capture, intent, roles, repository_authority=profile == TAURI_AUTHORITY_PROFILE,
-                                   corroboration=corroboration)
+                                   corroboration=corroboration, lineage_correction=lineage_correction)
                     if profile in {TAURI_PROFILE, TAURI_AUTHORITY_PROFILE} else _evaluate_package(capture, intent, roles))
     except ContractError as error:
         record_corroboration_failure(corroboration, error)
@@ -202,7 +204,8 @@ def evaluate_profile(capture, profile, intent, *, roles=None, corroboration=None
     return result
 
 
-def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False, corroboration=None):
+def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False, corroboration=None,
+                    lineage_correction=None):
     profile = TAURI_AUTHORITY_PROFILE if repository_authority else TAURI_PROFILE
     expected_legal = normalized["license"]["files"]
     if (not isinstance(expected_legal, list) or not expected_legal
@@ -212,6 +215,11 @@ def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False, c
     for legal_path in expected_legal:
         validate_safe_relative_posix_path(legal_path)
     root, source, metadata, payloads = capture.root, capture.source, capture.asset_metadata, capture.evidence_bytes
+    lineage_facts = None
+    if lineage_correction is not None:
+        from rs9.nebular_lineage import verify_forward_lineage_proof
+        lineage_facts = verify_forward_lineage_proof(capture, lineage_correction,
+                                                     intent=normalized, roles=roles)
     repository = capture.record["repository"]
     release = capture.record["release"]
     obj, tree_sha = {"sha": capture.record["tag"]["commit"]}, capture.record["tag"]["tree"]
@@ -262,10 +270,22 @@ def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False, c
         raise ContractError("INVALID_EVIDENCE", "Invalid provenance JSON") from None
     # Publisher assertions are consistency evidence, not signatures or attestations.
     assertions = provenance.get("release", {})
-    for key, expected in {"repository": repository["full_name"], "tag": normalized["tag"],
-                          "tagTarget": obj["sha"], "mergedMainTree": tree_sha}.items():
-        if key in assertions and assertions[key] != expected:
+    if lineage_facts is not None:
+        expected_assertions = {
+            "repository": repository["full_name"],
+            "tag": normalized["tag"],
+            "tagTarget": lineage_facts["historical"]["commit"],
+            "mergedMainCommit": lineage_facts["historical"]["commit"],
+            "mergedMainTree": tree_sha,
+        }
+        if (not isinstance(assertions, dict)
+                or any(assertions.get(key) != expected for key, expected in expected_assertions.items())):
             raise ContractError("PROVENANCE_MISMATCH", "Publisher lineage assertion disagrees")
+    else:
+        for key, expected in {"repository": repository["full_name"], "tag": normalized["tag"],
+                              "tagTarget": obj["sha"], "mergedMainTree": tree_sha}.items():
+            if key in assertions and assertions[key] != expected:
+                raise ContractError("PROVENANCE_MISMATCH", "Publisher lineage assertion disagrees")
     for candidate in provenance.get("candidates", []):
         raw = candidate.get("raw", {})
         matching = [a for a in inputs if a["name"] == raw.get("name")]
@@ -364,7 +384,10 @@ def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False, c
               "icon": icon, "limits": ["Captured API identity relies on trusted TLS collection; offline records cannot prove freshness.",
                                          "Publisher provenance is self-asserted; signatures and attestations not evaluated.",
                                          "No package acceptance or tenant license decision is implied."]}
-    return {"legacy_ingestion": record}
+    result = {"legacy_ingestion": record}
+    if lineage_facts is not None:
+        result["forward_lineage"] = lineage_facts
+    return result
 
 
 def _evaluate_package(capture, intent, roles):

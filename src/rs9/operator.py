@@ -10,6 +10,7 @@ from pathlib import Path
 
 from rs9.bootstrap import load_bootstrap, checked_bootstrap_configurations, require_configuration_authority
 from rs9.errors import ContractError
+from rs9.nebular_lineage import select_forward_lineage_proof
 from rs9.profiles import evaluate_profile, selection_for_intent
 from rs9.records import record_sha256, snapshot
 from rs9.release_core import authenticate_release, capture_release, digest, authenticated_tree, authenticated_release_metadata, read_evidence
@@ -82,8 +83,13 @@ def authenticate_generation(repository, output, *, approved_bootstrap_sha256, cl
         assert_release_expectations(capture, selected[0])
         intent = load_bootstrap(manifest_path, capture, approved_manifests=[approved_bootstrap_sha256])
         require_configuration_authority(capture, intent)
+        lineage_correction = select_forward_lineage_proof(repository, capture, intent)
         capture_supplemental(intent, evidence, client)
-        profile = evaluate_profile(capture, intent["release"]["evidence"]["profile"], intent)
+        profile_kwargs = {}
+        if lineage_correction is not None:
+            profile_kwargs["lineage_correction"] = lineage_correction
+        profile = evaluate_profile(capture, intent["release"]["evidence"]["profile"], intent,
+                                   **profile_kwargs)
         results.append({"project": intent["project"]["id"], "release": capture.record,
                         "profile": profile, "release_record_sha256": record_sha256(capture.record)})
     with ConfinedWriter(output / _make_summary_dir(output)) as writer:
