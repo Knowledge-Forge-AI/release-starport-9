@@ -6,17 +6,23 @@
   "candidate_adoption_ready": false,
   "changed_paths": [
     "config/forward/pypi-observe/v1alpha1/projection.json",
+    "docs/evaluations/rs9-linux-smoke-problem-categories1.md",
     "docs/evaluations/rs9-pypi-observe-forward-source-design1.md",
     "operators/live1/candidate-manifest.json",
+    "src/rs9/application_smoke_diagnostic.py",
     "src/rs9/hosted_observe.py",
+    "src/rs9/pages_smoke_diagnostic.py",
     "src/rs9/pypi_observe.py",
     "src/rs9/readers.py",
+    "src/rs9/smoke_stream_tokens.py",
     "src/rs9/tf_pypi_nebular_successor.py",
     "src/rs9/tf_pypi_remote.py",
     "src/rs9/wheel_nebular_successor.py",
+    "tests/test_cont22_diagnostics.py",
     "tests/test_hosted_observe.py",
     "tests/test_pypi_observe.py",
     "tests/test_readers.py",
+    "tests/test_smoke_stream_tokens.py",
     "tests/test_tf_pypi_nebular_successor.py",
     "tests/test_tf_pypi_remote.py"
   ],
@@ -369,6 +375,13 @@
       "path": "docs/architecture/theme-forge-extraction-inventory.md",
       "sha256": "02f7d5bef6246481c629c96fafc5893ddc15ced00e57b7aeac003bb66d8b53c1",
       "size": 11617
+    },
+    {
+      "git_blob": "2505229ea8d799971a0c9e113556d54ab1e2a42e",
+      "mode": "100644",
+      "path": "docs/evaluations/rs9-linux-smoke-problem-categories1.md",
+      "sha256": "c30b7871649f1fb6fdbc9541ac0fe80f1f18649219a4d70f869d547c44f36c3f",
+      "size": 14316
     },
     {
       "git_blob": "49782178dc1921d769b8371d4a8b5b649438b398",
@@ -1603,11 +1616,11 @@
       "size": 18463
     },
     {
-      "git_blob": "548359bea094fa51cfd4a7eda7799d28330e0f88",
+      "git_blob": "de7d41ddfc1f7d93a588c45f6512b84ea4c39bdd",
       "mode": "100644",
       "path": "src/rs9/application_smoke_diagnostic.py",
-      "sha256": "a138bb333e42bf0da0654f6d014f9b2fb083bc87141307f8aaaafbd581a4e9bf",
-      "size": 19118
+      "sha256": "57bdd60f03f7a377f8912ca3a08a0d6fb2cff50f925fa3607c9402c5ddf97f6e",
+      "size": 19631
     },
     {
       "git_blob": "85207de59d37210203f4f6ebbf220b29f623be41",
@@ -2219,11 +2232,11 @@
       "size": 19183
     },
     {
-      "git_blob": "39ff534fe3cbfb0379b8d4b25b75f17ffa03eb9d",
+      "git_blob": "ad0d10a475955e426838fd85028545ca57dee755",
       "mode": "100644",
       "path": "src/rs9/pages_smoke_diagnostic.py",
-      "sha256": "92d93c31769589dbe35f47b561c10d847940a0189aa2961e78f80b0195a7f230",
-      "size": 10186
+      "sha256": "48ec7f6a0152dee74f43d5337d8ac0f190cf28ff99985ea2981954af63398183",
+      "size": 11404
     },
     {
       "git_blob": "a9b2a4f7187fa214e14be25020cfe790b57ba1b7",
@@ -2429,11 +2442,11 @@
       "size": 4608
     },
     {
-      "git_blob": "6354e146eb39b109e20567cb969b90b4258222b1",
+      "git_blob": "5106cf32f8d605c783ae2935b504948f31f8266c",
       "mode": "100644",
       "path": "src/rs9/smoke_stream_tokens.py",
-      "sha256": "74a57c5529d2400f19e0100d32d2237606ff4747dddb5f8e678651a4e3686164",
-      "size": 33039
+      "sha256": "9323cfa4a6540fee01e3739802ae444ed00903ce3e1caf702eaa474d1b6d50e2",
+      "size": 41143
     },
     {
       "git_blob": "48f4e607e4800d37b7949374df4349251251862f",
@@ -3297,11 +3310,11 @@
       "size": 15888
     },
     {
-      "git_blob": "314ef9fd345b7b50e26151cd443f0ba9d8d753ed",
+      "git_blob": "036a1b52b44f8f15be8ce1bbcc1b3a1a0870063b",
       "mode": "100644",
       "path": "tests/test_cont22_diagnostics.py",
-      "sha256": "8397df863493970683b6ffb67a10c0cf044ff25a02b9a2b65910af063effe744",
-      "size": 10875
+      "sha256": "26605c92871cd9005b6613421d65667c347799e8e52e70bf71525605d2e9137d",
+      "size": 29540
     },
     {
       "git_blob": "590da4c6a1b0fadb9549ca2ab9eada4c21fdec18",
@@ -4200,11 +4213,11 @@
       "size": 8508
     },
     {
-      "git_blob": "bbc8237c49e7f9278dc072d2c4991d299a97b710",
+      "git_blob": "b4130469ffd04728c59f0c5ee203cf041af7f9cd",
       "mode": "100644",
       "path": "tests/test_smoke_stream_tokens.py",
-      "sha256": "3aa66dd8289527939ca03726bac8092119a05034747d06a7ff0fd890555c2c22",
-      "size": 32548
+      "sha256": "13b6cff22ba5d05d8abecca846054adc827a6b7014d9e612c521c90e2cef2932",
+      "size": 59446
     },
     {
       "git_blob": "5bbca60b0f646a64b4ba6ed7b338c0115de2e727",
@@ -4378,7 +4391,7 @@
   "inventory_scope": "complete product source excluding this manifest and preserved unrelated local state",
   "kind": "non-production-hosted-source-candidate",
   "parent": "261ee29d0fe6772f2aa1d07640cb6f47dcf140dc",
-  "phase_outcome": "source-only-observer-correction-original-native-and-pages-failures-retained",
+  "phase_outcome": "source-only-observer-and-diagnostic-correction-original-native-and-pages-failures-retained",
   "production_enabled": false,
   "production_ready": false,
   "publication_authority": false,
@@ -4407,8 +4420,8 @@
     "schema": "rs9.live1-candidate-readiness.v1alpha1",
     "source_adoption_scope": "partial-diagnostic"
   },
-  "review_status": "current-source-independent-review-and-parent-acceptance-required",
+  "review_status": "source-corrections-accepted-inventory-independent-review-pending",
   "schema": "rs9.live1-source-candidate-inventory.v1alpha2",
-  "task": "RS9 PyPI observer forward-source candidate",
+  "task": "RS9 forward observer and Linux diagnostic source candidate",
   "terminal_disposition": "amend"
 }
