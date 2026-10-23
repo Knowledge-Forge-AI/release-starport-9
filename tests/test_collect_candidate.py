@@ -12,7 +12,13 @@ from unittest.mock import patch
 import zipfile
 
 from rs9.candidate_readiness import readiness_record
-from rs9.adopt_candidate import adopt, staging_paths, main as adopt_main
+from rs9.adopt_candidate import (
+    COMMIT_OWNER_EMAIL,
+    COMMIT_OWNER_NAME,
+    adopt,
+    main as adopt_main,
+    staging_paths,
+)
 from rs9.collect_candidate import (
     collect, gh_read, gh_stream_artifact, extract_safe_zip,
     REPOSITORY, WORKFLOW, _run_identity, main as collect_main
@@ -517,10 +523,18 @@ class CollectionTests(unittest.TestCase):
                     if args[:2] == ["remote", "get-url"]: return "https://github.com/" + REPOSITORY + ".git"
                     if args[:1] == ["rev-parse"]:
                         return {"HEAD": commit if committed else parent, "origin/main": "d" * 40 if advanced else parent,
-                                "HEAD^{tree}": tree, "HEAD^": parent}[args[1]]
+                                "HEAD^{tree}": tree, "HEAD^": parent,
+                                f"{commit}^{{tree}}": tree, f"{commit}^": parent}[args[1]]
                     if args == ["write-tree"]: return tree
                     if args[:3] == ["diff", "--cached", "--name-only"] and parent in args: return "reviewed.py"
                     if args[:1] == ["commit"]: committed = True
+                    if args == ["cat-file", "commit", commit]:
+                        return (
+                            f"tree {tree}\nparent {parent}\n"
+                            f"author {COMMIT_OWNER_NAME} <{COMMIT_OWNER_EMAIL}> 1700000000 +0000\n"
+                            f"committer {COMMIT_OWNER_NAME} <{COMMIT_OWNER_EMAIL}> 1700000001 -0400\n"
+                            "\nmessage\n"
+                        )
                     return ""
                 packet = {"status": "not-qualified", "run_id": 999, "production_enabled": False,
                           "publication_authority": False, "validation": {"status": "fail"}}
@@ -543,7 +557,7 @@ class CollectionTests(unittest.TestCase):
                         result = adopt(root, out, **kwargs)
                         self.assertEqual(result["reviewed_tree"], tree)
                         self.assertIn(["git", "commit", "-m", kwargs["commit_message"]], calls)
-                        self.assertIn(["git", "push", "origin", "HEAD:main"], calls)
+                        self.assertIn(["git", "push", "origin", f"{commit}:refs/heads/main"], calls)
                         self.assertEqual(collect_v2.call_args.kwargs["commit"], commit)
                         self.assertNotIn("runner", collect_v2.call_args.kwargs)
                         self.assertFalse(any("rerun" in c for c in calls))
