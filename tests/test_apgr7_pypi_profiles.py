@@ -3,6 +3,7 @@ import base64
 import hashlib
 import io
 import json
+import tempfile
 import unittest
 import zipfile
 from pathlib import Path
@@ -216,10 +217,12 @@ class APGRPyPIProfileTests(unittest.TestCase):
                 self.assertEqual(raised.exception.code, "APGR7_PYPI_VERSION")
 
     def test_v0131_manifest_is_fail_closed_until_real_pins_exist(self):
-        self.assertFalse((ROOT / pypi.manifest_path("0.13.1")).exists())
-        with self.assertRaises(ContractError) as raised:
-            pypi.verify_pins(version="0.13.1")
-        self.assertEqual(raised.exception.code, "APGR7_PYPI_PINS_MISSING")
+        with tempfile.TemporaryDirectory(prefix="rs9-missing-pins-") as directory:
+            missing = Path(directory) / pypi.manifest_path("0.13.1")
+            self.assertFalse(missing.exists())
+            with self.assertRaises(ContractError) as raised:
+                pypi.verify_pins(pins_doc=missing, version="0.13.1")
+            self.assertEqual(raised.exception.code, "APGR7_PYPI_PINS_MISSING")
 
     def test_prepare_returns_blocked_without_dispatch_when_v0131_pins_are_missing(self):
         class Binding:
@@ -227,14 +230,16 @@ class APGRPyPIProfileTests(unittest.TestCase):
                 self.sidecar = {"pypi": {"version": "0.13.1"}}
 
         class IO:
-            def __init__(self):
-                self.pypi_pins = None
+            def __init__(self, missing):
+                self.pypi_pins = missing
 
-        row = pypi.prepare(Binding(), IO(), version="0.13.1")
-        self.assertEqual(row["state"], "blocked")
-        self.assertEqual(row["version"], "0.13.1")
-        self.assertEqual(row["stops"][0]["code"], "APGR7_PYPI_PINS_MISSING")
-        self.assertNotIn("prepared_sha256", row)
+        with tempfile.TemporaryDirectory(prefix="rs9-missing-pins-") as directory:
+            missing = Path(directory) / pypi.manifest_path("0.13.1")
+            row = pypi.prepare(Binding(), IO(missing), version="0.13.1")
+            self.assertEqual(row["state"], "blocked")
+            self.assertEqual(row["version"], "0.13.1")
+            self.assertEqual(row["stops"][0]["code"], "APGR7_PYPI_PINS_MISSING")
+            self.assertNotIn("prepared_sha256", row)
 
     def test_prepare_keeps_unknown_declared_version_neutral(self):
         class Binding:
@@ -255,13 +260,23 @@ class APGRPyPIProfileTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "APGR7_PYPI_PIN_DRIFT")
 
     def test_selected_deployment_closure_preserves_old_route_and_blocks_new_route(self):
-        closure = deploy.readback_transitive_import_closure(version="0.13.0")
-        paths = {row["path"] for row in closure["files"]}
-        self.assertIn("operators/apgr-publication/pypi-artifacts.json", paths)
-        self.assertNotIn("operators/apgr-publication/pypi-artifacts-v0.13.1.json", paths)
-        with self.assertRaises(ContractError) as raised:
-            deploy.readback_transitive_import_closure(version="0.13.1")
-        self.assertIn(raised.exception.code, {"APGR7_DEPLOY_CLOSURE", "APGR7_PYPI_PINS_MISSING"})
+        with tempfile.TemporaryDirectory(prefix="rs9-closure-fixture-") as directory:
+            fixture = Path(directory)
+            (fixture / "src").symlink_to(ROOT / "src", target_is_directory=True)
+            workflow_dir = fixture / ".github/workflows"
+            workflow_dir.mkdir(parents=True)
+            (workflow_dir / "rs9-pypi-publish.yml").symlink_to(ROOT / ".github/workflows/rs9-pypi-publish.yml")
+            manifest_dir = fixture / "operators/apgr-publication"
+            manifest_dir.mkdir(parents=True)
+            (manifest_dir / "pypi-artifacts.json").symlink_to(ROOT / "operators/apgr-publication/pypi-artifacts.json")
+
+            closure = deploy.readback_transitive_import_closure(root=fixture, version="0.13.0")
+            paths = {row["path"] for row in closure["files"]}
+            self.assertIn("operators/apgr-publication/pypi-artifacts.json", paths)
+            self.assertNotIn("operators/apgr-publication/pypi-artifacts-v0.13.1.json", paths)
+            with self.assertRaises(ContractError) as raised:
+                deploy.readback_transitive_import_closure(root=fixture, version="0.13.1")
+            self.assertEqual(raised.exception.code, "APGR7_DEPLOY_CLOSURE")
 
     def test_handoff_contains_selected_version(self):
         handoff = runs.dispatch_workflow(
@@ -390,9 +405,12 @@ class APGRPyPIProfileTests(unittest.TestCase):
             workflow._selected_version(_v0131_manifest(), version="0.13.0")
         self.assertEqual(raised.exception.code, "APGR7_PYPI_VERSION")
 
-        with self.assertRaises(ContractError) as raised:
-            workflow._load_manifest("0.13.1")
-        self.assertEqual(raised.exception.code, "APGR7_PYPI_PINS_MISSING")
+        with tempfile.TemporaryDirectory(prefix="rs9-missing-pins-") as directory:
+            missing = Path(directory) / pypi.manifest_path("0.13.1")
+            with patch.object(workflow, "manifest_path", return_value=str(missing)):
+                with self.assertRaises(ContractError) as raised:
+                    workflow._load_manifest("0.13.1")
+            self.assertEqual(raised.exception.code, "APGR7_PYPI_PINS_MISSING")
 
     def test_legacy_journal_defaults_to_v0130_but_cross_version_is_rejected(self):
         class Journal:
