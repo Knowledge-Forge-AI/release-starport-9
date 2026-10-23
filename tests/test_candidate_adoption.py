@@ -1,12 +1,15 @@
 """Exact source/hosted bindings and stopped adoption safety."""
 import hashlib
 import json
+import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
 
-from rs9.adopt_candidate import adopt, validate_receipts
+from rs9.adopt_candidate import (COMMIT_OWNER_EMAIL, COMMIT_OWNER_NAME, _validate_commit_identity,
+                                 adopt, run, validate_receipts)
 from rs9.candidate_readiness import readiness_record
 from rs9.candidate_inventory import MANIFEST, file_inventory, git_oid, operational_path, source_tree
 from rs9.errors import ContractError
@@ -101,6 +104,242 @@ class CandidateAdoptionTests(unittest.TestCase):
                     adopt(repo, out, reviewed_parent="1" * 40, reviewed_tree="2" * 40, manifest_sha256=hashlib.sha256(raw).hexdigest())
                 self.assertEqual(raised.exception.code, "ADOPTION_NOT_READY")
                 command.assert_not_called()
+
+    def test_commit_command_overrides_all_git_identity_fields_in_a_copy(self):
+        completed = type("Completed", (), {"returncode": 0, "stdout": b"ok\n"})()
+        ambient = {
+            "GIT_AUTHOR_NAME": "Ambient Author",
+            "GIT_AUTHOR_EMAIL": "ambient-author@example.invalid",
+            "GIT_COMMITTER_NAME": "Ambient Committer",
+            "GIT_COMMITTER_EMAIL": "ambient-committer@example.invalid",
+        }
+        with patch.dict(os.environ, ambient), patch("rs9.adopt_candidate.subprocess.run", return_value=completed) as command:
+            self.assertEqual(run(Path("/tmp/repository"), ["git", "commit", "-m", "message"]), "ok")
+        commit_env = command.call_args.kwargs["env"]
+        self.assertIsNot(commit_env, os.environ)
+        self.assertEqual(
+            {key: commit_env[key] for key in ambient},
+            {
+                "GIT_AUTHOR_NAME": COMMIT_OWNER_NAME,
+                "GIT_AUTHOR_EMAIL": COMMIT_OWNER_EMAIL,
+                "GIT_COMMITTER_NAME": COMMIT_OWNER_NAME,
+                "GIT_COMMITTER_EMAIL": COMMIT_OWNER_EMAIL,
+            },
+        )
+
+    def test_raw_commit_identity_requires_one_exact_owner_header_per_role(self):
+        valid = (
+            "tree " + "1" * 40 + "\n"
+            "parent " + "2" * 40 + "\n"
+            f"author {COMMIT_OWNER_NAME} <{COMMIT_OWNER_EMAIL}> 1700000000 +0000\n"
+            f"committer {COMMIT_OWNER_NAME} <{COMMIT_OWNER_EMAIL}> 1700000001 -0400\n"
+            "\nmessage\n"
+        )
+        _validate_commit_identity(valid)
+        for invalid in (
+            valid.replace("committer ", "committer Wrong <wrong@example.invalid>\ncommitter ", 1),
+            valid.replace("+0000", "+00:00", 1),
+            valid.replace(COMMIT_OWNER_EMAIL, "wrong@example.invalid", 1),
+        ):
+            with self.subTest(invalid=invalid), self.assertRaises(ContractError) as raised:
+                _validate_commit_identity(invalid)
+            self.assertEqual(raised.exception.code, "ADOPTION_IDENTITY")
+
+    def test_real_commit_uses_owner_identity_and_exact_raw_headers(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            subprocess.run(["git", "init", "-b", "main"], cwd=root, check=True, capture_output=True)
+            (root / "file.txt").write_text("data\n")
+            run(root, ["git", "add", "file.txt"])
+            run(root, ["git", "commit", "-m", "identity fixture"])
+            commit = run(root, ["git", "rev-parse", "HEAD"])
+            raw = run(root, ["git", "cat-file", "commit", commit])
+            _validate_commit_identity(raw)
+            headers = raw.split("\n\n", 1)[0].splitlines()
+            self.assertEqual(sum(line.startswith("author ") for line in headers), 1)
+            self.assertEqual(sum(line.startswith("committer ") for line in headers), 1)
+
+    def test_identity_mismatch_stops_before_push(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            repo, out = root / "repository", root / "results"
+            (repo / "operators/live1").mkdir(parents=True)
+            out.mkdir()
+            manifest_doc = {
+                "candidate_adoption_ready": False,
+                "adoption_scope": "partial-diagnostic", "readiness": readiness_record(), "publication_authority": False,
+                "production_enabled": False,
+                "changed_paths": ["src/changed.py"],
+                "files": [{"path": "src/changed.py", "size": 1, "sha256": "0" * 64, "mode": "100644", "git_blob": "0" * 40}],
+            }
+            raw = canonical(manifest_doc)
+            (repo / "src").mkdir(parents=True)
+            (repo / "src/changed.py").write_bytes(b"data")
+            (repo / MANIFEST).write_bytes(raw)
+            parent = "1" * 40
+            tree = "2" * 40
+            commit = "3" * 40
+            manifest_sha = hashlib.sha256(raw).hexdigest()
+            attestation = root / "manager-acceptance.json"
+            attestation.write_bytes(canonical({
+                "schema": "rs9.manager-source-adoption-attestation.v1alpha1",
+                "decision": "accept", "source_adoption_scope": "partial-diagnostic",
+                "reviewed_parent": parent, "reviewed_tree": tree, "manifest_sha256": manifest_sha,
+                "full_live1_qualification": False, "production_enabled": False,
+                "publication_authority": False}))
+            attestation_sha = hashlib.sha256(attestation.read_bytes()).hexdigest()
+            added = False
+            calls = []
+            wrong_identity = (
+                f"tree {tree}\nparent {parent}\n"
+                "author Wrong <wrong@example.invalid> 1700000000 +0000\n"
+                "committer Wrong <wrong@example.invalid> 1700000000 +0000\n\nmessage\n"
+            )
+
+            def mock_git(r, args):
+                nonlocal added
+                calls.append(args)
+                cmd = args[1:]
+                if cmd == ["branch", "--show-current"]:
+                    return "main"
+                if cmd in (["rev-parse", "HEAD"], ["rev-parse", "origin/main"]):
+                    return parent if cmd[-1] != "HEAD" or not added else commit
+                if cmd == ["diff", "--cached", "--name-only"]:
+                    return ""
+                if cmd == ["remote", "get-url", "origin"]:
+                    return "https://github.com/Knowledge-Forge-AI/release-starport-9.git"
+                if cmd[:2] == ["ls-files", "-z"] or cmd[:2] == ["ls-files", "--others"]:
+                    return ""
+                if cmd[:3] == ["fetch", "origin", "main"]:
+                    return ""
+                if cmd[:3] == ["add", "-A", "--"]:
+                    added = True
+                    return ""
+                if cmd[:2] == ["diff", "--cached"] and "--no-renames" in cmd:
+                    return "src/changed.py\n"
+                if cmd == ["write-tree"]:
+                    return tree
+                if cmd[:1] == ["commit"]:
+                    return ""
+                if cmd == ["rev-parse", "HEAD"]:
+                    return commit
+                if cmd == ["rev-parse", f"{commit}^{{tree}}"]:
+                    return tree
+                if cmd == ["rev-parse", f"{commit}^"]:
+                    return parent
+                if cmd == ["cat-file", "commit", commit]:
+                    return wrong_identity
+                if cmd[:1] == ["push"]:
+                    raise AssertionError("identity mismatch must stop before push")
+                return ""
+
+            with patch("rs9.adopt_candidate.run", side_effect=mock_git), \
+                 patch("rs9.hosted_contract.load_hosted_lanes", return_value={"lanes": [
+                     {"lane": "nix", "system": s, "module": "rs9.hosted_nix"}
+                     for s in ("x86_64-linux", "aarch64-linux")]}), \
+                 patch("rs9.adopt_candidate.verify_inventory", return_value=tree), \
+                 patch("rs9.collect_candidate.output_directory", return_value=out):
+                with self.assertRaises(ContractError) as raised:
+                    adopt(repo, out, reviewed_parent=parent, reviewed_tree=tree, manifest_sha256=manifest_sha,
+                          manager_attestation=attestation, manager_attestation_sha256=attestation_sha)
+            self.assertEqual(raised.exception.code, "ADOPTION_IDENTITY")
+            self.assertIn(["git", "cat-file", "commit", commit], calls)
+            self.assertFalse(any(call[1] == "push" for call in calls))
+
+    def test_captured_commit_sha_binds_checks_and_push_when_head_moves(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            repo, out = root / "repository", root / "results"
+            (repo / "operators/live1").mkdir(parents=True)
+            out.mkdir()
+            manifest_doc = {
+                "candidate_adoption_ready": False,
+                "adoption_scope": "partial-diagnostic", "readiness": readiness_record(), "publication_authority": False,
+                "production_enabled": False,
+                "changed_paths": ["src/changed.py"],
+                "files": [{"path": "src/changed.py", "size": 1, "sha256": "0" * 64, "mode": "100644", "git_blob": "0" * 40}],
+            }
+            raw = canonical(manifest_doc)
+            (repo / "src").mkdir(parents=True)
+            (repo / "src/changed.py").write_bytes(b"data")
+            (repo / MANIFEST).write_bytes(raw)
+            parent = "1" * 40
+            tree = "2" * 40
+            commit = "3" * 40
+            drift = "4" * 40
+            manifest_sha = hashlib.sha256(raw).hexdigest()
+            attestation = root / "manager-acceptance.json"
+            attestation.write_bytes(canonical({
+                "schema": "rs9.manager-source-adoption-attestation.v1alpha1",
+                "decision": "accept", "source_adoption_scope": "partial-diagnostic",
+                "reviewed_parent": parent, "reviewed_tree": tree, "manifest_sha256": manifest_sha,
+                "full_live1_qualification": False, "production_enabled": False,
+                "publication_authority": False}))
+            attestation_sha = hashlib.sha256(attestation.read_bytes()).hexdigest()
+            head_queries = 0
+            pushed = []
+            valid_identity = (
+                f"tree {tree}\nparent {parent}\n"
+                f"author {COMMIT_OWNER_NAME} <{COMMIT_OWNER_EMAIL}> 1700000000 +0000\n"
+                f"committer {COMMIT_OWNER_NAME} <{COMMIT_OWNER_EMAIL}> 1700000000 +0000\n\nmessage\n"
+            )
+
+            def mock_git(r, args):
+                nonlocal head_queries
+                cmd = args[1:]
+                if cmd == ["branch", "--show-current"]:
+                    return "main"
+                if cmd == ["rev-parse", "HEAD"]:
+                    head_queries += 1
+                    if head_queries <= 2:
+                        return parent
+                    if head_queries == 3:
+                        return commit
+                    return drift
+                if cmd == ["rev-parse", "origin/main"]:
+                    return parent
+                if cmd == ["diff", "--cached", "--name-only"]:
+                    return ""
+                if cmd == ["remote", "get-url", "origin"]:
+                    return "https://github.com/Knowledge-Forge-AI/release-starport-9.git"
+                if cmd[:2] == ["ls-files", "-z"] or cmd[:2] == ["ls-files", "--others"]:
+                    return ""
+                if cmd[:3] == ["fetch", "origin", "main"]:
+                    return ""
+                if cmd[:3] == ["add", "-A", "--"]:
+                    return ""
+                if cmd[:2] == ["diff", "--cached"] and "--no-renames" in cmd:
+                    return "src/changed.py\n"
+                if cmd == ["write-tree"]:
+                    return tree
+                if cmd[:1] == ["commit"]:
+                    return ""
+                if cmd == ["rev-parse", f"{commit}^{{tree}}"]:
+                    return tree
+                if cmd == ["rev-parse", f"{commit}^"]:
+                    return parent
+                if cmd == ["cat-file", "commit", commit]:
+                    return valid_identity
+                if cmd[:1] == ["push"]:
+                    pushed.append(args)
+                    return ""
+                return ""
+
+            with patch("rs9.adopt_candidate.run", side_effect=mock_git), \
+                 patch("rs9.hosted_contract.load_hosted_lanes", return_value={"lanes": [
+                     {"lane": "nix", "system": s, "module": "rs9.hosted_nix"}
+                     for s in ("x86_64-linux", "aarch64-linux")] }), \
+                 patch("rs9.adopt_candidate.verify_inventory", return_value=tree), \
+                 patch("rs9.collect_candidate.output_directory", return_value=out), \
+                 patch("rs9.collect_candidate.collect", return_value={
+                     "status": "not-qualified", "run_id": 1, "validation": {"status": "fail"}
+                 }), \
+                 patch("rs9.collect_candidate.write_packet"):
+                result = adopt(repo, out, reviewed_parent=parent, reviewed_tree=tree, manifest_sha256=manifest_sha,
+                               manager_attestation=attestation, manager_attestation_sha256=attestation_sha)
+            self.assertEqual(result["status"], "not-qualified")
+            self.assertEqual(head_queries, 3)
+            self.assertEqual(pushed, [["git", "push", "origin", f"{commit}:refs/heads/main"]])
 
     def test_adopt_stages_exactly_changed_paths_and_verifies_cached_set(self):
         with tempfile.TemporaryDirectory() as temporary:

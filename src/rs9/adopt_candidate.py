@@ -8,6 +8,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -21,10 +22,52 @@ from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
 
 REPOSITORY = "Knowledge-Forge-AI/release-starport-9"
 WORKFLOW = "rs9-candidate-tests.yml"
+COMMIT_OWNER_NAME = "Samuel Leighton Lair"
+COMMIT_OWNER_EMAIL = "sam.lair@knowledge-forge.ai"
+
+
+def _commit_environment():
+    """Copy the ambient environment, replacing every Git identity field."""
+    environment = os.environ.copy()
+    environment.update({
+        "GIT_AUTHOR_NAME": COMMIT_OWNER_NAME,
+        "GIT_AUTHOR_EMAIL": COMMIT_OWNER_EMAIL,
+        "GIT_COMMITTER_NAME": COMMIT_OWNER_NAME,
+        "GIT_COMMITTER_EMAIL": COMMIT_OWNER_EMAIL,
+    })
+    return environment
+
+
+def _validate_commit_identity(raw):
+    """Require one exact owner header for each Git commit identity role."""
+    if not isinstance(raw, str):
+        raise ContractError("ADOPTION_IDENTITY", "Raw commit object required")
+    lines = raw.splitlines()
+    try:
+        header_end = lines.index("")
+    except ValueError as exc:
+        raise ContractError("ADOPTION_IDENTITY", "Commit header/body separator required") from exc
+    headers = lines[:header_end]
+    role_lines = {
+        role: [line for line in headers if line.startswith(role + " ")]
+        for role in ("author", "committer")
+    }
+    if any(len(values) != 1 for values in role_lines.values()):
+        raise ContractError("ADOPTION_IDENTITY", "Exactly one author and committer header required")
+    for role, values in role_lines.items():
+        expected = re.compile(
+            rf"^{role} {re.escape(COMMIT_OWNER_NAME)} <{re.escape(COMMIT_OWNER_EMAIL)}> "
+            r"[0-9]+ [+-][0-9]{4}$"
+        )
+        if expected.fullmatch(values[0]) is None:
+            raise ContractError("ADOPTION_IDENTITY", "Commit identity or timestamp shape differs")
 
 
 def run(root, args):
-    result = subprocess.run(args, cwd=root, capture_output=True, timeout=120)
+    options = {"cwd": root, "capture_output": True, "timeout": 120}
+    if len(args) >= 2 and args[0] == "git" and args[1] == "commit":
+        options["env"] = _commit_environment()
+    result = subprocess.run(args, **options)
     if result.returncode:
         raise ContractError("ADOPTION_COMMAND", "Attended command failed; inspect locally")
     return result.stdout.decode("utf-8").strip()
@@ -240,9 +283,12 @@ def adopt(repository, output, *, reviewed_parent, reviewed_tree, manifest_sha256
         raise ContractError("ADOPTION_REVIEW", "Staged tree differs; index retained for inspection")
     git("commit", "-m", commit_message)
     commit = git("rev-parse", "HEAD")
-    if git("rev-parse", "HEAD^{tree}") != reviewed_tree or git("rev-parse", "HEAD^") != reviewed_parent:
+    if (not re.fullmatch(r"[0-9a-f]{40}", commit)
+            or git("rev-parse", f"{commit}^{{tree}}") != reviewed_tree
+            or git("rev-parse", f"{commit}^") != reviewed_parent):
         raise ContractError("ADOPTION_REVIEW", "Commit hook changed candidate; stop before push")
-    git("push", "origin", "HEAD:main")
+    _validate_commit_identity(git("cat-file", "commit", commit))
+    git("push", "origin", f"{commit}:refs/heads/main")
     started = datetime.now(timezone.utc).replace(microsecond=0)
     packet = collect(root, output, commit=commit, started_at=started, timeout=timeout)
     packet["reviewed_tree"] = reviewed_tree
