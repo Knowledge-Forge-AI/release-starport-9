@@ -8,6 +8,7 @@ from pathlib import Path
 from rs9.bootstrap import checked_bootstrap_configurations, load_bootstrap, require_configuration_authority
 from rs9.errors import ContractError
 from rs9.github import PublicClient
+from rs9.nebular_lineage import select_forward_lineage_proof
 from rs9.operator import BOOTSTRAP, EXPECTATIONS, assert_release_expectations
 from rs9.profiles import (TAURI_PROFILE, TAURI_AUTHORITY_PROFILE, capture_supplemental,
                           evaluate_profile, record_corroboration_failure, selection_for_intent)
@@ -57,6 +58,8 @@ def capture_generation(repository, output, *, project=None, client=None, checkou
             manifest = root / BOOTSTRAP
             intent = load_bootstrap(manifest, capture, approved_manifests=[digest(manifest.read_bytes())])
             require_configuration_authority(capture, intent)
+            stage = "lineage"
+            lineage_correction = select_forward_lineage_proof(root, capture, intent)
             stage = "supplemental"
             desktop_profile = intent["release"]["evidence"]["profile"] in {TAURI_PROFILE, TAURI_AUTHORITY_PROFILE}
             corroboration = ({"project": intent["project"]["id"], "release_authentication": "core-authenticated",
@@ -66,8 +69,11 @@ def capture_generation(repository, output, *, project=None, client=None, checkou
                 supplemental_receipts.append(corroboration)
             capture_supplemental(intent, target, client, corroboration=corroboration, core_authenticated=True)
             stage = "profile"
+            profile_kwargs = {"corroboration": corroboration if desktop_profile else None}
+            if lineage_correction is not None:
+                profile_kwargs["lineage_correction"] = lineage_correction
             profile = evaluate_profile(capture, intent["release"]["evidence"]["profile"], intent,
-                                       corroboration=corroboration if desktop_profile else None)
+                                       **profile_kwargs)
         except ContractError as error:
             record_corroboration_failure(corroboration, error)
             raise error.with_details(project=intent["project"]["id"], stage=stage) from None

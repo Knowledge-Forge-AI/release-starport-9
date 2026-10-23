@@ -1854,11 +1854,16 @@ class NebularPyPIContractTests(unittest.TestCase):
                 return subprocess.CompletedProcess(cmd, 0, (expected_sha + "\n").encode("ascii"), b"")
             return subprocess.CompletedProcess(cmd, 0, b" M src/rs9/tf_pypi_nebular.py\n?? .serena/project.yml\n", b"")
 
+        from rs9.tf_pypi_nebular import _nebular_import_closure_paths
+
+        closure_paths = _nebular_import_closure_paths(ROOT)
+        self.assertEqual(len(closure_paths), 85)
+        self.assertIn("src/rs9/nebular_lineage.py", closure_paths)
         with patch("rs9.tf_pypi_nebular.subprocess.run", side_effect=fake_git_run):
             st = source_tree_state(expected_sha, repository=ROOT, require_clean=False)
             self.assertFalse(st["worktree_clean"])
             self.assertEqual(st["dirty_paths_count"], 1)
-            self.assertEqual(st["closure_files_count"], 84)
+            self.assertEqual(st["closure_files_count"], len(closure_paths))
             self.assertRegex(st["closure_files_sha256"], r"^[0-9a-f]{64}$")
             self.assertTrue(st["serena_excluded_from_dirty_check"])
             with self.assertRaises(AdmissionError) as ctx_dirty:

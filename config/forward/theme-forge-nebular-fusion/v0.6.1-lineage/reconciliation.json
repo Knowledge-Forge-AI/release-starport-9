@@ -1,0 +1,115 @@
+{
+  "asset_inventory": [
+    {
+      "id": 601953752,
+      "name": "PROVENANCE.json",
+      "sha256": "3645984085dc434b1678eec16440d79a8c87dd704836eb8731085425dc976d1c",
+      "size": 14720
+    },
+    {
+      "id": 601953797,
+      "name": "SHA256SUMS",
+      "sha256": "0c811162316eb7fb99aac460db3cbeee6a6147d32ace29fa21b57856144f2ea0",
+      "size": 1378
+    },
+    {
+      "id": 601953710,
+      "name": "THIRD_PARTY_NOTICES.md",
+      "sha256": "d7547284b40ff84372ca4061004307b8513cc39d6839c346f0c4b52832cd5e04",
+      "size": 131900
+    },
+    {
+      "id": 601953356,
+      "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.6.1.tgz",
+      "sha256": "17f7563d6a6fa0bf250579a92ceca065fb4ca115a4fe4aae610850f1cfe29a7f",
+      "size": 18124
+    },
+    {
+      "id": 601953156,
+      "name": "knowledge-forge-ai-theme-forge-nebular-fusion-darwin-arm64-0.6.1.tgz",
+      "sha256": "089ab0ba9d2a2c6e36de58d23a988047d41d9e593f6bfc15d8d90debf08d2c24",
+      "size": 47082735
+    },
+    {
+      "id": 601953215,
+      "name": "knowledge-forge-ai-theme-forge-nebular-fusion-linux-arm64-0.6.1.tgz",
+      "sha256": "bb23429473211cca057a4b634d089eee938d360e7ee0e7ad415f516155cb99fd",
+      "size": 54205397
+    },
+    {
+      "id": 601953275,
+      "name": "knowledge-forge-ai-theme-forge-nebular-fusion-linux-x64-0.6.1.tgz",
+      "sha256": "a9f8084217104c3c23db39a5c9af01646e319793e2c70eda438bc576b776c4d2",
+      "size": 54053877
+    },
+    {
+      "id": 601953397,
+      "name": "nebular-public-source.tar.gz",
+      "sha256": "f9e0436ea4794e5dc8eb9e4c1585079fc65329e37ac502b30a9d075ea057b0aa",
+      "size": 7471875
+    },
+    {
+      "id": 601953680,
+      "name": "nebular.spdx.json",
+      "sha256": "d7b5ae755abc7a3807ff8425341e8028496b3c929d89915b4e5a7f88898909c1",
+      "size": 63796
+    },
+    {
+      "id": 601953101,
+      "name": "theme-forge-nebular-fusion-staging.tar.gz",
+      "sha256": "27ff6a60d5c139d7efcdb997cbc7daa04bd2f9d76391f1fccfcf7fac3a437bb1",
+      "size": 7466665
+    },
+    {
+      "id": 601953438,
+      "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+      "sha256": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be",
+      "size": 47079690
+    },
+    {
+      "id": 601953522,
+      "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-unknown-linux-gnu.tar.gz",
+      "sha256": "5d59a1dfb6b5cec5edced1b098eba7b79e4f77a0dd2a0ab815caa8992b17497f",
+      "size": 54248930
+    },
+    {
+      "id": 601953596,
+      "name": "theme-forge-nebular-fusion-v0.6.1-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "d6060f74d6e55ec3a096ac01a1ebadc8b8b1d89a9a51475cd52207b465ca434d",
+      "size": 54105413
+    }
+  ],
+  "current": {
+    "commit": "75bc4125a1e6a109321071ce70b3b99ae826f050",
+    "tree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b"
+  },
+  "historical": {
+    "commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+    "tree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b"
+  },
+  "provenance_asset": {
+    "id": 601953752,
+    "name": "PROVENANCE.json",
+    "sha256": "3645984085dc434b1678eec16440d79a8c87dd704836eb8731085425dc976d1c",
+    "size": 14720
+  },
+  "publisher_assertions": {
+    "mergedMainCommit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+    "mergedMainTree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b",
+    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+    "tag": "v0.6.1",
+    "tagTarget": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
+  },
+  "reason": "operator-authorized Git author metadata correction; no payload or publication authority",
+  "release": {
+    "id": 400494635,
+    "published_at": "2026-09-30T22:54:44Z",
+    "tag": "v0.6.1",
+    "version": "0.6.1"
+  },
+  "repository": {
+    "full_name": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+    "id": 1358643872
+  },
+  "schema": "rs9.nebular-forward-lineage.v1alpha1"
+}
