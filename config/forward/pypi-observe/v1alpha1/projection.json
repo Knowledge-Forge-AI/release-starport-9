@@ -1,0 +1,171 @@
+{
+  "current_manifest": {
+    "path": "bootstrap/pre-rs9/theme-forge-live1/manifest-author-aligned.json",
+    "sha256": "f31bd4ddc1caf0f591b1d8447c1bf694ffa822994fc5f88bb346a3292227bf78"
+  },
+  "historical_manifest": {
+    "path": "bootstrap/pre-rs9/theme-forge-live1/manifest.json",
+    "sha256": "93081d30cb2eedb88eb6248653177ab03570dbd51f7047293e25670d860b8e64"
+  },
+  "reason": "observer-only application-to-distribution projection; grants no upload, ownership or lineage authority outside this lane",
+  "rows": [
+    {
+      "application": {
+        "release_id": 400494635,
+        "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+        "repository_id": 1358643872,
+        "tag": "v0.6.1",
+        "version": "0.6.1"
+      },
+      "binding_asset": {
+        "github_asset_id": 601953438,
+        "name": "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz",
+        "sha256": "e5ab9c5ce5dd7fb02274b11b223db9db7ac1f3b2167334ee2f322abd3c8ec4be",
+        "size": 47079690
+      },
+      "distribution": {
+        "approval_path": "operators/tf-pypi/theme-forge-nebular-fusion-artifacts.json",
+        "approval_sha256": "bac462430273c4449485a70189d26e9ed090e1859cd8161ed14844a084122a89",
+        "kind": "nebular-native-wheel",
+        "name": "theme-forge-nebular-fusion",
+        "set_sha256": "5b306dfabae76d597263ea2ddd563d7d11211b252eba910eca45672a0a939284",
+        "version": "0.6.1"
+      },
+      "intake": null,
+      "lineage": {
+        "basis": "nebular-forward-lineage",
+        "current": {
+          "commit": "75bc4125a1e6a109321071ce70b3b99ae826f050",
+          "tree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b"
+        },
+        "historical": {
+          "commit": "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e",
+          "tree": "203a80b33fc94c776c9c184f8cac4f1609cb0f2b"
+        },
+        "tree_relation_basis": "reviewed-record"
+      },
+      "project": "theme-forge-nebular-fusion"
+    },
+    {
+      "application": {
+        "release_id": 399542664,
+        "repository": "Knowledge-Forge-AI/theme-forge-solar-sail",
+        "repository_id": 1374611333,
+        "tag": "v0.2.1",
+        "version": "0.2.1"
+      },
+      "binding_asset": {
+        "github_asset_id": 599267369,
+        "name": "knowledge-forge-ai-theme-forge-solar-sail-0.2.1.tgz",
+        "sha256": "ebc4f21d1e61dbc0ac4e87ce81f7ecec4f97d7c15562356e429d4c1a4e9aa5a0",
+        "size": 110658
+      },
+      "distribution": {
+        "approval_path": "operators/tf-pypi/theme-forge-solar-sail-0.2.1.post1-artifacts.json",
+        "approval_sha256": "e7d6b00e1f55652ef7aafe1117fcf3d5a4ad479585935a8de06fcee4f22046f4",
+        "kind": "tf-npm-aggregate",
+        "name": "theme-forge-solar-sail",
+        "set_sha256": "c50b64cb0251df129a8075155ee47b845490c14c82a12ed67165969dbe5adddf",
+        "version": "0.2.1.post1"
+      },
+      "intake": {
+        "pin_path": "operators/tf-pypi/theme-forge-solar-sail.json",
+        "pin_sha256": "00ce9b1290a29cbd5d22873a9c074fa9a28449c4a8b74a776fe4fb4f3f3550eb"
+      },
+      "lineage": {
+        "basis": "observer-equal-tree",
+        "current": {
+          "commit": "17883c161ce475666a229349062d89bee8f50a24",
+          "tree": "35a865bdea29dac6e39feb6afcba39485b23b3a6"
+        },
+        "historical": {
+          "commit": "68e3f95a27cf1681aabb1fccb55e8b78d23b5fa0",
+          "tree": "35a865bdea29dac6e39feb6afcba39485b23b3a6"
+        },
+        "tree_relation_basis": "reviewed-record"
+      },
+      "project": "theme-forge-solar-sail"
+    },
+    {
+      "application": {
+        "release_id": 399542205,
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+        "repository_id": 1342490027,
+        "tag": "v0.6.1",
+        "version": "0.6.1"
+      },
+      "binding_asset": {
+        "github_asset_id": 599265851,
+        "name": "knowledge-forge-ai-theme-forge-stellar-burst-0.6.1.tgz",
+        "sha256": "53ef41a3de3335e042f2c4b1d299b1155b64bfc6556a84baf6a62cb28bcca209",
+        "size": 644313
+      },
+      "distribution": {
+        "approval_path": "operators/tf-pypi/theme-forge-stellar-burst-0.6.1.post1-artifacts.json",
+        "approval_sha256": "414dbee9423c193992106b661f43effe235a6c0ba1f7a01efdc57234748faff9",
+        "kind": "tf-npm-aggregate",
+        "name": "theme-forge-stellar-burst",
+        "set_sha256": "816c5c230c4b413aa5f8d4dd41a0d02fcf755a1d4fb28d27d8bdef29c44a97c0",
+        "version": "0.6.1.post1"
+      },
+      "intake": {
+        "pin_path": "operators/tf-pypi/theme-forge-stellar-burst.json",
+        "pin_sha256": "e54a3c298782aa412158f0054270b7560c399234e40fd0fbb8f3b9004cd8fa75"
+      },
+      "lineage": {
+        "basis": "observer-equal-tree",
+        "current": {
+          "commit": "9f0bb67a8606ff1ab94e0760991cf8bbc7b052c4",
+          "tree": "158bd6d03b21d747385fb25f49e6e148d62043c8"
+        },
+        "historical": {
+          "commit": "a3e89683f92b8240c800ed303c866e7b12aa3277",
+          "tree": "158bd6d03b21d747385fb25f49e6e148d62043c8"
+        },
+        "tree_relation_basis": "reviewed-record"
+      },
+      "project": "theme-forge-stellar-burst"
+    },
+    {
+      "application": {
+        "release_id": 399542451,
+        "repository": "Knowledge-Forge-AI/theme-forge-stellar-loom",
+        "repository_id": 1361513719,
+        "tag": "v0.4.0",
+        "version": "0.4.0"
+      },
+      "binding_asset": {
+        "github_asset_id": 599266537,
+        "name": "knowledge-forge-ai-theme-forge-stellar-loom-0.4.0.tgz",
+        "sha256": "4550314d9a6eb9a016c8637eb2a0a98e9a410210ad6546642dfce31c7402c9ec",
+        "size": 273462
+      },
+      "distribution": {
+        "approval_path": "operators/tf-pypi/theme-forge-stellar-loom-0.4.0.post1-artifacts.json",
+        "approval_sha256": "a52d332b1257d48a73ebc8b9c552d82cc032fd3777f9dbd21137b104dfe596e4",
+        "kind": "tf-npm-aggregate",
+        "name": "theme-forge-stellar-loom",
+        "set_sha256": "05e1f8dc651e813f2f78d3b8cdc1effb6dea52a6a12d80d6e5b9649b247b52d0",
+        "version": "0.4.0.post1"
+      },
+      "intake": {
+        "pin_path": "operators/tf-pypi/theme-forge-stellar-loom.json",
+        "pin_sha256": "91a0f9090bf04a2a0986686ae4d24cea6587759d5446e1923e48765c3c36636c"
+      },
+      "lineage": {
+        "basis": "observer-equal-tree",
+        "current": {
+          "commit": "85e4264585bf3521ca0ec19529bb203410a1cd65",
+          "tree": "9388e305fd516755f01fdd01e66c72f09cc8e1d8"
+        },
+        "historical": {
+          "commit": "d6f3cc457ee68224cef06e9599c9d2401057c618",
+          "tree": "9388e305fd516755f01fdd01e66c72f09cc8e1d8"
+        },
+        "tree_relation_basis": "reviewed-record"
+      },
+      "project": "theme-forge-stellar-loom"
+    }
+  ],
+  "schema": "rs9.pypi-observe-projection.v1alpha1"
+}
