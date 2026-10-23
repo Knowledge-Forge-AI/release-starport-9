@@ -7,16 +7,17 @@ Nebular 0.6.1. Their tagged trees predate `.rs9/`. No upstream release, tag or
 repository is changed by this exception. Future releases require normal
 project-owned, release-bound `.rs9/` configuration or another reviewed exception.
 
-`manifest.json` binds each repository/tag/release/commit/tree/version and the
-canonical configuration inventory hash. The per-project `intent.json` and
+The historical `manifest.json` binds each repository/tag/release/commit/tree/version
+and the canonical configuration inventory hash. The per-project `intent.json` and
 `channels.json` are the single LIVE1 authority; the Nebular files under `examples/`
 remain illustrative and are not combined with these configurations.
 
 Expected release asset hashes are in the attended operator's expectation record.
 Authenticated derived hashes belong in ingestion evidence, not ordinary tenant
 config. The [bootstrap specification](../../../docs/specs/rs9-bootstrap-tenant-v1alpha1.md)
-defines hash computation and refusal rules. Exact file hashes appear in the
-[candidate inventory](../../../operators/live1/candidate-manifest.json).
+defines hash computation and refusal rules. Exact historical file hashes appear
+in the frozen [candidate inventory](../../../operators/live1/candidate-manifest.json).
+The forward manifest has no adoption inventory yet.
 
 Nebular 0.6.1 `intent.license.files` requires the native payload copies `LICENSE`
 and `NOTICE` only. The separate manifest `license_authority.files` and Tauri
@@ -28,3 +29,9 @@ Downstream metadata remains `AGPL-3.0-or-later`, with historical npm
 
 CONT5 manifest candidate SHA-256:
 `93081d30cb2eedb88eb6248653177ab03570dbd51f7047293e25670d860b8e64`.
+
+CONT5 SHA alignment: the historical manifest remains byte-identical while the
+current LIVE1 selector uses `manifest-author-aligned.json` with the corrected
+public tag commit identities. Release IDs, trees and assets remain unchanged;
+no release assets were republished. Future attended adoption requires a
+separately reviewed inventory for the forward manifest.
