@@ -4,10 +4,18 @@ import json
 from pathlib import Path
 
 from rs9.errors import ContractError
+from rs9.nebular_lineage import (
+    CURRENT_COMMIT,
+    CURRENT_TREE,
+    HISTORICAL_COMMIT,
+    HISTORICAL_TREE,
+)
 from rs9.release_core import digest
 
-TAG_COMMIT = "49e2c4919b6b4ec9bd4ed5d7e7ced90921e00f5e"
-TAG_TREE = "203a80b33fc94c776c9c184f8cac4f1609cb0f2b"
+TAG_COMMIT = HISTORICAL_COMMIT
+TAG_TREE = HISTORICAL_TREE
+CURRENT_TAG_COMMIT = CURRENT_COMMIT
+CURRENT_TAG_TREE = CURRENT_TREE
 TAG_NAME = "v0.6.1"
 NEBULAR_PROJECT_ID = "theme-forge-nebular-fusion"
 ROOT = "/usr/lib/" + NEBULAR_PROJECT_ID
@@ -81,6 +89,13 @@ REVIEWED_TAGGED_FILES = {'authenticated-inputs/loom-binding.json': {'blob': '0de
                               'sha256': 'fba7f292b3c01ed062f4727e0c22912bc269b6ca76fca8328fb5329c098aac77',
                               'size': 1906}}
 REVIEWED_CALLER_FILES = tuple(REVIEWED_TAGGED_FILES)
+# The retained caller rows are the exact historical-tree bytes. The current
+# tag is admitted only because the reviewed lineage proves the trees equal.
+REVIEWED_SOURCE_TREE = HISTORICAL_TREE
+REVIEWED_TAG_IDENTITIES = {
+    HISTORICAL_COMMIT: HISTORICAL_TREE,
+    CURRENT_COMMIT: CURRENT_TREE,
+}
 NEBULAR_MEMBER_DEFINITIONS = {'/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs': {'literals': {'src-tauri/src/platform.rs': ['parent.join("tfsb-studio-service")',
                                                                                                                                                   'if '
                                                                                                                                                   'packaged '
@@ -172,9 +187,20 @@ def _source_valid(path, record):
     if not isinstance(record, dict) or not isinstance(record.get("content"), str):
         return False
     data = record["content"].encode()
-    return (len(data) == pin["size"] and digest(data) == pin["sha256"]
+    return (record.get("path") == path and len(data) == pin["size"] and digest(data) == pin["sha256"]
             and hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest() == pin["blob"]
             and all(record.get(k) == pin[k] for k in ("blob", "sha256", "size")))
+
+
+def _reviewed_tag_identity(tag):
+    if not isinstance(tag, dict):
+        return None
+    commit, tree = tag.get("commit"), tag.get("tree")
+    if not isinstance(commit, str) or not isinstance(tree, str):
+        return None
+    if tree != REVIEWED_SOURCE_TREE or REVIEWED_TAG_IDENTITIES.get(commit) != tree:
+        return None
+    return commit, tree
 
 
 def collect_caller_sources(capture, client, scratch, entry=None):
@@ -185,9 +211,11 @@ def collect_caller_sources(capture, client, scratch, entry=None):
     try:
         if client is None:
             raise ContractError("CALLER_CLIENT_UNAVAILABLE", "Authenticated source client unavailable")
-        tag = capture.record["tag"]
-        if tag.get("commit") != TAG_COMMIT or tag.get("tree") != TAG_TREE:
+        tag = capture.record.get("tag") if isinstance(capture.record, dict) else None
+        identity = _reviewed_tag_identity(tag)
+        if identity is None:
             raise ContractError("CALLER_SOURCE_IDENTITY", "Caller tag/tree differs from reviewed release")
+        tag_commit, tag_tree = identity
         from rs9.hosted_smoke import tagged_files
         records = tagged_files(capture, client, output, (), paths=REVIEWED_CALLER_FILES, role="caller-source")
         files = {}
@@ -195,6 +223,8 @@ def collect_caller_sources(capture, client, scratch, entry=None):
             path = record["path"]
             if path not in REVIEWED_TAGGED_FILES:
                 raise ContractError("CALLER_SOURCE_IDENTITY", "Unselected source returned")
+            if record.get("tag_commit") != tag_commit:
+                raise ContractError("CALLER_SOURCE_IDENTITY", "Caller source record is bound to another tag")
             record = dict(record, content=(output / path).read_text(encoding="utf-8"))
             if not _source_valid(path, record):
                 raise ContractError("CALLER_SOURCE_IDENTITY", "Caller bytes differ from authenticated tag")
@@ -202,8 +232,8 @@ def collect_caller_sources(capture, client, scratch, entry=None):
             missing.remove(path)
         if missing:
             raise ContractError("CALLER_SOURCE_MISSING", "Selected source absent")
-        return dict(schema="rs9.nebular-caller-sources.v1", status="available", tag_commit=TAG_COMMIT,
-                    tag_tree=TAG_TREE, files=files, records=records)
+        return dict(schema="rs9.nebular-caller-sources.v1", status="available", tag_commit=tag_commit,
+                    tag_tree=tag_tree, files=files, records=records)
     except (ContractError, OSError, ValueError, KeyError, TypeError, AttributeError) as error:
         return dict(schema="rs9.nebular-caller-sources.v1", status="unavailable", reason=getattr(error, "code", "CALLER_SOURCE_UNAVAILABLE"),
                     missing_items=missing, collection_path="execute -> collect_caller_sources -> tagged_files", files={}, records=[])
@@ -268,9 +298,14 @@ def verify_nebular_caller(path, rule, pin, inventory, inputs, *, caller_evidence
     if not _preserved(path, inventory):
         return None, "script-preservation-unproven"
     evidence = caller_evidence if caller_evidence is not None else inventory.get("caller_evidence")
+    evidence_identity = _reviewed_tag_identity({
+        "commit": evidence.get("tag_commit") if isinstance(evidence, dict) else None,
+        "tree": evidence.get("tag_tree") if isinstance(evidence, dict) else None,
+    })
     if (not isinstance(evidence, dict) or evidence.get("schema") != "rs9.nebular-caller-sources.v1"
-            or evidence.get("status") != "available" or evidence.get("tag_commit") != TAG_COMMIT or evidence.get("tag_tree") != TAG_TREE):
+            or evidence.get("status") != "available" or evidence_identity is None):
         return None, "caller-content-or-identity-unproven"
+    evidence_commit, evidence_tree = evidence_identity
     sources = evidence.get("files", {})
     if set(sources) != set(REVIEWED_CALLER_FILES) or not all(_source_valid(p, sources[p]) for p in REVIEWED_CALLER_FILES):
         return None, "caller-content-or-identity-unproven"
@@ -325,6 +360,6 @@ def verify_nebular_caller(path, rule, pin, inventory, inputs, *, caller_evidence
         return None, "caller-content-or-identity-unproven"
     return dict(path=path, role=definition["role"], intent=rule["intent"], sha256=pin["sha256"], mode=inventory["files"][path]["mode"],
                 input_member=pin["input_member"], input_archive_sha256=pin["asset_sha256"],
-                proof_model="authenticated-source-relation-and-release-preservation", tag_commit=TAG_COMMIT, tag_tree=TAG_TREE,
+                proof_model="authenticated-source-relation-and-release-preservation", tag_commit=evidence_commit, tag_tree=evidence_tree,
                 runtime_member=RUNTIME, runtime_sha256=runtime["sha256"], manifest_sha256=digest(manifest_text.encode()),
                 native_execution_claimed=False, system_node_required=False), None

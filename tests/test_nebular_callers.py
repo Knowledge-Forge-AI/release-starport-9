@@ -1,14 +1,14 @@
 """Real tagged sources; controlled release/tool fixtures do not claim native results."""
 import copy
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from rs9 import nebular_callers as callers
-from rs9.rpm_lint_policy import load_policy, evaluate_policy
 from rs9.release_core import digest
+from rs9.rpm_lint_policy import evaluate_policy, load_policy
 from rs9.scratch import canonical
 
 SOURCES = Path(__file__).parent / 'fixtures/nebular-0.6.1/caller-sources.json'
@@ -16,8 +16,11 @@ SOURCES = Path(__file__).parent / 'fixtures/nebular-0.6.1/caller-sources.json'
 
 def attach_caller_fixture(inventory, inputs):
     """Actual source bytes plus explicit external package/manifest test doubles."""
+    source_rows = json.loads(SOURCES.read_bytes())
+    for row in source_rows.values():
+        row['tag_commit'] = callers.TAG_COMMIT
     inventory['caller_evidence'] = dict(schema='rs9.nebular-caller-sources.v1', status='available',
-        tag_commit=callers.TAG_COMMIT, tag_tree=callers.TAG_TREE, files=json.loads(SOURCES.read_bytes()))
+        tag_commit=callers.TAG_COMMIT, tag_tree=callers.TAG_TREE, files=source_rows)
     def add(path, sha, size, mode):
         row=dict(path=path,type='file',sha256=sha,size=size,mode=mode,device=1,inode=90000+len(inventory['files']),owner='root',group='root',flags=0)
         inventory['files'][path]=row
@@ -78,7 +81,8 @@ class NebularCallerTests(unittest.TestCase):
             _validate_policy(policy)
 
     def test_actual_engine_bytes_drive_versioned_requires(self):
-        import io, tarfile
+        import io
+        import tarfile
         payload=json.loads(SOURCES.with_name('caller-payload-members.json').read_bytes())
         metadata=payload['loom:package/package.json']
         self.assertEqual(digest(metadata['content'].encode()),callers.FLOOR_SHA256)
@@ -122,6 +126,11 @@ class NebularCallerTests(unittest.TestCase):
         attach_caller_fixture(inventory,inputs)
         variants=[]
         v=copy.deepcopy(inventory);v['caller_evidence']['tag_tree']='0'*40;variants.append(v)
+        v=copy.deepcopy(inventory);v['caller_evidence']['tag_commit']='a'*40;variants.append(v)
+        v=copy.deepcopy(inventory);v['caller_evidence']['tag_commit']=['x'];variants.append(v)
+        v=copy.deepcopy(inventory);v['caller_evidence']['tag_commit']={'commit': callers.TAG_COMMIT};variants.append(v)
+        v=copy.deepcopy(inventory);v['caller_evidence']['tag_tree']=['x'];variants.append(v)
+        v=copy.deepcopy(inventory);v['caller_evidence']['tag_tree']={'tree': callers.TAG_TREE};variants.append(v)
         v=copy.deepcopy(inventory);v['caller_evidence']['files']['src-tauri/src/platform.rs']['content']+='\n';variants.append(v)
         v=copy.deepcopy(inventory);v['files'][callers.RUNTIME]['sha256']='0'*64;variants.append(v)
         v=copy.deepcopy(inventory);v['contract_members'][callers.MANIFEST]='{}';variants.append(v)
@@ -142,16 +151,29 @@ class NebularCallerTests(unittest.TestCase):
         rule['caller_structure']['floor']='>=22'
         self.assertFalse(evaluate_policy(raw,inventory,inputs,policy)['accepted'])
 
+    def test_current_tag_is_accepted_only_with_the_equal_reviewed_tree(self):
+        from tests.test_rpm_lint_policy import run10_fixture_case
+        raw, inventory, inputs, _, _ = run10_fixture_case('x86_64-linux')
+        attach_caller_fixture(inventory, inputs)
+        inventory['caller_evidence']['tag_commit'] = callers.CURRENT_TAG_COMMIT
+        inventory['caller_evidence']['tag_tree'] = callers.CURRENT_TAG_TREE
+        result = evaluate_policy(raw, inventory, inputs, load_policy())
+        self.assertTrue(result['accepted'], result['blockers'])
+        self.assertTrue(all(proof['tag_commit'] == callers.CURRENT_TAG_COMMIT
+                            for proof in result['member_proofs']
+                            if proof.get('role') != 'typescript-declaration-data'))
+
     def test_collector_authenticates_bytes_not_claimed_hashes_and_names_missing_items(self):
         sources=json.loads(SOURCES.read_bytes())
         class Capture:
-            record={'tag':{'commit':callers.TAG_COMMIT,'tree':callers.TAG_TREE}}
+            record={'tag':{'commit':callers.CURRENT_TAG_COMMIT,'tree':callers.CURRENT_TAG_TREE}}
         with tempfile.TemporaryDirectory() as tmp:
             output=Path(tmp)
             records=[]
             for path,row in sources.items():
                 target=output/path;target.parent.mkdir(parents=True,exist_ok=True);target.write_text(row['content'])
-                records.append({k:v for k,v in row.items() if k!='content'})
+                records.append({**{k:v for k,v in row.items() if k!='content'},
+                                'tag_commit': callers.CURRENT_TAG_COMMIT})
             with patch('rs9.hosted_smoke.tagged_files',return_value=records):
                 self.assertEqual(callers.collect_caller_sources(Capture(),object(),output)['status'],'available')
                 (output/'src-tauri/src/platform.rs').write_text('forged')
@@ -161,3 +183,36 @@ class NebularCallerTests(unittest.TestCase):
             absent=callers.collect_caller_sources(Capture(),None,output)
             self.assertEqual(absent['status'],'unavailable')
             self.assertEqual(set(absent['missing_items']),set(callers.REVIEWED_CALLER_FILES))
+
+    def test_current_and_historical_tagged_sources_have_authenticated_identity(self):
+        sources = json.loads(SOURCES.read_bytes())
+        for commit, tree in callers.REVIEWED_TAG_IDENTITIES.items():
+            with self.subTest(commit=commit), tempfile.TemporaryDirectory() as tmp:
+                output = Path(tmp)
+                records = []
+                for path, row in sources.items():
+                    target = output / path
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(row['content'])
+                    records.append({**{k: v for k, v in row.items() if k != 'content'}, 'tag_commit': commit})
+
+                class Capture:
+                    record = {'tag': {'commit': commit, 'tree': tree}}
+
+                with patch('rs9.hosted_smoke.tagged_files', return_value=records):
+                    result = callers.collect_caller_sources(Capture(), object(), output)
+                self.assertEqual(result['status'], 'available')
+                self.assertEqual((result['tag_commit'], result['tag_tree']), (commit, tree))
+
+    def test_unknown_or_wrong_tree_caller_capture_is_rejected_before_collection(self):
+        for commit, tree in (('a' * 40, callers.CURRENT_TAG_TREE),
+                             (callers.CURRENT_TAG_COMMIT, '0' * 40)):
+            with self.subTest(commit=commit), tempfile.TemporaryDirectory() as tmp:
+                class Capture:
+                    record = {'tag': {'commit': commit, 'tree': tree}}
+
+                with patch('rs9.hosted_smoke.tagged_files') as collector:
+                    result = callers.collect_caller_sources(Capture(), object(), Path(tmp))
+                self.assertEqual(result['status'], 'unavailable')
+                self.assertEqual(result['reason'], 'CALLER_SOURCE_IDENTITY')
+                collector.assert_not_called()
