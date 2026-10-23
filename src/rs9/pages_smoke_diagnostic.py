@@ -73,7 +73,8 @@ def validate_smoke_observation(raw, *, system=None):
     if mismatch:
         result["binding_mismatch"] = True
     from rs9.smoke_stream_tokens import (
-        validate_inner_stream_tokens, validate_inventory, validate_run_record, validate_stream_tokens,
+        CATEGORY_SCHEMA, CATEGORY_STAGE, validate_inner_stream_tokens, validate_inventory,
+        validate_problem_categories, validate_run_record, validate_stream_tokens,
     )
     stream = validate_stream_tokens(raw.get("stderr_diagnostic"), sha256=hashes["stderr_sha256"],
         byte_count=counts["stderr_bytes"], complete=complete, mismatch=mismatch)
@@ -91,6 +92,23 @@ def validate_smoke_observation(raw, *, system=None):
             result["harness_run_record"] = run_record
         if inner_stream is not None:
             result["inner_stderr_diagnostic"] = inner_stream
+    if system in {"x86_64-linux", "aarch64-linux"}:
+        raw_categories = raw.get("harness_problem_categories")
+        try:
+            categories = validate_problem_categories(
+                raw_categories, system=system, scenario=scenario, receipt=raw.get("receipt"),
+                receipt_error=result["receipt_error"], inventory=inventory,
+                raw_inventory=raw.get("evidence_inventory"), mismatch=mismatch)
+        except Exception:
+            # An optional category fault is withheld, never raised over the original failure.
+            categories = None if raw_categories is None else {
+                "schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE,
+                "withheld_reason": "binding-mismatch" if mismatch else "invalid-observation"}
+        if categories is not None:
+            result["harness_problem_categories"] = categories
+            if "receipt" in categories:
+                # Positive binding only: carry the same-read identity so host re-projection stays a fixed point.
+                result["receipt"] = {"bytes": categories["receipt"]["bytes"], "sha256": categories["receipt"]["sha256"]}
     return result
 
 

@@ -1,9 +1,11 @@
 """Closed first-failure tokens, privacy and descriptor-only artifact observations."""
+import copy
 import json
 import os
 from pathlib import Path
 import tempfile
 import unittest
+from typing import ClassVar
 from unittest.mock import patch
 
 from rs9.release_core import digest
@@ -577,3 +579,390 @@ class RunRecordAndInnerStderrTests(unittest.TestCase):
 
             linux_doc = collect_failure_diagnostics(b"", fields, ev, "linux-x64", "C", record={})
             self.assertEqual(set(linux_doc.keys()), {"stderr_diagnostic", "evidence_inventory"})
+
+
+class LinuxProblemCategoryTests(unittest.TestCase):
+    PRIV_PATH = "/" + "Users/" + "private-operator/Library/secret"
+    PRIV_EMAIL = "private.user@example.com"
+    PRIV_TOK = "ghp" + "_" + "p" * 36
+    BINDINGS = (("x86_64-linux", "linux-x64", "C"), ("x86_64-linux", "linux-x64", "C-signal"),
+                ("aarch64-linux", "linux-arm64", "B"))
+    EXPECTED: ClassVar[list[dict[str, str | int]]] = [
+        {"category": "application-exit-nonzero", "count": 1},
+        {"category": "harness-error", "count": 1},
+        {"category": "read-only-fixture-modified", "count": 1},
+        {"category": "receipt-not-written", "count": 1},
+        {"category": "receipt-status", "count": 1},
+        {"category": "required-step", "count": 2},
+        {"category": "signal-termination-mismatch", "count": 1},
+    ]
+
+    def identity(self):
+        # Same-read descriptor summary exactly as sanitize_receipt_summary leaves it.
+        return {"present": True, "bytes": 1779, "sha256": "c" * 64, "status": "fail",
+                "problem_codes": ["withheld-token"], "problem_count": 11}
+
+    def problems(self):
+        return [
+            "no receipt was written",
+            f"receipt status fail: {self.PRIV_PATH} {self.PRIV_TOK}",
+            f"required step project-open failed: {self.PRIV_PATH} {self.PRIV_EMAIL}",
+            "application ended by exit 1 instead of SIGTERM",
+            f"read-only fixture core-minimal-{self.PRIV_EMAIL} was modified",
+            f"harness error: candidate processes already running: {self.PRIV_PATH}",
+            "application exit code 1 signal null",
+            "required step host-start failed",
+            "unrecognized problem with " + self.PRIV_PATH,
+            12345,
+            {"code": "object-problem"},
+        ]
+
+    def project(self, record, identity=None, binding=("x86_64-linux", "linux-x64", "C")):
+        from rs9.smoke_stream_tokens import project_problem_categories
+        system, platform, scenario = binding
+        return project_problem_categories(record, self.identity() if identity is None else identity,
+                                          system=system, platform=platform, scenario=scenario)
+
+    def validate(self, raw, *, system="x86_64-linux", scenario="C", receipt=None, receipt_error="receipt-failed",
+                 raw_inventory="default-observed", mismatch=False):
+        from rs9.smoke_stream_tokens import INVENTORY_STAGE, validate_problem_categories
+        if raw_inventory == "default-observed":
+            raw_inventory = {"stage": INVENTORY_STAGE, "status": "observed", "artifacts": [
+                {"kind": "run.json", "bytes": 1779, "regular": True, "symlink": False}],
+                "entries_observed": 1, "unlisted": 0}
+        return validate_problem_categories(
+            raw, system=system, scenario=scenario, receipt=self.identity() if receipt is None else receipt,
+            receipt_error=receipt_error, inventory=validate_inventory(raw_inventory) if raw_inventory is not None else None,
+            raw_inventory=raw_inventory, mismatch=mismatch)
+
+    def small(self):
+        return self.project({"problems": ["receipt schema", "required step a", "receipt schema", "unknown"]})
+
+    def test_producer_selects_only_linux_bindings_and_reduces_private_suffixes(self):
+        from rs9.smoke_stream_tokens import (
+            CATEGORY_SCHEMA,
+            CATEGORY_STAGE,
+            project_run_record,
+        )
+        record = {"status": "fail", "problems": self.problems(),
+                  "receipt": {"steps": [{"id": "app-shell", "ok": True, "detail": "SENTINEL_STEP"}]}}
+        for binding in self.BINDINGS:
+            system, _, scenario = binding
+            with self.subTest(system=system, scenario=scenario):
+                doc = self.project(record, binding=binding)
+                self.assertEqual(doc, {
+                    "schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "system": system, "scenario": scenario,
+                    "receipt": {"bytes": 1779, "sha256": "c" * 64},
+                    "problems": {"total": 11, "scanned": 11, "categories": self.EXPECTED, "unrecognized": 1,
+                                 "non_string": 2, "omitted": 0, "unavailable": 0},
+                })
+                # The exact existing vocabulary and matching policy, not a parallel classifier.
+                self.assertEqual(doc["problems"]["categories"],
+                                 project_run_record(record, self.identity())["problems"]["categories"])
+                serialized = json.dumps(doc)
+                for sentinel in (self.PRIV_PATH, self.PRIV_EMAIL, self.PRIV_TOK, "private-operator", "core-minimal",
+                                 "unrecognized problem", "object-problem", "project-open", "host-start",
+                                 "SENTINEL_STEP", "app-shell", "steps", "withheld-token", "present"):
+                    self.assertNotIn(sentinel, serialized)
+                self.assertEqual(self.validate(doc, system=system, scenario=scenario), doc)
+        for binding in (("aarch64-darwin", "darwin-arm64", "A"), ("x86_64-linux", "linux-x64", "B"),
+                        ("x86_64-linux", "linux-x64", "A"), ("aarch64-linux", "linux-arm64", "C"),
+                        ("aarch64-linux", "linux-x64", "C"), ("x86_64-linux", "linux-arm64", "B"),
+                        (None, "linux-x64", "C"), ("unexpected", "linux-x64", "C"),
+                        (["x86_64-linux"], "linux-x64", "C"), ("x86_64-linux", "linux-x64", None)):
+            with self.subTest(binding=repr(binding)):
+                self.assertIsNone(self.project(record, binding=binding))
+
+    def test_producer_requires_same_read_identity_and_dict_record(self):
+        record = {"problems": ["receipt schema"]}
+        good = self.identity()
+        for identity in (None, {}, "1779", {"present": False}, {"present": True},
+                         {"bytes": 1779, "sha256": "c" * 64},
+                         {**good, "present": 1}, {**good, "present": "true"},
+                         {**good, "bytes": True}, {**good, "bytes": 0}, {**good, "bytes": -1},
+                         {**good, "bytes": 1024 * 1024 + 1}, {**good, "bytes": 1779.0}, {**good, "bytes": "1779"},
+                         {k: v for k, v in good.items() if k != "sha256"}, {**good, "sha256": "C" * 64},
+                         {**good, "sha256": "c" * 63}, {**good, "sha256": None}):
+            with self.subTest(identity=repr(identity)):
+                if identity is None:
+                    from rs9.smoke_stream_tokens import project_problem_categories
+                    self.assertIsNone(project_problem_categories(record, None, system="x86_64-linux",
+                                                                 platform="linux-x64", scenario="C"))
+                else:
+                    self.assertIsNone(self.project(record, identity=identity))
+        for record in (None, [], "record", 42, [{"problems": []}]):
+            with self.subTest(record=repr(record)):
+                self.assertIsNone(self.project(record))
+
+    def test_unknown_near_match_multiline_and_non_string_forms(self):
+        negative = [
+            "candidate executable is not executable",
+            "maintained core fixture brand changed",
+            "receipt statusX", "receipt mode644", "Receipt status fail", " receipt status fail",
+            "no receipt was written: extra", "no receipt was written\n", "receipt schema v2",
+            "read-only fixture  was modified", "read-only fixture core-minimal",
+            "application ended by SIGKILL", "application ended by  instead of SIGTERM",
+            "application ended by exit 1 instead of SIGTERM\nsecond line",
+            "harness error:", "", "node-errno-eacces", "receipt-status",
+        ]
+        doc = self.project({"problems": negative})
+        self.assertEqual(doc["problems"], {"total": len(negative), "scanned": len(negative), "categories": [],
+                                           "unrecognized": len(negative), "non_string": 0, "omitted": 0,
+                                           "unavailable": 0})
+        self.assertEqual(self.validate(doc), doc)
+        multiline = ["receipt status fail\n" + self.PRIV_PATH, "read-only fixture x\ny was modified"]
+        doc = self.project({"problems": multiline})
+        self.assertEqual(doc["problems"]["categories"], [{"category": "read-only-fixture-modified", "count": 1},
+                                                         {"category": "receipt-status", "count": 1}])
+        self.assertNotIn(self.PRIV_PATH, json.dumps(doc))
+        non_strings = [1, None, True, ["receipt schema"], {"code": "receipt schema"}, 1.5]
+        doc = self.project({"problems": non_strings})
+        self.assertEqual(doc["problems"]["non_string"], len(non_strings))
+        self.assertEqual(doc["problems"]["categories"], [])
+        self.assertEqual(doc["problems"]["unrecognized"], 0)
+        self.assertEqual(self.validate(doc), doc)
+
+    def test_empty_list_is_distinct_from_unavailable_problems(self):
+        empty = self.project({"problems": []})
+        self.assertEqual(empty["problems"], {"total": 0, "scanned": 0, "categories": [], "unrecognized": 0,
+                                             "non_string": 0, "omitted": 0, "unavailable": 0})
+        self.assertEqual(self.validate(empty), empty)
+        for record in ({"problems": None}, {"problems": "receipt schema"}, {"problems": {"a": "receipt schema"}},
+                       {"problems": 42}, {"problems": True}, {}):
+            with self.subTest(record=repr(record)):
+                doc = self.project(record)
+                self.assertEqual(doc["problems"], {"total": None, "scanned": 0, "categories": [], "unrecognized": 0,
+                                                   "non_string": 0, "omitted": 0, "unavailable": 1})
+                self.assertNotEqual(doc["problems"], empty["problems"])
+                self.assertEqual(self.validate(doc), doc)
+
+    def test_scan_overflow_reports_omitted_and_ignores_items_past_window(self):
+        from rs9.smoke_stream_tokens import MAX_PROBLEMS
+        problems = ["receipt schema"] * MAX_PROBLEMS + ["required step " + self.PRIV_PATH] * 10
+        doc = self.project({"problems": problems})
+        self.assertEqual(doc["problems"], {"total": MAX_PROBLEMS + 10, "scanned": MAX_PROBLEMS,
+                                           "categories": [{"category": "receipt-schema", "count": MAX_PROBLEMS}],
+                                           "unrecognized": 0, "non_string": 0, "omitted": 10, "unavailable": 0})
+        self.assertNotIn(self.PRIV_PATH, json.dumps(doc))
+        self.assertEqual(self.validate(doc), doc)
+
+    def test_validator_fixed_point_and_withheld_idempotence(self):
+        from rs9.smoke_stream_tokens import CATEGORY_SCHEMA, CATEGORY_STAGE
+        doc = self.small()
+        p1 = self.validate(doc)
+        p2 = self.validate(p1, receipt=dict(p1["receipt"]))
+        p3 = self.validate(p2, receipt=dict(p2["receipt"]))
+        self.assertEqual(p1, doc)
+        self.assertEqual(p2, p1)
+        self.assertEqual(p3, p2)
+        self.assertIsNone(self.validate(None))
+        for reason in ("invalid-observation", "binding-mismatch"):
+            withheld = {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "withheld_reason": reason}
+            self.assertEqual(self.validate(withheld), withheld)
+            self.assertEqual(self.validate(withheld, mismatch=True)["withheld_reason"], "binding-mismatch")
+        for hostile in ({"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "withheld_reason": self.PRIV_PATH},
+                        {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "withheld_reason": "receipt-missing"},
+                        {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "withheld_reason": None},
+                        {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "withheld_reason": "binding-mismatch",
+                         "system": "x86_64-linux"}):
+            with self.subTest(hostile=repr(hostile)):
+                projected = self.validate(hostile)
+                self.assertEqual(projected, {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE,
+                                             "withheld_reason": "invalid-observation"})
+                self.assertNotIn(self.PRIV_PATH, json.dumps(projected))
+
+    def test_validator_rejects_structural_forgeries_as_invalid_observation(self):
+        from rs9.smoke_stream_tokens import CATEGORY_SCHEMA, CATEGORY_STAGE, RUN_STAGE
+
+        def edit(path, value=None, *, delete=False):
+            doc = copy.deepcopy(self.small())
+            target = doc
+            for key in path[:-1]:
+                target = target[key]
+            if delete:
+                del target[path[-1]]
+            else:
+                target[path[-1]] = value
+            return doc
+
+        good = self.small()
+        self.assertEqual(good["problems"], {
+            "total": 4, "scanned": 4, "categories": [{"category": "receipt-schema", "count": 2},
+                                                     {"category": "required-step", "count": 1}],
+            "unrecognized": 1, "non_string": 0, "omitted": 0, "unavailable": 0})
+        cats = good["problems"]["categories"]
+        unavailable = {"total": None, "scanned": 0, "categories": [], "unrecognized": 0, "non_string": 0,
+                       "omitted": 0, "unavailable": 1}
+        cases = {
+            "not-dict-list": [], "not-dict-str": "receipt schema", "not-dict-int": 3,
+            "extra-top": {**good, "raw": "receipt schema"}, "missing-receipt": edit(("receipt",), delete=True),
+            "darwin-record-shape": {**good, "stage": RUN_STAGE}, "wrong-schema": edit(("schema",), "v2"),
+            "wrong-stage": edit(("stage",), "original-smoke-process-stderr"),
+            "darwin-system": edit(("system",), "aarch64-darwin"), "unknown-system": edit(("system",), "unexpected"),
+            "list-system": edit(("system",), ["x86_64-linux"]), "unknown-scenario": edit(("scenario",), "A"),
+            "cross-scenario": edit(("scenario",), "B"), "list-scenario": edit(("scenario",), ["C"]),
+            "receipt-extra": edit(("receipt", "present"), True), "receipt-missing-sha": edit(("receipt", "sha256"), delete=True),
+            "receipt-bool-bytes": edit(("receipt", "bytes"), True), "receipt-zero-bytes": edit(("receipt", "bytes"), 0),
+            "receipt-upper-sha": edit(("receipt", "sha256"), "C" * 64), "receipt-list": edit(("receipt",), [1779]),
+            "problems-extra": edit(("problems", "raw"), "receipt schema"),
+            "problems-missing-omitted": edit(("problems", "omitted"), delete=True),
+            "problems-list": edit(("problems",), [4]),
+            "duplicate-category": edit(("problems", "categories"), [{"category": "receipt-schema", "count": 1},
+                                                                     {"category": "receipt-schema", "count": 1},
+                                                                     {"category": "required-step", "count": 1}]),
+            "unsorted-categories": edit(("problems", "categories"), list(reversed(cats))),
+            "unknown-category": edit(("problems", "categories"), [cats[0], {"category": "node-type-error", "count": 1}]),
+            "raw-text-category": edit(("problems", "categories"), [cats[0], {"category": "required step a", "count": 1}]),
+            "category-extra-key": edit(("problems", "categories"), [{**cats[0], "text": "receipt schema"}, cats[1]]),
+            "category-dict": edit(("problems", "categories"), {"receipt-schema": 2, "required-step": 1}),
+            "zero-count": edit(("problems",), {**good["problems"], "unrecognized": 2,
+                                               "categories": [cats[0], {"category": "required-step", "count": 0}]}),
+            "bool-count": edit(("problems", "categories"), [cats[0], {"category": "required-step", "count": True}]),
+            "count-over-scanned": edit(("problems", "categories"), [{"category": "receipt-schema", "count": 5}]),
+            "bool-total": edit(("problems", "total"), True),
+            "bool-scanned": edit(("problems",), {**good["problems"], "total": 1, "scanned": True,
+                                                 "categories": [{"category": "receipt-schema", "count": 1}],
+                                                 "unrecognized": 0}),
+            "bool-unavailable": edit(("problems", "unavailable"), False),
+            "bool-unrecognized": edit(("problems",), {**good["problems"], "unrecognized": True}),
+            "bool-non-string": edit(("problems",), {**good["problems"], "unrecognized": 0, "non_string": True}),
+            "unavailable-two": edit(("problems", "unavailable"), 2),
+            "sum-not-closed": edit(("problems", "unrecognized"), 2),
+            "false-scanned": edit(("problems",), {**good["problems"], "scanned": 3, "omitted": 1, "unrecognized": 0}),
+            "false-omitted": edit(("problems", "omitted"), 1),
+            "negative-omitted": edit(("problems", "omitted"), -1),
+            "total-over-bound": edit(("problems",), {**good["problems"], "total": 1024 * 1024 + 1}),
+            "string-total": edit(("problems", "total"), "4"),
+            "available-null-total": edit(("problems", "total"), None),
+            "unavailable-with-total": edit(("problems",), {**unavailable, "total": 0}),
+            "unavailable-with-categories": edit(("problems",), {**unavailable,
+                                                                "categories": [{"category": "receipt-schema", "count": 1}]}),
+            "unavailable-with-omitted": edit(("problems",), {**unavailable, "omitted": 1}),
+            "unavailable-with-scanned": edit(("problems",), {**unavailable, "scanned": 1, "unrecognized": 1}),
+        }
+        for name, hostile in cases.items():
+            with self.subTest(case=name):
+                projected = self.validate(hostile)
+                self.assertEqual(projected, {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE,
+                                             "withheld_reason": "invalid-observation"})
+                self.assertEqual(self.validate(projected), projected)
+                self.assertEqual(self.validate(hostile, mismatch=True)["withheld_reason"], "binding-mismatch")
+
+    def test_validator_binding_receipt_and_inventory(self):
+        from rs9.smoke_stream_tokens import (
+            CATEGORY_SCHEMA,
+            CATEGORY_STAGE,
+            INVENTORY_STAGE,
+            MAX_ENTRIES,
+        )
+        doc = self.small()
+        mismatch = {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "withheld_reason": "binding-mismatch"}
+        row = {"kind": "run.json", "bytes": 1779, "regular": True, "symlink": False}
+
+        def inventory(status="observed", artifacts=(row,), entries=None, unlisted=0):
+            artifacts = [dict(a) for a in artifacts]
+            entries = len(artifacts) + unlisted if entries is None else entries
+            return {"stage": INVENTORY_STAGE, "status": status, "artifacts": artifacts,
+                    "entries_observed": entries, "unlisted": unlisted}
+
+        identity = self.identity()
+        rejected = {
+            "other-linux-system": {"system": "aarch64-linux"},
+            "darwin-system": {"system": "aarch64-darwin"},
+            "no-system": {"system": None},
+            "other-scenario": {"scenario": "C-signal"},
+            "unknown-scenario": {"scenario": "unknown"},
+            "mismatch-flag": {"mismatch": True},
+            "forged-length": {"receipt": {**identity, "bytes": 1780}},
+            "forged-sha": {"receipt": {**identity, "sha256": "d" * 64}},
+            "absent-receipt": {"receipt": {}},
+            "not-present": {"receipt": {**identity, "present": False}},
+            "present-not-bool": {"receipt": {**identity, "present": 1}},
+            "no-bytes": {"receipt": {"present": True, "sha256": "c" * 64}},
+            "bool-bytes": {"receipt": {**identity, "bytes": True}},
+            "summary-extra-key": {"receipt": {**identity, "path": self.PRIV_PATH}},
+            "projection-extra-key": {"receipt": {"bytes": 1779, "sha256": "c" * 64, "status": "fail"}},
+            "string-receipt": {"receipt": "c" * 64},
+            "receipt-missing": {"receipt_error": "receipt-missing"},
+            "receipt-invalid": {"receipt_error": "receipt-invalid"},
+            "receipt-oversize": {"receipt_error": "receipt-oversize"},
+            "receipt-corrupt": {"receipt_error": "receipt-corrupt"},
+            "inventory-absent": {"raw_inventory": None},
+            "inventory-genuine-unavailable": {"raw_inventory": inventory(status="unavailable", artifacts=())},
+            "inventory-limit-without-row": {"raw_inventory": inventory(
+                status="limit-exceeded", artifacts=(), unlisted=MAX_ENTRIES)},
+            "inventory-no-run-json": {"raw_inventory": inventory(artifacts=())},
+            "inventory-other-kinds-only": {"raw_inventory": inventory(artifacts=(
+                {"kind": "stderr.log", "bytes": 1779, "regular": True, "symlink": False},))},
+            "inventory-byte-mismatch": {"raw_inventory": inventory(artifacts=({**row, "bytes": 1780},))},
+            "inventory-symlink": {"raw_inventory": inventory(artifacts=({**row, "regular": False, "symlink": True},))},
+            "inventory-nonregular": {"raw_inventory": inventory(artifacts=({**row, "regular": False},))},
+            "inventory-duplicate-row": {"raw_inventory": inventory(artifacts=(row, row))},
+            "inventory-hostile-fallback": {"raw_inventory": inventory(status="unavailable", artifacts=(), entries=False)},
+            "inventory-wrong-stage": {"raw_inventory": {**inventory(), "stage": "replay"}},
+            "inventory-limit-row-mismatch": {"raw_inventory": inventory(
+                status="limit-exceeded", artifacts=({**row, "bytes": 1780},), unlisted=MAX_ENTRIES - 1)},
+        }
+        for name, kwargs in rejected.items():
+            with self.subTest(case=name):
+                projected = self.validate(doc, **kwargs)
+                self.assertEqual(projected, mismatch)
+                self.assertEqual(self.validate(projected, **kwargs), mismatch)
+                self.assertNotIn(self.PRIV_PATH, json.dumps(projected))
+        for name, raw in (("list", [row]), ("string", "observed")):
+            with self.subTest(case="non-dict-inventory-" + name):
+                from rs9.smoke_stream_tokens import validate_problem_categories
+                self.assertEqual(validate_problem_categories(
+                    doc, system="x86_64-linux", scenario="C", receipt=identity, receipt_error="receipt-failed",
+                    inventory=validate_inventory(raw), raw_inventory=raw), mismatch)
+        accepted = {
+            "receipt-failed": {"receipt_error": "receipt-failed"},
+            "receipt-malformed": {"receipt_error": "receipt-malformed"},
+            "no-receipt-error": {"receipt_error": None},
+            "prior-projection-receipt": {"receipt": {"bytes": 1779, "sha256": "c" * 64}},
+            "inventory-observed": {"raw_inventory": inventory(unlisted=3)},
+            "inventory-limit-with-row": {"raw_inventory": inventory(
+                status="limit-exceeded", unlisted=MAX_ENTRIES - 1)},
+        }
+        for name, kwargs in accepted.items():
+            with self.subTest(case=name):
+                self.assertEqual(self.validate(doc, **kwargs), doc)
+        aarch = self.project({"problems": ["receipt schema"]}, binding=("aarch64-linux", "linux-arm64", "B"))
+        self.assertEqual(self.validate(aarch, system="aarch64-linux", scenario="B"), aarch)
+        self.assertEqual(self.validate(aarch, system="x86_64-linux", scenario="B"), mismatch)
+        self.assertEqual(self.validate(aarch, system="x86_64-linux", scenario="C"), mismatch)
+
+    def test_collect_failure_diagnostics_emits_categories_only_for_bound_linux(self):
+        from rs9.smoke_stream_tokens import project_problem_categories
+        with tempfile.TemporaryDirectory() as tmp:
+            ev = Path(tmp).resolve()
+            fields = {"stream_capture_complete": True, "receipt": self.identity(), "receipt_error": "receipt-failed"}
+            record = {"status": "fail", "problems": ["receipt schema", self.PRIV_PATH]}
+            for system, platform, scenario in self.BINDINGS:
+                with self.subTest(system=system, scenario=scenario):
+                    doc = collect_failure_diagnostics(b"", fields, ev, platform, scenario, record=record, system=system)
+                    self.assertEqual(set(doc), {"stderr_diagnostic", "evidence_inventory", "harness_problem_categories"})
+                    self.assertEqual(doc["harness_problem_categories"], project_problem_categories(
+                        record, fields["receipt"], system=system, platform=platform, scenario=scenario))
+                    self.assertNotIn(self.PRIV_PATH, json.dumps(doc))
+                    missing = collect_failure_diagnostics(b"", {**fields, "receipt": {"present": False},
+                                                               "receipt_error": "receipt-missing"},
+                                                          ev, platform, scenario, record=None, system=system)
+                    self.assertEqual(set(missing), {"stderr_diagnostic", "evidence_inventory"})
+            # Callers that do not pass the system keep the exact previous key set.
+            legacy = collect_failure_diagnostics(b"", fields, ev, "linux-x64", "C", record=record)
+            self.assertEqual(set(legacy), {"stderr_diagnostic", "evidence_inventory"})
+            with patch("rs9.smoke_stream_tokens.project_problem_categories", side_effect=RuntimeError("private boom")):
+                faulted = collect_failure_diagnostics(b"", fields, ev, "linux-x64", "C", record=record,
+                                                      system="x86_64-linux")
+            self.assertEqual(set(faulted), {"stderr_diagnostic", "evidence_inventory"})
+            self.assertNotIn("private boom", json.dumps(faulted))
+            (ev / "darwin-arm64-A.stderr.log").write_bytes(b"TypeError: inner\n")
+            darwin = collect_failure_diagnostics(b"", fields, ev, "darwin-arm64", "A", record=record,
+                                                 system="aarch64-darwin")
+            self.assertEqual(set(darwin), {"stderr_diagnostic", "evidence_inventory", "harness_run_record",
+                                           "inner_stderr_diagnostic"})
+            # Darwin problem projection keeps its six-key shape after the shared classifier refactor.
+            self.assertEqual(darwin["harness_run_record"]["problems"], {
+                "total": 2, "scanned": 2, "categories": [{"category": "receipt-schema", "count": 1}],
+                "unrecognized": 1, "non_string": 0, "unavailable": 0})

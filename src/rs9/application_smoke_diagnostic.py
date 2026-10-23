@@ -209,7 +209,8 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras, ses
     return command
 
 
-def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, extras, timeout=240, session_bus_argv=None):
+def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, extras, timeout=240, session_bus_argv=None,
+             system=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
@@ -258,9 +259,11 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
         # Optional observations happen after the original outcome is fixed.
         from rs9.smoke_stream_tokens import collect_failure_diagnostics
         try:
-            diagnostic = collect_failure_diagnostics(err, dict(fields), evidence, platform, scenario, record=record)
+            diagnostic = collect_failure_diagnostics(err, dict(fields), evidence, platform, scenario, record=record,
+                                                     system=system)
             fields.update({k: diagnostic[k] for k in (
-                "stderr_diagnostic", "evidence_inventory", "harness_run_record", "inner_stderr_diagnostic"
+                "stderr_diagnostic", "evidence_inventory", "harness_run_record", "inner_stderr_diagnostic",
+                "harness_problem_categories",
             ) if k in diagnostic})
         except Exception:
             pass
@@ -325,6 +328,12 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
             "withheld-token" in fields["problem_codes"],
         "descendant_cleanup_scope": "replay-created-process-group", "detached_descendants_proven_absent": False}
     raw = canonical(record)
+    if len(raw) > MAX_DIAGNOSTIC and "harness_problem_categories" in fields:
+        # The new optional field must not turn an otherwise bounded legacy diagnostic into an error.
+        initial = dict(fields)
+        initial.pop("harness_problem_categories")
+        record["initial_run"] = initial
+        raw = canonical(record)
     if len(raw) > MAX_DIAGNOSTIC:
         raise ContractError("APPLICATION_SMOKE", "Smoke diagnostic bound exceeded")
     scan_for_credentials(raw.decode())
@@ -353,7 +362,8 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
     for index, scenario in enumerate(scenarios):
         # Keep the qualification attempt comparable with run 15/16. Only a
         # separate diagnostic replay uses the instrumented process/argv path.
-        fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, False, session_bus_argv=session_bus_argv)
+        fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, False, session_bus_argv=session_bus_argv,
+                          system=system)
         if fields["failed"]:
             from rs9.pages_smoke_diagnostic import validate_smoke_observation
             observation = validate_smoke_observation(fields, system=system)
