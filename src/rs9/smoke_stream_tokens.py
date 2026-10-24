@@ -658,7 +658,12 @@ def _unavailable_inner(read_error, withheld_reason, byte_count=None):
 
 
 def read_inner_stderr(directory, platform, scenario):
-    """Physical no-follow descriptor read of original inner application stderr."""
+    """Physical no-follow descriptor read of original inner application stderr.
+
+    `complete` means only that this bounded regular-file read finished; the released
+    harness writes `<platform>-<scenario>.stderr.log` after the child exit wait without
+    proving child-pipe EOF.
+    """
     directory = Path(directory)
     try:
         if any(p.is_symlink() for p in (directory, *directory.parents)):
@@ -710,7 +715,7 @@ def read_inner_stderr(directory, platform, scenario):
     }
 
 
-def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False):
+def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require_inventory=False):
     """Idempotent closed validator for original inner application stderr bound to evidence_inventory."""
     if not isinstance(raw, dict):
         return None
@@ -775,7 +780,12 @@ def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False):
             return _unavailable_inner(None, fallback_reason)
     if mismatch:
         return _unavailable_inner(None, "binding-mismatch")
-    if isinstance(inventory, dict) and inventory.get("status") == "observed":
+    if require_inventory:
+        inventory = validate_inventory(inventory)
+    observed = isinstance(inventory, dict) and inventory.get("status") == "observed"
+    if require_inventory and byte_count is not None and not observed:
+        return _unavailable_inner(None, "binding-mismatch")
+    if observed:
         err_art = next((a for a in inventory.get("artifacts", ()) if isinstance(a, dict) and a.get("kind") == "stderr.log"), None)
         if complete:
             if (err_art is None or err_art.get("regular") is not True or
@@ -829,6 +839,13 @@ def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, re
         try:
             result["inner_stderr_diagnostic"] = read_inner_stderr(evidence, platform, scenario)
         except Exception:
+            pass
+    elif (all(isinstance(v, str) for v in (system, platform, scenario)) and
+          (system, platform, scenario) in _CATEGORY_BINDINGS):
+        # Linux B/C: same released <platform>-<scenario>.stderr.log; no retry, EOF or cause claim.
+        try:
+            result["inner_stderr_diagnostic"] = read_inner_stderr(evidence, platform, scenario)
+        except Exception:  # noqa: BLE001, S110 - optional fault must not mask failure or log private payloads.
             pass
     try:
         categories = project_problem_categories(

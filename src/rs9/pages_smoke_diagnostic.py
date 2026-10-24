@@ -73,8 +73,8 @@ def validate_smoke_observation(raw, *, system=None):
     if mismatch:
         result["binding_mismatch"] = True
     from rs9.smoke_stream_tokens import (
-        CATEGORY_SCHEMA, CATEGORY_STAGE, validate_inner_stream_tokens, validate_inventory,
-        validate_problem_categories, validate_run_record, validate_stream_tokens,
+        CATEGORY_SCHEMA, CATEGORY_STAGE, _unavailable_inner, validate_inner_stream_tokens,
+        validate_inventory, validate_problem_categories, validate_run_record, validate_stream_tokens,
     )
     stream = validate_stream_tokens(raw.get("stderr_diagnostic"), sha256=hashes["stderr_sha256"],
         byte_count=counts["stderr_bytes"], complete=complete, mismatch=mismatch)
@@ -93,6 +93,16 @@ def validate_smoke_observation(raw, *, system=None):
         if inner_stream is not None:
             result["inner_stderr_diagnostic"] = inner_stream
     if system in {"x86_64-linux", "aarch64-linux"}:
+        raw_inner = raw.get("inner_stderr_diagnostic")
+        try:
+            inner_stream = validate_inner_stream_tokens(
+                raw_inner, inventory=inventory, mismatch=mismatch, require_inventory=True)
+        except Exception:  # noqa: BLE001 - contain optional diagnostic faults without exposing payloads.
+            # An optional inner fault is withheld, never raised over the original failure.
+            inner_stream = None if not isinstance(raw_inner, dict) else _unavailable_inner(
+                None, "binding-mismatch" if mismatch else "invalid-observation")
+        if inner_stream is not None:
+            result["inner_stderr_diagnostic"] = inner_stream
         raw_categories = raw.get("harness_problem_categories")
         try:
             categories = validate_problem_categories(
