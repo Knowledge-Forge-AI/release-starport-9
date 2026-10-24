@@ -933,7 +933,11 @@ class LinuxProblemCategoryTests(unittest.TestCase):
         self.assertEqual(self.validate(aarch, system="x86_64-linux", scenario="C"), mismatch)
 
     def test_collect_failure_diagnostics_emits_categories_only_for_bound_linux(self):
-        from rs9.smoke_stream_tokens import project_problem_categories
+        from rs9.smoke_stream_tokens import (
+            INNER_STAGE,
+            project_problem_categories,
+            read_inner_stderr,
+        )
         with tempfile.TemporaryDirectory() as tmp:
             ev = Path(tmp).resolve()
             fields = {"stream_capture_complete": True, "receipt": self.identity(), "receipt_error": "receipt-failed"}
@@ -941,21 +945,28 @@ class LinuxProblemCategoryTests(unittest.TestCase):
             for system, platform, scenario in self.BINDINGS:
                 with self.subTest(system=system, scenario=scenario):
                     doc = collect_failure_diagnostics(b"", fields, ev, platform, scenario, record=record, system=system)
-                    self.assertEqual(set(doc), {"stderr_diagnostic", "evidence_inventory", "harness_problem_categories"})
+                    self.assertEqual(set(doc), {"stderr_diagnostic", "evidence_inventory",
+                                                "inner_stderr_diagnostic", "harness_problem_categories"})
+                    self.assertEqual(doc["inner_stderr_diagnostic"], read_inner_stderr(ev, platform, scenario))
+                    self.assertEqual(doc["inner_stderr_diagnostic"]["stage"], INNER_STAGE)
+                    self.assertEqual(doc["inner_stderr_diagnostic"]["read_error"], "missing")
+                    self.assertEqual(doc["inner_stderr_diagnostic"]["withheld_reason"], "missing")
                     self.assertEqual(doc["harness_problem_categories"], project_problem_categories(
                         record, fields["receipt"], system=system, platform=platform, scenario=scenario))
                     self.assertNotIn(self.PRIV_PATH, json.dumps(doc))
                     missing = collect_failure_diagnostics(b"", {**fields, "receipt": {"present": False},
                                                                "receipt_error": "receipt-missing"},
                                                           ev, platform, scenario, record=None, system=system)
-                    self.assertEqual(set(missing), {"stderr_diagnostic", "evidence_inventory"})
+                    self.assertEqual(set(missing), {"stderr_diagnostic", "evidence_inventory",
+                                                    "inner_stderr_diagnostic"})
+                    self.assertEqual(missing["inner_stderr_diagnostic"], doc["inner_stderr_diagnostic"])
             # Callers that do not pass the system keep the exact previous key set.
             legacy = collect_failure_diagnostics(b"", fields, ev, "linux-x64", "C", record=record)
             self.assertEqual(set(legacy), {"stderr_diagnostic", "evidence_inventory"})
             with patch("rs9.smoke_stream_tokens.project_problem_categories", side_effect=RuntimeError("private boom")):
                 faulted = collect_failure_diagnostics(b"", fields, ev, "linux-x64", "C", record=record,
                                                       system="x86_64-linux")
-            self.assertEqual(set(faulted), {"stderr_diagnostic", "evidence_inventory"})
+            self.assertEqual(set(faulted), {"stderr_diagnostic", "evidence_inventory", "inner_stderr_diagnostic"})
             self.assertNotIn("private boom", json.dumps(faulted))
             (ev / "darwin-arm64-A.stderr.log").write_bytes(b"TypeError: inner\n")
             darwin = collect_failure_diagnostics(b"", fields, ev, "darwin-arm64", "A", record=record,
@@ -966,3 +977,284 @@ class LinuxProblemCategoryTests(unittest.TestCase):
             self.assertEqual(darwin["harness_run_record"]["problems"], {
                 "total": 2, "scanned": 2, "categories": [{"category": "receipt-schema", "count": 1}],
                 "unrecognized": 1, "non_string": 0, "unavailable": 0})
+
+    def test_collect_failure_diagnostics_reads_inner_stderr_only_for_bound_linux_pairs(self):
+        from rs9.smoke_stream_tokens import INNER_STAGE
+        raw = b"TypeError: inner failure\nEACCES: permission denied, open '/tmp/work'\n"
+        fields = {"stream_capture_complete": True, "receipt": self.identity(), "receipt_error": "receipt-failed"}
+        record = {"status": "fail", "problems": ["receipt schema"]}
+        for system, platform, scenario in self.BINDINGS:
+            with self.subTest(system=system, scenario=scenario), tempfile.TemporaryDirectory() as tmp:
+                ev = Path(tmp).resolve()
+                (ev / f"{platform}-{scenario}.stderr.log").write_bytes(raw)
+                doc = collect_failure_diagnostics(b"", fields, ev, platform, scenario, record=record, system=system)
+                self.assertEqual(doc["inner_stderr_diagnostic"], {
+                    "stage": INNER_STAGE,
+                    "bytes": len(raw),
+                    "sha256": digest(raw),
+                    "complete": True,
+                    "read_error": None,
+                    "line_count": 2,
+                    "utf8_valid": True,
+                    "tokens": ["node-errno-eacces", "node-syscall-open", "node-type-error"],
+                    "tokens_omitted": 0,
+                    "withheld_reason": None,
+                })
+                self.assertNotIn("/tmp/work", json.dumps(doc))
+                with patch("rs9.smoke_stream_tokens.read_inner_stderr", side_effect=RuntimeError("private inner boom")):
+                    faulted = collect_failure_diagnostics(b"", fields, ev, platform, scenario,
+                                                          record=record, system=system)
+                self.assertNotIn("inner_stderr_diagnostic", faulted)
+                self.assertEqual(set(faulted), {"stderr_diagnostic", "evidence_inventory",
+                                                "harness_problem_categories"})
+                self.assertNotIn("private inner boom", json.dumps(faulted))
+            with self.subTest(wrong_name=f"{platform}-{scenario}"), tempfile.TemporaryDirectory() as tmp:
+                ev = Path(tmp).resolve()
+                (ev / "other.stderr.log").write_bytes(raw)
+                wrong_doc = collect_failure_diagnostics(b"", fields, ev, platform, scenario,
+                                                        record=record, system=system)
+                self.assertEqual(wrong_doc["inner_stderr_diagnostic"]["read_error"], "missing")
+                self.assertEqual(wrong_doc["inner_stderr_diagnostic"]["withheld_reason"], "missing")
+                self.assertFalse(wrong_doc["inner_stderr_diagnostic"]["complete"])
+                self.assertEqual(wrong_doc["inner_stderr_diagnostic"]["tokens"], [])
+                self.assertEqual(wrong_doc["evidence_inventory"]["unlisted"], 1)
+        unbound = (
+            ("x86_64-linux", "linux-x64", "B"),
+            ("x86_64-linux", "linux-x64", "A"),
+            ("x86_64-linux", "linux-x64", "C-SIGNAL"),
+            ("aarch64-linux", "linux-arm64", "C"),
+            ("aarch64-linux", "linux-arm64", "C-signal"),
+            ("aarch64-linux", "linux-x64", "C"),
+            ("x86_64-linux", "linux-arm64", "B"),
+            ("aarch64-darwin", "linux-x64", "C"),
+            (None, "linux-x64", "C"),
+            ("unexpected", "linux-x64", "C"),
+            (["x86_64-linux"], "linux-x64", "C"),
+            ("x86_64-linux", None, "C"),
+            ("x86_64-linux", "linux-x64", None),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            ev = Path(tmp).resolve()
+            for _, platform, scenario in self.BINDINGS:
+                (ev / f"{platform}-{scenario}.stderr.log").write_bytes(raw)
+            for system, platform, scenario in unbound:
+                with self.subTest(unbound=repr((system, platform, scenario))):
+                    doc = collect_failure_diagnostics(b"", fields, ev, platform,
+                                                      scenario, record=record, system=system)
+                    self.assertNotIn("inner_stderr_diagnostic", doc)
+
+    def test_linux_inner_stderr_read_withholding_and_privacy(self):
+        from rs9.smoke_stream_tokens import (
+            INNER_STAGE,
+            MAX_BYTES,
+            TOKENS,
+            read_inner_stderr,
+            validate_inner_stream_tokens,
+        )
+        real_lstat = os.lstat
+
+        def deny_dir_fd(path, *, dir_fd=None):
+            if dir_fd is not None:
+                raise PermissionError("private perm error")
+            return real_lstat(path)
+
+        for system, platform, scenario in self.BINDINGS:
+            with self.subTest(system=system, scenario=scenario), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                ev = root / "evidence"
+                ev.mkdir()
+                log_path = ev / f"{platform}-{scenario}.stderr.log"
+
+                def check_case(label, doc, inv_dir=ev, *, root=root,
+                               platform=platform, scenario=scenario):
+                    self.assertEqual(doc["stage"], INNER_STAGE, label)
+                    self.assertTrue(set(doc["tokens"]) <= TOKENS, label)
+                    self.assertEqual(doc["tokens"], [], label)
+                    serialized = json.dumps(doc)
+                    for sentinel in (self.PRIV_PATH, self.PRIV_EMAIL, self.PRIV_TOK, "private-operator",
+                                     "SECRET_TARGET", "private perm error", "no-newline", str(root)):
+                        self.assertNotIn(sentinel, serialized, label)
+                    inv = validate_inventory(evidence_inventory(inv_dir, platform, scenario))
+                    p1 = validate_inner_stream_tokens(doc, inventory=inv, require_inventory=True)
+                    p2 = validate_inner_stream_tokens(p1, inventory=inv, require_inventory=True)
+                    p3 = validate_inner_stream_tokens(p2, inventory=inv, require_inventory=True)
+                    self.assertEqual(p1, doc, label)
+                    self.assertEqual(p2, p1, label)
+                    self.assertEqual(p3, p2, label)
+
+                missing = read_inner_stderr(ev, platform, scenario)
+                self.assertEqual((missing["complete"], missing["read_error"], missing["withheld_reason"],
+                                  missing["bytes"], missing["sha256"]), (False, "missing", "missing", None, None))
+                check_case("missing", missing)
+
+                target = root / "secret-target.txt"
+                target.write_text("SECRET_TARGET\n")
+                log_path.symlink_to(target)
+                sym = read_inner_stderr(ev, platform, scenario)
+                self.assertEqual((sym["complete"], sym["read_error"], sym["withheld_reason"],
+                                  sym["bytes"], sym["sha256"]), (False, "symlink", "symlink", None, None))
+                check_case("symlink-file", sym)
+                log_path.unlink()
+
+                ev_link = root / "evidence-link"
+                ev_link.symlink_to(ev)
+                sym_dir = read_inner_stderr(ev_link, platform, scenario)
+                self.assertEqual((sym_dir["complete"], sym_dir["read_error"], sym_dir["withheld_reason"]),
+                                 (False, "symlink", "symlink"))
+                check_case("symlink-dir", sym_dir, inv_dir=ev_link)
+                ev_link.unlink()
+
+                log_path.mkdir()
+                nonreg_dir = read_inner_stderr(ev, platform, scenario)
+                self.assertEqual((nonreg_dir["complete"], nonreg_dir["read_error"], nonreg_dir["withheld_reason"]),
+                                 (False, "nonregular", "nonregular"))
+                check_case("directory", nonreg_dir)
+                log_path.rmdir()
+
+                if hasattr(os, "mkfifo"):
+                    os.mkfifo(log_path)
+                    nonreg_fifo = read_inner_stderr(ev, platform, scenario)
+                    self.assertEqual((nonreg_fifo["complete"], nonreg_fifo["read_error"],
+                                      nonreg_fifo["withheld_reason"]), (False, "nonregular", "nonregular"))
+                    check_case("fifo", nonreg_fifo)
+                    log_path.unlink()
+
+                log_path.write_bytes(b"z" * (MAX_BYTES + 5))
+                over = read_inner_stderr(ev, platform, scenario)
+                self.assertEqual((over["complete"], over["read_error"], over["withheld_reason"],
+                                  over["bytes"], over["sha256"]), (False, "oversize", "oversize", MAX_BYTES + 5, None))
+                check_case("oversize", over)
+
+                with patch("rs9.smoke_stream_tokens.os.lstat", side_effect=deny_dir_fd):
+                    read_err = read_inner_stderr(ev, platform, scenario)
+                self.assertEqual((read_err["complete"], read_err["read_error"], read_err["withheld_reason"],
+                                  read_err["bytes"], read_err["sha256"]),
+                                 (False, "read-error", "read-error", None, None))
+                check_case("read-error", read_err)
+
+                content_cases = (
+                    ("empty", b"", "empty", True),
+                    ("invalid-utf8", b"TypeError: \xff\n", "invalid-utf8", False),
+                    ("control-bytes", b"TypeError: nul\x00\n", "control-bytes", True),
+                    ("unterminated", b"TypeError: no-newline", "unterminated", True),
+                    ("private", f"TypeError: {self.PRIV_PATH} {self.PRIV_EMAIL} {self.PRIV_TOK}\n".encode(),
+                     "private", True),
+                )
+                for label, raw_bytes, reason, utf8_ok in content_cases:
+                    log_path.write_bytes(raw_bytes)
+                    doc = read_inner_stderr(ev, platform, scenario)
+                    self.assertEqual((doc["complete"], doc["read_error"], doc["withheld_reason"],
+                                      doc["bytes"], doc["sha256"], doc["utf8_valid"]),
+                                     (True, None, reason, len(raw_bytes), digest(raw_bytes), utf8_ok))
+                    check_case(label, doc)
+
+    def test_linux_inner_stderr_requires_observed_inventory_binding(self):
+        from rs9.smoke_stream_tokens import (
+            INNER_STAGE,
+            INVENTORY_STAGE,
+            MAX_BYTES,
+            MAX_ENTRIES,
+            read_inner_stderr,
+            validate_inner_stream_tokens,
+        )
+        raw = b"TypeError: inner failure\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            ev = Path(tmp).resolve()
+            log_path = ev / "linux-x64-C.stderr.log"
+            log_path.write_bytes(raw)
+            doc = read_inner_stderr(ev, "linux-x64", "C")
+            log_path.write_bytes(b"z" * (MAX_BYTES + 5))
+            over = read_inner_stderr(ev, "linux-x64", "C")
+            log_path.unlink()
+            missing = read_inner_stderr(ev, "linux-x64", "C")
+
+        row = {"kind": "stderr.log", "bytes": len(raw), "regular": True, "symlink": False}
+        mismatch_env = {
+            "stage": INNER_STAGE, "bytes": None, "sha256": None, "complete": False,
+            "read_error": None, "line_count": None, "utf8_valid": None,
+            "tokens": [], "tokens_omitted": 0, "withheld_reason": "binding-mismatch",
+        }
+        invalid_env = {**mismatch_env, "withheld_reason": "invalid-observation"}
+
+        def inv(status="observed", artifacts=(row,), entries=None, unlisted=0):
+            artifacts = [dict(a) for a in artifacts]
+            entries = len(artifacts) + unlisted if entries is None else entries
+            return {"stage": INVENTORY_STAGE, "status": status, "artifacts": artifacts,
+                    "entries_observed": entries, "unlisted": unlisted}
+
+        for unlisted in (0, 4):
+            valid_inv = inv(unlisted=unlisted)
+            p1 = validate_inner_stream_tokens(doc, inventory=valid_inv, require_inventory=True)
+            p2 = validate_inner_stream_tokens(p1, inventory=valid_inv, require_inventory=True)
+            p3 = validate_inner_stream_tokens(p2, inventory=valid_inv, require_inventory=True)
+            self.assertEqual(p1, doc)
+            self.assertEqual(p2, p1)
+            self.assertEqual(p3, p2)
+
+        rejected_inventories = {
+            "absent": None,
+            "unavailable": inv(status="unavailable", artifacts=()),
+            "limit-exceeded-with-row": inv(status="limit-exceeded", artifacts=(row,),
+                                           entries=MAX_ENTRIES, unlisted=MAX_ENTRIES - 1),
+            "missing-stderr-row": inv(artifacts=()),
+            "other-kind-only": inv(artifacts=({"kind": "run.json", "bytes": len(raw),
+                                               "regular": True, "symlink": False},)),
+            "nonregular-row": inv(artifacts=({**row, "regular": False},)),
+            "symlink-row": inv(artifacts=({**row, "regular": False, "symlink": True},)),
+            "bytes-minus-one": inv(artifacts=({**row, "bytes": len(raw) - 1},)),
+            "bytes-plus-one": inv(artifacts=({**row, "bytes": len(raw) + 1},)),
+            "duplicate-row-raw": inv(artifacts=(row, row)),
+            "duplicate-row-validated": validate_inventory(inv(artifacts=(row, row))),
+            "inconsistent-unlisted-raw": inv(entries=3, unlisted=0),
+            "inconsistent-unlisted-validated": validate_inventory(inv(entries=3, unlisted=0)),
+            "unlisted-kind-raw": inv(artifacts=({**row, "kind": "linux-x64-C.stderr.log"},)),
+        }
+        for name, bad_inv in rejected_inventories.items():
+            with self.subTest(inventory=name):
+                p1 = validate_inner_stream_tokens(doc, inventory=bad_inv, require_inventory=True)
+                p2 = validate_inner_stream_tokens(p1, inventory=bad_inv, require_inventory=True)
+                p3 = validate_inner_stream_tokens(p2, inventory=bad_inv, require_inventory=True)
+                self.assertEqual(p1, mismatch_env)
+                self.assertEqual(p2, mismatch_env)
+                self.assertEqual(p3, mismatch_env)
+
+        self.assertEqual(
+            validate_inner_stream_tokens(doc, inventory=inv(), mismatch=True, require_inventory=True),
+            mismatch_env,
+        )
+        self.assertEqual(
+            validate_inner_stream_tokens(over, inventory=None, require_inventory=True),
+            mismatch_env,
+        )
+        self.assertEqual(
+            validate_inner_stream_tokens(missing, inventory=None, require_inventory=True),
+            missing,
+        )
+
+        incomplete_env = {**mismatch_env, "withheld_reason": "incomplete"}
+        self.assertEqual(
+            validate_inner_stream_tokens(incomplete_env, inventory=inv(), require_inventory=True),
+            incomplete_env,
+        )
+        hostile_shapes = {
+            "complete-incomplete": {**doc, "tokens": [], "withheld_reason": "incomplete"},
+            "complete-truncated": {**doc, "tokens": [], "withheld_reason": "truncated"},
+            "complete-oversize": {**doc, "tokens": [], "withheld_reason": "oversize"},
+            "incomplete-with-bytes": {**incomplete_env, "bytes": 10},
+            "extra-eof-key": {**doc, "eof": True},
+            "private-token": {**doc, "tokens": [self.PRIV_PATH]},
+        }
+        for name, hostile in hostile_shapes.items():
+            with self.subTest(hostile=name):
+                p1 = validate_inner_stream_tokens(hostile, inventory=inv(), require_inventory=True)
+                p2 = validate_inner_stream_tokens(p1, inventory=inv(), require_inventory=True)
+                self.assertEqual(p1, invalid_env)
+                self.assertEqual(p2, invalid_env)
+                self.assertNotIn(self.PRIV_PATH, json.dumps(p1))
+
+        # Darwin default require_inventory=False remains unchanged.
+        self.assertEqual(validate_inner_stream_tokens(doc, inventory=None), doc)
+        self.assertEqual(
+            validate_inner_stream_tokens(doc, inventory=rejected_inventories["limit-exceeded-with-row"]),
+            doc,
+        )
