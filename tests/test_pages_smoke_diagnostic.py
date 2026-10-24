@@ -397,7 +397,7 @@ class PagesSmokeDiagnosticUnitTests(unittest.TestCase):
         err = ContractError("INVENTORY_LIMIT", "Limit exceeded", details={"stage": "pre-install"})
         self.assertEqual(determine_counters_source(None, err, "pre-install"), "pre-install")
 
-    def test_validate_smoke_observation_triple_idempotence_and_darwin_only_projection(self):
+    def test_validate_smoke_observation_triple_idempotence_and_bound_inner_projection(self):
         from rs9.smoke_stream_tokens import (
             evidence_inventory, project_run_record, read_inner_stderr, stream_tokens,
         )
@@ -471,14 +471,36 @@ class PagesSmokeDiagnosticUnitTests(unittest.TestCase):
             self.assertNotIn("harness_run_record", legacy_out)
             self.assertNotIn("inner_stderr_diagnostic", legacy_out)
 
-            # Hostile Linux inputs carrying Darwin projections drop them completely
+            # Linux accepts the typed optional field, but hostile content or binding is withheld.
             for linux_sys, linux_scen in (("x86_64-linux", "C"), ("aarch64-linux", "B")):
-                hostile_linux = {**raw_darwin, "scenario": linux_scen}
                 baseline_linux = {**legacy_input, "scenario": linux_scen}
-                self.assertEqual(
-                    validate_smoke_observation(hostile_linux, system=linux_sys),
-                    validate_smoke_observation(baseline_linux, system=linux_sys),
-                )
+                baseline = validate_smoke_observation(baseline_linux, system=linux_sys)
+                for hostile_inner, reason in (
+                    ({**inner_rec, "tokens": ["PRIVATE_RAW_SENTINEL"], "eof": True},
+                     "invalid-observation"),
+                    ({**inner_rec, "bytes": len(inner_bytes) + 1}, "binding-mismatch"),
+                ):
+                    with self.subTest(system=linux_sys, reason=reason):
+                        hostile_linux = {**raw_darwin, "scenario": linux_scen,
+                                         "inner_stderr_diagnostic": hostile_inner}
+                        l1 = validate_smoke_observation(hostile_linux, system=linux_sys)
+                        l2 = validate_smoke_observation(l1, system=linux_sys)
+                        l3 = validate_smoke_observation(l2, system=linux_sys)
+                        self.assertNotIn("harness_run_record", l1)
+                        self.assertEqual(l1["inner_stderr_diagnostic"], {
+                            "stage": inner_rec["stage"], "bytes": None, "sha256": None,
+                            "complete": False, "read_error": None, "line_count": None,
+                            "utf8_valid": None, "tokens": [], "tokens_omitted": 0,
+                            "withheld_reason": reason,
+                        })
+                        self.assertEqual(
+                            {key: value for key, value in l1.items()
+                             if key != "inner_stderr_diagnostic"}, baseline,
+                        )
+                        self.assertNotIn("PRIVATE_RAW_SENTINEL", json.dumps(l1))
+                        self.assertNotIn("inner error", json.dumps(l1))
+                        self.assertEqual(l1, l2)
+                        self.assertEqual(l2, l3)
 
 
 class PagesNebularControlTests(unittest.TestCase):
