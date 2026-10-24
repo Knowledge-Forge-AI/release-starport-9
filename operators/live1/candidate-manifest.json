@@ -18,8 +18,10 @@
     "src/rs9/tf_pypi_nebular_successor.py",
     "src/rs9/tf_pypi_remote.py",
     "src/rs9/wheel_nebular_successor.py",
+    "tests/test_application_smoke_diagnostic.py",
     "tests/test_cont22_diagnostics.py",
     "tests/test_hosted_observe.py",
+    "tests/test_pages_smoke_diagnostic.py",
     "tests/test_pypi_observe.py",
     "tests/test_readers.py",
     "tests/test_smoke_stream_tokens.py",
@@ -2232,11 +2234,11 @@
       "size": 19183
     },
     {
-      "git_blob": "ad0d10a475955e426838fd85028545ca57dee755",
+      "git_blob": "cd20dd2efbf010f97f97b0f620a5f48415bfb9cb",
       "mode": "100644",
       "path": "src/rs9/pages_smoke_diagnostic.py",
-      "sha256": "48ec7f6a0152dee74f43d5337d8ac0f190cf28ff99985ea2981954af63398183",
-      "size": 11404
+      "sha256": "ecc61503b7a622d1bb9d4f41e5664e88709ce095958c0ccdef99bfa760272b12",
+      "size": 12108
     },
     {
       "git_blob": "a9b2a4f7187fa214e14be25020cfe790b57ba1b7",
@@ -2442,11 +2444,11 @@
       "size": 4608
     },
     {
-      "git_blob": "5106cf32f8d605c783ae2935b504948f31f8266c",
+      "git_blob": "9eb5ac49eef7d14539df75edbb295e5fcfb6e9a5",
       "mode": "100644",
       "path": "src/rs9/smoke_stream_tokens.py",
-      "sha256": "9323cfa4a6540fee01e3739802ae444ed00903ce3e1caf702eaa474d1b6d50e2",
-      "size": 41143
+      "sha256": "40a278d2ac8d420e9a248aaea00b34e4c1a567792e5b48cf79fb4e9b6cfabc21",
+      "size": 42081
     },
     {
       "git_blob": "48f4e607e4800d37b7949374df4349251251862f",
@@ -3170,11 +3172,11 @@
       "size": 20349
     },
     {
-      "git_blob": "7d604ed097245bb6fccb5e66e6fc04f01c88af09",
+      "git_blob": "fb4dd90b850fa19dd661c79cebde90d17fdf8f4c",
       "mode": "100644",
       "path": "tests/test_application_smoke_diagnostic.py",
-      "sha256": "d3e353417b98516ac4a51e1e7bc9427ace47951b29d4e59245d3ea7df54470a2",
-      "size": 51353
+      "sha256": "7395f8a6f487688694b1f501281d2b6a361d3f43c23b42a02a1f520f6408cdbe",
+      "size": 52675
     },
     {
       "git_blob": "83db166e8c52d7e5cc959e305b16270c2877550c",
@@ -3310,11 +3312,11 @@
       "size": 15888
     },
     {
-      "git_blob": "036a1b52b44f8f15be8ce1bbcc1b3a1a0870063b",
+      "git_blob": "3848d83ae36c2054ef952450a3bd7f079a9188fc",
       "mode": "100644",
       "path": "tests/test_cont22_diagnostics.py",
-      "sha256": "26605c92871cd9005b6613421d65667c347799e8e52e70bf71525605d2e9137d",
-      "size": 29540
+      "sha256": "a5b5e9fa0de9873a762709a5a95969e6cf16ab5fbf92bba1192696aeea92f97b",
+      "size": 40746
     },
     {
       "git_blob": "590da4c6a1b0fadb9549ca2ab9eada4c21fdec18",
@@ -3828,11 +3830,11 @@
       "size": 17421
     },
     {
-      "git_blob": "4e3783df96ea58728f78b477ea29305493b52b33",
+      "git_blob": "933f76524e63956d6c22c8632910a7ac91b5d7cb",
       "mode": "100644",
       "path": "tests/test_pages_smoke_diagnostic.py",
-      "sha256": "b27fbc1beb5b9984daeac3a738e8b5845d35db5155a7d36f39a0e9b83506e6dd",
-      "size": 33238
+      "sha256": "314dc780149b773b914545f0a95125caf7e89f02f26d5ea65754492f28b5a566",
+      "size": 34763
     },
     {
       "git_blob": "c9cc52efeb57112d25df5e96a2b15b71e3ffc7a7",
@@ -4213,11 +4215,11 @@
       "size": 8508
     },
     {
-      "git_blob": "b4130469ffd04728c59f0c5ee203cf041af7f9cd",
+      "git_blob": "085fae04109e8c4c881419a36b714538a0dcf18e",
       "mode": "100644",
       "path": "tests/test_smoke_stream_tokens.py",
-      "sha256": "13b6cff22ba5d05d8abecca846054adc827a6b7014d9e612c521c90e2cef2932",
-      "size": 59446
+      "sha256": "d094f78e21e28f93f9d36fbd1733230cc0cd02adb7d797c86896f9917be2e54a",
+      "size": 76242
     },
     {
       "git_blob": "5bbca60b0f646a64b4ba6ed7b338c0115de2e727",

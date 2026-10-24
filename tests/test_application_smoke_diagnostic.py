@@ -982,8 +982,10 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
         ):
             self.assertNotIn(sentinel, serialized)
 
-    def test_darwin_projector_fault_and_linux_non_emission_preserve_primary_failure(self):
-        """Projector exceptions on Darwin and Linux runs preserve primary APPLICATION_SMOKE outcome."""
+    def test_darwin_projector_fault_and_linux_missing_inner_preserve_primary_failure(self):
+        """Darwin projector faults and Linux missing files preserve primary failure."""
+        from rs9.pages_smoke_diagnostic import validate_smoke_observation
+        from rs9.smoke_stream_tokens import INNER_STAGE
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=1, stdout=b"", stderr=b"")), \
              patch("rs9.smoke_stream_tokens.project_run_record", side_effect=RuntimeError("projector boom")):
             with self.assertRaises(ContractError) as caught_darwin:
@@ -1008,7 +1010,27 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
                     )
             obs_linux = caught_linux.exception.smoke_observation
             self.assertNotIn("harness_run_record", obs_linux)
-            self.assertNotIn("inner_stderr_diagnostic", obs_linux)
+            self.assertEqual(caught_linux.exception.code, "APPLICATION_SMOKE")
+            self.assertEqual(obs_linux["inner_stderr_diagnostic"], {
+                "stage": INNER_STAGE, "bytes": None, "sha256": None, "complete": False,
+                "read_error": "missing", "line_count": None, "utf8_valid": None,
+                "tokens": [], "tokens_omitted": 0, "withheld_reason": "missing",
+            })
+            self.assertEqual(
+                {key: obs_linux[key] for key in (
+                    "cause", "reason_token", "raw_returncode", "exit_code", "signal",
+                    "receipt_error", "problem_codes", "stream_capture_complete")},
+                {"cause": "process-nonzero", "reason_token": "process-nonzero",
+                 "raw_returncode": 1, "exit_code": 1, "signal": None,
+                 "receipt_error": "receipt-missing", "problem_codes": [],
+                 "stream_capture_complete": True},
+            )
+            p1 = validate_smoke_observation(obs_linux, system=linux_sys)
+            p2 = validate_smoke_observation(p1, system=linux_sys)
+            p3 = validate_smoke_observation(p2, system=linux_sys)
+            self.assertEqual(p1, obs_linux)
+            self.assertEqual(p2, p1)
+            self.assertEqual(p3, p2)
 
 
 if __name__ == "__main__":
