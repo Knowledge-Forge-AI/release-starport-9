@@ -12,9 +12,9 @@
   "node": ">=22",
   "license": "AGPL-3.0-or-later",
   "asset": "knowledge-forge-ai-theme-forge-stellar-loom-0.5.0.tgz",
-  "sha256": "9cfb6e313456f9bf0a65795f413b576abda19d68ef15e02e6abfe6235851196a",
+  "sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f",
   "size": 272836,
-  "source_commit": "bf9bf925d53e0964e480e9ee9cd321dfd9ab56f3",
+  "source_commit": "fca7db68bbf62ee7c9d53a72993b7fc6bda789f5",
   "source_status": "BLOCKED",
   "withheld": [
     "SUCCESSOR_PIN_ADMISSION_PENDING",
