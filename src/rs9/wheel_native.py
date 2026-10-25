@@ -41,6 +41,7 @@ PRODUCT_ID = "theme-forge-nebular-fusion"
 DISTRIBUTION_NAME = "theme-forge-nebular-fusion"
 PACKAGE_NAME = "theme_forge_nebular_fusion"
 VERSION = "0.6.1"
+SUPPORTED_VERSIONS = ("0.6.1", "0.7.0")
 REVIEWED_HELPERS = ("materialize.py", "archives.py", "errors.py", "scratch.py", "security.py")
 
 
@@ -317,8 +318,11 @@ def build_native_wheel(
     canonical_id = canonical_product_id(product_id)
     if canonical_id != PRODUCT_ID:
         raise ContractError("UNSUPPORTED_PRODUCT", f"Native builder only supports {PRODUCT_ID}, got {product_id}")
-    if version != VERSION:
-        raise ContractError("INVALID_VERSION", f"Version {version} differs from bound product version {VERSION}")
+    if version not in SUPPORTED_VERSIONS:
+        raise ContractError(
+            "INVALID_VERSION",
+            f"Version {version} is outside supported product versions {SUPPORTED_VERSIONS}",
+        )
 
     # Resolve and validate system / target_platform namespaces
     effective_system: str
@@ -399,7 +403,7 @@ def build_native_wheel(
         licence = profile_result["sections"].get("license", profile_result["sections"].get("legacy_ingestion", {}).get("license"))
         if not licence or licence.get("status") != "consistent":
             raise ContractError("LICENSE_AUTHORITY", "Consistent release license facts required")
-    if capture is not None and (capture.record["repository"]["full_name"] != "Knowledge-Forge-AI/" + PRODUCT_ID or capture.record["release"]["tag"] != "v" + VERSION):
+    if capture is not None and (capture.record["repository"]["full_name"] != "Knowledge-Forge-AI/" + PRODUCT_ID or capture.record["release"]["tag"] != "v" + version):
         raise ContractError("REPOSITORY_MISMATCH", "Native wheel requires the exact selected product generation")
 
     # 2. Acquire compressed archive bytes and archive filename

@@ -1,4 +1,4 @@
-"""Candidate-only Nebular post1 integration.
+"""Candidate-only Nebular successor integration.
 
 This adapter consumes an already captured release directory.  It authenticates
 the current tagged release, requires the reviewed equal-tree forward proof, and
@@ -53,8 +53,6 @@ from rs9.wheel_native import (
     resolve_native_linux_candidate_tag,
 )
 from rs9.wheel_nebular_successor import (
-    APPLICATION_VERSION,
-    DEFAULT_DESCRIPTION_PATH,
     DISTRIBUTION_NAME,
     DISTRIBUTION_VERSION,
     LEGAL_FILES,
@@ -62,13 +60,17 @@ from rs9.wheel_nebular_successor import (
     PACKAGE_NAME,
     PRODUCT_ID,
     SUCCESSOR_PROVENANCE_SCHEMA,
+    SUCCESSOR_RELEASES,
+    SuccessorRelease,
     _profile_license_facts,
+    _release_description_path,
     _render_successor_launcher,
     _successor_entry_points_bytes,
     _successor_init_bytes,
     _successor_metadata_bytes,
     _successor_wheel_info_bytes,
     build_successor_wheel,
+    successor_release,
 )
 
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
@@ -103,6 +105,7 @@ class AuthenticatedSuccessorInputs:
     lineage_proof: Any
     lineage_facts: dict[str, Any]
     bootstrap_sha256: str
+    release: SuccessorRelease = SUCCESSOR_RELEASES[DISTRIBUTION_VERSION]
 
 
 def _read_json(raw: bytes) -> dict[str, Any]:
@@ -130,6 +133,7 @@ def authenticate_successor_capture(
     evidence: str | Path,
     *,
     approved_bootstrap_sha256: str,
+    release: str = DISTRIBUTION_VERSION,
 ) -> AuthenticatedSuccessorInputs:
     """Authenticate one captured current release and issue its forward proof.
 
@@ -137,6 +141,7 @@ def authenticate_successor_capture(
     GitHub or npm.  A caller must supply the exact reviewed bootstrap digest so
     the candidate path cannot self-authorize a changed configuration.
     """
+    selected_release = successor_release(release)
     root = physical_directory(repository)
     evidence_root = physical_directory(evidence)
     manifest_path = root / BOOTSTRAP
@@ -162,6 +167,8 @@ def authenticate_successor_capture(
     _row, intent = selected[0]
     selection = selection_for_intent(intent)
     capture = authenticate_release(selection, evidence_root)
+    if capture.record.get("release", {}).get("tag") != "v" + selected_release.application_version:
+        raise _error("TAG_MISMATCH", "Authenticated capture is for a different upstream version")
     expectations = _read_json(read_evidence(root, EXPECTATIONS, limit=512 * 1024))
     assert_release_expectations(capture, _expected_project(expectations, selection["repository"]))
     intent = load_bootstrap(
@@ -188,6 +195,7 @@ def authenticate_successor_capture(
         lineage_proof=proof,
         lineage_facts=lineage_facts,
         bootstrap_sha256=bootstrap_sha256,
+        release=selected_release,
     )
 
 
@@ -239,10 +247,11 @@ def _receipt(
 ) -> dict[str, Any]:
     first = rows[0]
     capture_record = authenticated.capture.record
+    release = authenticated.release
     return {
         "schema": _RECEIPT_SCHEMA,
-        "application_version": APPLICATION_VERSION,
-        "distribution_version": DISTRIBUTION_VERSION,
+        "application_version": release.application_version,
+        "distribution_version": release.distribution_version,
         "repository": capture_record["repository"],
         "release": capture_record["release"],
         "source_identity": {
@@ -430,6 +439,7 @@ def _validate_wheel_artifact(
     expected_readme: dict[str, Any],
     expected_rs9_source: dict[str, Any],
 ) -> None:
+    release = authenticated.release
     system = row["system"]
     wheel = row.get("wheel")
     if not isinstance(wheel, dict):
@@ -451,9 +461,9 @@ def _validate_wheel_artifact(
         raise _error("RECEIPT_ARTIFACT", "Candidate wheel bytes disagree with the receipt")
     if (not isinstance(wheel.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", wheel["sha256"])
             or type(wheel.get("size")) is not int or wheel["size"] <= 0
-            or wheel.get("version") != DISTRIBUTION_VERSION or not isinstance(wheel.get("tag"), str)):
+            or wheel.get("version") != release.distribution_version or not isinstance(wheel.get("tag"), str)):
         raise _error("RECEIPT_ARTIFACT", "Candidate wheel identity is malformed")
-    expected_dist_info = f"{DISTRIBUTION_NAME.replace('-', '_')}-{DISTRIBUTION_VERSION}.dist-info"
+    expected_dist_info = f"{DISTRIBUTION_NAME.replace('-', '_')}-{release.distribution_version}.dist-info"
     provenance_member = f"{PACKAGE_NAME}/_rs9/provenance.json"
     metadata_member = f"{expected_dist_info}/METADATA"
     expected_asset = _expected_asset(authenticated, system)
@@ -468,6 +478,8 @@ def _validate_wheel_artifact(
     expected_launcher = _render_successor_launcher(
         expected_asset["name"], expected_asset["sha256"], expected_asset["manifest_sha256"],
         expected_asset["launcher_path"], expected_asset["gui_path"], family, arch,
+        application_version=release.application_version,
+        distribution_version=release.distribution_version,
     )
     expected_helpers = get_embedded_rs9_helpers()
     names = set(entries)
@@ -511,8 +523,8 @@ def _validate_wheel_artifact(
         "schema": SUCCESSOR_PROVENANCE_SCHEMA,
         "product_id": PRODUCT_ID,
         "distribution_name": DISTRIBUTION_NAME,
-        "application_version": APPLICATION_VERSION,
-        "distribution_version": DISTRIBUTION_VERSION,
+        "application_version": release.application_version,
+        "distribution_version": release.distribution_version,
         "wheel_tag": expected_tag,
         "source_identity": _expected_provenance_source(authenticated),
         "forward_lineage": authenticated.lineage_facts,
@@ -550,7 +562,7 @@ def _validate_wheel_artifact(
     expected_legacy = provenance.get("legacy_candidate")
     if (not isinstance(expected_legacy, dict)
             or set(expected_legacy) != {"version", "filename", "sha256"}
-            or expected_legacy.get("version") != APPLICATION_VERSION
+            or expected_legacy.get("version") != release.application_version
             or not isinstance(expected_legacy.get("filename"), str)
             or not isinstance(expected_legacy.get("sha256"), str)
             or not re.fullmatch(r"[0-9a-f]{64}", expected_legacy.get("sha256", ""))):
@@ -589,7 +601,10 @@ def _validate_wheel_artifact(
     marker = b"Description-Content-Type: text/markdown\n\n"
     if marker not in metadata or digest(metadata.split(marker, 1)[1]) != expected_readme["sha256"]:
         raise _error("RECEIPT_ARTIFACT", "Candidate README bytes disagree with the receipt")
-    if metadata != _successor_metadata_bytes(metadata.split(marker, 1)[1]):
+    if metadata != _successor_metadata_bytes(
+        metadata.split(marker, 1)[1],
+        distribution_version=release.distribution_version,
+    ):
         raise _error("RECEIPT_ARTIFACT", "Candidate METADATA is not the deterministic successor metadata")
     wheel_info = entries.get(f"{expected_dist_info}/WHEEL")
     if wheel_info is None:
@@ -601,10 +616,13 @@ def _validate_wheel_artifact(
     wheel_tag = wheel["tag"]
     if wheel_info != _successor_wheel_info_bytes(expected_tag):
         raise _error("RECEIPT_ARTIFACT", "Candidate WHEEL is not the deterministic successor metadata")
-    expected_filename = f"{DISTRIBUTION_NAME.replace('-', '_')}-{DISTRIBUTION_VERSION}-{expected_tag}.whl"
+    expected_filename = f"{DISTRIBUTION_NAME.replace('-', '_')}-{release.distribution_version}-{expected_tag}.whl"
     if filename != expected_filename or tag_line != wheel_tag or not filename.endswith(f"-{wheel_tag}.whl"):
         raise _error("RECEIPT_ARTIFACT", "Candidate wheel tag disagrees with its metadata")
-    if entries.get(f"{PACKAGE_NAME}/__init__.py") != _successor_init_bytes():
+    if entries.get(f"{PACKAGE_NAME}/__init__.py") != _successor_init_bytes(
+        application_version=release.application_version,
+        distribution_version=release.distribution_version,
+    ):
         raise _error("RECEIPT_ARTIFACT", "Candidate package identity is not deterministic")
     if entries.get(f"{expected_dist_info}/entry_points.txt") != _successor_entry_points_bytes():
         raise _error("RECEIPT_ARTIFACT", "Candidate entry points are not deterministic")
@@ -623,6 +641,9 @@ def validate_candidate_receipt(
     """Validate a persisted receipt against authenticated capture and wheel bytes."""
     if not isinstance(authenticated, AuthenticatedSuccessorInputs):
         raise _error("RECEIPT_AUTHORITY", "Authenticated successor inputs are required")
+    release = authenticated.release
+    if not isinstance(release, SuccessorRelease) or SUCCESSOR_RELEASES.get(release.distribution_version) != release:
+        raise _error("RECEIPT_VERSION", "Authenticated successor release selection is invalid")
     try:
         authenticated_record_hash(authenticated.capture)
     except ContractError as exc:
@@ -714,8 +735,14 @@ def validate_candidate_receipt(
             "builder_can_publish", "can_publish", "publication_admitted", "manylinux_proven"
         )}:
             raise _error("PUBLICATION_HOLD", "Successor candidate publication flags must remain false")
-    if receipt.get("application_version") != APPLICATION_VERSION or receipt.get("distribution_version") != DISTRIBUTION_VERSION:
+    if (
+        receipt.get("application_version") != release.application_version
+        or receipt.get("distribution_version") != release.distribution_version
+    ):
         raise _error("RECEIPT_VERSION", "Successor receipt version identity disagrees")
+    if source_record.get("release", {}).get("tag") != "v" + release.application_version:
+        raise _error("TAG_MISMATCH", "Authenticated capture is for a different upstream version")
+    _release_description_path(release, expected_readme["path"])
     expected_assets = {system: _expected_asset(authenticated, system) for system in _SYSTEMS}
     if receipt.get("asset_facts") != {
         "systems": list(_SYSTEMS),
@@ -758,7 +785,7 @@ def build_successor_candidates(
     *,
     rs9_source_commit: str,
     rs9_source_tree: str,
-    description_path: str | Path = DEFAULT_DESCRIPTION_PATH,
+    description_path: str | Path | None = None,
     deterministic_timestamp: tuple[int, int, int, int, int, int] | None = None,
 ) -> dict[str, Any]:
     """Build the exact Darwin, Linux arm64, and Linux amd64 candidates."""
@@ -783,6 +810,8 @@ def build_successor_candidates(
     for system, target_triple, platform_tag, candidate_only in target_specs:
         result = build_successor_wheel(
             PRODUCT_ID,
+            authenticated.release.application_version,
+            distribution_version=authenticated.release.distribution_version,
             capture=authenticated.capture,
             profile_result=authenticated.profile,
             output_dir=destination / system,
@@ -842,7 +871,7 @@ def write_candidate_receipt(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Build non-admitted Nebular post1 wheel candidates")
+    parser = argparse.ArgumentParser(description="Build non-admitted Nebular successor wheel candidates")
     parser.add_argument("command", choices=("build-candidate",))
     parser.add_argument("--repository", required=True)
     parser.add_argument("--evidence", required=True)
@@ -851,12 +880,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--approved-bootstrap-sha256", required=True)
     parser.add_argument("--rs9-source-commit", required=True)
     parser.add_argument("--rs9-source-tree", required=True)
-    parser.add_argument("--description", default=DEFAULT_DESCRIPTION_PATH)
+    parser.add_argument("--release", choices=tuple(SUCCESSOR_RELEASES), default=DISTRIBUTION_VERSION)
+    parser.add_argument("--description", default=None)
     args = parser.parse_args(argv)
     authenticated = authenticate_successor_capture(
         args.repository,
         args.evidence,
         approved_bootstrap_sha256=args.approved_bootstrap_sha256,
+        release=args.release,
     )
     receipt = build_successor_candidates(
         authenticated,

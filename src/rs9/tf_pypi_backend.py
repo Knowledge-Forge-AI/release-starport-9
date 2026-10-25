@@ -16,7 +16,7 @@ import zlib
 
 from rs9.tf_pypi_archive import AdmissionError, canonical, fail, physical_bytes
 from rs9.tf_pypi_model import (LEGAL, admit_bytes, build_pin, logical_identity,
-                            pure_payload, strict_json, validate_pin)
+                            pure_payload, release, strict_json, validate_pin)
 from rs9.tf_pypi_closure import DEPENDENCIES, closure_payload, dependency_licenses
 from rs9.tf_pypi_native import select_native
 from rs9.tf_pypi_platform import build_target, check_tag, pure_tag
@@ -50,6 +50,12 @@ def names(pin):
 
 def description_name(pin):
     validate_pin(pin)
+    _, versioned = release(pin)
+    if versioned is not None:
+        name = pin.get("description")
+        if not isinstance(name, str) or Path(name).name != name or not name.endswith(".md") or name != versioned:
+            fail("DESCRIPTION")
+        return name
     prefix = "theme-forge-"
     project = pin["project"]
     if not project.startswith(prefix):

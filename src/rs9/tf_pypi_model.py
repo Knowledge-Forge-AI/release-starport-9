@@ -1,5 +1,6 @@
 """Closed first-wave intake contract; no npm execution or network access."""
 import json
+import os
 import re
 from pathlib import Path
 
@@ -16,6 +17,32 @@ DISTRIBUTIONS = {
     "theme-forge-stellar-burst": "0.6.1.post1",
     "theme-forge-stellar-loom": "0.4.0.post1",
     "theme-forge-solar-sail": "0.2.1.post1",
+}
+RELEASES = {
+    ("theme-forge-stellar-burst", "0.6.1", "0.6.1.post1"): (
+        "theme-forge-stellar-burst.json",
+        None,
+    ),
+    ("theme-forge-stellar-loom", "0.4.0", "0.4.0.post1"): (
+        "theme-forge-stellar-loom.json",
+        None,
+    ),
+    ("theme-forge-solar-sail", "0.2.1", "0.2.1.post1"): (
+        "theme-forge-solar-sail.json",
+        None,
+    ),
+    ("theme-forge-stellar-burst", "0.7.0", "0.7.0"): (
+        "theme-forge-stellar-burst-0.7.0.json",
+        "stellar-burst-0.7.0.md",
+    ),
+    ("theme-forge-stellar-loom", "0.5.0", "0.5.0"): (
+        "theme-forge-stellar-loom-0.5.0.json",
+        "stellar-loom-0.5.0.md",
+    ),
+    ("theme-forge-solar-sail", "0.3.0", "0.3.0"): (
+        "theme-forge-solar-sail-0.3.0.json",
+        "solar-sail-0.3.0.md",
+    ),
 }
 TARGETS = ("darwin-arm64", "linux-arm64-gnu", "linux-x64-gnu")
 LEGAL = ("LICENSE", "NOTICE", "COMMERCIAL-LICENSE.md")
@@ -41,19 +68,38 @@ def strict_json(data):
         fail("JSON")
 
 
+def release(pin):
+    if not isinstance(pin, dict):
+        fail("PIN")
+    project = pin.get("project")
+    version = pin.get("version")
+    distribution_version = pin.get("distribution_version")
+    if (not isinstance(project, str)
+            or not isinstance(version, str)
+            or not isinstance(distribution_version, str)):
+        fail("PIN")
+    row = RELEASES.get((project, version, distribution_version))
+    if row is None:
+        fail("PIN")
+    return row
+
+
 def validate_pin(pin):
-    if not isinstance(pin, dict) or pin.get("project") not in PRODUCTS:
+    if not isinstance(pin, dict) or not isinstance(pin.get("project"), str) or pin["project"] not in PRODUCTS:
         fail("PRODUCT")
     project = pin["project"]
     allowed = {"schema", "project", "version", "distribution_version", "workflow",
                "npm_name", "bins", "node", "license", "asset", "sha256", "size",
                "source_commit", "source_status", "withheld", "candidate_platforms",
-               "qualified_platforms", "dependencies"}
+               "qualified_platforms", "dependencies", "description"}
     if set(pin) - allowed:
         fail("PIN")
-    version, short, bins = PRODUCTS[project]
+    _, expected_description = release(pin)
+    version = pin["version"]
+    distribution_version = pin["distribution_version"]
+    _, short, bins = PRODUCTS[project]
     expected = {"schema": "rs9.tf-pypi-intake.v2", "version": version,
-                "distribution_version": DISTRIBUTIONS[project],
+                "distribution_version": distribution_version,
                 "workflow": f"rs9-{short}-pypi-publish.yml",
                 "npm_name": "@knowledge-forge-ai/" + project, "bins": bins,
                 "node": ">=22", "license": "AGPL-3.0-or-later",
@@ -61,6 +107,14 @@ def validate_pin(pin):
                 "candidate_platforms": list(TARGETS)}
     if any(pin.get(k) != v for k, v in expected.items()):
         fail("PIN")
+    if expected_description is None:
+        if "description" in pin:
+            fail("PIN")
+    else:
+        name = pin.get("description")
+        if (not isinstance(name, str) or Path(name).name != name
+                or not name.endswith(".md") or name != expected_description):
+            fail("DESCRIPTION")
     if (not re.fullmatch(r"[0-9a-f]{64}", str(pin.get("sha256", "")))
             or type(pin.get("size")) is not int or not 0 < pin["size"] <= 32 * 1024**2
             or not re.fullmatch(r"[0-9a-f]{40}", str(pin.get("source_commit", "")))):
@@ -92,11 +146,30 @@ def build_pin(pin):
     return {**pin, "qualified_platforms": []}
 
 
-def load_pin(project):
-    if project not in PRODUCTS:
+def load_pin(project, path=None):
+    if not isinstance(project, str) or project not in PRODUCTS:
         fail("PRODUCT")
-    root = Path(__file__).resolve().parents[2]
-    return validate_pin(strict_json(physical_bytes(root / "operators/tf-pypi" / (project + ".json"))))
+    if path is None:
+        root = Path(__file__).resolve().parents[2]
+        return validate_pin(strict_json(physical_bytes(root / "operators/tf-pypi" / (project + ".json"))))
+    if not isinstance(path, (str, os.PathLike)):
+        fail("PIN")
+    raw_path = os.fspath(path)
+    if not isinstance(raw_path, str) or not raw_path or raw_path.endswith(("/", "\\")):
+        fail("PIN")
+    candidate = Path(raw_path)
+    if any(part.is_symlink() for part in (candidate, *candidate.parents)):
+        fail("SYMLINK")
+    allowed_names = {row[0] for key, row in RELEASES.items() if key[0] == project}
+    if candidate.name not in allowed_names:
+        fail("PIN")
+    pin = strict_json(physical_bytes(candidate))
+    if not isinstance(pin, dict) or not isinstance(pin.get("project"), str) or pin.get("project") != project:
+        fail("PRODUCT")
+    validate_pin(pin)
+    if release(pin)[0] != candidate.name:
+        fail("PIN")
+    return pin
 
 
 def check_package(pin, files):

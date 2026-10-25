@@ -39,10 +39,17 @@ class WorkflowTests(unittest.TestCase):
 
     def test_registered_first_wave_workflows_are_byte_identical_to_generator(self):
         workflows = ROOT / ".github/workflows"
-        for product in sorted(PRODUCTS):
-            pin = load_pin(product)
+        current = {
+            "theme-forge-stellar-burst": "0.7.0",
+            "theme-forge-stellar-loom": "0.5.0",
+            "theme-forge-solar-sail": "0.3.0",
+        }
+        self.assertEqual(set(current), set(PRODUCTS))
+        for product, version in sorted(current.items()):
+            pin_path = ROOT / "operators/tf-pypi" / f"{product}-{version}.json"
+            pin = load_pin(product, pin_path)
             raw = (workflows / pin["workflow"]).read_bytes()
-            self.assertEqual(raw, workflow_text(pin).encode("utf-8"))
+            self.assertEqual(raw, workflow_text(product, pin_path=pin_path).encode("utf-8"))
             self.assertNotIn(b"--output dist --target", raw)
             self.assertNotIn(b"native_consumer:", raw)
             self.assertNotIn(f"name: native-consumer-{product}\n".encode("utf-8"), raw)

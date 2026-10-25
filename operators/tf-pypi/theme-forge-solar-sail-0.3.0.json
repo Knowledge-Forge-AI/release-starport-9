@@ -1,0 +1,32 @@
+{
+  "schema": "rs9.tf-pypi-intake.v2",
+  "project": "theme-forge-solar-sail",
+  "version": "0.3.0",
+  "distribution_version": "0.3.0",
+  "workflow": "rs9-tfss-pypi-publish.yml",
+  "npm_name": "@knowledge-forge-ai/theme-forge-solar-sail",
+  "bins": {
+    "tfss": "bin/tfss.js"
+  },
+  "node": ">=22",
+  "license": "AGPL-3.0-or-later",
+  "asset": "knowledge-forge-ai-theme-forge-solar-sail-0.3.0.tgz",
+  "sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415",
+  "size": 110836,
+  "source_commit": "216a27e703ae256cd0030c497f722a707571bdb6",
+  "source_status": "BLOCKED",
+  "withheld": [
+    "SUCCESSOR_PIN_ADMISSION_PENDING",
+    "PYPI_RELEASE_MANIFEST_PENDING",
+    "PYPI_CONSUMER_MATRIX_PENDING",
+    "PYPI_WHEEL_ARTIFACT_RECEIPTS_PENDING",
+    "EXACT_SOURCE_RELEASE_BINDING_PENDING"
+  ],
+  "candidate_platforms": [
+    "darwin-arm64",
+    "linux-arm64-gnu",
+    "linux-x64-gnu"
+  ],
+  "qualified_platforms": [],
+  "description": "solar-sail-0.3.0.md"
+}

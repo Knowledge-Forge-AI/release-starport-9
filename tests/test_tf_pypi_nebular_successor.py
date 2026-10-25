@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 import shutil
 import tarfile
@@ -24,7 +25,14 @@ from rs9.tf_pypi_nebular_successor import (
     write_candidate_receipt,
 )
 from rs9.wheel import format_record
-from rs9.wheel_nebular_successor import _wheel_archive, build_successor_wheel
+from rs9.wheel_nebular_successor import (
+    DESCRIPTION_070_PATH,
+    DISTRIBUTION_VERSION,
+    SUCCESSOR_RELEASES,
+    _wheel_archive,
+    build_successor_wheel,
+    successor_release,
+)
 from tests.test_nebular_lineage import NebularLineageTests
 from tests.test_wheel_native import make_darwin_archive, make_standard_darwin_entries
 
@@ -483,6 +491,139 @@ class NebularSuccessorIntegrationTests(unittest.TestCase):
     def test_adapter_has_no_publication_command(self) -> None:
         with self.assertRaises(SystemExit):
             main(["publish"])
+
+    def test_release_selector_is_closed_and_defaults_to_historical(self) -> None:
+        self.assertEqual(tuple(SUCCESSOR_RELEASES), ("0.6.1.post1", "0.7.0"))
+        with self._with_pins()[0], self._with_pins()[1], self._with_pins()[2]:
+            authenticated = self._authenticate()
+        self.assertEqual(authenticated.release, SUCCESSOR_RELEASES[DISTRIBUTION_VERSION])
+        with self.assertRaises(SystemExit):
+            main([
+                "build-candidate",
+                "--release",
+                "0.8.0",
+                "--repository",
+                str(self.fixture["repo"]),
+                "--evidence",
+                str(self.fixture["evidence"]),
+                "--output",
+                str(self.root / "bad-cli-release"),
+                "--receipt",
+                str(self.root / "bad-cli-receipt.json"),
+                "--approved-bootstrap-sha256",
+                "0" * 64,
+                "--rs9-source-commit",
+                RS9_COMMIT,
+                "--rs9-source-tree",
+                RS9_TREE,
+            ])
+        recorded_kwargs: dict[str, object] = {}
+
+        def _sentinel(*args, **kwargs):
+            recorded_kwargs.update(kwargs)
+            raise RuntimeError("sentinel")
+
+        with (
+            patch("rs9.tf_pypi_nebular_successor.authenticate_successor_capture", side_effect=_sentinel),
+            self.assertRaises(RuntimeError),
+        ):
+            main([
+                "build-candidate",
+                "--repository",
+                str(self.fixture["repo"]),
+                "--evidence",
+                str(self.fixture["evidence"]),
+                "--output",
+                str(self.root / "default-cli-release"),
+                "--receipt",
+                str(self.root / "default-cli-receipt.json"),
+                "--approved-bootstrap-sha256",
+                "0" * 64,
+                "--rs9-source-commit",
+                RS9_COMMIT,
+                "--rs9-source-tree",
+                RS9_TREE,
+            ])
+        self.assertEqual(recorded_kwargs.get("release"), "0.6.1.post1")
+
+        recorded_kwargs.clear()
+        with (
+            patch("rs9.tf_pypi_nebular_successor.authenticate_successor_capture", side_effect=_sentinel),
+            self.assertRaises(RuntimeError),
+        ):
+            main([
+                "build-candidate",
+                "--release",
+                "0.7.0",
+                "--repository",
+                str(self.fixture["repo"]),
+                "--evidence",
+                str(self.fixture["evidence"]),
+                "--output",
+                str(self.root / "selected-cli-release"),
+                "--receipt",
+                str(self.root / "selected-cli-receipt.json"),
+                "--approved-bootstrap-sha256",
+                "0" * 64,
+                "--rs9-source-commit",
+                RS9_COMMIT,
+                "--rs9-source-tree",
+                RS9_TREE,
+            ])
+        self.assertEqual(recorded_kwargs.get("release"), "0.7.0")
+
+    def test_selected_070_release_rejects_historical_capture(self) -> None:
+        with (
+            self._with_pins()[0],
+            self._with_pins()[1],
+            self._with_pins()[2],
+            self.assertRaises(ContractError) as caught,
+        ):
+            authenticate_successor_capture(
+                self.fixture["repo"],
+                self.fixture["evidence"],
+                approved_bootstrap_sha256=digest(
+                    (self.fixture["repo"] / BOOTSTRAP).read_bytes()
+                ),
+                release="0.7.0",
+            )
+        self.assertEqual(caught.exception.code, "TAG_MISMATCH")
+
+        authenticated, receipt, output = self._build_for_receipt_validation("receipt-version-tamper")
+        version_tampered = copy.deepcopy(receipt)
+        version_tampered["distribution_version"] = "0.7.0"
+        with self.assertRaises(ContractError) as caught:
+            validate_candidate_receipt(version_tampered, authenticated, output_dir=output)
+        self.assertEqual(caught.exception.code, "RECEIPT_VERSION")
+
+        readme_070_bytes = (
+            Path(__file__).resolve().parents[1] / DESCRIPTION_070_PATH
+        ).read_bytes()
+        readme_070_entry = {
+            "path": DESCRIPTION_070_PATH,
+            "sha256": digest(readme_070_bytes),
+        }
+        readme_tampered = copy.deepcopy(receipt)
+        readme_tampered["readme"] = copy.deepcopy(readme_070_entry)
+        for row in readme_tampered["rows"]:
+            row["readme"] = copy.deepcopy(readme_070_entry)
+        with self.assertRaises(ContractError) as caught:
+            validate_candidate_receipt(readme_tampered, authenticated, output_dir=output)
+        self.assertEqual(caught.exception.code, "DESCRIPTION_VERSION")
+
+        cross_wired_auth = dataclasses.replace(
+            authenticated, release=successor_release("0.7.0")
+        )
+        with self.assertRaises(ContractError) as caught:
+            validate_candidate_receipt(receipt, cross_wired_auth, output_dir=output)
+        self.assertEqual(caught.exception.code, "RECEIPT_VERSION")
+
+        tag_mismatch_receipt = copy.deepcopy(receipt)
+        tag_mismatch_receipt["application_version"] = "0.7.0"
+        tag_mismatch_receipt["distribution_version"] = "0.7.0"
+        with self.assertRaises(ContractError) as caught:
+            validate_candidate_receipt(tag_mismatch_receipt, cross_wired_auth, output_dir=output)
+        self.assertEqual(caught.exception.code, "TAG_MISMATCH")
 
 
 if __name__ == "__main__":

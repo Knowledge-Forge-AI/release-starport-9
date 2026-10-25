@@ -23,6 +23,7 @@ def parser():
     for operation in ("fetch", "intake", "build", "verify", "consumer", "status"):
         command = sub.add_parser(operation)
         command.add_argument("--project", choices=sorted(PRODUCTS), required=True)
+        command.add_argument("--pin", type=Path, default=None)
         if operation in {"intake", "build"}:
             command.add_argument("--inputs", type=Path, required=True)
         if operation in {"fetch", "build"}:
@@ -40,7 +41,7 @@ def parser():
 def main(argv=None):
     args = parser().parse_args(argv)
     try:
-        pin = load_pin(args.project)
+        pin = load_pin(args.project, args.pin)
         operation = args.operation
         if operation == "status":
             remote = project_state(pin) if args.remote else "not-read"

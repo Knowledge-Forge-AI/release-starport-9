@@ -42,7 +42,7 @@ jobs:
       - name: Build and verify package distributions
         env:
           PYTHONPATH: src
-        run: python3 -B -m rs9.tf_pypi_publish build --project theme-forge-stellar-loom --output dist
+        run: python3 -B -m rs9.tf_pypi_publish build --project theme-forge-stellar-loom --pin operators/tf-pypi/theme-forge-stellar-loom-0.5.0.json --output dist
 
       - name: Stage verified artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -94,7 +94,7 @@ jobs:
           PHYSICAL_RUNNER_TEMP="$(python3 -c 'import os; print(os.path.realpath(os.environ["RUNNER_TEMP"]))')"
           mkdir -p "$PHYSICAL_RUNNER_TEMP/tf-consumer-report"
           /usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' \
-            python3 -B -m rs9.tf_pypi_hosted qualify --project theme-forge-stellar-loom \
+            python3 -B -m rs9.tf_pypi_hosted qualify --project theme-forge-stellar-loom --pin operators/tf-pypi/theme-forge-stellar-loom-0.5.0.json \
             --target darwin-arm64 \
             --dist "$GITHUB_WORKSPACE/dist" --work "$PHYSICAL_RUNNER_TEMP/tf-consumer" \
             --report "$PHYSICAL_RUNNER_TEMP/tf-consumer-report/result.json" \
@@ -150,7 +150,7 @@ jobs:
           export TMPDIR="$PHYSICAL_TMP" TMP="$PHYSICAL_TMP" TEMP="$PHYSICAL_TMP"
           PHYSICAL_RUNNER_TEMP="$(python3 -c 'import os; print(os.path.realpath(os.environ["RUNNER_TEMP"]))')"
           mkdir -p "$PHYSICAL_RUNNER_TEMP/tf-consumer-report"
-          python3 -B -m rs9.tf_pypi_hosted qualify --project theme-forge-stellar-loom \
+          python3 -B -m rs9.tf_pypi_hosted qualify --project theme-forge-stellar-loom --pin operators/tf-pypi/theme-forge-stellar-loom-0.5.0.json \
             --target linux-arm64-gnu \
             --dist "$GITHUB_WORKSPACE/dist" --work "$PHYSICAL_RUNNER_TEMP/tf-consumer" \
             --report "$PHYSICAL_RUNNER_TEMP/tf-consumer-report/result.json" \
@@ -206,7 +206,7 @@ jobs:
           export TMPDIR="$PHYSICAL_TMP" TMP="$PHYSICAL_TMP" TEMP="$PHYSICAL_TMP"
           PHYSICAL_RUNNER_TEMP="$(python3 -c 'import os; print(os.path.realpath(os.environ["RUNNER_TEMP"]))')"
           mkdir -p "$PHYSICAL_RUNNER_TEMP/tf-consumer-report"
-          python3 -B -m rs9.tf_pypi_hosted qualify --project theme-forge-stellar-loom \
+          python3 -B -m rs9.tf_pypi_hosted qualify --project theme-forge-stellar-loom --pin operators/tf-pypi/theme-forge-stellar-loom-0.5.0.json \
             --target linux-x64-gnu \
             --dist "$GITHUB_WORKSPACE/dist" --work "$PHYSICAL_RUNNER_TEMP/tf-consumer" \
             --report "$PHYSICAL_RUNNER_TEMP/tf-consumer-report/result.json" \
@@ -260,7 +260,7 @@ jobs:
           QUALIFY_COMMIT: '${{ github.sha }}'
           QUALIFY_RUN_ID: '${{ github.run_id }}'
           QUALIFY_RUN_ATTEMPT: '${{ github.run_attempt }}'
-        run: python3 -B -m rs9.tf_pypi_hosted admit --project theme-forge-stellar-loom --dist dist --receipts receipts --expected-commit "$QUALIFY_COMMIT" --run-id "$QUALIFY_RUN_ID" --run-attempt "$QUALIFY_RUN_ATTEMPT"
+        run: python3 -B -m rs9.tf_pypi_hosted admit --project theme-forge-stellar-loom --pin operators/tf-pypi/theme-forge-stellar-loom-0.5.0.json --dist dist --receipts receipts --expected-commit "$QUALIFY_COMMIT" --run-id "$QUALIFY_RUN_ID" --run-attempt "$QUALIFY_RUN_ATTEMPT"
 
   publish:
     if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.mode == 'publish'
@@ -309,7 +309,7 @@ jobs:
           QUALIFY_COMMIT: '${{ github.sha }}'
           QUALIFY_RUN_ID: '${{ github.run_id }}'
           QUALIFY_RUN_ATTEMPT: '${{ github.run_attempt }}'
-        run: python3 -B -m rs9.tf_pypi_publish select-missing --project theme-forge-stellar-loom --dist dist --upload-dir upload --receipts receipts --expected-commit "$QUALIFY_COMMIT" --run-id "$QUALIFY_RUN_ID" --run-attempt "$QUALIFY_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+        run: python3 -B -m rs9.tf_pypi_publish select-missing --project theme-forge-stellar-loom --pin operators/tf-pypi/theme-forge-stellar-loom-0.5.0.json --dist dist --upload-dir upload --receipts receipts --expected-commit "$QUALIFY_COMMIT" --run-id "$QUALIFY_RUN_ID" --run-attempt "$QUALIFY_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
       - name: Publish package distributions to PyPI
         if: steps.missing.outputs.upload == 'true'
@@ -320,4 +320,4 @@ jobs:
       - name: Read back published PyPI state
         env:
           PYTHONPATH: src
-        run: python3 -B -m rs9.tf_pypi_publish readback --project theme-forge-stellar-loom --dist dist
+        run: python3 -B -m rs9.tf_pypi_publish readback --project theme-forge-stellar-loom --pin operators/tf-pypi/theme-forge-stellar-loom-0.5.0.json --dist dist

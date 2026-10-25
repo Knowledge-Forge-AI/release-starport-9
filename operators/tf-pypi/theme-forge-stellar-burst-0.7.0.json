@@ -1,0 +1,65 @@
+{
+  "schema": "rs9.tf-pypi-intake.v2",
+  "project": "theme-forge-stellar-burst",
+  "version": "0.7.0",
+  "distribution_version": "0.7.0",
+  "workflow": "rs9-tfsb-pypi-publish.yml",
+  "npm_name": "@knowledge-forge-ai/theme-forge-stellar-burst",
+  "bins": {
+    "tfsb": "dist/cli.js",
+    "tfsb-studio-service": "dist/service-protocol/server-cli.js"
+  },
+  "node": ">=22",
+  "license": "AGPL-3.0-or-later",
+  "asset": "knowledge-forge-ai-theme-forge-stellar-burst-0.7.0.tgz",
+  "sha256": "2629b32980a7aa5a93cf3e893a9763695db47c01bd90db68ab7434ee309c029d",
+  "size": 646799,
+  "source_commit": "bf9bf925d53e0964e480e9ee9cd321dfd9ab56f3",
+  "source_status": "BLOCKED",
+  "withheld": [
+    "SUCCESSOR_PIN_ADMISSION_PENDING",
+    "PYPI_RELEASE_MANIFEST_PENDING",
+    "PYPI_CONSUMER_MATRIX_PENDING",
+    "PYPI_WHEEL_ARTIFACT_RECEIPTS_PENDING",
+    "EXACT_SOURCE_RELEASE_BINDING_PENDING"
+  ],
+  "candidate_platforms": [
+    "darwin-arm64",
+    "linux-arm64-gnu",
+    "linux-x64-gnu"
+  ],
+  "qualified_platforms": [],
+  "dependencies": [
+    {
+      "name": "@xmldom/xmldom",
+      "version": "0.9.12",
+      "asset": "xmldom-0.9.12.tgz",
+      "size": 109708,
+      "sha256": "08245e18c248b957b4c6e07f8549ad5f55ae11b7a8abd4c1113a0fd61ddc67ee",
+      "license": "MIT",
+      "url": "https://registry.npmjs.org/@xmldom/xmldom/-/xmldom-0.9.12.tgz",
+      "integrity": "sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A=="
+    },
+    {
+      "name": "fflate",
+      "version": "0.8.3",
+      "asset": "fflate-0.8.3.tgz",
+      "size": 173034,
+      "sha256": "38c2cd824402407b43153c782274aec2ea83ea688e4aa0b743c5f2c305857d92",
+      "license": "MIT",
+      "url": "https://registry.npmjs.org/fflate/-/fflate-0.8.3.tgz",
+      "integrity": "sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA=="
+    },
+    {
+      "name": "smol-toml",
+      "version": "1.8.0",
+      "asset": "smol-toml-1.8.0.tgz",
+      "size": 23162,
+      "sha256": "1fc995be91cdb777fc13e20c2edfebaaf60ef4e4d2d5331caef2837b04d37892",
+      "license": "BSD-3-Clause",
+      "url": "https://registry.npmjs.org/smol-toml/-/smol-toml-1.8.0.tgz",
+      "integrity": "sha512-kCZr2V3ch9i00x8zXRhjUNVcjG9ijES5dDudkXvUVCT5QlJNQWElSJdZqyPemffHoLNUYwOcou0Fy+ojN0uHSQ=="
+    }
+  ],
+  "description": "stellar-burst-0.7.0.md"
+}
