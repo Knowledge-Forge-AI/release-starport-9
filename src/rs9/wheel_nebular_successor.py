@@ -1,11 +1,12 @@
-"""Successor Python wheel builder for the authenticated Nebular 0.6.1 payload.
+"""Successor Python wheel builder for authenticated Nebular release payloads.
 
-The successor keeps the upstream application identity at ``0.6.1`` while using
-the first Python distribution post release, ``0.6.1.post1``.  It deliberately
-builds a verified legacy candidate first and then performs a deterministic,
-small reassembly.  The older native builder remains the source of the archive,
-manifest, and isolated helper contract; this module owns only the successor
-metadata, launcher, provenance, and RECORD.
+The successor defaults to the historical ``0.6.1`` upstream application with
+the ``0.6.1.post1`` Python distribution release, and also supports explicit
+selection of the ``0.7.0`` application and distribution release pair.  It
+deliberately builds a verified legacy candidate first and then performs a
+deterministic, small reassembly.  The older native builder remains the source
+of the archive, manifest, and isolated helper contract; this module owns only
+the successor metadata, launcher, provenance, and RECORD.
 """
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ import stat
 import tempfile
 import zipfile
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -51,7 +53,60 @@ LEGAL_FILES = ("LICENSE", "NOTICE", "COMMERCIAL-LICENSE.md")
 EXPECTED_COMMAND = "tfnf"
 SUPPORTED_SUCCESSOR_SYSTEMS = frozenset({"aarch64-darwin", "x86_64-linux", "aarch64-linux"})
 DEFAULT_DESCRIPTION_PATH = "operators/tf-pypi/descriptions/nebular-fusion.md"
+DESCRIPTION_070_PATH = "operators/tf-pypi/descriptions/nebular-fusion-0.7.0.md"
+HISTORICAL_RELEASE = DISTRIBUTION_VERSION
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
+_ARCHIVE_NAME_VERSION_RE = re.compile(
+    r"theme-forge-nebular-fusion-v(?P<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?)"
+    r"-(?:aarch64-apple-darwin\.app|(?:aarch64|x86_64)-unknown-linux-gnu)\.tar\.gz\Z"
+)
+
+
+@dataclass(frozen=True)
+class SuccessorRelease:
+    application_version: str
+    distribution_version: str
+    description_path: str
+
+
+SUCCESSOR_RELEASES: dict[str, SuccessorRelease] = {
+    HISTORICAL_RELEASE: SuccessorRelease(
+        application_version=APPLICATION_VERSION,
+        distribution_version=DISTRIBUTION_VERSION,
+        description_path=DEFAULT_DESCRIPTION_PATH,
+    ),
+    "0.7.0": SuccessorRelease(
+        application_version="0.7.0",
+        distribution_version="0.7.0",
+        description_path=DESCRIPTION_070_PATH,
+    ),
+}
+
+
+def successor_release(selector: str = HISTORICAL_RELEASE) -> SuccessorRelease:
+    if not isinstance(selector, str) or selector not in SUCCESSOR_RELEASES:
+        raise _error(
+            "RELEASE_SELECTION",
+            "Successor release selector must name a closed supported release",
+            release=selector,
+            supported_releases=list(SUCCESSOR_RELEASES),
+        )
+    return SUCCESSOR_RELEASES[selector]
+
+
+def _release_for_versions(application_version: str, distribution_version: str) -> SuccessorRelease:
+    for release in SUCCESSOR_RELEASES.values():
+        if (
+            release.application_version == application_version
+            and release.distribution_version == distribution_version
+        ):
+            return release
+    raise _error(
+        "INVALID_VERSION",
+        "Application and distribution versions must match a closed successor release pair",
+        application_version=application_version,
+        distribution_version=distribution_version,
+    )
 
 
 def _error(code: str, message: str, **details: Any) -> ContractError:
@@ -161,6 +216,45 @@ def _read_description(description_path: str | Path) -> tuple[str, bytes]:
     return str(path.relative_to(_repo_root())) if path.is_relative_to(_repo_root()) else path.name, data
 
 
+def _lexical_description_abspath(path_value: str | Path) -> str:
+    raw = Path(path_value)
+    target = raw if raw.is_absolute() else _repo_root() / raw
+    return os.path.abspath(os.fspath(target))
+
+
+def _release_description_path(
+    release: SuccessorRelease,
+    description_path: str | Path | None,
+) -> str | Path:
+    if description_path is None:
+        return release.description_path
+    if not isinstance(description_path, (str, Path)) or not str(description_path):
+        raise _error("INVALID_DESCRIPTION", "Description path is required")
+    candidate = _lexical_description_abspath(description_path)
+    selected = _lexical_description_abspath(release.description_path)
+    other_paths = {
+        _lexical_description_abspath(row.description_path)
+        for key, row in SUCCESSOR_RELEASES.items()
+        if key != release.distribution_version
+    }
+    if candidate in other_paths:
+        raise _error(
+            "DESCRIPTION_VERSION",
+            "Description path belongs to a different successor release",
+            release=release.distribution_version,
+            description_path=str(description_path),
+        )
+    if release.distribution_version != HISTORICAL_RELEASE and candidate != selected:
+        raise _error(
+            "DESCRIPTION_VERSION",
+            "Selected non-historical release requires its exact versioned description",
+            release=release.distribution_version,
+            description_path=str(description_path),
+            expected_description_path=release.description_path,
+        )
+    return description_path
+
+
 def _description_bytes(description_path: str | Path) -> tuple[str, bytes]:
     """Read the RS9-owned candidate README in both fixture and authenticated modes."""
     return _read_description(description_path)
@@ -195,7 +289,11 @@ def _legal_files(capture: ReleaseCapture | None, fixture_only: bool,
     return {name: observed[name] for name in LEGAL_FILES}
 
 
-def _capture_identity(capture: ReleaseCapture | None, fixture_only: bool) -> tuple[str | None, dict[str, Any] | None]:
+def _capture_identity(
+    capture: ReleaseCapture | None,
+    fixture_only: bool,
+    application_version: str = APPLICATION_VERSION,
+) -> tuple[str | None, dict[str, Any] | None]:
     if fixture_only:
         if capture is not None:
             raise _error("FIXTURE_AUTHORITY", "Fixture mode cannot mix authenticated capture and raw inputs")
@@ -206,7 +304,7 @@ def _capture_identity(capture: ReleaseCapture | None, fixture_only: bool) -> tup
     record = capture.record
     if record.get("repository", {}).get("full_name") != "Knowledge-Forge-AI/" + PRODUCT_ID:
         raise _error("REPOSITORY_MISMATCH", "Authenticated capture is for a different repository")
-    if record.get("release", {}).get("tag") != "v" + APPLICATION_VERSION:
+    if record.get("release", {}).get("tag") != "v" + application_version:
         raise _error("TAG_MISMATCH", "Authenticated capture is for a different upstream version")
     tag = record.get("tag", {})
     commit, tree = tag.get("commit"), tag.get("tree")
@@ -236,10 +334,15 @@ def _rs9_source_binding(commit: str | None, tree: str | None, fixture_only: bool
     }
 
 
-def _archive_inputs(capture: ReleaseCapture | None, fixture_only: bool, system: str,
-                    archive_path: str | Path | None, archive_bytes: bytes | None,
-                    manifest: dict[str, Any] | None) -> tuple[dict[str, Any] | None, bytes | None, str | None,
-                                                               str | None, str | None, str | None]:
+def _archive_inputs(
+    capture: ReleaseCapture | None,
+    fixture_only: bool,
+    system: str,
+    archive_path: str | Path | None,
+    archive_bytes: bytes | None,
+    manifest: dict[str, Any] | None,
+    release: SuccessorRelease = SUCCESSOR_RELEASES[HISTORICAL_RELEASE],
+) -> tuple[dict[str, Any] | None, bytes | None, str | None, str | None, str | None, str | None]:
     if not fixture_only:
         if capture is None:
             raise _error("PROVENANCE_REQUIRED", "Authenticated release capture is required")
@@ -266,15 +369,26 @@ def _archive_inputs(capture: ReleaseCapture | None, fixture_only: bool, system: 
         path = Path(archive_path)
         if path.is_symlink() or any(parent.is_symlink() for parent in (path, *path.parents)):
             raise _error("UNSAFE_ARCHIVE", "Fixture archive ancestry contains a symlink")
-        data, name = path.read_bytes(), path.name
+        name = path.name
+        if release.distribution_version != HISTORICAL_RELEASE:
+            match = _ARCHIVE_NAME_VERSION_RE.fullmatch(name)
+            if match is not None and match.group("version") != release.application_version:
+                raise _error(
+                    "ARCHIVE_VERSION",
+                    "Fixture archive filename version does not match selected application version",
+                    archive_name=name,
+                    observed_version=match.group("version"),
+                    expected_version=release.application_version,
+                )
+        data = path.read_bytes()
     else:
         if archive_bytes is None:
             raise _error("MISSING_ASSET", "Fixture archive bytes are unavailable")
         if system.endswith("-linux"):
             arch = "aarch64" if system.startswith(("aarch64", "arm64")) else "x86_64"
-            name = f"theme-forge-nebular-fusion-v0.6.1-{arch}-unknown-linux-gnu.tar.gz"
+            name = f"theme-forge-nebular-fusion-v{release.application_version}-{arch}-unknown-linux-gnu.tar.gz"
         else:
-            name = "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz"
+            name = f"theme-forge-nebular-fusion-v{release.application_version}-aarch64-apple-darwin.app.tar.gz"
         data = archive_bytes
     with tempfile.TemporaryDirectory(prefix="rs9-nebular-inspect-", dir=_repo_root()) as td:
         path = Path(td) / name
@@ -325,8 +439,18 @@ def _profile_license_facts(profile_result: Mapping[str, Any] | None) -> dict[str
     }
 
 
-def _render_successor_launcher(archive_name: str, archive_sha256: str, manifest_sha256: str,
-                               shell_path: str, gui_path: str, family: str, arch: str) -> bytes:
+def _render_successor_launcher(
+    archive_name: str,
+    archive_sha256: str,
+    manifest_sha256: str,
+    shell_path: str,
+    gui_path: str,
+    family: str,
+    arch: str,
+    *,
+    application_version: str = APPLICATION_VERSION,
+    distribution_version: str = DISTRIBUTION_VERSION,
+) -> bytes:
     source = '''"""Theme Forge Nebular Fusion successor launcher; offline and identity-bound."""
 from __future__ import annotations
 import hashlib, json, os, platform, sys
@@ -414,8 +538,8 @@ def main_tfnf() -> None:
     sys.exit(run_launcher("tfnf"))
 '''
     replacements = {
-        "__APP_VERSION__": repr(APPLICATION_VERSION),
-        "__DIST_VERSION__": repr(DISTRIBUTION_VERSION),
+        "__APP_VERSION__": repr(application_version),
+        "__DIST_VERSION__": repr(distribution_version),
         "__ARCHIVE_NAME__": repr(archive_name),
         "__ARCHIVE_SHA__": repr(archive_sha256),
         "__MANIFEST_SHA__": repr(manifest_sha256),
@@ -429,20 +553,28 @@ def main_tfnf() -> None:
     return source.encode("utf-8")
 
 
-def _successor_init_bytes() -> bytes:
+def _successor_init_bytes(
+    *,
+    application_version: str = APPLICATION_VERSION,
+    distribution_version: str = DISTRIBUTION_VERSION,
+) -> bytes:
     return (
         '"""Theme Forge Nebular Fusion Python successor package."""\n'
-        f"__version__ = {DISTRIBUTION_VERSION!r}\n"
-        f"__upstream_version__ = {APPLICATION_VERSION!r}\n"
+        f"__version__ = {distribution_version!r}\n"
+        f"__upstream_version__ = {application_version!r}\n"
         f"__product_id__ = {PRODUCT_ID!r}\n"
     ).encode()
 
 
-def _successor_metadata_bytes(description: bytes) -> bytes:
+def _successor_metadata_bytes(
+    description: bytes,
+    *,
+    distribution_version: str = DISTRIBUTION_VERSION,
+) -> bytes:
     return (
         "Metadata-Version: 2.4\n"
         f"Name: {DISTRIBUTION_NAME}\n"
-        f"Version: {DISTRIBUTION_VERSION}\n"
+        f"Version: {distribution_version}\n"
         "Summary: Theme Forge Nebular Fusion application distribution for Python 3\n"
         f"License-Expression: {LICENSE_EXPRESSION}\n"
         + "".join(f"License-File: {name}\n" for name in sorted(LEGAL_FILES))
@@ -501,7 +633,7 @@ def build_successor_wheel(
     target_platform: str | None = None,
     system: str | None = None,
     license_files: Mapping[str, bytes] | None = None,
-    description_path: str | Path = DEFAULT_DESCRIPTION_PATH,
+    description_path: str | Path | None = None,
     launcher_path: str | Path | None = None,
     gui_path: str | Path | None = None,
     profile_result: dict[str, Any] | None = None,
@@ -516,10 +648,7 @@ def build_successor_wheel(
     """Build a non-admitted successor wheel from an authenticated or explicit fixture input."""
     if product_id != PRODUCT_ID:
         raise _error("UNSUPPORTED_PRODUCT", "Successor builder only supports Nebular Fusion")
-    if application_version != APPLICATION_VERSION:
-        raise _error("INVALID_VERSION", "Upstream application version is fixed to 0.6.1")
-    if distribution_version != DISTRIBUTION_VERSION:
-        raise _error("INVALID_VERSION", "Successor distribution version is fixed to 0.6.1.post1")
+    release = _release_for_versions(application_version, distribution_version)
     if (output_dir is None) == (output_path is None):
         raise _error("DESTINATION_REQUIRED", "Exactly one wheel output destination is required")
     if fixture_only and capture is not None:
@@ -536,7 +665,7 @@ def build_successor_wheel(
         raise _error("COMMAND_OVERRIDE", "Authenticated command paths come only from the captured release")
 
     effective_system, target_triple, is_linux, family = _resolve_target(system, target_platform, platform_tag, candidate_only)
-    release_hash, release_identity = _capture_identity(capture, fixture_only)
+    release_hash, release_identity = _capture_identity(capture, fixture_only, release.application_version)
     forward_lineage = None
     if lineage_proof is not None:
         if capture is None or lineage_intent is None:
@@ -544,9 +673,10 @@ def build_successor_wheel(
         forward_lineage = verify_forward_lineage_proof(capture, lineage_proof, intent=lineage_intent)
     rs9_source = _rs9_source_binding(rs9_source_commit, rs9_source_tree, fixture_only)
     legal = _legal_files(capture, fixture_only, license_files)
-    description_name, description = _description_bytes(description_path)
+    selected_description = _release_description_path(release, description_path)
+    description_name, description = _description_bytes(selected_description)
     archive_manifest, payload_bytes, payload_name, captured_shell, captured_gui, selected_asset_id = _archive_inputs(
-        capture, fixture_only, effective_system, archive_path, archive_bytes, manifest
+        capture, fixture_only, effective_system, archive_path, archive_bytes, manifest, release
     )
     if archive_manifest is None or payload_bytes is None or payload_name is None:
         raise _error("MISSING_ASSET", "Archive and manifest inputs are unavailable")
@@ -563,7 +693,7 @@ def build_successor_wheel(
         old_dir = Path(temp) / "legacy"
         old_kwargs: dict[str, Any] = {
             "product_id": PRODUCT_ID,
-            "version": APPLICATION_VERSION,
+            "version": release.application_version,
             "output_dir": old_dir,
             "platform_tag": platform_tag,
             "target_platform": target_triple,
@@ -625,14 +755,28 @@ def build_successor_wheel(
             raise _error("HELPER_DRIFT", "Legacy candidate helper bytes changed")
 
     launcher_bytes = _render_successor_launcher(
-        payload_name, payload_sha, manifest_sha, shell_path, actual_gui_path, family, arch
+        payload_name,
+        payload_sha,
+        manifest_sha,
+        shell_path,
+        actual_gui_path,
+        family,
+        arch,
+        application_version=release.application_version,
+        distribution_version=release.distribution_version,
     )
     dist_name = DISTRIBUTION_NAME.replace("-", "_")
-    dist_info = f"{dist_name}-{DISTRIBUTION_VERSION}.dist-info"
+    dist_info = f"{dist_name}-{release.distribution_version}.dist-info"
     wheel_tag = legacy.tag
-    wheel_filename = f"{dist_name}-{DISTRIBUTION_VERSION}-{wheel_tag}.whl"
-    init_bytes = _successor_init_bytes()
-    metadata = _successor_metadata_bytes(description)
+    wheel_filename = f"{dist_name}-{release.distribution_version}-{wheel_tag}.whl"
+    init_bytes = _successor_init_bytes(
+        application_version=release.application_version,
+        distribution_version=release.distribution_version,
+    )
+    metadata = _successor_metadata_bytes(
+        description,
+        distribution_version=release.distribution_version,
+    )
     wheel_info = _successor_wheel_info_bytes(wheel_tag)
     entry_points = _successor_entry_points_bytes()
     profile_result_sha256 = record_sha256(profile_result) if isinstance(profile_result, Mapping) else None
@@ -641,8 +785,8 @@ def build_successor_wheel(
         "schema": SUCCESSOR_PROVENANCE_SCHEMA,
         "product_id": PRODUCT_ID,
         "distribution_name": DISTRIBUTION_NAME,
-        "application_version": APPLICATION_VERSION,
-        "distribution_version": DISTRIBUTION_VERSION,
+        "application_version": release.application_version,
+        "distribution_version": release.distribution_version,
         "source_identity": release_identity,
         "forward_lineage": forward_lineage,
         "rs9_source": rs9_source,
@@ -675,7 +819,11 @@ def build_successor_wheel(
         "launcher_sha256": digest(launcher_bytes),
         "metadata_sha256": digest(metadata),
         "helper_source_sha256": {name: digest(data) for name, data in helpers.items()},
-        "legacy_candidate": {"version": APPLICATION_VERSION, "filename": legacy.filename, "sha256": legacy.sha256},
+        "legacy_candidate": {
+            "version": release.application_version,
+            "filename": legacy.filename,
+            "sha256": legacy.sha256,
+        },
         "fixture_only": fixture_only,
         "candidate_only": candidate_only,
         "candidate_status": "policy-pending" if is_linux else "candidate",
@@ -711,7 +859,7 @@ def build_successor_wheel(
     ]
     return WheelBuildResult(
         wheel_path=destination.absolute(), filename=wheel_filename, distribution=DISTRIBUTION_NAME,
-        version=DISTRIBUTION_VERSION, tag=wheel_tag, sha256=digest(wheel_bytes), size=len(wheel_bytes),
+        version=release.distribution_version, tag=wheel_tag, sha256=digest(wheel_bytes), size=len(wheel_bytes),
         release_hash=release_hash or "", record=provenance, manifest=manifest_rows,
         wheel_bytes=wheel_bytes, can_publish=False,
     )

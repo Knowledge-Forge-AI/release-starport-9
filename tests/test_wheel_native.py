@@ -29,6 +29,7 @@ from rs9.verify_wheel import (
 from rs9.wheel import WheelWithheldError
 from rs9.wheel_native import (
     REVIEWED_HELPERS,
+    SUPPORTED_VERSIONS,
     build_native_wheel as _build_native_wheel,
     extract_darwin_minimum_version,
     resolve_native_darwin_tag,
@@ -696,6 +697,90 @@ class WheelNativeTests(unittest.TestCase):
             self.assertNotIn("public_receipt", called_attrs_or_names)
             self.assertEqual(imported_modules & forbidden_311_modules, set())
             self.assertEqual(referenced_symbols & forbidden_311_symbols, set())
+
+    def test_supported_versions_allow_070_and_reject_unknown_version(self) -> None:
+        self.assertEqual(SUPPORTED_VERSIONS, ("0.6.1", "0.7.0"))
+        arc_bytes = make_darwin_archive(make_standard_darwin_entries())
+        res_070 = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.7.0",
+            archive_bytes=arc_bytes,
+            output_dir=self.root / "out_070",
+        )
+        self.assertEqual(
+            res_070.filename,
+            "theme_forge_nebular_fusion-0.7.0-py3-none-macosx_11_0_arm64.whl",
+        )
+        self.assertFalse(res_070.can_publish)
+
+        with self.assertRaises(ContractError) as ctx:
+            build_native_wheel(
+                "theme-forge-nebular-fusion",
+                "0.8.0",
+                archive_bytes=arc_bytes,
+                output_dir=self.root / "out_080",
+            )
+        self.assertEqual(ctx.exception.code, "INVALID_VERSION")
+
+    def test_closed_application_versions_bind_capture_tag(self) -> None:
+        from rs9.archives import inspect_archive
+        arc_bytes = make_darwin_archive(make_standard_darwin_entries())
+        arc_file = self.root / "darwin-070.tar.gz"
+        arc_file.write_bytes(arc_bytes)
+        manifest = inspect_archive(arc_file, commands={})
+
+        def make_mock_capture(tag: str) -> MagicMock:
+            mock_capture = MagicMock()
+            mock_capture._proof = None
+            mock_capture.record = {
+                "repository": {"full_name": "Knowledge-Forge-AI/theme-forge-nebular-fusion"},
+                "release": {"tag": tag},
+                "payloads": [
+                    {
+                        "id": "darwin-arm64",
+                        "name": "darwin-070.tar.gz",
+                        "platforms": ["aarch64-darwin"],
+                        "size": len(arc_bytes),
+                        "sha256": digest(arc_bytes),
+                        "payload_manifest_sha256": manifest["manifest_sha256"],
+                    }
+                ],
+            }
+            mock_capture.archives = {"darwin-arm64": arc_file}
+            mock_capture.manifests = {"darwin-arm64": manifest}
+            return mock_capture
+
+        with self.assertRaises(ContractError) as ctx:
+            build_native_wheel(
+                "theme-forge-nebular-fusion",
+                "0.7.0",
+                capture=make_mock_capture("v0.6.1"),
+                system="aarch64-darwin",
+                output_dir=self.root / "out_mismatch_070_061",
+            )
+        self.assertEqual(ctx.exception.code, "REPOSITORY_MISMATCH")
+
+        with self.assertRaises(ContractError) as ctx:
+            build_native_wheel(
+                "theme-forge-nebular-fusion",
+                "0.6.1",
+                capture=make_mock_capture("v0.7.0"),
+                system="aarch64-darwin",
+                output_dir=self.root / "out_mismatch_061_070",
+            )
+        self.assertEqual(ctx.exception.code, "REPOSITORY_MISMATCH")
+
+        matched_070 = build_native_wheel(
+            "theme-forge-nebular-fusion",
+            "0.7.0",
+            capture=make_mock_capture("v0.7.0"),
+            system="aarch64-darwin",
+            output_dir=self.root / "out_matched_070",
+        )
+        self.assertEqual(
+            matched_070.filename,
+            "theme_forge_nebular_fusion-0.7.0-py3-none-macosx_11_0_arm64.whl",
+        )
 
 
 if __name__ == "__main__":

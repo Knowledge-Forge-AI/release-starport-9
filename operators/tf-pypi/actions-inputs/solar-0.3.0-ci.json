@@ -1,0 +1,304 @@
+{
+  "schema": "rs9.tf-pypi-actions-selection.v1",
+  "repository": "Knowledge-Forge-AI/theme-forge-solar-sail",
+  "repositoryId": 1374611333,
+  "project": "theme-forge-solar-sail",
+  "version": "0.3.0",
+  "run": {
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_branch": "staging",
+    "head_sha": "fa53c13756edaa993878e064e8dff9638803df93",
+    "id": 40210741876,
+    "path": ".github/workflows/ci.yml",
+    "pull_requests": [],
+    "run_attempt": 1,
+    "status": "completed",
+    "workflow_id": 360947832
+  },
+  "workflow": {
+    "id": 360947832,
+    "path": ".github/workflows/ci.yml",
+    "state": "active"
+  },
+  "pr": 3,
+  "headTree": "a98027847d6943e51095c6db0537aa1f14a10c7e",
+  "baseCommit": "17883c161ce475666a229349062d89bee8f50a24",
+  "ciMergeCommit": "1f2937f6387f1ef99bb492677067e92a0b136255",
+  "mainCommit": "216a27e703ae256cd0030c497f722a707571bdb6",
+  "pack": {
+    "bytes": 110836,
+    "sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415"
+  },
+  "artifacts": [
+    {
+      "created_at": "2026-10-25T16:17:27Z",
+      "digest": "sha256:425c4c084af58318c9bdf29ad682c7f02e7419f29043157321316bb6d0e6247b",
+      "expired": false,
+      "expires_at": "2026-11-08T16:17:26Z",
+      "id": 12606155370,
+      "name": "evidence-aggregate-artifacts",
+      "size_in_bytes": 4230,
+      "workflow_run": {
+        "head_branch": "staging",
+        "head_repository_id": 1374611333,
+        "head_sha": "fa53c13756edaa993878e064e8dff9638803df93",
+        "id": 40210741876,
+        "repository_id": 1374611333
+      },
+      "members": [
+        {
+          "bytes": 12134,
+          "name": "ci-evidence-manifest.json",
+          "sha256": "4d2609c9a19617d9f143f9561d20200cdaf7b2159ec89b95fdc4feab414a0f94"
+        },
+        {
+          "bytes": 443,
+          "name": "ci-evidence-summary.md",
+          "sha256": "3a6a6ca1527e3168bebdb1e985344e4639404dd19573a6bb88bf7824b72c77cf"
+        },
+        {
+          "bytes": 2276,
+          "name": "receipt.json",
+          "sha256": "b127601a84cadeee4565dcc5b7135815f3a8b7b4c33431b297242b3729a486f6"
+        }
+      ]
+    },
+    {
+      "created_at": "2026-10-25T16:15:13Z",
+      "digest": "sha256:865cb2794b7e90b81cb73d742fe63ef0162e00e450125c69575fbc146ccc7d34",
+      "expired": false,
+      "expires_at": "2026-11-08T16:15:12Z",
+      "id": 12605820497,
+      "name": "root-package-artifacts",
+      "size_in_bytes": 117311,
+      "workflow_run": {
+        "head_branch": "staging",
+        "head_repository_id": 1374611333,
+        "head_sha": "fa53c13756edaa993878e064e8dff9638803df93",
+        "id": 40210741876,
+        "repository_id": 1374611333
+      },
+      "members": [
+        {
+          "name": "artifact-manifest.json",
+          "bytes": 948,
+          "sha256": "8ce16581ff742162080dea5b5a257b12e4c58f8ecc0591a2ab561e2275893b31"
+        },
+        {
+          "name": "audit-result.json",
+          "bytes": 361,
+          "sha256": "bc9a301fc97ef4212c11bfca3880682b9fa7451b928315e3530b3a30c74e5242"
+        },
+        {
+          "name": "pack-manifest.json",
+          "bytes": 7937,
+          "sha256": "50c7f6be03fb5f1727283fe45c3ce1b7f43df12afa3f0b1000bbb042e0018045"
+        },
+        {
+          "name": "receipt.json",
+          "bytes": 2270,
+          "sha256": "d6e09c5689166c31ad474da78e877d4da49b69b8bc1f7b9c73f6d41ee37b0686"
+        },
+        {
+          "name": "root-package.tgz",
+          "bytes": 110836,
+          "sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415"
+        },
+        {
+          "name": "test-report.json",
+          "bytes": 20147,
+          "sha256": "8df5ccb02fe45255b8096ee0294bc30ad2e7e575ae805f2f012e84b7c90fac12"
+        }
+      ]
+    },
+    {
+      "created_at": "2026-10-25T16:14:49Z",
+      "digest": "sha256:ba07fee8933e4175cf1192309ce623f3f6e8fec39e8e80b653e65a8607bce91b",
+      "expired": false,
+      "expires_at": "2026-11-08T16:14:48Z",
+      "id": 12605566430,
+      "name": "source-policy-receipt",
+      "size_in_bytes": 1160,
+      "workflow_run": {
+        "head_branch": "staging",
+        "head_repository_id": 1374611333,
+        "head_sha": "fa53c13756edaa993878e064e8dff9638803df93",
+        "id": 40210741876,
+        "repository_id": 1374611333
+      },
+      "members": [
+        {
+          "bytes": 344,
+          "name": "artifact-manifest.json",
+          "sha256": "fbf819fa6360a681a3e4e7a8196db101b74a612b6bcfbbcfc2fdb67dfcc153da"
+        },
+        {
+          "bytes": 1967,
+          "name": "receipt.json",
+          "sha256": "615bd0a1e7a458f9eaf850c3d73388bf4a81e0c734c7809ed950b73608888240"
+        }
+      ]
+    }
+  ],
+  "artifactDownloadHosts": [
+    "productionresultssa12.blob.core.windows.net"
+  ],
+  "redirectAdmission": "exact-live-host-observed",
+  "transportObservation": {
+    "rootProbeSha256": "49205960b5ab5ef4dd3fba46dda5da10bdb74158c26c2ea2f34544e9826ac7ac",
+    "supportProbeSha256": "2bf7a9a8c1388d65b82ce8578d8162c5f1ac23ef0b57522c2a91e25e4fa91213"
+  },
+  "aggregateArtifacts": [
+    {
+      "path": "consumer-fixture-artifacts/artifact-manifest.json",
+      "size": 496,
+      "sha256": "7100c52c00b55c8ec4dc827ca86f856b1e9b5098664d71c1236cf4fc0e3c7613"
+    },
+    {
+      "path": "consumer-fixture-artifacts/receipt.json",
+      "size": 2274,
+      "sha256": "8742377c8b5771ed2a9475bbee94b6bbf47b0714e4d87176896de5f34b92437c"
+    },
+    {
+      "path": "consumer-fixture-artifacts/smoke-report.log",
+      "size": 613,
+      "sha256": "bb5cf9eb34283a7384ebbea59834f29b2118705e451ca528b583c3f33e582a0e"
+    },
+    {
+      "path": "root-package-artifacts/artifact-manifest.json",
+      "size": 948,
+      "sha256": "8ce16581ff742162080dea5b5a257b12e4c58f8ecc0591a2ab561e2275893b31"
+    },
+    {
+      "path": "root-package-artifacts/audit-result.json",
+      "size": 361,
+      "sha256": "bc9a301fc97ef4212c11bfca3880682b9fa7451b928315e3530b3a30c74e5242"
+    },
+    {
+      "path": "root-package-artifacts/pack-manifest.json",
+      "size": 7937,
+      "sha256": "50c7f6be03fb5f1727283fe45c3ce1b7f43df12afa3f0b1000bbb042e0018045"
+    },
+    {
+      "path": "root-package-artifacts/receipt.json",
+      "size": 2270,
+      "sha256": "d6e09c5689166c31ad474da78e877d4da49b69b8bc1f7b9c73f6d41ee37b0686"
+    },
+    {
+      "path": "root-package-artifacts/root-package.tgz",
+      "size": 110836,
+      "sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415"
+    },
+    {
+      "path": "root-package-artifacts/test-report.json",
+      "size": 20147,
+      "sha256": "8df5ccb02fe45255b8096ee0294bc30ad2e7e575ae805f2f012e84b7c90fac12"
+    },
+    {
+      "path": "source-policy-receipt/artifact-manifest.json",
+      "size": 344,
+      "sha256": "fbf819fa6360a681a3e4e7a8196db101b74a612b6bcfbbcfc2fdb67dfcc153da"
+    },
+    {
+      "path": "source-policy-receipt/receipt.json",
+      "size": 1967,
+      "sha256": "615bd0a1e7a458f9eaf850c3d73388bf4a81e0c734c7809ed950b73608888240"
+    },
+    {
+      "path": "supply-chain-artifacts/artifact-manifest.json",
+      "size": 3151,
+      "sha256": "a302ac08430976cf7fbb318bca137dc8a9ee00bc358193094bb219e220638e2e"
+    },
+    {
+      "path": "supply-chain-artifacts/receipt.json",
+      "size": 2270,
+      "sha256": "d1fda8bdfd5e47ea3a5deaf51245e15ba0e47651888ce47842f4d4a26b833520"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.cdx.json",
+      "size": 4794,
+      "sha256": "0b1e3fe04641846ef2eff1588784ff9344989d15e1b4622f7642f7b400070f99"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.grype.json",
+      "size": 5653,
+      "sha256": "00c68146e9fd11f6fec14d061cd09739a1839ace0fecc0fdae7aba26745f54b3"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.grype.sarif",
+      "size": 357,
+      "sha256": "da0853b4022c895fa75d7f84060c1e93d56c86ec112bb61b6baca5fe7fd2bd6e"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.receipt.json",
+      "size": 9491,
+      "sha256": "8646f0bc9877d97a4eb270f45aa81a3471f5f8654934779620aee289784afb16"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.spdx.json",
+      "size": 7188,
+      "sha256": "30f24545d5117ee0ba0553e712e3f92c09311f78cb15492e61abc1631a275efd"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.syft.json",
+      "size": 10349,
+      "sha256": "c45fe3c5de8ecfc8d9f64334c8641662f439ace289674c00e3a138c60a9acc81"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/actionlint.result.json",
+      "size": 1134,
+      "sha256": "51a3bad43c8a332fa0372d3311e1b13a7e1753fc8aa7d2c37e33f40b1805a3a8"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/actionlint.stderr.log",
+      "size": 7,
+      "sha256": "140baba927dc0d7b94391571d9fe588c0aade97ec7056b167924e3d8201860af"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/actionlint.stdout.log",
+      "size": 7,
+      "sha256": "140baba927dc0d7b94391571d9fe588c0aade97ec7056b167924e3d8201860af"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/betterleaks.report.json",
+      "size": 5,
+      "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/betterleaks.result.json",
+      "size": 1221,
+      "sha256": "cae2fb40914d0719936710fea900e98fc1237f25fa0b6680a8c08ecb63acfd96"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/betterleaks.stderr.log",
+      "size": 167,
+      "sha256": "ea7841953d8e01a7027b9e04ebd150ddda89a7af39913ec247cfb5957d35b589"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/betterleaks.stdout.log",
+      "size": 7,
+      "sha256": "140baba927dc0d7b94391571d9fe588c0aade97ec7056b167924e3d8201860af"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/workflow-checks.receipt.json",
+      "size": 964,
+      "sha256": "9f4be297cccc90b38a65757dc9990a909169b1af24535b145291a94b223416fe"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/zizmor.result.json",
+      "size": 1124,
+      "sha256": "1a2ffb91c2f5efc0ba44dff552c8399725cdce1a62af823306505e61bd052fbc"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/zizmor.stderr.log",
+      "size": 161,
+      "sha256": "6cbc957c680f43314313fd9fe817f27640dddb5dda82aef990eecf955ce26a92"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/zizmor.stdout.log",
+      "size": 97,
+      "sha256": "38a0c1c2be7c75c76c1e9f8b7ffa9bc86ce45fa87b48da2e780393baaa638734"
+    }
+  ]
+}

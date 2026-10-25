@@ -18,7 +18,7 @@ from rs9.tf_pypi_backend import build_aggregate
 from rs9.tf_pypi_closure import DEPENDENCIES, admit_dependency, load_dependencies
 from rs9.tf_pypi_hosted import admit_matrix
 from rs9.tf_pypi_intake import NoRedirect, download
-from rs9.tf_pypi_model import PRODUCTS, intake, load_pin, strict_json, validate_pin
+from rs9.tf_pypi_model import PRODUCTS, intake, load_pin, release, strict_json, validate_pin
 from rs9.tf_pypi_remote import PublicReader, exact_state
 from rs9.tf_pypi_verify import verify_aggregate
 
@@ -81,21 +81,25 @@ def fetch_dependencies(directory=None, *, opener=None):
     return result
 
 
-def approval_path(pin):
+def approval_path(pin, pin_path=None):
     """Return the path to the operator-approved artifacts manifest."""
     if isinstance(pin, str):
-        pin = load_pin(pin)
+        pin = load_pin(pin) if pin_path is None else load_pin(pin, pin_path)
     else:
+        if pin_path is not None:
+            fail("PIN")
         validate_pin(pin)
     root = Path(__file__).resolve().parents[2]
     return root / "operators/tf-pypi" / f"{pin['project']}-{pin['distribution_version']}-artifacts.json"
 
 
-def load_approval(pin):
+def load_approval(pin, pin_path=None):
     """Load the approved candidate artifacts manifest."""
     if isinstance(pin, str):
-        pin = load_pin(pin)
+        pin = load_pin(pin) if pin_path is None else load_pin(pin, pin_path)
     else:
+        if pin_path is not None:
+            fail("PIN")
         validate_pin(pin)
     path = approval_path(pin)
     if not path.is_file():
@@ -104,11 +108,13 @@ def load_approval(pin):
     return strict_json(data)
 
 
-def verify_approved(pin, dist):
+def verify_approved(pin, dist, pin_path=None):
     """Verify local dist directory exactly matches the committed approved aggregate."""
     if isinstance(pin, str):
-        pin = load_pin(pin)
+        pin = load_pin(pin) if pin_path is None else load_pin(pin, pin_path)
     else:
+        if pin_path is not None:
+            fail("PIN")
         validate_pin(pin)
     if pin.get("source_status") != "READY":
         fail("SOURCE_NOT_READY")
@@ -119,11 +125,13 @@ def verify_approved(pin, dist):
     return approved
 
 
-def build(pin, output=Path("dist"), inputs=None, opener=None):
+def build(pin, output=Path("dist"), inputs=None, opener=None, pin_path=None):
     """Build candidate distribution aggregate with deterministic cross-target builder."""
     if isinstance(pin, str):
-        pin = load_pin(pin)
+        pin = load_pin(pin) if pin_path is None else load_pin(pin, pin_path)
     else:
+        if pin_path is not None:
+            fail("PIN")
         validate_pin(pin)
     output = Path(output)
     if inputs is not None:
@@ -152,11 +160,14 @@ def select_missing(
     run_id=None,
     run_attempt=None,
     get=None,
+    pin_path=None,
 ):
     """Verify local approved dist, admit three-host matrix, check exact remote state, and copy only missing files."""
     if isinstance(pin, str):
-        pin = load_pin(pin)
+        pin = load_pin(pin) if pin_path is None else load_pin(pin, pin_path)
     else:
+        if pin_path is not None:
+            fail("PIN")
         validate_pin(pin)
     if pin.get("source_status") != "READY":
         fail("SOURCE_NOT_READY")
@@ -207,11 +218,13 @@ def select_missing(
     return {"upload": bool(missing), "state": state, "missing": missing}
 
 
-def readback(pin, dist=Path("dist"), get=None):
+def readback(pin, dist=Path("dist"), get=None, pin_path=None):
     """Read back remote PyPI state against approved candidate aggregate; must be published-exact."""
     if isinstance(pin, str):
-        pin = load_pin(pin)
+        pin = load_pin(pin) if pin_path is None else load_pin(pin, pin_path)
     else:
+        if pin_path is not None:
+            fail("PIN")
         validate_pin(pin)
     approved = verify_approved(pin, dist)
     dist = Path(dist)
@@ -229,7 +242,7 @@ def readback(pin, dist=Path("dist"), get=None):
     fail(f"READBACK_{(state or 'unknown').upper().replace('-', '_')}")
 
 
-def _native_qualify_job(job_id, job_name, runner, project, target, sandbox=False):
+def _native_qualify_job(job_id, job_name, runner, project, target, sandbox=False, selector=""):
     qualify_prefix = (
         "/usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' \\\n            "
         if sandbox else ""
@@ -275,7 +288,7 @@ def _native_qualify_job(job_id, job_name, runner, project, target, sandbox=False
           export TMPDIR="$PHYSICAL_TMP" TMP="$PHYSICAL_TMP" TEMP="$PHYSICAL_TMP"
           PHYSICAL_RUNNER_TEMP="$(python3 -c 'import os; print(os.path.realpath(os.environ["RUNNER_TEMP"]))')"
           mkdir -p "$PHYSICAL_RUNNER_TEMP/tf-consumer-report"
-          {qualify_prefix}python3 -B -m rs9.tf_pypi_hosted qualify --project {project} \\
+          {qualify_prefix}python3 -B -m rs9.tf_pypi_hosted qualify --project {project}{selector} \\
             --target {target} \\
             --dist "$GITHUB_WORKSPACE/dist" --work "$PHYSICAL_RUNNER_TEMP/tf-consumer" \\
             --report "$PHYSICAL_RUNNER_TEMP/tf-consumer-report/result.json" \\
@@ -309,26 +322,30 @@ def _receipt_download_steps(project):
           path: receipts/linux-x64-gnu/"""
 
 
-def workflow_text(pin):
+def workflow_text(pin, pin_path=None):
     """Generate exact registered GitHub Actions publish workflow text for a product pin."""
     if isinstance(pin, str):
-        pin = load_pin(pin)
+        pin = load_pin(pin) if pin_path is None else load_pin(pin, pin_path)
     else:
+        if pin_path is not None:
+            fail("PIN")
         validate_pin(pin)
     project = pin["project"]
+    pin_basename, _ = release(pin)
+    selector = "" if pin_basename == project + ".json" else f" --pin operators/tf-pypi/{pin_basename}"
     workflow_name = pin["workflow"]
     concurrency_group = workflow_name[:-4] if workflow_name.endswith(".yml") else workflow_name
     darwin_job = _native_qualify_job(
         "native_darwin_arm64", "Native macOS ARM64 installed consumer",
-        "macos-15", project, "darwin-arm64", sandbox=True,
+        "macos-15", project, "darwin-arm64", sandbox=True, selector=selector,
     )
     linux_arm_job = _native_qualify_job(
         "native_linux_arm64", "Native Linux ARM64 GNU installed consumer",
-        "ubuntu-24.04-arm", project, "linux-arm64-gnu", sandbox=False,
+        "ubuntu-24.04-arm", project, "linux-arm64-gnu", sandbox=False, selector=selector,
     )
     linux_x64_job = _native_qualify_job(
         "native_linux_x64", "Native Linux x86_64 GNU installed consumer",
-        "ubuntu-24.04", project, "linux-x64-gnu", sandbox=False,
+        "ubuntu-24.04", project, "linux-x64-gnu", sandbox=False, selector=selector,
     )
     receipt_downloads = _receipt_download_steps(project)
 
@@ -376,7 +393,7 @@ jobs:
       - name: Build and verify package distributions
         env:
           PYTHONPATH: src
-        run: python3 -B -m rs9.tf_pypi_publish build --project {project} --output dist
+        run: python3 -B -m rs9.tf_pypi_publish build --project {project}{selector} --output dist
 
       - name: Stage verified artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -417,7 +434,7 @@ jobs:
           QUALIFY_COMMIT: '${{{{ github.sha }}}}'
           QUALIFY_RUN_ID: '${{{{ github.run_id }}}}'
           QUALIFY_RUN_ATTEMPT: '${{{{ github.run_attempt }}}}'
-        run: python3 -B -m rs9.tf_pypi_hosted admit --project {project} --dist dist --receipts receipts --expected-commit "$QUALIFY_COMMIT" --run-id "$QUALIFY_RUN_ID" --run-attempt "$QUALIFY_RUN_ATTEMPT"
+        run: python3 -B -m rs9.tf_pypi_hosted admit --project {project}{selector} --dist dist --receipts receipts --expected-commit "$QUALIFY_COMMIT" --run-id "$QUALIFY_RUN_ID" --run-attempt "$QUALIFY_RUN_ATTEMPT"
 
   publish:
     if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.mode == 'publish'
@@ -452,7 +469,7 @@ jobs:
           QUALIFY_COMMIT: '${{{{ github.sha }}}}'
           QUALIFY_RUN_ID: '${{{{ github.run_id }}}}'
           QUALIFY_RUN_ATTEMPT: '${{{{ github.run_attempt }}}}'
-        run: python3 -B -m rs9.tf_pypi_publish select-missing --project {project} --dist dist --upload-dir upload --receipts receipts --expected-commit "$QUALIFY_COMMIT" --run-id "$QUALIFY_RUN_ID" --run-attempt "$QUALIFY_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+        run: python3 -B -m rs9.tf_pypi_publish select-missing --project {project}{selector} --dist dist --upload-dir upload --receipts receipts --expected-commit "$QUALIFY_COMMIT" --run-id "$QUALIFY_RUN_ID" --run-attempt "$QUALIFY_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
       - name: Publish package distributions to PyPI
         if: steps.missing.outputs.upload == 'true'
@@ -463,7 +480,7 @@ jobs:
       - name: Read back published PyPI state
         env:
           PYTHONPATH: src
-        run: python3 -B -m rs9.tf_pypi_publish readback --project {project} --dist dist
+        run: python3 -B -m rs9.tf_pypi_publish readback --project {project}{selector} --dist dist
 """
 
 
@@ -474,11 +491,13 @@ def parser():
 
     build_cmd = sub.add_parser("build")
     build_cmd.add_argument("--project", choices=sorted(PRODUCTS), required=True)
+    build_cmd.add_argument("--pin", type=Path, default=None)
     build_cmd.add_argument("--output", type=Path, default=Path("dist"))
     build_cmd.add_argument("--inputs", type=Path, default=None)
 
     missing_cmd = sub.add_parser("select-missing")
     missing_cmd.add_argument("--project", choices=sorted(PRODUCTS), required=True)
+    missing_cmd.add_argument("--pin", type=Path, default=None)
     missing_cmd.add_argument("--dist", type=Path, default=Path("dist"))
     missing_cmd.add_argument("--upload-dir", type=Path, default=Path("upload"))
     missing_cmd.add_argument("--receipts", type=Path, required=True)
@@ -488,10 +507,12 @@ def parser():
 
     readback_cmd = sub.add_parser("readback")
     readback_cmd.add_argument("--project", choices=sorted(PRODUCTS), required=True)
+    readback_cmd.add_argument("--pin", type=Path, default=None)
     readback_cmd.add_argument("--dist", type=Path, default=Path("dist"))
 
     workflow_cmd = sub.add_parser("workflow")
     workflow_cmd.add_argument("--project", choices=sorted(PRODUCTS), required=True)
+    workflow_cmd.add_argument("--pin", type=Path, default=None)
 
     return result
 
@@ -500,7 +521,7 @@ def main(argv=None, *, get=None, opener=None):
     """Run CLI dispatch with strict admission error handling."""
     args = parser().parse_args(argv)
     try:
-        pin = load_pin(args.project)
+        pin = load_pin(args.project, args.pin)
         op = args.operation
         if op == "build":
             result = build(pin, output=args.output, inputs=args.inputs, opener=opener)

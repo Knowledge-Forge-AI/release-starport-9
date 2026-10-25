@@ -65,9 +65,21 @@ def _check_consumer_fields(consumer, project, target, expected_pair_sha=None):
     return True
 
 
-def qualify(project, dist, work, expected_commit, target="darwin-arm64", run_id="1", run_attempt="1"):
+def qualify(project, dist, work, expected_commit, target="darwin-arm64", run_id="1", run_attempt="1", pin=None):
     """Must be invoked under OS network denial; smoke verifies Python and Node."""
-    pin = load_pin(project)
+    if isinstance(project, dict):
+        if pin is not None:
+            fail("PIN")
+        pin = validate_pin(project)
+        project = pin["project"]
+    elif pin is None:
+        pin = load_pin(project)
+    elif isinstance(pin, (str, os.PathLike)):
+        pin = load_pin(project, pin)
+    else:
+        if not isinstance(pin, dict) or not isinstance(pin.get("project"), str) or pin.get("project") != project:
+            fail("PRODUCT")
+        pin = validate_pin(pin)
     if target not in pin["candidate_platforms"]:
         fail("HOSTED_NATIVE_TARGET")
     try:
@@ -134,11 +146,13 @@ def qualify(project, dist, work, expected_commit, target="darwin-arm64", run_id=
     }
 
 
-def admit_matrix(pin, dist, receipts, expected_commit, run_id, run_attempt):
+def admit_matrix(pin, dist, receipts, expected_commit, run_id, run_attempt, pin_path=None):
     """Validate same-run, first-attempt, three-host native receipts against the aggregate."""
     if isinstance(pin, str):
-        pin = load_pin(pin)
+        pin = load_pin(pin) if pin_path is None else load_pin(pin, pin_path)
     else:
+        if pin_path is not None:
+            fail("PIN")
         validate_pin(pin)
     commit = source_commit(expected_commit)
     run_id = _run_id(run_id)
@@ -231,6 +245,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=["qualify", "admit"])
     parser.add_argument("--project", required=True, choices=sorted(PRODUCTS))
+    parser.add_argument("--pin", type=Path, default=None)
     parser.add_argument("--dist", required=True)
     parser.add_argument("--work")
     parser.add_argument("--report")
@@ -240,12 +255,23 @@ def main(argv=None):
     parser.add_argument("--run-id", default="1")
     parser.add_argument("--run-attempt", default="1")
     args = parser.parse_args(argv)
+    selected = None
+    if args.pin is not None:
+        try:
+            selected = load_pin(args.project, args.pin)
+        except AdmissionError as error:
+            sys.stderr.write(error.code + "\n")
+            return 1
+        except Exception:
+            sys.stderr.write("TF_PYPI_OPERATION_FAILED\n")
+            return 1
     if args.operation == "admit":
         try:
             if not args.receipts:
                 fail("HOSTED_MATRIX_RECEIPTS")
             record = admit_matrix(
-                args.project, args.dist, args.receipts,
+                selected if selected is not None else args.project,
+                args.dist, args.receipts,
                 args.expected_commit, args.run_id, args.run_attempt,
             )
             if args.report:
@@ -265,9 +291,16 @@ def main(argv=None):
     try:
         if not args.work or not args.report:
             fail("HOSTED_WORK_DIR")
+        qualify_kwargs = {
+            "target": args.target,
+            "run_id": args.run_id,
+            "run_attempt": args.run_attempt,
+        }
+        if selected is not None:
+            qualify_kwargs["pin"] = selected
         result = qualify(
             args.project, args.dist, args.work, args.expected_commit,
-            target=args.target, run_id=args.run_id, run_attempt=args.run_attempt,
+            **qualify_kwargs,
         )
         code = 0
     except AdmissionError as error:

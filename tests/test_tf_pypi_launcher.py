@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from rs9 import tf_pypi_consumer as consumer
 from rs9 import tf_pypi_launcher as launcher
 from rs9.tf_pypi_archive import AdmissionError
 from rs9.tf_pypi_consumer import host_system, smoke
@@ -78,3 +79,58 @@ class LauncherTests(unittest.TestCase):
                 self.assertEqual(len(receipt["lifecycle"]), 2)
                 self.assertTrue(receipt["offline_isolation"]["network_disabled"])
                 self.assertFalse(receipt["publication_admitted"])
+
+
+    def test_smoke_propagates_owned_temp_paths_to_all_subprocesses(self):
+        calls = []
+        wheel_name = "theme-forge-stellar-loom-py3-none-any.whl"
+        sdist_name = "theme-forge-stellar-loom-0.5.0.tar.gz"
+
+        class Builder:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+
+            def create(self, root):
+                (Path(root) / "bin").mkdir(parents=True)
+
+        def fake_run(argv, env, *, prefix=(), input=b""):
+            calls.append(dict(env))
+            if "--wheel-dir" in argv:
+                wheel_dir = Path(argv[argv.index("--wheel-dir") + 1])
+                wheel_dir.mkdir(parents=True, exist_ok=True)
+                (wheel_dir / wheel_name).write_bytes((dist / wheel_name).read_bytes())
+            return subprocess.CompletedProcess(list(argv), 0, b"v22.23.3\n", b"")
+
+        def fake_network_denial(python, node, env, prefix=()):
+            calls.append(dict(env))
+            return {"network_disabled": True}
+
+        pin = {"project": "theme-forge-stellar-loom", "version": "0.5.0", "bins": {}}
+        manifest = {
+            "files": [{"filename": wheel_name}, {"filename": sdist_name}],
+            "set_sha256": "fixture-set",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            dist = root / "dist"
+            dist.mkdir()
+            (dist / wheel_name).write_bytes(b"wheel")
+            (dist / sdist_name).write_bytes(b"sdist")
+            work = root / "consumer"
+            with patch.object(consumer, "host_key", return_value="aarch64-darwin"), \
+                    patch.object(consumer, "host_system", return_value="aarch64-darwin"), \
+                    patch.object(consumer, "node_binary", return_value="/fixture/node"), \
+                    patch.object(consumer, "verify_pair", return_value=manifest), \
+                    patch.object(consumer.venv, "EnvBuilder", Builder), \
+                    patch.object(consumer, "network_denial", side_effect=fake_network_denial), \
+                    patch.object(consumer, "_run", side_effect=fake_run):
+                result = consumer.smoke(pin, dist, work, functional=False)
+
+            expected_temp = str(work / "tmp")
+            self.assertTrue(calls)
+            self.assertTrue(all(call["TMPDIR"] == expected_temp for call in calls))
+            self.assertTrue(all(call["TMP"] == expected_temp for call in calls))
+            self.assertTrue(all(call["TEMP"] == expected_temp for call in calls))
+            self.assertEqual((work / "tmp").stat().st_mode & 0o777, 0o700)
+            self.assertEqual([row["kind"] for row in result["lifecycle"]], ["wheel", "sdist"])
+            self.assertFalse(result["publication_admitted"])

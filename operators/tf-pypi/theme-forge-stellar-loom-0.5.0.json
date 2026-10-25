@@ -1,0 +1,33 @@
+{
+  "schema": "rs9.tf-pypi-intake.v2",
+  "project": "theme-forge-stellar-loom",
+  "version": "0.5.0",
+  "distribution_version": "0.5.0",
+  "workflow": "rs9-tfsl-pypi-publish.yml",
+  "npm_name": "@knowledge-forge-ai/theme-forge-stellar-loom",
+  "bins": {
+    "tfsl": "bin/tfsl.js",
+    "tfsl-batch": "bin/tfsl-batch.js"
+  },
+  "node": ">=22",
+  "license": "AGPL-3.0-or-later",
+  "asset": "knowledge-forge-ai-theme-forge-stellar-loom-0.5.0.tgz",
+  "sha256": "9cfb6e313456f9bf0a65795f413b576abda19d68ef15e02e6abfe6235851196a",
+  "size": 272836,
+  "source_commit": "bf9bf925d53e0964e480e9ee9cd321dfd9ab56f3",
+  "source_status": "BLOCKED",
+  "withheld": [
+    "SUCCESSOR_PIN_ADMISSION_PENDING",
+    "PYPI_RELEASE_MANIFEST_PENDING",
+    "PYPI_CONSUMER_MATRIX_PENDING",
+    "PYPI_WHEEL_ARTIFACT_RECEIPTS_PENDING",
+    "EXACT_SOURCE_RELEASE_BINDING_PENDING"
+  ],
+  "candidate_platforms": [
+    "darwin-arm64",
+    "linux-arm64-gnu",
+    "linux-x64-gnu"
+  ],
+  "qualified_platforms": [],
+  "description": "stellar-loom-0.5.0.md"
+}

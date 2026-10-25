@@ -129,10 +129,14 @@ def smoke(pin, dist, work, *, offline_linux=False, functional=True):
     node = node_binary()
     work, dist = Path(work).resolve(), Path(dist).resolve()
     work.mkdir(parents=True, exist_ok=False)
+    temp = work / "tmp"
+    temp.mkdir(mode=0o700, exist_ok=False)
     env = {"PATH": str(Path(node).parent) + os.pathsep + "/usr/bin:/bin", "HOME": str(work),
            "THEME_FORGE_NODE_BIN": node, "LANG": "C", "LC_ALL": "C",
            "PYTHONDONTWRITEBYTECODE": "1", "PIP_CONFIG_FILE": os.devnull,
-           "PIP_DISABLE_PIP_VERSION_CHECK": "1", "PIP_NO_CACHE_DIR": "1", "PIP_NO_INDEX": "1"}
+           "PIP_DISABLE_PIP_VERSION_CHECK": "1", "PIP_NO_CACHE_DIR": "1",
+           "PIP_NO_INDEX": "1", "TEMP": str(temp), "TMP": str(temp),
+           "TMPDIR": str(temp)}
     prefix = []
     if offline_linux:
         if not system.endswith("-linux"):

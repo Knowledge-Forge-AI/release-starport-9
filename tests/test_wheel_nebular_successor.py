@@ -21,11 +21,15 @@ from rs9.verify_wheel import verify_wheel_record_bidirectional
 from rs9.wheel import WheelWithheldError
 from rs9.wheel_native import get_embedded_rs9_helpers
 from rs9.wheel_nebular_successor import (
+    DEFAULT_DESCRIPTION_PATH,
+    DESCRIPTION_070_PATH,
     DISTRIBUTION_VERSION,
     LEGAL_FILES,
     LICENSE_EXPRESSION,
+    SUCCESSOR_RELEASES,
     _rs9_source_binding,
     build_successor_wheel,
+    successor_release,
 )
 from tests.shadow_fixtures import fixture_evidence
 from tests.test_wheel_native import make_darwin_archive, make_standard_darwin_entries
@@ -470,3 +474,152 @@ class NebularSuccessorTests(unittest.TestCase):
         self.assertTrue(Path(relative_xdg.stdout.strip()).is_absolute())
         self.assertTrue(relative_xdg.stdout.strip().startswith(str(home)))
         self.assertFalse((self.root / "relative-cache").exists())
+
+    def test_selected_070_fixture_build_binds_release_tuple(self) -> None:
+        result = self._build(
+            "selected-070",
+            application_version="0.7.0",
+            distribution_version="0.7.0",
+        )
+        self.assertEqual(result.version, "0.7.0")
+        self.assertEqual(
+            result.filename,
+            "theme_forge_nebular_fusion-0.7.0-py3-none-macosx_11_0_arm64.whl",
+        )
+        self.assertFalse(result.can_publish)
+        self.assertEqual(result.record["application_version"], "0.7.0")
+        self.assertEqual(result.record["distribution_version"], "0.7.0")
+        self.assertEqual(result.record["legacy_candidate"]["version"], "0.7.0")
+        self.assertEqual(result.record["readme_authority"]["path"], DESCRIPTION_070_PATH)
+        self.assertEqual(
+            result.record["payload_archive_name"],
+            "theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz",
+        )
+        self.assertTrue(verify_wheel_record_bidirectional(result.wheel_path)["record_valid"])
+        readme_070 = (Path(__file__).resolve().parents[1] / DESCRIPTION_070_PATH).read_bytes()
+        with zipfile.ZipFile(result.wheel_path) as archive:
+            metadata_bytes = archive.read("theme_forge_nebular_fusion-0.7.0.dist-info/METADATA")
+            metadata = metadata_bytes.decode("utf-8")
+            init_py = archive.read("theme_forge_nebular_fusion/__init__.py").decode("utf-8")
+            launcher_py = archive.read("theme_forge_nebular_fusion/launcher.py").decode("utf-8")
+            payload_member = (
+                "theme_forge_nebular_fusion/payload/"
+                "theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz"
+            )
+            self.assertEqual(archive.read(payload_member), self.archive)
+        self.assertTrue(metadata_bytes.endswith(readme_070))
+        self.assertIn("Version: 0.7.0\n", metadata)
+        self.assertIn("theme-forge-nebular-fusion==0.7.0", metadata)
+        self.assertNotIn("0.6.1.post1", metadata)
+        self.assertIn("__version__ = '0.7.0'", init_py)
+        self.assertIn("__upstream_version__ = '0.7.0'", init_py)
+        self.assertIn("DISTRIBUTION_VERSION = '0.7.0'", launcher_py)
+        self.assertIn("APPLICATION_VERSION = '0.7.0'", launcher_py)
+
+    def test_release_pair_and_description_cross_selection_fail_closed(self) -> None:
+        self.assertEqual(tuple(SUCCESSOR_RELEASES), ("0.6.1.post1", "0.7.0"))
+        for bad_selector in ("0.6.1", "0.8.0"):
+            with self.assertRaises(ContractError) as raised:
+                successor_release(bad_selector)
+            self.assertEqual(raised.exception.code, "RELEASE_SELECTION")
+
+        for app_ver, dist_ver in (("0.7.0", "0.6.1.post1"), ("0.6.1", "0.7.0")):
+            with self.assertRaises(ContractError) as raised:
+                self._build(
+                    f"mismatch-{app_ver}-{dist_ver}",
+                    application_version=app_ver,
+                    distribution_version=dist_ver,
+                )
+            self.assertEqual(raised.exception.code, "INVALID_VERSION")
+
+        with self.assertRaises(ContractError) as raised:
+            self._build(
+                "hist-with-070-desc",
+                application_version="0.6.1",
+                distribution_version="0.6.1.post1",
+                description_path=DESCRIPTION_070_PATH,
+            )
+        self.assertEqual(raised.exception.code, "DESCRIPTION_VERSION")
+
+        with self.assertRaises(ContractError) as raised:
+            self._build(
+                "070-with-hist-desc",
+                application_version="0.7.0",
+                distribution_version="0.7.0",
+                description_path=DEFAULT_DESCRIPTION_PATH,
+            )
+        self.assertEqual(raised.exception.code, "DESCRIPTION_VERSION")
+
+        custom_desc = self.root / "custom-070.md"
+        custom_desc.write_text("# Custom 0.7.0\n", encoding="utf-8")
+        with self.assertRaises(ContractError) as raised:
+            self._build(
+                "070-with-custom-desc",
+                application_version="0.7.0",
+                distribution_version="0.7.0",
+                description_path=custom_desc,
+            )
+        self.assertEqual(raised.exception.code, "DESCRIPTION_VERSION")
+
+        capture, profile = self._authenticated_capture()
+        with self.assertRaises(ContractError) as raised:
+            build_successor_wheel(
+                "theme-forge-nebular-fusion",
+                "0.7.0",
+                distribution_version="0.7.0",
+                capture=capture,
+                profile_result=profile,
+                output_dir=self.root / "070-against-061-capture",
+                rs9_source_commit="a" * 40,
+                rs9_source_tree="b" * 40,
+            )
+        self.assertEqual(raised.exception.code, "TAG_MISMATCH")
+
+    def test_historical_release_rejects_dot_segment_alias_of_070_description(self) -> None:
+        with self.assertRaises(ContractError) as raised:
+            self._build(
+                "dot-alias",
+                description_path="operators/tf-pypi/descriptions/../descriptions/nebular-fusion-0.7.0.md",
+            )
+        self.assertEqual(raised.exception.code, "DESCRIPTION_VERSION")
+
+        custom_readme = self.root / "custom-historical-readme.md"
+        custom_bytes = b"# Custom Historical Readme\n"
+        custom_readme.write_bytes(custom_bytes)
+        accepted = self._build("custom-historical-readme", description_path=custom_readme)
+        expected_custom_path = str(custom_readme.relative_to(Path(__file__).resolve().parents[1]))
+        self.assertEqual(accepted.record["readme_path"], expected_custom_path)
+        self.assertEqual(accepted.record["readme_sha256"], digest(custom_bytes))
+        self.assertEqual(accepted.record["readme_authority"]["path"], expected_custom_path)
+        self.assertEqual(accepted.record["readme_authority"]["sha256"], digest(custom_bytes))
+
+    def test_selected_070_path_fixture_rejects_historical_archive_name(self) -> None:
+        bad_archive = self.root / "theme-forge-nebular-fusion-v0.6.1-aarch64-apple-darwin.app.tar.gz"
+        bad_archive.write_bytes(self.archive)
+        with self.assertRaises(ContractError) as raised:
+            build_successor_wheel(
+                "theme-forge-nebular-fusion",
+                "0.7.0",
+                distribution_version="0.7.0",
+                archive_path=bad_archive,
+                output_dir=self.root / "bad-070-archive-name",
+                license_files=self.legal,
+                launcher_path=self.launcher,
+                gui_path=self.gui,
+                fixture_only=True,
+            )
+        self.assertEqual(raised.exception.code, "ARCHIVE_VERSION")
+
+        custom_archive = self.root / "custom-fixture.tar.gz"
+        custom_archive.write_bytes(self.archive)
+        accepted = build_successor_wheel(
+            "theme-forge-nebular-fusion",
+            archive_path=custom_archive,
+            output_dir=self.root / "custom-historical-archive",
+            license_files=self.legal,
+            launcher_path=self.launcher,
+            gui_path=self.gui,
+            fixture_only=True,
+        )
+        self.assertEqual(accepted.record["payload_archive_name"], "custom-fixture.tar.gz")
+

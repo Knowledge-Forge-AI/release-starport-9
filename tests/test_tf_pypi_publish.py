@@ -404,6 +404,12 @@ class WorkflowGeneratorTests(unittest.TestCase):
 
                     for job_id, module, argv in invocations:
                         self.assertIn("--project", argv)
+                        # Registered successor commands forward their selected pin;
+                        # generated historical commands still omit the selector.
+                        selected_kwargs = {}
+                        if "--pin" in argv:
+                            selected_path = ROOT / argv[argv.index("--pin") + 1]
+                            selected_kwargs["pin"] = load_pin(product, selected_path)
                         if module == "rs9.tf_pypi_publish":
                             self.assertNotIn("--target", argv)
                             try:
@@ -452,10 +458,14 @@ class WorkflowGeneratorTests(unittest.TestCase):
                                 )
                                 self.assertEqual(c_kwargs["run_id"], "$QUALIFY_RUN_ID")
                                 self.assertEqual(c_kwargs["run_attempt"], "$QUALIFY_RUN_ATTEMPT")
+                                if selected_kwargs:
+                                    self.assertEqual(c_kwargs["pin"], selected_kwargs["pin"])
+                                else:
+                                    self.assertNotIn("pin", c_kwargs)
                                 hosted_qualify_targets.append(c_kwargs["target"])
                             elif argv[0] == "admit":
                                 a_mock.assert_called_once_with(
-                                    product,
+                                    selected_kwargs.get("pin", product),
                                     "dist",
                                     "receipts",
                                     "$QUALIFY_COMMIT",

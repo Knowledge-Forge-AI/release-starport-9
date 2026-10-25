@@ -64,7 +64,7 @@ with subprocess.Popen([sys.argv[1]],stdin=subprocess.PIPE,stdout=subprocess.PIPE
    return json.loads(p.stdout.readline())
   send('initialize',{'protocol':'tfsb.studio','minVersion':'1.0','maxVersion':'1.2','client':{'name':'rs9-offline-qualification','version':'1.0.0'},'capabilities':{'progress':False,'cancellation':False}},1)
   initialized=receive();assert initialized['id']==1
-  nonce=initialized['result']['sessionNonce'];assert initialized['result']['server']['version']=='0.6.1'
+  nonce=initialized['result']['sessionNonce'];assert initialized['result']['server']['version']==sys.argv[2]
   send('initialized',{'sessionNonce':nonce})
   send('shutdown',{'sessionNonce':nonce},2)
   shutdown=receive();assert shutdown=={'jsonrpc':'2.0','id':2,'result':None}
@@ -115,7 +115,7 @@ def _burst(pin, root, env, prefix, run):
             fail("FUNCTIONAL_BURST_" + command.upper())
         records.append(receipt("tfsb", command, result))
     studio = run([root / "bin/python", "-I", "-B", "-c", STUDIO_DRIVER,
-                  root / "bin/tfsb-studio-service"], env, prefix=prefix)
+                  root / "bin/tfsb-studio-service", pin["version"]], env, prefix=prefix)
     if studio.returncode or json.loads(studio.stdout).get("exit") != 0:
         fail("FUNCTIONAL_STUDIO")
     records.append(receipt("tfsb-studio-service", "initialize-shutdown-exit", studio))
