@@ -113,6 +113,16 @@ def scan_text(text, *, private_path=None, allow_pattern_source=False):
         raise ValueError("Private path")
 
 
+def import_roots(node):
+    if isinstance(node, ast.Import):
+        return [alias.name.split(".", 1)[0] for alias in node.names]
+    if isinstance(node, ast.ImportFrom):
+        if node.level:
+            return ["rs9"]
+        return [node.module.split(".", 1)[0]] if node.module else []
+    return []
+
+
 class HygieneTests(unittest.TestCase):
     root = ROOT
 
@@ -140,10 +150,24 @@ class HygieneTests(unittest.TestCase):
         for path in (ROOT / "src/rs9").glob("*.py"):
             tree = ast.parse(path.read_text())
             for node in ast.walk(tree):
-                modules = [a.name for a in node.names] if isinstance(node, ast.Import) else [node.module] if isinstance(node, ast.ImportFrom) else []
-                for module in modules:
-                    self.assertIn(module.split(".")[0], sys.stdlib_module_names | {"rs9"})
+                for module in import_roots(node):
+                    self.assertIn(module, sys.stdlib_module_names | {"rs9"})
         self.assertFalse((ROOT / "src/rs9/__main__.py").exists())
+
+    def test_relative_import_roots_are_package_local(self):
+        cases = (
+            ("from . import X", ["rs9"]),
+            ("from .name import X", ["rs9"]),
+            ("from ..name import X", ["rs9"]),
+            ("import json", ["json"]),
+            ("from tf_pypi_model import X", ["tf_pypi_model"]),
+        )
+        for text, expected in cases:
+            with self.subTest(source=text):
+                node = ast.parse(text).body[0]
+                self.assertEqual(import_roots(node), expected)
+        allowed = sys.stdlib_module_names | {"rs9"}
+        self.assertFalse(set(import_roots(ast.parse("from tf_pypi_model import X").body[0])).issubset(allowed))
 
 
 class HistoricalEvidenceTests(unittest.TestCase):
