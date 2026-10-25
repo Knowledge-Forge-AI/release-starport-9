@@ -57,7 +57,7 @@ EXPECTED_ASSET_HASHES = {
         "629a25fc68705bd610d0a09eeef4d77173ac5f6d7d6c98e3a4335d15b140dbb9"
     ),
     "operators/tf-pypi/theme-forge-stellar-loom-0.5.0.json": (
-        "7dc2453825452c113e7b94b460330bbdf55ecd4850c2c1ef0a1f182ad24cbbbd"
+        "c3b729ece76b6f231c43b9f0a2ea3b0e7653bfe256269671df0b3e957453a87d"
     ),
     "operators/tf-pypi/descriptions/stellar-loom-0.5.0.md": (
         "c183c3cf30410d5637d8bb877a571ebb841e7c53967cb1bac8a305d9b655bfc3"
@@ -85,7 +85,7 @@ SUCCESSOR_SPECS = {
         "description": "stellar-loom-0.5.0.md",
         "historical_description": "stellar-loom.md",
         "size": 272836,
-        "sha256": "9cfb6e313456f9bf0a65795f413b576abda19d68ef15e02e6abfe6235851196a",
+        "sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f",
     },
     "theme-forge-solar-sail": {
         "version": "0.3.0",

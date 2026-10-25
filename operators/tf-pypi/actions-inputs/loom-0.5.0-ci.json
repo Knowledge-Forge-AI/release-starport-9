@@ -1,0 +1,334 @@
+{
+  "schema": "rs9.tf-pypi-actions-selection.v1",
+  "repository": "Knowledge-Forge-AI/theme-forge-stellar-loom",
+  "repositoryId": 1361513719,
+  "project": "theme-forge-stellar-loom",
+  "version": "0.5.0",
+  "run": {
+    "id": 40222221851,
+    "run_attempt": 1,
+    "workflow_id": 353226742,
+    "path": ".github/workflows/ci.yml",
+    "event": "pull_request",
+    "head_branch": "staging",
+    "head_sha": "2e777cc540bef6c2fbb06a18c8ce70afd7dfeefc",
+    "status": "completed",
+    "conclusion": "success",
+    "pull_requests": []
+  },
+  "workflow": {
+    "id": 353226742,
+    "path": ".github/workflows/ci.yml",
+    "state": "active"
+  },
+  "pr": 5,
+  "headTree": "b7d946db9c5723dbb8e60f849b0ae4df01ca34c7",
+  "baseCommit": "85e4264585bf3521ca0ec19529bb203410a1cd65",
+  "ciMergeCommit": "952cb80794bed1c47f3e8068390dcb3f5e87517d",
+  "mainCommit": "fca7db68bbf62ee7c9d53a72993b7fc6bda789f5",
+  "pack": {
+    "bytes": 272836,
+    "sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f"
+  },
+  "artifacts": [
+    {
+      "id": 12610096112,
+      "name": "root-package-artifacts",
+      "size_in_bytes": 301784,
+      "url": "https://api.github.com/repos/Knowledge-Forge-AI/theme-forge-stellar-loom/actions/artifacts/12610096112",
+      "archive_download_url": "https://api.github.com/repos/Knowledge-Forge-AI/theme-forge-stellar-loom/actions/artifacts/12610096112/zip",
+      "expired": false,
+      "created_at": "2026-10-25T18:39:22Z",
+      "expires_at": "2026-11-08T18:39:22Z",
+      "updated_at": "2026-10-25T18:39:22Z",
+      "digest": "sha256:e2969c3a9e45003014e7ca4e9ab59e4b0a26623c5436ae8b8d636e6267595ca5",
+      "workflow_run": {
+        "id": 40222221851,
+        "repository_id": 1361513719,
+        "head_repository_id": 1361513719,
+        "head_branch": "staging",
+        "head_sha": "2e777cc540bef6c2fbb06a18c8ce70afd7dfeefc"
+      },
+      "members": [
+        {
+          "name": "artifact-manifest.json",
+          "bytes": 950,
+          "sha256": "f91cb0bc3ed6081a876368921d01d58528760f4cab262e5a5178a44140a430fa"
+        },
+        {
+          "name": "audit-result.json",
+          "bytes": 361,
+          "sha256": "bc9a301fc97ef4212c11bfca3880682b9fa7451b928315e3530b3a30c74e5242"
+        },
+        {
+          "name": "pack-manifest.json",
+          "bytes": 37250,
+          "sha256": "377d93ca420befa60e8e0bc9b3a0cecdc1c6df8606ec5bebd74fc53307169c3b"
+        },
+        {
+          "name": "receipt.json",
+          "bytes": 2282,
+          "sha256": "ff15dd095ef098d0e814487863cdf70efeaf07ce52f509fc10a6297058946d91"
+        },
+        {
+          "name": "root-package.tgz",
+          "bytes": 272836,
+          "sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f"
+        },
+        {
+          "name": "test-report.json",
+          "bytes": 198824,
+          "sha256": "da454829bd5edae847cb58668506912067fa48565bfc684861f8e61d6034bd0d"
+        }
+      ]
+    },
+    {
+      "id": 12609816643,
+      "name": "source-policy-receipt",
+      "size_in_bytes": 1158,
+      "url": "https://api.github.com/repos/Knowledge-Forge-AI/theme-forge-stellar-loom/actions/artifacts/12609816643",
+      "archive_download_url": "https://api.github.com/repos/Knowledge-Forge-AI/theme-forge-stellar-loom/actions/artifacts/12609816643/zip",
+      "expired": false,
+      "created_at": "2026-10-25T18:38:50Z",
+      "expires_at": "2026-11-08T18:38:49Z",
+      "updated_at": "2026-10-25T18:38:50Z",
+      "digest": "sha256:a690e788340c72ed3dde507befd431eb484c608ed909e0348557df33d0dc3aa1",
+      "workflow_run": {
+        "id": 40222221851,
+        "repository_id": 1361513719,
+        "head_repository_id": 1361513719,
+        "head_branch": "staging",
+        "head_sha": "2e777cc540bef6c2fbb06a18c8ce70afd7dfeefc"
+      },
+      "members": [
+        {
+          "name": "artifact-manifest.json",
+          "bytes": 344,
+          "sha256": "0e82cc644f0fb9c87de5c8b8677a0f88bcb292230755fcfc6a47b8e8a41ea16c"
+        },
+        {
+          "name": "receipt.json",
+          "bytes": 1979,
+          "sha256": "2eb0fd4187f4592720a10b8649c071a8efe3504c3bb9fe29bb40767e11a413f4"
+        }
+      ]
+    },
+    {
+      "id": 12609896882,
+      "name": "evidence-aggregate-artifacts",
+      "size_in_bytes": 4433,
+      "url": "https://api.github.com/repos/Knowledge-Forge-AI/theme-forge-stellar-loom/actions/artifacts/12609896882",
+      "archive_download_url": "https://api.github.com/repos/Knowledge-Forge-AI/theme-forge-stellar-loom/actions/artifacts/12609896882/zip",
+      "expired": false,
+      "created_at": "2026-10-25T18:42:28Z",
+      "expires_at": "2026-11-08T18:42:27Z",
+      "updated_at": "2026-10-25T18:42:28Z",
+      "digest": "sha256:f9c95f5b8e8f522f801c471e8d209b3857f018648511c0bfec1eba5ff7de0df2",
+      "workflow_run": {
+        "id": 40222221851,
+        "repository_id": 1361513719,
+        "head_repository_id": 1361513719,
+        "head_branch": "staging",
+        "head_sha": "2e777cc540bef6c2fbb06a18c8ce70afd7dfeefc"
+      },
+      "members": [
+        {
+          "name": "ci-evidence-manifest.json",
+          "bytes": 13129,
+          "sha256": "6142fc8b8cb6948360bd768392f5807fa95e6fd93e62802261e766f5cfb53d72"
+        },
+        {
+          "name": "ci-evidence-summary.md",
+          "bytes": 445,
+          "sha256": "af1f74b4aecb077ee2b9e737dfe3d30ed2ae369e82890b7d7b2e5eb6785151b6"
+        },
+        {
+          "name": "receipt.json",
+          "bytes": 2288,
+          "sha256": "94e9ea7bab26a18875b67cd7b3ebca947b45a5321bc75b90f973fa987180f25f"
+        }
+      ]
+    }
+  ],
+  "aggregateArtifacts": [
+    {
+      "path": "consumer-fixture-artifacts/artifact-manifest.json",
+      "size": 497,
+      "sha256": "c9f885f1b9333c671c3924b234ce5f8320ff4ae572af1b5d4aa6c27dc4649b0f"
+    },
+    {
+      "path": "consumer-fixture-artifacts/receipt.json",
+      "size": 2286,
+      "sha256": "696e0b3fadd759c79a9eb3e5a6f299d9fdd1bd93edf3f1531207a3569c159674"
+    },
+    {
+      "path": "consumer-fixture-artifacts/smoke-report.log",
+      "size": 2563,
+      "sha256": "b5fca938d27cc22259d30f8d5e1eac4b159274b89481b48408e062b2821dfb67"
+    },
+    {
+      "path": "root-package-artifacts/artifact-manifest.json",
+      "size": 950,
+      "sha256": "f91cb0bc3ed6081a876368921d01d58528760f4cab262e5a5178a44140a430fa"
+    },
+    {
+      "path": "root-package-artifacts/audit-result.json",
+      "size": 361,
+      "sha256": "bc9a301fc97ef4212c11bfca3880682b9fa7451b928315e3530b3a30c74e5242"
+    },
+    {
+      "path": "root-package-artifacts/pack-manifest.json",
+      "size": 37250,
+      "sha256": "377d93ca420befa60e8e0bc9b3a0cecdc1c6df8606ec5bebd74fc53307169c3b"
+    },
+    {
+      "path": "root-package-artifacts/receipt.json",
+      "size": 2282,
+      "sha256": "ff15dd095ef098d0e814487863cdf70efeaf07ce52f509fc10a6297058946d91"
+    },
+    {
+      "path": "root-package-artifacts/root-package.tgz",
+      "size": 272836,
+      "sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f"
+    },
+    {
+      "path": "root-package-artifacts/test-report.json",
+      "size": 198824,
+      "sha256": "da454829bd5edae847cb58668506912067fa48565bfc684861f8e61d6034bd0d"
+    },
+    {
+      "path": "source-policy-receipt/artifact-manifest.json",
+      "size": 344,
+      "sha256": "0e82cc644f0fb9c87de5c8b8677a0f88bcb292230755fcfc6a47b8e8a41ea16c"
+    },
+    {
+      "path": "source-policy-receipt/receipt.json",
+      "size": 1979,
+      "sha256": "2eb0fd4187f4592720a10b8649c071a8efe3504c3bb9fe29bb40767e11a413f4"
+    },
+    {
+      "path": "supply-chain-artifacts/artifact-manifest.json",
+      "size": 4015,
+      "sha256": "e7a10a2177d3eaca43d9814ec813ebbc5aae29192e07935f72b8b8c072f2aa2f"
+    },
+    {
+      "path": "supply-chain-artifacts/receipt.json",
+      "size": 2282,
+      "sha256": "cf577d0fbde3edc7f3c7e2c527aadbe64e342410eec0b6ca93b2c7573b6b34fe"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.cdx.json",
+      "size": 4782,
+      "sha256": "f9f40bfe52ab2f705af50b492ecce3e6de12aa8d26bb4f5ac49904fc015a1eac"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.grype.json",
+      "size": 5659,
+      "sha256": "b11d128aff961e25cab68de4345e1edd4babeec8502d650dc1594ff583410aaa"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.grype.sarif",
+      "size": 357,
+      "sha256": "da0853b4022c895fa75d7f84060c1e93d56c86ec112bb61b6baca5fe7fd2bd6e"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.input-core-lock.cdx.json",
+      "size": 8609,
+      "sha256": "fa978b995cd56b32ae817a8387e96243abbced10b380c3e4430157f09a09904d"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.input-core-lock.grype.json",
+      "size": 5682,
+      "sha256": "7fe42c2676ca3190c52fe79ecd749d3b037ca56d577d4fb8f8bf6173cccb7280"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.input-core-lock.grype.sarif",
+      "size": 357,
+      "sha256": "da0853b4022c895fa75d7f84060c1e93d56c86ec112bb61b6baca5fe7fd2bd6e"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.input-core-lock.spdx.json",
+      "size": 12957,
+      "sha256": "d9bb0b7ef638f582535329beebeded1a95c13cd7ad86e5822035d00e1be8ff38"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.input-core-lock.syft.json",
+      "size": 14621,
+      "sha256": "880ca7333910ddc45c8d627afbb7caba00dd2ab327a0a72bf3ee423eb7236eed"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.receipt.json",
+      "size": 15195,
+      "sha256": "9d1015100778536dd8670b5d29490860f07eab66d97650bc538075e7ca2ba2c2"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.spdx.json",
+      "size": 7109,
+      "sha256": "33d95689a81944104cfedf50a9c018e2969c4fabde2e0425cf4876805031f8f8"
+    },
+    {
+      "path": "supply-chain-artifacts/root-package.syft.json",
+      "size": 10328,
+      "sha256": "67df24aa6eff4d3c89625f34779d6a86eaefa76d4320f5b80510dcce3f2004db"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/actionlint.result.json",
+      "size": 1134,
+      "sha256": "546dfc9f513319050a2a488ec9bb6b51ac89685d44d695afa964c9e3e8f4a925"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/actionlint.stderr.log",
+      "size": 7,
+      "sha256": "140baba927dc0d7b94391571d9fe588c0aade97ec7056b167924e3d8201860af"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/actionlint.stdout.log",
+      "size": 7,
+      "sha256": "140baba927dc0d7b94391571d9fe588c0aade97ec7056b167924e3d8201860af"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/betterleaks.report.json",
+      "size": 5,
+      "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/betterleaks.result.json",
+      "size": 1221,
+      "sha256": "2778cb91e1da9b9ae8814724bfa2a28788bd332c883e6decb96944aa9cf63436"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/betterleaks.stderr.log",
+      "size": 166,
+      "sha256": "3fe6d94d73a1e97d3f6d39f4e22da0e98a8edfb5620fcdfa1d61b0aff1c6070b"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/betterleaks.stdout.log",
+      "size": 7,
+      "sha256": "140baba927dc0d7b94391571d9fe588c0aade97ec7056b167924e3d8201860af"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/workflow-checks.receipt.json",
+      "size": 964,
+      "sha256": "9f4be297cccc90b38a65757dc9990a909169b1af24535b145291a94b223416fe"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/zizmor.result.json",
+      "size": 1124,
+      "sha256": "e6b1ce2cf3b999bb17971d9d20af1ae3dd5c6fee0a722f2ed704a355ecdb1140"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/zizmor.stderr.log",
+      "size": 161,
+      "sha256": "6cbc957c680f43314313fd9fe817f27640dddb5dda82aef990eecf955ce26a92"
+    },
+    {
+      "path": "supply-chain-artifacts/workflow-checks/zizmor.stdout.log",
+      "size": 97,
+      "sha256": "38a0c1c2be7c75c76c1e9f8b7ffa9bc86ce45fa87b48da2e780393baaa638734"
+    }
+  ],
+  "artifactDownloadHosts": [
+    "productionresultssa5.blob.core.windows.net"
+  ],
+  "redirectAdmission": "exact-live-host-observed"
+}
