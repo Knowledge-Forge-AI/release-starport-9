@@ -13,14 +13,12 @@
   "asset": "knowledge-forge-ai-theme-forge-solar-sail-0.3.0.tgz",
   "sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415",
   "size": 110836,
-  "source_commit": "216a27e703ae256cd0030c497f722a707571bdb6",
-  "source_status": "BLOCKED",
+  "source_commit": "eafd594af8bce04ef3752c489ae770946b4e0e3b",
+  "source_status": "READY",
   "withheld": [
-    "SUCCESSOR_PIN_ADMISSION_PENDING",
     "PYPI_RELEASE_MANIFEST_PENDING",
     "PYPI_CONSUMER_MATRIX_PENDING",
-    "PYPI_WHEEL_ARTIFACT_RECEIPTS_PENDING",
-    "EXACT_SOURCE_RELEASE_BINDING_PENDING"
+    "PYPI_WHEEL_ARTIFACT_RECEIPTS_PENDING"
   ],
   "candidate_platforms": [
     "darwin-arm64",

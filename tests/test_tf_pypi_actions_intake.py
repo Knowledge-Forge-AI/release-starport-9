@@ -26,7 +26,7 @@ def body_fixture():
     pin, pack = fixture(a.PROJECT)
     pin["source_status"] = "BLOCKED"; pin["qualified_platforms"] = []
     def receipt(job, role):
-        e = {"name": "pull_request", "action": "synchronize", "number": 3, "repository": a.REPO, "headRepository": a.REPO, "baseRepository": a.REPO, "headRef": "staging", "baseRef": "main", "headSha": s["run"]["head_sha"], "baseSha": s["baseCommit"]}
+        e = {"name": "pull_request", "action": "synchronize", "number": 4, "repository": a.REPO, "headRepository": a.REPO, "baseRepository": a.REPO, "headRef": "staging", "baseRef": "main", "headSha": s["run"]["head_sha"], "baseSha": s["baseCommit"]}
         return encoded({"schema": "tfsb.ci-exact-head-receipt", "schemaVersion": 1, "status": "pass", "event": e, "workflow": {"job": job, "runId": str(s["run"]["id"]), "runAttempt": "1", "matrix": {}}, "checkout": {"role": role, "clean": True, "tree": s["headTree"], "commit": s["run"]["head_sha"] if role == "staging-head" else s["ciMergeCommit"], "parents": [] if role == "staging-head" else [s["baseCommit"], s["run"]["head_sha"]]}, "identities": {"stagingHead": {"commit": s["run"]["head_sha"], "tree": s["headTree"], "repository": a.REPO}}})
     root = {"receipt.json": receipt("root-package", "merge-candidate"), "pack-manifest.json": encoded([{"name": pin["npm_name"], "version": pin["version"], "size": len(pack), "integrity": "sha512-" + base64.b64encode(hashlib.sha512(pack).digest()).decode()}]), "test-report.json": b"{}", "audit-result.json": b"{}", "root-package.tgz": pack}
     source = {"receipt.json": receipt("source-policy", "staging-head")}
@@ -53,8 +53,8 @@ def zip_bytes(files, mode=None):
 def live_fixture(s):
     run = copy.deepcopy(s["run"])
     run.update(repository={"full_name": a.REPO, "id": s["repositoryId"]}, head_repository={"id": s["repositoryId"]})
-    pr = {"number": 3, "merged": True, "merge_commit_sha": s["mainCommit"], "head": {"sha": s["run"]["head_sha"], "ref": "staging", "repo": {"id": s["repositoryId"]}}, "base": {"ref": "main", "repo": {"id": s["repositoryId"]}}}
-    values = {"/actions/runs/40210741876/attempts/1": run, "/actions/workflows/360947832": s["workflow"], "/pulls/3": pr}
+    pr = {"number": 4, "merged": True, "merge_commit_sha": s["mainCommit"], "head": {"sha": s["run"]["head_sha"], "ref": "staging", "repo": {"id": s["repositoryId"]}}, "base": {"ref": "main", "repo": {"id": s["repositoryId"]}}}
+    values = {"/actions/runs/40238215111/attempts/1": run, "/actions/workflows/360947832": s["workflow"], "/pulls/4": pr}
     for sha in [s["run"]["head_sha"], s["ciMergeCommit"], s["mainCommit"]]:
         values["/git/commits/" + sha] = {"sha": sha, "tree": {"sha": s["headTree"]}, "parents": [{"sha": p} for p in [s["baseCommit"], s["run"]["head_sha"]]]}
     for artifact in s["artifacts"]:
@@ -109,16 +109,16 @@ def full_transport_fixture():
 
 
 class ActionsIntakeTests(unittest.TestCase):
-    def test_exact_measured_selection_and_blocked_pin(self):
+    def test_exact_measured_selection_and_ready_source_pin(self):
         s = json.loads(a.SELECTION.read_text()); pin = json.loads(a.PIN.read_text())
         a.validate_selection(s, pin)
-        self.assertEqual(pin["source_status"], "BLOCKED")
+        self.assertEqual(pin["source_status"], "READY")
         self.assertEqual(pin["qualified_platforms"], [])
         self.assertEqual(s["artifactDownloadHosts"], [a.ARTIFACT_HOST])
 
     def test_selection_substitution_refusals(self):
         s = json.loads(a.SELECTION.read_text()); pin = json.loads(a.PIN.read_text())
-        changes = [("repository", "attacker/repo"), ("pr", 4), ("mainCommit", "0" * 40), ("artifactDownloadHosts", ["example.com"])]
+        changes = [("repository", "attacker/repo"), ("pr", 3), ("mainCommit", "0" * 40), ("artifactDownloadHosts", ["example.com"])]
         for key, value in changes:
             with self.subTest(key=key), self.assertRaises(ValueError):
                 bad = copy.deepcopy(s); bad[key] = value; a.validate_selection(bad, pin)
@@ -128,12 +128,12 @@ class ActionsIntakeTests(unittest.TestCase):
 
     def test_live_pr_join_accepts_empty_run_pull_requests(self):
         s = json.loads(a.SELECTION.read_text()); c, values = live_fixture(s)
-        self.assertEqual(values["/actions/runs/40210741876/attempts/1"]["pull_requests"], [])
-        self.assertEqual(a.authenticate(s, c)["pr"]["number"], 3)
+        self.assertEqual(values["/actions/runs/40238215111/attempts/1"]["pull_requests"], [])
+        self.assertEqual(a.authenticate(s, c)["pr"]["number"], 4)
 
     def test_live_metadata_substitution_refusals(self):
         s = json.loads(a.SELECTION.read_text())
-        changes = [("/actions/runs/40210741876/attempts/1", "conclusion", "failure"), ("/pulls/3", "merged", False), ("/git/commits/" + s["mainCommit"], "tree", {"sha": "0" * 40}), ("/actions/artifacts/12605820497", "expired", True), ("/actions/artifacts/12605820497", "digest", "sha256:" + "0" * 64)]
+        changes = [("/actions/runs/40238215111/attempts/1", "conclusion", "failure"), ("/pulls/4", "merged", False), ("/git/commits/" + s["mainCommit"], "tree", {"sha": "0" * 40}), ("/actions/artifacts/12614794722", "expired", True), ("/actions/artifacts/12614794722", "digest", "sha256:" + "0" * 64)]
         for path, key, value in changes:
             with self.subTest(path=path, key=key), self.assertRaises(ValueError):
                 c, values = live_fixture(copy.deepcopy(s)); values[path][key] = value; a.authenticate(s, c)
@@ -214,7 +214,7 @@ class ActionsIntakeTests(unittest.TestCase):
                 raise urllib.error.HTTPError(request.full_url, 302, "redirect", {"Location": "https://unreviewed.blob.core.windows.net/path?signature=opaque"}, None)
         c.opener = Opener()
         with patch.dict("os.environ", {"GH_TOKEN": "synthetic-test-token"}), self.assertRaises(ValueError):
-            c.get("/actions/artifacts/12605820497/zip", 10, archive=True)
+            c.get("/actions/artifacts/12614794722/zip", 10, archive=True)
         self.assertEqual(len(requests), 1)
         self.assertIn("Authorization", requests[0].headers)
 
@@ -233,15 +233,15 @@ class ActionsIntakeTests(unittest.TestCase):
             def open(self, request, timeout):
                 requests.append(request)
                 if len(requests) == 1:
-                    raise urllib.error.HTTPError(request.full_url, 302, "redirect", {"Location": "https://productionresultssa12.blob.core.windows.net/object?signed=opaque"}, None)
+                    raise urllib.error.HTTPError(request.full_url, 302, "redirect", {"Location": "https://productionresultssa14.blob.core.windows.net/object?signed=opaque"}, None)
                 return Response(request.full_url)
         c.opener = Opener()
         with patch.dict("os.environ", {"GH_TOKEN": "synthetic-token"}):
-            self.assertEqual(c.get("/actions/artifacts/12605820497/zip", 10, archive=True), b"package")
+            self.assertEqual(c.get("/actions/artifacts/12614794722/zip", 10, archive=True), b"package")
         self.assertIn("Authorization", requests[0].headers)
         self.assertNotIn("Authorization", requests[1].headers)
         requests.clear()
-        with self.assertRaises(ValueError): c.get("/actions/artifacts/12605820497/zip", 2, archive=True)
+        with self.assertRaises(ValueError): c.get("/actions/artifacts/12614794722/zip", 2, archive=True)
 
     def test_controls_checked_on_primary_failure(self):
         with tempfile.TemporaryDirectory() as temp:
