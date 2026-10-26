@@ -4,7 +4,9 @@ The exact checkout binding is supplied after candidate adoption, not copied from
 the planning prompt. This module never writes product source or production.
 """
 import argparse
+import copy
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -18,6 +20,131 @@ from rs9.scratch import ConfinedWriter, canonical, physical_directory
 
 BOOTSTRAP = "bootstrap/pre-rs9/theme-forge-live1/manifest-author-aligned.json"
 EXPECTATIONS = "operators/live1/expectations.json"
+
+# The v0.6.1 controller remains the historical owner of its exact paths and
+# expectations.  v0.7.0 deliberately has no embedded release hashes yet: the
+# release capture and its reviewed bootstrap/expectation bytes are future
+# inputs, not values this checkout may infer from v0.6.1.
+NEBULAR070_PROFILE = "operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-gate1.json"
+NEBULAR070_BOOTSTRAP = "bootstrap/pre-rs9/theme-forge-nebular-0.7.0/manifest.json"
+NEBULAR070_EXPECTATIONS = "operators/tf-pypi/nebular-0.7.0/expectations.json"
+_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+
+
+def release_bindings(release: str) -> dict:
+    """Return the release-specific capture contract without inventing inputs.
+
+    The historical selector preserves the v0.6.1 controller.  The 0.7
+    selector names the new bootstrap/expectation locations and direct lineage
+    mode, but remains pending until a real release capture supplies immutable
+    IDs, commit/tree coordinates, asset rows, and reviewed configuration
+    digests.  Callers may pass a validated ready binding to the Gate1 adapter;
+    this function never derives one from a historical release.
+    """
+    if release == "0.6.1.post1":
+        return {
+            "schema": "rs9.nebular-release-binding.v1alpha1",
+            "release": "0.6.1.post1",
+            "application_version": "0.6.1",
+            "distribution_version": "0.6.1.post1",
+            "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+            "tag": "v0.6.1",
+            "bootstrap_path": BOOTSTRAP,
+            "expectations_path": EXPECTATIONS,
+            "status": "legacy-reviewed",
+            "lineage": {
+                "mode": "historical-forward-correction",
+                "requires_historical_author_rewrite": True,
+            },
+        }
+    if release != "0.7.0":
+        raise ContractError("RELEASE_SELECTION", "Unsupported Nebular release binding")
+    return {
+        "schema": "rs9.nebular-release-binding.v1alpha1",
+        "release": "0.7.0",
+        "application_version": "0.7.0",
+        "distribution_version": "0.7.0",
+        "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+        "tag": "v0.7.0",
+        "bootstrap_path": NEBULAR070_BOOTSTRAP,
+        "expectations_path": NEBULAR070_EXPECTATIONS,
+        "profile_path": NEBULAR070_PROFILE,
+        "status": "pending-release-inputs",
+        "lineage": {
+            "mode": "direct-tag-provenance-equality",
+            "requires_historical_author_rewrite": False,
+        },
+        "provenance": {
+            "path": "PROVENANCE.json",
+            "commit_field": "tagCommit",
+            "tree_field": "tagTree",
+        },
+        "required_inputs": [
+            "repository_id",
+            "release_id",
+            "tag_commit",
+            "tag_tree",
+            "bootstrap_sha256",
+            "expectations_sha256",
+            "asset_inventory",
+            "source_capture",
+        ],
+    }
+
+
+def validate_release_binding(binding: dict) -> dict:
+    """Validate a caller-supplied release binding before it selects evidence."""
+    if not isinstance(binding, dict):
+        raise ContractError("RELEASE_BINDING", "Release binding object required")
+    required = {
+        "schema", "release", "application_version", "distribution_version",
+        "repository", "tag", "bootstrap_path", "expectations_path", "status", "lineage",
+    }
+    if not required <= set(binding) or binding.get("schema") != "rs9.nebular-release-binding.v1alpha1":
+        raise ContractError("RELEASE_BINDING", "Release binding fields are not closed")
+    if binding["release"] != "0.7.0" or binding["application_version"] != "0.7.0" \
+            or binding["distribution_version"] != "0.7.0" \
+            or binding["repository"] != "Knowledge-Forge-AI/theme-forge-nebular-fusion" \
+            or binding["tag"] != "v0.7.0" \
+            or binding["bootstrap_path"] != NEBULAR070_BOOTSTRAP \
+            or binding["expectations_path"] != NEBULAR070_EXPECTATIONS \
+            or binding.get("profile_path") != NEBULAR070_PROFILE:
+        raise ContractError("RELEASE_BINDING", "Only the 0.7.0 Gate1 binding is accepted")
+    if binding["status"] not in {"pending-release-inputs", "ready"}:
+        raise ContractError("RELEASE_BINDING", "Unknown Gate1 release-binding status")
+    lineage = binding["lineage"]
+    if lineage != {
+        "mode": "direct-tag-provenance-equality",
+        "requires_historical_author_rewrite": False,
+    }:
+        raise ContractError("RELEASE_BINDING", "Gate1 direct lineage mode is required")
+    provenance = binding.get("provenance")
+    if not isinstance(provenance, dict) or set(provenance) != {
+        "path", "commit_field", "tree_field",
+    } or any(not isinstance(value, str) or not value for value in provenance.values()):
+        raise ContractError("RELEASE_BINDING", "Gate1 provenance field selection is required")
+    if provenance != {
+        "path": "PROVENANCE.json",
+        "commit_field": "tagCommit",
+        "tree_field": "tagTree",
+    }:
+        raise ContractError("RELEASE_BINDING", "Gate1 provenance identity fields are fixed")
+    if binding["status"] == "pending-release-inputs":
+        return copy.deepcopy(binding)
+    expected = binding.get("expected")
+    if not isinstance(expected, dict) or set(expected) != {
+        "repository_id", "release_id", "tag_commit", "tag_tree",
+        "bootstrap_sha256", "expectations_sha256",
+    }:
+        raise ContractError("RELEASE_BINDING", "Ready Gate1 bindings require exact release coordinates")
+    if (type(expected["repository_id"]) is not int or expected["repository_id"] <= 0
+            or type(expected["release_id"]) is not int or expected["release_id"] <= 0
+            or not re.fullmatch(r"[0-9a-f]{40}\Z", expected["tag_commit"])
+            or not re.fullmatch(r"[0-9a-f]{40}\Z", expected["tag_tree"])
+            or not _SHA256.fullmatch(expected["bootstrap_sha256"])
+            or not _SHA256.fullmatch(expected["expectations_sha256"])):
+        raise ContractError("RELEASE_BINDING", "Ready Gate1 release coordinates are malformed")
+    return copy.deepcopy(binding)
 
 
 def checked_checkout(root, commit, tree):
