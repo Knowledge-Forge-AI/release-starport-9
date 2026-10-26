@@ -1,0 +1,36 @@
+{
+  "schema": "rs9.nebular070-candidate-profile.v1alpha1",
+  "profile_id": "nebular-fusion-0.7.0-gate1-agpl-floor13-v1",
+  "application_version": "0.7.0",
+  "distribution_version": "0.7.0",
+  "description_path": "operators/tf-pypi/descriptions/nebular-fusion-0.7.0-gate1.md",
+  "provenance_schema": "rs9.wheel-provenance.v3alpha1",
+  "license_expression": "AGPL-3.0-or-later",
+  "required_legal_files": ["LICENSE", "NOTICE"],
+  "optional_legal_files": ["COMMERCIAL-LICENSE.md"],
+  "darwin_floor": {"major": 13, "minor": 0},
+  "linux_runtime_policy": {
+    "wheel_tag_policy": "generic-linux",
+    "glibc_floor": "2.36",
+    "glibcxx_floor": "3.4.30",
+    "provider_baseline": "manylinux236-named-provenance-only",
+    "manylinux_claim": false,
+    "dynamic_closure": "pending"
+  },
+  "readme_source": {
+    "kind": "npm-readme-adaptation",
+    "source_path": "README.md",
+    "source_sha256": null,
+    "recipe": "adapt the authenticated release README to Python 3 and pip commands while preserving product behavior and binding the resulting bytes to the ready release capture",
+    "status": "pending-release-inputs"
+  },
+  "release_binding": {
+    "bootstrap_path": "bootstrap/pre-rs9/theme-forge-nebular-0.7.0/manifest.json",
+    "expectations_path": "operators/tf-pypi/nebular-0.7.0/expectations.json",
+    "tag": "v0.7.0",
+    "lineage_mode": "direct-tag-provenance-equality",
+    "status": "pending-release-inputs"
+  },
+  "source_status": "pending-release-inputs",
+  "publication_admitted": false
+}

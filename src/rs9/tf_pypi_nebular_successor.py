@@ -31,9 +31,15 @@ from rs9.hosted_platforms import (
 )
 from rs9.nebular_lineage import (
     select_forward_lineage_proof,
+    verify_direct_release_lineage,
     verify_forward_lineage_proof,
 )
-from rs9.operator import BOOTSTRAP, EXPECTATIONS, assert_release_expectations
+from rs9.operator import (
+    BOOTSTRAP,
+    EXPECTATIONS,
+    assert_release_expectations,
+    validate_release_binding,
+)
 from rs9.profiles import evaluate_profile, selection_for_intent
 from rs9.records import record_sha256
 from rs9.release_core import (
@@ -51,6 +57,7 @@ from rs9.wheel_native import (
     get_embedded_rs9_helpers,
     resolve_native_darwin_tag,
     resolve_native_linux_candidate_tag,
+    validate_darwin_payload_floor,
 )
 from rs9.wheel_nebular_successor import (
     DISTRIBUTION_NAME,
@@ -69,7 +76,11 @@ from rs9.wheel_nebular_successor import (
     _successor_init_bytes,
     _successor_metadata_bytes,
     _successor_wheel_info_bytes,
+    GATE1_PROFILE,
+    SuccessorCandidateProfile,
     build_successor_wheel,
+    build_gate1_successor_wheel,
+    gate1_profile_record,
     successor_release,
 )
 
@@ -86,6 +97,9 @@ _PROVENANCE_KEYS = {
     "helper_source_sha256", "legacy_candidate", "fixture_only", "candidate_only",
     "candidate_status", "promotability", "manylinux_proven", "source_closure", "policy",
     "builder_can_publish", "can_publish", "publication_admitted",
+}
+_GATE1_PROVENANCE_KEYS = _PROVENANCE_KEYS | {
+    "candidate_profile", "source_legal_profile", "linux_runtime_policy", "darwin_floor_evidence",
 }
 
 
@@ -106,6 +120,7 @@ class AuthenticatedSuccessorInputs:
     lineage_facts: dict[str, Any]
     bootstrap_sha256: str
     release: SuccessorRelease = SUCCESSOR_RELEASES[DISTRIBUTION_VERSION]
+    release_binding: dict[str, Any] | None = None
 
 
 def _read_json(raw: bytes) -> dict[str, Any]:
@@ -196,6 +211,73 @@ def authenticate_successor_capture(
         lineage_facts=lineage_facts,
         bootstrap_sha256=bootstrap_sha256,
         release=selected_release,
+    )
+
+
+def authenticate_gate1_capture(
+    repository: str | Path,
+    evidence: str | Path,
+    *,
+    release_binding: dict[str, Any],
+    approved_bootstrap_sha256: str,
+) -> AuthenticatedSuccessorInputs:
+    """Authenticate a ready 0.7.0 capture using direct tag/provenance identity.
+
+    The binding is caller-owned release evidence.  A pending profile or a
+    historical v0.6.1 binding fails before any candidate output is created.
+    """
+    binding = validate_release_binding(release_binding)
+    if binding["status"] != "ready":
+        raise _error("RELEASE_INPUTS_PENDING", "Actual v0.7 release capture and reviewed expectations are not ready")
+    expected = binding["expected"]
+    if approved_bootstrap_sha256 != expected["bootstrap_sha256"]:
+        raise _error("BOOTSTRAP_APPROVAL", "Approved bootstrap digest differs from the ready release binding")
+    root = physical_directory(repository)
+    evidence_root = physical_directory(evidence)
+    manifest_path = root / binding["bootstrap_path"]
+    configurations = checked_bootstrap_configurations(
+        manifest_path,
+        approved_manifests=[expected["bootstrap_sha256"]],
+    )
+    selected = [
+        (row, intent)
+        for row, intent in configurations
+        if intent.get("project", {}).get("repository") == binding["repository"]
+        and intent.get("tag") == binding["tag"]
+        and intent.get("version") == binding["application_version"]
+    ]
+    if len(selected) != 1:
+        raise _error("BOOTSTRAP_BINDING", "Exactly one ready v0.7 Nebular configuration is required")
+    _row, intent = selected[0]
+    selection = selection_for_intent(intent)
+    capture = authenticate_release(selection, evidence_root)
+    if capture.record.get("release", {}).get("tag") != binding["tag"]:
+        raise _error("TAG_MISMATCH", "Authenticated capture is for a different upstream tag")
+    expectations_raw = read_evidence(root, binding["expectations_path"], limit=512 * 1024)
+    if digest(expectations_raw) != expected["expectations_sha256"]:
+        raise _error("EXPECTATIONS_APPROVAL", "Expectations bytes differ from the ready release binding")
+    expectations = _read_json(expectations_raw)
+    assert_release_expectations(capture, _expected_project(expectations, binding["repository"]))
+    intent = load_bootstrap(
+        manifest_path,
+        capture,
+        approved_manifests=[expected["bootstrap_sha256"]],
+    )
+    require_configuration_authority(capture, intent)
+    lineage_facts = verify_direct_release_lineage(capture, binding)
+    profile_name = intent["release"]["evidence"]["profile"]
+    profile = evaluate_profile(capture, profile_name, intent)
+    return AuthenticatedSuccessorInputs(
+        repository=root,
+        evidence=evidence_root,
+        capture=capture,
+        intent=intent,
+        profile=profile,
+        lineage_proof=None,
+        lineage_facts=lineage_facts,
+        bootstrap_sha256=expected["bootstrap_sha256"],
+        release=SUCCESSOR_RELEASES["0.7.0"],
+        release_binding=binding,
     )
 
 
@@ -309,6 +391,28 @@ def _expected_legal_files(authenticated: AuthenticatedSuccessorInputs) -> dict[s
         if not isinstance(data, bytes) or not data:
             raise _error("RECEIPT_BINDING", "Authenticated legal source bytes are unavailable")
         expected[name] = {"path": name, "size": len(data), "sha256": digest(data)}
+    return expected
+
+
+def _expected_gate1_legal_files(
+    authenticated: AuthenticatedSuccessorInputs,
+    profile: SuccessorCandidateProfile = GATE1_PROFILE,
+) -> dict[str, dict[str, Any]]:
+    """Bind required legal bytes and only an actually present optional companion."""
+    expected: dict[str, dict[str, Any]] = {}
+    for name in (*profile.required_legal_files, *profile.optional_legal_files):
+        data = authenticated.capture.source.get(name)
+        if data is None:
+            if name in profile.required_legal_files:
+                raise _error("RECEIPT_BINDING", "Authenticated required Gate1 legal source bytes are unavailable")
+            continue
+        if not isinstance(data, bytes) or not data:
+            raise _error("RECEIPT_BINDING", "Authenticated Gate1 legal source bytes are malformed")
+        expected[name] = {"path": name, "size": len(data), "sha256": digest(data)}
+    observed = set(expected)
+    required = set(profile.required_legal_files)
+    if not required <= observed or not observed <= required | set(profile.optional_legal_files):
+        raise _error("RECEIPT_BINDING", "Gate1 legal source set is outside its required/optional contract")
     return expected
 
 
@@ -438,6 +542,7 @@ def _validate_wheel_artifact(
     expected_legal: dict[str, dict[str, Any]],
     expected_readme: dict[str, Any],
     expected_rs9_source: dict[str, Any],
+    candidate_profile: SuccessorCandidateProfile | None = None,
 ) -> None:
     release = authenticated.release
     system = row["system"]
@@ -494,7 +599,7 @@ def _validate_wheel_artifact(
         f"{expected_dist_info}/WHEEL",
         f"{expected_dist_info}/entry_points.txt",
         f"{expected_dist_info}/RECORD",
-        *(f"{expected_dist_info}/licenses/{name}" for name in LEGAL_FILES),
+        *(f"{expected_dist_info}/licenses/{name}" for name in expected_legal),
     }
     if names != expected_members:
         raise _error("RECEIPT_ARTIFACT", "Candidate wheel member set is not closed")
@@ -506,7 +611,8 @@ def _validate_wheel_artifact(
         raise _error("RECEIPT_ARTIFACT", "Candidate wheel provenance is unavailable") from exc
     except KeyError as exc:
         raise _error("RECEIPT_ARTIFACT", "Candidate wheel provenance is unavailable") from exc
-    if set(provenance) != _PROVENANCE_KEYS:
+    provenance_keys = _GATE1_PROVENANCE_KEYS if candidate_profile is not None else _PROVENANCE_KEYS
+    if set(provenance) != provenance_keys:
         raise _error("RECEIPT_ARTIFACT", "Candidate wheel provenance fields are not closed")
     metadata = entries.get(metadata_member)
     if metadata is None:
@@ -520,7 +626,7 @@ def _validate_wheel_artifact(
     expected_pending = {"status": "pending", "receipt_sha256": None, "admitted": False}
     expected_policy = {"status": "pending", "receipt_sha256": None, "manylinux_proven": False}
     expected_provenance = {
-        "schema": SUCCESSOR_PROVENANCE_SCHEMA,
+        "schema": candidate_profile.provenance_schema if candidate_profile else SUCCESSOR_PROVENANCE_SCHEMA,
         "product_id": PRODUCT_ID,
         "distribution_name": DISTRIBUTION_NAME,
         "application_version": release.application_version,
@@ -540,7 +646,7 @@ def _validate_wheel_artifact(
         "license_facts": _profile_license_facts(authenticated.profile),
         "launcher_path": expected_asset["launcher_path"],
         "gui_path": expected_asset["gui_path"],
-        "license_expression": LICENSE_EXPRESSION,
+        "license_expression": candidate_profile.license_expression if candidate_profile else LICENSE_EXPRESSION,
         "legal_files": expected_legal,
         "readme_path": expected_readme["path"],
         "readme_sha256": expected_readme["sha256"],
@@ -556,6 +662,34 @@ def _validate_wheel_artifact(
         "policy": expected_policy,
         **expected_row_publication,
     }
+    if candidate_profile is not None:
+        profile_record = gate1_profile_record(candidate_profile)
+        if system == "aarch64-darwin":
+            try:
+                expected_floor_evidence = validate_darwin_payload_floor(
+                    expected_asset["payload_bytes"],
+                    required_floor=candidate_profile.darwin_floor,
+                )
+            except ContractError as exc:
+                raise _error("RECEIPT_ARTIFACT", "Authenticated Darwin payload floor is invalid") from exc
+            floor_evidence = provenance.get("darwin_floor_evidence")
+            if floor_evidence != expected_floor_evidence:
+                raise _error("RECEIPT_ARTIFACT", "Darwin Gate1 floor evidence is not authenticated to payload bytes")
+        else:
+            floor_evidence = None
+        expected_provenance.update({
+            "candidate_profile": profile_record,
+            "source_legal_profile": {
+                "expression": candidate_profile.license_expression,
+                "required_files": list(candidate_profile.required_legal_files),
+                "optional_files": list(candidate_profile.optional_legal_files),
+                "observed_files": sorted(expected_legal),
+            },
+            "linux_runtime_policy": profile_record["linux_runtime_policy"],
+            "darwin_floor_evidence": floor_evidence if system == "aarch64-darwin" else None,
+        })
+        if row.get("darwin_floor_evidence") != expected_provenance["darwin_floor_evidence"]:
+            raise _error("RECEIPT_ARTIFACT", "Candidate row Darwin floor evidence is not wheel-bound")
     for key, expected in expected_provenance.items():
         if provenance.get(key) != expected:
             raise _error("RECEIPT_ARTIFACT", "Candidate wheel provenance is not capture-bound")
@@ -604,6 +738,8 @@ def _validate_wheel_artifact(
     if metadata != _successor_metadata_bytes(
         metadata.split(marker, 1)[1],
         distribution_version=release.distribution_version,
+        license_expression=candidate_profile.license_expression if candidate_profile else LICENSE_EXPRESSION,
+        legal_files=tuple(expected_legal),
     ):
         raise _error("RECEIPT_ARTIFACT", "Candidate METADATA is not the deterministic successor metadata")
     wheel_info = entries.get(f"{expected_dist_info}/WHEEL")
@@ -626,7 +762,7 @@ def _validate_wheel_artifact(
         raise _error("RECEIPT_ARTIFACT", "Candidate package identity is not deterministic")
     if entries.get(f"{expected_dist_info}/entry_points.txt") != _successor_entry_points_bytes():
         raise _error("RECEIPT_ARTIFACT", "Candidate entry points are not deterministic")
-    for name in LEGAL_FILES:
+    for name in expected_legal:
         member = f"{expected_dist_info}/licenses/{name}"
         if entries.get(member) != authenticated.capture.source[name]:
             raise _error("RECEIPT_ARTIFACT", "Candidate legal bytes disagree with authenticated source")
@@ -779,6 +915,287 @@ def validate_candidate_receipt(
     return receipt
 
 
+def _gate1_candidate_row(system: str, target_triple: str, result: WheelBuildResult) -> dict[str, Any]:
+    row = _candidate_row(system, target_triple, result)
+    record = result.record
+    row.pop("rs9_source", None)
+    row.update({
+        "candidate_rs9_source": record.get("rs9_source"),
+        "candidate_profile": record.get("candidate_profile"),
+        "source_legal_profile": record.get("source_legal_profile"),
+        "linux_runtime_policy": record.get("linux_runtime_policy"),
+        "darwin_floor_evidence": record.get("darwin_floor_evidence"),
+    })
+    return row
+
+
+def _gate1_receipt(
+    authenticated: AuthenticatedSuccessorInputs,
+    rows: list[dict[str, Any]],
+    *,
+    candidate_rs9_source: dict[str, Any],
+) -> dict[str, Any]:
+    first = rows[0]
+    binding = authenticated.release_binding
+    if not isinstance(binding, dict) or binding.get("status") != "ready":
+        raise _error("RELEASE_INPUTS_PENDING", "Ready v0.7 release binding is required for a candidate receipt")
+    profile_record = gate1_profile_record(GATE1_PROFILE)
+    return {
+        "schema": "rs9.nebular-successor-candidate.v2alpha1",
+        "application_version": "0.7.0",
+        "distribution_version": "0.7.0",
+        "repository": authenticated.capture.record["repository"],
+        "release": authenticated.capture.record["release"],
+        "release_binding": binding,
+        "source_identity": _expected_source_identity(authenticated),
+        "candidate_rs9_source": candidate_rs9_source,
+        "qualification_rs9_source": {"status": "not-run", "reason": "gate1-only"},
+        "bootstrap_sha256": authenticated.bootstrap_sha256,
+        "direct_lineage": authenticated.lineage_facts,
+        "profile": profile_record,
+        "readme": first["readme"],
+        "legal_files": first["legal_files"],
+        "license": {"expression": GATE1_PROFILE.license_expression, "files": first["legal_files"]},
+        "rows": rows,
+        "flags": {
+            "candidate_only": True,
+            "builder_can_publish": False,
+            "can_publish": False,
+            "publication_admitted": False,
+            "manylinux_proven": False,
+        },
+        "source_closure": {"status": "pending", "receipt_sha256": None, "admitted": False},
+        "policy": {"status": "pending", "receipt_sha256": None, "manylinux_proven": False},
+        "profile_result_sha256": record_sha256(authenticated.profile),
+        "linux_runtime_policy": profile_record["linux_runtime_policy"],
+        "darwin_floor_evidence": first.get("darwin_floor_evidence"),
+        "asset_facts": {
+            "systems": [row["system"] for row in rows],
+            "selected_asset_ids": [row["selected_asset_id"] for row in rows],
+        },
+    }
+
+
+def validate_gate1_receipt(
+    receipt: dict[str, Any],
+    authenticated: AuthenticatedSuccessorInputs,
+    *,
+    output_dir: str | Path,
+) -> dict[str, Any]:
+    """Validate the new closed 0.7 profile/metadata/floor candidate receipt."""
+    if not isinstance(authenticated, AuthenticatedSuccessorInputs) or authenticated.release.distribution_version != "0.7.0":
+        raise _error("RECEIPT_AUTHORITY", "Authenticated v0.7 successor inputs are required")
+    if not isinstance(authenticated.release_binding, dict) or authenticated.release_binding.get("status") != "ready":
+        raise _error("RELEASE_INPUTS_PENDING", "Ready v0.7 release binding is required")
+    if authenticated.lineage_facts.get("schema") != "rs9.nebular-direct-lineage.v1alpha1":
+        raise _error("RECEIPT_BINDING", "Direct v0.7 lineage facts are required")
+    try:
+        authenticated_record_hash(authenticated.capture)
+        output_root = physical_directory(output_dir)
+    except (ContractError, OSError) as exc:
+        raise _error("RECEIPT_AUTHORITY", "Authenticated v0.7 capture/output is unavailable") from exc
+    expected_top = {
+        "schema", "application_version", "distribution_version", "repository", "release",
+        "release_binding", "source_identity", "candidate_rs9_source", "qualification_rs9_source",
+        "bootstrap_sha256", "direct_lineage", "profile", "readme", "legal_files", "license",
+        "rows", "flags", "source_closure", "policy", "profile_result_sha256",
+        "linux_runtime_policy", "darwin_floor_evidence", "asset_facts",
+    }
+    if not isinstance(receipt, dict) or set(receipt) != expected_top:
+        raise _error("RECEIPT_SCHEMA", "Gate1 candidate receipt fields are not closed")
+    if receipt.get("schema") != "rs9.nebular-successor-candidate.v2alpha1":
+        raise _error("RECEIPT_SCHEMA", "Gate1 candidate receipt schema is required")
+    if receipt.get("application_version") != "0.7.0" or receipt.get("distribution_version") != "0.7.0":
+        raise _error("RECEIPT_VERSION", "Gate1 candidate receipt must select 0.7.0")
+    if receipt.get("repository") != authenticated.capture.record.get("repository") \
+            or receipt.get("release") != authenticated.capture.record.get("release"):
+        raise _error("RECEIPT_BINDING", "Gate1 release identity is cross-wired")
+    if receipt.get("release_binding") != authenticated.release_binding:
+        raise _error("RECEIPT_BINDING", "Gate1 release binding is cross-wired")
+    if receipt.get("source_identity") != _expected_source_identity(authenticated):
+        raise _error("RECEIPT_BINDING", "Gate1 source identity is cross-wired")
+    expected_rs9_source = _expected_candidate_rs9_source(receipt.get("candidate_rs9_source"))
+    if receipt.get("bootstrap_sha256") != authenticated.bootstrap_sha256 \
+            or receipt.get("direct_lineage") != authenticated.lineage_facts:
+        raise _error("RECEIPT_BINDING", "Gate1 capture or lineage identity is cross-wired")
+    if receipt.get("profile") != gate1_profile_record(GATE1_PROFILE):
+        raise _error("RECEIPT_BINDING", "Gate1 profile revision is cross-wired")
+    if receipt.get("qualification_rs9_source") != {"status": "not-run", "reason": "gate1-only"}:
+        raise _error("RECEIPT_BINDING", "Gate1 must not claim a hosted qualification source")
+    expected_legal = _expected_gate1_legal_files(authenticated)
+    expected_readme = receipt.get("readme")
+    if not isinstance(expected_readme, dict) or set(expected_readme) != {"path", "sha256"}:
+        raise _error("RECEIPT_BINDING", "Gate1 README identity is incomplete")
+    if expected_readme["path"] != GATE1_PROFILE.description_path \
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_readme.get("sha256", "")):
+        raise _error("RECEIPT_BINDING", "Gate1 README identity is not the corrected profile input")
+    if receipt.get("legal_files") != expected_legal:
+        raise _error("RECEIPT_BINDING", "Gate1 legal files are not authenticated source facts")
+    if receipt.get("license") != {"expression": GATE1_PROFILE.license_expression, "files": expected_legal}:
+        raise _error("RECEIPT_BINDING", "Gate1 AGPL-only license facts are not authenticated")
+    if receipt.get("flags") != {
+        "candidate_only": True,
+        "builder_can_publish": False,
+        "can_publish": False,
+        "publication_admitted": False,
+        "manylinux_proven": False,
+    }:
+        raise _error("PUBLICATION_HOLD", "Gate1 publication flags must remain false")
+    if receipt.get("source_closure") != {"status": "pending", "receipt_sha256": None, "admitted": False} \
+            or receipt.get("policy") != {"status": "pending", "receipt_sha256": None, "manylinux_proven": False}:
+        raise _error("PUBLICATION_HOLD", "Gate1 source/policy closure must remain pending")
+    if receipt.get("profile_result_sha256") != record_sha256(authenticated.profile):
+        raise _error("RECEIPT_BINDING", "Gate1 profile result identity is cross-wired")
+    profile_record = gate1_profile_record(GATE1_PROFILE)
+    if receipt.get("linux_runtime_policy") != profile_record["linux_runtime_policy"]:
+        raise _error("RECEIPT_BINDING", "Gate1 Linux runtime policy is cross-wired")
+    rows = receipt.get("rows")
+    if not isinstance(rows, list) or len(rows) != len(_SYSTEMS):
+        raise _error("RECEIPT_ROWS", "Exactly three Gate1 candidate rows are required")
+    if {row.get("system") for row in rows if isinstance(row, dict)} != set(_SYSTEMS):
+        raise _error("RECEIPT_TARGET", "Gate1 target systems are not the reviewed three-system set")
+    if receipt.get("asset_facts") != {
+        "systems": list(_SYSTEMS),
+        "selected_asset_ids": [
+            _expected_asset(authenticated, system)["id"] for system in _SYSTEMS
+        ],
+    }:
+        raise _error("RECEIPT_BINDING", "Gate1 asset facts are not capture-bound")
+    expected_assets = {system: _expected_asset(authenticated, system) for system in _SYSTEMS}
+    expected_floor = next(
+        (row.get("darwin_floor_evidence") for row in rows if row.get("system") == "aarch64-darwin"),
+        None,
+    )
+    if receipt.get("darwin_floor_evidence") != expected_floor:
+        raise _error("RECEIPT_BINDING", "Gate1 receipt Darwin floor evidence is not row-bound")
+    for row in rows:
+        if not isinstance(row, dict):
+            raise _error("RECEIPT_ROWS", "Gate1 row is malformed")
+        system, triple = row.get("system"), row.get("target_triple")
+        try:
+            expected_triple = platform_contract(system).target_triple
+        except ContractError as exc:
+            raise _error("RECEIPT_TARGET", "Gate1 row target is unsupported") from exc
+        if triple != expected_triple or system_from_target_triple(triple) != system:
+            raise _error("RECEIPT_TARGET", "Gate1 row target triple disagrees")
+        expected_row_fields = {
+            "system", "target_triple", "wheel", "selected_asset_id", "payload_archive_name",
+            "payload_archive_sha256", "manifest_sha256", "source_identity", "forward_lineage",
+            "candidate_rs9_source", "candidate_only", "launcher_path", "gui_path",
+            "profile_result_sha256", "readme", "legal_files", "publication", "candidate_profile",
+            "source_legal_profile", "linux_runtime_policy", "darwin_floor_evidence",
+        }
+        if set(row) != expected_row_fields:
+            raise _error("RECEIPT_ROWS", "Gate1 row fields are not closed")
+        if set(row["wheel"]) != {"filename", "sha256", "size", "tag", "version"}:
+            raise _error("RECEIPT_ROWS", "Gate1 wheel identity fields are not closed")
+        if row.get("candidate_rs9_source") != expected_rs9_source \
+                or row.get("candidate_profile") != profile_record \
+                or row.get("source_legal_profile") != {
+                    "expression": GATE1_PROFILE.license_expression,
+                    "required_files": list(GATE1_PROFILE.required_legal_files),
+                    "optional_files": list(GATE1_PROFILE.optional_legal_files),
+                    "observed_files": sorted(expected_legal),
+                }:
+            raise _error("RECEIPT_BINDING", "Gate1 row profile/source identity is cross-wired")
+        if row.get("linux_runtime_policy") != profile_record["linux_runtime_policy"]:
+            raise _error("RECEIPT_BINDING", "Gate1 row Linux policy is cross-wired")
+        if row.get("source_identity") != _expected_source_identity(authenticated):
+            raise _error("RECEIPT_BINDING", "Gate1 row source identity is cross-wired")
+        if row.get("forward_lineage") != authenticated.lineage_facts:
+            raise _error("RECEIPT_BINDING", "Gate1 row lineage facts are cross-wired")
+        if row.get("candidate_only") is not system.endswith("-linux"):
+            raise _error("RECEIPT_BINDING", "Gate1 row candidate status is cross-wired")
+        asset = expected_assets[system]
+        if row.get("selected_asset_id") != asset["id"] or row.get("payload_archive_name") != asset["name"] \
+                or row.get("payload_archive_sha256") != asset["sha256"] \
+                or row.get("manifest_sha256") != asset["manifest_sha256"]:
+            raise _error("RECEIPT_BINDING", "Gate1 row payload identity is cross-wired")
+        if (row.get("launcher_path") != asset["launcher_path"]
+                or row.get("gui_path") != asset["gui_path"]
+                or row.get("profile_result_sha256") != record_sha256(authenticated.profile)
+                or row.get("readme") != expected_readme
+                or row.get("legal_files") != expected_legal
+                or row.get("publication") != {
+                    "builder_can_publish": False,
+                    "can_publish": False,
+                    "publication_admitted": False,
+                    "manylinux_proven": False,
+                }):
+            raise _error("RECEIPT_BINDING", "Gate1 row release or publication facts are cross-wired")
+        _validate_wheel_artifact(
+            row,
+            authenticated,
+            output_root,
+            _expected_source_identity(authenticated),
+            expected_legal,
+            expected_readme,
+            expected_rs9_source,
+            candidate_profile=GATE1_PROFILE,
+        )
+    return receipt
+
+
+def build_gate1_candidates(
+    authenticated: AuthenticatedSuccessorInputs,
+    output_dir: str | Path,
+    *,
+    rs9_source_commit: str,
+    rs9_source_tree: str,
+    description_path: str | Path | None = None,
+    deterministic_timestamp: tuple[int, int, int, int, int, int] | None = None,
+) -> dict[str, Any]:
+    """Build fresh v0.7 Gate1 candidates only from a ready real capture."""
+    if not isinstance(authenticated, AuthenticatedSuccessorInputs) \
+            or authenticated.release.distribution_version != "0.7.0" \
+            or not isinstance(authenticated.release_binding, dict) \
+            or authenticated.release_binding.get("status") != "ready":
+        raise _error("RELEASE_INPUTS_PENDING", "Actual v0.7 release inputs are required before candidate generation")
+    if (not isinstance(rs9_source_commit, str) or not isinstance(rs9_source_tree, str)
+            or not _HEX40.fullmatch(rs9_source_commit) or not _HEX40.fullmatch(rs9_source_tree)):
+        raise _error("RS9_SOURCE_IDENTITY", "Explicit reviewed candidate source commit and tree are required")
+    destination = Path(output_dir).absolute()
+    if destination.is_symlink() or any(parent.is_symlink() for parent in (destination, *destination.parents)):
+        raise _error("OUTPUT_CONFINEMENT", "Gate1 candidate output ancestry contains a symlink")
+    destination.mkdir(parents=True, exist_ok=True)
+    if any(destination.iterdir()):
+        raise _error("OUTPUT_NOT_EMPTY", "Gate1 candidate output must start empty")
+    target_specs = (
+        ("aarch64-darwin", "aarch64-apple-darwin", False),
+        ("aarch64-linux", "aarch64-unknown-linux-gnu", True),
+        ("x86_64-linux", "x86_64-unknown-linux-gnu", True),
+    )
+    rows: list[dict[str, Any]] = []
+    candidate_source = None
+    for system, target_triple, candidate_only in target_specs:
+        result = build_gate1_successor_wheel(
+            PRODUCT_ID,
+            authenticated.release.application_version,
+            distribution_version=authenticated.release.distribution_version,
+            capture=authenticated.capture,
+            profile_result=authenticated.profile,
+            output_dir=destination / system,
+            system=system,
+            target_platform=target_triple,
+            description_path=description_path,
+            rs9_source_commit=rs9_source_commit,
+            rs9_source_tree=rs9_source_tree,
+            lineage_proof=authenticated.lineage_facts,
+            candidate_only=candidate_only,
+            deterministic_timestamp=deterministic_timestamp,
+        )
+        row = _gate1_candidate_row(system, target_triple, result)
+        if candidate_source is None:
+            candidate_source = result.record["rs9_source"]
+        elif result.record["rs9_source"] != candidate_source:
+            raise _error("RECEIPT_BINDING", "Gate1 rows disagree on candidate source identity")
+        rows.append(row)
+    if len(rows) != 3 or candidate_source is None:
+        raise _error("RECEIPT_ROWS", "Exactly three Gate1 candidates must be built")
+    receipt = _gate1_receipt(authenticated, rows, candidate_rs9_source=candidate_source)
+    return validate_gate1_receipt(receipt, authenticated, output_dir=destination)
+
+
 def build_successor_candidates(
     authenticated: AuthenticatedSuccessorInputs,
     output_dir: str | Path,
@@ -840,6 +1257,36 @@ def build_successor_candidates(
         rs9_source=rs9_source,
     )
     return validate_candidate_receipt(receipt, authenticated, output_dir=destination)
+
+
+def write_gate1_receipt(
+    path: str | Path,
+    receipt: dict[str, Any],
+    *,
+    authenticated: AuthenticatedSuccessorInputs,
+    output_dir: str | Path,
+) -> None:
+    """Write one exclusive Gate1 receipt after validating fresh wheel bytes."""
+    validate_gate1_receipt(receipt, authenticated, output_dir=output_dir)
+    target = Path(path).absolute()
+    if target.is_symlink() or any(parent.is_symlink() for parent in (target, *target.parents)):
+        raise _error("OUTPUT_CONFINEMENT", "Gate1 receipt ancestry contains a symlink")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        descriptor = os.open(
+            str(target), os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o644
+        )
+    except (FileExistsError, OSError) as exc:
+        raise _error("RECEIPT_DESTINATION", "Gate1 receipt destination is unavailable") from exc
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(canonical(receipt, validate=True))
+    except Exception:
+        try:
+            target.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def write_candidate_receipt(

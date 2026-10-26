@@ -43,6 +43,7 @@ from rs9.wheel_native import (
     PRODUCT_ID,
     build_native_wheel,
     get_embedded_rs9_helpers,
+    validate_darwin_payload_floor,
 )
 
 APPLICATION_VERSION = "0.6.1"
@@ -54,6 +55,7 @@ EXPECTED_COMMAND = "tfnf"
 SUPPORTED_SUCCESSOR_SYSTEMS = frozenset({"aarch64-darwin", "x86_64-linux", "aarch64-linux"})
 DEFAULT_DESCRIPTION_PATH = "operators/tf-pypi/descriptions/nebular-fusion.md"
 DESCRIPTION_070_PATH = "operators/tf-pypi/descriptions/nebular-fusion-0.7.0.md"
+GATE1_DESCRIPTION_070_PATH = "operators/tf-pypi/descriptions/nebular-fusion-0.7.0-gate1.md"
 HISTORICAL_RELEASE = DISTRIBUTION_VERSION
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _ARCHIVE_NAME_VERSION_RE = re.compile(
@@ -67,6 +69,68 @@ class SuccessorRelease:
     application_version: str
     distribution_version: str
     description_path: str
+
+
+@dataclass(frozen=True)
+class SuccessorCandidateProfile:
+    """Immutable metadata/floor contract for a successor candidate revision."""
+
+    profile_id: str
+    application_version: str
+    distribution_version: str
+    description_path: str
+    provenance_schema: str
+    license_expression: str
+    required_legal_files: tuple[str, ...]
+    optional_legal_files: tuple[str, ...]
+    darwin_floor: tuple[int, int]
+    linux_glibc_floor: str
+    linux_glibcxx_floor: str
+    manylinux_claim: bool
+
+
+GATE1_PROFILE = SuccessorCandidateProfile(
+    profile_id="nebular-fusion-0.7.0-gate1-agpl-floor13-v1",
+    application_version="0.7.0",
+    distribution_version="0.7.0",
+    description_path=GATE1_DESCRIPTION_070_PATH,
+    provenance_schema="rs9.wheel-provenance.v3alpha1",
+    license_expression="AGPL-3.0-or-later",
+    required_legal_files=("LICENSE", "NOTICE"),
+    optional_legal_files=("COMMERCIAL-LICENSE.md",),
+    darwin_floor=(13, 0),
+    linux_glibc_floor="2.36",
+    linux_glibcxx_floor="3.4.30",
+    manylinux_claim=False,
+)
+
+
+def gate1_profile_record(profile: SuccessorCandidateProfile = GATE1_PROFILE) -> dict[str, Any]:
+    """Return the closed JSON-facing Gate1 profile without release hashes."""
+    if not isinstance(profile, SuccessorCandidateProfile):
+        raise _error("PROFILE_SCHEMA", "Successor candidate profile is required")
+    return {
+        "schema": "rs9.nebular070-candidate-profile.v1alpha1",
+        "profile_id": profile.profile_id,
+        "application_version": profile.application_version,
+        "distribution_version": profile.distribution_version,
+        "description_path": profile.description_path,
+        "provenance_schema": profile.provenance_schema,
+        "license_expression": profile.license_expression,
+        "required_legal_files": list(profile.required_legal_files),
+        "optional_legal_files": list(profile.optional_legal_files),
+        "darwin_floor": {"major": profile.darwin_floor[0], "minor": profile.darwin_floor[1]},
+        "linux_runtime_policy": {
+            "wheel_tag_policy": "generic-linux",
+            "glibc_floor": profile.linux_glibc_floor,
+            "glibcxx_floor": profile.linux_glibcxx_floor,
+            "provider_baseline": "manylinux236-named-provenance-only",
+            "manylinux_claim": profile.manylinux_claim,
+            "dynamic_closure": "pending",
+        },
+        "source_status": "pending-release-inputs",
+        "publication_admitted": False,
+    }
 
 
 SUCCESSOR_RELEASES: dict[str, SuccessorRelease] = {
@@ -225,13 +289,15 @@ def _lexical_description_abspath(path_value: str | Path) -> str:
 def _release_description_path(
     release: SuccessorRelease,
     description_path: str | Path | None,
+    *,
+    profile_description_path: str | None = None,
 ) -> str | Path:
     if description_path is None:
-        return release.description_path
+        return profile_description_path or release.description_path
     if not isinstance(description_path, (str, Path)) or not str(description_path):
         raise _error("INVALID_DESCRIPTION", "Description path is required")
     candidate = _lexical_description_abspath(description_path)
-    selected = _lexical_description_abspath(release.description_path)
+    selected = _lexical_description_abspath(profile_description_path or release.description_path)
     other_paths = {
         _lexical_description_abspath(row.description_path)
         for key, row in SUCCESSOR_RELEASES.items()
@@ -250,7 +316,7 @@ def _release_description_path(
             "Selected non-historical release requires its exact versioned description",
             release=release.distribution_version,
             description_path=str(description_path),
-            expected_description_path=release.description_path,
+            expected_description_path=profile_description_path or release.description_path,
         )
     return description_path
 
@@ -261,20 +327,30 @@ def _description_bytes(description_path: str | Path) -> tuple[str, bytes]:
 
 
 def _legal_files(capture: ReleaseCapture | None, fixture_only: bool,
-                 license_files: Mapping[str, bytes] | None) -> dict[str, bytes]:
+                 license_files: Mapping[str, bytes] | None,
+                 *,
+                 required_names: tuple[str, ...] = LEGAL_FILES,
+                 optional_names: tuple[str, ...] = ()) -> dict[str, bytes]:
     if fixture_only:
         observed = dict(license_files or {})
     else:
         if capture is None:
             raise _error("LICENSE_AUTHORITY", "Authenticated release capture is required")
-        observed = (
-            dict(license_files)
-            if license_files is not None
-            else {name: capture.source.get(name) for name in LEGAL_FILES}
+        observed = dict(license_files) if license_files is not None else {
+            name: capture.source[name]
+            for name in (*required_names, *optional_names)
+            if name in capture.source
+        }
+    required = set(required_names)
+    allowed = (required, required | set(optional_names))
+    if set(observed) not in allowed:
+        raise _error(
+            "LEGAL_FILES",
+            "Required successor legal files plus explicitly optional companions are required",
+            expected_legal_files=sorted(required),
+            optional_legal_files=sorted(optional_names),
+            observed_legal_files=sorted(observed),
         )
-    if set(observed) != set(LEGAL_FILES):
-        raise _error("LEGAL_FILES", "Exactly the three successor legal files are required",
-                     expected_legal_files=list(LEGAL_FILES), observed_legal_files=sorted(observed))
     for name, data in observed.items():
         validate_safe_relative_posix_path(name)
         if not isinstance(data, bytes) or not data:
@@ -283,10 +359,10 @@ def _legal_files(capture: ReleaseCapture | None, fixture_only: bool,
     if not fixture_only:
         if capture is None:
             raise _error("LICENSE_AUTHORITY", "Authenticated release capture is required")
-        for name in LEGAL_FILES:
+        for name in observed:
             if capture.source.get(name) != observed[name]:
                 raise _error("LICENSE_AUTHORITY", "Legal files must equal authenticated tagged source bytes")
-    return {name: observed[name] for name in LEGAL_FILES}
+    return {name: observed[name] for name in (*required_names, *optional_names) if name in observed}
 
 
 def _capture_identity(
@@ -570,14 +646,16 @@ def _successor_metadata_bytes(
     description: bytes,
     *,
     distribution_version: str = DISTRIBUTION_VERSION,
+    license_expression: str = LICENSE_EXPRESSION,
+    legal_files: tuple[str, ...] = LEGAL_FILES,
 ) -> bytes:
     return (
         "Metadata-Version: 2.4\n"
         f"Name: {DISTRIBUTION_NAME}\n"
         f"Version: {distribution_version}\n"
         "Summary: Theme Forge Nebular Fusion application distribution for Python 3\n"
-        f"License-Expression: {LICENSE_EXPRESSION}\n"
-        + "".join(f"License-File: {name}\n" for name in sorted(LEGAL_FILES))
+        f"License-Expression: {license_expression}\n"
+        + "".join(f"License-File: {name}\n" for name in sorted(legal_files))
         + "Requires-Python: >=3.10\n"
         "Description-Content-Type: text/markdown\n\n"
     ).encode("utf-8") + description
@@ -643,19 +721,36 @@ def build_successor_wheel(
     lineage_intent: Mapping[str, Any] | None = None,
     fixture_only: bool = False,
     candidate_only: bool = False,
+    candidate_profile: SuccessorCandidateProfile | None = None,
     deterministic_timestamp: tuple[int, int, int, int, int, int] | None = None,
 ) -> WheelBuildResult:
     """Build a non-admitted successor wheel from an authenticated or explicit fixture input."""
     if product_id != PRODUCT_ID:
         raise _error("UNSUPPORTED_PRODUCT", "Successor builder only supports Nebular Fusion")
     release = _release_for_versions(application_version, distribution_version)
+    if candidate_profile is not None:
+        if not isinstance(candidate_profile, SuccessorCandidateProfile):
+            raise _error("PROFILE_SCHEMA", "Successor candidate profile is required")
+        if (candidate_profile.application_version != application_version
+                or candidate_profile.distribution_version != distribution_version):
+            raise _error("PROFILE_BINDING", "Candidate profile version differs from the selected release")
+        if candidate_profile.manylinux_claim:
+            raise _error("PROFILE_POLICY", "Gate1 candidate profile cannot claim manylinux")
+    profile_license_expression = candidate_profile.license_expression if candidate_profile else LICENSE_EXPRESSION
+    profile_required_legal = candidate_profile.required_legal_files if candidate_profile else LEGAL_FILES
+    profile_optional_legal = candidate_profile.optional_legal_files if candidate_profile else ()
     if (output_dir is None) == (output_path is None):
         raise _error("DESTINATION_REQUIRED", "Exactly one wheel output destination is required")
     if fixture_only and capture is not None:
         raise _error("FIXTURE_AUTHORITY", "Fixture mode cannot accept an authenticated capture")
     if fixture_only and profile_result is not None:
         raise _error("FIXTURE_AUTHORITY", "Fixture mode cannot accept authenticated profile claims")
-    if (lineage_proof is None) != (lineage_intent is None):
+    direct_lineage = (
+        candidate_profile is not None
+        and isinstance(lineage_proof, Mapping)
+        and lineage_proof.get("schema") == "rs9.nebular-direct-lineage.v1alpha1"
+    )
+    if not direct_lineage and (lineage_proof is None) != (lineage_intent is None):
         raise _error("LINEAGE_REQUIRED", "Forward lineage proof and its bound intent must be supplied together")
     if fixture_only and (lineage_proof is not None or lineage_intent is not None):
         raise _error("FIXTURE_AUTHORITY", "Fixture mode cannot consume an authenticated forward lineage proof")
@@ -667,13 +762,25 @@ def build_successor_wheel(
     effective_system, target_triple, is_linux, family = _resolve_target(system, target_platform, platform_tag, candidate_only)
     release_hash, release_identity = _capture_identity(capture, fixture_only, release.application_version)
     forward_lineage = None
-    if lineage_proof is not None:
+    if direct_lineage:
+        forward_lineage = dict(lineage_proof)
+    elif lineage_proof is not None:
         if capture is None or lineage_intent is None:
             raise _error("LINEAGE_REQUIRED", "Authenticated forward lineage inputs are incomplete")
         forward_lineage = verify_forward_lineage_proof(capture, lineage_proof, intent=lineage_intent)
     rs9_source = _rs9_source_binding(rs9_source_commit, rs9_source_tree, fixture_only)
-    legal = _legal_files(capture, fixture_only, license_files)
-    selected_description = _release_description_path(release, description_path)
+    legal = _legal_files(
+        capture,
+        fixture_only,
+        license_files,
+        required_names=profile_required_legal,
+        optional_names=profile_optional_legal,
+    )
+    selected_description = _release_description_path(
+        release,
+        description_path,
+        profile_description_path=candidate_profile.description_path if candidate_profile else None,
+    )
     description_name, description = _description_bytes(selected_description)
     archive_manifest, payload_bytes, payload_name, captured_shell, captured_gui, selected_asset_id = _archive_inputs(
         capture, fixture_only, effective_system, archive_path, archive_bytes, manifest, release
@@ -688,6 +795,12 @@ def build_successor_wheel(
     manifest_sha = archive_manifest.get("manifest_sha256")
     if not isinstance(manifest_sha, str) or digest(canonical(archive_manifest.get("members", []))) != manifest_sha:
         raise _error("MANIFEST_IDENTITY", "Payload manifest digest is not self-consistent")
+    darwin_floor_evidence = None
+    if candidate_profile is not None and not is_linux:
+        darwin_floor_evidence = validate_darwin_payload_floor(
+            payload_bytes,
+            required_floor=candidate_profile.darwin_floor,
+        )
 
     with tempfile.TemporaryDirectory(prefix="rs9-nebular-successor-", dir=_repo_root()) as temp:
         old_dir = Path(temp) / "legacy"
@@ -776,13 +889,15 @@ def build_successor_wheel(
     metadata = _successor_metadata_bytes(
         description,
         distribution_version=release.distribution_version,
+        license_expression=profile_license_expression,
+        legal_files=tuple(legal),
     )
     wheel_info = _successor_wheel_info_bytes(wheel_tag)
     entry_points = _successor_entry_points_bytes()
     profile_result_sha256 = record_sha256(profile_result) if isinstance(profile_result, Mapping) else None
     license_facts = _profile_license_facts(profile_result)
     provenance = {
-        "schema": SUCCESSOR_PROVENANCE_SCHEMA,
+        "schema": candidate_profile.provenance_schema if candidate_profile else SUCCESSOR_PROVENANCE_SCHEMA,
         "product_id": PRODUCT_ID,
         "distribution_name": DISTRIBUTION_NAME,
         "application_version": release.application_version,
@@ -802,7 +917,7 @@ def build_successor_wheel(
         "license_facts": license_facts,
         "launcher_path": shell_path,
         "gui_path": actual_gui_path,
-        "license_expression": LICENSE_EXPRESSION,
+        "license_expression": profile_license_expression,
         "legal_files": {
             name: {"path": name, "size": len(data), "sha256": digest(data)}
             for name, data in legal.items()
@@ -835,6 +950,19 @@ def build_successor_wheel(
         "can_publish": False,
         "publication_admitted": False,
     }
+    if candidate_profile is not None:
+        profile_record = gate1_profile_record(candidate_profile)
+        provenance.update({
+            "candidate_profile": profile_record,
+            "source_legal_profile": {
+                "expression": profile_license_expression,
+                "required_files": list(profile_required_legal),
+                "optional_files": list(profile_optional_legal),
+                "observed_files": sorted(legal),
+            },
+            "linux_runtime_policy": profile_record["linux_runtime_policy"],
+            "darwin_floor_evidence": darwin_floor_evidence,
+        })
     entries: dict[str, bytes] = dict(payload_entries)
     entries.update({
         f"{PACKAGE_NAME}/__init__.py": init_bytes,
@@ -863,3 +991,24 @@ def build_successor_wheel(
         release_hash=release_hash or "", record=provenance, manifest=manifest_rows,
         wheel_bytes=wheel_bytes, can_publish=False,
     )
+
+
+def build_gate1_successor_wheel(*args: Any, **kwargs: Any) -> WheelBuildResult:
+    """Build one v0.7.0 Gate1 candidate with its immutable profile contract."""
+    if "candidate_profile" in kwargs and kwargs["candidate_profile"] is not GATE1_PROFILE:
+        raise _error("PROFILE_BINDING", "Gate1 builder owns one immutable candidate profile")
+    if len(args) >= 2 and args[1] != GATE1_PROFILE.application_version:
+        raise _error("PROFILE_BINDING", "Gate1 builder owns application version 0.7.0")
+    if len(args) >= 3 and args[2] != GATE1_PROFILE.distribution_version:
+        raise _error("PROFILE_BINDING", "Gate1 builder owns distribution version 0.7.0")
+    # The positional release arguments are accepted only when they already
+    # select the Gate1 release; remove them before supplying the owned keyword
+    # values so the legacy builder does not receive duplicate arguments.
+    if len(args) >= 3:
+        args = (args[0], *args[3:])
+    elif len(args) >= 2:
+        args = (args[0], *args[2:])
+    kwargs["candidate_profile"] = GATE1_PROFILE
+    kwargs.setdefault("application_version", GATE1_PROFILE.application_version)
+    kwargs.setdefault("distribution_version", GATE1_PROFILE.distribution_version)
+    return build_successor_wheel(*args, **kwargs)

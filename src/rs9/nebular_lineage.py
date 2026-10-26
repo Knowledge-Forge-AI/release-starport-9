@@ -344,6 +344,113 @@ def verify_forward_lineage_proof(capture, proof, *, intent=None, roles=None):
     return copy.deepcopy(facts)
 
 
+def verify_direct_release_lineage(capture, binding):
+    """Verify the release-specific v0.7 tag/provenance equality contract.
+
+    This is intentionally separate from the historical v0.6.1 author-metadata
+    correction above.  A ready Gate1 binding supplies the exact release
+    coordinates and the source path/field names for the v0.7 provenance
+    document.  No value is inferred from the retained v0.6.1 record.
+    """
+    if not isinstance(capture, ReleaseCapture):
+        _fail("LINEAGE_CAPTURE", "Fresh in-process authenticated capture required")
+    if not isinstance(binding, dict) or binding.get("status") != "ready":
+        _fail("LINEAGE_INPUTS_PENDING", "Ready v0.7 release binding is required")
+    if binding.get("release") != "0.7.0" or binding.get("tag") != "v0.7.0":
+        _fail("LINEAGE_BINDING", "Direct lineage is only defined for the v0.7.0 release")
+    expected = binding.get("expected")
+    if not isinstance(expected, dict) or set(expected) != {
+        "repository_id", "release_id", "tag_commit", "tag_tree",
+        "bootstrap_sha256", "expectations_sha256",
+    }:
+        _fail("LINEAGE_BINDING", "Direct lineage requires exact release coordinates")
+    authenticated_record_hash(capture)
+    repository = capture.record.get("repository", {})
+    release = capture.record.get("release", {})
+    tag = capture.record.get("tag", {})
+    if (
+        repository.get("full_name") != binding.get("repository")
+        or repository.get("id") != expected["repository_id"]
+        or release.get("id") != expected["release_id"]
+        or release.get("tag") != binding.get("tag")
+        or tag.get("commit") != expected["tag_commit"]
+        or tag.get("tree") != expected["tag_tree"]
+    ):
+        _fail("LINEAGE_CAPTURE", "Authenticated v0.7 release identity differs from the ready binding")
+    metadata = authenticated_release_metadata(capture)
+    if (
+        metadata.get("id") != expected["release_id"]
+        or metadata.get("tag_name") != binding.get("tag")
+        or metadata.get("draft") is not False
+        or metadata.get("prerelease") is not False
+    ):
+        _fail("LINEAGE_CAPTURE", "Authenticated v0.7 release metadata disagrees")
+    tree = authenticated_tree(capture)
+    if tree.get("sha") != expected["tag_tree"] or tree.get("truncated") is not False:
+        _fail("LINEAGE_CAPTURE", "Authenticated v0.7 tree is incomplete or differs")
+
+    provenance = binding.get("provenance")
+    if not isinstance(provenance, dict) or set(provenance) != {
+        "path", "commit_field", "tree_field",
+    }:
+        _fail("LINEAGE_BINDING", "Direct provenance field selection is required")
+    if provenance != {
+        "path": PROVENANCE_NAME,
+        "commit_field": "tagCommit",
+        "tree_field": "tagTree",
+    }:
+        _fail("LINEAGE_BINDING", "Direct provenance identity fields are fixed")
+    path = provenance["path"]
+    if not isinstance(path, str) or not path:
+        _fail("LINEAGE_PROVENANCE", "Authenticated v0.7 provenance path is unavailable")
+    # A release provenance document is normally an authenticated asset rather
+    # than a tagged-source file.  Keep both routes explicit so the proof never
+    # silently reads an arbitrary path from disk.
+    if path in capture.source:
+        raw = capture.source[path]
+        provenance_source_kind = "source"
+    elif path in capture.evidence_bytes:
+        raw = capture.evidence_bytes[path]
+        provenance_source_kind = "asset"
+    else:
+        _fail("LINEAGE_PROVENANCE", "Authenticated v0.7 provenance bytes are unavailable")
+    try:
+        document = json.loads(raw)
+    except (ValueError, UnicodeError):
+        _fail("LINEAGE_PROVENANCE", "Authenticated v0.7 provenance source is not valid JSON")
+    if not isinstance(document, dict):
+        _fail("LINEAGE_PROVENANCE", "Authenticated v0.7 provenance document must be an object")
+    release_document = document.get("release")
+    if not isinstance(release_document, dict):
+        _fail("LINEAGE_PROVENANCE", "Authenticated v0.7 provenance release object is required")
+    commit_field, tree_field = provenance["commit_field"], provenance["tree_field"]
+    if (
+        not isinstance(commit_field, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", commit_field)
+        or not isinstance(tree_field, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", tree_field)
+    ):
+        _fail("LINEAGE_BINDING", "Direct provenance field names are malformed")
+    provenance_commit = release_document.get(commit_field)
+    provenance_tree = release_document.get(tree_field)
+    if provenance_commit != expected["tag_commit"] or provenance_tree != expected["tag_tree"]:
+        _fail("LINEAGE_PROVENANCE", "v0.7 provenance commit/tree do not equal the authenticated tag")
+    return {
+        "schema": "rs9.nebular-direct-lineage.v1alpha1",
+        "mode": "direct-tag-provenance-equality",
+        "release": binding["release"],
+        "tag": binding["tag"],
+        "repository": binding["repository"],
+        "tag_commit": expected["tag_commit"],
+        "tag_tree": expected["tag_tree"],
+        "provenance_path": path,
+        "provenance_source_kind": provenance_source_kind,
+        "provenance_sha256": digest(raw),
+        "provenance_commit_field": commit_field,
+        "provenance_tree_field": tree_field,
+        "author_rewrite_required": False,
+        "authenticated_record_sha256": authenticated_record_hash(capture),
+    }
+
+
 def is_current_forward_identity(capture):
     """Select the correction only for the exact reviewed current identity."""
     if not isinstance(capture, ReleaseCapture):

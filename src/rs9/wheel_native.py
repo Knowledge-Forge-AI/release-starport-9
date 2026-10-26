@@ -11,6 +11,7 @@ import plistlib
 import posixpath
 import re
 import stat
+import struct
 import sys
 import tarfile
 from typing import Any, Mapping
@@ -66,6 +67,165 @@ def extract_darwin_minimum_version(plist_bytes: bytes) -> tuple[int, int]:
     major = int(match.group(1))
     minor = int(match.group(2) or 0)
     return max((11, 0), (major, minor))
+
+
+_MACHO_BUILD_VERSION = 0x32
+_MACHO_MAGICS = {
+    b"\xcf\xfa\xed\xfe": ("<", 32),  # thin 64-bit
+    b"\xfe\xed\xfa\xcf": (">", 32),  # thin 64-bit
+    b"\xce\xfa\xed\xfe": ("<", 28),  # thin 32-bit
+    b"\xfe\xed\xfa\xce": (">", 28),  # thin 32-bit
+}
+_FAT_MAGICS = {
+    b"\xca\xfe\xba\xbe": (">", False),  # fat32
+    b"\xbe\xba\xfe\xca": ("<", False),  # fat32 byte-swapped
+    b"\xca\xfe\xba\xbf": (">", True),   # fat64
+    b"\xbf\xba\xfe\xca": ("<", True),   # fat64 byte-swapped
+}
+_MACHO_MAGIC_BYTES = frozenset((*_MACHO_MAGICS, *_FAT_MAGICS))
+
+
+def _decode_macho_version(value: int) -> tuple[int, int, int]:
+    return ((value >> 16) & 0xffff, (value >> 8) & 0xff, value & 0xff)
+
+
+def _thin_macho_build_versions(binary: bytes, *, offset: int = 0) -> list[tuple[int, int, int]]:
+    if len(binary) - offset < 4 or binary[offset:offset + 4] not in _MACHO_MAGICS:
+        raise ContractError("INVALID_MACHO", "Native executable is not a supported Mach-O image")
+    endian, header_size = _MACHO_MAGICS[binary[offset:offset + 4]]
+    if len(binary) - offset < header_size:
+        raise ContractError("INVALID_MACHO", "Mach-O header is truncated")
+    ncmds = struct.unpack_from(endian + "I", binary, offset + 16)[0]
+    sizeofcmds = struct.unpack_from(endian + "I", binary, offset + 20)[0]
+    commands_start = offset + header_size
+    commands_end = commands_start + sizeofcmds
+    if sizeofcmds > len(binary) - commands_start or commands_end < commands_start:
+        raise ContractError("INVALID_MACHO", "Mach-O load-command table is truncated")
+    versions: list[tuple[int, int, int]] = []
+    cursor = commands_start
+    for _ in range(ncmds):
+        if cursor + 8 > commands_end:
+            raise ContractError("INVALID_MACHO", "Mach-O load-command header is truncated")
+        command, command_size = struct.unpack_from(endian + "II", binary, cursor)
+        if command_size < 8 or cursor + command_size > commands_end:
+            raise ContractError("INVALID_MACHO", "Mach-O load-command size is invalid")
+        if command == _MACHO_BUILD_VERSION:
+            if command_size < 24:
+                raise ContractError("INVALID_MACHO", "LC_BUILD_VERSION command is truncated")
+            minimum = struct.unpack_from(endian + "I", binary, cursor + 12)[0]
+            versions.append(_decode_macho_version(minimum))
+        cursor += command_size
+    if cursor != commands_end:
+        raise ContractError("INVALID_MACHO", "Mach-O load-command table has trailing bytes")
+    return versions
+
+
+def extract_macho_build_version(binary_bytes: bytes) -> tuple[int, int, int]:
+    """Extract one consistent LC_BUILD_VERSION minimum from a bounded Mach-O."""
+    if not isinstance(binary_bytes, bytes) or not binary_bytes or len(binary_bytes) > 256 * 1024 * 1024:
+        raise ContractError("INVALID_MACHO", "Bounded Mach-O executable bytes are required")
+    magic = binary_bytes[:4]
+    if magic in _MACHO_MAGICS:
+        versions = _thin_macho_build_versions(binary_bytes)
+    elif magic in _FAT_MAGICS:
+        endian, is_fat64 = _FAT_MAGICS[magic]
+        if len(binary_bytes) < 8:
+            raise ContractError("INVALID_MACHO", "Fat Mach-O header is truncated")
+        count = struct.unpack_from(endian + "I", binary_bytes, 4)[0]
+        arch_size = 32 if is_fat64 else 20
+        table_end = 8 + count * arch_size
+        if count == 0 or table_end > len(binary_bytes):
+            raise ContractError("INVALID_MACHO", "Fat Mach-O architecture table is invalid")
+        versions = []
+        for index in range(count):
+            row = 8 + index * arch_size
+            if is_fat64:
+                slice_offset = struct.unpack_from(endian + "Q", binary_bytes, row + 8)[0]
+                slice_size = struct.unpack_from(endian + "Q", binary_bytes, row + 16)[0]
+            else:
+                slice_offset = struct.unpack_from(endian + "I", binary_bytes, row + 8)[0]
+                slice_size = struct.unpack_from(endian + "I", binary_bytes, row + 12)[0]
+            if slice_offset > len(binary_bytes) or slice_size > len(binary_bytes) - slice_offset:
+                raise ContractError("INVALID_MACHO", "Fat Mach-O slice is outside the bounded image")
+            versions.extend(_thin_macho_build_versions(binary_bytes, offset=slice_offset))
+    else:
+        raise ContractError("INVALID_MACHO", "Native executable is not a supported Mach-O image")
+    if not versions:
+        raise ContractError("MACHO_FLOOR_MISSING", "Mach-O executable has no LC_BUILD_VERSION command")
+    if len(set(versions)) != 1:
+        raise ContractError("MACHO_FLOOR_MISMATCH", "Mach-O slices disagree on LC_BUILD_VERSION minimum")
+    return versions[0]
+
+
+def validate_darwin_payload_floor(
+    payload_archive_bytes: bytes,
+    *,
+    required_floor: tuple[int, int] = (13, 0),
+) -> dict[str, Any]:
+    """Cross-check Info.plist and every Contents/MacOS Mach-O floor.
+
+    This opt-in Gate1 check is separate from the legacy Info.plist-only tag
+    resolver.  Existing v1 callers retain their historical contract.
+    """
+    plist_bytes = _extract_plist_from_payload_tar(payload_archive_bytes)
+    plist_floor = extract_darwin_minimum_version(plist_bytes)
+    if plist_floor < required_floor:
+        raise ContractError("DARWIN_FLOOR", "Info.plist minimum is below the Gate1 floor")
+    binaries: list[tuple[str, str, tuple[int, int, int]]] = []
+    scripts: list[str] = []
+    native_bytes = 0
+    try:
+        with gzip.GzipFile(fileobj=io.BytesIO(payload_archive_bytes)) as gz, tarfile.open(
+            fileobj=gz, mode="r|"
+        ) as archive:
+            for member in archive:
+                if not member.isfile():
+                    continue
+                if member.size > 256 * 1024 * 1024:
+                    raise ContractError("INVALID_MACHO", "Native executable exceeds the bounded floor scan")
+                extracted = archive.extractfile(member)
+                if extracted is None:
+                    raise ContractError("INVALID_MACHO", "Native executable bytes are unavailable")
+                in_macos = "/Contents/MacOS/" in member.name
+                if in_macos:
+                    data = extracted.read(member.size + 1)
+                    native_bytes += len(data)
+                    binaries.append((member.name, "macos-executable", extract_macho_build_version(data)))
+                    continue
+                prefix = extracted.read(4)
+                if prefix in _MACHO_MAGIC_BYTES:
+                    data = prefix + extracted.read(member.size + 1)
+                    native_bytes += len(data)
+                    binaries.append((member.name, "embedded-native", extract_macho_build_version(data)))
+                    if native_bytes > 1024 * 1024 * 1024:
+                        raise ContractError("INVALID_MACHO", "Native floor scan exceeds the aggregate bound")
+                    continue
+                if member.mode & 0o111:
+                    data = prefix + extracted.read(member.size + 1)
+                    if not data.startswith(b"#!"):
+                        raise ContractError("INVALID_MACHO", "Executable bundle member is neither Mach-O nor a script")
+                    scripts.append(member.name)
+    except ContractError:
+        raise
+    except Exception as exc:
+        raise ContractError("INVALID_ARCHIVE", "Failed reading Darwin payload for floor verification") from exc
+    if not binaries:
+        raise ContractError("MACHO_FLOOR_MISSING", "Darwin payload has no Contents/MacOS native executable")
+    if any(version[:2] != plist_floor for _path, _role, version in binaries):
+        raise ContractError("DARWIN_FLOOR_MISMATCH", "Info.plist and LC_BUILD_VERSION floors disagree")
+    if any(version[:2] < required_floor for _path, _role, version in binaries):
+        raise ContractError("DARWIN_FLOOR", "Mach-O LC_BUILD_VERSION floor is below the Gate1 floor")
+    return {
+        "schema": "rs9.darwin-floor-evidence.v1alpha1",
+        "required_floor": {"major": required_floor[0], "minor": required_floor[1]},
+        "info_plist": {"major": plist_floor[0], "minor": plist_floor[1]},
+        "macho": [
+            {"path": path, "role": role, "major": version[0], "minor": version[1], "patch": version[2]}
+            for path, role, version in binaries
+        ],
+        "scripts": [{"path": path, "role": "script"} for path in scripts],
+        "status": "cross-checked",
+    }
 
 
 TOP_LEVEL_PLIST_RE = re.compile(r"(?:\./)?(?:[^/]+\.app/)?Contents/Info\.plist")
