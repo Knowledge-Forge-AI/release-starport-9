@@ -7,9 +7,10 @@ import platform
 import re
 import subprocess
 import sys
+from typing import Any, Mapping, Sequence
 
 from rs9.tf_pypi_archive import AdmissionError, canonical, fail, physical_bytes, sha256
-from rs9.tf_pypi_consumer import smoke
+from rs9.tf_pypi_consumer import consume_nebular_candidate, smoke
 from rs9.tf_pypi_model import PRODUCTS, TARGETS, load_pin, strict_json, validate_pin
 from rs9.tf_pypi_platform import host_key
 from rs9.tf_pypi_verify import host_view, verify_aggregate
@@ -317,3 +318,289 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# Gate 2 Nebular successor route.  This is an additive API beside the
+# historical Stellar wheel/sdist route above; it intentionally has no build,
+# upload, registry, or workflow mutation capability.
+NEBULAR070_HOSTED_SCHEMA = "rs9.nebular070-hosted-consumer.v1"
+NEBULAR070_MATRIX_SCHEMA = "rs9.nebular070-hosted-matrix.v1"
+NEBULAR070_EXPECTED_ARTIFACT_SCHEMA = "rs9.nebular070-expected-artifacts.v1"
+NEBULAR070_LICENSE_EXPRESSION = "AGPL-3.0-or-later"
+NEBULAR070_WHEEL_TAGS = {
+    "darwin-arm64": "py3-none-macosx_13_0_arm64",
+    "linux-arm64-gnu": "py3-none-linux_aarch64",
+    "linux-x64-gnu": "py3-none-linux_x86_64",
+}
+NEBULAR070_LINUX_RUNTIME_POLICY = {
+    "wheel_tag_policy": "generic-linux",
+    "glibc_floor": "2.36",
+    "glibcxx_floor": "3.4.30",
+    "provider_baseline": "manylinux236-named-provenance-only",
+    "manylinux_claim": False,
+    "dynamic_closure": "pending",
+}
+
+
+def _nebular_profile_sha(value: Any) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+        fail("NEBULAR_PROFILE_BINDING")
+    return value
+
+
+def _nebular_tree(expected: str) -> str:
+    if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{40}", expected):
+        fail("NEBULAR_HOSTED_TREE")
+    root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD^{tree}"],
+                            capture_output=True, timeout=15, check=False)
+    observed = result.stdout.decode("ascii", "replace").strip()
+    if result.returncode or observed != expected:
+        fail("NEBULAR_HOSTED_TREE")
+    return expected
+
+
+def _nebular_expected_artifacts(record: Mapping[str, Any], candidate: Mapping[str, Any]) -> dict[str, Any]:
+    if (not isinstance(record, Mapping)
+            or record.get("schema") != NEBULAR070_EXPECTED_ARTIFACT_SCHEMA
+            or record.get("candidate_rs9_source") != candidate.get("candidate_rs9_source")
+            or not isinstance(record.get("wheels"), list)
+            or len(record["wheels"]) != 3
+            or not isinstance(record.get("record_sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", record["record_sha256"])):
+        fail("NEBULAR_EXPECTED_ARTIFACTS")
+    candidate_license = candidate.get("license")
+    profile = candidate.get("profile")
+    if (not isinstance(candidate_license, Mapping)
+            or candidate_license.get("expression") != NEBULAR070_LICENSE_EXPRESSION
+            or not isinstance(profile, Mapping)
+            or profile.get("license_expression") != NEBULAR070_LICENSE_EXPRESSION
+            or profile.get("darwin_floor") != {"major": 13, "minor": 0}
+            or profile.get("linux_runtime_policy") != NEBULAR070_LINUX_RUNTIME_POLICY
+            or candidate.get("linux_runtime_policy") != NEBULAR070_LINUX_RUNTIME_POLICY):
+        fail("NEBULAR_EXPECTED_ARTIFACTS")
+    rows = []
+    for wheel in record["wheels"]:
+        if (not isinstance(wheel, Mapping)
+                or set(("target", "filename", "size", "sha256", "tag", "version")) - set(wheel)
+                or wheel.get("target") not in TARGET_SYSTEMS
+                or not isinstance(wheel.get("filename"), str)
+                or type(wheel.get("size")) is not int or wheel["size"] <= 0
+                or not re.fullmatch(r"[0-9a-f]{64}", str(wheel.get("sha256")))
+                or not isinstance(wheel.get("tag"), str)
+                or wheel.get("tag") != NEBULAR070_WHEEL_TAGS[wheel.get("target")]
+                or wheel.get("version") != "0.7.0"):
+            fail("NEBULAR_EXPECTED_ARTIFACTS")
+        rows.append(dict(wheel))
+    rows.sort(key=lambda row: row["target"])
+    if len({row["target"] for row in rows}) != 3 or sha256(canonical(rows)) != record["record_sha256"]:
+        fail("NEBULAR_EXPECTED_ARTIFACTS")
+    candidate_rows = {row.get("system"): row for row in candidate.get("rows", []) if isinstance(row, Mapping)}
+    for target, system in ((key, value) for key, value in TARGET_SYSTEMS.items()):
+        row = candidate_rows.get(system)
+        expected = next((item for item in rows if item["target"] == target), None)
+        expected_wheel = {key: expected[key] for key in ("filename", "sha256", "size", "tag", "version")}
+        row_profile = row.get("candidate_profile") if isinstance(row, Mapping) else None
+        if (not isinstance(row, Mapping) or not isinstance(expected, Mapping)
+                or row.get("wheel") != expected_wheel
+                or not isinstance(row_profile, Mapping)
+                or row_profile.get("license_expression") != NEBULAR070_LICENSE_EXPRESSION
+                or row.get("linux_runtime_policy") != NEBULAR070_LINUX_RUNTIME_POLICY):
+            fail("NEBULAR_EXPECTED_ARTIFACTS")
+    return {"schema": record["schema"], "candidate_rs9_source": record["candidate_rs9_source"],
+            "wheels": rows, "record_sha256": record["record_sha256"]}
+
+
+def qualify_nebular070(
+    candidate: Mapping[str, Any],
+    wheel_path: str | Path,
+    raw_release: Mapping[str, Any],
+    work: str | Path,
+    *,
+    expected_artifacts: Mapping[str, Any],
+    expected_commit: str,
+    expected_tree: str,
+    profile_sha256: str,
+    candidate_receipt_sha256: str,
+    target: str,
+    run_id: str = "1",
+    run_attempt: str = "1",
+    sandbox_prefix: Sequence[str] = (),
+    sandbox_probe: Any = None,
+    host_identity: Mapping[str, Any] | None = None,
+    fixture_only: bool = False,
+    runner: Any = None,
+    process_observer: Any = None,
+    state_snapshot: Any = None,
+    real_user_state_snapshot: Any = None,
+) -> dict[str, Any]:
+    """Run one Nebular 0.7 candidate through the post-path native consumer.
+
+    The candidate receipt and expected-artifact record are immutable inputs;
+    ``qualification_rs9_source`` is generated from the executing checkout and
+    is never relabeled as the candidate source.  Controlled fixtures are
+    explicitly non-qualification evidence.
+    """
+    if target not in TARGET_SYSTEMS:
+        fail("NEBULAR_TARGET")
+    run_id = _run_id(run_id)
+    run_attempt = _run_id(run_attempt)
+    if not isinstance(candidate_receipt_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", candidate_receipt_sha256):
+        fail("NEBULAR_CANDIDATE_RECEIPT")
+    profile_sha256 = _nebular_profile_sha(profile_sha256)
+    if fixture_only and isinstance(host_identity, Mapping):
+        commit = expected_commit
+        tree = expected_tree
+    else:
+        commit = source_commit(expected_commit)
+        tree = _nebular_tree(expected_tree)
+    if (not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit)
+            or not isinstance(tree, str) or not re.fullmatch(r"[0-9a-f]{40}", tree)):
+        fail("NEBULAR_HOSTED_SOURCE")
+    qualification_source = {
+        "status": "executing-qualification-source",
+        "commit": commit,
+        "tree": tree,
+        "run_id": run_id,
+        "run_attempt": run_attempt,
+        "profile_sha256": profile_sha256,
+    }
+    artifacts = _nebular_expected_artifacts(expected_artifacts, candidate)
+    # Consumer-side validation also proves the candidate row and actual wheel
+    # bytes agree with the expected record before a native process is spawned.
+    expected_wheel = next(row for row in artifacts["wheels"] if row["target"] == target)
+    if Path(wheel_path).name != expected_wheel["filename"]:
+        fail("NEBULAR_EXPECTED_ARTIFACTS")
+    consume_kwargs = {
+        "target": target,
+        "sandbox_prefix": sandbox_prefix,
+        "sandbox_probe": sandbox_probe,
+        "host_identity": host_identity,
+        "fixture_only": fixture_only,
+        "process_observer": process_observer,
+        "state_snapshot": state_snapshot,
+        "real_user_state_snapshot": real_user_state_snapshot,
+    }
+    if runner is not None:
+        consume_kwargs["runner"] = runner
+    consumer = consume_nebular_candidate(candidate, wheel_path, raw_release, work, **consume_kwargs)
+    consumer.update({
+        "candidate_receipt_sha256": candidate_receipt_sha256,
+        "expected_artifact_record_sha256": artifacts["record_sha256"],
+        "qualification_rs9_source": qualification_source,
+    })
+    return {
+        "schema": NEBULAR070_HOSTED_SCHEMA,
+        "status": "fixture-native-consumer-passed" if fixture_only else "native-consumer-passed",
+        "fixture_only": fixture_only,
+        "native_qualified": not fixture_only,
+        "candidate_receipt_sha256": candidate_receipt_sha256,
+        "expected_artifact_record_sha256": artifacts["record_sha256"],
+        "candidate_rs9_source": consumer["candidate_rs9_source"],
+        "qualification_rs9_source": qualification_source,
+        "target": target,
+        "run_id": run_id,
+        "run_attempt": run_attempt,
+        "consumer": consumer,
+        "publication_admitted": False,
+        "public_writes": 0,
+    }
+
+
+def admit_nebular070_matrix(
+    candidate: Mapping[str, Any],
+    expected_artifacts: Mapping[str, Any],
+    receipts: str | Path,
+    *,
+    expected_commit: str,
+    expected_tree: str,
+    profile_sha256: str,
+    candidate_receipt_sha256: str,
+    run_id: str,
+    run_attempt: str,
+) -> dict[str, Any]:
+    """Admit only genuine three-host Gate 2 receipts; fixture receipts fail closed."""
+    run_id = _run_id(run_id)
+    run_attempt = _run_id(run_attempt)
+    if run_attempt != "1":
+        fail("NEBULAR_HOSTED_RUN_ATTEMPT")
+    profile_sha256 = _nebular_profile_sha(profile_sha256)
+    if not isinstance(candidate_receipt_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", candidate_receipt_sha256):
+        fail("NEBULAR_CANDIDATE_RECEIPT")
+    if not isinstance(receipts, (str, os.PathLike)):
+        fail("NEBULAR_MATRIX_RECEIPTS")
+    root = Path(receipts)
+    if root.is_symlink() or not root.is_dir():
+        fail("NEBULAR_MATRIX_RECEIPTS")
+    expected = _nebular_expected_artifacts(expected_artifacts, candidate)
+    candidate_source = candidate.get("candidate_rs9_source")
+    if not isinstance(candidate_source, Mapping):
+        fail("NEBULAR_CANDIDATE_SCHEMA")
+    entries = sorted(path.name for path in root.iterdir())
+    if entries != sorted(TARGET_SYSTEMS):
+        fail("NEBULAR_MATRIX_RECEIPTS")
+    verified: dict[str, Any] = {}
+    qualification_sources: dict[str, Any] = {}
+    for target in sorted(TARGET_SYSTEMS):
+        target_dir = root / target
+        result_path = target_dir / "result.json"
+        if target_dir.is_symlink() or not target_dir.is_dir() or result_path.is_symlink() or not result_path.is_file():
+            fail("NEBULAR_MATRIX_RECEIPTS")
+        try:
+            result = strict_json(physical_bytes(result_path, limit=4 * 1024 * 1024))
+        except Exception:
+            fail("NEBULAR_MATRIX_RECEIPT")
+        if (not isinstance(result, Mapping)
+                or result.get("schema") != NEBULAR070_HOSTED_SCHEMA
+                or result.get("status") != "native-consumer-passed"
+                or result.get("fixture_only") is not False
+                or result.get("native_qualified") is not True
+                or result.get("candidate_receipt_sha256") != candidate_receipt_sha256
+                or result.get("candidate_rs9_source") != candidate_source
+                or result.get("target") != target
+                or result.get("run_id") != run_id
+                or result.get("run_attempt") != "1"
+                or result.get("expected_artifact_record_sha256") != expected["record_sha256"]
+                or result.get("publication_admitted") is not False
+                or not isinstance(result.get("qualification_rs9_source"), Mapping)):
+            fail("NEBULAR_MATRIX_RECEIPT")
+        qualification = result["qualification_rs9_source"]
+        if (qualification.get("status") != "executing-qualification-source"
+                or qualification.get("run_id") != run_id
+                or qualification.get("run_attempt") != "1"
+                or qualification.get("profile_sha256") != profile_sha256
+                or not re.fullmatch(r"[0-9a-f]{40}", str(qualification.get("commit")))
+                or not re.fullmatch(r"[0-9a-f]{40}", str(qualification.get("tree")))):
+            fail("NEBULAR_MATRIX_RECEIPT")
+        consumer = result.get("consumer")
+        if (not isinstance(consumer, Mapping)
+                or consumer.get("fixture_only") is not False
+                or consumer.get("native_qualified") is not True
+                or consumer.get("process_observer", {}).get("orphan_count") != 0
+                or consumer.get("user_state", {}).get("unchanged") is not True
+                or consumer.get("sandbox", {}).get("network_disabled") is not True
+                or consumer.get("provider_closure", {}).get("status") != "verified"):
+            fail("NEBULAR_MATRIX_RECEIPT")
+        expected_wheel = next(row for row in expected["wheels"] if row["target"] == target)
+        if result.get("consumer", {}).get("wheel") != expected_wheel:
+            fail("NEBULAR_MATRIX_RECEIPT")
+        verified[target] = result
+        qualification_sources[target] = qualification
+    _nebular_tree(expected_tree)
+    source_commit(expected_commit)
+    return {
+        "schema": NEBULAR070_MATRIX_SCHEMA,
+        "status": "native-matrix-passed",
+        "fixture_only": False,
+        "native_qualified": True,
+        "candidate_receipt_sha256": candidate_receipt_sha256,
+        "expected_artifact_record_sha256": expected["record_sha256"],
+        "candidate_rs9_source": dict(candidate_source),
+        "qualification_rs9_source": qualification_sources,
+        "targets": sorted(TARGET_SYSTEMS),
+        "receipts": verified,
+        "run_id": run_id,
+        "run_attempt": run_attempt,
+        "publication_admitted": False,
+        "public_writes": 0,
+    }
