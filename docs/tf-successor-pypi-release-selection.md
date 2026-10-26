@@ -12,8 +12,8 @@ RS9 admits only six exact `(project, version, distribution_version)` triples in 
 | `theme-forge-stellar-loom` | `0.4.0` | `0.4.0.post1` | `theme-forge-stellar-loom.json` | `stellar-loom.md` | Default (`READY`) |
 | `theme-forge-solar-sail` | `0.2.1` | `0.2.1.post1` | `theme-forge-solar-sail.json` | `solar-sail.md` | Default (`READY`) |
 | `theme-forge-stellar-burst` | `0.7.0` | `0.7.0` | `theme-forge-stellar-burst-0.7.0.json` | `stellar-burst-0.7.0.md` | Explicit opt-in (`BLOCKED`) |
-| `theme-forge-stellar-loom` | `0.5.0` | `0.5.0` | `theme-forge-stellar-loom-0.5.0.json` | `stellar-loom-0.5.0.md` | Explicit opt-in (`BLOCKED`) |
-| `theme-forge-solar-sail` | `0.3.0` | `0.3.0` | `theme-forge-solar-sail-0.3.0.json` | `solar-sail-0.3.0.md` | Explicit opt-in (`BLOCKED`) |
+| `theme-forge-stellar-loom` | `0.5.0` | `0.5.0` | `theme-forge-stellar-loom-0.5.0.json` | `stellar-loom-0.5.0.md` | Explicit opt-in (`READY`) |
+| `theme-forge-solar-sail` | `0.3.0` | `0.3.0` | `theme-forge-solar-sail-0.3.0.json` | `solar-sail-0.3.0.md` | Explicit opt-in (`READY`) |
 
 When `--pin` is omitted, `load_pin(project)` and all CLI operations retain the historical `.post1` defaults (`operators/tf-pypi/<project>.json`) and unversioned descriptions byte-for-byte. Arbitrary SemVer values, cross-version pairs, wrong-project bodies, symlinked pin files, duplicate JSON keys, and unlisted basenames fail closed before any operation writes or network calls.
 
@@ -67,21 +67,19 @@ python3 -B -m rs9.tf_pypi_hosted admit \
 
 When `tf_pypi_publish workflow` is called with a successor pin, every generated job command (`build_verify`, the three native qualification jobs, `qualification_gate`, and `publish` `select-missing` / `readback`) emits the closed repository-relative selector `--pin operators/tf-pypi/<project>-<version>.json` derived from `RELEASES`, never the caller's operational filesystem path. The three registered workflows now contain these explicit successor selectors under their existing filenames (`rs9-tfsb-pypi-publish.yml`, `rs9-tfsl-pypi-publish.yml`, and `rs9-tfss-pypi-publish.yml`). Default CLI selection and historical pin files remain unchanged. Workflow registration alone admits no source, platform, artifact or publication.
 
-## Blocked Status and Required Qualification Gates
+## Source Status and Required Qualification Gates
 
-All three successor pins (`0.7.0`, `0.5.0`, `0.3.0`) remain `source_status: "BLOCKED"` with `qualified_platforms: []` and non-empty `withheld` gate lists. While blocked, `verify_approved`, `select-missing`, and `readback` fail closed with `TF_PYPI_SOURCE_NOT_READY` before reading approval manifests, contacting PyPI, or creating an upload directory.
+The Solar `0.3.0` and Loom `0.5.0` pins have authenticated source admission and now use `source_status: "READY"` with `qualified_platforms: []`. Each retains exactly three downstream PyPI gates in `withheld`: `PYPI_RELEASE_MANIFEST_PENDING`, `PYPI_CONSUMER_MATRIX_PENDING`, and `PYPI_WHEEL_ARTIFACT_RECEIPTS_PENDING`. Burst `0.7.0` remains `source_status: "BLOCKED"` with its separate source and qualification gates. READY does not imply native qualification or publication.
 
-The following order describes future, separately evidenced transitions; this checkpoint changes none of the pin status, withheld, qualification or approval fields:
+For the two READY pins, the following order describes the remaining separately evidenced transitions. While a pin is unqualified or lacks approval, `verify_approved`, `select-missing`, and `readback` fail closed before reading approval manifests, contacting PyPI, or creating an upload directory:
 
-1. Verify source-release admission for the exact upstream archive, tag target/tree and lineage. The upstream `source_commit` is distinct from the checked-out RS9 commit recorded by hosted receipts.
-2. After source admission, set that successor pin to `source_status: "READY"` and clear `withheld`, keeping `qualified_platforms: []`.
-3. Build and verify the four-file aggregate (three wheels and one sdist) with the explicit versioned pin while its qualification list is empty.
-4. Qualify the exact artifacts on all three native target hosts, then admit the same-run, first-attempt receipt matrix. These receipts remain qualification-only with `publication_admitted: false`.
-5. Only after that evidence passes, record the exact candidate-platform list in `qualified_platforms`. `build_pin(pin)` clears this list in the embedded build pin, so this metadata-only transition preserves the aggregate bytes; it does not warrant a rebuild.
-6. Admit the exact versioned artifact approval manifest and Trusted Publisher binding through their existing gates. The unchanged publish job requires `main`, explicit `workflow_dispatch` and `mode: publish`.
-7. `select-missing` must recheck READY, exact qualifications, approval, same-run matrix and remote state; final readback must report `published-exact`.
+1. Build and verify the four-file aggregate (three wheels and one sdist) with the explicit versioned pin while its qualification list is empty.
+2. Qualify the exact artifacts on all three native target hosts, then admit the same-run, first-attempt receipt matrix. These receipts remain qualification-only with `publication_admitted: false`.
+3. Only after that evidence passes, record the exact candidate-platform list in `qualified_platforms`. `build_pin(pin)` clears this list in the embedded build pin, so this metadata-only transition preserves the aggregate bytes; it does not warrant a rebuild.
+4. Admit the exact versioned artifact approval manifest and Trusted Publisher binding through their existing gates. The unchanged publish job requires `main`, explicit `workflow_dispatch` and `mode: publish`.
+5. `select-missing` must recheck READY, exact qualifications, approval, same-run matrix and remote state; final readback must report `published-exact`.
 
-READY/withheld fields must be settled before the final aggregate build because they remain embedded in the sdist. The normalization regression uses synthetic metadata and proves byte invariance only; it is not a native qualification receipt or permission to promote a real pin.
+The source commits remain distinct from the checked-out RS9 commit recorded by hosted receipts. The normalization regression uses synthetic metadata and proves byte invariance only; it is not a native qualification receipt or permission to promote a real pin.
 
 ## Rollback
 

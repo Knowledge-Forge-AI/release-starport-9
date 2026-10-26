@@ -21,7 +21,7 @@ PIN = ROOT / "operators/tf-pypi/theme-forge-stellar-loom-0.5.0.json"
 REPO = "Knowledge-Forge-AI/theme-forge-stellar-loom"
 API = "https://api.github.com/repos/" + REPO
 PROJECT = "theme-forge-stellar-loom"
-ARTIFACT_HOST = "productionresultssa5.blob.core.windows.net"
+ARTIFACT_HOST = "productionresultssa9.blob.core.windows.net"
 MAX_JSON = 16 * 1024 * 1024
 MAX_ZIP = 32 * 1024 * 1024
 MAX_EXPANDED = 64 * 1024 * 1024
@@ -80,8 +80,8 @@ def validate_selection(s, pin):
     require(s["schema"] == "rs9.tf-pypi-actions-selection.v1" and s["repository"] == REPO and s["repositoryId"] == 1361513719, "SELECTION_REPO")
     require(s["project"] == PROJECT and s["version"] == "0.5.0", "SELECTION_PROJECT")
     r = s["run"]
-    require(r["id"] == 40222221851 and r["run_attempt"] == 1 and r["workflow_id"] == 353226742 and r["path"] == ".github/workflows/ci.yml", "SELECTION_RUN")
-    require(r["event"] == "pull_request" and r["head_branch"] == "staging" and r["status"] == "completed" and r["conclusion"] == "success" and s["pr"] == 5, "SELECTION_STATUS")
+    require(r["id"] == 40238216121 and r["run_attempt"] == 1 and r["workflow_id"] == 353226742 and r["path"] == ".github/workflows/ci.yml", "SELECTION_RUN")
+    require(r["event"] == "pull_request" and r["head_branch"] == "staging" and r["status"] == "completed" and r["conclusion"] == "success" and s["pr"] == 6, "SELECTION_STATUS")
     for value in [r["head_sha"], s["headTree"], s["baseCommit"], s["ciMergeCommit"], s["mainCommit"]]:
         require(isinstance(value, str) and re.fullmatch("[0-9a-f]{40}", value), "COMMIT")
     require(s["workflow"]["id"] == r["workflow_id"] and s["workflow"]["path"] == r["path"], "WORKFLOW")
@@ -163,14 +163,14 @@ class Client:
 
 
 def authenticate(s, client):
-    r = client.json("/actions/runs/40222221851/attempts/1")
+    r = client.json("/actions/runs/40238216121/attempts/1")
     for key in ("id", "run_attempt", "workflow_id", "path", "head_sha", "head_branch", "event", "status", "conclusion"):
         require(r[key] == s["run"][key], "LIVE_RUN_" + key.upper())
     require(r["repository"]["full_name"] == REPO and r["repository"]["id"] == s["repositoryId"] and r["head_repository"]["id"] == s["repositoryId"], "LIVE_REPO")
     workflow = client.json("/actions/workflows/353226742")
     require(workflow["id"] == s["workflow"]["id"] and workflow["path"] == s["workflow"]["path"] and workflow["state"] == "active", "LIVE_WORKFLOW")
-    pr = client.json("/pulls/5")
-    require(pr["number"] == 5 and pr["merged"] is True and pr["merge_commit_sha"] == s["mainCommit"], "LIVE_PR_MERGE")
+    pr = client.json("/pulls/6")
+    require(pr["number"] == 6 and pr["merged"] is True and pr["merge_commit_sha"] == s["mainCommit"], "LIVE_PR_MERGE")
     require(pr["head"]["sha"] == s["run"]["head_sha"] and pr["head"]["ref"] == "staging" and pr["base"]["ref"] == "main", "LIVE_PR_HEAD")
     require(pr["head"]["repo"]["id"] == s["repositoryId"] and pr["base"]["repo"]["id"] == s["repositoryId"], "LIVE_PR_REPO")
     commits = {}
@@ -224,7 +224,7 @@ def receipt(s, raw, job, role):
     r = decode(raw)
     require(r["schema"] == "tfsb.ci-exact-head-receipt" and r["schemaVersion"] == 1 and r["status"] == "pass", "RECEIPT")
     e = r["event"]; w = r["workflow"]; c = r["checkout"]
-    require(e["name"] == "pull_request" and e["action"] in ("opened", "synchronize", "reopened") and e["number"] == 5, "RECEIPT_EVENT")
+    require(e["name"] == "pull_request" and e["action"] in ("opened", "synchronize", "reopened") and e["number"] == 6, "RECEIPT_EVENT")
     require(all(e[k] == REPO for k in ("repository", "headRepository", "baseRepository")), "RECEIPT_REPO")
     require(e["headRef"] == "staging" and e["baseRef"] == "main" and e["headSha"] == s["run"]["head_sha"] and e["baseSha"] == s["baseCommit"], "RECEIPT_HEAD")
     require(w["runId"] == str(s["run"]["id"]) and w["runAttempt"] == "1" and w["job"] == job and w["matrix"] == {}, "RECEIPT_RUN")

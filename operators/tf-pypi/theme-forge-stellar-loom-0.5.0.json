@@ -14,14 +14,12 @@
   "asset": "knowledge-forge-ai-theme-forge-stellar-loom-0.5.0.tgz",
   "sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f",
   "size": 272836,
-  "source_commit": "fca7db68bbf62ee7c9d53a72993b7fc6bda789f5",
-  "source_status": "BLOCKED",
+  "source_commit": "9063fe5d283881f464ab566d8b74296a6ce1b688",
+  "source_status": "READY",
   "withheld": [
-    "SUCCESSOR_PIN_ADMISSION_PENDING",
     "PYPI_RELEASE_MANIFEST_PENDING",
     "PYPI_CONSUMER_MATRIX_PENDING",
-    "PYPI_WHEEL_ARTIFACT_RECEIPTS_PENDING",
-    "EXACT_SOURCE_RELEASE_BINDING_PENDING"
+    "PYPI_WHEEL_ARTIFACT_RECEIPTS_PENDING"
   ],
   "candidate_platforms": [
     "darwin-arm64",

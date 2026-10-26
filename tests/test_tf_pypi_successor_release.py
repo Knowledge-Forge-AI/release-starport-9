@@ -57,13 +57,13 @@ EXPECTED_ASSET_HASHES = {
         "629a25fc68705bd610d0a09eeef4d77173ac5f6d7d6c98e3a4335d15b140dbb9"
     ),
     "operators/tf-pypi/theme-forge-stellar-loom-0.5.0.json": (
-        "c3b729ece76b6f231c43b9f0a2ea3b0e7653bfe256269671df0b3e957453a87d"
+        "a133b703a1d5fb9be692e3da034043155fe906f735871d2e5fd91a1ce195883f"
     ),
     "operators/tf-pypi/descriptions/stellar-loom-0.5.0.md": (
         "c183c3cf30410d5637d8bb877a571ebb841e7c53967cb1bac8a305d9b655bfc3"
     ),
     "operators/tf-pypi/theme-forge-solar-sail-0.3.0.json": (
-        "af106bf58b6830327f2d60cac173ec4422afc41d238a35587515052f2e8afef8"
+        "cefe01f6e0a3abf7ccea205aa63ac2b3330c74316451f00b6bfbfce88ba1aa56"
     ),
     "operators/tf-pypi/descriptions/solar-sail-0.3.0.md": (
         "e3e8171561e933b0aabc1e4668defdcb727471505c6aebe9caebdb2289d1a9cf"
@@ -211,10 +211,18 @@ class SuccessorReleaseTests(unittest.TestCase):
                 )
                 self.assertEqual(pin["size"], spec["size"])
                 self.assertEqual(pin["sha256"], spec["sha256"])
-                self.assertEqual(pin["source_status"], "BLOCKED")
+                if project in {"theme-forge-solar-sail", "theme-forge-stellar-loom"}:
+                    self.assertEqual(pin["source_status"], "READY")
+                    self.assertEqual(pin["withheld"], [
+                        "PYPI_RELEASE_MANIFEST_PENDING",
+                        "PYPI_CONSUMER_MATRIX_PENDING",
+                        "PYPI_WHEEL_ARTIFACT_RECEIPTS_PENDING",
+                    ])
+                else:
+                    self.assertEqual(pin["source_status"], "BLOCKED")
+                    self.assertTrue(pin["withheld"])
                 self.assertEqual(pin["qualified_platforms"], [])
                 self.assertIsInstance(pin["withheld"], list)
-                self.assertTrue(pin["withheld"])
                 self.assertEqual(pin["candidate_platforms"], list(TARGETS))
                 self.assertEqual(validate_pin(pin), pin)
                 self.assertEqual(build_pin(pin), {**pin, "qualified_platforms": []})

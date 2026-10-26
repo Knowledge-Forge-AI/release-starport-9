@@ -8,8 +8,8 @@
     "conclusion": "success",
     "event": "pull_request",
     "head_branch": "staging",
-    "head_sha": "fa53c13756edaa993878e064e8dff9638803df93",
-    "id": 40210741876,
+    "head_sha": "eafd594af8bce04ef3752c489ae770946b4e0e3b",
+    "id": 40238215111,
     "path": ".github/workflows/ci.yml",
     "pull_requests": [],
     "run_attempt": 1,
@@ -21,284 +21,283 @@
     "path": ".github/workflows/ci.yml",
     "state": "active"
   },
-  "pr": 3,
-  "headTree": "a98027847d6943e51095c6db0537aa1f14a10c7e",
-  "baseCommit": "17883c161ce475666a229349062d89bee8f50a24",
-  "ciMergeCommit": "1f2937f6387f1ef99bb492677067e92a0b136255",
-  "mainCommit": "216a27e703ae256cd0030c497f722a707571bdb6",
+  "pr": 4,
+  "headTree": "a87aa8428f7b5d773683c8fb4ab0135b1ff73fd0",
+  "baseCommit": "216a27e703ae256cd0030c497f722a707571bdb6",
+  "ciMergeCommit": "d880adf7f80c79636e812a670e613cf9de0a479a",
+  "mainCommit": "eafd594af8bce04ef3752c489ae770946b4e0e3b",
   "pack": {
     "bytes": 110836,
     "sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415"
   },
   "artifacts": [
     {
-      "created_at": "2026-10-25T16:17:27Z",
-      "digest": "sha256:425c4c084af58318c9bdf29ad682c7f02e7419f29043157321316bb6d0e6247b",
+      "created_at": "2026-10-25T22:01:52Z",
+      "digest": "sha256:d82b689d9f690efdd698e2c0d525df5d344dcf2f883ae7cc73e7084582a862ce",
       "expired": false,
-      "expires_at": "2026-11-08T16:17:26Z",
-      "id": 12606155370,
-      "name": "evidence-aggregate-artifacts",
-      "size_in_bytes": 4230,
-      "workflow_run": {
-        "head_branch": "staging",
-        "head_repository_id": 1374611333,
-        "head_sha": "fa53c13756edaa993878e064e8dff9638803df93",
-        "id": 40210741876,
-        "repository_id": 1374611333
-      },
+      "expires_at": "2026-11-08T22:01:51Z",
+      "id": 12614794722,
       "members": [
         {
-          "bytes": 12134,
-          "name": "ci-evidence-manifest.json",
-          "sha256": "4d2609c9a19617d9f143f9561d20200cdaf7b2159ec89b95fdc4feab414a0f94"
-        },
-        {
-          "bytes": 443,
-          "name": "ci-evidence-summary.md",
-          "sha256": "3a6a6ca1527e3168bebdb1e985344e4639404dd19573a6bb88bf7824b72c77cf"
-        },
-        {
-          "bytes": 2276,
-          "name": "receipt.json",
-          "sha256": "b127601a84cadeee4565dcc5b7135815f3a8b7b4c33431b297242b3729a486f6"
-        }
-      ]
-    },
-    {
-      "created_at": "2026-10-25T16:15:13Z",
-      "digest": "sha256:865cb2794b7e90b81cb73d742fe63ef0162e00e450125c69575fbc146ccc7d34",
-      "expired": false,
-      "expires_at": "2026-11-08T16:15:12Z",
-      "id": 12605820497,
-      "name": "root-package-artifacts",
-      "size_in_bytes": 117311,
-      "workflow_run": {
-        "head_branch": "staging",
-        "head_repository_id": 1374611333,
-        "head_sha": "fa53c13756edaa993878e064e8dff9638803df93",
-        "id": 40210741876,
-        "repository_id": 1374611333
-      },
-      "members": [
-        {
-          "name": "artifact-manifest.json",
           "bytes": 948,
-          "sha256": "8ce16581ff742162080dea5b5a257b12e4c58f8ecc0591a2ab561e2275893b31"
+          "name": "artifact-manifest.json",
+          "sha256": "172e3677541292e90f705f30eb29e5240300dc44428281be1f40be2fc426ab0b"
         },
         {
-          "name": "audit-result.json",
           "bytes": 361,
+          "name": "audit-result.json",
           "sha256": "bc9a301fc97ef4212c11bfca3880682b9fa7451b928315e3530b3a30c74e5242"
         },
         {
-          "name": "pack-manifest.json",
           "bytes": 7937,
+          "name": "pack-manifest.json",
           "sha256": "50c7f6be03fb5f1727283fe45c3ce1b7f43df12afa3f0b1000bbb042e0018045"
         },
         {
-          "name": "receipt.json",
           "bytes": 2270,
-          "sha256": "d6e09c5689166c31ad474da78e877d4da49b69b8bc1f7b9c73f6d41ee37b0686"
+          "name": "receipt.json",
+          "sha256": "4bb117810058f5b4e24735c7a824758974e318c7955d043c690e62e3738390d7"
         },
         {
-          "name": "root-package.tgz",
           "bytes": 110836,
+          "name": "root-package.tgz",
           "sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415"
         },
         {
+          "bytes": 20152,
           "name": "test-report.json",
-          "bytes": 20147,
-          "sha256": "8df5ccb02fe45255b8096ee0294bc30ad2e7e575ae805f2f012e84b7c90fac12"
+          "sha256": "b0c2cf86cfc7537ce72af86e81d123cdf2c2cabdaaf5135923ae20bd43c2649a"
         }
-      ]
-    },
-    {
-      "created_at": "2026-10-25T16:14:49Z",
-      "digest": "sha256:ba07fee8933e4175cf1192309ce623f3f6e8fec39e8e80b653e65a8607bce91b",
-      "expired": false,
-      "expires_at": "2026-11-08T16:14:48Z",
-      "id": 12605566430,
-      "name": "source-policy-receipt",
-      "size_in_bytes": 1160,
+      ],
+      "name": "root-package-artifacts",
+      "size_in_bytes": 117305,
+      "updated_at": "2026-10-25T22:01:52Z",
       "workflow_run": {
         "head_branch": "staging",
         "head_repository_id": 1374611333,
-        "head_sha": "fa53c13756edaa993878e064e8dff9638803df93",
-        "id": 40210741876,
+        "head_sha": "eafd594af8bce04ef3752c489ae770946b4e0e3b",
+        "id": 40238215111,
         "repository_id": 1374611333
-      },
+      }
+    },
+    {
+      "created_at": "2026-10-25T22:01:33Z",
+      "digest": "sha256:ec3650a3781fb2db69ca6bff57e3077d908d1e68502539cb3fa10b576033a2f8",
+      "expired": false,
+      "expires_at": "2026-11-08T22:01:32Z",
+      "id": 12615892184,
       "members": [
         {
           "bytes": 344,
           "name": "artifact-manifest.json",
-          "sha256": "fbf819fa6360a681a3e4e7a8196db101b74a612b6bcfbbcfc2fdb67dfcc153da"
+          "sha256": "bfc489e065a45e791f17a90161188a69ec85cd079d4d27908cb3fc5af272a0a0"
         },
         {
-          "bytes": 1967,
+          "bytes": 2017,
           "name": "receipt.json",
-          "sha256": "615bd0a1e7a458f9eaf850c3d73388bf4a81e0c734c7809ed950b73608888240"
+          "sha256": "7170b7ceed3fc92c0e47b4634c3c811f5f5e9ea5c423fa20807954915225759e"
         }
-      ]
+      ],
+      "name": "source-policy-receipt",
+      "size_in_bytes": 1167,
+      "updated_at": "2026-10-25T22:01:33Z",
+      "workflow_run": {
+        "head_branch": "staging",
+        "head_repository_id": 1374611333,
+        "head_sha": "eafd594af8bce04ef3752c489ae770946b4e0e3b",
+        "id": 40238215111,
+        "repository_id": 1374611333
+      }
+    },
+    {
+      "created_at": "2026-10-25T22:04:04Z",
+      "digest": "sha256:4ef98d3875c19d260769a4a95440d3abdfb810c7ee0702d0990df68df316e719",
+      "expired": false,
+      "expires_at": "2026-11-08T22:04:03Z",
+      "id": 12615683699,
+      "members": [
+        {
+          "bytes": 12135,
+          "name": "ci-evidence-manifest.json",
+          "sha256": "b7e6b626ef7ddfccdee7e69a3ee2dc273af17c7c296b6ec8a821bcf87a8e2218"
+        },
+        {
+          "bytes": 443,
+          "name": "ci-evidence-summary.md",
+          "sha256": "dece03ff299c605b640840d0fd424627c05c12943e0473f7076ab12244058357"
+        },
+        {
+          "bytes": 2276,
+          "name": "receipt.json",
+          "sha256": "77334aac6dd9e55604b33d83b293f58d728ea65ccb50ab4f7c157c0662f84d98"
+        }
+      ],
+      "name": "evidence-aggregate-artifacts",
+      "size_in_bytes": 4230,
+      "updated_at": "2026-10-25T22:04:04Z",
+      "workflow_run": {
+        "head_branch": "staging",
+        "head_repository_id": 1374611333,
+        "head_sha": "eafd594af8bce04ef3752c489ae770946b4e0e3b",
+        "id": 40238215111,
+        "repository_id": 1374611333
+      }
     }
   ],
   "artifactDownloadHosts": [
-    "productionresultssa12.blob.core.windows.net"
+    "productionresultssa14.blob.core.windows.net"
   ],
   "redirectAdmission": "exact-live-host-observed",
-  "transportObservation": {
-    "rootProbeSha256": "49205960b5ab5ef4dd3fba46dda5da10bdb74158c26c2ea2f34544e9826ac7ac",
-    "supportProbeSha256": "2bf7a9a8c1388d65b82ce8578d8162c5f1ac23ef0b57522c2a91e25e4fa91213"
-  },
   "aggregateArtifacts": [
     {
       "path": "consumer-fixture-artifacts/artifact-manifest.json",
-      "size": 496,
-      "sha256": "7100c52c00b55c8ec4dc827ca86f856b1e9b5098664d71c1236cf4fc0e3c7613"
+      "sha256": "fff6710f2f26629392fb0b6e27503b32f5138ea7862974c0aff3156292d64564",
+      "size": 496
     },
     {
       "path": "consumer-fixture-artifacts/receipt.json",
-      "size": 2274,
-      "sha256": "8742377c8b5771ed2a9475bbee94b6bbf47b0714e4d87176896de5f34b92437c"
+      "sha256": "c411bdd8a3e066d7c08c7d223f0092b9c93f735a1121337bd7894ec2465803d2",
+      "size": 2274
     },
     {
       "path": "consumer-fixture-artifacts/smoke-report.log",
-      "size": 613,
-      "sha256": "bb5cf9eb34283a7384ebbea59834f29b2118705e451ca528b583c3f33e582a0e"
+      "sha256": "f8da1c4468a5caac2e65dfea6c26ac07da7ca5058c6109bc82566501932d52a7",
+      "size": 613
     },
     {
       "path": "root-package-artifacts/artifact-manifest.json",
-      "size": 948,
-      "sha256": "8ce16581ff742162080dea5b5a257b12e4c58f8ecc0591a2ab561e2275893b31"
+      "sha256": "172e3677541292e90f705f30eb29e5240300dc44428281be1f40be2fc426ab0b",
+      "size": 948
     },
     {
       "path": "root-package-artifacts/audit-result.json",
-      "size": 361,
-      "sha256": "bc9a301fc97ef4212c11bfca3880682b9fa7451b928315e3530b3a30c74e5242"
+      "sha256": "bc9a301fc97ef4212c11bfca3880682b9fa7451b928315e3530b3a30c74e5242",
+      "size": 361
     },
     {
       "path": "root-package-artifacts/pack-manifest.json",
-      "size": 7937,
-      "sha256": "50c7f6be03fb5f1727283fe45c3ce1b7f43df12afa3f0b1000bbb042e0018045"
+      "sha256": "50c7f6be03fb5f1727283fe45c3ce1b7f43df12afa3f0b1000bbb042e0018045",
+      "size": 7937
     },
     {
       "path": "root-package-artifacts/receipt.json",
-      "size": 2270,
-      "sha256": "d6e09c5689166c31ad474da78e877d4da49b69b8bc1f7b9c73f6d41ee37b0686"
+      "sha256": "4bb117810058f5b4e24735c7a824758974e318c7955d043c690e62e3738390d7",
+      "size": 2270
     },
     {
       "path": "root-package-artifacts/root-package.tgz",
-      "size": 110836,
-      "sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415"
+      "sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415",
+      "size": 110836
     },
     {
       "path": "root-package-artifacts/test-report.json",
-      "size": 20147,
-      "sha256": "8df5ccb02fe45255b8096ee0294bc30ad2e7e575ae805f2f012e84b7c90fac12"
+      "sha256": "b0c2cf86cfc7537ce72af86e81d123cdf2c2cabdaaf5135923ae20bd43c2649a",
+      "size": 20152
     },
     {
       "path": "source-policy-receipt/artifact-manifest.json",
-      "size": 344,
-      "sha256": "fbf819fa6360a681a3e4e7a8196db101b74a612b6bcfbbcfc2fdb67dfcc153da"
+      "sha256": "bfc489e065a45e791f17a90161188a69ec85cd079d4d27908cb3fc5af272a0a0",
+      "size": 344
     },
     {
       "path": "source-policy-receipt/receipt.json",
-      "size": 1967,
-      "sha256": "615bd0a1e7a458f9eaf850c3d73388bf4a81e0c734c7809ed950b73608888240"
+      "sha256": "7170b7ceed3fc92c0e47b4634c3c811f5f5e9ea5c423fa20807954915225759e",
+      "size": 2017
     },
     {
       "path": "supply-chain-artifacts/artifact-manifest.json",
-      "size": 3151,
-      "sha256": "a302ac08430976cf7fbb318bca137dc8a9ee00bc358193094bb219e220638e2e"
+      "sha256": "36cc4dc5c9ef25dc1c965ab7a399d794359fcf47e695b2b47d604024610826b1",
+      "size": 3152
     },
     {
       "path": "supply-chain-artifacts/receipt.json",
-      "size": 2270,
-      "sha256": "d1fda8bdfd5e47ea3a5deaf51245e15ba0e47651888ce47842f4d4a26b833520"
+      "sha256": "b497f305e1669a46357e9cc6e02d50c8aab23cfb66516f0535dbef3ea2878cb2",
+      "size": 2270
     },
     {
       "path": "supply-chain-artifacts/root-package.cdx.json",
-      "size": 4794,
-      "sha256": "0b1e3fe04641846ef2eff1588784ff9344989d15e1b4622f7642f7b400070f99"
+      "sha256": "11bc4a73dea2720bae582237e9185f4108eff419230457a2c1d8b7f4a1fa98a1",
+      "size": 4794
     },
     {
       "path": "supply-chain-artifacts/root-package.grype.json",
-      "size": 5653,
-      "sha256": "00c68146e9fd11f6fec14d061cd09739a1839ace0fecc0fdae7aba26745f54b3"
+      "sha256": "5439780f4999ee99ace28a4eb22e408f9699fd94f9856885508109cc8ba263b0",
+      "size": 5653
     },
     {
       "path": "supply-chain-artifacts/root-package.grype.sarif",
-      "size": 357,
-      "sha256": "da0853b4022c895fa75d7f84060c1e93d56c86ec112bb61b6baca5fe7fd2bd6e"
+      "sha256": "da0853b4022c895fa75d7f84060c1e93d56c86ec112bb61b6baca5fe7fd2bd6e",
+      "size": 357
     },
     {
       "path": "supply-chain-artifacts/root-package.receipt.json",
-      "size": 9491,
-      "sha256": "8646f0bc9877d97a4eb270f45aa81a3471f5f8654934779620aee289784afb16"
+      "sha256": "1bf0e135f021a73b61dac5264752817d1f34e350fa445138d66482f92619efa9",
+      "size": 9491
     },
     {
       "path": "supply-chain-artifacts/root-package.spdx.json",
-      "size": 7188,
-      "sha256": "30f24545d5117ee0ba0553e712e3f92c09311f78cb15492e61abc1631a275efd"
+      "sha256": "a60ddd62f6a77ef95f30c43487d4c0557e854d357cb4d12da70e4789719875ad",
+      "size": 7188
     },
     {
       "path": "supply-chain-artifacts/root-package.syft.json",
-      "size": 10349,
-      "sha256": "c45fe3c5de8ecfc8d9f64334c8641662f439ace289674c00e3a138c60a9acc81"
+      "sha256": "c45fe3c5de8ecfc8d9f64334c8641662f439ace289674c00e3a138c60a9acc81",
+      "size": 10349
     },
     {
       "path": "supply-chain-artifacts/workflow-checks/actionlint.result.json",
-      "size": 1134,
-      "sha256": "51a3bad43c8a332fa0372d3311e1b13a7e1753fc8aa7d2c37e33f40b1805a3a8"
+      "sha256": "60a34e57833b9eaaa86d4793f3d0bcf3cdcaff00e47fde758a185b0f3db4b696",
+      "size": 1193
     },
     {
       "path": "supply-chain-artifacts/workflow-checks/actionlint.stderr.log",
-      "size": 7,
-      "sha256": "140baba927dc0d7b94391571d9fe588c0aade97ec7056b167924e3d8201860af"
+      "sha256": "140baba927dc0d7b94391571d9fe588c0aade97ec7056b167924e3d8201860af",
+      "size": 7
     },
     {
       "path": "supply-chain-artifacts/workflow-checks/actionlint.stdout.log",
-      "size": 7,
-      "sha256": "140baba927dc0d7b94391571d9fe588c0aade97ec7056b167924e3d8201860af"
+      "sha256": "140baba927dc0d7b94391571d9fe588c0aade97ec7056b167924e3d8201860af",
+      "size": 7
     },
     {
       "path": "supply-chain-artifacts/workflow-checks/betterleaks.report.json",
-      "size": 5,
-      "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+      "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+      "size": 5
     },
     {
       "path": "supply-chain-artifacts/workflow-checks/betterleaks.result.json",
-      "size": 1221,
-      "sha256": "cae2fb40914d0719936710fea900e98fc1237f25fa0b6680a8c08ecb63acfd96"
+      "sha256": "46b7453ee4c40ee7d848e4712bd0507946412a8c6f29004e3e89325d68965cda",
+      "size": 1221
     },
     {
       "path": "supply-chain-artifacts/workflow-checks/betterleaks.stderr.log",
-      "size": 167,
-      "sha256": "ea7841953d8e01a7027b9e04ebd150ddda89a7af39913ec247cfb5957d35b589"
+      "sha256": "be9ad071640a4de56a8c4013c0c39c1e0a8fc7ba42b6f1134fd515e1c6cd8ef9",
+      "size": 169
     },
     {
       "path": "supply-chain-artifacts/workflow-checks/betterleaks.stdout.log",
-      "size": 7,
-      "sha256": "140baba927dc0d7b94391571d9fe588c0aade97ec7056b167924e3d8201860af"
+      "sha256": "140baba927dc0d7b94391571d9fe588c0aade97ec7056b167924e3d8201860af",
+      "size": 7
     },
     {
       "path": "supply-chain-artifacts/workflow-checks/workflow-checks.receipt.json",
-      "size": 964,
-      "sha256": "9f4be297cccc90b38a65757dc9990a909169b1af24535b145291a94b223416fe"
+      "sha256": "0e50573489fa2b0936a63467806a04ff343b961e34cf517bd50e5a99bb75fbfb",
+      "size": 1023
     },
     {
       "path": "supply-chain-artifacts/workflow-checks/zizmor.result.json",
-      "size": 1124,
-      "sha256": "1a2ffb91c2f5efc0ba44dff552c8399725cdce1a62af823306505e61bd052fbc"
+      "sha256": "55738a42be019b3a6ae0ba96ac153bac986f560581aa27c1bdcd4584870720b2",
+      "size": 1183
     },
     {
       "path": "supply-chain-artifacts/workflow-checks/zizmor.stderr.log",
-      "size": 161,
-      "sha256": "6cbc957c680f43314313fd9fe817f27640dddb5dda82aef990eecf955ce26a92"
+      "sha256": "ce16a1d9e3d7113e0ee37934b9e5d8cdb346d08521da079354d4b8d8ac36b2ed",
+      "size": 290
     },
     {
       "path": "supply-chain-artifacts/workflow-checks/zizmor.stdout.log",
-      "size": 97,
-      "sha256": "38a0c1c2be7c75c76c1e9f8b7ffa9bc86ce45fa87b48da2e780393baaa638734"
+      "sha256": "e740b69e16acde7086c3bb87d0134502bdf75a4311131e164d54c18ca0ec7dec",
+      "size": 97
     }
   ]
 }
