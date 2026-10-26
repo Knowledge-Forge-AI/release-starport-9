@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 
 import csv
+from contextlib import contextmanager
 import io
 import json
 import os
@@ -17,6 +18,7 @@ import tempfile
 from typing import Any, Callable, Mapping, Sequence
 import zipfile
 
+from rs9.apt_diagnostics import safe_sample
 from rs9.errors import ContractError
 from rs9.wheel import (
     WheelBuildResult,
@@ -24,6 +26,107 @@ from rs9.wheel import (
     inspect_wheel,
     verify_wheel_record_bidirectional,
 )
+
+
+def _stream_bytes(value: Any) -> bytes:
+    """Normalize subprocess exception streams without retaining their contents."""
+    if isinstance(value, (bytes, bytearray)):
+        return bytes(value)
+    if value is None:
+        return b""
+    return str(value).encode("utf-8", errors="replace")
+
+
+def _bounded_exit_code(value: Any) -> int | None:
+    if type(value) is int and -128 <= value <= 255:
+        return value
+    return None
+
+
+def _bounded_deadline(value: Any) -> int | None:
+    if type(value) is int and 0 <= value <= 86400 * 7:
+        return value
+    return None
+
+
+def _safe_stderr_tail(value: Any) -> str:
+    if isinstance(value, str):
+        return safe_sample(value[-1024:], max_chars=1024)
+    if isinstance(value, (bytes, bytearray)):
+        return safe_sample(bytes(value[-1024:]), max_chars=1024)
+    return ""
+
+
+def _command_result_error(result: subprocess.CompletedProcess, phase: str, expected_exit: Any) -> ContractError:
+    """Keep completed-command failure identity without retaining argv or streams."""
+    stdout = _stream_bytes(result.stdout)
+    stderr = _stream_bytes(result.stderr)
+    details = {
+        "phase": phase,
+        "underlying_code": "command-exit-mismatch",
+        "exit_code": _bounded_exit_code(result.returncode),
+        "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
+        "stderr_sha256": hashlib.sha256(stderr).hexdigest(),
+    }
+    expected = _bounded_exit_code(expected_exit)
+    if expected is not None:
+        details["expected_exit"] = expected
+    error = ContractError("COMMAND_EXECUTION_FAILED", "Installed command exit code differs from reviewed expectation",
+                          details=details)
+    error._diagnostic_stderr_tail = _safe_stderr_tail(result.stderr)
+    return error
+
+
+@contextmanager
+def _lifecycle_phase(phase: str):
+    """Attach a bounded lifecycle phase to failures without changing pass criteria."""
+    try:
+        yield
+    except ContractError as error:
+        details = dict(error.details)
+        details.setdefault("phase", phase)
+        details.setdefault("underlying_code", error.code)
+        wrapped = ContractError(error.code, error.message, details=details)
+        if hasattr(error, "_diagnostic_stderr_tail"):
+            wrapped._diagnostic_stderr_tail = error._diagnostic_stderr_tail
+        raise wrapped from error
+    except subprocess.CalledProcessError as error:
+        stdout = _stream_bytes(error.output)
+        stderr = _stream_bytes(error.stderr)
+        details = {
+            "phase": phase,
+            "underlying_code": "process-exit",
+            "exception_type": "CalledProcessError",
+            "exit_code": _bounded_exit_code(error.returncode),
+            "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
+            "stderr_sha256": hashlib.sha256(stderr).hexdigest(),
+        }
+        wrapped = ContractError("LIFECYCLE_PROCESS_FAILED", "Lifecycle subprocess exited nonzero", details=details)
+        wrapped._diagnostic_stderr_tail = _safe_stderr_tail(stderr)
+        raise wrapped from None
+    except subprocess.TimeoutExpired as error:
+        stdout = _stream_bytes(error.output)
+        stderr = _stream_bytes(error.stderr)
+        details = {
+            "phase": phase,
+            "underlying_code": "timeout",
+            "exception_type": "TimeoutExpired",
+            "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
+            "stderr_sha256": hashlib.sha256(stderr).hexdigest(),
+        }
+        deadline = _bounded_deadline(error.timeout)
+        if deadline is not None:
+            details["deadline_seconds"] = deadline
+        wrapped = ContractError("LIFECYCLE_TIMEOUT", "Lifecycle subprocess timed out", details=details)
+        wrapped._diagnostic_stderr_tail = _safe_stderr_tail(stderr)
+        raise wrapped from None
+    except OSError as error:
+        details = {
+            "phase": phase,
+            "underlying_code": "os-error",
+            "exception_type": type(error).__name__,
+        }
+        raise ContractError("LIFECYCLE_EXECUTION", "Lifecycle operation unavailable", details=details) from None
 
 
 def verify_double_build(
@@ -202,14 +305,15 @@ def verify_offline_venv_lifecycle(
             if declared_cache is not None and Path(declared_cache).resolve() != effective_cache_path:
                 raise ContractError("CACHE_BINDING", "All lifecycle commands must use the same isolated cache")
         # 1. Create clean venv
-        subprocess.run(
-            [sys.executable, "-m", "venv", str(venv_path)],
-            check=True,
-            capture_output=True,
-            timeout=90,
-        )
+        with _lifecycle_phase("venv-create"):
+            subprocess.run(
+                [sys.executable, "-m", "venv", str(venv_path)],
+                check=True,
+                capture_output=True,
+                timeout=90,
+            )
 
-        baseline_inventory = _venv_inventory(venv_path)
+            baseline_inventory = _venv_inventory(venv_path)
 
         python_bin = venv_path / "bin" / "python"
         from rs9.hosted_commands import runtime_environment
@@ -222,88 +326,87 @@ def verify_offline_venv_lifecycle(
         }
 
         # 2. Offline wheel installation (--no-index --no-deps)
-        install_res = subprocess.run(
-            [str(python_bin), "-m", "pip", "install", "--no-index", "--no-deps", str(whl)],
-            check=True,
-            capture_output=True,
-            env=pip_env,
-            timeout=60,
-        )
+        with _lifecycle_phase("wheel-install"):
+            install_res = subprocess.run(
+                [str(python_bin), "-m", "pip", "install", "--no-index", "--no-deps", str(whl)],
+                check=True,
+                capture_output=True,
+                env=pip_env,
+                timeout=60,
+            )
 
         executed_commands: dict[str, Any] = {}
         # 3. Test console script commands
         if commands_to_test:
             for cmd_name, cmd_spec in commands_to_test.items():
-                bin_path = venv_path / "bin" / cmd_name
-                if not bin_path.is_file():
-                    raise ContractError("COMMAND_NOT_FOUND", f"Expected installed console script missing: {bin_path}")
-                cmd_args = cmd_spec.get("argv", [])
-                stdin_input = cmd_spec.get("input")
-                expected_exit = cmd_spec.get("expect_exit", 0)
-                stdout_contains = cmd_spec.get("expect_stdout_contains")
-                json_error_code = cmd_spec.get("expect_json_error")
+                with _lifecycle_phase(f"command:{cmd_name}"):
+                    bin_path = venv_path / "bin" / cmd_name
+                    if not bin_path.is_file():
+                        raise ContractError("COMMAND_NOT_FOUND", f"Expected installed console script missing: {bin_path}")
+                    cmd_args = cmd_spec.get("argv", [])
+                    stdin_input = cmd_spec.get("input")
+                    expected_exit = cmd_spec.get("expect_exit", 0)
+                    stdout_contains = cmd_spec.get("expect_stdout_contains")
+                    json_error_code = cmd_spec.get("expect_json_error")
 
-                base_env = {} if cmd_spec.get("clean_environment") else dict(os.environ)
-                command_env = {
-                    **base_env,
-                    "THEME_FORGE_CACHE_DIR": str(effective_cache_path),
-                    **cmd_spec.get("env", {}),
-                    "THEME_FORGE_CACHE_DIR": str(effective_cache_path),
-                    "PYTHONDONTWRITEBYTECODE": "1",
-                }
+                    base_env = {} if cmd_spec.get("clean_environment") else dict(os.environ)
+                    command_env = {
+                        **base_env,
+                        "THEME_FORGE_CACHE_DIR": str(effective_cache_path),
+                        **cmd_spec.get("env", {}),
+                        "THEME_FORGE_CACHE_DIR": str(effective_cache_path),
+                        "PYTHONDONTWRITEBYTECODE": "1",
+                    }
 
-                if cmd_spec.get("verifier"):
-                    observed = cmd_spec["verifier"](bin_path, command_prefix, command_env)
-                    executed_commands[cmd_name] = {"verifier": observed}
-                    continue
-                run_res = subprocess.run(
-                    [*command_prefix, str(bin_path), *cmd_args],
-                    input=stdin_input,
-                    capture_output=True,
-                    text=True,
-                    timeout=cmd_spec.get("timeout", 20),
-                    env=command_env,
-                )
-                if run_res.returncode != expected_exit:
-                    raise ContractError(
-                        "COMMAND_EXECUTION_FAILED",
-                        "Installed command exit code differs from reviewed expectation",
+                    if cmd_spec.get("verifier"):
+                        observed = cmd_spec["verifier"](bin_path, command_prefix, command_env)
+                        executed_commands[cmd_name] = {"verifier": observed}
+                        continue
+                    run_res = subprocess.run(
+                        [*command_prefix, str(bin_path), *cmd_args],
+                        input=stdin_input,
+                        capture_output=True,
+                        text=True,
+                        timeout=cmd_spec.get("timeout", 20),
+                        env=command_env,
                     )
-                if stdout_contains and stdout_contains not in run_res.stdout:
-                    raise ContractError(
-                        "COMMAND_EXECUTION_FAILED",
-                        "Installed command stdout differs from reviewed expectation",
-                    )
-                if json_error_code:
-                    try:
-                        data = json.loads(run_res.stdout)
-                        code = data.get("error", {}).get("code")
-                        if code != json_error_code:
-                            raise ContractError(
-                                "COMMAND_EXECUTION_FAILED",
-                                f"Command {cmd_name} error code {code!r} does not match expected {json_error_code!r}",
-                            )
-                    except (ValueError, TypeError) as exc:
+                    if run_res.returncode != expected_exit:
+                        raise _command_result_error(run_res, f"command:{cmd_name}", expected_exit)
+                    if stdout_contains and stdout_contains not in run_res.stdout:
                         raise ContractError(
                             "COMMAND_EXECUTION_FAILED",
-                            "Installed command did not produce expected JSON",
-                        ) from exc
+                            "Installed command stdout differs from reviewed expectation",
+                        )
+                    if json_error_code:
+                        try:
+                            data = json.loads(run_res.stdout)
+                            code = data.get("error", {}).get("code")
+                            if code != json_error_code:
+                                raise ContractError(
+                                    "COMMAND_EXECUTION_FAILED",
+                                    f"Command {cmd_name} error code {code!r} does not match expected {json_error_code!r}",
+                                )
+                        except (ValueError, TypeError) as exc:
+                            raise ContractError(
+                                "COMMAND_EXECUTION_FAILED",
+                                "Installed command did not produce expected JSON",
+                            ) from exc
 
-                parity = None
-                if cmd_spec.get("raw_argv"):
-                    parity = verify_raw_vs_wheel_parity(
-                        [*command_prefix, *cmd_spec["raw_argv"]],
-                        [*command_prefix, str(bin_path), *cmd_args],
-                        stdin_input=stdin_input,
-                        env=command_env,
-                        timeout=cmd_spec.get("timeout", 20),
-                    )
-                executed_commands[cmd_name] = {
-                    "returncode": run_res.returncode,
-                    "stdout_sha256": hashlib.sha256(run_res.stdout.encode()).hexdigest(),
-                    "stderr_sha256": hashlib.sha256(run_res.stderr.encode()).hexdigest(),
-                    "parity": parity,
-                }
+                    parity = None
+                    if cmd_spec.get("raw_argv"):
+                        parity = verify_raw_vs_wheel_parity(
+                            [*command_prefix, *cmd_spec["raw_argv"]],
+                            [*command_prefix, str(bin_path), *cmd_args],
+                            stdin_input=stdin_input,
+                            env=command_env,
+                            timeout=cmd_spec.get("timeout", 20),
+                        )
+                    executed_commands[cmd_name] = {
+                        "returncode": run_res.returncode,
+                        "stdout_sha256": hashlib.sha256(run_res.stdout.encode()).hexdigest(),
+                        "stderr_sha256": hashlib.sha256(run_res.stderr.encode()).hexdigest(),
+                        "parity": parity,
+                    }
 
         # Check external cache materialization before uninstall
         materialized_entries: list[str] = []
@@ -312,35 +415,37 @@ def verify_offline_venv_lifecycle(
         has_materialized = len(materialized_entries) > 0
 
         # 4. Uninstall wheel
-        uninstall_res = subprocess.run(
-            [str(python_bin), "-m", "pip", "uninstall", "-y", distribution_name],
-            check=True,
-            capture_output=True,
-            env=pip_env,
-            timeout=60,
-        )
+        with _lifecycle_phase("wheel-uninstall"):
+            uninstall_res = subprocess.run(
+                [str(python_bin), "-m", "pip", "uninstall", "-y", distribution_name],
+                check=True,
+                capture_output=True,
+                env=pip_env,
+                timeout=60,
+            )
 
         # 5. Verify clean uninstallation
-        # Check command binaries removed
-        if commands_to_test:
-            for cmd_name in commands_to_test:
-                bin_path = venv_path / "bin" / cmd_name
-                if bin_path.exists():
-                    raise ContractError("DIRTY_UNINSTALL", f"Console script was not removed: {bin_path}")
+        with _lifecycle_phase("residual-check"):
+            # Check command binaries removed
+            if commands_to_test:
+                for cmd_name in commands_to_test:
+                    bin_path = venv_path / "bin" / cmd_name
+                    if bin_path.exists():
+                        raise ContractError("DIRTY_UNINSTALL", f"Console script was not removed: {bin_path}")
 
-        # Check site-packages removed
-        pkg_norm = distribution_name.replace("-", "_")
-        site_packages = list(venv_path.glob("lib/python*/site-packages"))
-        for sp in site_packages:
-            leftovers = list(sp.glob(f"{pkg_norm}*")) + list(sp.glob(f"{distribution_name}*"))
-            if leftovers:
-                raise ContractError("DIRTY_UNINSTALL", f"Site-packages leftovers found after uninstall: {leftovers}")
+            # Check site-packages removed
+            pkg_norm = distribution_name.replace("-", "_")
+            site_packages = list(venv_path.glob("lib/python*/site-packages"))
+            for sp in site_packages:
+                leftovers = list(sp.glob(f"{pkg_norm}*")) + list(sp.glob(f"{distribution_name}*"))
+                if leftovers:
+                    raise ContractError("DIRTY_UNINSTALL", f"Site-packages leftovers found after uninstall: {leftovers}")
 
-        current_inventory = _venv_inventory(venv_path)
-        residual_files = sorted(path for path in set(current_inventory) | set(baseline_inventory)
-                                if current_inventory.get(path) != baseline_inventory.get(path))
-        if residual_files:
-            raise ContractError("DIRTY_UNINSTALL", f"Venv inventory differs after uninstall: {residual_files}")
+            current_inventory = _venv_inventory(venv_path)
+            residual_files = sorted(path for path in set(current_inventory) | set(baseline_inventory)
+                                    if current_inventory.get(path) != baseline_inventory.get(path))
+            if residual_files:
+                raise ContractError("DIRTY_UNINSTALL", f"Venv inventory differs after uninstall: {residual_files}")
 
         # Account for external materialization cache truthfully
         post_uninstall_entries: list[str] = []

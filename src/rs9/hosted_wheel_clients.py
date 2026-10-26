@@ -3,8 +3,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import uuid
 
+from rs9.apt_diagnostics import safe_sample
 from rs9.build_native import SubprocessRunner
 from rs9.errors import ContractError
 from rs9.hosted_commands import _BOUND, run_probes
@@ -13,6 +15,183 @@ from rs9.hosted_smoke import verifier_import_preflight, verify_nebular_runtime
 from rs9.scratch import canonical, validate_safe_json
 from rs9.verify_wheel import verify_offline_venv_lifecycle
 from rs9.wheel import THEME_FORGE_PRODUCTS
+
+
+CLIENT_DIAGNOSTIC_SCHEMA = "rs9.hosted-candidate-diagnostic.v1alpha2"
+MAX_CHILD_DIAGNOSTIC_BYTES = 16 * 1024
+_CLIENT_FAMILIES = {"wheel-client-deb", "wheel-client-rpm"}
+_CLIENT_PHASES = {"venv-create", "wheel-install", "wheel-uninstall", "residual-check", "client-lifecycle"}
+
+
+def _safe_hash(value):
+    return value if isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) else None
+
+
+def _safe_exit_code(value):
+    return value if type(value) is int and -128 <= value <= 255 else None
+
+
+def _receipt_record(receipt):
+    """Keep only bounded command-receipt identity; never retain argv or tool paths."""
+    record = {
+        "executed": receipt.executed if type(getattr(receipt, "executed", None)) is bool else None,
+        "exit_code": _safe_exit_code(getattr(receipt, "exit_code", None)),
+    }
+    for name in ("stdout_sha256", "stderr_sha256"):
+        digest = _safe_hash(getattr(receipt, name, None))
+        if digest is not None:
+            record[name] = digest
+    for name in ("stdout_bytes", "stderr_bytes"):
+        stream = getattr(receipt, name, None)
+        if isinstance(stream, (bytes, bytearray)):
+            record[name] = len(stream)
+    return record
+
+
+def _stderr_tail(receipt):
+    text = getattr(receipt, "stderr_text", None)
+    if isinstance(text, str) and text:
+        return safe_sample(text[-1024:], max_chars=1024)
+    raw = getattr(receipt, "stderr_bytes", b"")
+    if isinstance(raw, (bytes, bytearray)):
+        return safe_sample(bytes(raw[-1024:]), max_chars=1024)
+    if isinstance(text, str):
+        return safe_sample(text[-1024:], max_chars=1024)
+    return ""
+
+
+def _failure_category(receipt, output):
+    if getattr(receipt, "executed", None) is not True:
+        return "container-not-executed"
+    if _safe_exit_code(getattr(receipt, "exit_code", None)) not in (None, 0):
+        return "child-exit-nonzero"
+    if not output.is_file():
+        return "child-receipt-missing"
+    return "child-receipt-unavailable"
+
+
+def _diagnostic_path(config):
+    family = config.get("prepared", {}).get("family")
+    if family not in _CLIENT_FAMILIES:
+        family = "wheel-client"
+    return Path(config["output"]).parent / "diagnostics" / f"{family}-lifecycle-diagnostic.json"
+
+
+def _child_diagnostic_details(path):
+    """Read only the child fields used for diagnosis; invalid child data cannot pass a gate."""
+    descriptor = None
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        if os.fstat(descriptor).st_size > MAX_CHILD_DIAGNOSTIC_BYTES:
+            return {}
+        with os.fdopen(descriptor, "rb", closefd=True) as stream:
+            descriptor = None
+            payload = stream.read(MAX_CHILD_DIAGNOSTIC_BYTES + 1)
+        if len(payload) > MAX_CHILD_DIAGNOSTIC_BYTES:
+            return {}
+        document = json.loads(payload)
+    except (OSError, ValueError, UnicodeError, RecursionError):
+        return {}
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    if (not isinstance(document, dict)
+            or document.get("schema") != CLIENT_DIAGNOSTIC_SCHEMA
+            or not isinstance(document.get("details"), dict)):
+        return {}
+    source = document["details"]
+    details = {}
+    phase = source.get("phase")
+    if phase in _CLIENT_PHASES or (isinstance(phase, str)
+                                   and re.fullmatch(r"command:[A-Za-z0-9_.+-]{1,64}", phase)):
+        details["phase"] = phase
+    for key in ("underlying_code", "exception_type"):
+        value = source.get(key)
+        if isinstance(value, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.:-]{0,63}", value):
+            details[key] = value
+    for key in ("exit_code", "deadline_seconds"):
+        value = source.get(key)
+        valid = (key == "deadline_seconds" and type(value) is int and 0 <= value <= 86400 * 7
+                 or key == "exit_code" and type(value) is int and -128 <= value <= 255)
+        if valid:
+            details[key] = value
+    for key in ("stdout_sha256", "stderr_sha256"):
+        value = _safe_hash(source.get(key))
+        if value is not None:
+            details[key] = value
+    tail = source.get("stderr_tail")
+    if isinstance(tail, str):
+        details["child_stderr_tail"] = safe_sample(tail, max_chars=1024)
+    product = document.get("product")
+    if product in THEME_FORGE_PRODUCTS:
+        details["child_product"] = product
+    return details
+
+
+def _write_failure_diagnostic(config, system, family, receipt, output):
+    path = _diagnostic_path(config)
+    child_details = _child_diagnostic_details(path) if path.is_file() else {}
+    details = {
+        **child_details,
+        "phase": child_details.get("phase", "client-lifecycle"),
+        "failure_category": _failure_category(receipt, output),
+        "stderr_tail": _stderr_tail(receipt),
+        "failed_receipt": _receipt_record(receipt),
+    }
+    document = {
+        "schema": CLIENT_DIAGNOSTIC_SCHEMA,
+        "system": system,
+        "product": child_details.get("child_product", "theme-forge-nebular-fusion"),
+        "substage": "client-lifecycle",
+        "error_code": "CLEAN_CLIENT_LIFECYCLE_FAILED",
+        "details": details,
+    }
+    validate_safe_json(document, lane="wheel-client", field="client_lifecycle_diagnostic")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(canonical(document))
+    return path, document
+
+
+def _write_child_diagnostic(config, product, error):
+    path = _diagnostic_path(config)
+    source_details = dict(getattr(error, "details", {}) or {})
+    phase = source_details.get("phase")
+    if not (phase in _CLIENT_PHASES or (isinstance(phase, str)
+                                        and re.fullmatch(r"command:[A-Za-z0-9_.+-]{1,64}", phase))):
+        phase = "client-lifecycle"
+    details = {"phase": phase, "failure_category": "child-exception"}
+    for key in ("underlying_code", "exception_type"):
+        value = source_details.get(key)
+        if isinstance(value, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.:-]{0,63}", value):
+            details[key] = value
+    for key in ("exit_code", "deadline_seconds"):
+        value = source_details.get(key)
+        valid = (key == "deadline_seconds" and type(value) is int and 0 <= value <= 86400 * 7
+                 or key == "exit_code" and type(value) is int and -128 <= value <= 255)
+        if valid:
+            details[key] = value
+    for key in ("stdout_sha256", "stderr_sha256"):
+        value = _safe_hash(source_details.get(key))
+        if value is not None:
+            details[key] = value
+    tail = getattr(error, "_diagnostic_stderr_tail", "")
+    if isinstance(tail, str) and tail:
+        details["stderr_tail"] = safe_sample(tail, max_chars=1024)
+    error_code = getattr(error, "code", "CLIENT_LIFECYCLE_FAILED")
+    if not isinstance(error_code, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", error_code):
+        error_code = "CLIENT_LIFECYCLE_FAILED"
+    document = {
+        "schema": CLIENT_DIAGNOSTIC_SCHEMA,
+        "system": config["system"],
+        "product": product if product in THEME_FORGE_PRODUCTS else "theme-forge-nebular-fusion",
+        "substage": "client-lifecycle",
+        "error_code": error_code,
+        "details": details,
+    }
+    validate_safe_json(document, lane="wheel-client", field="client_lifecycle_diagnostic")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(canonical(document))
+    return path
 
 
 def build_client_prepared_config(prepared, system):
@@ -87,7 +266,15 @@ def qualify(context, wheels, prepared):
             receipt = runner.run(["python3", "-m", "rs9.hosted_wheel_clients", str(cfg)],
                                  env={"PYTHONPATH": str(context["repository"] / "src"), "PYTHONDONTWRITEBYTECODE": "1"})
             if receipt.exit_code or not receipt.executed or not output.is_file():
-                gates.append({"name": "wheel-client-" + family, "status": "fail", "reason": "clean-client-lifecycle-failed"})
+                diagnostic_path, diagnostic = _write_failure_diagnostic(
+                    {"output": output, "prepared": client_prepared}, system, family, receipt, output)
+                files.append(diagnostic_path)
+                gates.append({"name": "wheel-client-" + family, "status": "fail",
+                              "reason": "clean-client-lifecycle-failed",
+                              "diagnostic": {
+                                  "path": diagnostic_path.relative_to(context["scratch"]).as_posix(),
+                                  "failure_category": diagnostic["details"]["failure_category"],
+                              }})
             else:
                 files.append(output)
                 gates.append({"name": "wheel-client-" + family, "status": "pass"})
@@ -129,39 +316,43 @@ def child(config):
         verifier_import_preflight(prepared, config["system"])
     rows, native_smoke = {}, {}
     for product, path in config["wheels"].items():
-        def verify(executable, prefix, env, name):
-            gates = run_probes(name, executable, repository=Path(config["repository"]), env=env,
-                              system=config["system"], substage="wheel-client-command-probe")
-            if any(g["status"] != "pass" for g in gates):
-                raise ContractError("COMMAND_CONTRACT", "Retained client command failed")
-            if name == "tfnf":
-                roots = list(Path(env["THEME_FORGE_CACHE_DIR"]).glob("entries/*/payload/*"))
-                if len(roots) != 1:
-                    raise ContractError("WHEEL_RUNTIME", "One installed native payload required")
-                import subprocess
-                count = 0
-                for file in roots[0].rglob("*"):
-                    if not file.is_file() or file.is_symlink():
-                        continue
-                    with file.open("rb") as stream:
-                        elf = stream.read(4) == bytes([127]) + b"ELF"
-                    if elf:
-                        result = subprocess.run(["ldd", str(file)], capture_output=True, timeout=30)
-                        text = result.stdout + result.stderr
-                        if b"not found" in text or (result.returncode and b"not a dynamic" not in text and b"statically linked" not in text):
-                            raise ContractError("WHEEL_CLOSURE", "Native wheel has unresolved ELF dependencies")
-                        count += 1
-                if not count:
-                    raise ContractError("WHEEL_CLOSURE", "Actual Linux native ELF objects required")
+        try:
+            def verify(executable, prefix, env, name):
+                gates = run_probes(name, executable, repository=Path(config["repository"]), env=env,
+                                  system=config["system"], substage="wheel-client-command-probe")
+                if any(g["status"] != "pass" for g in gates):
+                    raise ContractError("COMMAND_CONTRACT", "Retained client command failed")
+                if name == "tfnf":
+                    roots = list(Path(env["THEME_FORGE_CACHE_DIR"]).glob("entries/*/payload/*"))
+                    if len(roots) != 1:
+                        raise ContractError("WHEEL_RUNTIME", "One installed native payload required")
+                    import subprocess
+                    count = 0
+                    for file in roots[0].rglob("*"):
+                        if not file.is_file() or file.is_symlink():
+                            continue
+                        with file.open("rb") as stream:
+                            elf = stream.read(4) == bytes([127]) + b"ELF"
+                        if elf:
+                            result = subprocess.run(["ldd", str(file)], capture_output=True, timeout=30)
+                            text = result.stdout + result.stderr
+                            if b"not found" in text or (result.returncode and b"not a dynamic" not in text and b"statically linked" not in text):
+                                raise ContractError("WHEEL_CLOSURE", "Native wheel has unresolved ELF dependencies")
+                            count += 1
+                    if not count:
+                        raise ContractError("WHEEL_CLOSURE", "Actual Linux native ELF objects required")
 
-                native_smoke.update(verify_nebular_runtime(roots[0], prepared, config["system"], env=env))
-                native_smoke["elf_objects_checked"] = count
-            return {"status": "pass"}
-        commands = {name: {"verifier": lambda p, pre, env, name=name: verify(p, pre, env, name)}
-                    for name in THEME_FORGE_PRODUCTS[product]["console_scripts"]}
-        rows[product] = verify_offline_venv_lifecycle(path,
-            distribution_name=THEME_FORGE_PRODUCTS[product]["distribution_name"], commands_to_test=commands,
-            venv_dir=root / "venvs" / product, cache_dir=root / "cache" / product)
+                    native_smoke.update(verify_nebular_runtime(roots[0], prepared, config["system"], env=env))
+                    native_smoke["elf_objects_checked"] = count
+                return {"status": "pass"}
+            commands = {name: {"verifier": lambda p, pre, env, name=name: verify(p, pre, env, name)}
+                        for name in THEME_FORGE_PRODUCTS[product]["console_scripts"]}
+            rows[product] = verify_offline_venv_lifecycle(path,
+                distribution_name=THEME_FORGE_PRODUCTS[product]["distribution_name"], commands_to_test=commands,
+                venv_dir=root / "venvs" / product, cache_dir=root / "cache" / product)
+        except Exception as error:
+            _write_child_diagnostic(config, product, error)
+            raise
     receipt = {"schema": "rs9.wheel-client.v1alpha1", "production": False,
         "system": config["system"], "network": "docker-network-none-negative-connectivity-probe",
         "user": "unprivileged", "products": rows, "native_smoke": native_smoke}

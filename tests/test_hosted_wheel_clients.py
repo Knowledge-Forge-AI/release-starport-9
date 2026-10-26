@@ -131,8 +131,10 @@ class HostedWheelClientsTests(unittest.TestCase):
         self.assertEqual(gate_map["wheel-client-deb"]["reason"], "clean-client-lifecycle-failed")
 
         self.assertEqual(gate_map["wheel-client-rpm"]["status"], "pass")
-        self.assertEqual(len(files), 1)
-        self.assertEqual(files[0].name, "wheel-client-rpm-receipt.json")
+        self.assertEqual(gate_map["wheel-client-deb"]["diagnostic"]["failure_category"], "child-exit-nonzero")
+        self.assertEqual(len(files), 2)
+        self.assertEqual(files[0].name, "wheel-client-deb-lifecycle-diagnostic.json")
+        self.assertEqual(files[1].name, "wheel-client-rpm-receipt.json")
 
     @patch("socket.socket")
     @patch("os.getuid", return_value=1000)
