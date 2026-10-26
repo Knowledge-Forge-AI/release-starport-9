@@ -113,7 +113,7 @@ class ActionsIntakeTests(unittest.TestCase):
         s = json.loads(a.SELECTION.read_text()); pin = json.loads(a.PIN.read_text())
         a.validate_selection(s, pin)
         self.assertEqual(pin["source_status"], "READY")
-        self.assertEqual(pin["qualified_platforms"], [])
+        self.assertEqual(pin["qualified_platforms"], ["darwin-arm64", "linux-arm64-gnu", "linux-x64-gnu"])
         self.assertEqual(s["artifactDownloadHosts"], [a.ARTIFACT_HOST])
 
     def test_selection_substitution_refusals(self):

@@ -1,0 +1,43 @@
+{
+  "files": [
+    {
+      "filename": "theme_forge_stellar_loom-0.5.0-py3-none-macosx_11_0_arm64.whl",
+      "logical_sha256": "9abcb70d374cde13e159d041465559cf5bfc2f201520235ffaf2c914851ed351",
+      "sha256": "faf99433ec5c823b5faa97f56ee6b1a654135aa21076f336e44a48bd7c647b38",
+      "size": 1587222,
+      "target": "darwin-arm64"
+    },
+    {
+      "filename": "theme_forge_stellar_loom-0.5.0-py3-none-manylinux_2_28_aarch64.whl",
+      "logical_sha256": "92509a578a243704df4f200f527b945b64725c0cc4bf5dbad9e3c5eb09a4af0b",
+      "sha256": "8f76436c7f99008c82bd34101a2f12182040e42bd363520c909775418ec3f76d",
+      "size": 1587254,
+      "target": "linux-arm64-gnu"
+    },
+    {
+      "filename": "theme_forge_stellar_loom-0.5.0-py3-none-manylinux_2_28_x86_64.whl",
+      "logical_sha256": "e62bc28b96332d598021cbc32988b10f765569c3f4b524fd8dff6bf5dea8c188",
+      "sha256": "cc92dabdc7eb8ab34461e2114bcd956be2a0b1a4997948330e62fe6c07aa48e7",
+      "size": 1587249,
+      "target": "linux-x64-gnu"
+    },
+    {
+      "filename": "theme_forge_stellar_loom-0.5.0.tar.gz",
+      "logical_sha256": "eb98a830aabcee4051f0697ab04301ae1850302cc0e1e0fc8488535d0e8c051a",
+      "sha256": "8b17127ea7d95432c6a628b42769b82aa45b47f417e6023a5592e7fd3119d236",
+      "size": 573503,
+      "target": null
+    }
+  ],
+  "project": "theme-forge-stellar-loom",
+  "publication_admitted": true,
+  "schema": "rs9.tf-pypi-candidate-aggregate.v1",
+  "set_sha256": "3d9ab535c3d17a850849f0517cbbd03ce2eb180b9a66c0de8f94cd485a766caf",
+  "targets": [
+    "darwin-arm64",
+    "linux-arm64-gnu",
+    "linux-x64-gnu"
+  ],
+  "upstream_version": "0.5.0",
+  "version": "0.5.0"
+}

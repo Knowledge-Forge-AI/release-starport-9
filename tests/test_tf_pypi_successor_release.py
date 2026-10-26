@@ -48,6 +48,11 @@ PIN_DIR = ROOT / "operators/tf-pypi"
 DESC_DIR = PIN_DIR / "descriptions"
 COMMIT = "a" * 40
 RUN_ID = "54321"
+EXPECTED_SUCCESSOR_WITHHELD = [
+    "PYPI_RELEASE_MANIFEST_PENDING",
+    "PYPI_CONSUMER_MATRIX_PENDING",
+    "PYPI_WHEEL_ARTIFACT_RECEIPTS_PENDING",
+]
 
 EXPECTED_ASSET_HASHES = {
     "operators/tf-pypi/theme-forge-stellar-burst-0.7.0.json": (
@@ -57,13 +62,13 @@ EXPECTED_ASSET_HASHES = {
         "629a25fc68705bd610d0a09eeef4d77173ac5f6d7d6c98e3a4335d15b140dbb9"
     ),
     "operators/tf-pypi/theme-forge-stellar-loom-0.5.0.json": (
-        "a133b703a1d5fb9be692e3da034043155fe906f735871d2e5fd91a1ce195883f"
+        "b7eeb74870b6b4e2b566296caef3222d7e7c74e61d221b475bdecb10c8647013"
     ),
     "operators/tf-pypi/descriptions/stellar-loom-0.5.0.md": (
         "c183c3cf30410d5637d8bb877a571ebb841e7c53967cb1bac8a305d9b655bfc3"
     ),
     "operators/tf-pypi/theme-forge-solar-sail-0.3.0.json": (
-        "cefe01f6e0a3abf7ccea205aa63ac2b3330c74316451f00b6bfbfce88ba1aa56"
+        "c75b91e828ea74a99514aea4164d1a7b881dfce029be87985e1262c54130d15d"
     ),
     "operators/tf-pypi/descriptions/solar-sail-0.3.0.md": (
         "e3e8171561e933b0aabc1e4668defdcb727471505c6aebe9caebdb2289d1a9cf"
@@ -213,15 +218,14 @@ class SuccessorReleaseTests(unittest.TestCase):
                 self.assertEqual(pin["sha256"], spec["sha256"])
                 if project in {"theme-forge-solar-sail", "theme-forge-stellar-loom"}:
                     self.assertEqual(pin["source_status"], "READY")
-                    self.assertEqual(pin["withheld"], [
-                        "PYPI_RELEASE_MANIFEST_PENDING",
-                        "PYPI_CONSUMER_MATRIX_PENDING",
-                        "PYPI_WHEEL_ARTIFACT_RECEIPTS_PENDING",
-                    ])
+                    self.assertEqual(pin["withheld"], EXPECTED_SUCCESSOR_WITHHELD)
                 else:
                     self.assertEqual(pin["source_status"], "BLOCKED")
                     self.assertTrue(pin["withheld"])
-                self.assertEqual(pin["qualified_platforms"], [])
+                self.assertEqual(
+                    pin["qualified_platforms"],
+                    list(TARGETS) if project in {"theme-forge-solar-sail", "theme-forge-stellar-loom"} else [],
+                )
                 self.assertIsInstance(pin["withheld"], list)
                 self.assertEqual(pin["candidate_platforms"], list(TARGETS))
                 self.assertEqual(validate_pin(pin), pin)
@@ -236,6 +240,38 @@ class SuccessorReleaseTests(unittest.TestCase):
                 )
         finally:
             os.chdir(previous_cwd)
+
+    def test_current_approval_manifests_are_exact_and_admitted(self):
+        expected = {
+            "theme-forge-solar-sail": (
+                "0.3.0",
+                "7da37398aed89bda28ceddfe015fc307deb7fec32812a8bc11980096b1d85ce2",
+                "3e04e6af27a59262a590507bc8dcce631a267e92a1b3426db36755bd3c4f8c88",
+            ),
+            "theme-forge-stellar-loom": (
+                "0.5.0",
+                "6a41854669eee7630aa843cce6943e1b1dec9a6d423d219641af6581f66a1d4c",
+                "3d9ab535c3d17a850849f0517cbbd03ce2eb180b9a66c0de8f94cd485a766caf",
+            ),
+        }
+        for project, (version, file_sha, set_sha) in expected.items():
+            with self.subTest(project=project):
+                pin = load_pin(project, PIN_DIR / f"{project}-{version}.json")
+                raw = physical_bytes(p.approval_path(pin))
+                self.assertEqual(sha256(raw), file_sha)
+                record = strict_json(raw)
+                self.assertEqual(record["schema"], "rs9.tf-pypi-candidate-aggregate.v1")
+                self.assertEqual(record["project"], project)
+                self.assertEqual(record["version"], pin["distribution_version"])
+                self.assertEqual(record["upstream_version"], pin["version"])
+                self.assertEqual(record["targets"], list(TARGETS))
+                self.assertEqual(record["set_sha256"], set_sha)
+                self.assertIs(record["publication_admitted"], True)
+                self.assertEqual(len(record["files"]), 4)
+                self.assertEqual(
+                    [row["filename"] for row in record["files"]],
+                    sorted(row["filename"] for row in record["files"]),
+                )
 
     def test_historical_defaults_and_explicit_historical_paths_unchanged(self):
         for project, (upstream_ver, dist_ver, desc_file) in HISTORICAL_SPECS.items():
@@ -793,14 +829,22 @@ class SuccessorReleaseTests(unittest.TestCase):
         # Synthetic metadata transition only: this is not a native qualification.
         pin, data = _successor_fixture()
         before = copy.deepcopy(pin)
-        before.update(source_status="READY", withheld=[], qualified_platforms=[])
+        before.update(
+            source_status="READY",
+            withheld=copy.deepcopy(EXPECTED_SUCCESSOR_WITHHELD),
+            qualified_platforms=[],
+        )
         after = copy.deepcopy(before)
         after["qualified_platforms"] = list(TARGETS)
         saved_before = copy.deepcopy(before)
         saved_after = copy.deepcopy(after)
+        self.assertEqual(before["withheld"], EXPECTED_SUCCESSOR_WITHHELD)
+        self.assertEqual(after["withheld"], EXPECTED_SUCCESSOR_WITHHELD)
         self.assertNotEqual(before["qualified_platforms"], after["qualified_platforms"])
         self.assertEqual(build_pin(before), build_pin(after))
         self.assertEqual(build_pin(after)["qualified_platforms"], [])
+        self.assertEqual(build_pin(before)["withheld"], EXPECTED_SUCCESSOR_WITHHELD)
+        self.assertEqual(build_pin(after)["withheld"], EXPECTED_SUCCESSOR_WITHHELD)
 
         for target in TARGETS:
             with self.subTest(target=target):
@@ -816,6 +860,8 @@ class SuccessorReleaseTests(unittest.TestCase):
                 self.assertEqual(first_pin, second_pin)
                 self.assertEqual(strict_json(first_pin), build_pin(before))
                 self.assertEqual(strict_json(second_pin)["qualified_platforms"], [])
+                self.assertEqual(strict_json(first_pin)["withheld"], EXPECTED_SUCCESSOR_WITHHELD)
+                self.assertEqual(strict_json(second_pin)["withheld"], EXPECTED_SUCCESSOR_WITHHELD)
 
         one = self.root / "successor-unqualified-aggregate"
         two = self.root / "successor-qualified-metadata-aggregate"
