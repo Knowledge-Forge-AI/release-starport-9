@@ -6,9 +6,12 @@ Only the explicit future build command may download pinned source inputs.
 """
 import argparse
 import io
+import math
+import numbers
 from pathlib import Path
 import shutil
 import sys
+import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
@@ -21,6 +24,11 @@ from rs9.tf_pypi_intake import NoRedirect, download
 from rs9.tf_pypi_model import PRODUCTS, intake, load_pin, release, strict_json, validate_pin
 from rs9.tf_pypi_remote import PublicReader, exact_state
 from rs9.tf_pypi_verify import verify_aggregate
+
+
+_DEFAULT_READBACK_SCHEDULE = (0, 2, 4, 8, 16, 30)
+_MAX_READBACK_PROBES = 6
+_MAX_READBACK_SECONDS = 60
 
 
 def dependency_url(dep_pin):
@@ -218,8 +226,43 @@ def select_missing(
     return {"upload": bool(missing), "state": state, "missing": missing}
 
 
-def readback(pin, dist=Path("dist"), get=None, pin_path=None):
-    """Read back remote PyPI state against approved candidate aggregate; must be published-exact."""
+def _validate_readback_schedule(schedule):
+    """Validate bounded retry delays before reading the pin or any local artifact."""
+    if schedule is None:
+        schedule = _DEFAULT_READBACK_SCHEDULE
+    try:
+        iterator = iter(schedule)
+    except TypeError:
+        fail("READBACK_SCHEDULE")
+
+    values = []
+    for _ in range(_MAX_READBACK_PROBES + 1):
+        try:
+            values.append(next(iterator))
+        except StopIteration:
+            break
+    else:
+        fail("READBACK_SCHEDULE")
+
+    if not values or values[0] != 0 or len(values) > _MAX_READBACK_PROBES:
+        fail("READBACK_SCHEDULE")
+    for delay in values:
+        if isinstance(delay, bool) or not isinstance(delay, numbers.Real):
+            fail("READBACK_SCHEDULE")
+        if delay < 0 or delay > _MAX_READBACK_SECONDS or not math.isfinite(delay):
+            fail("READBACK_SCHEDULE")
+    if sum(values) > _MAX_READBACK_SECONDS:
+        fail("READBACK_SCHEDULE")
+    return tuple(values)
+
+
+def readback(pin, dist=Path("dist"), get=None, pin_path=None, *, schedule=None, sleep_fn=None):
+    """Read back remote PyPI state; retry only bounded transient absence/incompleteness."""
+    schedule = _validate_readback_schedule(schedule)
+    if sleep_fn is None:
+        sleep_fn = time.sleep
+    elif not callable(sleep_fn):
+        fail("READBACK_SLEEP")
     if isinstance(pin, str):
         pin = load_pin(pin) if pin_path is None else load_pin(pin, pin_path)
     else:
@@ -230,15 +273,20 @@ def readback(pin, dist=Path("dist"), get=None, pin_path=None):
     dist = Path(dist)
     local = {record["filename"]: physical_bytes(dist / record["filename"]) for record in approved["files"]}
 
-    state_info = exact_state(pin, local, get=get)
-    state = state_info.get("state")
-    if state == "published-exact":
-        return {
-            "project": pin["project"],
-            "version": pin["distribution_version"],
-            "upstream_version": pin["version"],
-            "state": "published-exact",
-        }
+    state = None
+    for attempt, delay in enumerate(schedule):
+        if attempt and delay:
+            sleep_fn(delay)
+        state = exact_state(pin, local, get=get).get("state")
+        if state == "published-exact":
+            return {
+                "project": pin["project"],
+                "version": pin["distribution_version"],
+                "upstream_version": pin["version"],
+                "state": "published-exact",
+            }
+        if state not in ("absent", "version-absent", "incomplete"):
+            break
     fail(f"READBACK_{(state or 'unknown').upper().replace('-', '_')}")
 
 

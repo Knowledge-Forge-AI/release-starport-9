@@ -1182,7 +1182,7 @@ class ReadbackStateTests(unittest.TestCase):
 
     def test_readback_states(self):
         with patch("rs9.tf_pypi_publish.load_approval", return_value=self.approved):
-            res = readback(self.pin, dist=self.dist, get=self.mock_get(self.rows()))
+            res = readback(self.pin, dist=self.dist, get=self.mock_get(self.rows()), schedule=(0,))
             self.assertEqual(res["state"], "published-exact")
             self.assertEqual(res["version"], self.dv)
             self.assertEqual(res["upstream_version"], self.pin["version"])
@@ -1194,12 +1194,113 @@ class ReadbackStateTests(unittest.TestCase):
                 ({"rows": self.rows(), "wrong_bytes": True}, "TF_PYPI_READBACK_CONFLICT"),
             ):
                 with self.subTest(code=code), self.assertRaises(AdmissionError) as cm:
-                    readback(self.pin, dist=self.dist, get=self.mock_get(**kwargs))
+                    readback(self.pin, dist=self.dist, get=self.mock_get(**kwargs), schedule=(0,))
                 self.assertEqual(cm.exception.code, code)
 
             with self.assertRaises(AdmissionError) as cm:
-                readback(self.pin, dist=self.dist, get=lambda _: fail("REMOTE_UNKNOWN"))
+                readback(
+                    self.pin,
+                    dist=self.dist,
+                    get=lambda _: fail("REMOTE_UNKNOWN"),
+                    schedule=(0,),
+                )
             self.assertEqual(cm.exception.code, "TF_PYPI_READBACK_UNKNOWN")
+
+    def test_readback_retries_transient_states(self):
+        for transient_state in ("absent", "version-absent", "incomplete"):
+            with self.subTest(state=transient_state):
+                states = [
+                    {"state": transient_state, "missing": sorted(self.local)},
+                    {"state": "published-exact", "missing": []},
+                ]
+                sleeps = []
+                with patch("rs9.tf_pypi_publish.load_approval", return_value=self.approved), \
+                        patch("rs9.tf_pypi_publish.exact_state", side_effect=states) as remote:
+                    result = readback(
+                        self.pin,
+                        dist=self.dist,
+                        schedule=(0, 2),
+                        sleep_fn=sleeps.append,
+                    )
+
+                self.assertEqual(result["state"], "published-exact")
+                self.assertEqual(remote.call_count, 2)
+                self.assertEqual(sleeps, [2])
+
+    def test_readback_exhausted_retry_budget_preserves_final_state(self):
+        states = [{"state": "incomplete", "missing": ["one"]}] * 3
+        sleeps = []
+        with patch("rs9.tf_pypi_publish.load_approval", return_value=self.approved), \
+                patch("rs9.tf_pypi_publish.exact_state", side_effect=states) as remote:
+            with self.assertRaises(AdmissionError) as cm:
+                readback(
+                    self.pin,
+                    dist=self.dist,
+                    schedule=(0, 2, 4),
+                    sleep_fn=sleeps.append,
+                )
+
+        self.assertEqual(cm.exception.code, "TF_PYPI_READBACK_INCOMPLETE")
+        self.assertEqual(remote.call_count, 3)
+        self.assertEqual(sleeps, [2, 4])
+
+    def test_readback_conflict_and_unknown_abort_without_sleep(self):
+        for state, code in (("conflict", "TF_PYPI_READBACK_CONFLICT"), ("unknown", "TF_PYPI_READBACK_UNKNOWN")):
+            sleeps = []
+            with self.subTest(state=state), \
+                    patch("rs9.tf_pypi_publish.load_approval", return_value=self.approved), \
+                    patch("rs9.tf_pypi_publish.exact_state", return_value={"state": state, "missing": []}) as remote:
+                with self.assertRaises(AdmissionError) as cm:
+                    readback(
+                        self.pin,
+                        dist=self.dist,
+                        schedule=(0, 2, 4),
+                        sleep_fn=sleeps.append,
+                    )
+            self.assertEqual(cm.exception.code, code)
+            remote.assert_called_once()
+            self.assertEqual(sleeps, [])
+
+    def test_readback_rejects_invalid_schedule_before_local_or_remote_io(self):
+        invalid_schedules = (
+            (1,),
+            (0, -1),
+            (0, float("nan")),
+            (0, float("inf")),
+            (0, 61),
+            (0, True),
+            (0, 10**10000),
+            (0, -(10**10000)),
+            (0, 1, 2, 3, 4, 5, 6),
+            ("0",),
+        )
+        for index, schedule in enumerate(invalid_schedules):
+            with self.subTest(index=index), \
+                    patch("rs9.tf_pypi_publish.load_approval", side_effect=AssertionError("local I/O")) as loader, \
+                    patch("rs9.tf_pypi_publish.exact_state", side_effect=AssertionError("remote I/O")) as remote:
+                with self.assertRaises(AdmissionError) as cm:
+                    readback(self.pin, dist=self.dist, schedule=schedule, sleep_fn=lambda _: None)
+            self.assertEqual(cm.exception.code, "TF_PYPI_READBACK_SCHEDULE")
+            loader.assert_not_called()
+            remote.assert_not_called()
+
+    def test_readback_approval_guard_precedes_polling(self):
+        sleeps = []
+        with patch(
+            "rs9.tf_pypi_publish.verify_approved",
+            side_effect=AdmissionError("TF_PYPI_APPROVAL_MISMATCH"),
+        ) as approval, patch("rs9.tf_pypi_publish.exact_state") as remote:
+            with self.assertRaises(AdmissionError) as cm:
+                readback(
+                    self.pin,
+                    dist=self.dist,
+                    schedule=(0, 2),
+                    sleep_fn=sleeps.append,
+                )
+        self.assertEqual(cm.exception.code, "TF_PYPI_APPROVAL_MISMATCH")
+        approval.assert_called_once()
+        remote.assert_not_called()
+        self.assertEqual(sleeps, [])
 
 
 class BuildCommandTests(unittest.TestCase):
