@@ -26,6 +26,10 @@
     "linux-arm64-gnu",
     "linux-x64-gnu"
   ],
-  "qualified_platforms": [],
+  "qualified_platforms": [
+    "darwin-arm64",
+    "linux-arm64-gnu",
+    "linux-x64-gnu"
+  ],
   "description": "stellar-loom-0.5.0.md"
 }
