@@ -1880,7 +1880,7 @@ class NebularPyPIContractTests(unittest.TestCase):
         from rs9.tf_pypi_nebular import _nebular_import_closure_paths
 
         closure_paths = _nebular_import_closure_paths(ROOT)
-        self.assertEqual(len(closure_paths), 99)
+        self.assertEqual(len(closure_paths), 100)
         self.assertIn("src/rs9/nebular_lineage.py", closure_paths)
         self.assertIn("src/rs9/tf_pypi_nebular070_publish.py", closure_paths)
         with patch("rs9.tf_pypi_nebular.subprocess.run", side_effect=fake_git_run):

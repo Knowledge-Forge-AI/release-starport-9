@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import uuid
 
 from rs9.apt_diagnostics import safe_sample
@@ -75,6 +76,16 @@ def _diagnostic_path(config):
     if family not in _CLIENT_FAMILIES:
         family = "wheel-client"
     return Path(config["output"]).parent / "diagnostics" / f"{family}-lifecycle-diagnostic.json"
+
+
+def _diagnostic_stamp(path):
+    try:
+        info = path.lstat()
+    except OSError:
+        return None
+    if not stat.S_ISREG(info.st_mode):
+        return None
+    return info.st_mtime_ns, info.st_size
 
 
 def _child_diagnostic_details(path):
@@ -249,6 +260,9 @@ def qualify(context, wheels, prepared):
             client_prepared = build_client_prepared_config(prepared, system)
             client_prepared.update(scratch=str(context["scratch"] / ("wheel-client-smoke-" + family)),
                                    label="wheel-client-" + family, family="wheel-client-" + family)
+            smoke_diagnostic = (Path(client_prepared["scratch"]).parent / "diagnostics" /
+                                "application-smoke-diagnostic.json")
+            prior_smoke_stamp = _diagnostic_stamp(smoke_diagnostic)
             client_config = {
                 "system": system,
                 "root": str(context["scratch"] / ("client-" + family)),
@@ -269,6 +283,9 @@ def qualify(context, wheels, prepared):
                 diagnostic_path, diagnostic = _write_failure_diagnostic(
                     {"output": output, "prepared": client_prepared}, system, family, receipt, output)
                 files.append(diagnostic_path)
+                current_smoke_stamp = _diagnostic_stamp(smoke_diagnostic)
+                if current_smoke_stamp is not None and current_smoke_stamp != prior_smoke_stamp:
+                    files.append(smoke_diagnostic)
                 gates.append({"name": "wheel-client-" + family, "status": "fail",
                               "reason": "clean-client-lifecycle-failed",
                               "diagnostic": {
@@ -342,7 +359,9 @@ def child(config):
                     if not count:
                         raise ContractError("WHEEL_CLOSURE", "Actual Linux native ELF objects required")
 
-                    native_smoke.update(verify_nebular_runtime(roots[0], prepared, config["system"], env=env))
+                    native_smoke.update(verify_nebular_runtime(
+                        roots[0], prepared, config["system"], env=env,
+                        diagnostic_boundary_probes=config["system"].endswith("-linux")))
                     native_smoke["elf_objects_checked"] = count
                 return {"status": "pass"}
             commands = {name: {"verifier": lambda p, pre, env, name=name: verify(p, pre, env, name)}

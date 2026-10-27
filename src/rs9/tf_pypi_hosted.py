@@ -15,8 +15,13 @@ from rs9.tf_pypi_model import PRODUCTS, TARGETS, load_pin, strict_json, validate
 from rs9.tf_pypi_platform import host_key
 from rs9.tf_pypi_verify import host_view, verify_aggregate
 from rs9.nebular070_manylinux import (
+    CLAIM as NEBULAR070_MANYLINUX_CLAIM,
+    LINUX_TARGETS as NEBULAR070_MANYLINUX_TARGETS,
+    PORTABILITY_SCHEMA as NEBULAR070_PORTABILITY_SCHEMA,
+    VERSION as NEBULAR070_MANYLINUX_VERSION,
     ValidatedPayloadPortability,
     ValidatedReleaseAdmission,
+    manylinux_tag_for_target,
     validate_nebular070_payload_portability as _validate_nebular070_payload_portability,
     validate_nebular070_release_admission as _validate_nebular070_release_admission,
 )
@@ -386,6 +391,63 @@ NEBULAR070_LINUX_RUNTIME_POLICY = {
     "manylinux_claim": False,
     "dynamic_closure": "pending",
 }
+_NEBULAR070_STAGE_A_FIELDS = {
+    "construction_stage", "release_admission", "manylinux_construction_receipt_sha256",
+}
+_NEBULAR070_STAGE_A_RECEIPT_KINDS = (
+    "source", "qualification", "portability", "runtime", "runtime_floor",
+    "host_floor", "host_newer", "cpu",
+)
+
+
+def _nebular_stage_a_digest(stage_a: ValidatedPayloadPortability | None) -> str | None:
+    """Check the closed, non-fixture Stage-A object before enabling manylinux rows."""
+    if stage_a is None:
+        return None
+    if not isinstance(stage_a, ValidatedPayloadPortability) or stage_a.fixture_only:
+        fail("NEBULAR_EXPECTED_ARTIFACTS")
+    record = stage_a.record
+    if (not isinstance(record, Mapping)
+            or set(record) != {
+                "schema", "version", "claim", "construction_status", "tf_producer_source",
+                "rs9_tool_source", "evidence_mode", "source_input_snapshot_sha256", "targets", "identity",
+            }
+            or record.get("schema") != NEBULAR070_PORTABILITY_SCHEMA
+            or record.get("version") != NEBULAR070_MANYLINUX_VERSION
+            or record.get("claim") != NEBULAR070_MANYLINUX_CLAIM
+            or record.get("construction_status") != "payload-qualified"
+            or record.get("evidence_mode") != "actual"
+            or not isinstance(record.get("targets"), list)
+            or any(not isinstance(row, Mapping) or not isinstance(row.get("target"), str)
+                   for row in record["targets"])
+            or {row["target"] for row in record["targets"]}
+            != set(NEBULAR070_MANYLINUX_TARGETS)):
+        fail("NEBULAR_EXPECTED_ARTIFACTS")
+    for source_key in ("tf_producer_source", "rs9_tool_source"):
+        source = record.get(source_key)
+        if (not isinstance(source, Mapping) or set(source) != {"commit", "tree"}
+                or not re.fullmatch(r"[0-9a-f]{40}", str(source.get("commit")))
+                or not re.fullmatch(r"[0-9a-f]{40}", str(source.get("tree")))):
+            fail("NEBULAR_EXPECTED_ARTIFACTS")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(record.get("source_input_snapshot_sha256"))):
+        fail("NEBULAR_EXPECTED_ARTIFACTS")
+    digest = stage_a.digest
+    if (not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)
+            or record.get("identity") != digest
+            or not isinstance(stage_a.receipt_bodies, Mapping)
+            or set(stage_a.receipt_bodies) != {
+                f"{target}:{kind}"
+                for target in NEBULAR070_MANYLINUX_TARGETS
+                for kind in _NEBULAR070_STAGE_A_RECEIPT_KINDS
+            }):
+        fail("NEBULAR_EXPECTED_ARTIFACTS")
+    for row in record["targets"]:
+        if (not isinstance(row, Mapping)
+                or not isinstance(row.get("target"), str)
+                or row.get("target") not in NEBULAR070_MANYLINUX_TARGETS
+                or row.get("triple") != NEBULAR070_MANYLINUX_TARGETS[row["target"]][0]):
+            fail("NEBULAR_EXPECTED_ARTIFACTS")
+    return digest
 
 
 def _nebular_profile_sha(value: Any) -> str:
@@ -406,7 +468,12 @@ def _nebular_tree(expected: str) -> str:
     return expected
 
 
-def _nebular_expected_artifacts(record: Mapping[str, Any], candidate: Mapping[str, Any]) -> dict[str, Any]:
+def _nebular_expected_artifacts(
+    record: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+    manylinux_stage_a: ValidatedPayloadPortability | None = None,
+) -> dict[str, Any]:
+    stage_a_digest = _nebular_stage_a_digest(manylinux_stage_a)
     if (not isinstance(record, Mapping)
             or record.get("schema") != NEBULAR070_EXPECTED_ARTIFACT_SCHEMA
             or record.get("candidate_rs9_source") != candidate.get("candidate_rs9_source")
@@ -427,15 +494,31 @@ def _nebular_expected_artifacts(record: Mapping[str, Any], candidate: Mapping[st
         fail("NEBULAR_EXPECTED_ARTIFACTS")
     rows = []
     for wheel in record["wheels"]:
+        target = wheel.get("target") if isinstance(wheel, Mapping) else None
+        expected_tag = NEBULAR070_WHEEL_TAGS.get(target) if isinstance(target, str) else None
+        if stage_a_digest is not None and isinstance(target, str) and target in NEBULAR070_MANYLINUX_TARGETS:
+            expected_tag = manylinux_tag_for_target(target)
         if (not isinstance(wheel, Mapping)
                 or set(("target", "filename", "size", "sha256", "tag", "version")) - set(wheel)
-                or wheel.get("target") not in TARGET_SYSTEMS
+                or not isinstance(target, str)
+                or target not in TARGET_SYSTEMS
                 or not isinstance(wheel.get("filename"), str)
                 or type(wheel.get("size")) is not int or wheel["size"] <= 0
                 or not re.fullmatch(r"[0-9a-f]{64}", str(wheel.get("sha256")))
                 or not isinstance(wheel.get("tag"), str)
-                or wheel.get("tag") != NEBULAR070_WHEEL_TAGS[wheel.get("target")]
+                or wheel.get("tag") != expected_tag
                 or wheel.get("version") != "0.7.0"):
+            fail("NEBULAR_EXPECTED_ARTIFACTS")
+        if stage_a_digest is not None and target in NEBULAR070_MANYLINUX_TARGETS:
+            if (wheel.get("filename") !=
+                    f"theme_forge_nebular_fusion-0.7.0-{expected_tag}.whl"
+                    or any(wheel.get(key) != value for key, value in {
+                        "construction_stage": "payload-portability",
+                        "release_admission": "external",
+                        "manylinux_construction_receipt_sha256": stage_a_digest,
+                    }.items())):
+                fail("NEBULAR_EXPECTED_ARTIFACTS")
+        elif any(key in wheel for key in _NEBULAR070_STAGE_A_FIELDS):
             fail("NEBULAR_EXPECTED_ARTIFACTS")
         rows.append(dict(wheel))
     rows.sort(key=lambda row: row["target"])
@@ -453,8 +536,20 @@ def _nebular_expected_artifacts(record: Mapping[str, Any], candidate: Mapping[st
                 or row_profile.get("license_expression") != NEBULAR070_LICENSE_EXPRESSION
                 or row.get("linux_runtime_policy") != NEBULAR070_LINUX_RUNTIME_POLICY):
             fail("NEBULAR_EXPECTED_ARTIFACTS")
-    return {"schema": record["schema"], "candidate_rs9_source": record["candidate_rs9_source"],
-            "wheels": rows, "record_sha256": record["record_sha256"]}
+        if stage_a_digest is not None and target in NEBULAR070_MANYLINUX_TARGETS:
+            if any(row.get(key) != value for key, value in {
+                "construction_stage": "payload-portability",
+                "release_admission": "external",
+                "manylinux_construction_receipt_sha256": stage_a_digest,
+            }.items()):
+                fail("NEBULAR_EXPECTED_ARTIFACTS")
+        elif any(key in row for key in _NEBULAR070_STAGE_A_FIELDS):
+            fail("NEBULAR_EXPECTED_ARTIFACTS")
+    result = {"schema": record["schema"], "candidate_rs9_source": record["candidate_rs9_source"],
+              "wheels": rows, "record_sha256": record["record_sha256"]}
+    if stage_a_digest is not None:
+        result["manylinux_stage_a_sha256"] = stage_a_digest
+    return result
 
 
 def qualify_nebular070(
@@ -479,6 +574,8 @@ def qualify_nebular070(
     process_observer: Any = None,
     state_snapshot: Any = None,
     real_user_state_snapshot: Any = None,
+    offline_pip_bootstrap: Mapping[str, Any] | None = None,
+    manylinux_stage_a: ValidatedPayloadPortability | None = None,
 ) -> dict[str, Any]:
     """Run one Nebular 0.7 candidate through the post-path native consumer.
 
@@ -511,7 +608,7 @@ def qualify_nebular070(
         "run_attempt": run_attempt,
         "profile_sha256": profile_sha256,
     }
-    artifacts = _nebular_expected_artifacts(expected_artifacts, candidate)
+    artifacts = _nebular_expected_artifacts(expected_artifacts, candidate, manylinux_stage_a)
     # Consumer-side validation also proves the candidate row and actual wheel
     # bytes agree with the expected record before a native process is spawned.
     expected_wheel = next(row for row in artifacts["wheels"] if row["target"] == target)
@@ -527,6 +624,8 @@ def qualify_nebular070(
         "state_snapshot": state_snapshot,
         "real_user_state_snapshot": real_user_state_snapshot,
     }
+    if offline_pip_bootstrap is not None:
+        consume_kwargs["offline_pip_bootstrap"] = offline_pip_bootstrap
     if runner is not None:
         consume_kwargs["runner"] = runner
     consumer = consume_nebular_candidate(candidate, wheel_path, raw_release, work, **consume_kwargs)
@@ -535,7 +634,7 @@ def qualify_nebular070(
         "expected_artifact_record_sha256": artifacts["record_sha256"],
         "qualification_rs9_source": qualification_source,
     })
-    return {
+    result = {
         "schema": NEBULAR070_HOSTED_SCHEMA,
         "status": "fixture-native-consumer-passed" if fixture_only else "native-consumer-passed",
         "fixture_only": fixture_only,
@@ -551,6 +650,10 @@ def qualify_nebular070(
         "publication_admitted": False,
         "public_writes": 0,
     }
+    if "manylinux_stage_a_sha256" in artifacts:
+        consumer["manylinux_stage_a_sha256"] = artifacts["manylinux_stage_a_sha256"]
+        result["manylinux_stage_a_sha256"] = artifacts["manylinux_stage_a_sha256"]
+    return result
 
 
 def admit_nebular070_matrix(
@@ -564,6 +667,7 @@ def admit_nebular070_matrix(
     candidate_receipt_sha256: str,
     run_id: str,
     run_attempt: str,
+    manylinux_stage_a: ValidatedPayloadPortability | None = None,
 ) -> dict[str, Any]:
     """Admit only genuine three-host Gate 2 receipts; fixture receipts fail closed."""
     run_id = _run_id(run_id)
@@ -578,7 +682,8 @@ def admit_nebular070_matrix(
     root = Path(receipts)
     if root.is_symlink() or not root.is_dir():
         fail("NEBULAR_MATRIX_RECEIPTS")
-    expected = _nebular_expected_artifacts(expected_artifacts, candidate)
+    stage_a_digest = _nebular_stage_a_digest(manylinux_stage_a)
+    expected = _nebular_expected_artifacts(expected_artifacts, candidate, manylinux_stage_a)
     candidate_source = candidate.get("candidate_rs9_source")
     if not isinstance(candidate_source, Mapping):
         fail("NEBULAR_CANDIDATE_SCHEMA")
@@ -607,6 +712,10 @@ def admit_nebular070_matrix(
                 or result.get("run_id") != run_id
                 or result.get("run_attempt") != "1"
                 or result.get("expected_artifact_record_sha256") != expected["record_sha256"]
+                or (stage_a_digest is not None
+                    and result.get("manylinux_stage_a_sha256") != stage_a_digest)
+                or (stage_a_digest is None
+                    and "manylinux_stage_a_sha256" in result)
                 or result.get("publication_admitted") is not False
                 or not isinstance(result.get("qualification_rs9_source"), Mapping)):
             fail("NEBULAR_MATRIX_RECEIPT")
@@ -625,7 +734,11 @@ def admit_nebular070_matrix(
                 or consumer.get("process_observer", {}).get("orphan_count") != 0
                 or consumer.get("user_state", {}).get("unchanged") is not True
                 or consumer.get("sandbox", {}).get("network_disabled") is not True
-                or consumer.get("provider_closure", {}).get("status") != "verified"):
+                or consumer.get("provider_closure", {}).get("status") != "verified"
+                or (stage_a_digest is not None
+                    and consumer.get("manylinux_stage_a_sha256") != stage_a_digest)
+                or (stage_a_digest is None
+                    and "manylinux_stage_a_sha256" in consumer)):
             fail("NEBULAR_MATRIX_RECEIPT")
         expected_wheel = next(row for row in expected["wheels"] if row["target"] == target)
         if result.get("consumer", {}).get("wheel") != expected_wheel:
@@ -634,7 +747,7 @@ def admit_nebular070_matrix(
         qualification_sources[target] = qualification
     _nebular_tree(expected_tree)
     source_commit(expected_commit)
-    return {
+    result = {
         "schema": NEBULAR070_MATRIX_SCHEMA,
         "status": "native-matrix-passed",
         "fixture_only": False,
@@ -650,3 +763,6 @@ def admit_nebular070_matrix(
         "publication_admitted": False,
         "public_writes": 0,
     }
+    if stage_a_digest is not None:
+        result["manylinux_stage_a_sha256"] = stage_a_digest
+    return result

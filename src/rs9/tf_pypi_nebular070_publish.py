@@ -32,6 +32,9 @@ from rs9.errors import ContractError
 from rs9.github import PublicClient
 from rs9.materialize import parse_manifest_members
 from rs9.nebular070_manylinux import (
+    MAX_INPUT_BYTES,
+    PORTABILITY_INPUT_SCHEMA,
+    validate_nebular070_payload_portability,
     ValidatedPayloadPortability,
     ValidatedReleaseAdmission,
     load_payload_portability_bundle,
@@ -2549,6 +2552,48 @@ def _load_manylinux_stage_a(
     return stage_a
 
 
+def _load_candidate_stage_a(
+    bundle: Path,
+    descriptor: Mapping[str, Any] | None,
+    *,
+    expected_commit: str,
+    expected_tree: str,
+) -> ValidatedPayloadPortability | None:
+    """Load the bundle Stage-A member only with the same anchored descriptor joins."""
+    stage_a_path = bundle / MANYLINUX_STAGE_A_MEMBER
+    manylinux_spec = descriptor.get("manylinux") if isinstance(descriptor, Mapping) else None
+    if manylinux_spec is None:
+        if stage_a_path.exists() or stage_a_path.is_symlink():
+            fail("BUNDLE_MANYLINUX_INPUT")
+        return None
+    if not isinstance(manylinux_spec, Mapping):
+        fail("BUNDLE_MANYLINUX_INPUT")
+    _check_no_symlinks(stage_a_path, "BUNDLE_MANYLINUX_INPUT")
+    if not stage_a_path.is_file():
+        fail("BUNDLE_MANYLINUX_INPUT")
+    captured = manylinux_spec.get("stage_a")
+    if not isinstance(captured, Mapping):
+        fail("BUNDLE_MANYLINUX_INPUT")
+    stage_a_bytes = physical_bytes(stage_a_path, limit=MAX_INPUT_BYTES)
+    if (len(stage_a_bytes) != captured.get("size")
+            or sha256(stage_a_bytes) != captured.get("sha256")):
+        fail("BUNDLE_MANYLINUX_INPUT")
+    # Validate the exact authenticated read, without reopening the mutable path.
+    envelope = strict_json(stage_a_bytes)
+    if (not isinstance(envelope, Mapping)
+            or set(envelope) != {"schema", "record", "bodies"}
+            or envelope["schema"] != PORTABILITY_INPUT_SCHEMA
+            or not isinstance(envelope["record"], Mapping)
+            or not isinstance(envelope["bodies"], Mapping)):
+        fail("BUNDLE_MANYLINUX_INPUT")
+    return validate_nebular070_payload_portability(
+        envelope["record"],
+        envelope["bodies"],
+        expected_tf_producer_source=manylinux_spec["tf_producer_source"],
+        expected_rs9_tool_source={"commit": expected_commit, "tree": expected_tree},
+    )
+
+
 def _validate_manylinux_matrix_binding(
     envelope: Mapping[str, Any],
     *,
@@ -3858,6 +3903,7 @@ def workflow_070_qualify_jobs_text() -> str:
             --receipts-dir "${{{{ runner.temp }}}}/tfnf-070-receipts" \\
             --output "${{{{ runner.temp }}}}/tfnf-070-matrix/matrix_receipt.json" \\
             --expected-commit "${{{{ github.sha }}}}" \\
+            --qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()} \\
             --run-id "${{{{ github.run_id }}}}" \\
             --run-attempt "${{{{ github.run_attempt }}}}"
 
@@ -5273,6 +5319,7 @@ def qualify_native_target(
             / "raw_release.json"
         )
     _check_no_symlinks(rr_out_path, "RAW_RELEASE_SYMLINK")
+    descriptor: Mapping[str, Any]
     if rr_out_path.is_file():
         raw_release = load_raw_release_handoff(
             rr_out_path,
@@ -5303,8 +5350,27 @@ def qualify_native_target(
             expected_artifacts=expected,
             repository=root,
         )
+        descriptor = (
+            validate_qualification_inputs_descriptor(
+                eff_qual_inputs,
+                repository=root,
+                pending_code="RAW_RELEASE_HANDOFF_PENDING",
+            )
+            if isinstance(eff_qual_inputs, Mapping)
+            else load_qualification_inputs_descriptor(
+                eff_qual_inputs,
+                repository=root,
+                pending_code="RAW_RELEASE_HANDOFF_PENDING",
+            )
+        )
 
     tree = _git_output(root, ["rev-parse", "--verify", "HEAD^{tree}"], "HOSTED_COMMIT")
+    manylinux_stage_a = _load_candidate_stage_a(
+        bundle,
+        descriptor,
+        expected_commit=expected_commit,
+        expected_tree=tree,
+    )
     target_system = SYSTEM_BY_TARGET[target]
     target_row = next(
         (row for row in candidate.get("rows", [])
@@ -5340,6 +5406,7 @@ def qualify_native_target(
         run_attempt=run_attempt,
         sandbox_prefix=eff_prefix,
         real_user_state_snapshot=eff_user_state,
+        manylinux_stage_a=manylinux_stage_a,
     )
     out_path = Path(output_path)
     _check_no_symlinks(out_path.parent, "QUALIFY_OUTPUT")
@@ -5507,7 +5574,23 @@ def build_candidates_bundle(
             src_w = cand_dir / row["system"] / row["wheel"]["filename"]
             dst_w = dist_dir / row["wheel"]["filename"]
             shutil.copyfile(src_w, dst_w)
-            wheels_list.append({"target": target, **row["wheel"]})
+            expected_wheel = {"target": target, **row["wheel"]}
+            if stage_a is not None and target.startswith("linux"):
+                construction = {
+                    key: row.get(key)
+                    for key in (
+                        "construction_stage", "release_admission",
+                        "manylinux_construction_receipt_sha256",
+                    )
+                }
+                if construction != {
+                    "construction_stage": "payload-portability",
+                    "release_admission": "external",
+                    "manylinux_construction_receipt_sha256": stage_a.digest,
+                }:
+                    fail("MANYLINUX_INPUT")
+                expected_wheel.update(construction)
+            wheels_list.append(expected_wheel)
     finally:
         if cand_dir.exists():
             shutil.rmtree(cand_dir)
@@ -5575,6 +5658,7 @@ def parser() -> argparse.ArgumentParser:
     m_cmd.add_argument("--receipts-dir", type=Path, required=True)
     m_cmd.add_argument("--output", type=Path, required=True)
     m_cmd.add_argument("--expected-commit", required=True)
+    m_cmd.add_argument("--qualification-inputs", type=Path, default=None)
     m_cmd.add_argument("--run-id", required=True)
     m_cmd.add_argument("--run-attempt", required=True)
 
@@ -5708,6 +5792,21 @@ def main(
             prof_sha = _require_candidate_profile_sha(candidate)
             root = repo_root()
             tree = _git_output(root, ["rev-parse", "--verify", "HEAD^{tree}"], "HOSTED_COMMIT")
+            descriptor = (
+                load_qualification_inputs_descriptor(
+                    args.qualification_inputs,
+                    repository=root,
+                    pending_code="RELEASE_INPUTS_PENDING",
+                )
+                if args.qualification_inputs is not None
+                else None
+            )
+            manylinux_stage_a = _load_candidate_stage_a(
+                bundle,
+                descriptor,
+                expected_commit=args.expected_commit,
+                expected_tree=tree,
+            )
             matrix = admit_nebular070_matrix(
                 candidate,
                 expected,
@@ -5718,6 +5817,7 @@ def main(
                 candidate_receipt_sha256=sha256(canonical(candidate)),
                 run_id=args.run_id,
                 run_attempt=args.run_attempt,
+                manylinux_stage_a=manylinux_stage_a,
             )
             out_path = Path(args.output)
             _check_no_symlinks(out_path.parent, "MATRIX_OUTPUT")
