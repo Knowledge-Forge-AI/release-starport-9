@@ -426,6 +426,7 @@ def execute(context):
     session_bus_argv = _pinned_session_bus_argv(runtime_facts) if system.endswith("-linux") else None
     smoke = verify_nebular_runtime(roots[0], prepared, system, [*prefix, *runtime_prefix], env, baseline=baseline,
                                    diagnostic_boundary_probes=system.endswith("-linux"),
+                                   diagnostic_replay=system.endswith("-linux"),
                                    session_bus_argv=session_bus_argv)
     gates.extend([{"name": "nix-native-closure", "status": "pass"}, {"name": "nix-build-check-run", "status": "pass"}])
     evidence = scratch / "nix-output-receipt.json"

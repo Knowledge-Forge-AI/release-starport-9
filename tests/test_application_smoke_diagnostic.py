@@ -396,6 +396,63 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
         diag_path = self.work / "diagnostics/application-smoke-diagnostic.json"
         self.assertFalse(diag_path.is_file())
 
+    def test_independent_replay_covers_linux_b_and_c_without_changing_gate(self):
+        """Linux Nix can request replay independently of x86 diagnostic extras."""
+        for system, scenario in (("aarch64-linux", "B"), ("x86_64-linux", "C")):
+            with self.subTest(system=system):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp).resolve()
+                    scratch = root / "scratch"
+                    tools = root / "tools"
+                    source = root / "source"
+                    scratch.mkdir()
+                    tools.mkdir()
+                    source.mkdir()
+                    (tools / "native-rc-smoke.mjs").write_text("// synthetic smoke harness fixture\n")
+                    prepared = {
+                        "scratch": scratch,
+                        "tools": tools,
+                        "source": source,
+                        "checkout": source,
+                        "records": [],
+                    }
+                    calls = []
+
+                    def original_run(cmd, **kwargs):
+                        calls.append(("original", list(cmd), kwargs))
+                        return SimpleNamespace(returncode=127, stdout=b"", stderr=b"initial failure\n")
+
+                    def replay_run(cmd, **kwargs):
+                        calls.append(("replay", list(cmd), kwargs))
+                        return SimpleNamespace(returncode=127, stdout=b"", stderr=b"replay failure\n")
+
+                    with patch("subprocess.run", side_effect=original_run), patch(
+                        "rs9.application_smoke_diagnostic._bounded_run", side_effect=replay_run
+                    ):
+                        with self.assertRaises(ContractError) as caught:
+                            execute_application_smoke(
+                                prepared=prepared,
+                                system=system,
+                                launch_root=root,
+                                diagnostic_replay=True,
+                            )
+
+                    self.assertEqual(caught.exception.code, "APPLICATION_SMOKE")
+                    self.assertEqual(len(calls), 2)
+                    self.assertEqual([kind for kind, _cmd, _kwargs in calls], ["original", "replay"])
+                    self.assertEqual(calls[0][2]["timeout"], 240)
+                    self.assertEqual(calls[1][2]["timeout"], 240)
+                    self.assertIn("--scenario", calls[0][1])
+                    self.assertEqual(calls[0][1][calls[0][1].index("--scenario") + 1], scenario)
+                    self.assertIn(f"evidence-replay-{scenario}", " ".join(calls[1][1]))
+                    diagnostic = json.loads(
+                        (root / "diagnostics/application-smoke-diagnostic.json").read_bytes()
+                    )
+                    self.assertEqual(diagnostic["gate_status"], "fail")
+                    self.assertEqual(diagnostic["replay"]["status"], "replay-reproduced")
+                    if scenario == "C":
+                        self.assertEqual(diagnostic["scenarios_not_run"], ["C-signal"])
+
     def test_nonzero_retains_receipt_problem_and_identity(self):
         evidence = self.scratch / "evidence"
         evidence.mkdir()
@@ -673,6 +730,62 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
         self.assertFalse(probes["application_qualified"])
         self.assertNotIn(str(self.work), json.dumps(diagnostic))
         self.assertNotIn("startup failed", json.dumps(diagnostic))
+
+    def test_nix_replay_with_boundary_probes_keeps_pinned_bus_and_failed_gate(self):
+        """The Linux Nix combination replays once with the pinned bus, then probes."""
+        root = "/nix/store/00000000000000000000000000001023-dbus-1.14.10"
+        pinned_argv = [
+            f"{root}/bin/dbus-run-session",
+            f"--dbus-daemon={root}/bin/dbus-daemon",
+            f"--config-file={root}/share/dbus-1/session.conf",
+            "--",
+        ]
+        original_calls, bounded_calls = [], []
+
+        def original_failure(cmd, **kwargs):
+            original_calls.append(list(cmd))
+            return SimpleNamespace(returncode=127, stdout=b"", stderr=b"initial failure\n")
+
+        def bounded(cmd, **kwargs):
+            bounded_calls.append(list(cmd))
+            if "native-rc-smoke.mjs" in " ".join(cmd):
+                return SimpleNamespace(returncode=127, stdout=b"", stderr=b"replay failure\n",
+                                       stream_sizes=(0, 15), capture_error=None, cleanup_error=None,
+                                       child_reaped=True)
+            output = b"22.23.3\n" if "process.versions.node" in cmd else b""
+            return SimpleNamespace(returncode=0, stdout=output, stderr=b"",
+                                   stream_sizes=(len(output), 0), capture_error=None,
+                                   cleanup_error=None, child_reaped=True)
+
+        with patch("subprocess.run", side_effect=original_failure), \
+             patch("rs9.application_smoke_diagnostic._bounded_run", side_effect=bounded):
+            with self.assertRaises(ContractError) as caught:
+                execute_application_smoke(
+                    prepared=self.prepared,
+                    system="aarch64-linux",
+                    launch_root=self.launch_root,
+                    diagnostic_boundary_probes=True,
+                    diagnostic_replay=True,
+                    session_bus_argv=pinned_argv,
+                )
+
+        self.assertEqual(caught.exception.code, "APPLICATION_SMOKE")
+        self.assertEqual(len(original_calls), 1)
+        replays = [cmd for cmd in bounded_calls if "native-rc-smoke.mjs" in " ".join(cmd)]
+        self.assertEqual(len(replays), 1)
+        self.assertIs(bounded_calls[0], replays[0])
+        for cmd in (original_calls[0], replays[0]):
+            self.assertEqual(cmd[cmd.index(pinned_argv[0]):cmd.index(pinned_argv[0]) + 4], pinned_argv)
+            self.assertNotIn("dbus-run-session", cmd)
+        diagnostic = json.loads((self.work / "diagnostics/application-smoke-diagnostic.json").read_bytes())
+        self.assertEqual(diagnostic["gate_status"], "fail")
+        self.assertEqual(diagnostic["replay"]["status"], "replay-reproduced")
+        self.assertFalse(diagnostic["replay_equivalent_to_original"])
+        self.assertEqual(diagnostic["descendant_cleanup_scope"], "replay-created-process-group")
+        self.assertFalse(diagnostic["boundary_probes"]["qualification_authority"])
+        self.assertNotIn(str(self.work), json.dumps(diagnostic))
+        self.assertNotIn("initial failure", json.dumps(diagnostic))
+        self.assertNotIn("replay failure", json.dumps(diagnostic))
 
     def test_boundary_probe_timeout_and_untrusted_pinned_argv_are_bounded(self):
         calls = []
