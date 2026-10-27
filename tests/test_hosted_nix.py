@@ -144,6 +144,7 @@ class NixHostedTests(unittest.TestCase):
         self.assertIn('"nix", "build"', source)
         self.assertIn('"nix", "path-info"', source)
         self.assertIn('diagnostic_boundary_probes=system.endswith("-linux")', source)
+        self.assertIn('diagnostic_replay=system.endswith("-linux")', source)
         self.assertNotIn("compute_bounded_out_hash", source)
         self.assertEqual(SYSTEMS, {"aarch64-darwin", "x86_64-linux", "aarch64-linux"})
 

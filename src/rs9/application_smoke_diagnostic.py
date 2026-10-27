@@ -704,7 +704,7 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
 
 
 def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=None, diagnostic_extras=False,
-                             diagnostic_boundary_probes=False, session_bus_argv=None):
+                             diagnostic_boundary_probes=False, diagnostic_replay=False, session_bus_argv=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
@@ -724,10 +724,10 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
             from rs9.pages_smoke_diagnostic import validate_smoke_observation
             observation = validate_smoke_observation(fields, system=system)
             details = _failure_details(fields, extras=extras, receipt_name=platform+"-"+scenario+".run.json")
-            if extras or diagnostic_boundary_probes:
+            if extras or diagnostic_boundary_probes or diagnostic_replay:
                 details["diagnostic_sha256"] = _retain_failure(prepared, system, platform, scenario,
                     launch_root, prefix, env, fields, scenarios[index+1:], session_bus_argv=session_bus_argv,
-                    include_replay=extras, boundary_probes=diagnostic_boundary_probes)
+                    include_replay=(extras or diagnostic_replay), boundary_probes=diagnostic_boundary_probes)
             err = ContractError("APPLICATION_SMOKE", "Released application-aware smoke failed", details=details)
             err.smoke_observation = observation
             raise err
