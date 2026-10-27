@@ -98,12 +98,12 @@ from authenticated release metadata and are checked for executable regular
 files before use.
 
 The wheel's `_rs9/provenance.json` records the PEP 639 license expression
-`AGPL-3.0-or-later OR LicenseRef-Commercial`, the three legal companion files,
-the Markdown project description path and digest, the upstream release identity, the
-payload and manifest digests, and the source hashes of the isolated helper
-modules. These provenance fields are separate from the PEP 639 headers in
-`METADATA`. The build result is a candidate and has publication admission
-turned off until the separate release qualification process completes.
+`AGPL-3.0-or-later`, the `LICENSE` and `NOTICE` files, the Markdown project
+description path and digest, the upstream release identity, the payload and
+manifest digests, and the source hashes of the isolated helper modules. These
+provenance fields are separate from the PEP 639 headers in `METADATA`. The
+build result is a candidate and has publication admission turned off until the
+separate release qualification process completes.
 
 Archive, manifest, platform, and executable-path checks run immediately before
 materialization. `tfnf --path` reports the resolved GUI path without launching
@@ -113,11 +113,9 @@ another process after resolution are outside this package's guarantee.
 
 ## License
 
-The open-source portion is available under **AGPL-3.0-or-later**. Commercial
-use and any additional commercial terms are described in
-`COMMERCIAL-LICENSE.md`, which is distributed with the wheel alongside
-`LICENSE` and `NOTICE`. Review the applicable legal files before using the
-application in a commercial deployment.
+This Python distribution and its embedded Nebular application are offered
+under **AGPL-3.0-or-later**. Review `LICENSE` and `NOTICE` before use and
+preserve those notices when conveying the package.
 
 ## Reporting problems
 

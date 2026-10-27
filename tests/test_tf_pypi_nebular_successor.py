@@ -18,6 +18,7 @@ from rs9.profiles import selection_for_intent
 from rs9.release_core import authenticate_release, digest
 from rs9.scratch import canonical
 from rs9.tf_pypi_nebular_successor import (
+    authenticate_gate1_capture,
     authenticate_successor_capture,
     build_successor_candidates,
     main,
@@ -33,6 +34,7 @@ from rs9.wheel_nebular_successor import (
     build_successor_wheel,
     successor_release,
 )
+from tests.test_nebular070_gate1_roundtrip import _prepare_fixture
 from tests.test_nebular_lineage import NebularLineageTests
 from tests.test_wheel_native import make_darwin_archive, make_standard_darwin_entries
 
@@ -618,12 +620,92 @@ class NebularSuccessorIntegrationTests(unittest.TestCase):
             validate_candidate_receipt(receipt, cross_wired_auth, output_dir=output)
         self.assertEqual(caught.exception.code, "RECEIPT_VERSION")
 
-        tag_mismatch_receipt = copy.deepcopy(receipt)
-        tag_mismatch_receipt["application_version"] = "0.7.0"
-        tag_mismatch_receipt["distribution_version"] = "0.7.0"
+        three_file_070_receipt = copy.deepcopy(receipt)
+        three_file_070_receipt["application_version"] = "0.7.0"
+        three_file_070_receipt["distribution_version"] = "0.7.0"
+        with self.assertRaises(ContractError) as caught:
+            validate_candidate_receipt(three_file_070_receipt, cross_wired_auth, output_dir=output)
+        self.assertEqual(caught.exception.code, "RECEIPT_BINDING")
+
+        tag_mismatch_receipt = copy.deepcopy(three_file_070_receipt)
+        tag_mismatch_receipt["legal_files"] = {
+            name: receipt["legal_files"][name] for name in ("LICENSE", "NOTICE")
+        }
+        commercial_license_070_receipt = copy.deepcopy(tag_mismatch_receipt)
+        commercial_license_070_receipt["license"] = {
+            "expression": "AGPL-3.0-or-later OR LicenseRef-Commercial",
+            "files": tag_mismatch_receipt["legal_files"],
+        }
+        with self.assertRaises(ContractError) as caught:
+            validate_candidate_receipt(
+                commercial_license_070_receipt, cross_wired_auth, output_dir=output
+            )
+        self.assertEqual(caught.exception.code, "RECEIPT_BINDING")
+
+        tag_mismatch_receipt["license"] = {
+            "expression": "AGPL-3.0-or-later",
+            "files": tag_mismatch_receipt["legal_files"],
+        }
         with self.assertRaises(ContractError) as caught:
             validate_candidate_receipt(tag_mismatch_receipt, cross_wired_auth, output_dir=output)
         self.assertEqual(caught.exception.code, "TAG_MISMATCH")
+
+        repo_070, evidence_070, _intent_070, binding_070 = _prepare_fixture(
+            self.root / "generic-070-roundtrip"
+        )
+        gate1_auth = authenticate_gate1_capture(
+            repo_070,
+            evidence_070,
+            release_binding=binding_070,
+            approved_bootstrap_sha256=binding_070["expected"]["bootstrap_sha256"],
+        )
+        generic_070_auth = dataclasses.replace(
+            gate1_auth,
+            lineage_proof=authenticated.lineage_proof,
+        )
+        output_070 = self.root / "candidates-070"
+        with patch(
+            "rs9.wheel_nebular_successor.verify_forward_lineage_proof",
+            return_value=gate1_auth.lineage_facts,
+        ):
+            receipt_070 = build_successor_candidates(
+                generic_070_auth,
+                output_070,
+                rs9_source_commit=RS9_COMMIT,
+                rs9_source_tree=RS9_TREE,
+                deterministic_timestamp=(2026, 1, 1, 0, 0, 0),
+            )
+        self.assertEqual(receipt_070["application_version"], "0.7.0")
+        self.assertEqual(receipt_070["distribution_version"], "0.7.0")
+        self.assertEqual(receipt_070["license"]["expression"], "AGPL-3.0-or-later")
+        self.assertEqual(set(receipt_070["legal_files"]), {"LICENSE", "NOTICE"})
+        self.assertEqual(
+            validate_candidate_receipt(receipt_070, generic_070_auth, output_dir=output_070),
+            receipt_070,
+        )
+        tampered_070 = copy.deepcopy(receipt_070)
+        row_070 = tampered_070["rows"][0]
+        wheel_070_path = output_070 / row_070["system"] / row_070["wheel"]["filename"]
+        self._rewrite_wheel(
+            wheel_070_path,
+            lambda entries, provenance: (
+                entries.__setitem__(
+                    next(name for name in entries if name.endswith(".dist-info/METADATA")),
+                    entries[next(name for name in entries if name.endswith(".dist-info/METADATA"))].replace(
+                        b"License-Expression: AGPL-3.0-or-later\n",
+                        b"License-Expression: AGPL-3.0-or-later OR LicenseRef-Commercial\n",
+                    ),
+                ),
+                provenance.__setitem__(
+                    "metadata_sha256",
+                    digest(entries[next(name for name in entries if name.endswith(".dist-info/METADATA"))]),
+                ),
+            ),
+        )
+        self._refresh_wheel_row(row_070, wheel_070_path)
+        with self.assertRaises(ContractError) as caught:
+            validate_candidate_receipt(tampered_070, generic_070_auth, output_dir=output_070)
+        self.assertEqual(caught.exception.code, "RECEIPT_ARTIFACT")
 
 
 if __name__ == "__main__":

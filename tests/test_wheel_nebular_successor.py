@@ -24,6 +24,7 @@ from rs9.wheel_nebular_successor import (
     DEFAULT_DESCRIPTION_PATH,
     DESCRIPTION_070_PATH,
     DISTRIBUTION_VERSION,
+    GATE1_PROFILE,
     LEGAL_FILES,
     LICENSE_EXPRESSION,
     SUCCESSOR_RELEASES,
@@ -76,7 +77,22 @@ class NebularSuccessorTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def _build(self, name: str = "wheel", **kwargs):
-        license_files = kwargs.pop("license_files", self.legal)
+        candidate_profile = kwargs.get("candidate_profile")
+        release = successor_release(
+            kwargs.get(
+                "distribution_version",
+                candidate_profile.distribution_version if candidate_profile else DISTRIBUTION_VERSION,
+            )
+        )
+        legal_names = (
+            (*candidate_profile.required_legal_files, *candidate_profile.optional_legal_files)
+            if candidate_profile is not None
+            else (("LICENSE", "NOTICE") if release.distribution_version == "0.7.0" else LEGAL_FILES)
+        )
+        license_files = kwargs.pop(
+            "license_files",
+            {name: self.legal[name] for name in legal_names},
+        )
         archive_bytes = kwargs.pop("archive_bytes", self.archive)
         launcher_path = kwargs.pop("launcher_path", self.launcher)
         gui_path = kwargs.pop("gui_path", self.gui)
@@ -502,6 +518,10 @@ class NebularSuccessorTests(unittest.TestCase):
             metadata = metadata_bytes.decode("utf-8")
             init_py = archive.read("theme_forge_nebular_fusion/__init__.py").decode("utf-8")
             launcher_py = archive.read("theme_forge_nebular_fusion/launcher.py").decode("utf-8")
+            provenance = json.loads(
+                archive.read("theme_forge_nebular_fusion/_rs9/provenance.json")
+            )
+            names = set(archive.namelist())
             payload_member = (
                 "theme_forge_nebular_fusion/payload/"
                 "theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz"
@@ -509,12 +529,74 @@ class NebularSuccessorTests(unittest.TestCase):
             self.assertEqual(archive.read(payload_member), self.archive)
         self.assertTrue(metadata_bytes.endswith(readme_070))
         self.assertIn("Version: 0.7.0\n", metadata)
+        self.assertIn("License-Expression: AGPL-3.0-or-later\n", metadata)
+        self.assertNotIn("LicenseRef-Commercial", metadata)
+        for name in ("LICENSE", "NOTICE"):
+            self.assertIn(f"License-File: {name}\n", metadata)
+            self.assertIn(
+                f"theme_forge_nebular_fusion-0.7.0.dist-info/licenses/{name}", names
+            )
+        self.assertNotIn(
+            "theme_forge_nebular_fusion-0.7.0.dist-info/licenses/COMMERCIAL-LICENSE.md", names
+        )
+        self.assertEqual(provenance["license_expression"], "AGPL-3.0-or-later")
+        self.assertEqual(set(provenance["legal_files"]), {"LICENSE", "NOTICE"})
+        readme_text = readme_070.decode("utf-8")
+        self.assertIn("AGPL-3.0-or-later", readme_text)
+        self.assertNotIn("LicenseRef-Commercial", readme_text)
+        self.assertNotIn("COMMERCIAL-LICENSE.md", readme_text)
         self.assertIn("theme-forge-nebular-fusion==0.7.0", metadata)
         self.assertNotIn("0.6.1.post1", metadata)
         self.assertIn("__version__ = '0.7.0'", init_py)
         self.assertIn("__upstream_version__ = '0.7.0'", init_py)
         self.assertIn("DISTRIBUTION_VERSION = '0.7.0'", launcher_py)
         self.assertIn("APPLICATION_VERSION = '0.7.0'", launcher_py)
+
+        with self.assertRaises(ContractError) as raised:
+            self._build(
+                "selected-070-three-legal",
+                application_version="0.7.0",
+                distribution_version="0.7.0",
+                license_files=self.legal,
+            )
+        self.assertEqual(raised.exception.code, "LEGAL_FILES")
+
+        with self.assertRaises(ContractError) as raised:
+            self._build(
+                "selected-070-missing-notice",
+                application_version="0.7.0",
+                distribution_version="0.7.0",
+                license_files={"LICENSE": self.legal["LICENSE"]},
+            )
+        self.assertEqual(raised.exception.code, "LEGAL_FILES")
+
+    def test_gate1_profile_fixture_binds_agpl_metadata_and_legal_files(self) -> None:
+        result = self._build(
+            "gate1-profile",
+            application_version="0.7.0",
+            distribution_version="0.7.0",
+            archive_bytes=_linux_archive(),
+            launcher_path="theme-forge-nebular-fusion/bin/tfnf",
+            gui_path="theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+            system="x86_64-linux",
+            target_platform="x86_64-unknown-linux-gnu",
+            candidate_only=True,
+            candidate_profile=GATE1_PROFILE,
+            license_files={name: self.legal[name] for name in ("LICENSE", "NOTICE")},
+        )
+        with zipfile.ZipFile(result.wheel_path) as archive:
+            metadata = archive.read("theme_forge_nebular_fusion-0.7.0.dist-info/METADATA").decode()
+            provenance = json.loads(
+                archive.read("theme_forge_nebular_fusion/_rs9/provenance.json")
+            )
+            names = set(archive.namelist())
+        self.assertIn("License-Expression: AGPL-3.0-or-later\n", metadata)
+        self.assertNotIn("LicenseRef-Commercial", metadata)
+        self.assertEqual(provenance["candidate_profile"]["profile_id"], GATE1_PROFILE.profile_id)
+        self.assertEqual(provenance["source_legal_profile"]["observed_files"], ["LICENSE", "NOTICE"])
+        self.assertNotIn(
+            "theme_forge_nebular_fusion-0.7.0.dist-info/licenses/COMMERCIAL-LICENSE.md", names
+        )
 
     def test_release_pair_and_description_cross_selection_fail_closed(self) -> None:
         self.assertEqual(tuple(SUCCESSOR_RELEASES), ("0.6.1.post1", "0.7.0"))
@@ -603,7 +685,7 @@ class NebularSuccessorTests(unittest.TestCase):
                 distribution_version="0.7.0",
                 archive_path=bad_archive,
                 output_dir=self.root / "bad-070-archive-name",
-                license_files=self.legal,
+                license_files={name: self.legal[name] for name in ("LICENSE", "NOTICE")},
                 launcher_path=self.launcher,
                 gui_path=self.gui,
                 fixture_only=True,

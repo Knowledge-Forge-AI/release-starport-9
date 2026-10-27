@@ -62,8 +62,6 @@ from rs9.wheel_native import (
 from rs9.wheel_nebular_successor import (
     DISTRIBUTION_NAME,
     DISTRIBUTION_VERSION,
-    LEGAL_FILES,
-    LICENSE_EXPRESSION,
     PACKAGE_NAME,
     PRODUCT_ID,
     SUCCESSOR_PROVENANCE_SCHEMA,
@@ -76,6 +74,7 @@ from rs9.wheel_nebular_successor import (
     _successor_init_bytes,
     _successor_metadata_bytes,
     _successor_wheel_info_bytes,
+    _generic_successor_contract,
     GATE1_PROFILE,
     SuccessorCandidateProfile,
     build_successor_wheel,
@@ -330,6 +329,7 @@ def _receipt(
     first = rows[0]
     capture_record = authenticated.capture.record
     release = authenticated.release
+    license_expression, _ = _generic_successor_contract(release)
     return {
         "schema": _RECEIPT_SCHEMA,
         "application_version": release.application_version,
@@ -348,7 +348,7 @@ def _receipt(
         "rs9_source": rs9_source,
         "readme": first["readme"],
         "legal_files": first["legal_files"],
-        "license": {"expression": LICENSE_EXPRESSION, "files": first["legal_files"]},
+        "license": {"expression": license_expression, "files": first["legal_files"]},
         "rows": rows,
         "flags": {
             "candidate_only": True,
@@ -386,7 +386,8 @@ def _expected_provenance_source(authenticated: AuthenticatedSuccessorInputs) -> 
 def _expected_legal_files(authenticated: AuthenticatedSuccessorInputs) -> dict[str, dict[str, Any]]:
     source = authenticated.capture.source
     expected: dict[str, dict[str, Any]] = {}
-    for name in LEGAL_FILES:
+    _, required_names = _generic_successor_contract(authenticated.release)
+    for name in required_names:
         data = source.get(name)
         if not isinstance(data, bytes) or not data:
             raise _error("RECEIPT_BINDING", "Authenticated legal source bytes are unavailable")
@@ -545,6 +546,11 @@ def _validate_wheel_artifact(
     candidate_profile: SuccessorCandidateProfile | None = None,
 ) -> None:
     release = authenticated.release
+    license_expression = (
+        candidate_profile.license_expression
+        if candidate_profile is not None
+        else _generic_successor_contract(release)[0]
+    )
     system = row["system"]
     wheel = row.get("wheel")
     if not isinstance(wheel, dict):
@@ -646,7 +652,7 @@ def _validate_wheel_artifact(
         "license_facts": _profile_license_facts(authenticated.profile),
         "launcher_path": expected_asset["launcher_path"],
         "gui_path": expected_asset["gui_path"],
-        "license_expression": candidate_profile.license_expression if candidate_profile else LICENSE_EXPRESSION,
+        "license_expression": license_expression,
         "legal_files": expected_legal,
         "readme_path": expected_readme["path"],
         "readme_sha256": expected_readme["sha256"],
@@ -738,7 +744,7 @@ def _validate_wheel_artifact(
     if metadata != _successor_metadata_bytes(
         metadata.split(marker, 1)[1],
         distribution_version=release.distribution_version,
-        license_expression=candidate_profile.license_expression if candidate_profile else LICENSE_EXPRESSION,
+        license_expression=license_expression,
         legal_files=tuple(expected_legal),
     ):
         raise _error("RECEIPT_ARTIFACT", "Candidate METADATA is not the deterministic successor metadata")
@@ -800,6 +806,11 @@ def validate_candidate_receipt(
         raise _error("RECEIPT_SCHEMA", "Versioned Nebular candidate receipt required")
     if set(receipt) != expected_top:
         raise _error("RECEIPT_SCHEMA", "Candidate receipt fields are not closed")
+    if (
+        receipt.get("application_version") != release.application_version
+        or receipt.get("distribution_version") != release.distribution_version
+    ):
+        raise _error("RECEIPT_VERSION", "Successor receipt version identity disagrees")
     source_record = authenticated.capture.record
     expected_identity = _expected_source_identity(authenticated)
     expected_legal = _expected_legal_files(authenticated)
@@ -825,7 +836,7 @@ def validate_candidate_receipt(
         raise _error("RECEIPT_BINDING", "Candidate README digest is malformed")
     if receipt.get("legal_files") != expected_legal:
         raise _error("RECEIPT_BINDING", "Candidate legal files are not authenticated source facts")
-    if receipt.get("license") != {"expression": LICENSE_EXPRESSION, "files": expected_legal}:
+    if receipt.get("license") != {"expression": _generic_successor_contract(release)[0], "files": expected_legal}:
         raise _error("RECEIPT_BINDING", "Candidate license facts are not authenticated")
     if receipt.get("flags") != {
         "candidate_only": True,
@@ -871,11 +882,6 @@ def validate_candidate_receipt(
             "builder_can_publish", "can_publish", "publication_admitted", "manylinux_proven"
         )}:
             raise _error("PUBLICATION_HOLD", "Successor candidate publication flags must remain false")
-    if (
-        receipt.get("application_version") != release.application_version
-        or receipt.get("distribution_version") != release.distribution_version
-    ):
-        raise _error("RECEIPT_VERSION", "Successor receipt version identity disagrees")
     if source_record.get("release", {}).get("tag") != "v" + release.application_version:
         raise _error("TAG_MISMATCH", "Authenticated capture is for a different upstream version")
     _release_description_path(release, expected_readme["path"])
