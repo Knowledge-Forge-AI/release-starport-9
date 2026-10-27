@@ -246,7 +246,7 @@ class StaticContractTests(unittest.TestCase):
 
 class WorkflowGeneratorTests(unittest.TestCase):
     def test_workflow_text_structure_for_all_products(self):
-        expected_jobs = {
+        base_expected_jobs = {
             "build_verify",
             "native_darwin_arm64",
             "native_linux_arm64",
@@ -258,6 +258,8 @@ class WorkflowGeneratorTests(unittest.TestCase):
             pin = load_pin(product)
             text = workflow_text(pin)
             doc = yaml.safe_load(text)
+            resume_enabled = product == "theme-forge-stellar-burst" and pin["version"] == "0.7.0"
+            expected_jobs = base_expected_jobs | ({"publication_resume"} if resume_enabled else set())
 
             self.assertEqual(doc["name"], f"RS9 {product} PyPI Publish")
             self.assertIn("${{ inputs.mode }}", doc["run-name"])
@@ -270,7 +272,10 @@ class WorkflowGeneratorTests(unittest.TestCase):
             inputs = on_trigger["workflow_dispatch"]["inputs"]
             self.assertEqual(set(inputs.keys()), {"mode", "dispatch_id"})
             self.assertEqual(inputs["mode"]["type"], "choice")
-            self.assertEqual(inputs["mode"]["options"], ["qualify", "publish"])
+            self.assertEqual(
+                inputs["mode"]["options"],
+                ["qualify", "publish", "resume"] if resume_enabled else ["qualify", "publish"],
+            )
             self.assertEqual(inputs["mode"]["default"], "qualify")
 
             self.assertEqual(doc["permissions"], {"contents": "read"})
@@ -282,7 +287,12 @@ class WorkflowGeneratorTests(unittest.TestCase):
             self.assertEqual(set(doc["jobs"].keys()), expected_jobs)
 
             bv = doc["jobs"]["build_verify"]
-            self.assertEqual(bv["if"], "github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9-tf-pypi-hostqual1'")
+            self.assertEqual(
+                bv["if"],
+                "(github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9-tf-pypi-hostqual1') && inputs.mode != 'resume'"
+                if resume_enabled else
+                "github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9-tf-pypi-hostqual1'",
+            )
             self.assertEqual(bv["runs-on"], "ubuntu-24.04")
             self.assertEqual(bv["timeout-minutes"], 15)
             bv_build = bv["steps"][1]
@@ -351,6 +361,36 @@ class WorkflowGeneratorTests(unittest.TestCase):
             self.assertIn("readback", pub_readback["run"])
             self.assertIn(f"--project {product}", pub_readback["run"])
 
+            if resume_enabled:
+                resume = doc["jobs"]["publication_resume"]
+                self.assertEqual(
+                    resume["if"],
+                    "github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.mode == 'resume'",
+                )
+                self.assertNotIn("needs", resume)
+                resume_runs = "\n".join(step.get("run", "") for step in resume["steps"])
+                self.assertIn("rs9.tf_pypi_resume prepare", resume_runs)
+                self.assertIn("rs9.tf_pypi_publish select-missing", resume_runs)
+                self.assertNotIn("rs9.tf_pypi_publish build", resume_runs)
+
+    def test_burst_resume_uses_registered_workflow_identity_and_no_rebuild(self):
+        pin_path = ROOT / "operators/tf-pypi/theme-forge-stellar-burst-0.7.0.json"
+        pin = load_pin("theme-forge-stellar-burst", pin_path)
+        self.assertEqual(pin["workflow"], "rs9-tfsb-pypi-publish.yml")
+        text = workflow_text("theme-forge-stellar-burst", pin_path=pin_path)
+        doc = yaml.safe_load(text)
+        trigger = doc.get("on") or doc.get(True)
+        self.assertIn("resume", trigger["workflow_dispatch"]["inputs"]["mode"]["options"])
+        self.assertEqual(
+            doc["jobs"]["build_verify"]["if"],
+            "(github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9-tf-pypi-hostqual1') && inputs.mode != 'resume'",
+        )
+        self.assertNotIn("needs", doc["jobs"]["publication_resume"])
+        self.assertNotIn("rs9-tfsb-pypi-publication-resume.yml", text)
+        workflows = ROOT / ".github/workflows"
+        self.assertFalse((workflows / "rs9-tfsb-pypi-publication-resume.yml").exists())
+        self.assertEqual((workflows / pin["workflow"]).read_text(), text)
+
     def test_workflow_text_actions_use_only_apgr_shas(self):
         for product in PRODUCTS:
             doc = yaml.safe_load(workflow_text(product))
@@ -371,6 +411,8 @@ class WorkflowGeneratorTests(unittest.TestCase):
     def _extract_module_invocations(self, doc):
         invocations = []
         for job_id, job in doc["jobs"].items():
+            if job_id == "publication_resume":
+                continue
             for step in job["steps"]:
                 run_text = step.get("run")
                 if not run_text:
@@ -480,7 +522,7 @@ class WorkflowGeneratorTests(unittest.TestCase):
 
     def test_registered_workflows_matrix_wiring_and_oidc_boundary(self):
         workflows = ROOT / ".github/workflows"
-        expected_jobs = [
+        base_expected_jobs = [
             "build_verify",
             "native_darwin_arm64",
             "native_linux_arm64",
@@ -502,6 +544,9 @@ class WorkflowGeneratorTests(unittest.TestCase):
             pin = load_pin(product)
             doc = yaml.safe_load((workflows / pin["workflow"]).read_text(encoding="utf-8"))
             jobs = doc["jobs"]
+            expected_jobs = list(base_expected_jobs)
+            if product == "theme-forge-stellar-burst":
+                expected_jobs.append("publication_resume")
             self.assertEqual(list(jobs.keys()), expected_jobs)
             self.assertEqual(doc["permissions"], {"contents": "read"})
 
@@ -570,7 +615,7 @@ class WorkflowGeneratorTests(unittest.TestCase):
                 self.assertEqual(missing_step["env"][key], val)
 
             for job_id, job in jobs.items():
-                if job_id != "publish":
+                if job_id not in {"publish", "publication_resume"}:
                     self.assertNotIn("id-token", job.get("permissions", {}))
                     self.assertNotIn("environment", job)
                 for step in job["steps"]:

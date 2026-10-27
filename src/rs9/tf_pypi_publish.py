@@ -385,6 +385,19 @@ def workflow_text(pin, pin_path=None):
     selector = "" if pin_basename == project + ".json" else f" --pin operators/tf-pypi/{pin_basename}"
     workflow_name = pin["workflow"]
     concurrency_group = workflow_name[:-4] if workflow_name.endswith(".yml") else workflow_name
+    resume_enabled = project == "theme-forge-stellar-burst" and pin["version"] == "0.7.0"
+    mode_options = "\n".join(
+        f"          - {mode}" for mode in ("qualify", "publish", "resume") if mode != "resume" or resume_enabled
+    )
+    build_condition = "github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9-tf-pypi-hostqual1'"
+    if resume_enabled:
+        build_condition = "(github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9-tf-pypi-hostqual1') && inputs.mode != 'resume'"
+    resume_job = ""
+    if resume_enabled:
+        # Keep the resume module out of import-time dependency paths; it is a
+        # Burst-only workflow fragment selected after the pin is validated.
+        from rs9.tf_pypi_resume import resume_job_text
+        resume_job = "\n\n" + resume_job_text()
     darwin_job = _native_qualify_job(
         "native_darwin_arm64", "Native macOS ARM64 installed consumer",
         "macos-15", project, "darwin-arm64", sandbox=True, selector=selector,
@@ -412,8 +425,7 @@ on:
         required: true
         type: choice
         options:
-          - qualify
-          - publish
+{mode_options}
         default: qualify
       dispatch_id:
         description: 'Unique attended intent correlation; not publication authority'
@@ -429,7 +441,7 @@ concurrency:
 
 jobs:
   build_verify:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9-tf-pypi-hostqual1'
+    if: {build_condition}
     name: Build and Verify Candidate Artifacts
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -530,7 +542,7 @@ jobs:
       - name: Read back published PyPI state
         env:
           PYTHONPATH: src
-        run: python3 -B -m rs9.tf_pypi_publish readback --project {project}{selector} --dist dist
+        run: python3 -B -m rs9.tf_pypi_publish readback --project {project}{selector} --dist dist{resume_job}
 """
 
 
