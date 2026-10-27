@@ -113,7 +113,7 @@ class Nebular070HostObservationTests(unittest.TestCase):
     def test_loader_path_and_architecture_are_checked(self):
         runner = ProbeRunner(
             loader_text="  Machine: Advanced Micro Devices X86-64\n"
-            "      [Requesting program interpreter: /home/operator/ld-linux-x86-64.so.2]\n"
+            "      [Requesting program interpreter: /opt/unsupported/ld-linux-x86-64.so.2]\n"
         )
         with self.assertRaises(ContractError) as context:
             self._observe(runner=runner)
