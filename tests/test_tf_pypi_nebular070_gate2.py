@@ -7,16 +7,24 @@ import json
 import os
 from pathlib import Path
 import platform
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
 import tarfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 from rs9.tf_pypi_archive import AdmissionError, canonical, sha256
-from rs9.tf_pypi_consumer import _nebular_process_snapshot, _nebular_run, consume_nebular_candidate
+from rs9.tf_pypi_consumer import (
+    _NEBULAR_TERMINATION_GRACE,
+    _nebular_grace_deadline,
+    _nebular_process_snapshot,
+    _nebular_run,
+    consume_nebular_candidate,
+)
 from rs9.tf_pypi_nebular_successor import (
     authenticate_gate1_capture,
     build_gate1_candidates,
@@ -911,6 +919,145 @@ class NebularGate2Fixture(unittest.TestCase):
         self.assertTrue(timeout["cleanup_known"])
         self.assertEqual(_nebular_process_snapshot(timeout_work)["orphan_count"], 0)
 
+    def test_termination_grace_deadline_is_not_postponed_by_repeated_checks(self):
+        initial_now = 10.0
+        first_deadline = _nebular_grace_deadline(None, initial_now)
+        repeated_now = initial_now + 0.25
+        legacy_repeated_deadline = repeated_now + _NEBULAR_TERMINATION_GRACE
+
+        # The former assignment on every request would postpone escalation;
+        # the bounded state transition retains the first deadline instead.
+        self.assertGreater(legacy_repeated_deadline, first_deadline)
+        self.assertEqual(
+            _nebular_grace_deadline(first_deadline, repeated_now),
+            first_deadline,
+        )
+
+    def test_term_ignoring_leader_reaches_sigkill_and_exact_group_is_absent(self):
+        work = self.root / "term-ignoring-leader-work"
+        work.mkdir()
+        captured_child = None
+        identity = None
+
+        def capture_runner(command, **kwargs):
+            nonlocal captured_child
+            captured_child = subprocess.Popen(command, **kwargs)
+            return captured_child
+
+        try:
+            result = _nebular_run(
+                [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import os,signal,time;"
+                        "signal.signal(signal.SIGTERM, signal.SIG_IGN);"
+                        "print(f'{os.getpid()}:{os.getpgrp()}', flush=True);"
+                        "time.sleep(30)"
+                    ),
+                ],
+                {"PATH": os.environ.get("PATH", "/usr/bin:/bin")},
+                work,
+                (),
+                1,
+                runner=capture_runner,
+            )
+            fields = result["stdout_token"].strip().split(":")
+            self.assertEqual(len(fields), 2)
+            identity = tuple(int(field) for field in fields)
+            leader_pid, group_id = identity
+            self.assertIsNotNone(captured_child)
+            self.assertEqual(leader_pid, captured_child.pid)
+            self.assertEqual(leader_pid, group_id)
+            self.assertTrue(result["timed_out"])
+            self.assertTrue(result["forced_cleanup"])
+            self.assertEqual(result["signal"], signal.SIGKILL)
+            self.assertTrue(result["cleanup_known"])
+            self.assertLess(result["duration_ms"], 5000)
+            with self.assertRaises(ProcessLookupError):
+                os.killpg(group_id, 0)
+        finally:
+            if captured_child is not None and captured_child.poll() is None:
+                try:
+                    owned_group = os.getpgid(captured_child.pid)
+                except ProcessLookupError:
+                    owned_group = None
+                if owned_group == captured_child.pid:
+                    try:
+                        os.killpg(owned_group, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        captured_child.wait(timeout=_NEBULAR_TERMINATION_GRACE)
+                    except subprocess.TimeoutExpired:
+                        if captured_child.poll() is None:
+                            try:
+                                if os.getpgid(captured_child.pid) == captured_child.pid:
+                                    os.killpg(captured_child.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                            if captured_child.poll() is None:
+                                captured_child.wait(timeout=_NEBULAR_TERMINATION_GRACE)
+
+    def test_leader_exit_waits_for_group_observation_and_fails_closed_on_retained_group(self):
+        """Leader EOF must not bypass the owned-group cleanup observation."""
+        clean_work = self.root / "leader-exit-cleanup-work"
+        clean_work.mkdir()
+        clean_signals = []
+
+        def clean_signal(_child, signal_number):
+            clean_signals.append(signal_number)
+            return True
+
+        def clean_group_exists(_pid):
+            # The group remains present until the existing TERM then KILL
+            # sequence has completed.  This makes the regression independent
+            # of scheduler timing while exercising the real loop deadlines.
+            return len(clean_signals) < 2
+
+        with patch("rs9.tf_pypi_consumer._nebular_group_exists", side_effect=clean_group_exists), \
+                patch("rs9.tf_pypi_consumer._nebular_signal_group", side_effect=clean_signal):
+            clean = _nebular_run(
+                [sys.executable, "-c", "pass"],
+                {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}, clean_work, (), 1,
+            )
+        self.assertTrue(clean["cleanup_known"])
+        self.assertGreaterEqual(len(clean_signals), 2)
+
+        retained_work = self.root / "leader-exit-retained-group-work"
+        retained_work.mkdir()
+        retained_signals = []
+
+        def retained_signal(_child, signal_number):
+            retained_signals.append(signal_number)
+            return True
+
+        with patch("rs9.tf_pypi_consumer._nebular_group_exists", return_value=True), \
+                patch("rs9.tf_pypi_consumer._nebular_signal_group", side_effect=retained_signal):
+            retained = _nebular_run(
+                [sys.executable, "-c", "pass"],
+                {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}, retained_work, (), 1,
+            )
+        self.assertFalse(retained["cleanup_known"])
+        self.assertGreaterEqual(len(retained_signals), 2)
+
+        unknown_work = self.root / "leader-exit-unknown-group-work"
+        unknown_work.mkdir()
+        unknown_signals = []
+
+        def unknown_signal(_child, signal_number):
+            unknown_signals.append(signal_number)
+            return True
+
+        with patch("rs9.tf_pypi_consumer.os.killpg", side_effect=PermissionError), \
+                patch("rs9.tf_pypi_consumer._nebular_signal_group", side_effect=unknown_signal):
+            unknown = _nebular_run(
+                [sys.executable, "-c", "pass"],
+                {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}, unknown_work, (), 1,
+            )
+        self.assertFalse(unknown["cleanup_known"])
+        self.assertGreaterEqual(len(unknown_signals), 2)
+
     def test_nebular_wheel_member_cap_is_scoped_and_total_cap_remains_64m(self):
         over_legacy_member = b"x" * (8 * 1024 * 1024 + 1)
         wheel = _zip_bytes({"package/payload.bin": (over_legacy_member, 0o644)})
@@ -1408,15 +1555,16 @@ class NebularGate1ToGate2Fixture(unittest.TestCase):
         }
 
     def fixture_runner(self, target):
-        """Run the actual wheel entry point with only its host guard bypassed.
+        """Run the actual wheel entry point with its fixture-only host guard bypassed.
 
-        Linux Gate 1 bytes are authenticated and exercised on this Darwin
-        host.  The temporary fixture-only bypass leaves materialization,
-        executable-path resolution, hashes, and the native command intact;
-        it avoids pretending that this host is a Linux qualification runner.
+        Each synthetic Gate 1 wheel is authenticated and exercised on a
+        diagnostic host that may differ from its target platform.  The
+        temporary fixture-only bypass leaves materialization, executable-path
+        resolution, hashes, and the native command intact; it never pretends
+        to establish native qualification.
         """
         def runner(argv, **kwargs):
-            if target.startswith("linux") and "--path" in [str(value) for value in argv]:
+            if "--path" in [str(value) for value in argv]:
                 work = Path(argv[0]).resolve().parent.parent
                 launcher = next(work.joinpath("site").glob("theme_forge_nebular_fusion/launcher.py"))
                 source = launcher.read_text(encoding="utf-8")

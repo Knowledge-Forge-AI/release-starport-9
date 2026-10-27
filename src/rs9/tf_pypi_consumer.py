@@ -251,6 +251,11 @@ _NEBULAR_TERMINATION_GRACE = 0.5
 _NEBULAR_DRAIN_GRACE = 0.5
 
 
+def _nebular_grace_deadline(current: float | None, now: float) -> float:
+    """Keep the first termination grace deadline stable across loop checks."""
+    return current if current is not None else now + _NEBULAR_TERMINATION_GRACE
+
+
 def _nebular_safe_rel(value: Any) -> str:
     if (not isinstance(value, str) or not value or not value.isascii()
             or value.startswith("/") or "\\" in value or ":" in value
@@ -872,7 +877,7 @@ def _nebular_run(argv: Sequence[str], env: Mapping[str, str], cwd: Path,
             if not term_sent:
                 _nebular_signal_group(child, signal.SIGTERM)
                 term_sent = True
-            cleanup_deadline = time.monotonic() + _NEBULAR_TERMINATION_GRACE
+            cleanup_deadline = _nebular_grace_deadline(cleanup_deadline, time.monotonic())
 
         def escalate() -> None:
             nonlocal cleanup_deadline, forced_cleanup, kill_sent
@@ -907,7 +912,15 @@ def _nebular_run(argv: Sequence[str], env: Mapping[str, str], cwd: Path,
                         pass
                     streams.pop(fd, None)
                 forced_cleanup = True
-            if code is not None and not streams:
+            # A reaped leader and closed pipes do not prove that its created
+            # process group has disappeared.  Finish the already-started
+            # post-exit/cleanup grace before returning the group observation;
+            # never extend the production deadlines or admit a surviving or
+            # unobservable group as clean.
+            if (code is not None and not streams
+                    and post_exit_deadline is not None
+                    and now >= post_exit_deadline
+                    and (cleanup_deadline is None or now >= cleanup_deadline)):
                 break
             if code is None and kill_sent and cleanup_deadline is not None and now >= cleanup_deadline:
                 try:
@@ -919,8 +932,8 @@ def _nebular_run(argv: Sequence[str], env: Mapping[str, str], cwd: Path,
                 except subprocess.TimeoutExpired:
                     stream_error = stream_error or "native probe process did not terminate after SIGKILL"
                 code = child.poll()
-                if code is not None and not streams:
-                    break
+                # Let the next loop turn establish the post-exit observation
+                # even when wait() reaped the leader after group escalation.
 
             wait_for = 0.05
             if code is None:
@@ -930,6 +943,10 @@ def _nebular_run(argv: Sequence[str], env: Mapping[str, str], cwd: Path,
             if post_exit_deadline is not None:
                 wait_for = min(wait_for, max(0.001, post_exit_deadline - now))
             events = selector.select(wait_for) if streams else []
+            if not streams and not events:
+                # An empty selector does not provide the bounded wait needed
+                # to finish post-exit cleanup; keep the loop deadline-bound.
+                time.sleep(wait_for)
             for key, _mask in events:
                 fd = key.fd
                 name, stream = key.data
