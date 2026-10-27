@@ -24,6 +24,7 @@ from rs9.application_smoke_diagnostic import (
     execute_application_smoke,
     extract_log_categories,
     read_and_validate_receipt,
+    run_boundary_probes,
     run_replay,
     sanitize_receipt_summary,
     validate_problem_codes,
@@ -623,6 +624,189 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
                               env=None, timeout=3)
         self.assertEqual(result.capture_error, "process-output-limit")
         self.assertLessEqual(len(result.stdout), 1024 * 1024)
+
+    def test_boundary_probes_follow_failure_and_never_qualify(self):
+        root = "/nix/store/00000000000000000000000000001023-dbus-1.14.10"
+        pinned_argv = [
+            f"{root}/bin/dbus-run-session",
+            f"--dbus-daemon={root}/bin/dbus-daemon",
+            f"--config-file={root}/share/dbus-1/session.conf",
+            "--",
+        ]
+        original_calls = []
+
+        def original_failure(cmd, **kwargs):
+            original_calls.append(list(cmd))
+            return SimpleNamespace(returncode=127, stdout=b"",
+                                   stderr=b"dbus-run-session: startup failed\n")
+
+        def boundary_success(cmd, **kwargs):
+            output = b"22.23.3\n" if "process.versions.node" in cmd else b""
+            return SimpleNamespace(returncode=0, stdout=output, stderr=b"",
+                                   stream_sizes=(len(output), 0), capture_error=None,
+                                   cleanup_error=None, child_reaped=True)
+
+        with patch("subprocess.run", side_effect=original_failure), \
+             patch("rs9.application_smoke_diagnostic._bounded_run", side_effect=boundary_success) as bounded:
+            with self.assertRaises(ContractError) as caught:
+                execute_application_smoke(
+                    prepared=self.prepared,
+                    system="aarch64-linux",
+                    launch_root=self.launch_root,
+                    diagnostic_boundary_probes=True,
+                    session_bus_argv=pinned_argv,
+                )
+
+        self.assertEqual(len(original_calls), 1)
+        self.assertEqual(bounded.call_count, 5)
+        self.assertEqual(caught.exception.code, "APPLICATION_SMOKE")
+        self.assertIn("diagnostic_sha256", caught.exception.details)
+        diagnostic = json.loads((self.work / "diagnostics/application-smoke-diagnostic.json").read_bytes())
+        probes = diagnostic["boundary_probes"]
+        self.assertEqual(probes["schema"], "rs9.application-smoke-boundary-probes.v1")
+        self.assertTrue(probes["pinned_argv_available"])
+        self.assertTrue(all(row["status"] == "pass" for row in probes["probes"]))
+        self.assertEqual(probes["probes"][2]["expected_child"],
+                         "dbus-run-session+dbus-daemon+session.conf+sh")
+        self.assertEqual(diagnostic["replay"]["status"], "not-run")
+        self.assertFalse(probes["qualification_authority"])
+        self.assertFalse(probes["application_qualified"])
+        self.assertNotIn(str(self.work), json.dumps(diagnostic))
+        self.assertNotIn("startup failed", json.dumps(diagnostic))
+
+    def test_boundary_probe_timeout_and_untrusted_pinned_argv_are_bounded(self):
+        calls = []
+
+        def timeout_then_failure(cmd, **kwargs):
+            calls.append(list(cmd))
+            if len(calls) == 1:
+                return SimpleNamespace(returncode=None, stdout=b"", stderr=b"secret path\n",
+                                       stream_sizes=(0, 12), capture_error="process-timeout",
+                                       cleanup_error=None, child_reaped=True)
+            return SimpleNamespace(returncode=1, stdout=b"", stderr=b"private path\n",
+                                   stream_sizes=(0, 13), capture_error=None,
+                                   cleanup_error=None, child_reaped=True)
+
+        with patch("rs9.application_smoke_diagnostic._bounded_run", side_effect=timeout_then_failure):
+            report = run_boundary_probes(
+                prefix=["same-fhs-prefix"],
+                env={"PATH": "same-fhs-path"},
+                session_bus_argv=["/private/not-a-store-path"],
+            )
+
+        self.assertEqual(len(calls), 4)
+        self.assertEqual(report["status"], "complete")
+        self.assertFalse(report["pinned_argv_available"])
+        self.assertEqual(report["probes"][0]["reason"], "process-timeout")
+        self.assertEqual(report["probes"][2]["reason"], "pinned-argv-unavailable")
+        self.assertNotIn("secret path", json.dumps(report))
+        self.assertNotIn("private path", json.dumps(report))
+        self.assertNotIn("same-fhs", json.dumps(report))
+
+    def test_boundary_probe_clamps_remaining_execution_budget(self):
+        root = "/nix/store/00000000000000000000000000001023-dbus-1.14.10"
+        pinned_argv = [
+            f"{root}/bin/dbus-run-session",
+            f"--dbus-daemon={root}/bin/dbus-daemon",
+            f"--config-file={root}/share/dbus-1/session.conf",
+            "--",
+        ]
+        calls = []
+        reads = [0]
+
+        def clock():
+            reads[0] += 1
+            return 0.0 if reads[0] == 1 else (29.75 if not calls else 30.0)
+
+        def one_probe(cmd, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(returncode=0, stdout=b"", stderr=b"", stream_sizes=(0, 0),
+                                   capture_error=None, cleanup_error=None, child_reaped=True)
+
+        with patch("rs9.application_smoke_diagnostic.time.monotonic", side_effect=clock), \
+             patch("rs9.application_smoke_diagnostic._bounded_run", side_effect=one_probe):
+            report = run_boundary_probes(session_bus_argv=pinned_argv)
+
+        self.assertEqual(len(calls), 1)
+        self.assertAlmostEqual(calls[0]["timeout"], 0.25, places=6)
+        self.assertEqual(calls[0]["cleanup_timeout"], 1)
+        self.assertEqual(report["status"], "incomplete")
+        self.assertTrue(report["execution_budget_exhausted"])
+        self.assertEqual(report["stop_reason"], "probe-total-deadline")
+        self.assertTrue(all(row.get("not_started") for row in report["probes"][1:]))
+
+    def test_boundary_probe_cleanup_failure_stops_following_probes(self):
+        root = "/nix/store/00000000000000000000000000001023-dbus-1.14.10"
+        pinned_argv = [
+            f"{root}/bin/dbus-run-session",
+            f"--dbus-daemon={root}/bin/dbus-daemon",
+            f"--config-file={root}/share/dbus-1/session.conf",
+            "--",
+        ]
+        calls = []
+
+        def cleanup_failure(cmd, **kwargs):
+            calls.append(list(cmd))
+            return SimpleNamespace(returncode=0, stdout=b"", stderr=b"", stream_sizes=(0, 0),
+                                   capture_error=None, cleanup_error="process-reap-timeout",
+                                   child_reaped=False)
+
+        with patch("rs9.application_smoke_diagnostic._bounded_run", side_effect=cleanup_failure):
+            report = run_boundary_probes(session_bus_argv=pinned_argv)
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(report["status"], "incomplete")
+        self.assertEqual(report["stop_reason"], "process-cleanup-failure")
+        self.assertEqual(report["probes"][0]["reason"], "process-cleanup-failure")
+        self.assertEqual(report["probes"][0]["cleanup_error"], "process-reap-timeout")
+        self.assertTrue(all(row.get("not_started") for row in report["probes"][1:]))
+
+    def test_boundary_probe_unreaped_discovery_never_authenticates_pinned_argv(self):
+        calls = []
+        store_run_session = b"/nix/store/00000000000000000000000000001023-dbus-1.14.10/bin/dbus-run-session\n"
+
+        def unreaped_discovery(cmd, **kwargs):
+            calls.append(list(cmd))
+            return SimpleNamespace(returncode=0, stdout=store_run_session, stderr=b"",
+                                   stream_sizes=(len(store_run_session), 0), capture_error=None,
+                                   cleanup_error=None, child_reaped=False)
+
+        with patch("rs9.application_smoke_diagnostic._bounded_run", side_effect=unreaped_discovery):
+            report = run_boundary_probes(prefix=["same-fhs-prefix"], env={"PATH": "same-fhs-path"})
+
+        self.assertEqual(len(calls), 1)
+        self.assertFalse(report["pinned_argv_available"])
+        self.assertEqual(report["status"], "incomplete")
+        self.assertEqual(report["stop_reason"], "process-reap-unconfirmed")
+        self.assertTrue(all(row.get("not_started") for row in report["probes"]))
+        self.assertNotIn(store_run_session.decode().strip(), json.dumps(report))
+
+    def test_boundary_probes_discover_pinned_store_root_inside_same_fhs(self):
+        calls = []
+        store_run_session = b"/nix/store/00000000000000000000000000001023-dbus-1.14.10/bin/dbus-run-session\n"
+
+        def discovered_success(cmd, **kwargs):
+            calls.append(list(cmd))
+            if len(calls) == 1:
+                return SimpleNamespace(returncode=0, stdout=store_run_session, stderr=b"",
+                                       stream_sizes=(len(store_run_session), 0), capture_error=None,
+                                       cleanup_error=None, child_reaped=True)
+            output = b"22.23.3\n" if "process.versions.node" in cmd else b""
+            return SimpleNamespace(returncode=0, stdout=output, stderr=b"",
+                                   stream_sizes=(len(output), 0), capture_error=None,
+                                   cleanup_error=None, child_reaped=True)
+
+        with patch("rs9.application_smoke_diagnostic._bounded_run", side_effect=discovered_success):
+            report = run_boundary_probes(prefix=["same-fhs-prefix"], env={"PATH": "same-fhs-path"})
+
+        self.assertEqual(len(calls), 6)
+        self.assertEqual(calls[0][1:4], ["sh", "-c", "command -v dbus-run-session"])
+        self.assertEqual(report["pinned_argv_source"], "same-fhs-command-v")
+        self.assertTrue(report["pinned_argv_available"])
+        self.assertEqual(report["probes"][2]["label"], "dbus-pinned")
+        self.assertEqual(report["probes"][2]["status"], "pass")
+        self.assertNotIn(store_run_session.decode().strip(), json.dumps(report))
+        self.assertNotIn("same-fhs-path", json.dumps(report))
 
     def test_real_capture_cleans_owned_group_descendant(self):
         import sys

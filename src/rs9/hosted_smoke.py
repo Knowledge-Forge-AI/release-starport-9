@@ -743,7 +743,9 @@ def bound_diagnostic(diagnostic, max_bytes=60 * 1024):
     return result
 
 
-def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, discovered=None, baseline=None, label=None, diagnostic_extras: bool = False, session_bus_argv=None):
+def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, discovered=None, baseline=None,
+                            label=None, diagnostic_extras: bool = False, diagnostic_boundary_probes: bool = False,
+                            session_bus_argv=None):
     """No extraction here: runtime_root is the wheel cache, Nix cache, or installed package."""
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
@@ -810,6 +812,7 @@ def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, 
         prefix=prefix,
         env=env,
         diagnostic_extras=diagnostic_extras,
+        diagnostic_boundary_probes=diagnostic_boundary_probes,
         session_bus_argv=session_bus_argv,
     )
     # Raw harness logs can contain ephemeral paths. Keep only bounded public identities.

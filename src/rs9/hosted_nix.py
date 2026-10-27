@@ -396,7 +396,8 @@ def execute(context):
                 result = subprocess.run([*prefix, *runtime_prefix, "ldd", str(file)], env=env, capture_output=True, timeout=30)
                 if b"not found" in result.stdout or (result.returncode and b"not a dynamic" not in result.stderr + result.stdout and b"statically linked" not in result.stderr + result.stdout):
                     raise ContractError("NIX_CLOSURE", "ELF dependency missing from actual FHS closure")
-    smoke = verify_nebular_runtime(roots[0], prepared, system, [*prefix, *runtime_prefix], env, baseline=baseline)
+    smoke = verify_nebular_runtime(roots[0], prepared, system, [*prefix, *runtime_prefix], env, baseline=baseline,
+                                   diagnostic_boundary_probes=system.endswith("-linux"))
     gates.extend([{"name": "nix-native-closure", "status": "pass"}, {"name": "nix-build-check-run", "status": "pass"}])
     evidence = scratch / "nix-output-receipt.json"
     evidence.write_bytes(canonical({"schema": "rs9.hosted-nix-output.v1alpha1", "system": system,
