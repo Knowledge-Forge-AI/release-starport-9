@@ -780,10 +780,12 @@ class SmokeEnvironmentTests(unittest.TestCase):
             with patch("rs9.hosted_smoke.verifier_import_preflight", return_value={"status": "pass"}), \
                  patch("rs9.hosted_smoke._run_verifier", return_value=({"status": "pass"}, {"status": "pass"})), \
                  patch("rs9.application_smoke_diagnostic.execute_application_smoke", return_value=[{"scenario": "C"}]) as mock_smoke:
-                res = verify_nebular_runtime(root, prepared, "x86_64-linux", session_bus_argv=pinned_argv)
+                res = verify_nebular_runtime(root, prepared, "x86_64-linux", session_bus_argv=pinned_argv,
+                                             diagnostic_boundary_probes=True)
                 self.assertEqual(res["scenarios"], [{"scenario": "C"}])
                 mock_smoke.assert_called_once()
                 self.assertEqual(mock_smoke.call_args.kwargs["session_bus_argv"], pinned_argv)
+                self.assertTrue(mock_smoke.call_args.kwargs["diagnostic_boundary_probes"])
 
     def test_verify_nebular_runtime_default_session_bus_argv_is_none(self):
         """verify_nebular_runtime defaults session_bus_argv to None."""

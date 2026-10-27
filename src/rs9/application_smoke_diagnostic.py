@@ -28,6 +28,10 @@ SAFE_LOG_CATEGORIES = frozenset({"dbus-session-conf-missing", "dbus-daemon-error
     "shared-library-missing", "webkit-crash", "assertion", "socket-unavailable", "unclassified"})
 SAFE_FAILURE_ROLES = frozenset({"dbus-wrapper", "dbus-daemon", "dbus-config", "node",
     "smoke-script", "loader", "unknown"})
+PROBE_COMMAND_TIMEOUT = 5
+PROBE_TOTAL_TIMEOUT = 30
+PROBE_CLEANUP_TIMEOUT = 1
+PROBE_SCHEMA = "rs9.application-smoke-boundary-probes.v1"
 
 
 def extract_log_categories(stdout, stderr, exit_code=None):
@@ -238,7 +242,7 @@ def sanitize_receipt_summary(record, identity=None):
     return result
 
 
-def _bounded_run(argv, *, env, timeout):
+def _bounded_run(argv, *, env, timeout, cleanup_timeout=10):
     """Cap replay capture; report group cleanup separately from child status."""
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
         child = subprocess.Popen(argv, env=env, stdin=subprocess.DEVNULL, stdout=out,
@@ -261,7 +265,7 @@ def _bounded_run(argv, *, env, timeout):
             except PermissionError:
                 cleanup_error = "process-group-permission-denied"
             try:
-                child.wait(timeout=10)
+                child.wait(timeout=cleanup_timeout)
             except subprocess.TimeoutExpired:
                 cleanup_error = "process-reap-timeout"
         sizes = (os.fstat(out.fileno()).st_size, os.fstat(err.fileno()).st_size)
@@ -272,6 +276,249 @@ def _bounded_run(argv, *, env, timeout):
         result.child_reaped = child.returncode is not None
         result.stream_sizes = sizes
         return result
+
+
+def _probe_output_shape(label, raw):
+    """Retain only a fixed output shape; probe bytes are never serialized."""
+    if label == "node-direct":
+        if len(raw) <= 64 and re.fullmatch(rb"[0-9]+\.[0-9]+\.[0-9]+\r?\n?", raw):
+            return "node-semver"
+        return "unexpected"
+    return "empty" if not raw else "unexpected"
+
+
+def _probe_remaining(started):
+    return PROBE_TOTAL_TIMEOUT - (time.monotonic() - started)
+
+
+def _unstarted_boundary_probe(probe, reason):
+    label, argv, role, expected_shape, expected_child = probe
+    result = {
+        "label": label,
+        "role": role,
+        "expected_child": expected_child,
+        "expected_output": expected_shape,
+        "status": "unavailable",
+        "reason": reason,
+        "qualification_authority": False,
+        "application_qualified": False,
+        "not_started": True,
+    }
+    if argv is not None:
+        result["argv_sha256"] = digest(b"\0".join(arg.encode() for arg in argv))
+    return result
+
+
+def _boundary_probe_record(probe):
+    label, argv, role, expected_shape, expected_child = probe
+    result = {
+        "label": label,
+        "role": role,
+        "expected_child": expected_child or role,
+        "expected_output": expected_shape,
+        "argv_sha256": digest(b"\0".join(arg.encode() for arg in argv)),
+        "qualification_authority": False,
+        "application_qualified": False,
+    }
+    return result
+
+
+def _boundary_probe_execution(probe, prefix, env, started):
+    _, argv, _, _, _ = probe
+    remaining = _probe_remaining(started)
+    if remaining <= 0:
+        return None, "probe-total-deadline"
+    try:
+        completed = _bounded_run([*prefix, *argv], env=env,
+                                 timeout=min(PROBE_COMMAND_TIMEOUT, remaining),
+                                 cleanup_timeout=PROBE_CLEANUP_TIMEOUT)
+    except (OSError, subprocess.SubprocessError, TypeError, ValueError):
+        return None, "probe-execution-failed"
+    return completed, None
+
+
+def _boundary_probe_reason(completed, shape, expected_shape):
+    returncode = completed.returncode
+    capture_error = getattr(completed, "capture_error", None)
+    cleanup_error = getattr(completed, "cleanup_error", None)
+    child_reaped = getattr(completed, "child_reaped", None)
+    if cleanup_error:
+        return "process-cleanup-failure"
+    if child_reaped is not True:
+        return "process-reap-unconfirmed"
+    if capture_error:
+        return capture_error
+    if returncode is not None and returncode < 0:
+        return "process-signal"
+    if returncode != 0:
+        return "process-nonzero"
+    if shape != expected_shape:
+        return "unexpected-output"
+    return None
+
+
+def _boundary_probe_streams(completed):
+    stdout = completed.stdout or b""
+    stderr = completed.stderr or b""
+    sizes = getattr(completed, "stream_sizes", None)
+    stdout_bytes = sizes[0] if isinstance(sizes, tuple) and len(sizes) == 2 else len(stdout)
+    stderr_bytes = sizes[1] if isinstance(sizes, tuple) and len(sizes) == 2 else len(stderr)
+    return stdout, stderr, stdout_bytes, stderr_bytes
+
+
+def _boundary_probe_snapshot(probe, completed):
+    label, _, _, expected_shape, _ = probe
+    stdout, stderr, stdout_bytes, stderr_bytes = _boundary_probe_streams(completed)
+    returncode = completed.returncode
+    shape = _probe_output_shape(label, stdout)
+    capture_error = getattr(completed, "capture_error", None)
+    cleanup_error = getattr(completed, "cleanup_error", None)
+    child_reaped = getattr(completed, "child_reaped", None)
+    reason = _boundary_probe_reason(completed, shape, expected_shape)
+    status = "pass" if (returncode == 0 and capture_error is None and cleanup_error is None
+                         and child_reaped is True and shape == expected_shape) else "fail"
+    result = {
+        "status": status,
+        "exit_code": returncode if isinstance(returncode, int) and returncode >= 0 else None,
+        "signal": -returncode if isinstance(returncode, int) and returncode < 0 else None,
+        "stdout_bytes": stdout_bytes,
+        "stderr_bytes": stderr_bytes,
+        "stdout_sha256": digest(stdout),
+        "stderr_sha256": digest(stderr),
+        "output_shape": shape,
+        "stream_capture_complete": capture_error not in {"process-output-limit", "process-timeout", "harness-error"},
+        "cleanup_error": cleanup_error,
+        "child_reaped": child_reaped,
+        "_stop_following": bool(cleanup_error or child_reaped is not True),
+    }
+    if reason is not None:
+        result["reason"] = reason
+    return result
+
+
+def _run_boundary_probe(probe, prefix, env, started):
+    """Run one fixed child in the caller's exact FHS prefix and environment."""
+    result = _boundary_probe_record(probe)
+    completed, execution_error = _boundary_probe_execution(probe, prefix, env, started)
+    if completed is None:
+        result.update(status="unavailable", reason=execution_error)
+        if execution_error == "probe-total-deadline":
+            result["not_started"] = True
+        return result
+    result.update(_boundary_probe_snapshot(probe, completed))
+    return result
+
+
+def _discover_pinned_session_bus(*, prefix, env, started):
+    """Resolve the pinned DBus store root inside the same FHS boundary."""
+    remaining = _probe_remaining(started)
+    if remaining <= 0:
+        return None, "probe-total-deadline"
+    try:
+        result = _bounded_run([*prefix, "sh", "-c", "command -v dbus-run-session"],
+                              env=env, timeout=min(PROBE_COMMAND_TIMEOUT, remaining),
+                              cleanup_timeout=PROBE_CLEANUP_TIMEOUT)
+    except (OSError, subprocess.SubprocessError, TypeError, ValueError):
+        return None, None
+    if getattr(result, "cleanup_error", None):
+        return None, "process-cleanup-failure"
+    if getattr(result, "child_reaped", None) is not True:
+        return None, "process-reap-unconfirmed"
+    raw = result.stdout or b""
+    if (result.returncode != 0 or getattr(result, "capture_error", None) is not None
+            or len(raw) > 512 or not re.fullmatch(
+                rb"/nix/store/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._-]+/bin/dbus-run-session\r?\n?", raw)):
+        return None, None
+    run_session = raw.rstrip(b"\r\n").decode("ascii")
+    root = run_session[:-len("/bin/dbus-run-session")]
+    try:
+        from rs9.nix_proot_dbus_command import validate_session_bus_argv
+        return validate_session_bus_argv([
+            run_session,
+            "--dbus-daemon=" + root + "/bin/dbus-daemon",
+            "--config-file=" + root + "/share/dbus-1/session.conf",
+            "--",
+        ]), None
+    except (ContractError, UnicodeError):
+        return None, None
+
+
+def _boundary_probe_plan(pinned_bus):
+    """Build fixed probe argv; only the validated pinned argv may enter the plan."""
+    default_bus = ["dbus-run-session", "--"]
+    display_child = ["sh", "-c", 'test -n "$DISPLAY"']
+    dbus_child = ["sh", "-c", 'test -n "$DBUS_SESSION_BUS_ADDRESS"']
+    node_child = ["node", "-e", "process.exit(process.env.DBUS_SESSION_BUS_ADDRESS ? 0 : 2)"]
+    plan = [
+        ("display-wrapper", ["xvfb-run", "-a", *display_child], "display-wrapper", "empty", "xvfb-run+sh"),
+        ("dbus-default", [*default_bus, *dbus_child], "dbus-default", "empty", "dbus-run-session+sh"),
+        ("node-direct", ["node", "-p", "process.versions.node"], "node-direct", "node-semver", "node"),
+        ("dbus-node", [*(pinned_bus or default_bus), *node_child], "dbus-node", "empty", "dbus-run-session+node"),
+    ]
+    if pinned_bus is not None:
+        plan.insert(2, ("dbus-pinned", [*pinned_bus, *dbus_child], "dbus-pinned", "empty",
+                         "dbus-run-session+dbus-daemon+session.conf+sh"))
+    return plan, pinned_bus is not None
+
+
+def run_boundary_probes(*, prefix=(), env=None, session_bus_argv=None):
+    """Run non-qualifying display/DBus/Node boundary controls after a failed smoke."""
+    started = time.monotonic()
+    pinned_source = "unavailable"
+    pinned_bus = None
+    discovery_stop_reason = None
+    if session_bus_argv is not None:
+        try:
+            from rs9.nix_proot_dbus_command import validate_session_bus_argv
+            pinned_bus = validate_session_bus_argv(session_bus_argv)
+            pinned_source = "caller"
+        except ContractError:
+            pinned_bus = None
+    else:
+        pinned_bus, discovery_stop_reason = _discover_pinned_session_bus(
+            prefix=prefix, env=env, started=started)
+        if pinned_bus is not None:
+            pinned_source = "same-fhs-command-v"
+    plan, pinned_available = _boundary_probe_plan(pinned_bus)
+    if not pinned_available:
+        plan.insert(2, ("dbus-pinned", None, "dbus-pinned", "empty",
+                        "dbus-run-session+dbus-daemon+session.conf+sh"))
+    rows = []
+    for probe in plan:
+        label, argv, role, expected_shape, expected_child = probe
+        if discovery_stop_reason is not None:
+            rows.append(_unstarted_boundary_probe(probe, discovery_stop_reason))
+            continue
+        if argv is None:
+            rows.append(_unstarted_boundary_probe(probe, "pinned-argv-unavailable"))
+            continue
+        if _probe_remaining(started) <= 0:
+            discovery_stop_reason = "probe-total-deadline"
+            rows.append(_unstarted_boundary_probe(probe, discovery_stop_reason))
+            continue
+        row = _run_boundary_probe(probe, prefix, env, started)
+        stop_following = row.pop("_stop_following", False)
+        rows.append(row)
+        if stop_following:
+            discovery_stop_reason = row.get("reason", "process-cleanup-failure")
+    return {
+        "schema": PROBE_SCHEMA,
+        "status": "incomplete" if discovery_stop_reason is not None else "complete",
+        "command_timeout_seconds": PROBE_COMMAND_TIMEOUT,
+        "total_timeout_seconds": PROBE_TOTAL_TIMEOUT,
+        "cleanup_timeout_seconds": PROBE_CLEANUP_TIMEOUT,
+        "execution_budget_only": True,
+        "wall_clock_bound_includes_cleanup": False,
+        "execution_budget_exhausted": discovery_stop_reason == "probe-total-deadline",
+        "elapsed_ms": int((time.monotonic() - started) * 1000),
+        "probe_count": len(rows),
+        "pinned_argv_available": pinned_available,
+        "pinned_argv_source": pinned_source,
+        "qualification_authority": False,
+        "application_qualified": False,
+        "stop_reason": discovery_stop_reason,
+        "probes": rows,
+    }
 
 
 def _command(prepared, platform, scenario, launch_root, evidence, *, extras, session_bus_argv=None):
@@ -400,20 +647,41 @@ def _failure_details(fields, *, extras, receipt_name):
     return details
 
 
-def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, env, fields, not_run, session_bus_argv=None):
-    _, replay = run_replay(scenario=scenario, platform=platform, launch_root=launch_root,
-        checkout=prepared.get("checkout", prepared["source"]), tools=prepared["tools"], prefix=prefix,
-        env=env, scratch=prepared["scratch"], session_bus_argv=session_bus_argv)
+def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, env, fields, not_run,
+                    session_bus_argv=None, include_replay=True, boundary_probes=False):
+    if include_replay:
+        _, replay = run_replay(scenario=scenario, platform=platform, launch_root=launch_root,
+            checkout=prepared.get("checkout", prepared["source"]), tools=prepared["tools"], prefix=prefix,
+            env=env, scratch=prepared["scratch"], session_bus_argv=session_bus_argv)
+    else:
+        replay = {"status": "not-run", "reason": "boundary-probe-only"}
+    if boundary_probes:
+        try:
+            probes = run_boundary_probes(prefix=prefix, env=env, session_bus_argv=session_bus_argv)
+        except Exception:
+            probes = {
+                "schema": PROBE_SCHEMA,
+                "status": "unavailable",
+                "reason": "probe-execution-failed",
+                "qualification_authority": False,
+                "application_qualified": False,
+                "probes": [],
+            }
+    else:
+        probes = None
     record = {"schema": "rs9.application-smoke-diagnostic.v1alpha1", "system": system,
         "product": "theme-forge-nebular-fusion", "substage": "application_smoke",
         "scenario": scenario, "cause": fields["cause"], "status": "fail", "gate_status": "fail",
         "initial_run": fields, "replay": replay, "scenarios_not_run": not_run,
         "initial_process_policy": "legacy-subprocess-run-and-argv",
-        "replay_process_policy": "bounded-created-process-group-with-xvfb-error-file",
+        "replay_process_policy": "bounded-created-process-group-with-xvfb-error-file" if include_replay else "not-run",
         "replay_equivalent_to_original": False,
         "cause_withheld_or_unresolved": fields["cause"] in {"process-nonzero", "unknown"} or
             "withheld-token" in fields["problem_codes"],
-        "descendant_cleanup_scope": "replay-created-process-group", "detached_descendants_proven_absent": False}
+        "descendant_cleanup_scope": "replay-created-process-group" if include_replay else "boundary-probe-process-groups",
+        "detached_descendants_proven_absent": False}
+    if boundary_probes:
+        record["boundary_probes"] = probes
     raw = canonical(record)
     if len(raw) > MAX_DIAGNOSTIC and "harness_problem_categories" in fields:
         # The new optional field must not turn an otherwise bounded legacy diagnostic into an error.
@@ -435,7 +703,8 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
     return digest(raw)
 
 
-def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=None, diagnostic_extras=False, session_bus_argv=None):
+def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=None, diagnostic_extras=False,
+                             diagnostic_boundary_probes=False, session_bus_argv=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
@@ -455,9 +724,10 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
             from rs9.pages_smoke_diagnostic import validate_smoke_observation
             observation = validate_smoke_observation(fields, system=system)
             details = _failure_details(fields, extras=extras, receipt_name=platform+"-"+scenario+".run.json")
-            if extras:
+            if extras or diagnostic_boundary_probes:
                 details["diagnostic_sha256"] = _retain_failure(prepared, system, platform, scenario,
-                    launch_root, prefix, env, fields, scenarios[index+1:], session_bus_argv=session_bus_argv)
+                    launch_root, prefix, env, fields, scenarios[index+1:], session_bus_argv=session_bus_argv,
+                    include_replay=extras, boundary_probes=diagnostic_boundary_probes)
             err = ContractError("APPLICATION_SMOKE", "Released application-aware smoke failed", details=details)
             err.smoke_observation = observation
             raise err
