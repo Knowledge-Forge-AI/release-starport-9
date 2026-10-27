@@ -6,6 +6,12 @@ version **0.7.0**. The wheel packages the offline launcher and authenticated
 native application payload while keeping the captured payload byte-for-byte
 intact.
 
+It is a desktop workbench for reviewing, inspecting, and managing Theme Forge
+brand systems and artifacts. This distribution exposes that workflow through
+Python 3 and pip while retaining the native application's platform selection,
+payload authentication, and fail-closed launch behavior; it is not a Python
+reimplementation or a source-build fallback.
+
 The workbench component targets for this release are Stellar Burst 0.7.0,
 Stellar Loom 0.5.0, and Solar Sail 0.3.0. Component payloads are authenticated
 before the workbench uses them.
@@ -24,8 +30,10 @@ JavaScriptCoreGTK 4.1, and the required bundled runtime libraries used by the
 native application. The wheel does not install host packages. Those private
 runtime files are covered by the authenticated payload and manifest checks.
 
-The console command is `tfnf`. The command forwards ordinary arguments to the
-captured application launcher. The diagnostic options are available before
+The console command is `tfnf`. It selects exactly one platform payload for the
+current operating system and CPU architecture; it has no foreign-architecture
+fallback. Normal invocation forwards ordinary arguments to the captured
+application launcher. The diagnostic options are available before
 materialization:
 
 ```console
@@ -92,17 +100,18 @@ The intended 0.7.0 wheel set contains exactly these three targets:
 - Linux ARM64 with GNU glibc 2.36 or newer; and
 - Linux AMD64/x86_64 with GNU glibc 2.36 or newer.
 
-Linux wheels use truthful generic architecture tags. They do not claim
-`manylinux`, `musllinux`, or universal compatibility. The private GTK3,
-WebKitGTK 4.1, JavaScriptCoreGTK 4.1, and required runtime libraries are
-inside the Linux payload; the host still needs a working display/session and a
-compatible host graphics stack for the native application. Bundling these
-user-space libraries does not supply the host display server, compositor, GPU,
-DRM, or driver facilities.
+The corresponding wheel tags are `macosx_13_0_arm64`,
+`manylinux_2_36_aarch64`, and `manylinux_2_36_x86_64`. The Linux wheels use
+the `manylinux_2_36` GNU/glibc floor; they do not claim musllinux or universal
+compatibility. Private user-space GTK3, WebKitGTK 4.1, JavaScriptCoreGTK 4.1,
+and the required bundled runtime libraries are inside each Linux payload. The
+host still needs a working display/session and a compatible host graphics
+stack for the native application. Bundling these user-space libraries does
+not supply the host display server, compositor, GPU, DRM, or driver facilities.
 
 This release is wheel-only: exactly three platform wheels, with no source
-distribution or source-build fallback. See the release page for the published
-artifacts and their qualification receipts.
+distribution or source-build fallback. Select the artifact whose platform tag
+matches the host; release metadata identifies the three target wheels.
 
 ## Offline and reproducible behavior
 

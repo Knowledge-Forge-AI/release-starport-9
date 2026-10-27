@@ -9,17 +9,87 @@ import unittest
 from unittest.mock import Mock, patch
 
 from rs9.errors import ContractError
-from rs9.hosted_nix import command, execute, fhs_runtime_smoke, prepare_input, record_direct_loader_evaluation, PRODUCTS, SYSTEMS
+from rs9.hosted_nix import (_pinned_session_bus_argv, command, execute, fhs_runtime_smoke,
+                            prepare_input, record_direct_loader_evaluation, PRODUCTS, SYSTEMS)
 from rs9.hosted_summary import contract, gate_blockers
 from rs9.scratch import canonical
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _mock_dbus_loader_facts(source, system, overrides, scratch, neb, prefix, env, *, facts_out=None):
+    if facts_out is not None:
+        root = "/nix/store/" + "a" * 32 + "-dbus-1"
+        facts_out.update({
+            "dbus_run_session": root + "/bin/dbus-run-session",
+            "dbus_daemon": root + "/bin/dbus-daemon",
+            "dbus_session_config": root + "/share/dbus-1/session.conf",
+        })
+    return {"status": "pass", "application_qualified": False}
+
+
 class NixHostedTests(unittest.TestCase):
+    def test_linux_runtime_facts_require_strict_co_rooted_dbus_paths(self):
+        root = "/nix/store/" + "a" * 32 + "-dbus-1"
+        facts = {
+            "dbus_run_session": root + "/bin/dbus-run-session",
+            "dbus_daemon": root + "/bin/dbus-daemon",
+            "dbus_session_config": root + "/share/dbus-1/session.conf",
+        }
+        self.assertEqual(_pinned_session_bus_argv(facts), [
+            facts["dbus_run_session"],
+            "--dbus-daemon=" + facts["dbus_daemon"],
+            "--config-file=" + facts["dbus_session_config"],
+            "--",
+        ])
+        for mutation in (
+            {"dbus_daemon": "/nix/store/" + "b" * 32 + "-dbus-1/bin/dbus-daemon"},
+            {"dbus_session_config": root + "/etc/dbus-1/session.conf"},
+            {"dbus_run_session": None},
+        ):
+            with self.subTest(mutation=mutation), self.assertRaises(ContractError):
+                _pinned_session_bus_argv({**facts, **mutation})
+
+    def test_nix_runtime_facts_source_emits_dbus_bindings(self):
+        source = (ROOT / "nix/nebular.nix").read_text()
+        self.assertIn('dbus_run_session = "${pkgs.dbus}/bin/dbus-run-session";', source)
+        self.assertIn('dbus_daemon = "${pkgs.dbus}/bin/dbus-daemon";', source)
+        self.assertIn('dbus_session_config = "${pkgs.dbus}/share/dbus-1/session.conf";', source)
+
+    def test_loader_facts_capture_preserves_dbus_bindings_without_expanding_loader_contract(self):
+        with tempfile.TemporaryDirectory() as td:
+            scratch = Path(td)
+            facts_path = scratch / "facts.json"
+            root = "/nix/store/" + "a" * 32 + "-dbus-1"
+            facts = {
+                "loader": "/nix/store/" + "b" * 32 + "-glibc/lib/ld-linux-x86-64.so.2",
+                "glibc_lib": "/nix/store/" + "b" * 32 + "-glibc/lib",
+                "library_path": "/nix/store/" + "b" * 32 + "-glibc/lib",
+                "python": "/nix/store/" + "c" * 32 + "-python/bin/python3",
+                "node": "/nix/store/" + "d" * 32 + "-node/bin/node",
+                "readelf": "/nix/store/" + "e" * 32 + "-binutils/bin/readelf",
+                "dbus_run_session": root + "/bin/dbus-run-session",
+                "dbus_daemon": root + "/bin/dbus-daemon",
+                "dbus_session_config": root + "/share/dbus-1/session.conf",
+            }
+            facts_path.write_bytes(canonical(facts))
+            facts_out = {}
+            evaluation = {"schema": "rs9.nix-loader-evaluation.v1", "status": "fail",
+                          "application_qualified": False}
+            with patch("rs9.hosted_nix.command", return_value=json.dumps([{"outputs": {"out": str(facts_path)}}])), \
+                 patch("rs9.hosted_nix.stage_payload"), \
+                 patch("rs9.hosted_nix.select_payload", return_value={}), \
+                 patch("rs9.hosted_nix.evaluate_direct_loader", return_value=evaluation) as evaluate:
+                result = record_direct_loader_evaluation(
+                    ROOT, "x86_64-linux", [], scratch, Mock(), [], {}, facts_out=facts_out)
+            self.assertEqual(result, evaluation)
+            self.assertEqual(facts_out, facts)
+            self.assertEqual(evaluate.call_args.args[0], {key: facts[key] for key in (
+                "loader", "glibc_lib", "library_path", "python", "node", "readelf")})
     def test_loader_facts_failures_remain_diagnostics_before_runtime_gate(self):
         for result in (ContractError("NIX_EXECUTION", "fixture build failed"),
-                       "[]", "{}", '[{"outputs":{}}]', "not-json"):
+                       "[]", "{}", '[{"outputs":{}}]', "[null]",
+                       '[{"outputs":null}]', '[{"outputs":[]}]', "not-json"):
             with self.subTest(result=str(result)), tempfile.TemporaryDirectory() as td:
                 scratch = Path(td)
                 kwargs = {"side_effect": result} if isinstance(result, Exception) else {"return_value": result}
@@ -563,7 +633,13 @@ class NixHostedTests(unittest.TestCase):
                     return json.dumps([{"path": out_path, "narHash": "sha256-mock", "narSize": 1024}])
                 raise ValueError(f"Unexpected mock_command argv: {argv}")
 
-            def mock_record_loader(source, system, overrides, scratch, neb, prefix, env):
+            def mock_record_loader(source, system, overrides, scratch, neb, prefix, env, *, facts_out=None):
+                if facts_out is not None:
+                    facts_out.update({
+                        "dbus_run_session": "/nix/store/" + "a" * 32 + "-dbus-1/bin/dbus-run-session",
+                        "dbus_daemon": "/nix/store/" + "a" * 32 + "-dbus-1/bin/dbus-daemon",
+                        "dbus_session_config": "/nix/store/" + "a" * 32 + "-dbus-1/share/dbus-1/session.conf",
+                    })
                 doc = {
                     "schema": "rs9.nix-loader-evaluation.v1",
                     "status": "fail",
@@ -918,12 +994,12 @@ class NixHostedTests(unittest.TestCase):
                  patch("rs9.hosted_nix.release_load_record", return_value={"synthetic": True}), \
                  patch("rs9.hosted_nix.verify_burst_payload", return_value={"status": "pass"}), \
                  patch("rs9.hosted_nix.run_probes", side_effect=lambda name, *a, **k: (k.get("after_probe", lambda: None)() or [{"name": f"command.{name}.supported-behavior", "status": "pass"}])), \
-                 patch("rs9.hosted_nix.record_direct_loader_evaluation", return_value={"status": "pass", "application_qualified": False}), \
+                 patch("rs9.hosted_nix.record_direct_loader_evaluation", side_effect=_mock_dbus_loader_facts), \
                  patch("rs9.hosted_nix.fhs_runtime_smoke", return_value={"name": "nix-fhs-runtime-smoke", "status": "pass"}), \
                  patch("rs9.hosted_nix.snapshot_nebular_runtime", return_value={"runtime_root_sha256": "a" * 64}), \
                  patch("rs9.hosted_nix.prepare_smoke", return_value={}), \
                  patch("rs9.hosted_nix.verifier_import_preflight", return_value={"status": "pass"}), \
-                 patch("rs9.hosted_nix.verify_nebular_runtime", return_value={"status": "pass"}):
+                 patch("rs9.hosted_nix.verify_nebular_runtime", return_value={"status": "pass"}) as verify_runtime:
 
                 # Ensure cache directory entry exists for nebular smoke materialization check
                 cache_dir = scratch / "nix-runtime-cache"
@@ -937,6 +1013,12 @@ class NixHostedTests(unittest.TestCase):
                 self.assertIn("nix-store-archive-readback", gate_names)
                 self.assertIn("nix-native-closure", gate_names)
                 self.assertIn("nix-build-check-run", gate_names)
+                self.assertEqual(verify_runtime.call_args.kwargs["session_bus_argv"], [
+                    "/nix/store/" + "a" * 32 + "-dbus-1/bin/dbus-run-session",
+                    "--dbus-daemon=/nix/store/" + "a" * 32 + "-dbus-1/bin/dbus-daemon",
+                    "--config-file=/nix/store/" + "a" * 32 + "-dbus-1/share/dbus-1/session.conf",
+                    "--",
+                ])
 
                 lanes = [l for l in contract(ROOT)["lanes"] if l.get("lane") == "nix" and l.get("system") == "x86_64-linux"]
                 self.assertEqual(len(lanes), 1)

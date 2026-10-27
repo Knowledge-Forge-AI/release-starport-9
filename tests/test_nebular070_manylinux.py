@@ -674,6 +674,46 @@ class Nebular070ManylinuxContractTests(unittest.TestCase):
             ).fixture_only
         )
 
+    def test_stage_a_cpu_requires_concrete_baseline_and_property(self) -> None:
+        def variant(*, baseline=None, properties=None):
+            record = copy.deepcopy(self.stage_a_record)
+            bodies = copy.deepcopy(self.receipt_bodies)
+            for target, (triple, _tag) in manylinux.LINUX_TARGETS.items():
+                body = bodies[f"{target}:cpu"]
+                if baseline is not None:
+                    body["baseline"] = baseline
+                if properties is not None:
+                    body["properties"] = copy.deepcopy(properties)
+                body["identity"] = manylinux._digest({k: v for k, v in body.items() if k != "identity"})
+                row = next(item for item in record["targets"] if item["target"] == target)
+                row["cpu_baseline_sha256"] = manylinux._digest(body)
+            record["identity"] = manylinux._digest({k: v for k, v in record.items() if k != "identity"})
+            return record, bodies
+
+        for bad_baseline in ("unknown", " UnKnOwN ", "unresolved", "   ", "not_claimed"):
+            record, bodies = variant(baseline=bad_baseline)
+            with self.assertRaises(ContractError):
+                manylinux.validate_nebular070_payload_portability(
+                    record, bodies, expected_tf_producer_source=self.tf_source,
+                    expected_rs9_tool_source=self.rs9_source, allow_fixture=True,
+                )
+        for bad_properties in ({}, {"isa": "unknown"}, {"isa": " UNRESOLVED "}, {"isa": "not-claimed"}):
+            record, bodies = variant(properties=bad_properties)
+            with self.assertRaises(ContractError):
+                manylinux.validate_nebular070_payload_portability(
+                    record, bodies, expected_tf_producer_source=self.tf_source,
+                    expected_rs9_tool_source=self.rs9_source, allow_fixture=True,
+                )
+
+        for concrete in ({"count": 0}, {"feature": False}, {"isa": "generic"}):
+            record, bodies = variant(properties=concrete)
+            self.assertTrue(
+                manylinux.validate_nebular070_payload_portability(
+                    record, bodies, expected_tf_producer_source=self.tf_source,
+                    expected_rs9_tool_source=self.rs9_source, allow_fixture=True,
+                ).fixture_only
+            )
+
     def test_stage_b_refuses_stale_consumer_and_wheel_hash_or_claim_shortcut(self) -> None:
         wheels = self._build_linux_wheels()
         admission, consumers, approval, matrix = self._stage_b_record(wheels)

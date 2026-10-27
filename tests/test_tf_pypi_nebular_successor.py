@@ -683,7 +683,7 @@ class NebularSuccessorIntegrationTests(unittest.TestCase):
             receipt_070["readme"],
             {
                 "path": DESCRIPTION_070_PATH,
-                "sha256": "19961e11514340f8a87d17688d938b606304f5b5734d7158ef97aad9580886ee",
+                "sha256": "c590e84005aed24a726160213d1bcd89e5855b006cc39612dcb7769238568078",
             },
         )
         self.assertEqual(

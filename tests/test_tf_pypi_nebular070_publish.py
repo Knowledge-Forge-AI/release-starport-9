@@ -1246,10 +1246,10 @@ class Nebular070PublisherSeamTests(unittest.TestCase):
         desc_file = ROOT / DESCRIPTION_PATH
         self.assertTrue(desc_file.is_file())
         desc_bytes = desc_file.read_bytes()
-        self.assertEqual(len(desc_bytes), 6028)
+        self.assertEqual(len(desc_bytes), 6671)
         self.assertEqual(
             sha256(desc_bytes),
-            "19961e11514340f8a87d17688d938b606304f5b5734d7158ef97aad9580886ee",
+            "c590e84005aed24a726160213d1bcd89e5855b006cc39612dcb7769238568078",
         )
 
         for absent_name in (PIN_BASENAME, APPROVAL_BASENAME, CAPTURE_BASENAME):
