@@ -461,6 +461,7 @@ jobs:
             --receipts-dir "${{ runner.temp }}/tfnf-070-receipts" \
             --output "${{ runner.temp }}/tfnf-070-matrix/matrix_receipt.json" \
             --expected-commit "${{ github.sha }}" \
+            --qualification-inputs operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-qualification-inputs.json \
             --run-id "${{ github.run_id }}" \
             --run-attempt "${{ github.run_attempt }}"
 

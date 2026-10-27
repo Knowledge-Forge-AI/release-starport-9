@@ -24,6 +24,23 @@ from rs9.tf_pypi_verify import read_wheel, verify_pair, verify_record
 from rs9.tf_pypi_platform import host_key
 from rs9.tf_pypi_probes import functional_probes
 from rs9.tf_pypi_probes import receipt
+from rs9.nebular070_pip import (
+    _NEBULAR_PIP_MANIFEST,
+    _NEBULAR_PIP_MANIFEST_BYTES,
+    _NEBULAR_PIP_MANIFEST_SHA256,
+    _NEBULAR_PIP_MAX_BYTES,
+    _NEBULAR_PIP_MAX_FILES,
+    _NEBULAR_PIP_RECORD_COUNT,
+    _NEBULAR_PIP_ROOT,
+    _NEBULAR_PIP_SCHEMA,
+    _NEBULAR_PIP_REGULAR_BYTES,
+    _NEBULAR_PIP_VERSION,
+    _nebular_offline_pip_input,
+    _nebular_pip_inventory,
+    _nebular_pip_command,
+    _nebular_require_pip_bootstrap,
+    _nebular_validate_pip_source,
+)
 from rs9.nebular070_manylinux import manylinux_tag_for_target
 
 _CONSUMER_ENV_KEYS = (
@@ -250,8 +267,6 @@ _NEBULAR_MAX_ARTIFACT_BYTES = 64 * 1024 * 1024
 _NEBULAR_IO_CHUNK = 64 * 1024
 _NEBULAR_TERMINATION_GRACE = 0.5
 _NEBULAR_DRAIN_GRACE = 0.5
-
-
 def _nebular_grace_deadline(current: float | None, now: float) -> float:
     """Keep the first termination grace deadline stable across loop checks."""
     return current if current is not None else now + _NEBULAR_TERMINATION_GRACE
@@ -1275,6 +1290,7 @@ def consume_nebular_candidate(
     process_observer: Callable[[Path], dict[str, Any]] | None = None,
     state_snapshot: Callable[[Path, Sequence[str]], dict[str, Any]] | None = None,
     real_user_state_snapshot: Callable[[str, str], Mapping[str, Any]] | None = None,
+    offline_pip_bootstrap: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Qualify one authenticated Nebular 0.7 wheel through a real installed native probe.
 
@@ -1282,6 +1298,8 @@ def consume_nebular_candidate(
     contract tests.  It requires controlled host/provider identities and the
     returned receipt can never be treated as hosted qualification evidence.
     Production callers must leave it false and provide the platform sandbox.
+    ``offline_pip_bootstrap`` is an explicit Linux-only mounted pip source;
+    when absent, the established ensurepip-backed path is unchanged.
     """
     if not isinstance(raw_release, Mapping):
         fail("NEBULAR_CAPTURE_BINDING")
@@ -1289,6 +1307,7 @@ def consume_nebular_candidate(
     host = _nebular_identity_observed(host_identity, target, fixture_only)
     capture = _nebular_validate_capture(candidate, row, context, raw_release,
                                         target=target, fixture_only=fixture_only)
+    pip_source = _nebular_offline_pip_input(offline_pip_bootstrap, target)
     wheel_file = Path(wheel_path)
     if wheel_file.is_symlink() or not wheel_file.is_file() or wheel_file.name != wheel["filename"]:
         fail("NEBULAR_WHEEL_BINDING")
@@ -1440,16 +1459,32 @@ def consume_nebular_candidate(
                 "linux-arm64-gnu": "linux_aarch64",
                 "linux-x64-gnu": "linux_x86_64",
             }[target]
-            install_args = [python, "-I", "-B", "-m", "pip", "install", "--no-index", "--no-deps",
-                            "--only-binary=:all:", "--no-cache-dir", "--target", site,
-                            "--platform", pip_platform, wheel_file.resolve()]
+            install_args = _nebular_pip_command(
+                python,
+                ["install", "--no-index", "--no-deps", "--only-binary=:all:",
+                 "--no-cache-dir", "--target", site, "--platform", pip_platform,
+                 wheel_file.resolve()],
+                pip_source,
+            )
         else:
             venv_root = work_path / "venv"
-            venv.EnvBuilder(with_pip=True, clear=False).create(venv_root)
+            venv.EnvBuilder(with_pip=pip_source is None, clear=False).create(venv_root)
             python = venv_root / "bin/python"
             install_env = {**base_env, "PATH": str(python.parent) + os.pathsep + base_env["PATH"]}
-            install_args = [python, "-I", "-B", "-m", "pip", "install", "--no-index", "--no-deps",
-                            "--only-binary=:all:", "--no-cache-dir", wheel_file.resolve()]
+            if pip_source is not None:
+                bootstrap = _nebular_run(
+                    _nebular_pip_command(
+                        python, ["--python", str(python), "--version"], pip_source,
+                    ),
+                    install_env, work_path, sandbox_prefix, 30, runner=runner,
+                )
+                _nebular_require_pip_bootstrap(bootstrap)
+            install_args = _nebular_pip_command(
+                python,
+                ["install", "--no-index", "--no-deps", "--only-binary=:all:",
+                 "--no-cache-dir", wheel_file.resolve()],
+                pip_source,
+            )
         install = _nebular_run(
             install_args,
             install_env, work_path, sandbox_prefix, 60, runner=runner,
@@ -1511,9 +1546,12 @@ def consume_nebular_candidate(
             uninstall = {"exit_code": 0, "signal": None, "stdout_sha256": sha256(b""),
                          "stderr_sha256": sha256(b"")}
         else:
-            uninstall = _nebular_run([python, "-I", "-B", "-m", "pip", "uninstall", "--yes",
-                                       "theme-forge-nebular-fusion"], install_env, work_path,
-                                     sandbox_prefix, 60, runner=runner)
+            uninstall = _nebular_run(
+                _nebular_pip_command(
+                    python, ["uninstall", "--yes", "theme-forge-nebular-fusion"], pip_source,
+                ),
+                install_env, work_path, sandbox_prefix, 60, runner=runner,
+            )
         if (uninstall["exit_code"] != 0 or uninstall.get("timed_out")
                 or uninstall.get("output_limit_exceeded") or uninstall.get("forced_cleanup")
                 or uninstall.get("cleanup_known", True) is not True):
@@ -1574,4 +1612,15 @@ def consume_nebular_candidate(
         "publication_admitted": False,
         "public_writes": 0,
     }
+    if pip_source is not None:
+        result["pip_bootstrap"] = {
+            "schema": "rs9.nebular070-offline-pip-bootstrap.v1",
+            "root_role": "consumer-tools/pip",
+            "version": pip_source["version"],
+            "manifest_bytes": pip_source["manifest_bytes"],
+            "manifest_sha256": pip_source["manifest_sha256"],
+            "regular_files": pip_source["regular_files"],
+            "regular_bytes": pip_source["regular_bytes"],
+            "primary_cli": "pip --python <venv> --version",
+        }
     return result

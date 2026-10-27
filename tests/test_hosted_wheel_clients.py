@@ -239,11 +239,61 @@ class HostedWheelClientsTests(unittest.TestCase):
             child(config)
 
         mock_neb_smoke.assert_called_once()
+        self.assertNotIn("diagnostic_extras", mock_neb_smoke.call_args.kwargs)
+        self.assertTrue(mock_neb_smoke.call_args.kwargs["diagnostic_boundary_probes"])
         receipt_file = self.scratch / "client-receipt.json"
         self.assertTrue(receipt_file.is_file())
         receipt_data = json.loads(receipt_file.read_bytes())
         self.assertEqual(receipt_data["native_smoke"]["nebular_smoke"], "pass")
         self.assertEqual(receipt_data["native_smoke"]["elf_objects_checked"], 1)
+
+    @patch("rs9.hosted_wheel_clients.provision_image")
+    @patch("rs9.hosted_wheel_clients.ContainerRunner")
+    @patch("rs9.hosted_wheel_clients.RecordingRunner")
+    def test_qualify_retains_sanitized_application_smoke_diagnostic(self, mock_rec, mock_runner_cls, mock_prov):
+        """A child boundary diagnostic is retained with the client failure, never raw output."""
+        context = {
+            "system": "x86_64-linux",
+            "repository": self.repo,
+            "scratch": self.scratch,
+            "pins": {
+                "deb": {"container_digests": {"amd64": "sha256:" + "d" * 64}},
+                "rpm": {"container_digests": {"x86_64": "sha256:" + "r" * 64}},
+            },
+        }
+        wheels = {"theme-forge-nebular-fusion": self.scratch / "wheel.whl"}
+        prepared = {
+            "source": self.scratch / "source",
+            "tools": self.scratch / "tools",
+            "scratch": self.scratch / "native-smoke",
+            "records": [],
+        }
+        diagnostic = self.scratch / "diagnostics" / "application-smoke-diagnostic.json"
+        diagnostic.parent.mkdir(parents=True)
+        diagnostic.write_bytes(b'{"schema":"rs9.application-smoke-diagnostic.v1alpha1","status":"stale"}')
+
+        deb_receipt = MagicMock(exit_code=1, executed=True)
+        rpm_receipt = MagicMock(exit_code=0, executed=True)
+        call_count = 0
+
+        def runner_instance_factory(*args, **kwargs):
+            nonlocal call_count
+            runner = MagicMock()
+            runner.run.return_value = deb_receipt if call_count == 0 else rpm_receipt
+            if call_count == 0:
+                diagnostic.write_bytes(b'{"schema":"rs9.application-smoke-diagnostic.v1alpha1","status":"fail"}')
+            if call_count == 1:
+                (self.scratch / "wheel-client-rpm-receipt.json").write_bytes(b"{}")
+            call_count += 1
+            return runner
+
+        mock_runner_cls.side_effect = runner_instance_factory
+
+        gates, files = qualify(context, wheels, prepared)
+
+        self.assertEqual({g["name"]: g for g in gates}["wheel-client-deb"]["status"], "fail")
+        self.assertIn(diagnostic, files)
+        self.assertEqual(diagnostic.read_bytes(), b'{"schema":"rs9.application-smoke-diagnostic.v1alpha1","status":"fail"}')
 
 
 if __name__ == "__main__":
