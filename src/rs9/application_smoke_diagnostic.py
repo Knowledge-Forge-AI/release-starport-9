@@ -26,6 +26,8 @@ CAUSE_CATEGORIES = frozenset({"process-timeout", "process-nonzero", "process-sig
 SAFE_LOG_CATEGORIES = frozenset({"dbus-session-conf-missing", "dbus-daemon-error",
     "xvfb-display-error", "xvfb-auth-error", "module-not-found", "command-not-found",
     "shared-library-missing", "webkit-crash", "assertion", "socket-unavailable", "unclassified"})
+SAFE_FAILURE_ROLES = frozenset({"dbus-wrapper", "dbus-daemon", "dbus-config", "node",
+    "smoke-script", "loader", "unknown"})
 
 
 def extract_log_categories(stdout, stderr, exit_code=None):
@@ -74,6 +76,86 @@ def classify_smoke_cause(*, exit_code=None, signal=None, timed_out=False, receip
     if has_problems or receipt_status not in (None, "pass"):
         return "receipt-failed"
     return "unknown"
+
+
+def _role_for_target(target):
+    """Map only a recognized failed-callee basename; never return the path."""
+    cleaned = target.strip().strip(b"'\"")
+    for quote in (b"\xe2\x80\x98", b"\xe2\x80\x99", b"\xe2\x80\x9c", b"\xe2\x80\x9d"):
+        cleaned = cleaned.removeprefix(quote).removesuffix(quote)
+    basename = cleaned.strip(b"'\"").rsplit(b"/", 1)[-1]
+    return {
+        b"dbus-run-session": "dbus-wrapper",
+        b"dbus-daemon": "dbus-daemon",
+        b"node": "node",
+        b"native-rc-smoke.mjs": "smoke-script",
+    }.get(basename)
+
+
+def _resolution_role(text):
+    """Read closed transient failure templates and return the failed callee role."""
+    markers = (b"not found", b"no such file", b"cannot execute", b"exec format error")
+    roles, saw_marker = set(), False
+    for line in text.splitlines():
+        line = line.strip()
+        if b"failed to exec" in line:
+            target = line.split(b"failed to exec", 1)[1].split(b":", 1)[0]
+            roles.add(_role_for_target(target) or "unknown")
+            continue
+        if not any(marker in line for marker in markers):
+            continue
+        saw_marker = True
+        if line.startswith((b"/usr/bin/env:", b"env:")):
+            target = line.split(b":", 1)[1].split(b":", 1)[0]
+            roles.add(_role_for_target(target) or "unknown")
+            continue
+        if b"command not found" in line or b": not found" in line:
+            parts = line.split(b":")
+            for index, part in enumerate(parts):
+                if index > 0 and (b"command not found" in part or b"not found" in part):
+                    roles.add(_role_for_target(parts[index - 1]) or "unknown")
+                    break
+            else:
+                roles.add("unknown")
+    if len(roles) == 1:
+        return next(iter(roles))
+    return "unknown" if roles or saw_marker else None
+
+
+def _module_not_found_role(text):
+    roles = set()
+    for line in text.splitlines():
+        if b"cannot find module" in line:
+            target = line.split(b"cannot find module", 1)[1].split(b"imported from", 1)[0]
+            roles.add("smoke-script" if _role_for_target(target) == "smoke-script" else "unknown")
+    return "smoke-script" if roles == {"smoke-script"} else "unknown"
+
+
+def _has_dbus_daemon_token(text):
+    return re.search(rb"(?<![a-z0-9._-])dbus-daemon(?![a-z0-9._-])", text) is not None
+
+
+def classify_failure_binding(stdout, stderr, exit_code=None, log_categories=()):
+    """Classify a bounded failure into a safe role/phase binding."""
+    text = (stderr + b"\n" + stdout).lower()
+    categories = set(log_categories)
+    if "dbus-session-conf-missing" in categories:
+        return {"role": "dbus-config", "phase": "resolution", "evidence": "dbus-session-conf-missing"}
+    if "shared-library-missing" in categories:
+        return {"role": "loader", "phase": "loader", "evidence": "shared-library-missing"}
+    role = _resolution_role(text)
+    if role is not None:
+        return {"role": role, "phase": "resolution", "evidence": "command-not-found"}
+    if "dbus-daemon-error" in categories:
+        role = "dbus-daemon" if _has_dbus_daemon_token(text) else "unknown"
+        return {"role": role, "phase": "startup", "evidence": "dbus-daemon-error"}
+    if "module-not-found" in categories:
+        return {"role": _module_not_found_role(text), "phase": "module-resolution", "evidence": "module-not-found"}
+    if exit_code == 127 or "command-not-found" in categories:
+        return {"role": "unknown", "phase": "resolution", "evidence": "command-not-found"}
+    if categories or exit_code not in (None, 0):
+        return {"role": "unknown", "phase": "runtime", "evidence": "unclassified"}
+    return None
 
 
 def validate_problem_codes(problems):
@@ -246,6 +328,8 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
         "stream_capture_complete": error not in {"process-output-limit", "process-timeout", "harness-error"}, "error": error,
         "cleanup_error": cleanup_error, "child_reaped": child_reaped,
         "log_categories": extract_log_categories(out, err, rc)}
+    fields["failure_binding"] = classify_failure_binding(
+        out, err, rc, log_categories=fields["log_categories"])
     record, receipt_error, codes = read_and_validate_receipt(evidence / (platform+"-"+scenario+".run.json"), fields)
     fields["receipt"] = sanitize_receipt_summary(record, fields.pop("receipt_identity"))
     fields["receipt_error"], fields["problem_codes"] = receipt_error, codes
@@ -296,6 +380,9 @@ def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
 def _failure_details(fields, *, extras, receipt_name):
     keys = ("exit_code", "stdout_sha256", "stderr_sha256", "reason_token")
     details = {k: fields[k] for k in keys if fields.get(k) is not None}
+    binding = fields.get("failure_binding")
+    if binding is not None:
+        details["diagnostic_token"] = binding["role"] + "-" + binding["phase"]
     if fields.get("error") == "process-timeout":
         details["exception_type"] = "TimeoutExpired"
         details.pop("exit_code", None)

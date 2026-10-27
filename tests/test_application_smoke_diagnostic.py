@@ -17,7 +17,9 @@ from unittest.mock import MagicMock, patch
 
 from rs9.application_smoke_diagnostic import (
     CAUSE_CATEGORIES,
+    SAFE_FAILURE_ROLES,
     SAFE_LOG_CATEGORIES,
+    classify_failure_binding,
     classify_smoke_cause,
     execute_application_smoke,
     extract_log_categories,
@@ -91,6 +93,7 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
         self.assertEqual(details["scenario"], "C")
         self.assertEqual(details["cause"], "dbus-session-failure")
         self.assertEqual(details["exit_code"], 127)
+        self.assertEqual(details["diagnostic_token"], "dbus-config-resolution")
         self.assertIn("diagnostic_sha256", details)
 
         # Verify exactly 2 calls: initial run of C, and ONE replay of C.
@@ -168,6 +171,55 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
             log_categories=log_cats_dbus,
         )
         self.assertEqual(cause_dbus, "dbus-session-failure")
+
+    def test_failure_binding_uses_failed_callee_not_wrapper_prefix(self):
+        cases = [
+            (b"dbus-run-session: failed to exec 'dbus-daemon': No such file or directory\n", "dbus-daemon", "resolution"),
+            (b"dbus-run-session: failed to exec '/nix/store/x-node/node': No such file or directory\n", "node", "resolution"),
+            (b"dbus-run-session: failed to exec 'node': Permission denied\n", "node", "resolution"),
+            (b"/usr/bin/env: 'node': No such file or directory\n", "node", "resolution"),
+            (b"/usr/bin/env: \xe2\x80\x98node\xe2\x80\x99: No such file or directory\n", "node", "resolution"),
+            (b"sh: 1: /nix/store/x-node/bin/node: not found\n", "node", "resolution"),
+            (b"dbus-run-session: failed to exec '/private/node_modules/native-rc-smoke.mjs': No such file or directory\n", "smoke-script", "resolution"),
+        ]
+        for stderr, role, phase in cases:
+            with self.subTest(stderr=stderr):
+                categories = extract_log_categories(b"", stderr, exit_code=127)
+                binding = classify_failure_binding(b"", stderr, 127, categories)
+                self.assertEqual(binding["role"], role)
+                self.assertEqual(binding["phase"], phase)
+                self.assertIn(binding["role"], SAFE_FAILURE_ROLES)
+                self.assertNotIn(stderr.decode("utf-8", errors="replace").strip(), json.dumps(binding))
+
+        module_stderr = b"Error: Cannot find module '/private/node_modules/native-rc-smoke.mjs'\n"
+        module_categories = extract_log_categories(b"", module_stderr, exit_code=1)
+        self.assertIn("module-not-found", module_categories)
+        module_binding = classify_failure_binding(b"", module_stderr, 1, module_categories)
+        self.assertEqual(module_binding, {
+            "role": "smoke-script",
+            "phase": "module-resolution",
+            "evidence": "module-not-found",
+        })
+
+    def test_failure_binding_unknown_for_ambiguous_paths_and_non_utf8(self):
+        cases = [
+            (b"dbus-run-session: failed to exec '/private/secret-node': No such file or directory\n", "resolution"),
+            (b"dbus-run-session: failed to exec '/private/secret-node': Permission denied\n", "resolution"),
+            (b"dbus-run-session: child process exited with error\n", "startup"),
+            (b"/x/bin/node: 3: exec: /x/.node-wrapped: not found\n", "resolution"),
+            (b"Error: Cannot find module '/private/node_modules/node-secret.js'\n", "module-resolution"),
+            (b"Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/private/pkg/index.mjs' imported from /private/node_modules/native-rc-smoke.mjs\n", "module-resolution"),
+            (b"Error: Cannot find module '/private/pkg/index.js'\nRequire stack:\n- /private/node_modules/native-rc-smoke.mjs\n", "module-resolution"),
+            (b"dbus-run-session: failed to exec 'dbus-daemon': No such file or directory\ndbus-run-session: failed to exec 'node': No such file or directory\n", "resolution"),
+            (b"\x80\xffdbus-run-session\x00\n", "resolution"),
+        ]
+        for stderr, phase in cases:
+            with self.subTest(stderr=stderr):
+                categories = extract_log_categories(b"", stderr, exit_code=127)
+                binding = classify_failure_binding(b"", stderr, 127, categories)
+                self.assertEqual(binding["role"], "unknown")
+                self.assertEqual(binding["phase"], phase)
+                self.assertNotIn("secret-node", json.dumps(binding))
 
     def test_adverse_corrupt_streams_handled_safely(self):
         """Corrupt non-UTF-8 binary stream bytes compute lengths and digests cleanly."""
