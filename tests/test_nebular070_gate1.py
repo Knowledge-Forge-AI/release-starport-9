@@ -18,6 +18,7 @@ from rs9.scratch import canonical
 from rs9.operator import release_bindings, validate_release_binding
 from rs9.wheel_native import extract_macho_build_version, validate_darwin_payload_floor
 from rs9.wheel_nebular_successor import (
+    DESCRIPTION_070_PATH,
     GATE1_PROFILE,
     _successor_metadata_bytes,
     gate1_profile_record,
@@ -114,6 +115,20 @@ class Nebular070Gate1Tests(unittest.TestCase):
         profile = gate1_profile_record()
         self.assertEqual(profile["darwin_floor"], {"major": 13, "minor": 0})
         self.assertFalse(profile["linux_runtime_policy"]["manylinux_claim"])
+        self.assertEqual(GATE1_PROFILE.description_path, DESCRIPTION_070_PATH)
+        self.assertEqual(profile["description_path"], DESCRIPTION_070_PATH)
+        repo_root = Path(__file__).resolve().parents[1]
+        raw_profile = json.loads(
+            (repo_root / "operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-gate1.json").read_bytes()
+        )
+        self.assertEqual({k: raw_profile[k] for k in profile}, profile)
+        self.assertEqual(raw_profile["description_path"], DESCRIPTION_070_PATH)
+        desc_bytes = (repo_root / DESCRIPTION_070_PATH).read_bytes()
+        self.assertEqual(len(desc_bytes), 6028)
+        self.assertEqual(
+            digest(desc_bytes),
+            "19961e11514340f8a87d17688d938b606304f5b5734d7158ef97aad9580886ee",
+        )
 
     def test_darwin_floor_cross_checks_macho_and_info_plist(self) -> None:
         evidence = validate_darwin_payload_floor(_darwin_payload((13, 0, 0)))
