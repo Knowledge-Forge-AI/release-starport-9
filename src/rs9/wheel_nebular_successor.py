@@ -133,6 +133,13 @@ def gate1_profile_record(profile: SuccessorCandidateProfile = GATE1_PROFILE) -> 
     }
 
 
+def _generic_successor_contract(release: SuccessorRelease) -> tuple[str, tuple[str, ...]]:
+    """Reuse the immutable 0.7 profile contract for the generic successor path."""
+    if release.distribution_version == GATE1_PROFILE.distribution_version:
+        return GATE1_PROFILE.license_expression, GATE1_PROFILE.required_legal_files
+    return LICENSE_EXPRESSION, LEGAL_FILES
+
+
 SUCCESSOR_RELEASES: dict[str, SuccessorRelease] = {
     HISTORICAL_RELEASE: SuccessorRelease(
         application_version=APPLICATION_VERSION,
@@ -736,9 +743,13 @@ def build_successor_wheel(
             raise _error("PROFILE_BINDING", "Candidate profile version differs from the selected release")
         if candidate_profile.manylinux_claim:
             raise _error("PROFILE_POLICY", "Gate1 candidate profile cannot claim manylinux")
-    profile_license_expression = candidate_profile.license_expression if candidate_profile else LICENSE_EXPRESSION
-    profile_required_legal = candidate_profile.required_legal_files if candidate_profile else LEGAL_FILES
-    profile_optional_legal = candidate_profile.optional_legal_files if candidate_profile else ()
+    if candidate_profile is not None:
+        profile_license_expression = candidate_profile.license_expression
+        profile_required_legal = candidate_profile.required_legal_files
+        profile_optional_legal = candidate_profile.optional_legal_files
+    else:
+        profile_license_expression, profile_required_legal = _generic_successor_contract(release)
+        profile_optional_legal = ()
     if (output_dir is None) == (output_path is None):
         raise _error("DESTINATION_REQUIRED", "Exactly one wheel output destination is required")
     if fixture_only and capture is not None:
