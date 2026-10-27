@@ -30,6 +30,11 @@ from rs9.hosted_platforms import (
     system_from_target_triple,
 )
 from rs9.materialize import parse_manifest_members
+from rs9.nebular070_manylinux import (
+    ValidatedPayloadPortability,
+    manylinux_tag_for_target,
+    validate_nebular070_payload_portability,
+)
 from rs9.nebular_lineage import verify_forward_lineage_proof
 from rs9.records import record_sha256
 from rs9.release_core import ReleaseCapture, authenticated_record_hash, digest
@@ -215,7 +220,8 @@ def _write_exclusive(path: Path, data: bytes) -> None:
 
 
 def _resolve_target(system: str | None, target_platform: str | None, platform_tag: str | None,
-                    candidate_only: bool) -> tuple[str, str, bool, str]:
+                    candidate_only: bool,
+                    payload_portability: ValidatedPayloadPortability | None = None) -> tuple[str, str, bool, str]:
     if system is None and target_platform is None:
         system, target_platform = "aarch64-darwin", "aarch64-apple-darwin"
     elif system is None:
@@ -234,8 +240,17 @@ def _resolve_target(system: str | None, target_platform: str | None, platform_ta
         raise _error("UNSUPPORTED_PLATFORM", "Successor wheels cannot use the universal tag")
     is_linux = system.endswith("-linux")
     expected_linux_tag = contract.platform_tag
+    policy_target = {"aarch64-linux": "linux-arm64-gnu", "x86_64-linux": "linux-x64-gnu"}.get(system)
+    qualified_tag = manylinux_tag_for_target(policy_target) if policy_target else None
+    if payload_portability is not None:
+        if not is_linux or policy_target is None or payload_portability.target(policy_target)["triple"] != target_platform:
+            raise _error("MANYLINUX_TARGET", "Payload portability evidence does not match the selected Linux target")
+        if platform_tag not in (None, qualified_tag):
+            raise _error("MANYLINUX_TAG", "Payload-qualified construction requires its exact 2.36 manylinux tag")
     if is_linux and platform_tag and platform_tag not in {expected_linux_tag, "manylinux", "musllinux"}:
         if "manylinux" in platform_tag or "musllinux" in platform_tag:
+            if payload_portability is not None and platform_tag == qualified_tag:
+                return system, target_platform, is_linux, "linux"
             raise WheelWithheldError(
                 "MANYLINUX_UNPROVEN",
                 "manylinux and musllinux claims are withheld for the generic Linux candidate",
@@ -255,6 +270,8 @@ def _resolve_target(system: str | None, target_platform: str | None, platform_ta
             reason="manylinux_unproven",
         )
     if is_linux and platform_tag and ("manylinux" in platform_tag or "musllinux" in platform_tag):
+        if payload_portability is not None and platform_tag == qualified_tag:
+            return system, target_platform, is_linux, "linux"
         raise WheelWithheldError(
             "MANYLINUX_UNPROVEN",
             "manylinux and musllinux claims are withheld for the generic Linux candidate",
@@ -729,6 +746,7 @@ def build_successor_wheel(
     fixture_only: bool = False,
     candidate_only: bool = False,
     candidate_profile: SuccessorCandidateProfile | None = None,
+    payload_portability: ValidatedPayloadPortability | None = None,
     deterministic_timestamp: tuple[int, int, int, int, int, int] | None = None,
 ) -> WheelBuildResult:
     """Build a non-admitted successor wheel from an authenticated or explicit fixture input."""
@@ -743,6 +761,23 @@ def build_successor_wheel(
             raise _error("PROFILE_BINDING", "Candidate profile version differs from the selected release")
         if candidate_profile.manylinux_claim:
             raise _error("PROFILE_POLICY", "Gate1 candidate profile cannot claim manylinux")
+    if payload_portability is not None:
+        if not isinstance(payload_portability, ValidatedPayloadPortability):
+            raise _error("MANYLINUX_INPUT", "Validated 0.7.0 payload portability evidence is required")
+        if application_version != "0.7.0" or distribution_version != "0.7.0" or not candidate_only:
+            raise _error("MANYLINUX_INPUT", "Manylinux construction is limited to the held 0.7.0 candidate")
+        try:
+            rebound = validate_nebular070_payload_portability(
+                payload_portability.record,
+                payload_portability.receipt_bodies,
+                expected_tf_producer_source=payload_portability.record["tf_producer_source"],
+                expected_rs9_tool_source=payload_portability.record["rs9_tool_source"],
+                allow_fixture=payload_portability.fixture_only,
+            )
+        except (ContractError, KeyError, TypeError) as exc:
+            raise _error("MANYLINUX_INPUT", "Stage A payload portability evidence is not internally authenticated") from exc
+        if rebound.digest != payload_portability.digest or rebound.record != payload_portability.record:
+            raise _error("MANYLINUX_INPUT", "Stage A payload portability evidence changed after validation")
     if candidate_profile is not None:
         profile_license_expression = candidate_profile.license_expression
         profile_required_legal = candidate_profile.required_legal_files
@@ -770,7 +805,12 @@ def build_successor_wheel(
     if not fixture_only and (launcher_path is not None or gui_path is not None):
         raise _error("COMMAND_OVERRIDE", "Authenticated command paths come only from the captured release")
 
-    effective_system, target_triple, is_linux, family = _resolve_target(system, target_platform, platform_tag, candidate_only)
+    effective_system, target_triple, is_linux, family = _resolve_target(
+        system, target_platform, platform_tag, candidate_only, payload_portability
+    )
+    policy_target = {"aarch64-linux": "linux-arm64-gnu", "x86_64-linux": "linux-x64-gnu"}.get(effective_system)
+    if payload_portability is not None and policy_target is None:
+        raise _error("MANYLINUX_TARGET", "Manylinux construction requires one of the reviewed Linux targets")
     release_hash, release_identity = _capture_identity(capture, fixture_only, release.application_version)
     forward_lineage = None
     if direct_lineage:
@@ -806,6 +846,15 @@ def build_successor_wheel(
     manifest_sha = archive_manifest.get("manifest_sha256")
     if not isinstance(manifest_sha, str) or digest(canonical(archive_manifest.get("members", []))) != manifest_sha:
         raise _error("MANIFEST_IDENTITY", "Payload manifest digest is not self-consistent")
+    if payload_portability is not None:
+        portability_row = payload_portability.target(policy_target)  # type: ignore[arg-type]
+        if portability_row.get("triple") != target_triple \
+                or portability_row.get("payload_archive_sha256") != payload_sha \
+                or portability_row.get("manifest_sha256") != manifest_sha:
+            raise _error(
+                "MANYLINUX_INPUT",
+                "Stage A payload and manifest identities do not match the selected archive",
+            )
     darwin_floor_evidence = None
     if candidate_profile is not None and not is_linux:
         darwin_floor_evidence = validate_darwin_payload_floor(
@@ -819,7 +868,7 @@ def build_successor_wheel(
             "product_id": PRODUCT_ID,
             "version": release.application_version,
             "output_dir": old_dir,
-            "platform_tag": platform_tag,
+            "platform_tag": platform_contract(effective_system).platform_tag if payload_portability is not None else platform_tag,
             "target_platform": target_triple,
             "system": effective_system,
             "manifest": archive_manifest,
@@ -891,7 +940,7 @@ def build_successor_wheel(
     )
     dist_name = DISTRIBUTION_NAME.replace("-", "_")
     dist_info = f"{dist_name}-{release.distribution_version}.dist-info"
-    wheel_tag = legacy.tag
+    wheel_tag = manylinux_tag_for_target(policy_target) if payload_portability is not None else legacy.tag
     wheel_filename = f"{dist_name}-{release.distribution_version}-{wheel_tag}.whl"
     init_bytes = _successor_init_bytes(
         application_version=release.application_version,
@@ -952,11 +1001,15 @@ def build_successor_wheel(
         },
         "fixture_only": fixture_only,
         "candidate_only": candidate_only,
-        "candidate_status": "policy-pending" if is_linux else "candidate",
-        "promotability": "policy-pending" if is_linux else "candidate",
+        "candidate_status": "payload-qualified" if payload_portability is not None else ("policy-pending" if is_linux else "candidate"),
+        "promotability": "payload-qualified" if payload_portability is not None else ("policy-pending" if is_linux else "candidate"),
         "manylinux_proven": False,
         "source_closure": {"status": "pending", "receipt_sha256": None, "admitted": False},
-        "policy": {"status": "pending", "receipt_sha256": None, "manylinux_proven": False},
+        "policy": {
+            "status": "payload-qualified" if payload_portability is not None else "pending",
+            "receipt_sha256": payload_portability.digest if payload_portability is not None else None,
+            "manylinux_proven": False,
+        },
         "builder_can_publish": False,
         "can_publish": False,
         "publication_admitted": False,
@@ -973,6 +1026,12 @@ def build_successor_wheel(
             },
             "linux_runtime_policy": profile_record["linux_runtime_policy"],
             "darwin_floor_evidence": darwin_floor_evidence,
+        })
+    if payload_portability is not None:
+        provenance.update({
+            "construction_stage": "payload-portability",
+            "release_admission": "external",
+            "manylinux_construction_receipt_sha256": payload_portability.digest,
         })
     entries: dict[str, bytes] = dict(payload_entries)
     entries.update({

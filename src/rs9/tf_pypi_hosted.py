@@ -14,12 +14,58 @@ from rs9.tf_pypi_consumer import consume_nebular_candidate, smoke
 from rs9.tf_pypi_model import PRODUCTS, TARGETS, load_pin, strict_json, validate_pin
 from rs9.tf_pypi_platform import host_key
 from rs9.tf_pypi_verify import host_view, verify_aggregate
+from rs9.nebular070_manylinux import (
+    ValidatedPayloadPortability,
+    ValidatedReleaseAdmission,
+    validate_nebular070_payload_portability as _validate_nebular070_payload_portability,
+    validate_nebular070_release_admission as _validate_nebular070_release_admission,
+)
 
 TARGET_SYSTEMS = {
     "darwin-arm64": "aarch64-darwin",
     "linux-arm64-gnu": "aarch64-linux",
     "linux-x64-gnu": "x86_64-linux",
 }
+
+
+def validate_nebular070_payload_portability(
+    record: Mapping[str, Any],
+    receipt_bodies: Mapping[str, Mapping[str, Any]],
+    *,
+    expected_tf_producer_source: Mapping[str, str],
+    expected_rs9_tool_source: Mapping[str, str],
+) -> ValidatedPayloadPortability:
+    """Validate Stage A before any hosted consumer can admit a manylinux tag."""
+    return _validate_nebular070_payload_portability(
+        record,
+        receipt_bodies,
+        expected_tf_producer_source=expected_tf_producer_source,
+        expected_rs9_tool_source=expected_rs9_tool_source,
+    )
+
+
+def validate_nebular070_release_admission(
+    record: Mapping[str, Any],
+    *,
+    stage_a: ValidatedPayloadPortability,
+    wheel_bytes_by_target: Mapping[str, bytes],
+    wheel_filenames_by_target: Mapping[str, str] | None = None,
+    installed_consumer_bodies: Mapping[str, Mapping[str, Mapping[str, Any]]],
+    existing_three_target_approval: Mapping[str, Any],
+    existing_matrix_receipt: Mapping[str, Any],
+    expected_rs9_release_source: Mapping[str, str],
+) -> ValidatedReleaseAdmission:
+    """Hosted release-admission seam; it never performs a publication write."""
+    return _validate_nebular070_release_admission(
+        record,
+        stage_a=stage_a,
+        wheel_bytes_by_target=wheel_bytes_by_target,
+        wheel_filenames_by_target=wheel_filenames_by_target,
+        installed_consumer_bodies=installed_consumer_bodies,
+        existing_three_target_approval=existing_three_target_approval,
+        existing_matrix_receipt=existing_matrix_receipt,
+        expected_rs9_release_source=expected_rs9_release_source,
+    )
 
 
 def source_commit(expected):

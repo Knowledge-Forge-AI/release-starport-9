@@ -24,6 +24,7 @@ from rs9.tf_pypi_verify import read_wheel, verify_pair, verify_record
 from rs9.tf_pypi_platform import host_key
 from rs9.tf_pypi_probes import functional_probes
 from rs9.tf_pypi_probes import receipt
+from rs9.nebular070_manylinux import manylinux_tag_for_target
 
 _CONSUMER_ENV_KEYS = (
     "HOME", "LANG", "LC_ALL", "PATH", "PIP_CONFIG_FILE",
@@ -452,6 +453,25 @@ def _nebular_profile_contract(candidate: Mapping[str, Any], row: Mapping[str, An
             or not isinstance(source_legal, Mapping)
             or source_legal.get("expression") != _NEBULAR_LICENSE_EXPRESSION):
         fail("NEBULAR_LICENSE")
+    construction_digest = row.get("manylinux_construction_receipt_sha256")
+    manylinux_candidate = target.startswith("linux") and construction_digest is not None
+    if manylinux_candidate:
+        if (set(key for key in (
+                "construction_stage", "release_admission", "manylinux_construction_receipt_sha256"
+            ) if key in row) != {
+                "construction_stage", "release_admission", "manylinux_construction_receipt_sha256"
+            }
+                or row.get("construction_stage") != "payload-portability"
+                or row.get("release_admission") != "external"
+                or not _NEBULAR_HEX64.fullmatch(str(construction_digest))):
+            fail("NEBULAR_PROVENANCE_BINDING")
+        expected_tag = manylinux_tag_for_target(
+            "linux-arm64-gnu" if target == "linux-arm64-gnu" else "linux-x64-gnu"
+        )
+    elif any(key in row for key in (
+        "construction_stage", "release_admission", "manylinux_construction_receipt_sha256",
+    )):
+        fail("NEBULAR_PROVENANCE_BINDING")
     wheel = row.get("wheel")
     if not isinstance(wheel, Mapping) or wheel.get("tag") != expected_tag:
         fail("NEBULAR_WHEEL_BINDING")
@@ -467,6 +487,7 @@ def _nebular_profile_contract(candidate: Mapping[str, Any], row: Mapping[str, An
         "linux_runtime_policy": _NEBULAR_LINUX_RUNTIME_POLICY,
         "darwin_floor_evidence": floor,
         "wheel_tag": expected_tag,
+        "manylinux_construction_receipt_sha256": construction_digest if manylinux_candidate else None,
     }
 
 
@@ -1295,7 +1316,7 @@ def consume_nebular_candidate(
         fail("NEBULAR_WHEEL_BINDING")
     wheel_tags = [line.split(": ", 1)[1] for line in wheel_metadata.splitlines()
                   if line.startswith("Tag: ") and ": " in line]
-    expected_tag = _NEBULAR_EXPECTED_WHEEL_TAGS[target]
+    expected_tag = context["profile_contract"]["wheel_tag"]
     if (metadata_lines.get("Name") != "theme-forge-nebular-fusion"
             or metadata_lines.get("Version") != "0.7.0"
             or metadata_lines.get("License-Expression") != _NEBULAR_LICENSE_EXPRESSION
@@ -1317,6 +1338,25 @@ def consume_nebular_candidate(
             or wheel_provenance.get("linux_runtime_policy") != context["profile_contract"]["linux_runtime_policy"]
             or wheel_provenance.get("darwin_floor_evidence") != context["profile_contract"]["darwin_floor_evidence"]):
         fail("NEBULAR_WHEEL_BINDING")
+    stage_a_digest = context["profile_contract"].get("manylinux_construction_receipt_sha256")
+    if stage_a_digest is None:
+        if any(key in wheel_provenance for key in (
+            "construction_stage", "release_admission", "manylinux_construction_receipt_sha256",
+        )):
+            fail("NEBULAR_PROVENANCE_BINDING")
+    elif (
+        wheel_provenance.get("construction_stage") != "payload-portability"
+        or wheel_provenance.get("release_admission") != "external"
+        or wheel_provenance.get("manylinux_construction_receipt_sha256") != stage_a_digest
+        or wheel_provenance.get("candidate_status") != "payload-qualified"
+        or wheel_provenance.get("promotability") != "payload-qualified"
+        or wheel_provenance.get("policy") != {
+            "status": "payload-qualified",
+            "receipt_sha256": stage_a_digest,
+            "manylinux_proven": False,
+        }
+    ):
+        fail("NEBULAR_PROVENANCE_BINDING")
     payload_member = next((name for name in wheel_files
                            if name.endswith("/payload/" + str(row["payload_archive_name"]))), None)
     if payload_member is None or wheel_files[payload_member][0] != capture["payload_bytes"]:
