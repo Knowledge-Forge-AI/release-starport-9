@@ -17,7 +17,7 @@ import zlib
 from rs9.tf_pypi_archive import AdmissionError, canonical, fail, physical_bytes
 from rs9.tf_pypi_model import (LEGAL, admit_bytes, build_pin, logical_identity,
                             pure_payload, release, strict_json, validate_pin)
-from rs9.tf_pypi_closure import DEPENDENCIES, closure_payload, dependency_licenses
+from rs9.tf_pypi_closure import closure_payload, dependencies_for_pin, dependency_licenses
 from rs9.tf_pypi_native import select_native
 from rs9.tf_pypi_platform import build_target, check_tag, pure_tag
 
@@ -102,12 +102,12 @@ def license_expression(pin):
     return " AND ".join(terms)
 
 
-def legal_files(files, dependencies=None):
+def legal_files(files, dependencies=None, pins=None):
     result = {name: files["package/" + name] for name in LEGAL if "package/" + name in files}
     result["RS9-NOTICE"] = (ADAPTER_NOTICE, 0o644)
     result["RS9-LICENSE"] = (adapter_license(), 0o644)
     if dependencies:
-        result.update(dependency_licenses(dependencies))
+        result.update(dependency_licenses(dependencies, pins=pins))
     return result
 
 
@@ -125,7 +125,8 @@ def metadata(pin, files, dependencies=None):
                "License-Expression: " + license_expression(pin), "Description-Content-Type: text/markdown"]
     headers += ["Classifier: " + item for item in CLASSIFIERS]
     headers += ["Project-URL: " + label + ", " + url for label, url in project_urls(pin).items()]
-    headers += ["License-File: " + name for name in sorted(legal_files(files, dependencies))]
+    headers += ["License-File: " + name for name in sorted(
+        legal_files(files, dependencies, pins=dependencies_for_pin(pin)))]
     return ("\n".join(headers) + "\n\n" + description(pin)).encode()
 
 
@@ -172,7 +173,8 @@ def wheel_entries(pin, data, dependencies=None, target=None):
                     info + "/entry_points.txt": (("\n".join(scripts) + "\n").encode(), 0o644),
                     info + "/WHEEL": (("Wheel-Version: 1.0\nGenerator: rs9-tf-pypi\nRoot-Is-Purelib: false\nTag: py3-none-" + tag + "\n").encode(), 0o644),
                     info + "/rs9-tf-transform.json": (canonical(transform), 0o644)})
-    entries.update({info + "/licenses/" + p: v for p, v in legal_files(files, dependencies).items()})
+    entries.update({info + "/licenses/" + p: v for p, v in legal_files(
+        files, dependencies, pins=dependencies_for_pin(pin)).items()})
     output = io.StringIO(newline="")
     writer = csv.writer(output, lineterminator="\n")
     for path, (body, _) in sorted(entries.items()):
@@ -223,7 +225,8 @@ def project_toml(pin, files, dependencies=None):
              'backend-path = ["_rs9_build"]', '', '[project]', 'name = ' + value(pin['project']),
              'version = ' + value(pin['distribution_version']), 'requires-python = ' + value(PYTHON_FLOOR),
              'description = ' + value(SUMMARY), 'classifiers = ' + value(CLASSIFIERS),
-             'license = ' + value(license_expression(pin)), 'license-files = ' + value(sorted(legal_files(files, dependencies))),
+             'license = ' + value(license_expression(pin)), 'license-files = ' + value(sorted(
+                 legal_files(files, dependencies, pins=dependencies_for_pin(pin)))),
              'readme = {file = "README.md", content-type = "text/markdown"}', 'dynamic = []',
              '', '[project.urls]']
     lines += [value(label) + ' = ' + value(url) for label, url in project_urls(pin).items()]
@@ -244,7 +247,7 @@ def sdist_entries(pin, data, dependencies=None, target=None):
               "_rs9_build/rs9/__init__.py": (b"", 0o644),
               "_rs9_build/rs9/pins.json": (canonical(build_pin(pin)), 0o644),
               "_rs9_build/rs9/descriptions/" + description_name(pin): (desc, 0o644)}
-    result.update(legal_files(files, dependencies))
+    result.update(legal_files(files, dependencies, pins=dependencies_for_pin(pin)))
     result["_rs9_build/rs9/RS9-LICENSE"] = (adapter_license(), 0o644)
     result.update({"upstream/" + name: (body, 0o644) for name, body in (dependencies or {}).items()})
     for helper in HELPERS:
@@ -302,8 +305,9 @@ def _inputs(config_settings):
     # artifact paths still use descriptor-relative no-follow reads unchanged.
     pin = validate_pin(strict_json(physical_bytes(Path(__file__).resolve().with_name("pins.json"))))
     data = physical_bytes(Path.cwd() / "upstream" / pin["asset"])
+    pins = dependencies_for_pin(pin)
     dependencies = {p["asset"]: physical_bytes(Path.cwd() / "upstream" / p["asset"])
-                    for p in DEPENDENCIES} if pin["project"] == "theme-forge-stellar-burst" else {}
+                    for p in pins} if pin["project"] == "theme-forge-stellar-burst" else {}
     files, _, _ = payload(pin, data, dependencies)
     if (physical_bytes(Path.cwd() / "pyproject.toml") != project_toml(pin, files, dependencies)
             or physical_bytes(Path.cwd() / "README.md") != description(pin).encode()):

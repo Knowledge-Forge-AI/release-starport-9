@@ -9,7 +9,7 @@ import zipfile
 
 from rs9.tf_pypi_archive import canonical, fail, physical_bytes, read_tar, sha256
 from rs9.tf_pypi_backend import names, payload, sdist_entries, wheel_entries
-from rs9.tf_pypi_closure import DEPENDENCIES
+from rs9.tf_pypi_closure import dependencies_for_pin
 from rs9.tf_pypi_model import logical_identity, strict_json, validate_pin
 
 
@@ -25,28 +25,36 @@ def _wheel_path(member):
     return path
 
 
-def _wheel_mode(member):
+def _wheel_mode(member, *, max_member_bytes=8 * 1024**2):
+    if type(max_member_bytes) is not int or max_member_bytes <= 0:
+        fail("WHEEL")
     mode = member.external_attr >> 16
     if stat.S_IFMT(mode) != stat.S_IFREG or stat.S_IMODE(mode) not in {0o644, 0o755}:
         fail("WHEEL")
-    if (member.flag_bits & 1 or member.file_size > 8 * 1024**2
+    if (member.flag_bits & 1 or member.file_size > max_member_bytes
             or member.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)):
         fail("WHEEL")
     return stat.S_IMODE(mode)
 
 
-def read_wheel(data):
+def read_wheel(data, *, max_total_bytes=64 * 1024**2, max_member_bytes=8 * 1024**2):
+    if (type(max_total_bytes) is not int or max_total_bytes <= 0
+            or type(max_member_bytes) is not int or max_member_bytes <= 0
+            or max_member_bytes > max_total_bytes):
+        fail("WHEEL")
     result, folded, total = {}, set(), 0
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             if len(archive.infolist()) > 20000:
                 fail("WHEEL")
             for member in archive.infolist():
-                path, mode = _wheel_path(member), _wheel_mode(member)
+                path, mode = _wheel_path(member), _wheel_mode(
+                    member, max_member_bytes=max_member_bytes,
+                )
                 if path.casefold() in folded:
                     fail("WHEEL")
                 total += member.file_size
-                if total > 64 * 1024**2:
+                if total > max_total_bytes:
                     fail("WHEEL")
                 folded.add(path.casefold())
                 # Bound actual decompression before CRC/declared-size validation.
@@ -93,7 +101,7 @@ def _sdist_dependencies(pin, sdist):
     if pin["project"] != "theme-forge-stellar-burst":
         return {}
     dependencies = {}
-    for dep in DEPENDENCIES:
+    for dep in dependencies_for_pin(pin):
         entry = sdist.get("upstream/" + dep["asset"])
         if entry is None:
             fail("SDIST")

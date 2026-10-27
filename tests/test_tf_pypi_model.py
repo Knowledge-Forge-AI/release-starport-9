@@ -37,6 +37,27 @@ class ModelTests(unittest.TestCase):
             self.assertEqual(validate_pin(pin), pin)
         self.error("PRODUCT", load_pin, "theme-forge-nebular-fusion")
 
+    def test_successor_dependency_authority_rejects_mixed_stale_history(self):
+        successor_path = ROOT / "operators/tf-pypi/theme-forge-stellar-burst-0.7.0.json"
+        successor = load_pin("theme-forge-stellar-burst", successor_path)
+        legacy = load_pin("theme-forge-stellar-burst")
+
+        self.assertEqual(successor["source_status"], "READY")
+        self.assertEqual(successor["qualified_platforms"], [])
+        self.assertEqual(successor["source_commit"], "3edb9d2c40dd19a2b7d97d9309bc210e7fed711c")
+        self.assertEqual(successor["dependencies"][-1]["version"], "1.9.1")
+        self.assertEqual(legacy["version"], "0.6.1")
+        self.assertEqual(legacy["source_commit"], "a3e89683f92b8240c800ed303c866e7b12aa3277")
+        self.assertEqual(legacy["dependencies"][-1]["version"], "1.8.0")
+
+        mixed = copy.deepcopy(successor)
+        mixed["dependencies"][-1] = copy.deepcopy(legacy["dependencies"][-1])
+        self.error("PIN", validate_pin, mixed)
+
+        requalified = copy.deepcopy(successor)
+        requalified["qualified_platforms"] = list(TARGETS)
+        self.assertEqual(build_pin(requalified)["qualified_platforms"], [])
+
     def test_distribution_version_and_platform_pin_negatives(self):
         pin = load_pin("theme-forge-stellar-loom")
         for bad_dv in ("0.4.0", "0.4.0.post2", "0.6.1.post1", "0.2.1.post1", "1.0.0.post1", "", None):

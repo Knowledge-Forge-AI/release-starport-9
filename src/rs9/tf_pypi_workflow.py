@@ -8,7 +8,7 @@ import sys
 
 from rs9.tf_pypi_archive import AdmissionError, canonical, fail
 from rs9.tf_pypi_backend import build_aggregate
-from rs9.tf_pypi_closure import load_dependencies
+from rs9.tf_pypi_closure import dependencies_for_pin, load_dependencies
 from rs9.tf_pypi_consumer import smoke
 from rs9.tf_pypi_intake import fetch
 from rs9.tf_pypi_model import PRODUCTS, intake, load_pin, logical_identity
@@ -57,7 +57,8 @@ def main(argv=None):
             result = {"project": pin["project"], "payload_identity": logical_identity(files),
                       "source": "BLOCKED", "publication_admitted": False}
             if operation == "build":
-                dependencies = load_dependencies(args.inputs) if pin["project"] == "theme-forge-stellar-burst" else {}
+                dependencies = (load_dependencies(args.inputs, dependencies_for_pin(pin))
+                                if pin["project"] == "theme-forge-stellar-burst" else {})
                 build_aggregate(pin, data, args.output, dependencies)
                 result = verify_aggregate(pin, args.output)
         elif operation == "verify":

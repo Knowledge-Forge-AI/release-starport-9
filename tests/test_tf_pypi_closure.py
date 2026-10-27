@@ -18,11 +18,12 @@ from rs9.tf_pypi_closure import (
     DependencyPin,
     admit_dependency,
     closure_payload,
+    dependencies_for_pin,
     dependency_licenses,
     load_dependencies,
 )
 from rs9.tf_pypi_model import admit_bytes, load_pin
-from tests.tf_pypi_fixtures import live_inputs
+from tests.tf_pypi_fixtures import ROOT, live_inputs
 
 
 def write_tar(files: dict[str, tuple[bytes, int]], root: str = "package") -> bytes:
@@ -188,6 +189,20 @@ class TfPypiClosureTests(unittest.TestCase):
             {"xmldom-0.9.12.tgz", "fflate-0.8.3.tgz", "smol-toml-1.8.0.tgz"},
         )
         self.assertEqual(set(DEPENDENCIES_BY_NAME.keys()), {"@xmldom/xmldom", "fflate", "smol-toml"})
+
+    def test_dependency_authority_is_selected_per_burst_release(self):
+        successor = load_pin(
+            "theme-forge-stellar-burst",
+            ROOT / "operators/tf-pypi/theme-forge-stellar-burst-0.7.0.json",
+        )
+        legacy = load_pin("theme-forge-stellar-burst")
+
+        self.assertEqual([pin.version for pin in dependencies_for_pin(successor)],
+                         ["0.9.12", "0.8.3", "1.9.1"])
+        self.assertEqual([pin.version for pin in dependencies_for_pin(legacy)],
+                         ["0.9.12", "0.8.3", "1.8.0"])
+        self.assertEqual(DEPENDENCIES[-1].version, "1.8.0")
+        self.assertEqual(dependencies_for_pin(legacy), DEPENDENCIES)
 
     def test_admit_real_dependencies(self):
         inputs = live_inputs(self)

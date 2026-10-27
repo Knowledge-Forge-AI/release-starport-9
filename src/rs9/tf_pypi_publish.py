@@ -18,7 +18,7 @@ from urllib.request import ProxyHandler, Request, build_opener
 
 from rs9.tf_pypi_archive import AdmissionError, canonical, fail, physical_bytes
 from rs9.tf_pypi_backend import build_aggregate
-from rs9.tf_pypi_closure import DEPENDENCIES, admit_dependency, load_dependencies
+from rs9.tf_pypi_closure import admit_dependency, dependencies_for_pin, load_dependencies
 from rs9.tf_pypi_hosted import admit_matrix
 from rs9.tf_pypi_intake import NoRedirect, download
 from rs9.tf_pypi_model import PRODUCTS, intake, load_pin, release, strict_json, validate_pin
@@ -75,10 +75,11 @@ def fetch_dependency(dep_pin, *, opener=None):
         fail("REMOTE_UNKNOWN")
 
 
-def fetch_dependencies(directory=None, *, opener=None):
-    """Fetch all pinned dependencies verified via closure DEPENDENCIES."""
+def fetch_dependencies(directory=None, *, opener=None, pin=None):
+    """Fetch all dependencies selected by the supplied release pin."""
     result = {}
-    for dep in DEPENDENCIES:
+    pins = dependencies_for_pin(pin) if pin is not None else dependencies_for_pin({})
+    for dep in pins:
         body = fetch_dependency(dep, opener=opener)
         result[dep["asset"]] = body
         if directory is not None:
@@ -146,13 +147,14 @@ def build(pin, output=Path("dist"), inputs=None, opener=None, pin_path=None):
         inputs = Path(inputs)
         data, _ = intake(pin, inputs / pin["asset"])
         if pin["project"] == "theme-forge-stellar-burst":
-            dependencies = load_dependencies(inputs)
+            dependencies = load_dependencies(inputs, dependencies_for_pin(pin))
         else:
             dependencies = None
     else:
         data = download(pin, opener=opener)
         if pin["project"] == "theme-forge-stellar-burst":
-            dependencies = {dep["asset"]: fetch_dependency(dep, opener=opener) for dep in DEPENDENCIES}
+            dependencies = {dep["asset"]: fetch_dependency(dep, opener=opener)
+                            for dep in dependencies_for_pin(pin)}
         else:
             dependencies = None
     build_aggregate(pin, data, output, dependencies=dependencies)

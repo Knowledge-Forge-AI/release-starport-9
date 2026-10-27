@@ -16,6 +16,7 @@ from rs9 import tf_pypi_hosted as h
 from rs9 import tf_pypi_publish as p
 from rs9 import tf_pypi_workflow as w
 from rs9.tf_pypi_archive import AdmissionError, canonical, fail, physical_bytes, sha256
+from rs9.tf_pypi_closure import dependencies_for_pin
 from rs9.tf_pypi_backend import (
     build_aggregate,
     description,
@@ -56,7 +57,7 @@ EXPECTED_SUCCESSOR_WITHHELD = [
 
 EXPECTED_ASSET_HASHES = {
     "operators/tf-pypi/theme-forge-stellar-burst-0.7.0.json": (
-        "fcbe586eff3089546c79c8bd630494402c2de63c6c7c59caf4141a01bc304049"
+        "0d8b83ec9e230df6338d177247c67ded05efbcd8d747346d7bbdb894261583e4"
     ),
     "operators/tf-pypi/descriptions/stellar-burst-0.7.0.md": (
         "629a25fc68705bd610d0a09eeef4d77173ac5f6d7d6c98e3a4335d15b140dbb9"
@@ -81,8 +82,8 @@ SUCCESSOR_SPECS = {
         "pin_file": "theme-forge-stellar-burst-0.7.0.json",
         "description": "stellar-burst-0.7.0.md",
         "historical_description": "stellar-burst.md",
-        "size": 646799,
-        "sha256": "2629b32980a7aa5a93cf3e893a9763695db47c01bd90db68ab7434ee309c029d",
+        "size": 646798,
+        "sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
     },
     "theme-forge-stellar-loom": {
         "version": "0.5.0",
@@ -216,7 +217,7 @@ class SuccessorReleaseTests(unittest.TestCase):
                 )
                 self.assertEqual(pin["size"], spec["size"])
                 self.assertEqual(pin["sha256"], spec["sha256"])
-                if project in {"theme-forge-solar-sail", "theme-forge-stellar-loom"}:
+                if project in {"theme-forge-solar-sail", "theme-forge-stellar-loom", "theme-forge-stellar-burst"}:
                     self.assertEqual(pin["source_status"], "READY")
                     self.assertEqual(pin["withheld"], EXPECTED_SUCCESSOR_WITHHELD)
                 else:
@@ -531,7 +532,7 @@ class SuccessorReleaseTests(unittest.TestCase):
         status_doc = json.loads(buf.buffer.getvalue())
         self.assertEqual(status_doc["version"], "0.7.0")
         self.assertEqual(status_doc["upstream_version"], "0.7.0")
-        self.assertEqual(status_doc["source"], "BLOCKED")
+        self.assertEqual(status_doc["source"], expected_pin["source_status"])
 
         # 2. fetch
         buf = _BufferStdout()
@@ -562,7 +563,7 @@ class SuccessorReleaseTests(unittest.TestCase):
             ])
         self.assertEqual(rc, 0)
         intake_mock.assert_called_once_with(expected_pin, inputs_dir / expected_pin["asset"])
-        deps_mock.assert_called_once_with(inputs_dir)
+        deps_mock.assert_called_once_with(inputs_dir, dependencies_for_pin(expected_pin))
         build_mock.assert_called_once_with(expected_pin, b"tar", out_dir, {"dep": b"1"})
         verify_mock.assert_called_once_with(expected_pin, out_dir)
 
@@ -637,20 +638,24 @@ class SuccessorReleaseTests(unittest.TestCase):
             ])
         self.assertEqual(rc, 0)
         intake_mock.assert_called_once_with(selected, inputs_dir / selected["asset"])
-        deps_mock.assert_called_once_with(inputs_dir)
+        deps_mock.assert_called_once_with(inputs_dir, dependencies_for_pin(selected))
         build_mock.assert_called_once_with(selected, b"tar", dist_dir, dependencies={"d": b"1"})
         verify_mock.assert_called_once_with(selected, dist_dir)
 
-        # Real BLOCKED successor pin on select-missing and readback fails with SOURCE_NOT_READY
-        # before approval read, matrix admission, remote state, or upload directory creation.
+        # Use an explicit synthetic BLOCKED copy for the not-ready pre-approval contract;
+        # the committed Burst 0.7.0 pin is now READY and must exercise later gates.
+        blocked_pin_path = self.root / "theme-forge-stellar-burst-0.7.0.json"
+        blocked_pin = copy.deepcopy(selected)
+        blocked_pin["source_status"] = "BLOCKED"
+        blocked_pin_path.write_bytes(canonical(blocked_pin))
         for argv in (
             [
-                "select-missing", "--project", project, "--pin", str(pin_path),
+                "select-missing", "--project", project, "--pin", str(blocked_pin_path),
                 "--dist", str(dist_dir), "--upload-dir", str(upload_dir),
                 "--receipts", str(receipts_dir), "--expected-commit", COMMIT,
             ],
             [
-                "readback", "--project", project, "--pin", str(pin_path),
+                "readback", "--project", project, "--pin", str(blocked_pin_path),
                 "--dist", str(dist_dir),
             ],
         ):
@@ -666,6 +671,25 @@ class SuccessorReleaseTests(unittest.TestCase):
             mat_mock.assert_not_called()
             rem_mock.assert_not_called()
             self.assertFalse(upload_dir.exists())
+
+        # The committed READY pin must stop at the platform gate before approval,
+        # matrix admission, remote state, or upload directory creation.
+        err = io.StringIO()
+        with patch.object(p, "load_approval", side_effect=AssertionError("approval read")) as app_mock, \
+                patch.object(p, "admit_matrix", side_effect=AssertionError("matrix called")) as mat_mock, \
+                patch.object(p, "exact_state", side_effect=AssertionError("remote called")) as rem_mock, \
+                patch("sys.stderr", err):
+            rc = p.main([
+                "select-missing", "--project", project, "--pin", str(pin_path),
+                "--dist", str(dist_dir), "--upload-dir", str(upload_dir),
+                "--receipts", str(receipts_dir), "--expected-commit", COMMIT,
+            ])
+        self.assertEqual(rc, 1)
+        self.assertEqual(err.getvalue(), "TF_PYPI_PLATFORM_UNQUALIFIED\n")
+        app_mock.assert_not_called()
+        mat_mock.assert_not_called()
+        rem_mock.assert_not_called()
+        self.assertFalse(upload_dir.exists())
 
         # Same-selection identity without reload across select_missing -> verify_approved -> admit_matrix,
         # and across hosted qualify / admit_matrix.
