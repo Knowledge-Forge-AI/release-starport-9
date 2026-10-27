@@ -254,7 +254,9 @@ class NebularPyPIContractTests(unittest.TestCase):
         self.committed_approval = load_approval(ROOT)
 
     def test_static_contract_and_workflow_yaml_parity(self) -> None:
-        for mod_name in ("tf_pypi_nebular.py", "nebular_host_state.py"):
+        from rs9.tf_pypi_nebular import _legacy_workflow_text
+
+        for mod_name in ("tf_pypi_nebular.py", "nebular_host_state.py", "tf_pypi_nebular070_publish.py"):
             path = ROOT / "src/rs9" / mod_name
             tree = ast.parse(path.read_text(encoding="utf-8"), feature_version=(3, 12))
             for node in ast.walk(tree):
@@ -274,6 +276,19 @@ class NebularPyPIContractTests(unittest.TestCase):
         self.assertTrue(wf_path.is_file())
         text = wf_path.read_text(encoding="utf-8")
         self.assertEqual(text, workflow_text())
+        self.assertEqual(text, workflow_text("0.6.1"))
+        self.assertEqual(text, workflow_text("0.7.0"))
+        self.assertIn("build_verify:", _legacy_workflow_text())
+        self.assertNotIn("build_verify_070:", _legacy_workflow_text())
+        with self.assertRaises(AdmissionError) as ctx_rel:
+            workflow_text("0.8.0")
+        self.assertEqual(ctx_rel.exception.code, "TF_PYPI_WORKFLOW_RELEASE")
+        with self.assertRaises(AdmissionError) as ctx_m061:
+            workflow_text("0.6.1", mode="resume")
+        self.assertEqual(ctx_m061.exception.code, "TF_PYPI_WORKFLOW_MODE_UNSUPPORTED")
+        with self.assertRaises(AdmissionError) as ctx_m070:
+            workflow_text("0.7.0", mode="publish")
+        self.assertEqual(ctx_m070.exception.code, "TF_PYPI_WORKFLOW_MODE_UNSUPPORTED")
 
         uses = {
             line.split("uses:", 1)[1].strip()
@@ -283,6 +298,7 @@ class NebularPyPIContractTests(unittest.TestCase):
         self.assertEqual(uses, EXPECTED_PINNED_ACTIONS)
         self.assertIn("runs-on: macos-15", text)
         self.assertIn("runs-on: ubuntu-24.04", text)
+        self.assertIn("runs-on: ubuntu-24.04-arm", text)
         self.assertIn("python-version: '3.13'", text)
         self.assertIn("name: pypi", text)
         self.assertIn("url: https://pypi.org/p/theme-forge-nebular-fusion", text)
@@ -306,11 +322,18 @@ class NebularPyPIContractTests(unittest.TestCase):
         self.assertNotIn('--dist "$GITHUB_WORKSPACE/dist"', native_consumer_section)
         self.assertNotIn("environment:\n      name: pypi", pre_publish_section)
         self.assertNotIn("id-token: write", pre_publish_section)
+        self.assertIn("build_verify_070:", pre_publish_section)
+        self.assertIn("native_consumer_070_darwin_arm64:", pre_publish_section)
+        self.assertIn("native_consumer_070_linux_arm64_gnu:", pre_publish_section)
+        self.assertIn("native_consumer_070_linux_x64_gnu:", pre_publish_section)
+        self.assertIn("qualification_gate_070:", pre_publish_section)
+        self.assertNotIn("publication_resume_070:", pre_publish_section)
         self.assertIn("environment:\n      name: pypi", publish_section)
         self.assertIn("id-token: write", publish_section)
         self.assertIn("actions: read", publish_section)
         self.assertIn("RS9_GITHUB_READ_TOKEN: ${{ github.token }}", publish_section)
         self.assertIn("needs: [build_verify, native_consumer]", publish_section)
+        self.assertIn("publication_resume_070:", publish_section)
 
     def test_committed_approval_manifest_and_set_sha256_invariance(self) -> None:
         doc = self.committed_approval
@@ -1857,8 +1880,9 @@ class NebularPyPIContractTests(unittest.TestCase):
         from rs9.tf_pypi_nebular import _nebular_import_closure_paths
 
         closure_paths = _nebular_import_closure_paths(ROOT)
-        self.assertEqual(len(closure_paths), 85)
+        self.assertEqual(len(closure_paths), 96)
         self.assertIn("src/rs9/nebular_lineage.py", closure_paths)
+        self.assertIn("src/rs9/tf_pypi_nebular070_publish.py", closure_paths)
         with patch("rs9.tf_pypi_nebular.subprocess.run", side_effect=fake_git_run):
             st = source_tree_state(expected_sha, repository=ROOT, require_clean=False)
             self.assertFalse(st["worktree_clean"])
@@ -3446,6 +3470,137 @@ class NebularPyPIContractTests(unittest.TestCase):
         obs_crash = report_crash["smoke_observation"]["observation"]  # type: ignore[index]
         self.assertNotIn("harness_run_record", obs_crash)
         self.assertNotIn("inner_stderr_diagnostic", obs_crash)
+
+    def test_check_prior_publish_runs_admits_completed_070_qualify_run_and_rejects_partial(
+        self,
+    ) -> None:
+        from rs9.tf_pypi_nebular070_publish import (
+            DISPATCH_GUARD_070_JOB_NAME,
+            QUALIFY_070_JOB_NAMES,
+        )
+
+        skipped_other_jobs = [
+            {
+                "name": "Attended Nebular 0.7.0 PyPI publication resume",
+                "status": "completed",
+                "conclusion": "skipped",
+                "steps": [],
+            },
+            {
+                "name": DISPATCH_GUARD_070_JOB_NAME,
+                "status": "completed",
+                "conclusion": "skipped",
+                "steps": [],
+            },
+            {
+                "name": "Build and Verify Native Darwin Wheel",
+                "status": "completed",
+                "conclusion": "skipped",
+                "steps": [],
+            },
+            {
+                "name": "Native macOS ARM64 installed consumer and Scenario A",
+                "status": "completed",
+                "conclusion": "skipped",
+                "steps": [],
+            },
+            {
+                "name": "Trusted Publishing to PyPI",
+                "status": "completed",
+                "conclusion": "skipped",
+                "steps": [],
+            },
+        ]
+        qual_10_success = [
+            {
+                "name": name,
+                "status": "completed",
+                "conclusion": "success",
+                "steps": [],
+            }
+            for name in sorted(QUALIFY_070_JOB_NAMES)
+        ] + skipped_other_jobs
+        qual_10_build_failed = [
+            {
+                "name": name,
+                "status": "completed",
+                "conclusion": (
+                    "failure"
+                    if name == "Build and Verify Nebular 0.7.0 Candidate Bundle"
+                    else "skipped"
+                ),
+                "steps": [],
+            }
+            for name in sorted(QUALIFY_070_JOB_NAMES)
+        ] + skipped_other_jobs
+
+        def _api_ok(url: str) -> dict:
+            if "actions/workflows/" in url:
+                return {
+                    "total_count": 2,
+                    "workflow_runs": [
+                        {
+                            "id": 910,
+                            "status": "completed",
+                            "conclusion": "success",
+                            "event": "workflow_dispatch",
+                        },
+                        {
+                            "id": 911,
+                            "status": "completed",
+                            "conclusion": "failure",
+                            "event": "workflow_dispatch",
+                        },
+                    ],
+                }
+            if "/runs/910/jobs" in url:
+                return {"total_count": len(qual_10_success), "jobs": qual_10_success}
+            if "/runs/911/jobs" in url:
+                return {
+                    "total_count": len(qual_10_build_failed),
+                    "jobs": qual_10_build_failed,
+                }
+            raise AssertionError(url)
+
+        base_env = {
+            "GITHUB_REPOSITORY": "Knowledge-Forge-AI/release-starport-9",
+            "GITHUB_RUN_ID": "920",
+            "GITHUB_RUN_ATTEMPT": "1",
+        }
+        check_prior_publish_runs(api_get=_api_ok, environ=base_env)
+
+        partial_jobs = qual_10_success[:4] + skipped_other_jobs
+        in_progress_jobs = [dict(j) for j in qual_10_success]
+        in_progress_jobs[0] = {
+            **in_progress_jobs[0],
+            "status": "in_progress",
+            "conclusion": None,
+        }
+
+        for bad_jobs in (partial_jobs, in_progress_jobs):
+            def _api_bad(url: str, payload=bad_jobs) -> dict:
+                if "actions/workflows/" in url:
+                    return {
+                        "total_count": 1,
+                        "workflow_runs": [
+                            {
+                                "id": 912,
+                                "status": "completed",
+                                "event": "workflow_dispatch",
+                            }
+                        ],
+                    }
+                if "/runs/912/jobs" in url:
+                    return {"total_count": len(payload), "jobs": payload}
+                raise AssertionError(url)
+
+            with self.assertRaises(AdmissionError) as ctx_part:
+                check_prior_publish_runs(
+                    api_get=_api_bad, environ=base_env
+                )
+            self.assertEqual(
+                ctx_part.exception.code, "TF_PYPI_PRIOR_ATTEMPT_UNCONFIRMED"
+            )
 
 
 if __name__ == "__main__":

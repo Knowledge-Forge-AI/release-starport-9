@@ -1602,13 +1602,60 @@ def check_prior_publish_runs(
             jobs = _fetch_paginated_github_list(
                 jobs_base_url, "jobs", client_json
             )
+            from rs9.tf_pypi_nebular070_publish import (
+                ALL_KNOWN_WORKFLOW_JOB_NAMES,
+                QUALIFY_070_JOB_NAMES,
+            )
+
             publish_jobs = [
                 job
                 for job in jobs
                 if isinstance(job, dict)
                 and job.get("name") == "Trusted Publishing to PyPI"
             ]
-            if not publish_jobs:
+            qualify_070_jobs = [
+                job
+                for job in jobs
+                if isinstance(job, dict)
+                and job.get("name") in QUALIFY_070_JOB_NAMES
+            ]
+            active_qualify_070 = [
+                job
+                for job in qualify_070_jobs
+                if job.get("conclusion") != "skipped"
+            ]
+            active_non_qualify_070 = [
+                job
+                for job in jobs
+                if isinstance(job, dict)
+                and job.get("name") not in QUALIFY_070_JOB_NAMES
+                and job.get("conclusion") != "skipped"
+            ]
+            if active_qualify_070 or not publish_jobs:
+                if (
+                    run.get("status") in (None, "completed")
+                    and jobs
+                    and all(
+                        isinstance(job, dict)
+                        and job.get("name") in ALL_KNOWN_WORKFLOW_JOB_NAMES
+                        and job.get("status") == "completed"
+                        and isinstance(job.get("conclusion"), str)
+                        and bool(job.get("conclusion"))
+                        for job in jobs
+                    )
+                    and not active_non_qualify_070
+                    and len(qualify_070_jobs) == len(QUALIFY_070_JOB_NAMES)
+                    and {job.get("name") for job in qualify_070_jobs}
+                    == QUALIFY_070_JOB_NAMES
+                    and bool(active_qualify_070)
+                ):
+                    continue
+                fail("PRIOR_ATTEMPT_UNCONFIRMED")
+            if qualify_070_jobs and (
+                len(qualify_070_jobs) != len(QUALIFY_070_JOB_NAMES)
+                or {job.get("name") for job in qualify_070_jobs} != QUALIFY_070_JOB_NAMES
+                or not all(job.get("status") == "completed" for job in qualify_070_jobs)
+            ):
                 fail("PRIOR_ATTEMPT_UNCONFIRMED")
             for job in publish_jobs:
                 if job.get("status") not in (None, "completed"):
@@ -2628,8 +2675,8 @@ def write_report(path: str | Path, record: Mapping[str, Any]) -> None:
         stream.write("\n")
 
 
-def workflow_text() -> str:
-    """Generate the exact registered GitHub Actions workflow rs9-tfnf-pypi-publish.yml."""
+def _legacy_workflow_text() -> str:
+    """Generate the historical 0.6.1-only GitHub Actions workflow."""
     return f"""name: RS9 {PROJECT} PyPI Publish
 run-name: 'RS9 {PROJECT} ${{{{ inputs.mode }}}} / ${{{{ inputs.dispatch_id }}}}'
 
@@ -2846,6 +2893,245 @@ jobs:
 """
 
 
+def workflow_text(release: str = "0.6.1", *, mode: str | None = None) -> str:
+    """Generate the exact registered GitHub Actions workflow rs9-tfnf-pypi-publish.yml."""
+    if release not in ("0.6.1", "0.7.0"):
+        fail("WORKFLOW_RELEASE")
+    from rs9.tf_pypi_nebular070_publish import (
+        publication_resume_job_text,
+        validate_workflow_dispatch,
+        workflow_070_qualify_jobs_text,
+    )
+
+    if mode is not None:
+        validate_workflow_dispatch(release, mode)
+
+    return f"""name: RS9 {PROJECT} PyPI Publish
+run-name: "RS9 {PROJECT} ${{{{ inputs.release || '0.6.1' }}}} ${{{{ inputs.mode || 'qualify' }}}} / ${{{{ inputs.dispatch_id }}}}"
+
+on:
+  push:
+    branches: [{QUALIFY_BRANCH}]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Target Nebular release'
+        required: false
+        type: choice
+        options:
+          - 0.6.1
+          - 0.7.0
+        default: 0.6.1
+      mode:
+        description: 'Execution mode'
+        required: true
+        type: choice
+        options:
+          - qualify
+          - publish
+          - resume
+        default: qualify
+      dispatch_id:
+        description: 'Unique attended intent correlation; not publication authority'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rs9-tfnf-pypi-publish-${{{{ github.ref }}}}
+  cancel-in-progress: false
+
+jobs:
+  build_verify:
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/{QUALIFY_BRANCH}') && inputs.release != '0.7.0' && inputs.mode != 'resume'
+    name: Build and Verify Native Darwin Wheel
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{{{ github.sha }}}}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Build and verify candidate wheel
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{{{ github.token }}}}
+        run: |
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular build \\
+            --output dist --scratch "${{{{ runner.temp }}}}/tfnf-build"
+
+      - name: Stage verified wheel artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pypi-artifacts
+          path: dist/
+          retention-days: 1
+          if-no-files-found: error
+
+  native_consumer:
+    if: inputs.release != '0.7.0' && inputs.mode != 'resume'
+    name: Native macOS ARM64 installed consumer and Scenario A
+    needs: [build_verify]
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{{{ github.sha }}}}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Download the same run's verified wheel
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pypi-artifacts
+          path: '${{{{ runner.temp }}}}/tfnf-dist'
+
+      - name: Prepare authenticated captures and verifier closure outside network denial
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{{{ github.token }}}}
+        run: |
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular prepare \\
+            --output "${{{{ runner.temp }}}}/tfnf-inputs"
+
+      - name: Qualify installed wheel and Darwin Scenario A under network denial
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFY_COMMIT: '${{{{ github.sha }}}}'
+          SUPERVISOR_PYTHON: '${{{{ steps.setup_python.outputs.python-path }}}}'
+        shell: bash
+        run: |
+          set -euo pipefail
+          PHYSICAL_TMP="$("$SUPERVISOR_PYTHON" -c 'import os,tempfile; print(os.path.realpath(tempfile.gettempdir()))')"
+          export TMPDIR="$PHYSICAL_TMP" TMP="$PHYSICAL_TMP" TEMP="$PHYSICAL_TMP"
+          PHYSICAL_RUNNER_TEMP="$("$SUPERVISOR_PYTHON" -c 'import os; print(os.path.realpath(os.environ["RUNNER_TEMP"]))')"
+          mkdir -p "$PHYSICAL_RUNNER_TEMP/tfnf-consumer-report"
+          /usr/bin/sandbox-exec -p '{SANDBOX_PROFILE}' \\
+            "$SUPERVISOR_PYTHON" -B -m rs9.tf_pypi_nebular qualify \\
+            --dist "$PHYSICAL_RUNNER_TEMP/tfnf-dist" \\
+            --work "$PHYSICAL_RUNNER_TEMP/tfnf-consumer" \\
+            --nebular-capture "$PHYSICAL_RUNNER_TEMP/tfnf-inputs/captures/nebular/{PROJECT}" \\
+            --stellar-capture "$PHYSICAL_RUNNER_TEMP/tfnf-inputs/captures/stellar/{STELLAR_PROJECT}" \\
+            --closure "$PHYSICAL_RUNNER_TEMP/tfnf-inputs/verifier-closure" \\
+            --python39 /usr/bin/python3 \\
+            --report "$PHYSICAL_RUNNER_TEMP/tfnf-consumer-report/result.json" \\
+            --expected-commit "$QUALIFY_COMMIT" \\
+            --require-clean
+
+      - name: Preserve native consumer result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-consumer-{PROJECT}
+          path: '${{{{ runner.temp }}}}/tfnf-consumer-report/'
+          retention-days: 14
+          if-no-files-found: error
+""" + workflow_070_qualify_jobs_text() + f"""
+  publish:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release != '0.7.0' && inputs.mode == 'publish'
+    name: Trusted Publishing to PyPI
+    needs: [build_verify, native_consumer]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: rs9-tfnf-pypi-publish-main
+      cancel-in-progress: false
+    environment:
+      name: {ENVIRONMENT}
+      url: https://pypi.org/p/{PROJECT}
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{{{ github.sha }}}}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Download staged artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pypi-artifacts
+          path: dist/
+
+      - name: Verify artifact integrity and select only missing files
+        id: missing
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{{{ github.token }}}}
+          RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED: ${{{{ vars.RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED }}}}
+          GITHUB_RUN_ATTEMPT: ${{{{ github.run_attempt }}}}
+        run: |
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular select-missing \\
+            --dist dist --upload-dir upload \\
+            --attempt-marker "${{{{ runner.temp }}}}/tfnf-upload-attempt.json" >> "$GITHUB_OUTPUT"
+
+      - name: Re-verify staged upload artifact against approval before upload
+        if: steps.missing.outputs.upload == 'true'
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular verify-upload \\
+            --dist dist --upload-dir upload
+
+      - name: Publish package distribution to PyPI
+        if: steps.missing.outputs.upload == 'true'
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e
+        with:
+          packages-dir: upload/
+          verify-metadata: true
+          print-hash: true
+          skip-existing: false
+          attestations: false
+
+      - name: Read back published PyPI state
+        if: always() && (steps.missing.outputs.upload == 'true' || steps.missing.outputs.state == 'published-exact')
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular readback --dist dist
+""" + publication_resume_job_text()
+
+
 def parser() -> argparse.ArgumentParser:
     """Build CLI parser for tf_pypi_nebular operations."""
     p = argparse.ArgumentParser(description=__doc__)
@@ -2891,7 +3177,8 @@ def parser() -> argparse.ArgumentParser:
     r_cmd = sub.add_parser("readback")
     r_cmd.add_argument("--dist", type=Path, default=Path("dist"))
 
-    sub.add_parser("workflow")
+    wf_cmd = sub.add_parser("workflow")
+    wf_cmd.add_argument("--release", choices=("0.6.1", "0.7.0"), default="0.6.1")
     return p
 
 
@@ -3010,7 +3297,7 @@ def main(
             sys.stdout.write(f"state={res['state']}\n")
             return 0
         if op == "workflow":
-            sys.stdout.write(workflow_text())
+            sys.stdout.write(workflow_text(release=args.release))
             return 0
         return 1
     except AdmissionError as error:

@@ -1,11 +1,19 @@
 name: RS9 theme-forge-nebular-fusion PyPI Publish
-run-name: 'RS9 theme-forge-nebular-fusion ${{ inputs.mode }} / ${{ inputs.dispatch_id }}'
+run-name: "RS9 theme-forge-nebular-fusion ${{ inputs.release || '0.6.1' }} ${{ inputs.mode || 'qualify' }} / ${{ inputs.dispatch_id }}"
 
 on:
   push:
     branches: [rs9-tfnf-pypi-hostqual1]
   workflow_dispatch:
     inputs:
+      release:
+        description: 'Target Nebular release'
+        required: false
+        type: choice
+        options:
+          - 0.6.1
+          - 0.7.0
+        default: 0.6.1
       mode:
         description: 'Execution mode'
         required: true
@@ -13,6 +21,7 @@ on:
         options:
           - qualify
           - publish
+          - resume
         default: qualify
       dispatch_id:
         description: 'Unique attended intent correlation; not publication authority'
@@ -28,7 +37,7 @@ concurrency:
 
 jobs:
   build_verify:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9-tfnf-pypi-hostqual1'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9-tfnf-pypi-hostqual1') && inputs.release != '0.7.0' && inputs.mode != 'resume'
     name: Build and Verify Native Darwin Wheel
     runs-on: macos-15
     timeout-minutes: 30
@@ -63,6 +72,7 @@ jobs:
           if-no-files-found: error
 
   native_consumer:
+    if: inputs.release != '0.7.0' && inputs.mode != 'resume'
     name: Native macOS ARM64 installed consumer and Scenario A
     needs: [build_verify]
     runs-on: macos-15
@@ -137,8 +147,319 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+  reject_unsupported_dispatch:
+    if: github.event_name == 'workflow_dispatch' && ((inputs.release == '0.7.0' && inputs.mode == 'publish') || (inputs.release != '0.7.0' && inputs.mode == 'resume'))
+    name: Reject unsupported release and mode combination
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Fail closed on unsupported release and mode combination
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish validate-dispatch \
+            --release "${{ inputs.release || '0.6.1' }}" \
+            --mode "${{ inputs.mode }}"
+
+  build_verify_070:
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9/nebular-pypi-qualify') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
+    name: Build and Verify Nebular 0.7.0 Candidate Bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Build and verify 0.7.0 candidate bundle
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish build-candidates \
+            --qualification-inputs operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-qualification-inputs.json \
+            --evidence "${{ runner.temp }}/tfnf-070-evidence" \
+            --output "${{ runner.temp }}/tfnf-070-bundle" \
+            --expected-commit "${{ github.sha }}" \
+            --require-clean
+
+      - name: Upload 0.7.0 candidate bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-070-candidate-bundle
+          path: '${{ runner.temp }}/tfnf-070-bundle/'
+          retention-days: 14
+          if-no-files-found: error
+
+  native_consumer_070_darwin_arm64:
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9/nebular-pypi-qualify') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
+    name: Native consumer 0.7.0 (darwin-arm64)
+    needs: [build_verify_070]
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Download 0.7.0 candidate bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-070-candidate-bundle
+          path: '${{ runner.temp }}/tfnf-070-bundle'
+
+      - name: Qualify native consumer on darwin-arm64
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish qualify-native \
+            --target darwin-arm64 \
+            --qualification-inputs operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-qualification-inputs.json \
+            --raw-release "${{ runner.temp }}/tfnf-070-raw-release-darwin-arm64/raw_release.json" \
+            --bundle "${{ runner.temp }}/tfnf-070-bundle" \
+            --work "${{ runner.temp }}/tfnf-070-work-darwin-arm64" \
+            --output "${{ runner.temp }}/tfnf-070-qual/darwin-arm64/result.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Upload darwin-arm64 qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-070-qualification-darwin-arm64
+          path: '${{ runner.temp }}/tfnf-070-qual/'
+          retention-days: 14
+          if-no-files-found: error
+
+  native_consumer_070_linux_arm64_gnu:
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9/nebular-pypi-qualify') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
+    name: Native consumer 0.7.0 (linux-arm64-gnu)
+    needs: [build_verify_070]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Download 0.7.0 candidate bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-070-candidate-bundle
+          path: '${{ runner.temp }}/tfnf-070-bundle'
+
+      - name: Qualify native consumer on linux-arm64-gnu
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish qualify-native \
+            --target linux-arm64-gnu \
+            --qualification-inputs operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-qualification-inputs.json \
+            --raw-release "${{ runner.temp }}/tfnf-070-raw-release-linux-arm64-gnu/raw_release.json" \
+            --bundle "${{ runner.temp }}/tfnf-070-bundle" \
+            --work "${{ runner.temp }}/tfnf-070-work-linux-arm64-gnu" \
+            --output "${{ runner.temp }}/tfnf-070-qual/linux-arm64-gnu/result.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Upload linux-arm64-gnu qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-070-qualification-linux-arm64-gnu
+          path: '${{ runner.temp }}/tfnf-070-qual/'
+          retention-days: 14
+          if-no-files-found: error
+
+  native_consumer_070_linux_x64_gnu:
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9/nebular-pypi-qualify') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
+    name: Native consumer 0.7.0 (linux-x64-gnu)
+    needs: [build_verify_070]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Download 0.7.0 candidate bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-070-candidate-bundle
+          path: '${{ runner.temp }}/tfnf-070-bundle'
+
+      - name: Qualify native consumer on linux-x64-gnu
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish qualify-native \
+            --target linux-x64-gnu \
+            --qualification-inputs operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-qualification-inputs.json \
+            --raw-release "${{ runner.temp }}/tfnf-070-raw-release-linux-x64-gnu/raw_release.json" \
+            --bundle "${{ runner.temp }}/tfnf-070-bundle" \
+            --work "${{ runner.temp }}/tfnf-070-work-linux-x64-gnu" \
+            --output "${{ runner.temp }}/tfnf-070-qual/linux-x64-gnu/result.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Upload linux-x64-gnu qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-070-qualification-linux-x64-gnu
+          path: '${{ runner.temp }}/tfnf-070-qual/'
+          retention-days: 14
+          if-no-files-found: error
+
+  qualification_gate_070:
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9/nebular-pypi-qualify') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
+    name: Qualification matrix gate 0.7.0
+    needs:
+      - build_verify_070
+      - native_consumer_070_darwin_arm64
+      - native_consumer_070_linux_arm64_gnu
+      - native_consumer_070_linux_x64_gnu
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Download 0.7.0 candidate bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-070-candidate-bundle
+          path: '${{ runner.temp }}/tfnf-070-bundle'
+
+      - name: Download darwin-arm64 qualification receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-070-qualification-darwin-arm64
+          path: '${{ runner.temp }}/tfnf-070-receipts'
+
+      - name: Download linux-arm64-gnu qualification receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-070-qualification-linux-arm64-gnu
+          path: '${{ runner.temp }}/tfnf-070-receipts'
+
+      - name: Download linux-x64-gnu qualification receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-070-qualification-linux-x64-gnu
+          path: '${{ runner.temp }}/tfnf-070-receipts'
+
+      - name: Admit complete 3-platform 0.7.0 qualification matrix
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish admit-matrix \
+            --bundle "${{ runner.temp }}/tfnf-070-bundle" \
+            --receipts-dir "${{ runner.temp }}/tfnf-070-receipts" \
+            --output "${{ runner.temp }}/tfnf-070-matrix/matrix_receipt.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Upload 0.7.0 matrix qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-070-matrix-receipt
+          path: '${{ runner.temp }}/tfnf-070-matrix/'
+          retention-days: 14
+          if-no-files-found: error
+
   publish:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.mode == 'publish'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release != '0.7.0' && inputs.mode == 'publish'
     name: Trusted Publishing to PyPI
     needs: [build_verify, native_consumer]
     runs-on: ubuntu-24.04
@@ -211,3 +532,177 @@ jobs:
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
           "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular readback --dist dist
+
+  publication_resume_070:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'resume'
+    name: Attended Nebular 0.7.0 PyPI publication resume
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: rs9-tfnf-pypi-publish-main
+      cancel-in-progress: false
+    environment:
+      name: pypi
+      url: https://pypi.org/p/theme-forge-nebular-fusion
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout publisher authority commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          path: publisher-authority
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Resolve pinned qualification commit from publisher authority
+        id: resolve_qual
+        env:
+          PYTHONPATH: publisher-authority/src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -c '
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import load_approval, load_pin, load_qualification_capture
+          pub = Path("publisher-authority")
+          pin = load_pin(pub)
+          app = load_approval(pub)
+          cap = load_qualification_capture(pub, pin=pin, approval=app)
+          print(f"qualification_commit={cap["qualification_source_commit"]}")
+          print(f"qualification_run_id={cap["run_id"]}")
+          ' >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact qualified source commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ steps.resolve_qual.outputs.qualification_commit }}'
+          path: qualification-source
+          persist-credentials: false
+
+      - name: Verify publisher and qualification source lineage
+        env:
+          PYTHONPATH: qualification-source/src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish verify-source \
+            --publisher-dir publisher-authority \
+            --qualification-dir qualification-source \
+            --publisher-revision "${{ github.sha }}"
+
+      - name: Fetch retained qualification run and artifact archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONPATH: qualification-source/src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          API_DIR="${{ runner.temp }}/tfnf-070-api"
+          ARCHIVES_DIR="${{ runner.temp }}/tfnf-070-archives"
+          mkdir -p "$API_DIR" "$ARCHIVES_DIR"
+          RUN_ID="${{ steps.resolve_qual.outputs.qualification_run_id }}"
+          gh api --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "/repos/${{ github.repository }}/actions/runs/$RUN_ID" \
+            > "$API_DIR/run.json"
+          gh api --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "/repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts?per_page=100" \
+            > "$API_DIR/artifacts.json"
+          "${{ steps.setup_python.outputs.python-path }}" -B -c '
+          import os, subprocess
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import load_qualification_capture
+          cap = load_qualification_capture(Path("publisher-authority"))
+          repo = cap["repository"]
+          archives_dir = Path(os.environ["RUNNER_TEMP"]) / "tfnf-070-archives"
+          for name, spec in cap["artifacts"].items():
+              art_id = spec["id"]
+              with (archives_dir / f"{name}.zip").open("xb") as out:
+                  subprocess.run(
+                      [
+                          "gh",
+                          "api",
+                          "--header",
+                          "X-GitHub-Api-Version: 2022-11-28",
+                          f"/repos/{repo}/actions/artifacts/{art_id}/zip",
+                      ],
+                      check=True,
+                      stdout=out,
+                  )
+          '
+
+      - name: Authenticate retained archives and stage verified distribution
+        env:
+          PYTHONPATH: qualification-source/src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish prepare-resume \
+            --publisher-dir publisher-authority \
+            --qualification-dir qualification-source \
+            --api-dir "${{ runner.temp }}/tfnf-070-api" \
+            --archives-dir "${{ runner.temp }}/tfnf-070-archives" \
+            --output "${{ runner.temp }}/tfnf-070-resume"
+
+      - name: Stage admitted 0.7.0 operator metadata into qualification checkout
+        env:
+          PYTHONPATH: qualification-source/src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish stage-metadata \
+            --publisher-dir publisher-authority \
+            --qualification-dir qualification-source
+
+      - name: Verify artifact integrity and select only missing files
+        id: missing
+        working-directory: qualification-source
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+          RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED: ${{ vars.RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish select-missing \
+            --dist "${{ runner.temp }}/tfnf-070-resume/dist" \
+            --upload-dir "${{ runner.temp }}/tfnf-070-resume/upload" \
+            --candidate-receipt "${{ runner.temp }}/tfnf-070-resume/candidate_receipt.json" \
+            --expected-artifacts "${{ runner.temp }}/tfnf-070-resume/expected_artifacts.json" \
+            --receipts-dir "${{ runner.temp }}/tfnf-070-resume/receipts" \
+            --attempt-marker "${{ runner.temp }}/tfnf-070-upload-attempt.json" >> "$GITHUB_OUTPUT"
+
+      - name: Re-verify staged upload artifacts against approval before upload
+        if: steps.missing.outputs.upload == 'true'
+        working-directory: qualification-source
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish verify-upload \
+            --dist "${{ runner.temp }}/tfnf-070-resume/dist" \
+            --upload-dir "${{ runner.temp }}/tfnf-070-resume/upload"
+
+      - name: Publish package distribution to PyPI
+        if: steps.missing.outputs.upload == 'true'
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e
+        with:
+          packages-dir: '${{ runner.temp }}/tfnf-070-resume/upload/'
+          verify-metadata: true
+          print-hash: true
+          skip-existing: false
+          attestations: false
+
+      - name: Read back published PyPI state
+        if: always() && (steps.missing.outputs.upload == 'true' || steps.missing.outputs.state == 'published-exact')
+        working-directory: qualification-source
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish readback \
+            --dist "${{ runner.temp }}/tfnf-070-resume/dist"

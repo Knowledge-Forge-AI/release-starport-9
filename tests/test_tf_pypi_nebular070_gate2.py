@@ -1443,6 +1443,13 @@ class NebularGate1ToGate2Fixture(unittest.TestCase):
         return path, before, descriptor.copy()
 
     def test_actual_gate1_receipt_hands_off_to_controlled_gate2_consumer(self):
+        self.assertEqual(
+            self.candidate["readme"],
+            {
+                "path": "operators/tf-pypi/descriptions/nebular-fusion-0.7.0.md",
+                "sha256": "19961e11514340f8a87d17688d938b606304f5b5734d7158ef97aad9580886ee",
+            },
+        )
         for target, (expected, raw_release, wheel) in self.handoffs.items():
             result = hosted.qualify_nebular070(
                 self.candidate,

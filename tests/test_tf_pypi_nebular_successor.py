@@ -680,6 +680,13 @@ class NebularSuccessorIntegrationTests(unittest.TestCase):
         self.assertEqual(receipt_070["license"]["expression"], "AGPL-3.0-or-later")
         self.assertEqual(set(receipt_070["legal_files"]), {"LICENSE", "NOTICE"})
         self.assertEqual(
+            receipt_070["readme"],
+            {
+                "path": DESCRIPTION_070_PATH,
+                "sha256": "19961e11514340f8a87d17688d938b606304f5b5734d7158ef97aad9580886ee",
+            },
+        )
+        self.assertEqual(
             validate_candidate_receipt(receipt_070, generic_070_auth, output_dir=output_070),
             receipt_070,
         )

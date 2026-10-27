@@ -3,7 +3,7 @@
   "profile_id": "nebular-fusion-0.7.0-gate1-agpl-floor13-v1",
   "application_version": "0.7.0",
   "distribution_version": "0.7.0",
-  "description_path": "operators/tf-pypi/descriptions/nebular-fusion-0.7.0-gate1.md",
+  "description_path": "operators/tf-pypi/descriptions/nebular-fusion-0.7.0.md",
   "provenance_schema": "rs9.wheel-provenance.v3alpha1",
   "license_expression": "AGPL-3.0-or-later",
   "required_legal_files": ["LICENSE", "NOTICE"],
