@@ -3,7 +3,10 @@
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 from typing import Iterator
 import unittest
@@ -276,6 +279,34 @@ class ResumeTests(unittest.TestCase):
         self.assertNotIn("tf_pypi_publish build", text)
         self.assertNotIn("tf_pypi_hosted qualify", text)
         self.assertNotIn("tf_pypi_hosted admit", text)
+
+    def test_resume_qualification_source_uses_relative_pythonpath(self):
+        with _tempdir() as root:
+            qualification_source = root / "qualification-source"
+            shutil.copytree(ROOT / "src", qualification_source / "src")
+            command = ["python3", "-B", "-c", "import rs9.tf_pypi_publish"]
+            environment = os.environ.copy()
+            environment["PYTHONPATH"] = "$GITHUB_WORKSPACE/qualification-source/src"
+            literal = subprocess.run(
+                command,
+                cwd=qualification_source,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(literal.returncode, 0)
+            self.assertIn("ModuleNotFoundError", literal.stderr)
+            environment["PYTHONPATH"] = "src"
+            relative = subprocess.run(
+                command,
+                cwd=qualification_source,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(relative.returncode, 0, relative.stderr)
 
     def test_publisher_revision_requires_original_head_ancestor(self):
         with self.assertRaises(AdmissionError) as error:

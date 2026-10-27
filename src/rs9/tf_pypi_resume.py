@@ -572,7 +572,7 @@ jobs:
       - name: Verify approved candidate and select only missing files
         id: missing
         env:
-          PYTHONPATH: '$GITHUB_WORKSPACE/qualification-source/src'
+          PYTHONPATH: src
           QUALIFY_COMMIT: '{QUALIFICATION_COMMIT}'
           QUALIFY_RUN_ID: '{QUALIFICATION_RUN_ID}'
           QUALIFY_RUN_ATTEMPT: '{QUALIFICATION_RUN_ATTEMPT}'
@@ -597,7 +597,7 @@ jobs:
 
       - name: Read back exact PyPI state
         env:
-          PYTHONPATH: '$GITHUB_WORKSPACE/qualification-source/src'
+          PYTHONPATH: src
         run: |
           set -euo pipefail
           python3 -B -m rs9.tf_pypi_publish readback \\
