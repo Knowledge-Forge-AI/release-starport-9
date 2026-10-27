@@ -43,7 +43,7 @@ class ModelTests(unittest.TestCase):
         legacy = load_pin("theme-forge-stellar-burst")
 
         self.assertEqual(successor["source_status"], "READY")
-        self.assertEqual(successor["qualified_platforms"], [])
+        self.assertEqual(successor["qualified_platforms"], list(TARGETS))
         self.assertEqual(successor["source_commit"], "3edb9d2c40dd19a2b7d97d9309bc210e7fed711c")
         self.assertEqual(successor["dependencies"][-1]["version"], "1.9.1")
         self.assertEqual(legacy["version"], "0.6.1")

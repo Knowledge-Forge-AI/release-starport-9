@@ -57,7 +57,7 @@ EXPECTED_SUCCESSOR_WITHHELD = [
 
 EXPECTED_ASSET_HASHES = {
     "operators/tf-pypi/theme-forge-stellar-burst-0.7.0.json": (
-        "0d8b83ec9e230df6338d177247c67ded05efbcd8d747346d7bbdb894261583e4"
+        "57c6c1e86c3025c89494f0ef942e739c0616b8df5ab90dbe3e489e4da54fce57"
     ),
     "operators/tf-pypi/descriptions/stellar-burst-0.7.0.md": (
         "629a25fc68705bd610d0a09eeef4d77173ac5f6d7d6c98e3a4335d15b140dbb9"
@@ -225,7 +225,7 @@ class SuccessorReleaseTests(unittest.TestCase):
                     self.assertTrue(pin["withheld"])
                 self.assertEqual(
                     pin["qualified_platforms"],
-                    list(TARGETS) if project in {"theme-forge-solar-sail", "theme-forge-stellar-loom"} else [],
+                    list(TARGETS),
                 )
                 self.assertIsInstance(pin["withheld"], list)
                 self.assertEqual(pin["candidate_platforms"], list(TARGETS))
@@ -253,6 +253,11 @@ class SuccessorReleaseTests(unittest.TestCase):
                 "0.5.0",
                 "6a41854669eee7630aa843cce6943e1b1dec9a6d423d219641af6581f66a1d4c",
                 "3d9ab535c3d17a850849f0517cbbd03ce2eb180b9a66c0de8f94cd485a766caf",
+            ),
+            "theme-forge-stellar-burst": (
+                "0.7.0",
+                "33a2cf9c93ba075ecd13f45ab940263012a0c208094699cc2c054a6fcf5e95de",
+                "a88e0b211bd025b8bbab2e5f79fbdf6bde1e1fe61aaf4ef5fdeb0e63e1de31f3",
             ),
         }
         for project, (version, file_sha, set_sha) in expected.items():
@@ -672,15 +677,21 @@ class SuccessorReleaseTests(unittest.TestCase):
             rem_mock.assert_not_called()
             self.assertFalse(upload_dir.exists())
 
-        # The committed READY pin must stop at the platform gate before approval,
-        # matrix admission, remote state, or upload directory creation.
+        # Use a canonical basename inside a fresh synthetic unqualified fixture;
+        # the committed READY pin must exercise the later gates.
+        unqualified_dir = self.root / "unqualified-fixture"
+        unqualified_dir.mkdir()
+        unqualified_pin_path = unqualified_dir / "theme-forge-stellar-burst-0.7.0.json"
+        unqualified_pin = copy.deepcopy(selected)
+        unqualified_pin["qualified_platforms"] = []
+        unqualified_pin_path.write_bytes(canonical(unqualified_pin))
         err = io.StringIO()
         with patch.object(p, "load_approval", side_effect=AssertionError("approval read")) as app_mock, \
                 patch.object(p, "admit_matrix", side_effect=AssertionError("matrix called")) as mat_mock, \
                 patch.object(p, "exact_state", side_effect=AssertionError("remote called")) as rem_mock, \
                 patch("sys.stderr", err):
             rc = p.main([
-                "select-missing", "--project", project, "--pin", str(pin_path),
+                "select-missing", "--project", project, "--pin", str(unqualified_pin_path),
                 "--dist", str(dist_dir), "--upload-dir", str(upload_dir),
                 "--receipts", str(receipts_dir), "--expected-commit", COMMIT,
             ])
@@ -834,6 +845,8 @@ class SuccessorReleaseTests(unittest.TestCase):
     def _extract_module_invocations(self, doc):
         invocations = []
         for job_id, job in doc["jobs"].items():
+            if job_id == "publication_resume":
+                continue
             for step in job["steps"]:
                 run_text = step.get("run")
                 if not run_text:
@@ -936,11 +949,14 @@ class SuccessorReleaseTests(unittest.TestCase):
                 expected_selector = f" --pin {expected_rel}"
                 self.assertNotIn(str(self.root), text)
                 self.assertNotIn(str(ROOT), text)
-                self.assertEqual(text.count(expected_selector), 7)
-                self.assertEqual(
-                    sha256(text.replace(expected_selector, "").encode("utf-8")),
-                    HISTORICAL_WORKFLOW_SHA256[project],
-                )
+                if project == "theme-forge-stellar-burst":
+                    self.assertEqual(text.count(expected_selector), 10)
+                else:
+                    self.assertEqual(text.count(expected_selector), 7)
+                    self.assertEqual(
+                        sha256(text.replace(expected_selector, "").encode("utf-8")),
+                        HISTORICAL_WORKFLOW_SHA256[project],
+                    )
                 self.assertEqual(
                     text.encode("utf-8"),
                     (workflows / load_pin(project)["workflow"]).read_bytes(),

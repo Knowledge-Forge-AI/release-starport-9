@@ -1,0 +1,111 @@
+{
+  "aggregate_set_sha256": "a88e0b211bd025b8bbab2e5f79fbdf6bde1e1fe61aaf4ef5fdeb0e63e1de31f3",
+  "artifacts": [
+    {
+      "id": 12701155653,
+      "members": [
+        {
+          "bytes": 12122,
+          "name": "result.json",
+          "sha256": "0862cc1b6697db0f8ae2306ed52db58683948848f5c0e00e46ede7eedb1565cb"
+        }
+      ],
+      "name": "native-consumer-theme-forge-stellar-burst-linux-arm64-gnu",
+      "sha256": "cd06d7cb503aac58e29bb04a7b256edf49acf4934313b642d069c1b8258ff6bf",
+      "size": 1819,
+      "workflow_run": {
+        "head_repository_id": 1402549560,
+        "head_sha": "e35ed6dfbe38f601db9b329c34331a170580372a",
+        "id": 40427947585,
+        "repository_id": 1402549560
+      }
+    },
+    {
+      "id": 12700482027,
+      "members": [
+        {
+          "bytes": 4890808,
+          "name": "theme_forge_stellar_burst-0.7.0-py3-none-macosx_13_0_arm64.whl",
+          "sha256": "df7bde863f94f6130fd0fe49af2ca85f9d2cffbfc3369226054120c095402e86"
+        },
+        {
+          "bytes": 4910808,
+          "name": "theme_forge_stellar_burst-0.7.0-py3-none-manylinux_2_33_aarch64.whl",
+          "sha256": "f9d6377697290a986112dff569058d9ec8c8730a2bea8395c38f2ee57e547636"
+        },
+        {
+          "bytes": 4864702,
+          "name": "theme_forge_stellar_burst-0.7.0-py3-none-manylinux_2_33_x86_64.whl",
+          "sha256": "b1ee52d8cb55788aeb53d6e94daceeccb8d53f092794af3e20ba115d39f4f16c"
+        },
+        {
+          "bytes": 1228913,
+          "name": "theme_forge_stellar_burst-0.7.0.tar.gz",
+          "sha256": "eeb0636584d586b375c909c26f52984995cb650755e5961e4f8ae2445ec40807"
+        }
+      ],
+      "name": "pypi-artifacts",
+      "sha256": "3a4cf61340708207d0296eecb37739fd808bc157c4c356767df0caa0646c4023",
+      "size": 3977146,
+      "workflow_run": {
+        "head_repository_id": 1402549560,
+        "head_sha": "e35ed6dfbe38f601db9b329c34331a170580372a",
+        "id": 40427947585,
+        "repository_id": 1402549560
+      }
+    },
+    {
+      "id": 12700432813,
+      "members": [
+        {
+          "bytes": 12103,
+          "name": "result.json",
+          "sha256": "dbaf47f93be21c6e8b0850f3906e29dfa460c4ff979db1a26b62909a46553437"
+        }
+      ],
+      "name": "native-consumer-theme-forge-stellar-burst-darwin-arm64",
+      "sha256": "37c07abdfdcbab55e08a775a054fdff5cffdf6fc68ced53bb346f51fbd75f638",
+      "size": 1816,
+      "workflow_run": {
+        "head_repository_id": 1402549560,
+        "head_sha": "e35ed6dfbe38f601db9b329c34331a170580372a",
+        "id": 40427947585,
+        "repository_id": 1402549560
+      }
+    },
+    {
+      "id": 12700053808,
+      "members": [
+        {
+          "bytes": 12111,
+          "name": "result.json",
+          "sha256": "03a2a2e08fa91a57830974782df15aaebeb77124ec67c88b228a580d70f6b034"
+        }
+      ],
+      "name": "native-consumer-theme-forge-stellar-burst-linux-x64-gnu",
+      "sha256": "6f3b90fae04bbc0d1730638b9b122866c4b71fd3bf573e425769326f4cc1a506",
+      "size": 1818,
+      "workflow_run": {
+        "head_repository_id": 1402549560,
+        "head_sha": "e35ed6dfbe38f601db9b329c34331a170580372a",
+        "id": 40427947585,
+        "repository_id": 1402549560
+      }
+    }
+  ],
+  "head": "e35ed6dfbe38f601db9b329c34331a170580372a",
+  "project": "theme-forge-stellar-burst",
+  "repository": "Knowledge-Forge-AI/release-starport-9",
+  "repository_id": 1402549560,
+  "run_attempt": "1",
+  "run_id": "40427947585",
+  "schema": "rs9.tf-pypi-publication-resume.v1",
+  "successful_prerequisites": [
+    "Build and Verify Candidate Artifacts",
+    "Native Linux ARM64 GNU installed consumer",
+    "Native macOS ARM64 installed consumer",
+    "Native Linux x86_64 GNU installed consumer",
+    "Three-host qualification gate"
+  ],
+  "version": "0.7.0"
+}

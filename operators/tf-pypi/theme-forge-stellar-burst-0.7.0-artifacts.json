@@ -1,0 +1,43 @@
+{
+  "files": [
+    {
+      "filename": "theme_forge_stellar_burst-0.7.0-py3-none-macosx_13_0_arm64.whl",
+      "logical_sha256": "9e8554eaea0464b6455d16936991c22ddad836922fe77e791f1c7ce188b4ad4a",
+      "sha256": "df7bde863f94f6130fd0fe49af2ca85f9d2cffbfc3369226054120c095402e86",
+      "size": 4890808,
+      "target": "darwin-arm64"
+    },
+    {
+      "filename": "theme_forge_stellar_burst-0.7.0-py3-none-manylinux_2_33_aarch64.whl",
+      "logical_sha256": "a1b1369a23aaf5fab907a4b64186f593823272545cd4d6eeded3856d5f5d2722",
+      "sha256": "f9d6377697290a986112dff569058d9ec8c8730a2bea8395c38f2ee57e547636",
+      "size": 4910808,
+      "target": "linux-arm64-gnu"
+    },
+    {
+      "filename": "theme_forge_stellar_burst-0.7.0-py3-none-manylinux_2_33_x86_64.whl",
+      "logical_sha256": "9d4f4be1cf3cf459634fa731f4b1e3a8364f2cea5749b61dc605ef44d88c5dcd",
+      "sha256": "b1ee52d8cb55788aeb53d6e94daceeccb8d53f092794af3e20ba115d39f4f16c",
+      "size": 4864702,
+      "target": "linux-x64-gnu"
+    },
+    {
+      "filename": "theme_forge_stellar_burst-0.7.0.tar.gz",
+      "logical_sha256": "597c0618b75ce2d4610b5e2eee1d969aaae4af0290befecbe201aee77444005c",
+      "sha256": "eeb0636584d586b375c909c26f52984995cb650755e5961e4f8ae2445ec40807",
+      "size": 1228913,
+      "target": null
+    }
+  ],
+  "project": "theme-forge-stellar-burst",
+  "publication_admitted": true,
+  "schema": "rs9.tf-pypi-candidate-aggregate.v1",
+  "set_sha256": "a88e0b211bd025b8bbab2e5f79fbdf6bde1e1fe61aaf4ef5fdeb0e63e1de31f3",
+  "targets": [
+    "darwin-arm64",
+    "linux-arm64-gnu",
+    "linux-x64-gnu"
+  ],
+  "upstream_version": "0.7.0",
+  "version": "0.7.0"
+}
