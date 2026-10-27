@@ -177,7 +177,15 @@ jobs:
           RS9_GITHUB_READ_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          if [[ "${RUNNER_OS-}" == 'Linux' ]]; then
+            ./.github/scripts/rs9-linux-userns-apparmor-guard.sh -- \
+              python3 -m rs9.hosted_pipeline 'nix' --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs"
+          elif [[ "${RUNNER_OS-}" == 'macOS' ]]; then
           python3 -m rs9.hosted_pipeline 'nix' --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs"
+          else
+            printf '%s\n' 'Unsupported runner OS for the maintained nix matrix' >&2
+            exit 78
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ !cancelled() }}
         with:
