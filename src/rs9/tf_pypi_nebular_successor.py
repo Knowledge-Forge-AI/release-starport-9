@@ -14,6 +14,7 @@ import json
 import os
 import re
 import zipfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,11 @@ from rs9.nebular_lineage import (
     select_forward_lineage_proof,
     verify_direct_release_lineage,
     verify_forward_lineage_proof,
+)
+from rs9.nebular070_manylinux import (
+    ValidatedPayloadPortability,
+    manylinux_tag_for_target,
+    validate_nebular070_payload_portability as _validate_nebular070_payload_portability,
 )
 from rs9.operator import (
     BOOTSTRAP,
@@ -100,6 +106,25 @@ _PROVENANCE_KEYS = {
 _GATE1_PROVENANCE_KEYS = _PROVENANCE_KEYS | {
     "candidate_profile", "source_legal_profile", "linux_runtime_policy", "darwin_floor_evidence",
 }
+_MANYLINUX_PROVENANCE_KEYS = {
+    "construction_stage", "release_admission", "manylinux_construction_receipt_sha256",
+}
+
+
+def validate_nebular070_payload_portability(
+    record: Mapping[str, Any],
+    receipt_bodies: Mapping[str, Mapping[str, Any]],
+    *,
+    expected_tf_producer_source: Mapping[str, str],
+    expected_rs9_tool_source: Mapping[str, str],
+) -> ValidatedPayloadPortability:
+    """Validate Stage A before constructing a manylinux-tagged candidate."""
+    return _validate_nebular070_payload_portability(
+        record,
+        receipt_bodies,
+        expected_tf_producer_source=expected_tf_producer_source,
+        expected_rs9_tool_source=expected_rs9_tool_source,
+    )
 
 
 def _error(code: str, message: str) -> ContractError:
@@ -282,7 +307,7 @@ def authenticate_gate1_capture(
 
 def _candidate_row(system: str, target_triple: str, result: WheelBuildResult) -> dict[str, Any]:
     record = result.record
-    return {
+    row = {
         "system": system,
         "target_triple": target_triple,
         "wheel": {
@@ -318,6 +343,14 @@ def _candidate_row(system: str, target_triple: str, result: WheelBuildResult) ->
             "manylinux_proven": record.get("manylinux_proven"),
         },
     }
+    construction_fields = {
+        key: record.get(key)
+        for key in _MANYLINUX_PROVENANCE_KEYS
+        if key in record
+    }
+    if construction_fields:
+        row.update(construction_fields)
+    return row
 
 
 def _receipt(
@@ -472,9 +505,23 @@ def _expected_candidate_rs9_source(value: Any) -> dict[str, Any]:
     return value
 
 
-def _expected_wheel_tag(system: str, target_triple: str, asset: dict[str, Any]) -> str:
+def _expected_wheel_tag(
+    system: str,
+    target_triple: str,
+    asset: dict[str, Any],
+    *,
+    manylinux: bool = False,
+) -> str:
     try:
         if system.endswith("-linux"):
+            if manylinux:
+                target = {
+                    "aarch64-unknown-linux-gnu": "linux-arm64-gnu",
+                    "x86_64-unknown-linux-gnu": "linux-x64-gnu",
+                }.get(target_triple)
+                if target is None:
+                    raise _error("RECEIPT_TARGET", "Manylinux target triple is unsupported")
+                return manylinux_tag_for_target(target)
             return resolve_native_linux_candidate_tag(target_triple, None)
         if system != "aarch64-darwin":
             raise _error("RECEIPT_TARGET", "Candidate target system is unsupported")
@@ -578,7 +625,25 @@ def _validate_wheel_artifact(
     provenance_member = f"{PACKAGE_NAME}/_rs9/provenance.json"
     metadata_member = f"{expected_dist_info}/METADATA"
     expected_asset = _expected_asset(authenticated, system)
-    expected_tag = _expected_wheel_tag(system, row["target_triple"], expected_asset)
+    construction_fields = {
+        key: row.get(key)
+        for key in _MANYLINUX_PROVENANCE_KEYS
+        if key in row
+    }
+    manylinux_candidate = system.endswith("-linux") and bool(construction_fields)
+    if manylinux_candidate and set(construction_fields) != _MANYLINUX_PROVENANCE_KEYS:
+        raise _error("RECEIPT_BINDING", "Manylinux construction identity is incomplete")
+    if manylinux_candidate:
+        if construction_fields["construction_stage"] != "payload-portability" \
+                or construction_fields["release_admission"] != "external" \
+                or not isinstance(construction_fields["manylinux_construction_receipt_sha256"], str) \
+                or not re.fullmatch(r"[0-9a-f]{64}", construction_fields["manylinux_construction_receipt_sha256"]):
+            raise _error("RECEIPT_BINDING", "Manylinux construction identity is malformed")
+    elif construction_fields:
+        raise _error("RECEIPT_BINDING", "Manylinux construction fields are only valid for Linux rows")
+    expected_tag = _expected_wheel_tag(
+        system, row["target_triple"], expected_asset, manylinux=manylinux_candidate
+    )
     if wheel.get("tag") != expected_tag:
         raise _error("RECEIPT_TARGET", "Candidate wheel tag disagrees with its authenticated target")
     if not isinstance(expected_asset.get("launcher_path"), str) or not isinstance(expected_asset.get("gui_path"), str):
@@ -617,7 +682,8 @@ def _validate_wheel_artifact(
         raise _error("RECEIPT_ARTIFACT", "Candidate wheel provenance is unavailable") from exc
     except KeyError as exc:
         raise _error("RECEIPT_ARTIFACT", "Candidate wheel provenance is unavailable") from exc
-    provenance_keys = _GATE1_PROVENANCE_KEYS if candidate_profile is not None else _PROVENANCE_KEYS
+    base_provenance_keys = _GATE1_PROVENANCE_KEYS if candidate_profile is not None else _PROVENANCE_KEYS
+    provenance_keys = base_provenance_keys | _MANYLINUX_PROVENANCE_KEYS if manylinux_candidate else base_provenance_keys
     if set(provenance) != provenance_keys:
         raise _error("RECEIPT_ARTIFACT", "Candidate wheel provenance fields are not closed")
     metadata = entries.get(metadata_member)
@@ -630,7 +696,15 @@ def _validate_wheel_artifact(
         "manylinux_proven": False,
     }
     expected_pending = {"status": "pending", "receipt_sha256": None, "admitted": False}
-    expected_policy = {"status": "pending", "receipt_sha256": None, "manylinux_proven": False}
+    expected_policy = (
+        {
+            "status": "payload-qualified",
+            "receipt_sha256": construction_fields["manylinux_construction_receipt_sha256"],
+            "manylinux_proven": False,
+        }
+        if manylinux_candidate
+        else {"status": "pending", "receipt_sha256": None, "manylinux_proven": False}
+    )
     expected_provenance = {
         "schema": candidate_profile.provenance_schema if candidate_profile else SUCCESSOR_PROVENANCE_SCHEMA,
         "product_id": PRODUCT_ID,
@@ -661,8 +735,8 @@ def _validate_wheel_artifact(
         "metadata_sha256": digest(metadata),
         "fixture_only": False,
         "candidate_only": candidate_only,
-        "candidate_status": "policy-pending" if candidate_only else "candidate",
-        "promotability": "policy-pending" if candidate_only else "candidate",
+        "candidate_status": "payload-qualified" if manylinux_candidate else ("policy-pending" if candidate_only else "candidate"),
+        "promotability": "payload-qualified" if manylinux_candidate else ("policy-pending" if candidate_only else "candidate"),
         "manylinux_proven": False,
         "source_closure": expected_pending,
         "policy": expected_policy,
@@ -696,6 +770,8 @@ def _validate_wheel_artifact(
         })
         if row.get("darwin_floor_evidence") != expected_provenance["darwin_floor_evidence"]:
             raise _error("RECEIPT_ARTIFACT", "Candidate row Darwin floor evidence is not wheel-bound")
+    if manylinux_candidate:
+        expected_provenance.update(construction_fields)
     for key, expected in expected_provenance.items():
         if provenance.get(key) != expected:
             raise _error("RECEIPT_ARTIFACT", "Candidate wheel provenance is not capture-bound")
@@ -870,12 +946,15 @@ def validate_candidate_receipt(
         if (not isinstance(wheel, dict) or set(wheel) != {"filename", "sha256", "size", "tag", "version"}
                 or not isinstance(wheel.get("filename"), str)):
             raise _error("RECEIPT_ROWS", "Candidate wheel identity is incomplete")
-        if set(row) != {
+        expected_row_fields = {
             "system", "target_triple", "wheel", "selected_asset_id", "payload_archive_name",
             "payload_archive_sha256", "manifest_sha256", "source_identity", "forward_lineage",
             "rs9_source", "candidate_only", "launcher_path", "gui_path", "profile_result_sha256",
             "readme", "legal_files", "publication",
-        }:
+        }
+        if any(key in row for key in _MANYLINUX_PROVENANCE_KEYS):
+            expected_row_fields |= _MANYLINUX_PROVENANCE_KEYS
+        if set(row) != expected_row_fields:
             raise _error("RECEIPT_ROWS", "Candidate receipt row fields are not closed")
         publication = row.get("publication")
         if publication != {key: False for key in (
@@ -1091,6 +1170,8 @@ def validate_gate1_receipt(
             "profile_result_sha256", "readme", "legal_files", "publication", "candidate_profile",
             "source_legal_profile", "linux_runtime_policy", "darwin_floor_evidence",
         }
+        if any(key in row for key in _MANYLINUX_PROVENANCE_KEYS):
+            expected_row_fields |= _MANYLINUX_PROVENANCE_KEYS
         if set(row) != expected_row_fields:
             raise _error("RECEIPT_ROWS", "Gate1 row fields are not closed")
         if set(row["wheel"]) != {"filename", "sha256", "size", "tag", "version"}:
@@ -1149,6 +1230,7 @@ def build_gate1_candidates(
     rs9_source_commit: str,
     rs9_source_tree: str,
     description_path: str | Path | None = None,
+    payload_portability: ValidatedPayloadPortability | None = None,
     deterministic_timestamp: tuple[int, int, int, int, int, int] | None = None,
 ) -> dict[str, Any]:
     """Build fresh v0.7 Gate1 candidates only from a ready real capture."""
@@ -1160,6 +1242,8 @@ def build_gate1_candidates(
     if (not isinstance(rs9_source_commit, str) or not isinstance(rs9_source_tree, str)
             or not _HEX40.fullmatch(rs9_source_commit) or not _HEX40.fullmatch(rs9_source_tree)):
         raise _error("RS9_SOURCE_IDENTITY", "Explicit reviewed candidate source commit and tree are required")
+    if payload_portability is not None and not isinstance(payload_portability, ValidatedPayloadPortability):
+        raise _error("MANYLINUX_INPUT", "Validated 0.7.0 payload portability evidence is required")
     destination = Path(output_dir).absolute()
     if destination.is_symlink() or any(parent.is_symlink() for parent in (destination, *destination.parents)):
         raise _error("OUTPUT_CONFINEMENT", "Gate1 candidate output ancestry contains a symlink")
@@ -1188,6 +1272,7 @@ def build_gate1_candidates(
             rs9_source_tree=rs9_source_tree,
             lineage_proof=authenticated.lineage_facts,
             candidate_only=candidate_only,
+            payload_portability=payload_portability if candidate_only else None,
             deterministic_timestamp=deterministic_timestamp,
         )
         row = _gate1_candidate_row(system, target_triple, result)
@@ -1209,6 +1294,7 @@ def build_successor_candidates(
     rs9_source_commit: str,
     rs9_source_tree: str,
     description_path: str | Path | None = None,
+    payload_portability: ValidatedPayloadPortability | None = None,
     deterministic_timestamp: tuple[int, int, int, int, int, int] | None = None,
 ) -> dict[str, Any]:
     """Build the exact Darwin, Linux arm64, and Linux amd64 candidates."""
@@ -1217,6 +1303,8 @@ def build_successor_candidates(
     if (not isinstance(rs9_source_commit, str) or not isinstance(rs9_source_tree, str)
             or not _HEX40.fullmatch(rs9_source_commit) or not _HEX40.fullmatch(rs9_source_tree)):
         raise _error("RS9_SOURCE_IDENTITY", "Explicit reviewed RS9 source commit and tree are required")
+    if payload_portability is not None and not isinstance(payload_portability, ValidatedPayloadPortability):
+        raise _error("MANYLINUX_INPUT", "Validated 0.7.0 payload portability evidence is required")
     destination = Path(output_dir).absolute()
     if destination.is_symlink() or any(parent.is_symlink() for parent in (destination, *destination.parents)):
         raise _error("OUTPUT_CONFINEMENT", "Candidate output ancestry contains a symlink")
@@ -1247,6 +1335,7 @@ def build_successor_candidates(
             lineage_proof=authenticated.lineage_proof,
             lineage_intent=authenticated.intent,
             candidate_only=candidate_only,
+            payload_portability=payload_portability if candidate_only else None,
             deterministic_timestamp=deterministic_timestamp,
         )
         row = _candidate_row(system, target_triple, result)

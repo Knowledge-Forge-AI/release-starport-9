@@ -31,6 +31,13 @@ from typing import Any
 from rs9.errors import ContractError
 from rs9.github import PublicClient
 from rs9.materialize import parse_manifest_members
+from rs9.nebular070_manylinux import (
+    ValidatedPayloadPortability,
+    ValidatedReleaseAdmission,
+    load_payload_portability_bundle,
+    manylinux_tag_for_target,
+    validate_nebular070_release_admission as _validate_nebular070_release_admission,
+)
 from rs9.release_core import digest
 from rs9.scratch import canonical as gate1_canonical
 from rs9.tf_pypi_archive import AdmissionError, canonical, physical_bytes, sha256
@@ -128,6 +135,32 @@ TARGET_QUALIFICATION_ARTIFACTS = {
     target: f"tfnf-070-qualification-{target}" for target in TARGETS
 }
 MATRIX_RECEIPT_ARTIFACT = "tfnf-070-matrix-receipt"
+MATRIX_RECEIPT_MEMBER = "matrix_receipt.json"
+MANYLINUX_ADMISSION_ARTIFACT = "tfnf-070-manylinux-admission"
+MANYLINUX_ADMISSION_MEMBER = "manylinux_admission.json"
+MANYLINUX_STAGE_A_MEMBER = "payload_portability.json"
+MANYLINUX_CONSUMER_KINDS = ("floor", "newer")
+
+
+def _manylinux_consumer_member(target: str, kind: str) -> str:
+    """Return the closed Stage-B capture member name for one installed-wheel receipt."""
+    if target not in ("linux-arm64-gnu", "linux-x64-gnu") or kind not in MANYLINUX_CONSUMER_KINDS:
+        fail("MANYLINUX_CAPTURE_MEMBER")
+    return f"consumers/{target}/{kind}.json"
+
+
+def _manylinux_consumer_members() -> tuple[str, ...]:
+    return tuple(
+        _manylinux_consumer_member(target, kind)
+        for target in ("linux-arm64-gnu", "linux-x64-gnu")
+        for kind in MANYLINUX_CONSUMER_KINDS
+    )
+
+
+MANYLINUX_ADMISSION_MEMBERS = {
+    MANYLINUX_ADMISSION_MEMBER,
+    *_manylinux_consumer_members(),
+}
 REQUIRED_CAPTURE_ARTIFACTS = (
     CANDIDATE_BUNDLE_ARTIFACT,
     TARGET_QUALIFICATION_ARTIFACTS["darwin-arm64"],
@@ -135,6 +168,22 @@ REQUIRED_CAPTURE_ARTIFACTS = (
     TARGET_QUALIFICATION_ARTIFACTS["linux-x64-gnu"],
     MATRIX_RECEIPT_ARTIFACT,
 )
+
+
+def _capture_artifact_names(
+    approval: Mapping[str, Any] | None = None,
+    artifacts: Mapping[str, Any] | None = None,
+) -> tuple[str, ...]:
+    """Return the capture artifact set, adding Stage B only for a qualified claim."""
+    names = list(REQUIRED_CAPTURE_ARTIFACTS)
+    stage_a_claimed = isinstance(approval, Mapping) and approval.get("manylinux_stage_a_sha256") is not None
+    if stage_a_claimed or (
+        approval is None
+        and isinstance(artifacts, Mapping)
+        and MANYLINUX_ADMISSION_ARTIFACT in artifacts
+    ):
+        names.append(MANYLINUX_ADMISSION_ARTIFACT)
+    return tuple(names)
 REQUIRED_RESUME_FILES = (
     PIN_BASENAME,
     APPROVAL_BASENAME,
@@ -209,6 +258,7 @@ WORKFLOW_STEP_PROFILES = {
     BUILD_VERIFY_070_JOB_NAME: (
         ("Checkout repository", True),
         ("Set up Python 3.13", True),
+        ("Materialize authenticated 0.7.0 manylinux inputs", False),
         ("Build and verify 0.7.0 candidate bundle", False),
         ("Upload 0.7.0 candidate bundle", True),
     ),
@@ -245,6 +295,8 @@ WORKFLOW_STEP_PROFILES = {
         ("Download linux-x64-gnu qualification receipt", True),
         ("Admit complete 3-platform 0.7.0 qualification matrix", False),
         ("Upload 0.7.0 matrix qualification receipt", True),
+        ("Materialize authenticated 0.7.0 Stage-B admission input", False),
+        ("Upload 0.7.0 manylinux admission input", True),
     ),
     RESUME_070_JOB_NAME: (
         ("Checkout publisher authority commit", True),
@@ -254,6 +306,7 @@ WORKFLOW_STEP_PROFILES = {
         ("Verify publisher and qualification source lineage", False),
         ("Fetch retained qualification run and artifact archives", False),
         ("Authenticate retained archives and stage verified distribution", False),
+        ("Resolve captured 0.7.0 manylinux source coordinates", False),
         ("Stage admitted 0.7.0 operator metadata into qualification checkout", False),
         ("Verify artifact integrity and select only missing files", False),
         ("Re-verify staged upload artifacts against approval before upload", False),
@@ -364,6 +417,8 @@ REQUIRED_QUALIFICATION_INPUTS_KEYS = frozenset({
     "evidence",
     "raw_release",
 })
+OPTIONAL_QUALIFICATION_INPUTS_KEYS = frozenset({"manylinux"})
+MANYLINUX_INPUT_SPEC_KEYS = frozenset({"stage_a", "stage_b", "tf_producer_source"})
 
 _HEX40_RE = re.compile(r"^[0-9a-f]{40}$")
 _HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -700,6 +755,7 @@ def compute_admission_sha256(approval: Mapping[str, Any]) -> str:
                 "expected_artifact_record_sha256": approval.get("expected_artifact_record_sha256"),
                 "profile_sha256": approval.get("profile_sha256"),
                 "matrix_receipt_sha256": approval.get("matrix_receipt_sha256"),
+                "manylinux_stage_a_sha256": approval.get("manylinux_stage_a_sha256"),
                 "qualification": approval.get("qualification"),
             }
         )
@@ -710,7 +766,7 @@ def validate_approval(doc: Mapping[str, Any]) -> dict[str, Any]:
     """Validate the closed 3-wheel 0.7.0 artifact approval manifest schema, set_sha256, and admission_sha256."""
     if not isinstance(doc, dict):
         fail("APPROVAL_SCHEMA")
-    allowed_approval_keys = set(REQUIRED_APPROVAL_KEYS) | {"admission_sha256"}
+    allowed_approval_keys = set(REQUIRED_APPROVAL_KEYS) | {"admission_sha256", "manylinux_stage_a_sha256"}
     if not REQUIRED_APPROVAL_KEYS.issubset(doc.keys()) or (set(doc.keys()) - allowed_approval_keys):
         fail("APPROVAL_SCHEMA")
 
@@ -791,17 +847,31 @@ def validate_approval(doc: Mapping[str, Any]) -> dict[str, Any]:
         fail("APPROVAL_FILES")
 
     seen_targets: list[str] = []
+    stage_a_digest = doc.get("manylinux_stage_a_sha256")
+    qualified_linux = stage_a_digest is not None
+    if qualified_linux and not _is_hex64(stage_a_digest):
+        fail("APPROVAL_MANYLINUX")
+    if not qualified_linux and any(
+        isinstance(row, Mapping) and isinstance(row.get("tag"), str) and "manylinux_2_36" in row["tag"]
+        for row in files if isinstance(files, list)
+    ):
+        fail("APPROVAL_MANYLINUX")
     for expected_target, row in zip(TARGETS, files):
         if not isinstance(row, dict) or set(row.keys()) != REQUIRED_FILE_RECORD_KEYS:
             fail("APPROVAL_FILES")
         filename = row.get("filename")
         if isinstance(filename, str) and filename.endswith((".tar.gz", ".tgz")):
             fail("SDIST_FORBIDDEN")
+        expected_tag = TAG_BY_TARGET[expected_target]
+        expected_filename = EXPECTED_WHEEL_FILENAMES[expected_target]
+        if qualified_linux and expected_target.startswith("linux"):
+            expected_tag = manylinux_tag_for_target(expected_target)
+            expected_filename = f"{DISTRIBUTION_WHEEL_PREFIX}-{DISTRIBUTION_VERSION}-{expected_tag}.whl"
         if (
             row.get("target") != expected_target
             or row.get("system") != SYSTEM_BY_TARGET[expected_target]
-            or filename != EXPECTED_WHEEL_FILENAMES[expected_target]
-            or row.get("tag") != TAG_BY_TARGET[expected_target]
+            or filename != expected_filename
+            or row.get("tag") != expected_tag
             or row.get("version") != VERSION
             or type(row.get("size")) is not int
             or not (0 < row["size"] <= MAX_WHEEL_FILE_BYTES)
@@ -885,6 +955,7 @@ def inspect_candidate_wheel(
     *,
     file_record: Mapping[str, Any],
     approval: Mapping[str, Any],
+    manylinux_stage_a_digest: str | None = None,
 ) -> dict[str, Any]:
     """Verify a single 0.7.0 wheel's bytes, zip safety, RECORD, METADATA, legal files, helpers, and v3alpha1 provenance."""
     w_path = Path(wheel_path)
@@ -895,7 +966,17 @@ def inspect_candidate_wheel(
     target = str(file_record.get("target") or "")
     if target not in TARGETS:
         fail("WHEEL_TARGET")
-    expected_filename = EXPECTED_WHEEL_FILENAMES[target]
+    expected_tag = TAG_BY_TARGET[target]
+    if manylinux_stage_a_digest is not None:
+        if target == "linux-arm64-gnu":
+            expected_tag = manylinux_tag_for_target("linux-arm64-gnu")
+        elif target == "linux-x64-gnu":
+            expected_tag = manylinux_tag_for_target("linux-x64-gnu")
+        else:
+            fail("WHEEL_TARGET")
+        if not _is_hex64(manylinux_stage_a_digest):
+            fail("WHEEL_PROVENANCE")
+    expected_filename = f"{DISTRIBUTION_WHEEL_PREFIX}-{DISTRIBUTION_VERSION}-{expected_tag}.whl"
     if w_path.name != expected_filename or file_record.get("filename") != expected_filename:
         fail("WHEEL_FILENAME")
 
@@ -1017,7 +1098,6 @@ def inspect_candidate_wheel(
     if metadata_bytes != expected_metadata:
         fail("WHEEL_METADATA")
 
-    expected_tag = TAG_BY_TARGET[target]
     if entries[wheel_member] != _successor_wheel_info_bytes(expected_tag):
         fail("WHEEL_TAG_MISMATCH")
     if entries[entry_points_member] != _successor_entry_points_bytes():
@@ -1045,6 +1125,25 @@ def inspect_candidate_wheel(
 
     prov = strict_json(entries[provenance_member])
     if not isinstance(prov, dict):
+        fail("WHEEL_PROVENANCE")
+
+    if manylinux_stage_a_digest is None:
+        if any(key in prov for key in (
+            "construction_stage", "release_admission", "manylinux_construction_receipt_sha256",
+        )):
+            fail("WHEEL_PROVENANCE")
+    elif (
+        prov.get("construction_stage") != "payload-portability"
+        or prov.get("release_admission") != "external"
+        or prov.get("manylinux_construction_receipt_sha256") != manylinux_stage_a_digest
+        or prov.get("candidate_status") != "payload-qualified"
+        or prov.get("promotability") != "payload-qualified"
+        or prov.get("policy") != {
+            "status": "payload-qualified",
+            "receipt_sha256": manylinux_stage_a_digest,
+            "manylinux_proven": False,
+        }
+    ):
         fail("WHEEL_PROVENANCE")
 
     expected_system = SYSTEM_BY_TARGET[target]
@@ -1140,6 +1239,30 @@ def inspect_candidate_wheel(
     }
 
 
+def validate_nebular070_release_admission(
+    record: Mapping[str, Any],
+    *,
+    stage_a: ValidatedPayloadPortability,
+    wheel_bytes_by_target: Mapping[str, bytes],
+    wheel_filenames_by_target: Mapping[str, str] | None = None,
+    installed_consumer_bodies: Mapping[str, Mapping[str, Mapping[str, Any]]],
+    existing_three_target_approval: Mapping[str, Any],
+    existing_matrix_receipt: Mapping[str, Any],
+    expected_rs9_release_source: Mapping[str, str],
+) -> ValidatedReleaseAdmission:
+    """Public publisher seam for the external, post-wheel 0.7.0 admission."""
+    return _validate_nebular070_release_admission(
+        record,
+        stage_a=stage_a,
+        wheel_bytes_by_target=wheel_bytes_by_target,
+        wheel_filenames_by_target=wheel_filenames_by_target,
+        installed_consumer_bodies=installed_consumer_bodies,
+        existing_three_target_approval=existing_three_target_approval,
+        existing_matrix_receipt=existing_matrix_receipt,
+        expected_rs9_release_source=expected_rs9_release_source,
+    )
+
+
 def verify_approved(
     dist: str | Path = Path("dist"),
     *,
@@ -1187,6 +1310,11 @@ def verify_approved(
             d_path / file_rec["filename"],
             file_record=file_rec,
             approval=approved,
+            manylinux_stage_a_digest=(
+                approved.get("manylinux_stage_a_sha256")
+                if file_rec["target"].startswith("linux") and approved.get("manylinux_stage_a_sha256")
+                else None
+            ),
         )
 
     return approved
@@ -2149,6 +2277,11 @@ def verify_upload_dir(
     pin: Mapping[str, Any] | None = None,
     repository: str | Path | None = None,
     expected_files: Sequence[str] | None = None,
+    manylinux_admission: str | Path | None = None,
+    payload_portability: str | Path | None = None,
+    manylinux_consumer_receipts: str | Path | None = None,
+    tf_producer_source: Mapping[str, str] | None = None,
+    captured_matrix: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Re-verify both dist/ (all 3 wheels) and staged upload/ bytes against the approval immediately before upload."""
     approved = verify_approved(
@@ -2158,6 +2291,25 @@ def verify_upload_dir(
         repository=repository,
         require_admitted=True,
     )
+    if approved.get("manylinux_stage_a_sha256") is not None:
+        if (
+            manylinux_admission is None
+            or payload_portability is None
+            or manylinux_consumer_receipts is None
+            or tf_producer_source is None
+        ):
+            fail("MANYLINUX_ADMISSION_REQUIRED")
+        if captured_matrix is None:
+            fail("MATRIX_RECEIPTS_REQUIRED")
+        _validate_manylinux_admission_files(
+            manylinux_admission,
+            payload_portability=payload_portability,
+            consumer_receipts=manylinux_consumer_receipts,
+            tf_producer_source=tf_producer_source,
+            approved=approved,
+            dist=dist,
+            captured_matrix=captured_matrix,
+        )
     u_path = Path(upload_dir)
     _check_no_symlinks(u_path, "UPLOAD_DIR")
     if not u_path.is_dir():
@@ -2184,8 +2336,332 @@ def verify_upload_dir(
             u_path / filename,
             file_record=rec_by_name[filename],
             approval=approved,
+            manylinux_stage_a_digest=(
+                approved.get("manylinux_stage_a_sha256")
+                if filename.endswith(("manylinux_2_36_aarch64.whl", "manylinux_2_36_x86_64.whl"))
+                else None
+            ),
         )
     return approved
+
+
+def _read_json_object(path: str | Path, code: str, *, limit: int = 8 * 1024 * 1024) -> dict[str, Any]:
+    candidate = Path(path)
+    _check_no_symlinks(candidate, code)
+    if not candidate.is_file():
+        fail(code)
+    value = strict_json(physical_bytes(candidate, limit=limit))
+    if not isinstance(value, dict):
+        fail(code)
+    return value
+
+
+def load_captured_matrix_receipt(path: str | Path) -> dict[str, Any]:
+    """Load the exact resume matrix member without weakening its later equality checks."""
+    candidate = Path(path)
+    _check_no_symlinks(candidate, "MATRIX_RECEIPT_SYMLINK")
+    if candidate.name != MATRIX_RECEIPT_MEMBER:
+        fail("MATRIX_RECEIPT_PATH")
+    return _read_json_object(candidate, "MATRIX_RECEIPT", limit=4 * 1024 * 1024)
+
+
+def _validate_captured_consumer_member(
+    target: str,
+    kind: str,
+    claim: Any,
+    raw: Any,
+    expected_body: Any,
+    source: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate one captured Stage-B member, including source and exact body bytes."""
+    member = _manylinux_consumer_member(target, kind)
+    if (
+        not isinstance(claim, Mapping)
+        or set(claim) != {"member", "sha256", "source"}
+        or claim["member"] != member
+        or not _is_hex64(claim["sha256"])
+        or claim["source"] != dict(source)
+        or not isinstance(raw, bytes)
+        or sha256(raw) != claim["sha256"]
+    ):
+        fail("MANYLINUX_CAPTURE_MEMBER")
+    try:
+        body = strict_json(raw)
+    except (AdmissionError, OSError, ValueError):
+        fail("MANYLINUX_CAPTURE_MEMBER")
+    if not isinstance(body, Mapping) or canonical(body) != canonical(expected_body):
+        fail("MANYLINUX_CAPTURE_MEMBER")
+    return dict(body)
+
+
+def _validate_captured_consumer_members(
+    envelope: Mapping[str, Any],
+    members: Mapping[str, bytes],
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """Bind Stage-B consumer rows to separately captured member bytes and source."""
+    expected_members = set(MANYLINUX_ADMISSION_MEMBERS) - {MANYLINUX_ADMISSION_MEMBER}
+    if set(members) != expected_members:
+        fail("MANYLINUX_CAPTURE_MEMBER")
+    captured = envelope.get("captured_consumer_receipts")
+    record = envelope.get("record")
+    consumers = envelope.get("consumers")
+    source = record.get("rs9_release_source") if isinstance(record, Mapping) else None
+    if (
+        not isinstance(captured, Mapping)
+        or set(captured) != {"linux-arm64-gnu", "linux-x64-gnu"}
+        or not isinstance(consumers, Mapping)
+        or set(consumers) != set(captured)
+        or not isinstance(source, Mapping)
+        or set(source) != {"commit", "tree"}
+    ):
+        fail("MANYLINUX_CAPTURE_MEMBER")
+    result: dict[str, dict[str, dict[str, Any]]] = {}
+    for target in ("linux-arm64-gnu", "linux-x64-gnu"):
+        target_captured = captured.get(target)
+        target_consumers = consumers.get(target)
+        if (
+            not isinstance(target_captured, Mapping)
+            or set(target_captured) != set(MANYLINUX_CONSUMER_KINDS)
+            or not isinstance(target_consumers, Mapping)
+            or set(target_consumers) != set(MANYLINUX_CONSUMER_KINDS)
+        ):
+            fail("MANYLINUX_CAPTURE_MEMBER")
+        result[target] = {}
+        for kind in MANYLINUX_CONSUMER_KINDS:
+            member = _manylinux_consumer_member(target, kind)
+            result[target][kind] = _validate_captured_consumer_member(
+                target,
+                kind,
+                target_captured[kind],
+                members.get(member),
+                target_consumers[kind],
+                source,
+            )
+    return result
+
+
+def _encoded_manylinux_consumer_member(
+    target: str,
+    kind: str,
+    claim: Any,
+    body: Any,
+    source: Mapping[str, Any],
+) -> tuple[str, bytes]:
+    member = _manylinux_consumer_member(target, kind)
+    raw = canonical(body) if isinstance(body, Mapping) else b""
+    if (
+        not isinstance(claim, Mapping)
+        or set(claim) != {"member", "sha256", "source"}
+        or claim["member"] != member
+        or claim["source"] != dict(source)
+        or not _is_hex64(claim["sha256"])
+        or not raw
+        or sha256(raw) != claim["sha256"]
+    ):
+        fail("MANYLINUX_CAPTURE_MEMBER")
+    return member, raw
+
+
+def _collect_manylinux_consumer_member_bytes(envelope: Mapping[str, Any]) -> dict[str, bytes]:
+    consumers = envelope.get("consumers")
+    captured = envelope.get("captured_consumer_receipts")
+    record = envelope.get("record")
+    source = record.get("rs9_release_source") if isinstance(record, Mapping) else None
+    if not isinstance(consumers, Mapping) or not isinstance(captured, Mapping) or not isinstance(source, Mapping):
+        fail("MANYLINUX_CAPTURE_MEMBER")
+    member_bytes: dict[str, bytes] = {}
+    for target in ("linux-arm64-gnu", "linux-x64-gnu"):
+        target_consumers = consumers.get(target)
+        target_captured = captured.get(target)
+        if not isinstance(target_consumers, Mapping) or not isinstance(target_captured, Mapping):
+            fail("MANYLINUX_CAPTURE_MEMBER")
+        for kind in MANYLINUX_CONSUMER_KINDS:
+            member, raw = _encoded_manylinux_consumer_member(
+                target,
+                kind,
+                target_captured.get(kind),
+                target_consumers.get(kind),
+                source,
+            )
+            member_bytes[member] = raw
+    return member_bytes
+
+
+def _prepare_manylinux_consumer_output_dir(output_dir: str | Path) -> Path:
+    out = Path(output_dir)
+    _check_no_symlinks(out, "MANYLINUX_CAPTURE_MEMBER")
+    if out.exists():
+        if not out.is_dir():
+            fail("MANYLINUX_CAPTURE_MEMBER")
+        for entry in out.iterdir():
+            if entry.name != MANYLINUX_ADMISSION_MEMBER or entry.is_symlink() or not entry.is_file():
+                fail("MANYLINUX_CAPTURE_MEMBER")
+    out.mkdir(parents=True, exist_ok=True)
+    return out
+
+
+def materialize_manylinux_consumer_receipts(
+    admission_path: str | Path,
+    output_dir: str | Path,
+) -> Path:
+    """Materialize the closed Stage-B consumer members before capture/upload."""
+    envelope = _read_json_object(admission_path, "MANYLINUX_ADMISSION", limit=16 * 1024 * 1024)
+    if envelope.get("schema") != "rs9.nebular070-manylinux-admission-input.v1":
+        fail("MANYLINUX_ADMISSION")
+    member_bytes = _collect_manylinux_consumer_member_bytes(envelope)
+    out = _prepare_manylinux_consumer_output_dir(output_dir)
+    for member, raw in member_bytes.items():
+        dest = out / member
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with dest.open("xb") as stream:
+            stream.write(raw)
+    return out
+
+
+def _load_manylinux_admission_envelope(path: str | Path) -> dict[str, Any]:
+    """Load the closed Stage-B envelope before any dependent member is read."""
+    envelope = _read_json_object(path, "MANYLINUX_ADMISSION", limit=16 * 1024 * 1024)
+    required = {
+        "schema", "record", "consumers", "approval", "matrix", "captured_consumer_receipts"
+    }
+    if set(envelope) != required or envelope.get("schema") != "rs9.nebular070-manylinux-admission-input.v1":
+        fail("MANYLINUX_ADMISSION")
+    return envelope
+
+
+def _load_manylinux_stage_a(
+    path: str | Path,
+    *,
+    tf_producer_source: Mapping[str, str],
+    approved: Mapping[str, Any],
+) -> ValidatedPayloadPortability:
+    """Load Stage A with the already-approved producer/tool source joins."""
+    stage_a = load_payload_portability_bundle(
+        path,
+        expected_tf_producer_source=tf_producer_source,
+        expected_rs9_tool_source={
+            "commit": approved["qualification"]["candidate_source_commit"],
+            "tree": approved["qualification"]["candidate_source_tree"],
+        },
+    )
+    if stage_a.digest != approved.get("manylinux_stage_a_sha256"):
+        fail("MANYLINUX_ADMISSION")
+    return stage_a
+
+
+def _validate_manylinux_matrix_binding(
+    envelope: Mapping[str, Any],
+    *,
+    approved: Mapping[str, Any],
+    captured_matrix: Mapping[str, Any] | None,
+) -> Mapping[str, Any]:
+    """Bind the envelope matrix to the captured resume member when supplied."""
+    if envelope.get("approval") != approved:
+        fail("MANYLINUX_ADMISSION")
+    matrix = envelope.get("matrix")
+    receipts = matrix.get("receipts") if isinstance(matrix, Mapping) else None
+    expected_targets = {"darwin-arm64", "linux-arm64-gnu", "linux-x64-gnu"}
+    if not isinstance(receipts, Mapping) or set(receipts) != expected_targets:
+        fail("MANYLINUX_CAPTURE_MATRIX_SHAPE")
+    if captured_matrix is not None:
+        if canonical(matrix) != canonical(captured_matrix):
+            fail("MANYLINUX_CAPTURE_MATRIX")
+        captured_receipts = captured_matrix.get("receipts")
+        if not isinstance(captured_receipts, Mapping) or set(captured_receipts) != expected_targets:
+            fail("MANYLINUX_CAPTURE_MATRIX_SHAPE")
+        if canonical(captured_receipts) != canonical(receipts):
+            fail("MANYLINUX_CAPTURE_MATRIX")
+    return matrix
+
+
+def _read_manylinux_consumer_members(
+    root: str | Path,
+    *,
+    envelope: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Read exactly the four captured Linux consumer members and validate their bytes."""
+    receipt_root = Path(root)
+    _check_no_symlinks(receipt_root, "MANYLINUX_CAPTURE_MEMBER")
+    if not receipt_root.is_dir():
+        fail("MANYLINUX_CAPTURE_MEMBER")
+    member_bytes: dict[str, bytes] = {}
+    expected_members = set(MANYLINUX_ADMISSION_MEMBERS) - {MANYLINUX_ADMISSION_MEMBER}
+    actual_members: set[str] = set()
+    for dirpath, dirnames, filenames in os.walk(receipt_root, followlinks=False):
+        dp = Path(dirpath)
+        if any((dp / dname).is_symlink() for dname in dirnames):
+            fail("MANYLINUX_CAPTURE_MEMBER")
+        for fname in filenames:
+            path = dp / fname
+            if path.is_symlink() or not path.is_file():
+                fail("MANYLINUX_CAPTURE_MEMBER")
+            rel = path.relative_to(receipt_root).as_posix()
+            if rel not in expected_members:
+                fail("MANYLINUX_CAPTURE_MEMBER")
+            actual_members.add(rel)
+            member_bytes[rel] = physical_bytes(path, limit=2 * 1024 * 1024)
+    if actual_members != expected_members:
+        fail("MANYLINUX_CAPTURE_MEMBER")
+    return _validate_captured_consumer_members(envelope, member_bytes)
+
+
+def _read_manylinux_wheels(
+    dist: str | Path,
+    *,
+    approved: Mapping[str, Any],
+) -> tuple[dict[str, bytes], dict[str, str]]:
+    """Read the two Linux wheel bytes named by the approved three-target set."""
+    dist_path = Path(dist)
+    wheels: dict[str, bytes] = {}
+    names: dict[str, str] = {}
+    for target in ("linux-arm64-gnu", "linux-x64-gnu"):
+        row = next((item for item in approved["files"] if item["target"] == target), None)
+        if not isinstance(row, Mapping):
+            fail("MANYLINUX_ADMISSION")
+        wheel_path = dist_path / row["filename"]
+        wheels[target] = physical_bytes(wheel_path, limit=MAX_WHEEL_FILE_BYTES)
+        names[target] = wheel_path.name
+    return wheels, names
+
+
+def _validate_manylinux_admission_files(
+    admission_path: str | Path,
+    *,
+    payload_portability: str | Path,
+    consumer_receipts: str | Path,
+    tf_producer_source: Mapping[str, str],
+    approved: Mapping[str, Any],
+    dist: str | Path,
+    captured_matrix: Mapping[str, Any] | None = None,
+) -> ValidatedReleaseAdmission:
+    """Validate the external Stage-B record against the actual wheel directory."""
+    envelope = _load_manylinux_admission_envelope(admission_path)
+    stage_a = _load_manylinux_stage_a(
+        payload_portability, tf_producer_source=tf_producer_source, approved=approved
+    )
+    matrix = _validate_manylinux_matrix_binding(
+        envelope, approved=approved, captured_matrix=captured_matrix
+    )
+    captured_consumers = _read_manylinux_consumer_members(
+        consumer_receipts, envelope=envelope
+    )
+    wheels, names = _read_manylinux_wheels(dist, approved=approved)
+    result = _validate_nebular070_release_admission(
+        envelope["record"],
+        stage_a=stage_a,
+        wheel_bytes_by_target=wheels,
+        wheel_filenames_by_target=names,
+        installed_consumer_bodies=captured_consumers,
+        existing_three_target_approval=approved,
+        existing_matrix_receipt=matrix,
+        expected_rs9_release_source={
+            "commit": approved["qualification"]["candidate_source_commit"],
+            "tree": approved["qualification"]["candidate_source_tree"],
+        },
+    )
+    if result.digest != envelope["record"].get("identity"):
+        fail("MANYLINUX_ADMISSION")
+    return result
 
 
 def select_missing(
@@ -2202,6 +2678,10 @@ def select_missing(
     attempt_marker: str | Path | None = None,
     api_get: Callable[[str], Any] | None = None,
     environ: Mapping[str, str] | None = None,
+    manylinux_admission: str | Path | None = None,
+    payload_portability: str | Path | None = None,
+    manylinux_consumer_receipts: str | Path | None = None,
+    tf_producer_source: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Verify admitted pin, 3-wheel approval, and Gate 2 matrix receipts, then stage only missing 0.7.0 wheels."""
     env = environ if environ is not None else os.environ
@@ -2243,7 +2723,7 @@ def select_missing(
         or receipts_dir is None
     ):
         fail("MATRIX_RECEIPTS_REQUIRED")
-    verify_matrix_receipts(
+    captured_matrix = verify_matrix_receipts(
         candidate_receipt,
         expected_artifacts,
         receipts_dir,
@@ -2252,6 +2732,24 @@ def select_missing(
         pin=validated_pin,
         repository=repository,
     )
+
+    if approved.get("manylinux_stage_a_sha256") is not None:
+        if (
+            manylinux_admission is None
+            or payload_portability is None
+            or manylinux_consumer_receipts is None
+            or tf_producer_source is None
+        ):
+            fail("MANYLINUX_ADMISSION_REQUIRED")
+        _validate_manylinux_admission_files(
+            manylinux_admission,
+            payload_portability=payload_portability,
+            consumer_receipts=manylinux_consumer_receipts,
+            tf_producer_source=tf_producer_source,
+            approved=approved,
+            dist=dist,
+            captured_matrix=captured_matrix,
+        )
 
     d_path = Path(dist)
     u_path = Path(upload_dir)
@@ -2294,6 +2792,11 @@ def select_missing(
             pin=validated_pin,
             repository=repository,
             expected_files=missing,
+            manylinux_admission=manylinux_admission,
+            payload_portability=payload_portability,
+            manylinux_consumer_receipts=manylinux_consumer_receipts,
+            tf_producer_source=tf_producer_source,
+            captured_matrix=captured_matrix,
         )
 
     if missing and attempt_marker is not None:
@@ -2425,11 +2928,12 @@ def validate_qualification_capture(
         fail("QUALIFICATION_CAPTURE_SCHEMA")
 
     artifacts = doc.get("artifacts")
-    if not isinstance(artifacts, dict) or set(artifacts.keys()) != set(REQUIRED_CAPTURE_ARTIFACTS):
+    capture_artifacts = _capture_artifact_names(approval, artifacts)
+    if not isinstance(artifacts, dict) or set(artifacts.keys()) != set(capture_artifacts):
         fail("QUALIFICATION_CAPTURE_ARTIFACTS")
 
     seen_ids: set[int] = set()
-    for art_name in REQUIRED_CAPTURE_ARTIFACTS:
+    for art_name in capture_artifacts:
         art = artifacts.get(art_name)
         if (
             not isinstance(art, dict)
@@ -2469,14 +2973,27 @@ def validate_qualification_capture(
         "candidate_receipt.json",
         "expected_artifacts.json",
     }
+    stage_a_claimed = (
+        isinstance(approval, Mapping)
+        and approval.get("manylinux_stage_a_sha256") is not None
+    )
+    if stage_a_claimed or (
+        approval is None and MANYLINUX_STAGE_A_MEMBER in bundle_files
+    ):
+        expected_bundle_members.add(MANYLINUX_STAGE_A_MEMBER)
     if set(bundle_files.keys()) != expected_bundle_members:
         fail("QUALIFICATION_CAPTURE_ARTIFACTS")
+
+    if MANYLINUX_ADMISSION_ARTIFACT in artifacts:
+        admission_files = artifacts[MANYLINUX_ADMISSION_ARTIFACT]["files"]
+        if set(admission_files.keys()) != MANYLINUX_ADMISSION_MEMBERS:
+            fail("QUALIFICATION_CAPTURE_ARTIFACTS")
 
     for target, art_name in TARGET_QUALIFICATION_ARTIFACTS.items():
         if set(artifacts[art_name]["files"].keys()) != {f"{target}/result.json"}:
             fail("QUALIFICATION_CAPTURE_ARTIFACTS")
 
-    if set(artifacts[MATRIX_RECEIPT_ARTIFACT]["files"].keys()) != {"matrix_receipt.json"}:
+    if set(artifacts[MATRIX_RECEIPT_ARTIFACT]["files"].keys()) != {MATRIX_RECEIPT_MEMBER}:
         fail("QUALIFICATION_CAPTURE_ARTIFACTS")
 
     for ref in (pin, approval):
@@ -2695,7 +3212,7 @@ def validate_api_metadata(
                 fail("QUALIFICATION_ARTIFACTS")
             by_name[name] = row
 
-    if set(by_name.keys()) != set(REQUIRED_CAPTURE_ARTIFACTS):
+    if set(by_name.keys()) != set(eff_cap["artifacts"]):
         fail("QUALIFICATION_ARTIFACTS")
 
     for name, expected in eff_cap["artifacts"].items():
@@ -2759,22 +3276,23 @@ def validate_archives(
     archives_dir: str | Path,
     *,
     capture: Mapping[str, Any] | None = None,
+    approval: Mapping[str, Any] | None = None,
     repository: str | Path | None = None,
 ) -> dict[str, dict[str, bytes]]:
-    """Validate all 5 retained GitHub Actions qualification zip archives and their extracted members."""
+    """Validate the retained GitHub Actions qualification archives and their extracted members."""
     root = _require_real_directory(archives_dir, "QUALIFICATION_ARCHIVE")
     eff_cap = (
-        load_qualification_capture(repository)
+        load_qualification_capture(repository, approval=approval)
         if capture is None
-        else validate_qualification_capture(capture)
+        else validate_qualification_capture(capture, approval=approval)
     )
-    expected_zip_names = {f"{name}.zip" for name in REQUIRED_CAPTURE_ARTIFACTS}
+    expected_zip_names = {f"{name}.zip" for name in eff_cap["artifacts"]}
     actual_zip_names = {p.name for p in root.iterdir()}
     if actual_zip_names != expected_zip_names:
         fail("QUALIFICATION_ARCHIVE")
 
     extracted: dict[str, dict[str, bytes]] = {}
-    for name in REQUIRED_CAPTURE_ARTIFACTS:
+    for name in eff_cap["artifacts"]:
         spec = eff_cap["artifacts"][name]
         zip_path = root / f"{name}.zip"
         _check_no_symlinks(zip_path, "QUALIFICATION_ARCHIVE")
@@ -2785,6 +3303,19 @@ def validate_archives(
             fail("QUALIFICATION_ARCHIVE")
         extracted[name] = _read_exact_zip_members(zip_path, spec["files"])
     return extracted
+
+
+def _write_resume_member(output_dir: Path, name: str, data: bytes) -> Path:
+    """Write one capture-authenticated manylinux member into the resume root."""
+    if not name or "/" in name or "\\" in name or name in (".", ".."):
+        fail("MANYLINUX_CAPTURE_MEMBER")
+    path = output_dir / name
+    _check_no_symlinks(path, "MANYLINUX_CAPTURE_MEMBER")
+    if path.exists():
+        fail("MANYLINUX_CAPTURE_MEMBER")
+    with path.open("xb") as stream:
+        stream.write(data)
+    return path
 
 
 def prepare_resume(
@@ -2808,7 +3339,7 @@ def prepare_resume(
     _cross_check_pin_and_approval(pin, approval, require_admitted=True)
 
     validate_api_metadata(api_dir, capture=capture)
-    extracted = validate_archives(archives_dir, capture=capture)
+    extracted = validate_archives(archives_dir, capture=capture, approval=approval)
 
     out = Path(output_dir)
     _check_no_symlinks(out, "RESUME_OUTPUT")
@@ -2834,6 +3365,63 @@ def prepare_resume(
     with exp_path.open("xb") as stream:
         stream.write(bundle["expected_artifacts.json"])
 
+    stage_a_claimed = approval.get("manylinux_stage_a_sha256") is not None
+    if stage_a_claimed:
+        stage_a_bytes = bundle.get(MANYLINUX_STAGE_A_MEMBER)
+        admission_artifact = extracted.get(MANYLINUX_ADMISSION_ARTIFACT)
+        if stage_a_bytes is None or admission_artifact is None:
+            fail("MANYLINUX_CAPTURE_MEMBER")
+        try:
+            stage_a_doc = strict_json(stage_a_bytes)
+        except (AdmissionError, OSError, ValueError):
+            fail("MANYLINUX_CAPTURE_MEMBER")
+        stage_a_record = stage_a_doc.get("record") if isinstance(stage_a_doc, Mapping) else None
+        tf_source = stage_a_record.get("tf_producer_source") if isinstance(stage_a_record, Mapping) else None
+        if not isinstance(tf_source, Mapping):
+            fail("MANYLINUX_CAPTURE_MEMBER")
+        if qual_repo is not None:
+            qual_inputs = load_qualification_inputs_descriptor(repository=qual_repo)
+            qual_manylinux = qual_inputs.get("manylinux")
+            if (
+                not isinstance(qual_manylinux, Mapping)
+                or dict(tf_source) != dict(qual_manylinux["tf_producer_source"])
+            ):
+                fail("MANYLINUX_CAPTURE_MEMBER")
+        stage_a = load_payload_portability_bundle(
+            _write_resume_member(out, MANYLINUX_STAGE_A_MEMBER, stage_a_bytes),
+            expected_tf_producer_source=tf_source,
+            expected_rs9_tool_source={
+                "commit": approval["qualification"]["candidate_source_commit"],
+                "tree": approval["qualification"]["candidate_source_tree"],
+            },
+        )
+        if stage_a.digest != approval["manylinux_stage_a_sha256"]:
+            fail("MANYLINUX_CAPTURE_MEMBER")
+        try:
+            admission_doc = strict_json(admission_artifact[MANYLINUX_ADMISSION_MEMBER])
+        except (AdmissionError, OSError, ValueError):
+            fail("MANYLINUX_CAPTURE_MEMBER")
+        consumer_member_bytes = {
+            name: data
+            for name, data in admission_artifact.items()
+            if name != MANYLINUX_ADMISSION_MEMBER
+        }
+        _validate_captured_consumer_members(admission_doc, consumer_member_bytes)
+        consumer_root = out / "manylinux-consumers"
+        _check_no_symlinks(consumer_root, "MANYLINUX_CAPTURE_MEMBER")
+        consumer_root.mkdir(parents=True, exist_ok=True)
+        for member, data in consumer_member_bytes.items():
+            dest = consumer_root / member
+            _check_no_symlinks(dest.parent, "MANYLINUX_CAPTURE_MEMBER")
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with dest.open("xb") as stream:
+                stream.write(data)
+        _write_resume_member(
+            out,
+            MANYLINUX_ADMISSION_MEMBER,
+            admission_artifact[MANYLINUX_ADMISSION_MEMBER],
+        )
+
     for target, art_name in TARGET_QUALIFICATION_ARTIFACTS.items():
         t_dir = receipts_dir / target
         t_dir.mkdir(parents=True, exist_ok=True)
@@ -2841,8 +3429,8 @@ def prepare_resume(
         with q_dest.open("xb") as stream:
             stream.write(extracted[art_name][f"{target}/result.json"])
 
-    mat_bytes = extracted[MATRIX_RECEIPT_ARTIFACT]["matrix_receipt.json"]
-    mat_path = out / "matrix_receipt.json"
+    mat_bytes = extracted[MATRIX_RECEIPT_ARTIFACT][MATRIX_RECEIPT_MEMBER]
+    mat_path = out / MATRIX_RECEIPT_MEMBER
     with mat_path.open("xb") as stream:
         stream.write(mat_bytes)
 
@@ -2867,6 +3455,7 @@ def prepare_resume(
         "set_sha256": approval["set_sha256"],
         "matrix_receipt_sha256": approval["matrix_receipt_sha256"],
         "files": [rec["filename"] for rec in approval["files"]],
+        "manylinux": stage_a_claimed,
     }
 
 
@@ -3004,6 +3593,16 @@ def workflow_070_qualify_jobs_text() -> str:
         with:
           python-version: '3.13'
 
+      - name: Materialize authenticated 0.7.0 manylinux inputs
+        id: manylinux_inputs
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-inputs \\
+            --qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()} \\
+            --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence" >> "$GITHUB_OUTPUT"
+
       - name: Build and verify 0.7.0 candidate bundle
         env:
           PYTHONPATH: src
@@ -3015,6 +3614,10 @@ def workflow_070_qualify_jobs_text() -> str:
             --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence" \\
             --output "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
             --expected-commit "${{{{ github.sha }}}}" \\
+            --payload-portability "${{{{ steps.manylinux_inputs.outputs.stage_a }}}}" \\
+            --tf-producer-commit "${{{{ steps.manylinux_inputs.outputs.tf_producer_commit }}}}" \\
+            --tf-producer-tree "${{{{ steps.manylinux_inputs.outputs.tf_producer_tree }}}}" \\
+            --require-manylinux \\
             --require-clean
 
       - name: Upload 0.7.0 candidate bundle
@@ -3265,6 +3868,33 @@ def workflow_070_qualify_jobs_text() -> str:
           path: '${{{{ runner.temp }}}}/tfnf-070-matrix/'
           retention-days: 14
           if-no-files-found: error
+
+      - name: Materialize authenticated 0.7.0 Stage-B admission input
+        id: manylinux_inputs
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          MANYLINUX_OUT="$("${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-inputs \\
+            --qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()} \\
+            --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence")"
+          printf '%s\\n' "$MANYLINUX_OUT" >> "$GITHUB_OUTPUT"
+          STAGE_B_PATH="$(printf '%s\\n' "$MANYLINUX_OUT" | sed -n 's/^stage_b=//p')"
+          test -n "$STAGE_B_PATH"
+          mkdir -p "${{{{ runner.temp }}}}/tfnf-070-manylinux-admission"
+          cp "$STAGE_B_PATH" \\
+            "${{{{ runner.temp }}}}/tfnf-070-manylinux-admission/{MANYLINUX_ADMISSION_MEMBER}"
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-consumers \\
+            --admission "${{{{ runner.temp }}}}/tfnf-070-manylinux-admission/{MANYLINUX_ADMISSION_MEMBER}" \\
+            --output "${{{{ runner.temp }}}}/tfnf-070-manylinux-admission"
+
+      - name: Upload 0.7.0 manylinux admission input
+        uses: {UPLOAD_ARTIFACT_ACTION}
+        with:
+          name: {MANYLINUX_ADMISSION_ARTIFACT}
+          path: '${{{{ runner.temp }}}}/tfnf-070-manylinux-admission/'
+          retention-days: 14
+          if-no-files-found: error
 """
 
 
@@ -3387,6 +4017,15 @@ def publication_resume_job_text() -> str:
             --archives-dir "${{{{ runner.temp }}}}/tfnf-070-archives" \\
             --output "${{{{ runner.temp }}}}/tfnf-070-resume"
 
+      - name: Resolve captured 0.7.0 manylinux source coordinates
+        id: manylinux_source
+        env:
+          PYTHONPATH: qualification-source/src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish resolve-manylinux-source \\
+            --payload-portability "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_STAGE_A_MEMBER}" >> "$GITHUB_OUTPUT"
+
       - name: Stage admitted 0.7.0 operator metadata into qualification checkout
         env:
           PYTHONPATH: qualification-source/src
@@ -3412,6 +4051,11 @@ def publication_resume_job_text() -> str:
             --candidate-receipt "${{{{ runner.temp }}}}/tfnf-070-resume/candidate_receipt.json" \\
             --expected-artifacts "${{{{ runner.temp }}}}/tfnf-070-resume/expected_artifacts.json" \\
             --receipts-dir "${{{{ runner.temp }}}}/tfnf-070-resume/receipts" \\
+            --manylinux-admission "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_ADMISSION_MEMBER}" \\
+            --manylinux-consumer-receipts "${{{{ runner.temp }}}}/tfnf-070-resume/manylinux-consumers" \\
+            --payload-portability "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_STAGE_A_MEMBER}" \\
+            --tf-producer-commit "${{{{ steps.manylinux_source.outputs.tf_producer_commit }}}}" \\
+            --tf-producer-tree "${{{{ steps.manylinux_source.outputs.tf_producer_tree }}}}" \\
             --attempt-marker "${{{{ runner.temp }}}}/tfnf-070-upload-attempt.json" >> "$GITHUB_OUTPUT"
 
       - name: Re-verify staged upload artifacts against approval before upload
@@ -3423,7 +4067,13 @@ def publication_resume_job_text() -> str:
         run: |
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish verify-upload \\
             --dist "${{{{ runner.temp }}}}/tfnf-070-resume/dist" \\
-            --upload-dir "${{{{ runner.temp }}}}/tfnf-070-resume/upload"
+            --upload-dir "${{{{ runner.temp }}}}/tfnf-070-resume/upload" \\
+            --manylinux-admission "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_ADMISSION_MEMBER}" \\
+            --manylinux-consumer-receipts "${{{{ runner.temp }}}}/tfnf-070-resume/manylinux-consumers" \\
+            --matrix-receipt "${{{{ runner.temp }}}}/tfnf-070-resume/{MATRIX_RECEIPT_MEMBER}" \\
+            --payload-portability "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_STAGE_A_MEMBER}" \\
+            --tf-producer-commit "${{{{ steps.manylinux_source.outputs.tf_producer_commit }}}}" \\
+            --tf-producer-tree "${{{{ steps.manylinux_source.outputs.tf_producer_tree }}}}"
 
       - name: Publish package distribution to PyPI
         if: steps.missing.outputs.upload == 'true'
@@ -3607,6 +4257,39 @@ def _validate_descriptor_target_raw_release(
         )
 
 
+def _validate_manylinux_input_spec(
+    value: Any,
+    *,
+    evidence_files: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate externally-authenticated Stage-A/Stage-B paths in qualification inputs."""
+    if not isinstance(value, Mapping) or set(value.keys()) != set(MANYLINUX_INPUT_SPEC_KEYS):
+        fail("QUALIFICATION_INPUTS_MANYLINUX")
+    source = value.get("tf_producer_source")
+    if (
+        not isinstance(source, Mapping)
+        or set(source.keys()) != {"commit", "tree"}
+        or not _is_hex40(source.get("commit"))
+        or not _is_hex40(source.get("tree"))
+    ):
+        fail("QUALIFICATION_INPUTS_MANYLINUX")
+    checked: dict[str, Any] = {"tf_producer_source": dict(source)}
+    for role in ("stage_a", "stage_b"):
+        entry = _validate_file_digest_entry(
+            value.get(role), code="QUALIFICATION_INPUTS_MANYLINUX"
+        )
+        rel_path = entry["path"]
+        if rel_path not in evidence_files:
+            fail("QUALIFICATION_INPUTS_MANYLINUX")
+        ev_entry = _validate_file_digest_entry(
+            evidence_files[rel_path], code="QUALIFICATION_INPUTS_EVIDENCE"
+        )
+        if entry != ev_entry:
+            fail("QUALIFICATION_INPUTS_MANYLINUX")
+        checked[role] = entry
+    return checked
+
+
 def validate_qualification_inputs_descriptor(
     doc: Mapping[str, Any],
     *,
@@ -3622,7 +4305,10 @@ def validate_qualification_inputs_descriptor(
     if status == "pending":
         fail(pending_code)
     if (
-        set(doc.keys()) != REQUIRED_QUALIFICATION_INPUTS_KEYS
+        not REQUIRED_QUALIFICATION_INPUTS_KEYS.issubset(doc.keys())
+        or not set(doc.keys()).issubset(
+            REQUIRED_QUALIFICATION_INPUTS_KEYS | OPTIONAL_QUALIFICATION_INPUTS_KEYS
+        )
         or doc.get("schema") != QUALIFICATION_INPUTS_SCHEMA
         or doc.get("project") != PROJECT
         or doc.get("version") != VERSION
@@ -3733,6 +4419,12 @@ def validate_qualification_inputs_descriptor(
         if checked.get("path", rel_key) != rel_key:
             fail("QUALIFICATION_INPUTS_EVIDENCE")
 
+    manylinux_spec = None
+    if "manylinux" in doc:
+        manylinux_spec = _validate_manylinux_input_spec(
+            doc["manylinux"], evidence_files=ev_files
+        )
+
     rr_spec = doc.get("raw_release")
     if not isinstance(rr_spec, Mapping) or set(rr_spec.keys()) != {
         "source_root",
@@ -3748,7 +4440,10 @@ def validate_qualification_inputs_descriptor(
         fail("QUALIFICATION_INPUTS_RAW_RELEASE")
     for target in TARGETS:
         _validate_descriptor_target_raw_release(target, rr_targets.get(target))
-    return json.loads(canonical(doc))
+    validated = json.loads(canonical(doc))
+    if manylinux_spec is not None:
+        validated["manylinux"] = manylinux_spec
+    return validated
 
 
 def load_qualification_inputs_descriptor(
@@ -3870,6 +4565,38 @@ def materialize_qualification_evidence(
     return descriptor
 
 
+def materialize_manylinux_inputs(
+    qualification_inputs: str | Path | Mapping[str, Any] | None,
+    evidence_dir: str | Path,
+    *,
+    repository: str | Path | None = None,
+) -> dict[str, Any]:
+    """Materialize and return the digest-bound external Stage-A/Stage-B paths."""
+    descriptor = materialize_qualification_evidence(
+        qualification_inputs, evidence_dir, repository=repository
+    )
+    spec = descriptor.get("manylinux")
+    if not isinstance(spec, Mapping):
+        fail("MANYLINUX_INPUT")
+    root = Path(evidence_dir)
+    result: dict[str, Any] = {
+        "stage_a": str((root / spec["stage_a"]["path"]).resolve()),
+        "stage_b": str((root / spec["stage_b"]["path"]).resolve()),
+        "tf_producer_commit": spec["tf_producer_source"]["commit"],
+        "tf_producer_tree": spec["tf_producer_source"]["tree"],
+    }
+    for role in ("stage_a", "stage_b"):
+        path = Path(result[role])
+        _check_no_symlinks(path, "MANYLINUX_INPUT")
+        if not path.is_file():
+            fail("MANYLINUX_INPUT")
+        expected = spec[role]
+        data = physical_bytes(path, limit=16 * 1024 * 1024)
+        if len(data) != expected["size"] or sha256(data) != expected["sha256"]:
+            fail("MANYLINUX_INPUT")
+    return result
+
+
 def _validate_bundle_file_set(bundle: Path) -> None:
     cand_file = bundle / "candidate_receipt.json"
     exp_file = bundle / "expected_artifacts.json"
@@ -3877,10 +4604,23 @@ def _validate_bundle_file_set(bundle: Path) -> None:
     _check_no_symlinks(exp_file, "EXPECTED_ARTIFACTS_SYMLINK")
     if not cand_file.is_file() or not exp_file.is_file():
         fail("BUNDLE_FILES_MISSING")
+    try:
+        candidate_doc = strict_json(physical_bytes(cand_file, limit=4 * 1024 * 1024))
+        candidate_rows = candidate_doc.get("rows") if isinstance(candidate_doc, Mapping) else None
+        wheel_names = {
+            row["wheel"]["filename"]
+            for row in candidate_rows
+            if isinstance(row, Mapping) and isinstance(row.get("wheel"), Mapping)
+            and isinstance(row["wheel"].get("filename"), str)
+        }
+    except (AdmissionError, OSError, ValueError, KeyError, TypeError):
+        fail("BUNDLE_FILES_MISSING")
+    if len(wheel_names) != len(TARGETS):
+        fail("BUNDLE_FILES_MISSING")
     expected_bundle_files = {
         "candidate_receipt.json",
         "expected_artifacts.json",
-        *{f"dist/{name}" for name in EXPECTED_WHEEL_FILENAMES.values()},
+        *{f"dist/{name}" for name in wheel_names},
     }
     actual_files: set[str] = set()
     for dirpath, dirnames, filenames in os.walk(bundle, followlinks=False):
@@ -3893,8 +4633,16 @@ def _validate_bundle_file_set(bundle: Path) -> None:
             if fpath.is_symlink() or not fpath.is_file():
                 fail("BUNDLE_DIR")
             actual_files.add(fpath.relative_to(bundle).as_posix())
-    if actual_files != expected_bundle_files:
+    optional_manylinux = {"payload_portability.json"}
+    if actual_files != expected_bundle_files and actual_files != expected_bundle_files | optional_manylinux:
         fail("BUNDLE_FILE_SET")
+    if "payload_portability.json" in actual_files:
+        try:
+            envelope = strict_json(physical_bytes(bundle / "payload_portability.json", limit=8 * 1024 * 1024))
+        except (AdmissionError, OSError, ValueError):
+            fail("BUNDLE_MANYLINUX_INPUT")
+        if not isinstance(envelope, Mapping) or envelope.get("schema") != "rs9.nebular070-payload-portability-input.v2":
+            fail("BUNDLE_MANYLINUX_INPUT")
 
 
 def _verify_handoff_file_entry_matches_descriptor(
@@ -4557,7 +5305,18 @@ def qualify_native_target(
         )
 
     tree = _git_output(root, ["rev-parse", "--verify", "HEAD^{tree}"], "HOSTED_COMMIT")
-    wheel_path = bundle / "dist" / EXPECTED_WHEEL_FILENAMES[target]
+    target_system = SYSTEM_BY_TARGET[target]
+    target_row = next(
+        (row for row in candidate.get("rows", [])
+         if isinstance(row, Mapping) and row.get("system") == target_system),
+        None,
+    )
+    if not isinstance(target_row, Mapping) or not isinstance(target_row.get("wheel"), Mapping):
+        fail("CANDIDATE_RECEIPT_SCHEMA")
+    wheel_name = target_row["wheel"].get("filename")
+    if not isinstance(wheel_name, str):
+        fail("CANDIDATE_RECEIPT_SCHEMA")
+    wheel_path = bundle / "dist" / wheel_name
     eff_prefix = (
         tuple(sandbox_prefix)
         if sandbox_prefix is not None
@@ -4598,6 +5357,9 @@ def build_candidates_bundle(
     evidence_dir: str | Path | None = None,
     release_binding: Mapping[str, Any] | str | Path | None = None,
     qualification_inputs: Mapping[str, Any] | str | Path | None = None,
+    payload_portability: str | Path | None = None,
+    tf_producer_source: Mapping[str, str] | None = None,
+    require_manylinux: bool = False,
     require_clean: bool = False,
 ) -> dict[str, Any]:
     """Build 0.7.0 Gate 1 candidate bundle; fail closed when release inputs remain pending."""
@@ -4629,6 +5391,28 @@ def build_candidates_bundle(
         eff_evidence,
         repository=root,
     )
+
+    manylinux_spec = descriptor.get("manylinux")
+    if require_manylinux:
+        if not isinstance(manylinux_spec, Mapping):
+            fail("MANYLINUX_INPUT")
+        expected_stage_a = (
+            Path(eff_evidence).resolve() / manylinux_spec["stage_a"]["path"]
+        )
+        if payload_portability is None:
+            payload_portability = expected_stage_a
+        else:
+            _check_no_symlinks(Path(payload_portability), "MANYLINUX_INPUT")
+            try:
+                if Path(payload_portability).resolve() != expected_stage_a:
+                    fail("MANYLINUX_INPUT")
+            except OSError:
+                fail("MANYLINUX_INPUT")
+        expected_tf_source = dict(manylinux_spec["tf_producer_source"])
+        if tf_producer_source is None:
+            tf_producer_source = expected_tf_source
+        elif dict(tf_producer_source) != expected_tf_source:
+            fail("MANYLINUX_INPUT")
 
     if release_binding is None:
         env_binding = os.environ.get("RS9_TFNF070_RELEASE_BINDING", "").strip()
@@ -4672,6 +5456,18 @@ def build_candidates_bundle(
     if bootstrap_sha != validated_binding["expected"]["bootstrap_sha256"]:
         fail("GATE1_BOOTSTRAP_DIGEST_MISMATCH")
 
+    stage_a: ValidatedPayloadPortability | None = None
+    if payload_portability is not None:
+        if tf_producer_source is None:
+            fail("MANYLINUX_INPUT")
+        stage_a = load_payload_portability_bundle(
+            payload_portability,
+            expected_tf_producer_source=tf_producer_source,
+            expected_rs9_tool_source={"commit": commit, "tree": tree},
+        )
+    elif require_manylinux:
+        fail("MANYLINUX_INPUT")
+
     out = Path(output_dir)
     _check_no_symlinks(out, "BUNDLE_OUTPUT")
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
@@ -4691,6 +5487,7 @@ def build_candidates_bundle(
                 cand_dir,
                 rs9_source_commit=commit,
                 rs9_source_tree=tree,
+                payload_portability=stage_a,
             )
             receipt_path = out / "candidate_receipt.json"
             write_gate1_receipt(
@@ -4723,10 +5520,17 @@ def build_candidates_bundle(
         "record_sha256": sha256(canonical(wheels_sorted)),
     }
     (out / "expected_artifacts.json").write_bytes(canonical(expected_artifacts))
+    if stage_a is not None:
+        (out / "payload_portability.json").write_bytes(canonical({
+            "schema": "rs9.nebular070-payload-portability-input.v2",
+            "record": stage_a.record,
+            "bodies": stage_a.receipt_bodies,
+        }))
     _validate_bundle_file_set(out)
     return {
         "candidate_receipt_sha256": sha256(canonical(receipt)),
         "expected_artifact_record_sha256": expected_artifacts["record_sha256"],
+        "manylinux_stage_a_sha256": stage_a.digest if stage_a is not None else None,
     }
 
 
@@ -4741,7 +5545,19 @@ def parser() -> argparse.ArgumentParser:
     b_cmd.add_argument("--qualification-inputs", type=Path, default=None)
     b_cmd.add_argument("--evidence", type=Path, default=None)
     b_cmd.add_argument("--release-binding", type=Path, default=None)
+    b_cmd.add_argument("--payload-portability", type=Path, default=None)
+    b_cmd.add_argument("--tf-producer-commit", default=None)
+    b_cmd.add_argument("--tf-producer-tree", default=None)
+    b_cmd.add_argument("--require-manylinux", action="store_true")
     b_cmd.add_argument("--require-clean", action="store_true")
+
+    mi_cmd = sub.add_parser("materialize-manylinux-inputs")
+    mi_cmd.add_argument("--qualification-inputs", type=Path, required=True)
+    mi_cmd.add_argument("--evidence", type=Path, required=True)
+
+    mc_cmd = sub.add_parser("materialize-manylinux-consumers")
+    mc_cmd.add_argument("--admission", type=Path, required=True)
+    mc_cmd.add_argument("--output", type=Path, required=True)
 
     q_cmd = sub.add_parser("qualify-native")
     q_cmd.add_argument("--target", choices=TARGETS, required=True)
@@ -4761,6 +5577,23 @@ def parser() -> argparse.ArgumentParser:
     m_cmd.add_argument("--expected-commit", required=True)
     m_cmd.add_argument("--run-id", required=True)
     m_cmd.add_argument("--run-attempt", required=True)
+
+    ma_cmd = sub.add_parser("admit-manylinux")
+    ma_cmd.add_argument("--approval", type=Path, required=True)
+    ma_cmd.add_argument("--dist", type=Path, required=True)
+    ma_cmd.add_argument("--payload-portability", type=Path, required=True)
+    ma_cmd.add_argument("--manylinux-admission", type=Path, required=True)
+    ma_cmd.add_argument("--manylinux-consumer-receipts", type=Path, required=True)
+    ma_cmd.add_argument("--tf-producer-commit", required=True)
+    ma_cmd.add_argument("--tf-producer-tree", required=True)
+    ma_cmd.add_argument("--output", type=Path, required=True)
+
+    vp_cmd = sub.add_parser("validate-portability")
+    vp_cmd.add_argument("--input", type=Path, required=True)
+    vp_cmd.add_argument("--tf-producer-commit", required=True)
+    vp_cmd.add_argument("--tf-producer-tree", required=True)
+    vp_cmd.add_argument("--rs9-commit", required=True)
+    vp_cmd.add_argument("--rs9-tree", required=True)
 
     vs_cmd = sub.add_parser("verify-source")
     vs_cmd.add_argument("--publisher-dir", type=Path, required=True)
@@ -4785,13 +5618,27 @@ def parser() -> argparse.ArgumentParser:
     sel_cmd.add_argument("--expected-artifacts", type=Path, required=True)
     sel_cmd.add_argument("--receipts-dir", type=Path, required=True)
     sel_cmd.add_argument("--attempt-marker", type=Path, default=None)
+    sel_cmd.add_argument("--manylinux-admission", type=Path, default=None)
+    sel_cmd.add_argument("--payload-portability", type=Path, default=None)
+    sel_cmd.add_argument("--manylinux-consumer-receipts", type=Path, default=None)
+    sel_cmd.add_argument("--tf-producer-commit", default=None)
+    sel_cmd.add_argument("--tf-producer-tree", default=None)
 
     vu_cmd = sub.add_parser("verify-upload")
     vu_cmd.add_argument("--dist", type=Path, default=Path("dist"))
     vu_cmd.add_argument("--upload-dir", type=Path, default=Path("upload"))
+    vu_cmd.add_argument("--manylinux-admission", type=Path, default=None)
+    vu_cmd.add_argument("--payload-portability", type=Path, default=None)
+    vu_cmd.add_argument("--manylinux-consumer-receipts", type=Path, default=None)
+    vu_cmd.add_argument("--matrix-receipt", type=Path, default=None)
+    vu_cmd.add_argument("--tf-producer-commit", default=None)
+    vu_cmd.add_argument("--tf-producer-tree", default=None)
 
     rb_cmd = sub.add_parser("readback")
     rb_cmd.add_argument("--dist", type=Path, default=Path("dist"))
+
+    ms_cmd = sub.add_parser("resolve-manylinux-source")
+    ms_cmd.add_argument("--payload-portability", type=Path, required=True)
 
     vd_cmd = sub.add_parser("validate-dispatch")
     vd_cmd.add_argument("--release", required=True)
@@ -4817,9 +5664,26 @@ def main(
                 evidence_dir=args.evidence,
                 release_binding=args.release_binding,
                 qualification_inputs=args.qualification_inputs,
+                payload_portability=args.payload_portability,
+                tf_producer_source=(
+                    {"commit": args.tf_producer_commit, "tree": args.tf_producer_tree}
+                    if args.tf_producer_commit and args.tf_producer_tree else None
+                ),
+                require_manylinux=args.require_manylinux,
                 require_clean=args.require_clean,
             )
             sys.stdout.write(canonical(res).decode("utf-8"))
+            return 0
+        if args.operation == "materialize-manylinux-inputs":
+            res = materialize_manylinux_inputs(
+                args.qualification_inputs,
+                args.evidence,
+            )
+            for key in ("stage_a", "stage_b", "tf_producer_commit", "tf_producer_tree"):
+                sys.stdout.write(f"{key}={res[key]}\n")
+            return 0
+        if args.operation == "materialize-manylinux-consumers":
+            materialize_manylinux_consumer_receipts(args.admission, args.output)
             return 0
         if args.operation == "qualify-native":
             qualify_native_target(
@@ -4861,6 +5725,35 @@ def main(
             with out_path.open("xb") as stream:
                 stream.write(canonical(matrix))
             return 0
+        if args.operation == "admit-manylinux":
+            approval = load_approval(path=args.approval)
+            result = _validate_manylinux_admission_files(
+                args.manylinux_admission,
+                payload_portability=args.payload_portability,
+                consumer_receipts=args.manylinux_consumer_receipts,
+                tf_producer_source={"commit": args.tf_producer_commit, "tree": args.tf_producer_tree},
+                approved=approval,
+                dist=args.dist,
+            )
+            out_path = Path(args.output)
+            _check_no_symlinks(out_path.parent, "MANYLINUX_ADMISSION_OUTPUT")
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            with out_path.open("xb") as stream:
+                stream.write(canonical(result.record))
+            return 0
+        if args.operation == "validate-portability":
+            stage_a = load_payload_portability_bundle(
+                args.input,
+                expected_tf_producer_source={"commit": args.tf_producer_commit, "tree": args.tf_producer_tree},
+                expected_rs9_tool_source={"commit": args.rs9_commit, "tree": args.rs9_tree},
+            )
+            sys.stdout.write(canonical({
+                "schema": "rs9.nebular070-payload-portability-validation-v1",
+                "status": "validated",
+                "digest": stage_a.digest,
+                "targets": [row["target"] for row in stage_a.record["targets"]],
+            }).decode("utf-8"))
+            return 0
         if args.operation == "verify-source":
             res = verify_source_lineage(
                 args.publisher_dir,
@@ -4892,16 +5785,54 @@ def main(
                 receipts_dir=args.receipts_dir,
                 get=get,
                 attempt_marker=args.attempt_marker,
+                manylinux_admission=args.manylinux_admission,
+                payload_portability=args.payload_portability,
+                manylinux_consumer_receipts=args.manylinux_consumer_receipts,
+                tf_producer_source=(
+                    {"commit": args.tf_producer_commit, "tree": args.tf_producer_tree}
+                    if args.tf_producer_commit and args.tf_producer_tree else None
+                ),
             )
             print(f"upload={'true' if res['upload'] else 'false'}")
             print(f"state={res['state']}")
             return 0
         if args.operation == "verify-upload":
-            verify_upload_dir(args.dist, args.upload_dir)
+            captured_matrix = (
+                load_captured_matrix_receipt(args.matrix_receipt)
+                if args.matrix_receipt is not None
+                else None
+            )
+            verify_upload_dir(
+                args.dist,
+                args.upload_dir,
+                manylinux_admission=args.manylinux_admission,
+                payload_portability=args.payload_portability,
+                manylinux_consumer_receipts=args.manylinux_consumer_receipts,
+                captured_matrix=captured_matrix,
+                tf_producer_source=(
+                    {"commit": args.tf_producer_commit, "tree": args.tf_producer_tree}
+                    if args.tf_producer_commit and args.tf_producer_tree else None
+                ),
+            )
             return 0
         if args.operation == "readback":
             res = readback(args.dist, get=get)
             sys.stdout.write(canonical(res).decode("utf-8"))
+            return 0
+        if args.operation == "resolve-manylinux-source":
+            path = Path(args.payload_portability)
+            _check_no_symlinks(path, "MANYLINUX_INPUT")
+            envelope = _read_json_object(path, "MANYLINUX_INPUT", limit=16 * 1024 * 1024)
+            record = envelope.get("record")
+            source = record.get("tf_producer_source") if isinstance(record, Mapping) else None
+            if (
+                not isinstance(source, Mapping)
+                or not _is_hex40(source.get("commit"))
+                or not _is_hex40(source.get("tree"))
+            ):
+                fail("MANYLINUX_INPUT")
+            sys.stdout.write(f"tf_producer_commit={source['commit']}\n")
+            sys.stdout.write(f"tf_producer_tree={source['tree']}\n")
             return 0
         if args.operation == "validate-dispatch":
             res = validate_workflow_dispatch(args.release, args.mode)
