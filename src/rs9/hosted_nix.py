@@ -26,6 +26,8 @@ from rs9.wheel_native import get_embedded_rs9_helpers
 SYSTEMS = {"aarch64-darwin", "x86_64-linux", "aarch64-linux"}
 PRODUCTS = ("theme-forge-stellar-burst", "theme-forge-stellar-loom",
             "theme-forge-solar-sail", "theme-forge-nebular-fusion")
+_LOADER_FACT_KEYS = ("loader", "glibc_lib", "library_path", "python", "node", "readelf")
+_DBUS_FACT_KEYS = ("dbus_run_session", "dbus_daemon", "dbus_session_config")
 
 
 def fhs_runtime_smoke(runtime, system, prefix, env):
@@ -184,17 +186,40 @@ os.execv(str(exe),[str(exe),*sys.argv[2:]])
     return source, capture_input, products
 
 
-def record_direct_loader_evaluation(source, system, overrides, scratch, capture, prefix, env):
+def _read_runtime_facts(source, system, overrides):
+    facts_output = json.loads(command(["nix", "build", "--json", "--no-link", *overrides,
+        str(source) + "#candidates." + system + "." + PRODUCTS[-1] + ".runtimeFacts"]))
+    if not isinstance(facts_output, list) or len(facts_output) != 1:
+        raise ContractError("NIX_LOADER_FACTS", "One loader facts output required")
+    facts_row = facts_output[0]
+    if not isinstance(facts_row, dict) or not isinstance(facts_row.get("outputs"), dict):
+        raise ContractError("NIX_LOADER_FACTS", "Loader facts output record required")
+    facts_path = facts_row["outputs"].get("out")
+    if not isinstance(facts_path, str):
+        raise ContractError("NIX_LOADER_FACTS", "Loader facts output path required")
+    facts_raw = Path(facts_path).read_bytes()
+    if len(facts_raw) > 64 * 1024:
+        raise ContractError("NIX_LOADER_FACTS", "Loader fact bound exceeded")
+    facts = json.loads(facts_raw)
+    if not isinstance(facts, dict):
+        raise ContractError("NIX_LOADER_FACTS", "Loader facts object required")
+    return facts
+
+
+def _pinned_session_bus_argv(facts):
+    if not isinstance(facts, dict) or any(key not in facts for key in _DBUS_FACT_KEYS):
+        raise ContractError("NIX_LOADER_FACTS", "Co-rooted D-Bus runtime facts required")
+    from rs9.nix_proot_dbus_command import dbus_session_command
+    return dbus_session_command(facts)
+
+
+def record_direct_loader_evaluation(source, system, overrides, scratch, capture, prefix, env, *, facts_out=None):
     """Retain optional loader diagnostics without preempting the runtime gate."""
     try:
-        facts_output = json.loads(command(["nix", "build", "--json", "--no-link", *overrides,
-            str(source) + "#candidates." + system + "." + PRODUCTS[-1] + ".runtimeFacts"]))
-        if not isinstance(facts_output, list) or len(facts_output) != 1:
-            raise ContractError("NIX_LOADER_FACTS", "One loader facts output required")
-        facts_path = facts_output[0]["outputs"]["out"]
-        facts_raw = Path(facts_path).read_bytes()
-        if len(facts_raw) > 64 * 1024:
-            raise ContractError("NIX_LOADER_FACTS", "Loader fact bound exceeded")
+        facts = _read_runtime_facts(source, system, overrides)
+        if facts_out is not None:
+            facts_out.clear()
+            facts_out.update(facts)
         loader_payload = scratch / "nix-loader-payload"
         loader_work = scratch / "nix-loader-stage"
         loader_work.mkdir()
@@ -205,7 +230,8 @@ def record_direct_loader_evaluation(source, system, overrides, scratch, capture,
                 with file.open("rb") as stream:
                     if stream.read(4) == b"\x7fELF":
                         elfs.append(file)
-        evaluation = evaluate_direct_loader(json.loads(facts_raw), elfs, prefix=prefix, env=env)
+        loader_facts = {key: facts[key] for key in _LOADER_FACT_KEYS}
+        evaluation = evaluate_direct_loader(loader_facts, elfs, prefix=prefix, env=env)
     except (ContractError, OSError, ValueError, KeyError, TypeError) as error:
         evaluation = {"schema": "rs9.nix-loader-evaluation.v1", "status": "fail",
                       "application_qualified": False,
@@ -284,6 +310,7 @@ def execute(context):
     baseline = None
     prepared = None
     runtime_prefix = []
+    runtime_facts = {}
     def after_nebular_probe():
         nonlocal baseline
         if baseline is None:
@@ -320,7 +347,7 @@ def execute(context):
                 # Inspect the unmodified released ELFs before the known FHS
                 # boundary. These results never qualify the application.
                 paths[pid]["direct_loader_evaluation"] = record_direct_loader_evaluation(
-                    source, system, overrides, scratch, neb, prefix, env)
+                    source, system, overrides, scratch, neb, prefix, env, facts_out=runtime_facts)
                 runtime = json.loads(command(["nix", "build", "--json", "--no-link", *overrides,
                     str(source) + "#candidates." + system + "." + pid + ".runtime"]))[0]["outputs"]["out"]
                 try:
@@ -396,8 +423,10 @@ def execute(context):
                 result = subprocess.run([*prefix, *runtime_prefix, "ldd", str(file)], env=env, capture_output=True, timeout=30)
                 if b"not found" in result.stdout or (result.returncode and b"not a dynamic" not in result.stderr + result.stdout and b"statically linked" not in result.stderr + result.stdout):
                     raise ContractError("NIX_CLOSURE", "ELF dependency missing from actual FHS closure")
+    session_bus_argv = _pinned_session_bus_argv(runtime_facts) if system.endswith("-linux") else None
     smoke = verify_nebular_runtime(roots[0], prepared, system, [*prefix, *runtime_prefix], env, baseline=baseline,
-                                   diagnostic_boundary_probes=system.endswith("-linux"))
+                                   diagnostic_boundary_probes=system.endswith("-linux"),
+                                   session_bus_argv=session_bus_argv)
     gates.extend([{"name": "nix-native-closure", "status": "pass"}, {"name": "nix-build-check-run", "status": "pass"}])
     evidence = scratch / "nix-output-receipt.json"
     evidence.write_bytes(canonical({"schema": "rs9.hosted-nix-output.v1alpha1", "system": system,

@@ -60,6 +60,10 @@ MATRIX_SCHEMA = "rs9.nebular070-hosted-matrix.v1"
 MAX_INPUT_BYTES = 8 * 1024 * 1024
 MAX_RUNTIME_FILE_BYTES = 512 * 1024 * 1024
 SONAME_RE = re.compile(r"[A-Za-z0-9_+@.-]{1,255}\Z")
+CPU_UNKNOWN_MARKERS = frozenset({
+    "", "unknown", "unresolved", "unreported", "not-claimed", "not-observed",
+    "n/a", "na", "null", "none", "missing", "unavailable", "not-available",
+})
 
 
 def _fail(code: str, message: str) -> ContractError:
@@ -439,11 +443,32 @@ def _actual_host(body: Any, *, target: str, triple: str, kind: str) -> dict[str,
     return body
 
 
+def _cpu_has_concrete_value(value: Any) -> bool:
+    if isinstance(value, str):
+        normalized = re.sub(r"[_\s]+", "-", value.strip().casefold())
+        return normalized not in CPU_UNKNOWN_MARKERS
+    if value is None:
+        return False
+    if type(value) in (bool, int, float):
+        return True
+    if isinstance(value, Mapping):
+        return bool(value) and any(_cpu_has_concrete_value(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return bool(value) and any(_cpu_has_concrete_value(item) for item in value)
+    return False
+
+
 def _actual_cpu(body: Any, *, target: str, triple: str) -> dict[str, Any]:
     body = _identity_body(body, schema=CPU_SCHEMA, label=f"{target}/cpu")
+    baseline = body.get("baseline")
+    normalized_baseline = (
+        re.sub(r"[_\s]+", "-", baseline.strip().casefold())
+        if isinstance(baseline, str) else None
+    )
     if body.get("target") != triple or body.get("status") != "observed" \
-            or not isinstance(body.get("baseline"), str) or not body["baseline"] \
-            or not isinstance(body.get("properties"), Mapping):
+            or normalized_baseline is None or normalized_baseline in CPU_UNKNOWN_MARKERS \
+            or not isinstance(body.get("properties"), Mapping) \
+            or not _cpu_has_concrete_value(body["properties"]):
         raise _fail("NEBULAR_MANYLINUX_RECEIPT", f"{target} CPU baseline observation is unresolved")
     return body
 

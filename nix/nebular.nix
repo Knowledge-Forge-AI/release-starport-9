@@ -30,6 +30,9 @@ let
     python = "${python3}/bin/python3";
     node = "${pkgs.nodejs_22}/bin/node";
     readelf = "${pkgs.binutils}/bin/readelf";
+    dbus_run_session = "${pkgs.dbus}/bin/dbus-run-session";
+    dbus_daemon = "${pkgs.dbus}/bin/dbus-daemon";
+    dbus_session_config = "${pkgs.dbus}/share/dbus-1/session.conf";
   });
   runtime = buildFHSEnv {
     name = "rs9-nebular-fhs";
