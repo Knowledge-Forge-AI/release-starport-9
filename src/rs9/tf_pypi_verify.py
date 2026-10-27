@@ -9,7 +9,7 @@ import zipfile
 
 from rs9.tf_pypi_archive import canonical, fail, physical_bytes, read_tar, sha256
 from rs9.tf_pypi_backend import names, payload, sdist_entries, wheel_entries
-from rs9.tf_pypi_closure import DEPENDENCIES
+from rs9.tf_pypi_closure import dependencies_for_pin
 from rs9.tf_pypi_model import logical_identity, strict_json, validate_pin
 
 
@@ -101,7 +101,7 @@ def _sdist_dependencies(pin, sdist):
     if pin["project"] != "theme-forge-stellar-burst":
         return {}
     dependencies = {}
-    for dep in DEPENDENCIES:
+    for dep in dependencies_for_pin(pin):
         entry = sdist.get("upstream/" + dep["asset"])
         if entry is None:
             fail("SDIST")

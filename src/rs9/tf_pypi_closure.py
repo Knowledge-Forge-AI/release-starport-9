@@ -77,8 +77,44 @@ DEPENDENCIES: list[DependencyPin] = [
     ),
 ]
 
+BURST_070_DEPENDENCIES: list[DependencyPin] = [
+    DependencyPin(
+        name="@xmldom/xmldom",
+        version="0.9.12",
+        asset="xmldom-0.9.12.tgz",
+        size=109708,
+        sha256="08245e18c248b957b4c6e07f8549ad5f55ae11b7a8abd4c1113a0fd61ddc67ee",
+        license="MIT",
+    ),
+    DependencyPin(
+        name="fflate",
+        version="0.8.3",
+        asset="fflate-0.8.3.tgz",
+        size=173034,
+        sha256="38c2cd824402407b43153c782274aec2ea83ea688e4aa0b743c5f2c305857d92",
+        license="MIT",
+    ),
+    DependencyPin(
+        name="smol-toml",
+        version="1.9.1",
+        asset="smol-toml-1.9.1.tgz",
+        size=31492,
+        sha256="4ac8392f1918c22a4366be19047cf53aa42646077d4c711b2ef73263beefb172",
+        license="BSD-3-Clause",
+    ),
+]
+
 DEPENDENCIES_BY_ASSET: dict[str, DependencyPin] = {d["asset"]: d for d in DEPENDENCIES}
 DEPENDENCIES_BY_NAME: dict[str, DependencyPin] = {d["name"]: d for d in DEPENDENCIES}
+
+
+def dependencies_for_pin(pin: typing.Any) -> list[DependencyPin]:
+    """Select the exact per-release dependency authority without changing legacy pins."""
+    if (isinstance(pin, dict)
+            and pin.get("project") == "theme-forge-stellar-burst"
+            and pin.get("version") == "0.7.0"):
+        return BURST_070_DEPENDENCIES
+    return DEPENDENCIES
 
 
 def _extract_pin(pin: typing.Any) -> tuple[str, str, str, int, str, str]:
@@ -225,7 +261,8 @@ def closure_payload(
         return dict(sorted(files.items()))
 
     if project == "theme-forge-stellar-burst":
-        expected_deps = {p["name"]: p["version"] for p in DEPENDENCIES}
+        pins = dependencies_for_pin(pin)
+        expected_deps = {p["name"]: p["version"] for p in pins}
         if upstream_pkg.get("dependencies") != expected_deps:
             fail("DEPENDENCY")
         for key in (
@@ -239,12 +276,12 @@ def closure_payload(
 
         if not isinstance(dependencies, typing.Mapping):
             fail("DEPENDENCY")
-        expected_assets = {p["asset"] for p in DEPENDENCIES}
+        expected_assets = {p["asset"] for p in pins}
         if set(dependencies.keys()) != expected_assets:
             fail("DEPENDENCY")
 
         result = dict(files)
-        for dep_pin in DEPENDENCIES:
+        for dep_pin in pins:
             asset = dep_pin["asset"]
             data = dependencies[asset]
             dep_files = admit_dependency(dep_pin, data)
@@ -265,6 +302,7 @@ def closure_payload(
 
 def dependency_licenses(
     dependencies: typing.Mapping[str, typing.Any],
+    pins: typing.Optional[typing.Iterable[typing.Mapping[str, typing.Any]]] = None,
 ) -> dict[str, tuple[bytes, int]]:
     """Return dict of relative 'node_modules/<name>/LICENSE' -> (bytes, mode) for legal_files."""
     if not isinstance(dependencies, typing.Mapping):
@@ -282,11 +320,13 @@ def dependency_licenses(
                 result[clean] = (data, mode)
         return dict(sorted(result.items()))
 
+    frozen = DEPENDENCIES if pins is None else list(pins)
+    by_asset = {pin["asset"]: pin for pin in frozen}
     result = {}
     for asset, data in sorted(dependencies.items()):
-        if asset not in DEPENDENCIES_BY_ASSET:
+        if asset not in by_asset:
             fail("DEPENDENCY")
-        pin = DEPENDENCIES_BY_ASSET[asset]
+        pin = by_asset[asset]
         dep_files = admit_dependency(pin, data)
         for legal in LEGAL:
             path = f"package/{legal}"
@@ -295,11 +335,15 @@ def dependency_licenses(
     return dict(sorted(result.items()))
 
 
-def load_dependencies(directory: typing.Union[str, os.PathLike]) -> dict[str, bytes]:
+def load_dependencies(
+    directory: typing.Union[str, os.PathLike],
+    pins: typing.Optional[typing.Iterable[typing.Mapping[str, typing.Any]]] = None,
+) -> dict[str, bytes]:
     """Read regular physical bytes for each pinned dependency from directory."""
     dir_path = Path(directory)
+    frozen = DEPENDENCIES if pins is None else list(pins)
     result = {}
-    for pin in DEPENDENCIES:
+    for pin in frozen:
         asset_path = dir_path / pin["asset"]
         data = physical_bytes(asset_path, limit=pin["size"] + 1)
         if len(data) != pin["size"]:

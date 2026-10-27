@@ -127,14 +127,15 @@ def validate_pin(pin):
     if pin.get("source_status") not in {"READY", "BLOCKED"}:
         fail("PIN")
     if "dependencies" in pin:
-        from rs9.tf_pypi_closure import DEPENDENCIES
+        from rs9.tf_pypi_closure import dependencies_for_pin
+        frozen = dependencies_for_pin(pin)
         dependencies = pin["dependencies"]
         if (project != "theme-forge-stellar-burst" or not isinstance(dependencies, list)
-                or len(dependencies) != len(DEPENDENCIES)):
+                or len(dependencies) != len(frozen)):
             fail("PIN")
-        for dep, frozen in zip(dependencies, DEPENDENCIES):
-            if (not isinstance(dep, dict) or set(dep) != set(frozen) | {"integrity", "url"}
-                    or any(dep.get(k) != v for k, v in frozen.items())
+        for dep, frozen_pin in zip(dependencies, frozen):
+            if (not isinstance(dep, dict) or set(dep) != set(frozen_pin) | {"integrity", "url"}
+                    or any(dep.get(k) != v for k, v in frozen_pin.items())
                     or dep["url"] != "https://registry.npmjs.org/" + dep["name"] + "/-/" + dep["asset"]
                     or not re.fullmatch(r"sha512-[A-Za-z0-9+/]{86}==", dep["integrity"])):
                 fail("PIN")
