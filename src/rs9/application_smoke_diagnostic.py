@@ -32,6 +32,13 @@ PROBE_COMMAND_TIMEOUT = 5
 PROBE_TOTAL_TIMEOUT = 30
 PROBE_CLEANUP_TIMEOUT = 1
 PROBE_SCHEMA = "rs9.application-smoke-boundary-probes.v1"
+# The released harness accepts --timeout-ms.  This value is reserved for the
+# optional post-failure replay so the unchanged 240-second outer attempt still
+# has time to reap the harness and retain its bounded evidence.
+DIAGNOSTIC_REPLAY_HARNESS_TIMEOUT_MS = 180_000
+DIAGNOSTIC_REPLAY_TIMEOUT_TARGETS = frozenset({
+    ("linux-arm64", "B"), ("linux-x64", "C"),
+})
 
 
 def extract_log_categories(stdout, stderr, exit_code=None):
@@ -521,7 +528,8 @@ def run_boundary_probes(*, prefix=(), env=None, session_bus_argv=None):
     }
 
 
-def _command(prepared, platform, scenario, launch_root, evidence, *, extras, session_bus_argv=None):
+def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
+             session_bus_argv=None, harness_timeout_ms=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
@@ -529,6 +537,10 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras, ses
         "--scenario", scenario, "--launch-root", str(launch_root),
         "--checkout", str(prepared.get("checkout", prepared["source"])),
         "--evidence", str(evidence), "--label", platform + "-" + scenario]
+    if harness_timeout_ms is not None:
+        if harness_timeout_ms != DIAGNOSTIC_REPLAY_HARNESS_TIMEOUT_MS:
+            raise ContractError("APPLICATION_SMOKE", "Unsupported diagnostic harness timeout")
+        command.extend(["--timeout-ms", str(harness_timeout_ms)])
     if platform != "darwin-arm64":
         display = ["xvfb-run", "-a"]
         if extras:
@@ -539,11 +551,12 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras, ses
 
 
 def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, extras, timeout=240, session_bus_argv=None,
-             system=None):
+             system=None, harness_timeout_ms=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
-    command = _command(prepared, platform, scenario, launch_root, evidence, extras=extras, session_bus_argv=session_bus_argv)
+    command = _command(prepared, platform, scenario, launch_root, evidence, extras=extras,
+                       session_bus_argv=session_bus_argv, harness_timeout_ms=harness_timeout_ms)
     start = time.monotonic()
     error, rc, out, err = None, None, b"", b""
     sizes, cleanup_error, child_reaped = None, None, None
@@ -617,7 +630,11 @@ def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
     except OSError:
         return "replay-not-run", {"status": "replay-not-run", "reason_token": "fresh-evidence-unavailable"}
     prepared = {"tools": tools, "source": checkout, "checkout": checkout}
-    fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, True, timeout, session_bus_argv=session_bus_argv)
+    harness_timeout_ms = (DIAGNOSTIC_REPLAY_HARNESS_TIMEOUT_MS
+                          if (platform, scenario) in DIAGNOSTIC_REPLAY_TIMEOUT_TARGETS else None)
+    fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, True, timeout,
+                      session_bus_argv=session_bus_argv,
+                      harness_timeout_ms=harness_timeout_ms)
     label = "replay-reproduced" if fields["failed"] else "replay-passed"
     if fields["error"] == "harness-error" or fields["cleanup_error"]:
         label = "replay-not-run"

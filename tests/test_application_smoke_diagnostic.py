@@ -1381,6 +1381,168 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
             self.assertEqual(p2, p1)
             self.assertEqual(p3, p2)
 
+    def test_optional_replay_keeps_mandatory_attempt_at_240(self):
+        """The mandatory attempt keeps its legacy argv and outer deadline."""
+        with patch("subprocess.run", return_value=SimpleNamespace(
+                returncode=1, stdout=b"", stderr=b"initial failure\n")) as original:
+            with self.assertRaises(ContractError):
+                execute_application_smoke(
+                    prepared=self.prepared, system="x86_64-linux",
+                    launch_root=self.launch_root,
+                )
+        self.assertEqual(original.call_count, 1)
+        self.assertEqual(original.call_args.kwargs["timeout"], 240)
+        self.assertNotIn("--timeout-ms", original.call_args.args[0])
+
+    def test_optional_replay_uses_inner_timeout_only_for_linux_b_c(self):
+        """Only the existing Linux B/C replay tuples receive 180 seconds."""
+        cases = (
+            ("linux-arm64", "B", True),
+            ("linux-x64", "C", True),
+            ("darwin-arm64", "A", False),
+            ("linux-x64", "C-signal", False),
+        )
+        for platform, scenario, expects_inner_timeout in cases:
+            with self.subTest(platform=platform, scenario=scenario):
+                scratch = self.work / ("selector-" + platform + "-" + scenario)
+                scratch.mkdir()
+                calls = []
+
+                def replay_result(command, **kwargs):
+                    calls.append((list(command), kwargs))
+                    return SimpleNamespace(
+                        returncode=1, stdout=b"", stderr=b"replay failure\n",
+                        stream_sizes=(0, 15), capture_error=None,
+                        cleanup_error=None, child_reaped=True,
+                    )
+
+                with patch("rs9.application_smoke_diagnostic._bounded_run",
+                           side_effect=replay_result):
+                    label, replay = run_replay(
+                        scenario=scenario, platform=platform,
+                        launch_root=self.launch_root, checkout=self.prepared["checkout"],
+                        tools=self.tools, prefix=(), env=None,
+                        scratch=scratch, timeout=240,
+                    )
+                self.assertEqual(label, "replay-reproduced")
+                self.assertEqual(replay["status"], "replay-reproduced")
+                self.assertEqual(calls[0][1]["timeout"], 240)
+                if expects_inner_timeout:
+                    self.assertEqual(calls[0][0].count("--timeout-ms"), 1)
+                    index = calls[0][0].index("--timeout-ms")
+                    self.assertEqual(calls[0][0][index + 1], "180000")
+                else:
+                    self.assertNotIn("--timeout-ms", calls[0][0])
+
+    def test_optional_replay_pass_never_promotes_original_failure(self):
+        """A passing Linux C replay remains diagnostic evidence only."""
+        replay_dir = self.scratch / "evidence-replay-C"
+        calls = []
+
+        def original_failure(command, **kwargs):
+            calls.append(("original", list(command), kwargs))
+            return SimpleNamespace(returncode=1, stdout=b"", stderr=b"initial failure\n")
+
+        def replay_success(command, **kwargs):
+            calls.append(("replay", list(command), kwargs))
+            replay_dir.mkdir(parents=True, exist_ok=True)
+            (replay_dir / "linux-x64-C.run.json").write_text(json.dumps({
+                "status": "pass", "executable": {"sha256": "f" * 64},
+            }))
+            return SimpleNamespace(
+                returncode=0, stdout=b"", stderr=b"", stream_sizes=(0, 0),
+                capture_error=None, cleanup_error=None, child_reaped=True,
+            )
+
+        with patch("subprocess.run", side_effect=original_failure), \
+                patch("rs9.application_smoke_diagnostic._bounded_run",
+                      side_effect=replay_success):
+            with self.assertRaises(ContractError):
+                execute_application_smoke(
+                    prepared=self.prepared, system="x86_64-linux",
+                    launch_root=self.launch_root, diagnostic_replay=True,
+                )
+
+        self.assertEqual([kind for kind, _command, _kwargs in calls],
+                         ["original", "replay"])
+        self.assertEqual(calls[0][2]["timeout"], 240)
+        self.assertNotIn("--timeout-ms", calls[0][1])
+        self.assertEqual(calls[1][2]["timeout"], 240)
+        replay_index = calls[1][1].index("--timeout-ms")
+        self.assertEqual(calls[1][1][replay_index + 1], "180000")
+        diagnostic = json.loads(
+            (self.work / "diagnostics/application-smoke-diagnostic.json").read_text()
+        )
+        self.assertEqual(diagnostic["status"], "fail")
+        self.assertEqual(diagnostic["gate_status"], "fail")
+        self.assertEqual(diagnostic["replay"]["status"], "replay-passed")
+
+    def test_hosted_wheel_diagnostic_extras_keeps_failure_after_replay_pass(self):
+        """The hosted-wheel x64 extras lane remains a failed gate after replay."""
+        replay_dir = self.scratch / "evidence-replay-C"
+        calls = []
+
+        def original_failure(command, **kwargs):
+            calls.append(("original", list(command), kwargs))
+            return SimpleNamespace(returncode=1, stdout=b"", stderr=b"initial failure\n")
+
+        def replay_success(command, **kwargs):
+            calls.append(("replay", list(command), kwargs))
+            replay_dir.mkdir(parents=True, exist_ok=True)
+            (replay_dir / "linux-x64-C.run.json").write_text(json.dumps({
+                "status": "pass", "executable": {"sha256": "f" * 64},
+            }))
+            return SimpleNamespace(
+                returncode=0, stdout=b"", stderr=b"", stream_sizes=(0, 0),
+                capture_error=None, cleanup_error=None, child_reaped=True,
+            )
+
+        with patch("subprocess.run", side_effect=original_failure), \
+                patch("rs9.application_smoke_diagnostic._bounded_run",
+                      side_effect=replay_success):
+            with self.assertRaises(ContractError):
+                execute_application_smoke(
+                    prepared=self.prepared, system="x86_64-linux",
+                    launch_root=self.launch_root, diagnostic_extras=True,
+                )
+
+        self.assertEqual([kind for kind, _command, _kwargs in calls],
+                         ["original", "replay"])
+        self.assertEqual(calls[0][2]["timeout"], 240)
+        self.assertNotIn("--timeout-ms", calls[0][1])
+        self.assertEqual(calls[1][2]["timeout"], 240)
+        self.assertIn("-e", calls[1][1])
+        replay_index = calls[1][1].index("--timeout-ms")
+        self.assertEqual(calls[1][1][replay_index + 1], "180000")
+        diagnostic = json.loads(
+            (self.work / "diagnostics/application-smoke-diagnostic.json").read_text()
+        )
+        self.assertEqual(diagnostic["status"], "fail")
+        self.assertEqual(diagnostic["gate_status"], "fail")
+        self.assertEqual(diagnostic["replay"]["status"], "replay-passed")
+
+    def test_arm_linux_mandatory_attempt_keeps_240_and_no_inner_flag(self):
+        """The ARM/B mandatory path stays on the original subprocess contract."""
+        with patch("subprocess.run", return_value=SimpleNamespace(
+                returncode=1, stdout=b"", stderr=b"initial failure\n")) as original:
+            with self.assertRaises(ContractError):
+                execute_application_smoke(
+                    prepared=self.prepared, system="aarch64-linux",
+                    launch_root=self.launch_root,
+                )
+        self.assertEqual(original.call_count, 1)
+        self.assertEqual(original.call_args.kwargs["timeout"], 240)
+        self.assertNotIn("--timeout-ms", original.call_args.args[0])
+
+    def test_replay_rejects_unsupported_inner_timeout(self):
+        """Only the fixed supported inner deadline can be requested."""
+        with self.assertRaises(ContractError):
+            _command(
+                self.prepared, "linux-x64", "C", self.launch_root,
+                self.scratch / "evidence-replay-C", extras=True,
+                harness_timeout_ms=179999,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
