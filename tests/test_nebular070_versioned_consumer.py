@@ -22,6 +22,8 @@ from rs9 import tf_pypi_hosted as hosted
 from rs9 import tf_pypi_nebular070_publish as publish
 from rs9.tf_pypi_archive import AdmissionError, canonical, sha256
 import tests.test_nebular070_manylinux as _manylinux_tests
+import tests.test_nebular070_public_consumers as _public_consumers_tests
+from tests.test_tf_pypi_nebular070_publish import _complete_smoke_summary
 import tests.test_tf_pypi_nebular070_gate2 as _gate2_tests
 
 
@@ -330,20 +332,67 @@ class Nebular070VersionedConsumerTests(unittest.TestCase):
         receipts = fixture.root / "receipts"
         candidate_receipt = sha256(canonical(fixture.candidate))
         expected_tree = "2" * 40
+        actual_shape = _public_consumers_tests.PublicStageBConsumerTests(
+            "test_actual_result_rejects_failed_consumer_network_and_cleanup"
+        )
+        actual_shape.setUp()
+        self.addCleanup(actual_shape.doCleanups)
+
+        consumer_shapes = {}
+        for target in ("darwin-arm64", *TARGETS):
+            expected_wheel = next(row for row in fixture.expected["wheels"] if row["target"] == target)
+            if target == "darwin-arm64":
+                shaped = hosted.qualify_nebular070(
+                    fixture.candidate,
+                    fixture.wheels[target],
+                    fixture.raw_for(target),
+                    fixture.root / "shape-darwin-arm64",
+                    expected_artifacts=fixture.expected,
+                    expected_commit="1" * 40,
+                    expected_tree=expected_tree,
+                    profile_sha256="c" * 64,
+                    candidate_receipt_sha256=candidate_receipt,
+                    target=target,
+                    run_id="1",
+                    run_attempt="1",
+                    sandbox_probe=fixture.sandbox_probe,
+                    host_identity=fixture.identity(target),
+                    fixture_only=True,
+                    real_user_state_snapshot=fixture.real_user_state_snapshot,
+                    manylinux_stage_a=stage_a,
+                )
+                consumer = copy.deepcopy(shaped["consumer"])
+            else:
+                consumer = copy.deepcopy(actual_shape._actual_result(target)["consumer"])
+            consumer["candidate_rs9_source"] = copy.deepcopy(fixture.candidate["candidate_rs9_source"])
+            consumer["wheel"] = copy.deepcopy(expected_wheel)
+            consumer["sandbox"]["method"] = "explicit-isolation-prefix"
+            gui = consumer["gui"]
+            scenarios = {
+                "linux-arm64-gnu": ("B",),
+                "linux-x64-gnu": ("C", "C-signal"),
+                "darwin-arm64": ("A",),
+            }[target]
+            consumer["application_smoke"] = _complete_smoke_summary(
+                target,
+                scenarios,
+                gui_path=gui["smoke_path"],
+                gui_sha=gui["sha256"],
+            )
+            consumer["status"] = "native-consumer-passed"
+            consumer["fixture_only"] = False
+            consumer["native_qualified"] = True
+            consumer_shapes[target] = consumer
 
         def fake_consumer(candidate, wheel_path, raw_release, work, **kwargs):
             target = kwargs["target"]
-            expected_wheel = next(row for row in fixture.expected["wheels"] if row["target"] == target)
-            return {
-                "candidate_rs9_source": candidate["candidate_rs9_source"],
-                "fixture_only": False,
-                "native_qualified": True,
-                "process_observer": {"orphan_count": 0},
-                "user_state": {"unchanged": True},
-                "sandbox": {"network_disabled": True},
-                "provider_closure": {"status": "verified"},
-                "wheel": expected_wheel,
-            }
+            # Reuse the maintained complete actual-shaped consumer record so
+            # this matrix test exercises the same smoke/GUI contract as the
+            # production validator.  Only the candidate and wheel identities
+            # belong to this test's fixture and are rebound here.
+            consumer = copy.deepcopy(consumer_shapes[target])
+            consumer["candidate_rs9_source"] = copy.deepcopy(candidate["candidate_rs9_source"])
+            return consumer
 
         with (
             patch.object(hosted, "consume_nebular_candidate", side_effect=fake_consumer),

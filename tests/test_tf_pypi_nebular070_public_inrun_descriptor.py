@@ -186,8 +186,9 @@ class PublicInRunDescriptorTests(unittest.TestCase):
         self.assertIn("stage_a", materialized)
         self.assertNotIn("stage_b", materialized)
         workflow = workflow_070_qualify_jobs_text()
-        self.assertIn("--phase qualification-prep", workflow)
-        self.assertIn("--phase publication", workflow)
+        self.assertIn("prepare-public-inputs-070", workflow)
+        self.assertIn("--stage-a-spec stage-a-files.json", workflow)
+        self.assertNotIn("--phase qualification-prep", workflow)
 
     def test_legacy_v1_with_precomputed_stage_b_is_phase_insensitive(self) -> None:
         legacy = self._legacy_with_stage_b()
