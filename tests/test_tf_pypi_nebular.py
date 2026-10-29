@@ -1880,9 +1880,16 @@ class NebularPyPIContractTests(unittest.TestCase):
         from rs9.tf_pypi_nebular import _nebular_import_closure_paths
 
         closure_paths = _nebular_import_closure_paths(ROOT)
-        self.assertEqual(len(closure_paths), 100)
+        self.assertEqual(len(closure_paths), 105)
         self.assertIn("src/rs9/nebular_lineage.py", closure_paths)
         self.assertIn("src/rs9/tf_pypi_nebular070_publish.py", closure_paths)
+        self.assertTrue({
+            "bootstrap/pre-rs9/theme-forge-live1/manifest-author-aligned.json",
+            "operators/live1/expectations.json",
+            "src/rs9/nebular070_installed_smoke.py",
+            "src/rs9/nebular070_public_inputs.py",
+            "src/rs9/nebular070_smoke_support.py",
+        } <= set(closure_paths))
         with patch("rs9.tf_pypi_nebular.subprocess.run", side_effect=fake_git_run):
             st = source_tree_state(expected_sha, repository=ROOT, require_clean=False)
             self.assertFalse(st["worktree_clean"])

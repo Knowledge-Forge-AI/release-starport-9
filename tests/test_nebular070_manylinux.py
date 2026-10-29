@@ -817,7 +817,14 @@ class Nebular070ManylinuxContractTests(unittest.TestCase):
         )
         wf_text = publish_module.workflow_text()
         self.assertNotIn("steps.manylinux_inputs.outputs.stage_b", wf_text)
-        self.assertIn('STAGE_B_PATH="$(printf \'%s\\n\' "$MANYLINUX_OUT" | sed -n \'s/^stage_b=//p\')"', wf_text)
+        # Stage-B is now assembled directly from the authenticated Stage-A
+        # path and the four retained consumer receipts.  Keep this assertion
+        # tied to the maintained command seam rather than the removed
+        # materialize-and-parse shell variable.
+        self.assertIn('CAPTURES="${{ runner.temp }}/tfnf-070-stage-b-captures"', wf_text)
+        self.assertIn('rs9.nebular070_public_consumers assemble-stage-b', wf_text)
+        self.assertIn('--stage-a "${{ runner.temp }}/tfnf-070-public-inputs/evidence/public-release/generated-stage-a/payload-portability.json"', wf_text)
+        self.assertIn('--captures-dir "$CAPTURES"', wf_text)
 
     def test_main_cli_admits_stage_b_only_with_actual_approval_matrix_and_wheel_bytes(self) -> None:
         actual_record = copy.deepcopy(self.stage_a_record)
