@@ -1131,6 +1131,11 @@ def _controlled_native_consumer_driver(
         }
 
     def _fake_installed_smoke(**kwargs):
+        # The installed cache uses the authenticated manifest byte domain.
+        # Compact JSON re-encoding produces a different digest for real inputs.
+        payload_root = next(parent for parent in Path(kwargs["runtime_root"]).parents
+                            if parent.name == "payload")
+        assert kwargs["prepared"]["manifest_sha256"] == payload_root.parent.name
         target = kwargs["target"]
         native = kwargs["native"]
         gui = kwargs["gui"]

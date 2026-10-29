@@ -106,6 +106,12 @@ class SystemWebKitWorkflow2Tests(unittest.TestCase):
             self.assertIn("defaults:\n      run:\n        shell: bash", section)
             self.assertIn("TFNF_CI_TEMP: /__w/_temp", section)
             self.assertNotIn("runner.temp", section)
+            self.assertIn("Select pinned Bookworm Python 3.11", section)
+            self.assertIn("python-path=/usr/bin/python3", section)
+            self.assertNotIn("actions/setup-python@", section)
+            target = "linux-arm64-gnu" if index == 0 else "linux-x64-gnu"
+            self.assertIn(("Select pinned Bookworm Python 3.11", False),
+                          WORKFLOW_STEP_PROFILES[f"Native consumer 0.7.0 ({target} floor)"])
             tools = section.split("- name: Install pinned Bookworm floor tools", 1)[1]
             self.assertLess(
                 tools.index('mkdir -p "${{ env.TFNF_CI_TEMP }}"'),

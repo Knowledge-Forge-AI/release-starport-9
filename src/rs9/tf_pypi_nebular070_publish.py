@@ -396,7 +396,7 @@ WORKFLOW_STEP_PROFILES = {
         ("Install pinned Bookworm floor tools", False),
         ("Verify Bookworm display tool class", False),
         ("Checkout exact source", True),
-        ("Set up Python 3.13", True),
+        ("Select pinned Bookworm Python 3.11", False),
         ("Set up Node 22", True),
         ("Download 0.7.0 candidate bundle", True),
         ("Download 0.7.0 public inputs", True),
@@ -411,7 +411,7 @@ WORKFLOW_STEP_PROFILES = {
         ("Install pinned Bookworm floor tools", False),
         ("Verify Bookworm display tool class", False),
         ("Checkout exact source", True),
-        ("Set up Python 3.13", True),
+        ("Select pinned Bookworm Python 3.11", False),
         ("Set up Node 22", True),
         ("Download 0.7.0 candidate bundle", True),
         ("Download 0.7.0 public inputs", True),
@@ -4477,11 +4477,13 @@ def workflow_070_qualify_jobs_text() -> str:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Set up Python 3.13
+      - name: Select pinned Bookworm Python 3.11
         id: setup_python
-        uses: {SETUP_PYTHON_ACTION}
-        with:
-          python-version: '3.13'
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B -c 'import sys; assert sys.version_info[:2] == (3, 11)'
+          dpkg-query -W python3 python3.11 python3.11-venv
+          echo 'python-path=/usr/bin/python3' >> "$GITHUB_OUTPUT"
 
       - name: Set up Node 22
         uses: {SETUP_NODE_ACTION}
@@ -4660,11 +4662,13 @@ def workflow_070_qualify_jobs_text() -> str:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Set up Python 3.13
+      - name: Select pinned Bookworm Python 3.11
         id: setup_python
-        uses: {SETUP_PYTHON_ACTION}
-        with:
-          python-version: '3.13'
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B -c 'import sys; assert sys.version_info[:2] == (3, 11)'
+          dpkg-query -W python3 python3.11 python3.11-venv
+          echo 'python-path=/usr/bin/python3' >> "$GITHUB_OUTPUT"
 
       - name: Set up Node 22
         uses: {SETUP_NODE_ACTION}
