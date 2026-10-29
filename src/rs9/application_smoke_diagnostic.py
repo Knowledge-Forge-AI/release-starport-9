@@ -39,6 +39,21 @@ DIAGNOSTIC_REPLAY_HARNESS_TIMEOUT_MS = 180_000
 DIAGNOSTIC_REPLAY_TIMEOUT_TARGETS = frozenset({
     ("linux-arm64", "B"), ("linux-x64", "C"),
 })
+RELEASED_NATIVE_RC_SMOKE_SHA256 = "3d1eb991bd586dbb90e926049b516549e7518c0851c2e90ecbcc4e20838963f2"
+RELEASED_NATIVE_RC_SNAPSHOT_SHA256 = "a85cd9e81602ddc585baa4164f98707debe5158d260130e489431e9ae699bbde"
+REPLAY_PROGRESS_SCHEMA = "rs9.application-smoke-replay-progress.v1"
+REPLAY_PROGRESS_MAX_BYTES = 16 * 1024
+REPLAY_PROGRESS_MAX_EVENTS = 32
+REPLAY_PROGRESS_EVENTS = {
+    ("harness", "import-start"), ("harness", "imported"),
+    ("harness", "import-failed"), ("harness", "export-missing"),
+    ("candidate", "launch-failed"), ("candidate", "launched"),
+    ("candidate", "exited"), ("run-smoke", "enter"),
+    ("run-smoke", "returned"), ("run-smoke", "error"),
+    ("receipt", "write-start"), ("receipt", "finalized"),
+    ("receipt", "write-failed"), ("run-record", "write-start"),
+    ("run-record", "finalized"), ("run-record", "write-failed"),
+}
 
 
 def extract_log_categories(stdout, stderr, exit_code=None):
@@ -210,6 +225,56 @@ def _read_regular(path, limit):
     if len(raw) > limit:
         return b"", meta, "oversize"
     return raw, {"present": True, "bytes": len(raw), "sha256": digest(raw)}, None
+
+
+def _replay_progress_wrapper(prepared):
+    """Return the owned observer only for the authenticated harness pair."""
+    tools = prepared.get("tools")
+    if not isinstance(tools, (str, Path)):
+        return None
+    # ``source`` is the maintained Theme Forge checkout in the real Nix lane;
+    # the observer is an RS9-owned module and therefore is not expected inside
+    # that checkout.  Resolve the sibling from this authenticated module.
+    candidate = Path(__file__).with_name("replay_progress_wrapper.mjs")
+    harness = Path(tools) / "native-rc-smoke.mjs"
+    snapshot = Path(tools) / "fs-snapshot.mjs"
+    try:
+        _raw, _meta, error = _read_regular(candidate, 4 * 1024 * 1024)
+        if error:
+            return None
+        raw, _meta, error = _read_regular(harness, 4 * 1024 * 1024)
+        if error or digest(raw) != RELEASED_NATIVE_RC_SMOKE_SHA256:
+            return None
+        raw, _meta, error = _read_regular(snapshot, 4 * 1024 * 1024)
+        if error or digest(raw) != RELEASED_NATIVE_RC_SNAPSHOT_SHA256:
+            return None
+        return candidate
+    except OSError:
+        return None
+
+
+def _read_replay_progress(path):
+    """Validate only fixed progress enums; never retain raw sink bytes."""
+    raw, meta, error = _read_regular(path, REPLAY_PROGRESS_MAX_BYTES)
+    if error:
+        return {"status": "unobserved", "reason": "missing" if error == "missing" else error}
+    try:
+        lines = raw.splitlines()
+        if not lines or len(lines) > REPLAY_PROGRESS_MAX_EVENTS:
+            raise ValueError
+        events = []
+        for expected_seq, line in enumerate(lines, 1):
+            record = json.loads(line)
+            if not isinstance(record, dict) or set(record) != {"schema", "seq", "stage", "event"}:
+                raise ValueError
+            if record["schema"] != REPLAY_PROGRESS_SCHEMA or type(record["seq"]) is not int:
+                raise ValueError
+            if record["seq"] != expected_seq or (record["stage"], record["event"]) not in REPLAY_PROGRESS_EVENTS:
+                raise ValueError
+            events.append({"seq": expected_seq, "stage": record["stage"], "event": record["event"]})
+    except (ValueError, TypeError, UnicodeError, RecursionError):
+        return {"status": "unobserved", "reason": "invalid"}
+    return {"status": "observed", "event_count": len(events), "events": events}
 
 
 def read_and_validate_receipt(path, command_details):
@@ -529,14 +594,25 @@ def run_boundary_probes(*, prefix=(), env=None, session_bus_argv=None):
 
 
 def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
-             session_bus_argv=None, harness_timeout_ms=None):
+             session_bus_argv=None, harness_timeout_ms=None, replay_progress=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
-    command = ["node", str(prepared["tools"] / "native-rc-smoke.mjs"), "--platform", platform,
+    harness = replay_progress["wrapper"] if replay_progress else prepared["tools"] / "native-rc-smoke.mjs"
+    command = ["node", str(harness), "--platform", platform,
         "--scenario", scenario, "--launch-root", str(launch_root),
         "--checkout", str(prepared.get("checkout", prepared["source"])),
         "--evidence", str(evidence), "--label", platform + "-" + scenario]
+    if replay_progress:
+        command[2:2] = [
+            "--rs9-replay-progress-harness", str(replay_progress["harness"]),
+            "--rs9-replay-progress-file", str(replay_progress["progress"]),
+            "--rs9-replay-progress-expected-sha256", replay_progress["expected_sha256"],
+        ]
+        for name, expected_sha256 in sorted(replay_progress.get("closure", {}).items()):
+            command[2:2] = [
+                "--rs9-replay-progress-closure-member", name + "=" + expected_sha256,
+            ]
     if harness_timeout_ms is not None:
         if harness_timeout_ms != DIAGNOSTIC_REPLAY_HARNESS_TIMEOUT_MS:
             raise ContractError("APPLICATION_SMOKE", "Unsupported diagnostic harness timeout")
@@ -551,12 +627,13 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
 
 
 def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, extras, timeout=240, session_bus_argv=None,
-             system=None, harness_timeout_ms=None):
+             system=None, harness_timeout_ms=None, replay_progress=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
     command = _command(prepared, platform, scenario, launch_root, evidence, extras=extras,
-                       session_bus_argv=session_bus_argv, harness_timeout_ms=harness_timeout_ms)
+                       session_bus_argv=session_bus_argv, harness_timeout_ms=harness_timeout_ms,
+                       replay_progress=replay_progress)
     start = time.monotonic()
     error, rc, out, err = None, None, b"", b""
     sizes, cleanup_error, child_reaped = None, None, None
@@ -615,11 +692,13 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
         raw, meta, log_error = _read_regular(evidence / "xvfb-error.log", MAX_LOG)
         fields["display_log"] = {**meta, "error": log_error,
             "categories": extract_log_categories(b"", raw) if not log_error else []}
+        if replay_progress:
+            fields["progress"] = _read_replay_progress(replay_progress["progress"])
     return fields
 
 
 def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
-               scratch, timeout=240, session_bus_argv=None):
+               scratch, timeout=240, session_bus_argv=None, replay_progress_wrapper=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
@@ -632,9 +711,21 @@ def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
     prepared = {"tools": tools, "source": checkout, "checkout": checkout}
     harness_timeout_ms = (DIAGNOSTIC_REPLAY_HARNESS_TIMEOUT_MS
                           if (platform, scenario) in DIAGNOSTIC_REPLAY_TIMEOUT_TARGETS else None)
+    replay_progress = None
+    if replay_progress_wrapper is not None:
+        replay_progress = {
+            "wrapper": Path(replay_progress_wrapper),
+            "harness": Path(tools) / "native-rc-smoke.mjs",
+            "progress": evidence / "replay-progress.jsonl",
+            "expected_sha256": RELEASED_NATIVE_RC_SMOKE_SHA256,
+            "closure": {
+                "native-rc-smoke.mjs": RELEASED_NATIVE_RC_SMOKE_SHA256,
+                "fs-snapshot.mjs": RELEASED_NATIVE_RC_SNAPSHOT_SHA256,
+            },
+        }
     fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, True, timeout,
                       session_bus_argv=session_bus_argv,
-                      harness_timeout_ms=harness_timeout_ms)
+                      harness_timeout_ms=harness_timeout_ms, replay_progress=replay_progress)
     label = "replay-reproduced" if fields["failed"] else "replay-passed"
     if fields["error"] == "harness-error" or fields["cleanup_error"]:
         label = "replay-not-run"
@@ -667,9 +758,11 @@ def _failure_details(fields, *, extras, receipt_name):
 def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, env, fields, not_run,
                     session_bus_argv=None, include_replay=True, boundary_probes=False):
     if include_replay:
+        replay_progress_wrapper = _replay_progress_wrapper(prepared)
         _, replay = run_replay(scenario=scenario, platform=platform, launch_root=launch_root,
             checkout=prepared.get("checkout", prepared["source"]), tools=prepared["tools"], prefix=prefix,
-            env=env, scratch=prepared["scratch"], session_bus_argv=session_bus_argv)
+            env=env, scratch=prepared["scratch"], session_bus_argv=session_bus_argv,
+            replay_progress_wrapper=replay_progress_wrapper)
     else:
         replay = {"status": "not-run", "reason": "boundary-probe-only"}
     if boundary_probes:
