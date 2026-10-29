@@ -14,6 +14,29 @@ from rs9.tf_pypi_consumer import _nebular_payload_member
 
 
 class ReceiptIdentityTests(unittest.TestCase):
+    def test_provider_version_definitions_are_bounded_and_structurally_checked(self):
+        import struct
+        from rs9.nebular070_system_webkit import _provider_version_definitions
+        body = bytearray(512)
+        body[:6] = b"\x7fELF\x02\x01"
+        struct.pack_into("<Q", body, 40, 256)
+        struct.pack_into("<HH", body, 58, 64, 3)
+        strings = b"\0WEBKIT_TEST_1.0\0"
+        body[64:64 + len(strings)] = strings
+        struct.pack_into("<HHHHIII", body, 128, 1, 0, 2, 1, 0, 20, 0)
+        struct.pack_into("<II", body, 148, 1, 0)
+        struct.pack_into("<IIQQQQIIQQ", body, 320, 0, 3, 0, 0, 64, len(strings), 0, 0, 1, 0)
+        struct.pack_into("<IIQQQQIIQQ", body, 384, 0, 0x6FFFFFFD, 0, 0, 128, 28, 1, 1, 4, 0)
+        self.assertEqual(_provider_version_definitions(bytes(body)), ["WEBKIT_TEST_1.0"])
+        absent = bytearray(body)
+        struct.pack_into("<I", absent, 388, 0)
+        self.assertEqual(_provider_version_definitions(bytes(absent)), [])
+        for offset, value in ((148, 9999), (408, 9999), (424, 9), (428, 2), (144, 9999)):
+            changed = bytearray(body)
+            struct.pack_into("<I", changed, offset, value)
+            with self.subTest(offset=offset), self.assertRaises(AdmissionError):
+                _provider_version_definitions(bytes(changed))
+
     def test_native_execution_diagnostics_emit_only_closed_categories(self):
         from rs9.nebular070_installed_smoke import _native_execution_failure_code
         from rs9.tf_pypi_archive import fail
