@@ -67,6 +67,11 @@ CONSUMER_KINDS = (ROLE_FLOOR, ROLE_NEWER)
 LINUX_CONSUMER_TARGETS = tuple(LINUX_TARGETS)
 _ACTUAL_CAPTURE_MODE = "actual"
 _FIXTURE_CAPTURE_MODE = "fixture-test-only"
+_INSTALLED_SMOKE_SCENARIOS = {
+    "darwin-arm64": ("A",),
+    "linux-arm64-gnu": ("B",),
+    "linux-x64-gnu": ("C", "C-signal"),
+}
 _REQUIRED_CONSUMER_RESULT = {
     "schema", "status", "fixture_only", "native_qualified", "target", "consumer",
     "publication_admitted", "public_writes",
@@ -126,6 +131,7 @@ def _required_actual_result(result: Mapping[str, Any], *, target: str) -> Mappin
         or consumer.get("target") != target
         or consumer.get("publication_admitted") is not False
         or consumer.get("public_writes") != 0
+        or consumer.get("candidate_rs9_source") != result.get("candidate_rs9_source")
     ):
         _fail("NEBULAR_STAGE_B_CONSUMER", "The nested consumer result is not actual")
     process = consumer.get("process_observer")
@@ -161,6 +167,17 @@ def _required_actual_result(result: Mapping[str, Any], *, target: str) -> Mappin
         or native.get("forced_cleanup") is True
     ):
         _fail("NEBULAR_STAGE_B_CONSUMER", "The native consumer command did not complete cleanly")
+    installed_smoke = consumer.get("application_smoke")
+    authenticated_gui = consumer.get("gui")
+    try:
+        from rs9.nebular070_installed_smoke import validate_installed_smoke_summary
+        validate_installed_smoke_summary(
+            installed_smoke, target=target, authenticated_gui=authenticated_gui,
+        )
+    except Exception as exc:
+        raise ContractError(
+            "NEBULAR_STAGE_B_CONSUMER", "Fresh installed native smoke cases are incomplete",
+        ) from exc
     return result
 
 

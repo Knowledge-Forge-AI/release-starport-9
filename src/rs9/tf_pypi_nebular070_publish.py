@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import io
 import json
 import os
@@ -26,6 +27,7 @@ import urllib.request
 import zipfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 from rs9.errors import ContractError
@@ -99,6 +101,20 @@ CAPTURE_BASENAME = "theme-forge-nebular-fusion-0.7.0-qualification.json"
 CAPTURE_PATH = Path("operators/tf-pypi") / CAPTURE_BASENAME
 QUALIFICATION_INPUTS_BASENAME = "theme-forge-nebular-fusion-0.7.0-qualification-inputs.json"
 QUALIFICATION_INPUTS_PATH = Path("operators/tf-pypi") / QUALIFICATION_INPUTS_BASENAME
+PUBLIC_INPUTS_MANIFEST_PATH = Path(
+    "operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-public-inputs.json"
+)
+PUBLIC_INPUTS_ARTIFACT = "tfnf-070-public-inputs"
+PUBLIC_INPUTS_TEMPLATE_DESCRIPTOR = "qualification-inputs.json"
+PUBLIC_INPUTS_DESCRIPTOR = "qualification-inputs-prep.json"
+PUBLIC_STAGE_A_SPEC = "stage-a-files.json"
+PUBLIC_STAGE_A_OUTPUT = "evidence/public-release/generated-stage-a"
+PUBLIC_INPUTS_PREPARATION_RECEIPT = "public-inputs-preparation.json"
+PUBLIC_INPUTS_PREPARATION_SCHEMA = "rs9.tf-pypi-nebular070-public-inputs-preparation.v1"
+PUBLIC_TF_PRODUCER_SOURCE = {
+    "commit": "79c67bb70d800701b4b0cdbb9caa9be2bbc7c2ff",
+    "tree": "e663c9cf15144578a17d3cd501cf031ac83a7e0e",
+}
 
 PIN_SCHEMA = "rs9.tf-pypi-nebular-publication.v1"
 APPROVAL_SCHEMA = "rs9.tf-pypi-nebular070-artifacts.v1"
@@ -137,6 +153,10 @@ CANDIDATE_BUNDLE_ARTIFACT = "tfnf-070-candidate-bundle"
 TARGET_QUALIFICATION_ARTIFACTS = {
     target: f"tfnf-070-qualification-{target}" for target in TARGETS
 }
+FLOOR_TARGET_QUALIFICATION_ARTIFACTS = {
+    target: f"tfnf-070-qualification-{target}-floor"
+    for target in ("linux-arm64-gnu", "linux-x64-gnu")
+}
 MATRIX_RECEIPT_ARTIFACT = "tfnf-070-matrix-receipt"
 MATRIX_RECEIPT_MEMBER = "matrix_receipt.json"
 MANYLINUX_ADMISSION_ARTIFACT = "tfnf-070-manylinux-admission"
@@ -164,6 +184,17 @@ MANYLINUX_ADMISSION_MEMBERS = {
     MANYLINUX_ADMISSION_MEMBER,
     *_manylinux_consumer_members(),
 }
+
+
+def _resume_stage_b_member_path(resume: Path, name: str) -> Path:
+    """Map one closed Stage-B archive member to its prepared resume path."""
+    if name == MANYLINUX_ADMISSION_MEMBER:
+        return resume / name
+    if name in MANYLINUX_ADMISSION_MEMBERS and name != MANYLINUX_ADMISSION_MEMBER:
+        return resume / "manylinux-consumers" / name
+    fail("MANYLINUX_CAPTURE_MEMBER")
+
+
 REQUIRED_CAPTURE_ARTIFACTS = (
     CANDIDATE_BUNDLE_ARTIFACT,
     TARGET_QUALIFICATION_ARTIFACTS["darwin-arm64"],
@@ -219,7 +250,19 @@ UPLOAD_ARTIFACT_ACTION = "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886
 DOWNLOAD_ARTIFACT_ACTION = "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093"
 PYPA_PUBLISH_ACTION = "pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e"
 
+# Release-scoped Linux native-consumer display policy.  The Bookworm floor
+# jobs use exact package versions; the hosted Ubuntu jobs use the same minimal
+# package class while recording the runner-resolved versions.
+BOOKWORM_DISPLAY_TOOL_PACKAGES = (
+    "xvfb=2:21.1.7-3+deb12u13",
+    "xauth=1:1.1.2-1",
+    "dbus-x11=1.14.10-1~deb12u1",
+)
+UBUNTU_DISPLAY_TOOL_PACKAGES = ("xvfb", "xauth", "dbus-x11")
+DISPLAY_TOOL_COMMANDS = ("xvfb-run", "xauth", "dbus-run-session")
+
 RESUME_070_JOB_NAME = "Attended Nebular 0.7.0 PyPI publication resume"
+PREPARE_PUBLIC_INPUTS_070_JOB_NAME = "Prepare held Nebular 0.7.0 public inputs"
 PUBLISH_JOB_NAMES = frozenset({
     RESUME_070_JOB_NAME,
 })
@@ -229,10 +272,17 @@ NATIVE_CONSUMER_070_JOB_NAMES = frozenset({
     "Native consumer 0.7.0 (darwin-arm64)",
     "Native consumer 0.7.0 (linux-arm64-gnu)",
     "Native consumer 0.7.0 (linux-x64-gnu)",
+    "Native consumer 0.7.0 (linux-arm64-gnu floor)",
+    "Native consumer 0.7.0 (linux-x64-gnu floor)",
+})
+NATIVE_CONSUMER_070_FLOOR_JOB_NAMES = frozenset({
+    "Native consumer 0.7.0 (linux-arm64-gnu floor)",
+    "Native consumer 0.7.0 (linux-x64-gnu floor)",
 })
 QUALIFICATION_GATE_070_JOB_NAME = "Qualification matrix gate 0.7.0"
 QUALIFY_070_JOB_NAMES = (
     frozenset({
+        PREPARE_PUBLIC_INPUTS_070_JOB_NAME,
         BUILD_VERIFY_070_JOB_NAME,
         QUALIFICATION_GATE_070_JOB_NAME,
     })
@@ -253,6 +303,13 @@ LEGACY_061_JOB_NAMES = frozenset({
 # records that the generated step is a ``uses`` step, which is the only kind
 # allowed to receive a corresponding ``Post <step name>`` record.
 WORKFLOW_STEP_PROFILES = {
+    PREPARE_PUBLIC_INPUTS_070_JOB_NAME: (
+        ("Checkout repository", True),
+        ("Set up Python 3.13", True),
+        ("Resolve current source tree", False),
+        ("Prepare held 0.7.0 public inputs", False),
+        ("Upload 0.7.0 public inputs", True),
+    ),
     DISPATCH_GUARD_070_JOB_NAME: (
         ("Checkout repository", True),
         ("Set up Python 3.13", True),
@@ -261,7 +318,7 @@ WORKFLOW_STEP_PROFILES = {
     BUILD_VERIFY_070_JOB_NAME: (
         ("Checkout repository", True),
         ("Set up Python 3.13", True),
-        ("Materialize authenticated 0.7.0 manylinux inputs", False),
+        ("Download 0.7.0 public inputs", True),
         ("Build and verify 0.7.0 candidate bundle", False),
         ("Upload 0.7.0 candidate bundle", True),
     ),
@@ -270,6 +327,7 @@ WORKFLOW_STEP_PROFILES = {
         ("Set up Python 3.13", True),
         ("Set up Node 22", True),
         ("Download 0.7.0 candidate bundle", True),
+        ("Download 0.7.0 public inputs", True),
         ("Qualify native consumer on darwin-arm64", False),
         ("Upload darwin-arm64 qualification receipt", True),
     ),
@@ -277,7 +335,10 @@ WORKFLOW_STEP_PROFILES = {
         ("Checkout exact source", True),
         ("Set up Python 3.13", True),
         ("Set up Node 22", True),
+        ("Install minimal Ubuntu display tools", False),
+        ("Verify Ubuntu display tool class", False),
         ("Download 0.7.0 candidate bundle", True),
+        ("Download 0.7.0 public inputs", True),
         ("Qualify native consumer on linux-arm64-gnu", False),
         ("Upload linux-arm64-gnu qualification receipt", True),
     ),
@@ -285,20 +346,49 @@ WORKFLOW_STEP_PROFILES = {
         ("Checkout exact source", True),
         ("Set up Python 3.13", True),
         ("Set up Node 22", True),
+        ("Install minimal Ubuntu display tools", False),
+        ("Verify Ubuntu display tool class", False),
         ("Download 0.7.0 candidate bundle", True),
+        ("Download 0.7.0 public inputs", True),
         ("Qualify native consumer on linux-x64-gnu", False),
         ("Upload linux-x64-gnu qualification receipt", True),
+    ),
+    "Native consumer 0.7.0 (linux-arm64-gnu floor)": (
+        ("Install pinned Bookworm floor tools", False),
+        ("Verify Bookworm display tool class", False),
+        ("Checkout exact source", True),
+        ("Set up Python 3.13", True),
+        ("Set up Node 22", True),
+        ("Download 0.7.0 candidate bundle", True),
+        ("Download 0.7.0 public inputs", True),
+        ("Qualify native consumer on linux-arm64-gnu floor", False),
+        ("Upload linux-arm64-gnu floor qualification receipt", True),
+    ),
+    "Native consumer 0.7.0 (linux-x64-gnu floor)": (
+        ("Install pinned Bookworm floor tools", False),
+        ("Verify Bookworm display tool class", False),
+        ("Checkout exact source", True),
+        ("Set up Python 3.13", True),
+        ("Set up Node 22", True),
+        ("Download 0.7.0 candidate bundle", True),
+        ("Download 0.7.0 public inputs", True),
+        ("Qualify native consumer on linux-x64-gnu floor", False),
+        ("Upload linux-x64-gnu floor qualification receipt", True),
     ),
     QUALIFICATION_GATE_070_JOB_NAME: (
         ("Checkout exact source", True),
         ("Set up Python 3.13", True),
         ("Download 0.7.0 candidate bundle", True),
+        ("Download 0.7.0 public inputs", True),
         ("Download darwin-arm64 qualification receipt", True),
         ("Download linux-arm64-gnu qualification receipt", True),
         ("Download linux-x64-gnu qualification receipt", True),
+        ("Download linux-arm64-gnu floor qualification receipt", True),
+        ("Download linux-x64-gnu floor qualification receipt", True),
+        ("Verify floor consumer receipts", False),
         ("Admit complete 3-platform 0.7.0 qualification matrix", False),
         ("Upload 0.7.0 matrix qualification receipt", True),
-        ("Materialize authenticated 0.7.0 Stage-B admission input", False),
+        ("Assemble authenticated 0.7.0 Stage-B admission input", False),
         ("Upload 0.7.0 manylinux admission input", True),
     ),
     RESUME_070_JOB_NAME: (
@@ -308,7 +398,9 @@ WORKFLOW_STEP_PROFILES = {
         ("Checkout exact qualified source commit", True),
         ("Verify publisher and qualification source lineage", False),
         ("Fetch retained qualification run and artifact archives", False),
+        ("Extract and bind held public input roots", False),
         ("Authenticate retained archives and stage verified distribution", False),
+        ("Verify external Stage-B and Stage-A bindings", False),
         ("Resolve captured 0.7.0 manylinux source coordinates", False),
         ("Stage admitted 0.7.0 operator metadata into qualification checkout", False),
         ("Verify artifact integrity and select only missing files", False),
@@ -3696,9 +3788,61 @@ def workflow_070_qualify_jobs_text() -> str:
             --release "${{{{ inputs.release || '0.6.1' }}}}" \\
             --mode "${{{{ inputs.mode }}}}"
 
+  prepare_public_inputs_070:
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/{QUALIFY_BRANCH}') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
+    name: {PREPARE_PUBLIC_INPUTS_070_JOB_NAME}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: {CHECKOUT_ACTION}
+        with:
+          ref: '${{{{ github.sha }}}}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: {SETUP_PYTHON_ACTION}
+        with:
+          python-version: '3.13'
+
+      - name: Resolve current source tree
+        id: source_tree
+        run: |
+          set -euo pipefail
+          printf 'tree=%s\\n' "$(git rev-parse --verify 'HEAD^{{tree}}')" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare held 0.7.0 public inputs
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish prepare-public-inputs-070 \\
+            --manifest {PUBLIC_INPUTS_MANIFEST_PATH.as_posix()} \\
+            --output "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
+            --repository "$GITHUB_WORKSPACE" \\
+            --stage-a-spec {PUBLIC_STAGE_A_SPEC} \\
+            --rs9-commit "${{{{ github.sha }}}}" \\
+            --rs9-tree "${{{{ steps.source_tree.outputs.tree }}}}" \\
+            --tf-producer-commit {PUBLIC_TF_PRODUCER_SOURCE['commit']} \\
+            --tf-producer-tree {PUBLIC_TF_PRODUCER_SOURCE['tree']}
+
+      - name: Upload 0.7.0 public inputs
+        uses: {UPLOAD_ARTIFACT_ACTION}
+        with:
+          name: {PUBLIC_INPUTS_ARTIFACT}
+          path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/'
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+
   build_verify_070:
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/{QUALIFY_BRANCH}') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
     name: Build and Verify Nebular 0.7.0 Candidate Bundle
+    needs: [prepare_public_inputs_070]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -3716,16 +3860,11 @@ def workflow_070_qualify_jobs_text() -> str:
         with:
           python-version: '3.13'
 
-      - name: Materialize authenticated 0.7.0 manylinux inputs
-        id: manylinux_inputs
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-inputs \\
-            --qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()} \\
-            --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence" \\
-            --phase {QUALIFICATION_INPUT_PHASE_PREP} >> "$GITHUB_OUTPUT"
+      - name: Download 0.7.0 public inputs
+        uses: {DOWNLOAD_ARTIFACT_ACTION}
+        with:
+          name: {PUBLIC_INPUTS_ARTIFACT}
+          path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
 
       - name: Build and verify 0.7.0 candidate bundle
         env:
@@ -3734,13 +3873,14 @@ def workflow_070_qualify_jobs_text() -> str:
           RS9_GITHUB_READ_TOKEN: ${{{{ github.token }}}}
         run: |
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish build-candidates \\
-            --qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()} \\
+            --qualification-inputs "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
+            --inrun-root "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
             --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence" \\
             --output "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
             --expected-commit "${{{{ github.sha }}}}" \\
-            --payload-portability "${{{{ steps.manylinux_inputs.outputs.stage_a }}}}" \\
-            --tf-producer-commit "${{{{ steps.manylinux_inputs.outputs.tf_producer_commit }}}}" \\
-            --tf-producer-tree "${{{{ steps.manylinux_inputs.outputs.tf_producer_tree }}}}" \\
+            --payload-portability "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_STAGE_A_OUTPUT}/payload-portability.json" \\
+            --tf-producer-commit {PUBLIC_TF_PRODUCER_SOURCE['commit']} \\
+            --tf-producer-tree {PUBLIC_TF_PRODUCER_SOURCE['tree']} \\
             --require-manylinux \\
             --require-clean
 
@@ -3785,6 +3925,12 @@ def workflow_070_qualify_jobs_text() -> str:
           name: {CANDIDATE_BUNDLE_ARTIFACT}
           path: '${{{{ runner.temp }}}}/tfnf-070-bundle'
 
+      - name: Download 0.7.0 public inputs
+        uses: {DOWNLOAD_ARTIFACT_ACTION}
+        with:
+          name: {PUBLIC_INPUTS_ARTIFACT}
+          path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+
       - name: Qualify native consumer on darwin-arm64
         env:
           PYTHONPATH: src
@@ -3792,7 +3938,8 @@ def workflow_070_qualify_jobs_text() -> str:
         run: |
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish qualify-native \\
             --target darwin-arm64 \\
-            --qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()} \\
+            --qualification-inputs "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
+            --inrun-root "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
             --raw-release "${{{{ runner.temp }}}}/tfnf-070-raw-release-darwin-arm64/raw_release.json" \\
             --bundle "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
             --work "${{{{ runner.temp }}}}/tfnf-070-work-darwin-arm64" \\
@@ -3836,11 +3983,43 @@ def workflow_070_qualify_jobs_text() -> str:
           node-version: '22'
           package-manager-cache: false
 
+      - name: Install minimal Ubuntu display tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \\
+            {" ".join(UBUNTU_DISPLAY_TOOL_PACKAGES)}
+
+      - name: Verify Ubuntu display tool class
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in {" ".join(DISPLAY_TOOL_COMMANDS)}; do
+            command -v "$tool" >/dev/null
+          done
+          for package in {" ".join(UBUNTU_DISPLAY_TOOL_PACKAGES)}; do
+            dpkg-query -W -f='${{Version}}' "$package" >/dev/null
+          done
+          {{
+            printf 'platform=ubuntu-runner\\n'
+            dpkg-query -W -f='${{Package}}\\t${{Version}}\\n' {" ".join(UBUNTU_DISPLAY_TOOL_PACKAGES)}
+            for tool in {" ".join(DISPLAY_TOOL_COMMANDS)}; do
+              printf 'tool=%s path=%s\\n' "$tool" "$(command -v "$tool")"
+            done
+          }} | tee "${{{{ runner.temp }}}}/tfnf-070-display-tools.tsv"
+
       - name: Download 0.7.0 candidate bundle
         uses: {DOWNLOAD_ARTIFACT_ACTION}
         with:
           name: {CANDIDATE_BUNDLE_ARTIFACT}
           path: '${{{{ runner.temp }}}}/tfnf-070-bundle'
+
+      - name: Download 0.7.0 public inputs
+        uses: {DOWNLOAD_ARTIFACT_ACTION}
+        with:
+          name: {PUBLIC_INPUTS_ARTIFACT}
+          path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
 
       - name: Qualify native consumer on linux-arm64-gnu
         env:
@@ -3849,14 +4028,17 @@ def workflow_070_qualify_jobs_text() -> str:
         run: |
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish qualify-native \\
             --target linux-arm64-gnu \\
-            --qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()} \\
+            --qualification-inputs "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
+            --inrun-root "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
             --raw-release "${{{{ runner.temp }}}}/tfnf-070-raw-release-linux-arm64-gnu/raw_release.json" \\
             --bundle "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
             --work "${{{{ runner.temp }}}}/tfnf-070-work-linux-arm64-gnu" \\
             --output "${{{{ runner.temp }}}}/tfnf-070-qual/linux-arm64-gnu/result.json" \\
             --expected-commit "${{{{ github.sha }}}}" \\
             --run-id "${{{{ github.run_id }}}}" \\
-            --run-attempt "${{{{ github.run_attempt }}}}"
+            --run-attempt "${{{{ github.run_attempt }}}}" \\
+            --consumer-host-role newer \\
+            --consumer-capture-output "${{{{ runner.temp }}}}/tfnf-070-qual/linux-arm64-gnu/newer.json"
 
       - name: Upload linux-arm64-gnu qualification receipt
         uses: {UPLOAD_ARTIFACT_ACTION}
@@ -3893,11 +4075,43 @@ def workflow_070_qualify_jobs_text() -> str:
           node-version: '22'
           package-manager-cache: false
 
+      - name: Install minimal Ubuntu display tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \\
+            {" ".join(UBUNTU_DISPLAY_TOOL_PACKAGES)}
+
+      - name: Verify Ubuntu display tool class
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in {" ".join(DISPLAY_TOOL_COMMANDS)}; do
+            command -v "$tool" >/dev/null
+          done
+          for package in {" ".join(UBUNTU_DISPLAY_TOOL_PACKAGES)}; do
+            dpkg-query -W -f='${{Version}}' "$package" >/dev/null
+          done
+          {{
+            printf 'platform=ubuntu-runner\\n'
+            dpkg-query -W -f='${{Package}}\\t${{Version}}\\n' {" ".join(UBUNTU_DISPLAY_TOOL_PACKAGES)}
+            for tool in {" ".join(DISPLAY_TOOL_COMMANDS)}; do
+              printf 'tool=%s path=%s\\n' "$tool" "$(command -v "$tool")"
+            done
+          }} | tee "${{{{ runner.temp }}}}/tfnf-070-display-tools.tsv"
+
       - name: Download 0.7.0 candidate bundle
         uses: {DOWNLOAD_ARTIFACT_ACTION}
         with:
           name: {CANDIDATE_BUNDLE_ARTIFACT}
           path: '${{{{ runner.temp }}}}/tfnf-070-bundle'
+
+      - name: Download 0.7.0 public inputs
+        uses: {DOWNLOAD_ARTIFACT_ACTION}
+        with:
+          name: {PUBLIC_INPUTS_ARTIFACT}
+          path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
 
       - name: Qualify native consumer on linux-x64-gnu
         env:
@@ -3906,20 +4120,231 @@ def workflow_070_qualify_jobs_text() -> str:
         run: |
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish qualify-native \\
             --target linux-x64-gnu \\
-            --qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()} \\
+            --qualification-inputs "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
+            --inrun-root "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
             --raw-release "${{{{ runner.temp }}}}/tfnf-070-raw-release-linux-x64-gnu/raw_release.json" \\
             --bundle "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
             --work "${{{{ runner.temp }}}}/tfnf-070-work-linux-x64-gnu" \\
             --output "${{{{ runner.temp }}}}/tfnf-070-qual/linux-x64-gnu/result.json" \\
             --expected-commit "${{{{ github.sha }}}}" \\
             --run-id "${{{{ github.run_id }}}}" \\
-            --run-attempt "${{{{ github.run_attempt }}}}"
+            --run-attempt "${{{{ github.run_attempt }}}}" \\
+            --consumer-host-role newer \\
+            --consumer-capture-output "${{{{ runner.temp }}}}/tfnf-070-qual/linux-x64-gnu/newer.json"
 
       - name: Upload linux-x64-gnu qualification receipt
         uses: {UPLOAD_ARTIFACT_ACTION}
         with:
           name: {TARGET_QUALIFICATION_ARTIFACTS['linux-x64-gnu']}
           path: '${{{{ runner.temp }}}}/tfnf-070-qual/'
+          retention-days: 14
+          if-no-files-found: error
+
+  native_consumer_070_linux_arm64_gnu_floor:
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/{QUALIFY_BRANCH}') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
+    name: Native consumer 0.7.0 (linux-arm64-gnu floor)
+    needs: [build_verify_070]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    # Release-scoped Bookworm/SYS_ADMIN floor policy; held pending its
+    # corresponding release-policy decision.
+    container:
+      image: debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
+      options: --init --cap-add=SYS_ADMIN
+    steps:
+      - name: Install pinned Bookworm floor tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends \\
+            ca-certificates git python3 python3-venv=3.11.2-1+b1 \\
+            sudo=1.9.13p3-1+deb12u4 util-linux=2.38.1-5+deb12u3 \\
+            binutils procps \\
+            {BOOKWORM_DISPLAY_TOOL_PACKAGES[0]} \\
+            {BOOKWORM_DISPLAY_TOOL_PACKAGES[1]} \\
+            {BOOKWORM_DISPLAY_TOOL_PACKAGES[2]}
+
+      - name: Verify Bookworm display tool class
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in {" ".join(DISPLAY_TOOL_COMMANDS)}; do
+            command -v "$tool" >/dev/null
+          done
+          test "$(dpkg-query -W -f='${{Version}}' xvfb)" = "2:21.1.7-3+deb12u13"
+          test "$(dpkg-query -W -f='${{Version}}' xauth)" = "1:1.1.2-1"
+          test "$(dpkg-query -W -f='${{Version}}' dbus-x11)" = "1.14.10-1~deb12u1"
+          {{
+            printf 'platform=debian-bookworm-floor\\n'
+            dpkg-query -W -f='${{Package}}\\t${{Version}}\\n' xvfb xauth dbus-x11
+            for tool in {" ".join(DISPLAY_TOOL_COMMANDS)}; do
+              printf 'tool=%s path=%s\\n' "$tool" "$(command -v "$tool")"
+            done
+          }} | tee "${{{{ runner.temp }}}}/tfnf-070-floor-display-tools.tsv"
+
+      - name: Checkout exact source
+        uses: {CHECKOUT_ACTION}
+        with:
+          ref: '${{{{ github.sha }}}}'
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: {SETUP_PYTHON_ACTION}
+        with:
+          python-version: '3.13'
+
+      - name: Set up Node 22
+        uses: {SETUP_NODE_ACTION}
+        with:
+          node-version: '22.23.3'
+          package-manager-cache: false
+
+      - name: Download 0.7.0 candidate bundle
+        uses: {DOWNLOAD_ARTIFACT_ACTION}
+        with:
+          name: {CANDIDATE_BUNDLE_ARTIFACT}
+          path: '${{{{ runner.temp }}}}/tfnf-070-bundle'
+
+      - name: Download 0.7.0 public inputs
+        uses: {DOWNLOAD_ARTIFACT_ACTION}
+        with:
+          name: {PUBLIC_INPUTS_ARTIFACT}
+          path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+
+      - name: Qualify native consumer on linux-arm64-gnu floor
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish qualify-native \\
+            --target linux-arm64-gnu \\
+            --consumer-host-role floor \\
+            --consumer-capture-output "${{{{ runner.temp }}}}/tfnf-070-floor/linux-arm64-gnu/floor.json" \\
+            --qualification-inputs "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
+            --inrun-root "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
+            --raw-release "${{{{ runner.temp }}}}/tfnf-070-raw-release-linux-arm64-gnu-floor/raw_release.json" \\
+            --bundle "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
+            --work "${{{{ runner.temp }}}}/tfnf-070-work-linux-arm64-gnu-floor" \\
+            --output "${{{{ runner.temp }}}}/tfnf-070-floor/linux-arm64-gnu/result.json" \\
+            --expected-commit "${{{{ github.sha }}}}" \\
+            --run-id "${{{{ github.run_id }}}}" \\
+            --run-attempt "${{{{ github.run_attempt }}}}"
+
+      - name: Upload linux-arm64-gnu floor qualification receipt
+        uses: {UPLOAD_ARTIFACT_ACTION}
+        with:
+          name: {FLOOR_TARGET_QUALIFICATION_ARTIFACTS['linux-arm64-gnu']}
+          path: '${{{{ runner.temp }}}}/tfnf-070-floor/'
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+
+  native_consumer_070_linux_x64_gnu_floor:
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/{QUALIFY_BRANCH}') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
+    name: Native consumer 0.7.0 (linux-x64-gnu floor)
+    needs: [build_verify_070]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    # Release-scoped Bookworm/SYS_ADMIN floor policy; held pending its
+    # corresponding release-policy decision.
+    container:
+      image: debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
+      options: --init --cap-add=SYS_ADMIN
+    steps:
+      - name: Install pinned Bookworm floor tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends \\
+            ca-certificates git python3 python3-venv=3.11.2-1+b1 \\
+            sudo=1.9.13p3-1+deb12u4 util-linux=2.38.1-5+deb12u3 \\
+            binutils procps \\
+            {BOOKWORM_DISPLAY_TOOL_PACKAGES[0]} \\
+            {BOOKWORM_DISPLAY_TOOL_PACKAGES[1]} \\
+            {BOOKWORM_DISPLAY_TOOL_PACKAGES[2]}
+
+      - name: Verify Bookworm display tool class
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in {" ".join(DISPLAY_TOOL_COMMANDS)}; do
+            command -v "$tool" >/dev/null
+          done
+          test "$(dpkg-query -W -f='${{Version}}' xvfb)" = "2:21.1.7-3+deb12u13"
+          test "$(dpkg-query -W -f='${{Version}}' xauth)" = "1:1.1.2-1"
+          test "$(dpkg-query -W -f='${{Version}}' dbus-x11)" = "1.14.10-1~deb12u1"
+          {{
+            printf 'platform=debian-bookworm-floor\\n'
+            dpkg-query -W -f='${{Package}}\\t${{Version}}\\n' xvfb xauth dbus-x11
+            for tool in {" ".join(DISPLAY_TOOL_COMMANDS)}; do
+              printf 'tool=%s path=%s\\n' "$tool" "$(command -v "$tool")"
+            done
+          }} | tee "${{{{ runner.temp }}}}/tfnf-070-floor-display-tools.tsv"
+
+      - name: Checkout exact source
+        uses: {CHECKOUT_ACTION}
+        with:
+          ref: '${{{{ github.sha }}}}'
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: {SETUP_PYTHON_ACTION}
+        with:
+          python-version: '3.13'
+
+      - name: Set up Node 22
+        uses: {SETUP_NODE_ACTION}
+        with:
+          node-version: '22.23.3'
+          package-manager-cache: false
+
+      - name: Download 0.7.0 candidate bundle
+        uses: {DOWNLOAD_ARTIFACT_ACTION}
+        with:
+          name: {CANDIDATE_BUNDLE_ARTIFACT}
+          path: '${{{{ runner.temp }}}}/tfnf-070-bundle'
+
+      - name: Download 0.7.0 public inputs
+        uses: {DOWNLOAD_ARTIFACT_ACTION}
+        with:
+          name: {PUBLIC_INPUTS_ARTIFACT}
+          path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+
+      - name: Qualify native consumer on linux-x64-gnu floor
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish qualify-native \\
+            --target linux-x64-gnu \\
+            --consumer-host-role floor \\
+            --consumer-capture-output "${{{{ runner.temp }}}}/tfnf-070-floor/linux-x64-gnu/floor.json" \\
+            --qualification-inputs "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
+            --inrun-root "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
+            --raw-release "${{{{ runner.temp }}}}/tfnf-070-raw-release-linux-x64-gnu-floor/raw_release.json" \\
+            --bundle "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
+            --work "${{{{ runner.temp }}}}/tfnf-070-work-linux-x64-gnu-floor" \\
+            --output "${{{{ runner.temp }}}}/tfnf-070-floor/linux-x64-gnu/result.json" \\
+            --expected-commit "${{{{ github.sha }}}}" \\
+            --run-id "${{{{ github.run_id }}}}" \\
+            --run-attempt "${{{{ github.run_attempt }}}}"
+
+      - name: Upload linux-x64-gnu floor qualification receipt
+        uses: {UPLOAD_ARTIFACT_ACTION}
+        with:
+          name: {FLOOR_TARGET_QUALIFICATION_ARTIFACTS['linux-x64-gnu']}
+          path: '${{{{ runner.temp }}}}/tfnf-070-floor/'
+          compression-level: 0
           retention-days: 14
           if-no-files-found: error
 
@@ -3931,6 +4356,8 @@ def workflow_070_qualify_jobs_text() -> str:
       - native_consumer_070_darwin_arm64
       - native_consumer_070_linux_arm64_gnu
       - native_consumer_070_linux_x64_gnu
+      - native_consumer_070_linux_arm64_gnu_floor
+      - native_consumer_070_linux_x64_gnu_floor
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -3954,6 +4381,12 @@ def workflow_070_qualify_jobs_text() -> str:
           name: {CANDIDATE_BUNDLE_ARTIFACT}
           path: '${{{{ runner.temp }}}}/tfnf-070-bundle'
 
+      - name: Download 0.7.0 public inputs
+        uses: {DOWNLOAD_ARTIFACT_ACTION}
+        with:
+          name: {PUBLIC_INPUTS_ARTIFACT}
+          path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+
       - name: Download darwin-arm64 qualification receipt
         uses: {DOWNLOAD_ARTIFACT_ACTION}
         with:
@@ -3972,6 +4405,25 @@ def workflow_070_qualify_jobs_text() -> str:
           name: {TARGET_QUALIFICATION_ARTIFACTS['linux-x64-gnu']}
           path: '${{{{ runner.temp }}}}/tfnf-070-receipts'
 
+      - name: Download linux-arm64-gnu floor qualification receipt
+        uses: {DOWNLOAD_ARTIFACT_ACTION}
+        with:
+          name: {FLOOR_TARGET_QUALIFICATION_ARTIFACTS['linux-arm64-gnu']}
+          path: '${{{{ runner.temp }}}}/tfnf-070-floor-receipts'
+
+      - name: Download linux-x64-gnu floor qualification receipt
+        uses: {DOWNLOAD_ARTIFACT_ACTION}
+        with:
+          name: {FLOOR_TARGET_QUALIFICATION_ARTIFACTS['linux-x64-gnu']}
+          path: '${{{{ runner.temp }}}}/tfnf-070-floor-receipts'
+
+      - name: Verify floor consumer receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "${{{{ runner.temp }}}}/tfnf-070-floor-receipts/linux-arm64-gnu/floor.json"
+          test -s "${{{{ runner.temp }}}}/tfnf-070-floor-receipts/linux-x64-gnu/floor.json"
+
       - name: Admit complete 3-platform 0.7.0 qualification matrix
         env:
           PYTHONPATH: src
@@ -3982,7 +4434,8 @@ def workflow_070_qualify_jobs_text() -> str:
             --receipts-dir "${{{{ runner.temp }}}}/tfnf-070-receipts" \\
             --output "${{{{ runner.temp }}}}/tfnf-070-matrix/matrix_receipt.json" \\
             --expected-commit "${{{{ github.sha }}}}" \\
-            --qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()} \\
+            --qualification-inputs "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
+            --inrun-root "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
             --run-id "${{{{ github.run_id }}}}" \\
             --run-attempt "${{{{ github.run_attempt }}}}"
 
@@ -3994,25 +4447,36 @@ def workflow_070_qualify_jobs_text() -> str:
           retention-days: 14
           if-no-files-found: error
 
-      - name: Materialize authenticated 0.7.0 Stage-B admission input
-        id: manylinux_inputs
+      - name: Assemble authenticated 0.7.0 Stage-B admission input
         env:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
-          MANYLINUX_OUT="$("${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-inputs \\
-            --qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()} \\
-            --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence" \\
-            --phase {QUALIFICATION_INPUT_PHASE_PUBLICATION})"
-          printf '%s\\n' "$MANYLINUX_OUT" >> "$GITHUB_OUTPUT"
-          STAGE_B_PATH="$(printf '%s\\n' "$MANYLINUX_OUT" | sed -n 's/^stage_b=//p')"
-          test -n "$STAGE_B_PATH"
-          mkdir -p "${{{{ runner.temp }}}}/tfnf-070-manylinux-admission"
-          cp "$STAGE_B_PATH" \\
-            "${{{{ runner.temp }}}}/tfnf-070-manylinux-admission/{MANYLINUX_ADMISSION_MEMBER}"
-          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-consumers \\
-            --admission "${{{{ runner.temp }}}}/tfnf-070-manylinux-admission/{MANYLINUX_ADMISSION_MEMBER}" \\
-            --output "${{{{ runner.temp }}}}/tfnf-070-manylinux-admission"
+          set -euo pipefail
+          CAPTURES="${{{{ runner.temp }}}}/tfnf-070-stage-b-captures"
+          mkdir -p "$CAPTURES/linux-arm64-gnu" "$CAPTURES/linux-x64-gnu"
+          cp "${{{{ runner.temp }}}}/tfnf-070-receipts/linux-arm64-gnu/newer.json" \\
+            "$CAPTURES/linux-arm64-gnu/newer.json"
+          cp "${{{{ runner.temp }}}}/tfnf-070-receipts/linux-x64-gnu/newer.json" \\
+            "$CAPTURES/linux-x64-gnu/newer.json"
+          cp "${{{{ runner.temp }}}}/tfnf-070-floor-receipts/linux-arm64-gnu/floor.json" \\
+            "$CAPTURES/linux-arm64-gnu/floor.json"
+          cp "${{{{ runner.temp }}}}/tfnf-070-floor-receipts/linux-x64-gnu/floor.json" \\
+            "$CAPTURES/linux-x64-gnu/floor.json"
+          RS9_TREE="$(git rev-parse --verify 'HEAD^{{tree}}')"
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.nebular070_public_consumers assemble-stage-b \\
+            --stage-a "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_STAGE_A_OUTPUT}/payload-portability.json" \\
+            --approval "{APPROVAL_PATH.as_posix()}" \\
+            --matrix "${{{{ runner.temp }}}}/tfnf-070-matrix/{MATRIX_RECEIPT_MEMBER}" \\
+            --wheels-dir "${{{{ runner.temp }}}}/tfnf-070-bundle/dist" \\
+            --captures-dir "$CAPTURES" \\
+            --output "${{{{ runner.temp }}}}/tfnf-070-manylinux-admission" \\
+            --tf-producer-commit {PUBLIC_TF_PRODUCER_SOURCE['commit']} \\
+            --tf-producer-tree {PUBLIC_TF_PRODUCER_SOURCE['tree']} \\
+            --rs9-tool-commit "${{{{ github.sha }}}}" \\
+            --rs9-tool-tree "$RS9_TREE" \\
+            --rs9-release-commit "${{{{ github.sha }}}}" \\
+            --rs9-release-tree "$RS9_TREE"
 
       - name: Upload 0.7.0 manylinux admission input
         uses: {UPLOAD_ARTIFACT_ACTION}
@@ -4100,7 +4564,8 @@ def publication_resume_job_text() -> str:
           set -euo pipefail
           API_DIR="${{{{ runner.temp }}}}/tfnf-070-api"
           ARCHIVES_DIR="${{{{ runner.temp }}}}/tfnf-070-archives"
-          mkdir -p "$API_DIR" "$ARCHIVES_DIR"
+          EXTERNAL_DIR="${{{{ runner.temp }}}}/tfnf-070-external-archives"
+          mkdir -p "$API_DIR" "$ARCHIVES_DIR" "$EXTERNAL_DIR"
           RUN_ID="${{{{ steps.resolve_qual.outputs.qualification_run_id }}}}"
           gh api --header 'X-GitHub-Api-Version: 2022-11-28' \\
             "/repos/${{{{ github.repository }}}}/actions/runs/$RUN_ID" \\
@@ -4130,6 +4595,79 @@ def publication_resume_job_text() -> str:
                       stdout=out,
                   )
           '
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -c '
+          import json, os, subprocess
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              PUBLIC_INPUTS_ARTIFACT,
+              MANYLINUX_ADMISSION_ARTIFACT,
+              load_qualification_capture,
+              validate_public_external_artifact_metadata,
+          )
+          pub = Path("publisher-authority")
+          cap = load_qualification_capture(pub)
+          repo = cap["repository"]
+          rows = validate_public_external_artifact_metadata(
+              Path(os.environ["RUNNER_TEMP"]) / "tfnf-070-api",
+              capture=cap,
+          )
+          out_dir = Path(os.environ["RUNNER_TEMP"]) / "tfnf-070-external-archives"
+          for name, row in rows.items():
+              artifact_id = row["id"]
+              destination = out_dir / f"{{name}}.zip"
+              temporary = out_dir / f".{{name}}.zip.part"
+              if destination.exists() or temporary.exists():
+                  raise SystemExit("external artifact output already exists")
+              with temporary.open("xb") as out:
+                  subprocess.run(
+                      [
+                          "gh",
+                          "api",
+                          "--header",
+                          "X-GitHub-Api-Version: 2022-11-28",
+                          f"/repos/{{repo}}/actions/artifacts/{{artifact_id}}/zip",
+                      ],
+                      check=True,
+                      stdout=out,
+                  )
+              data = temporary.read_bytes()
+              if len(data) != row["size_in_bytes"]:
+                  temporary.unlink()
+                  raise SystemExit("external artifact size mismatch")
+              if row["archive_sha256"] is not None:
+                  import hashlib
+                  if hashlib.sha256(data).hexdigest() != row["archive_sha256"]:
+                      temporary.unlink()
+                      raise SystemExit("external artifact digest mismatch")
+              temporary.replace(destination)
+          '
+
+      - name: Extract and bind held public input roots
+        env:
+          PYTHONPATH: qualification-source/src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -c '
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              PUBLIC_INPUTS_ARTIFACT,
+              MANYLINUX_ADMISSION_ARTIFACT,
+              extract_public_external_artifact,
+          )
+          temp = Path(os.environ["RUNNER_TEMP"])
+          extract_public_external_artifact(
+              temp / "tfnf-070-external-archives" / f"{{PUBLIC_INPUTS_ARTIFACT}}.zip",
+              temp / "tfnf-070-public-inputs",
+              artifact_name=PUBLIC_INPUTS_ARTIFACT,
+          )
+          extract_public_external_artifact(
+              temp / "tfnf-070-external-archives" / f"{{MANYLINUX_ADMISSION_ARTIFACT}}.zip",
+              temp / "tfnf-070-external-manylinux",
+              artifact_name=MANYLINUX_ADMISSION_ARTIFACT,
+          )
+          '
 
       - name: Authenticate retained archives and stage verified distribution
         env:
@@ -4139,9 +4677,42 @@ def publication_resume_job_text() -> str:
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish prepare-resume \\
             --publisher-dir publisher-authority \\
             --qualification-dir qualification-source \\
+            --qualification-inputs "${{{{ runner.temp }}}}/tfnf-070-public-inputs/{PUBLIC_INPUTS_DESCRIPTOR}" \\
+            --inrun-root "${{{{ runner.temp }}}}/tfnf-070-public-inputs" \\
             --api-dir "${{{{ runner.temp }}}}/tfnf-070-api" \\
             --archives-dir "${{{{ runner.temp }}}}/tfnf-070-archives" \\
             --output "${{{{ runner.temp }}}}/tfnf-070-resume"
+
+      - name: Verify external Stage-B and Stage-A bindings
+        env:
+          PYTHONPATH: qualification-source/src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -c '
+          import hashlib, os
+          from pathlib import Path
+          temp = Path(os.environ["RUNNER_TEMP"])
+          resume = temp / "tfnf-070-resume"
+          external = temp / "tfnf-070-external-manylinux"
+          names = (
+              "manylinux_admission.json",
+              "consumers/linux-arm64-gnu/floor.json",
+              "consumers/linux-arm64-gnu/newer.json",
+              "consumers/linux-x64-gnu/floor.json",
+              "consumers/linux-x64-gnu/newer.json",
+          )
+          from rs9.tf_pypi_nebular070_publish import _resume_stage_b_member_path
+          for name in names:
+              left = external / name
+              right = _resume_stage_b_member_path(resume, name)
+              if left.read_bytes() != right.read_bytes():
+                  raise SystemExit("external Stage-B binding mismatch")
+          stage_a = temp / "tfnf-070-public-inputs" / "{PUBLIC_STAGE_A_OUTPUT}" / "payload-portability.json"
+          resumed_stage_a = resume / "payload_portability.json"
+          if hashlib.sha256(stage_a.read_bytes()).digest() != hashlib.sha256(resumed_stage_a.read_bytes()).digest():
+              raise SystemExit("external Stage-A binding mismatch")
+          '
 
       - name: Resolve captured 0.7.0 manylinux source coordinates
         id: manylinux_source
@@ -4180,6 +4751,8 @@ def publication_resume_job_text() -> str:
             --manylinux-admission "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_ADMISSION_MEMBER}" \\
             --manylinux-consumer-receipts "${{{{ runner.temp }}}}/tfnf-070-resume/manylinux-consumers" \\
             --payload-portability "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_STAGE_A_MEMBER}" \\
+            --qualification-inputs "${{{{ runner.temp }}}}/tfnf-070-public-inputs/{PUBLIC_INPUTS_DESCRIPTOR}" \\
+            --inrun-root "${{{{ runner.temp }}}}/tfnf-070-public-inputs" \\
             --tf-producer-commit "${{{{ steps.manylinux_source.outputs.tf_producer_commit }}}}" \\
             --tf-producer-tree "${{{{ steps.manylinux_source.outputs.tf_producer_tree }}}}" \\
             --attempt-marker "${{{{ runner.temp }}}}/tfnf-070-upload-attempt.json" >> "$GITHUB_OUTPUT"
@@ -4198,6 +4771,8 @@ def publication_resume_job_text() -> str:
             --manylinux-consumer-receipts "${{{{ runner.temp }}}}/tfnf-070-resume/manylinux-consumers" \\
             --matrix-receipt "${{{{ runner.temp }}}}/tfnf-070-resume/{MATRIX_RECEIPT_MEMBER}" \\
             --payload-portability "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_STAGE_A_MEMBER}" \\
+            --qualification-inputs "${{{{ runner.temp }}}}/tfnf-070-public-inputs/{PUBLIC_INPUTS_DESCRIPTOR}" \\
+            --inrun-root "${{{{ runner.temp }}}}/tfnf-070-public-inputs" \\
             --tf-producer-commit "${{{{ steps.manylinux_source.outputs.tf_producer_commit }}}}" \\
             --tf-producer-tree "${{{{ steps.manylinux_source.outputs.tf_producer_tree }}}}"
 
@@ -4253,6 +4828,567 @@ def qualification_inputs_path(repository: str | Path | None = None) -> Path:
     path = repo_root(repository) / QUALIFICATION_INPUTS_PATH
     _check_no_symlinks(path, "QUALIFICATION_INPUTS_SYMLINK")
     return path
+
+
+def _public_relative_path(value: Any, code: str) -> str:
+    """Validate a private transport-relative path without resolving links."""
+    if (
+        not isinstance(value, str)
+        or not value
+        or value.startswith("/")
+        or "\\" in value
+        or value in (".", "..")
+        or ".." in Path(value).parts
+        or any(part in ("", ".") for part in value.split("/"))
+    ):
+        fail(code)
+    return value
+
+
+def _public_stage_a_output_from_descriptor(doc: Mapping[str, Any]) -> str:
+    """Return the descriptor-bound Stage-A directory, never a caller-selected path."""
+    manylinux = doc.get("manylinux")
+    if (
+        not isinstance(manylinux, Mapping)
+        or manylinux.get("schema") != PUBLIC_INRUN_MANYLINUX_SCHEMA
+        or manylinux.get("origin_kind") != PUBLIC_INRUN_MANYLINUX_ORIGIN_KIND
+    ):
+        fail("PUBLIC_INPUTS_STAGE_A_DESCRIPTOR")
+    stage_a = manylinux.get("stage_a")
+    if not isinstance(stage_a, Mapping):
+        fail("PUBLIC_INPUTS_STAGE_A_DESCRIPTOR")
+    stage_a_path = _public_relative_path(stage_a.get("path"), "PUBLIC_INPUTS_STAGE_A_DESCRIPTOR")
+    if not stage_a_path.endswith("/payload-portability.json"):
+        fail("PUBLIC_INPUTS_STAGE_A_DESCRIPTOR")
+    output = stage_a_path.rsplit("/", 1)[0]
+    if not output or output == ".":
+        fail("PUBLIC_INPUTS_STAGE_A_DESCRIPTOR")
+    return _public_relative_path(output, "PUBLIC_INPUTS_STAGE_A_DESCRIPTOR")
+
+
+def _load_public_stage_a_adapter() -> ModuleType:
+    """Load the separately maintained detached-file Stage-A adapter.
+
+    The adapter is deliberately not copied into this publisher candidate.  A
+    workflow run must use the independently maintained implementation, and a
+    missing adapter is a held, fail-closed input error rather than permission
+    to synthesize a payload or receipt here.
+    """
+    try:
+        module = importlib.import_module("rs9.nebular070_public_stagea_files")
+        assembler = getattr(module, "assemble_stage_a_files")
+        binder = getattr(module, "bind_descriptor_phase")
+    except (ImportError, AttributeError):
+        fail("PUBLIC_STAGE_A_ADAPTER")
+    if not callable(assembler) or not callable(binder):
+        fail("PUBLIC_STAGE_A_ADAPTER")
+    return module
+
+
+def _read_public_descriptor_bind_output(
+    root: Path,
+    descriptor_path: Path,
+    stage_path: str,
+    result: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Authenticate the maintained Stage-A descriptor binder result."""
+    old_bytes = physical_bytes(root / PUBLIC_INPUTS_TEMPLATE_DESCRIPTOR, limit=4 * 1024 * 1024)
+    try:
+        old_descriptor = strict_json(old_bytes)
+    except (AdmissionError, OSError, ValueError):
+        fail("PUBLIC_INPUTS_DESCRIPTOR_BIND")
+    evidence = old_descriptor.get("evidence") if isinstance(old_descriptor, Mapping) else None
+    if not isinstance(evidence, Mapping):
+        fail("PUBLIC_INPUTS_DESCRIPTOR_BIND")
+    evidence_root = _public_relative_path(
+        evidence.get("source_root"), "PUBLIC_INPUTS_DESCRIPTOR_BIND"
+    )
+    artifact_stage_path = _public_relative_path(stage_path, "PUBLIC_INPUTS_DESCRIPTOR_BIND")
+    if artifact_stage_path == evidence_root:
+        fail("PUBLIC_INPUTS_DESCRIPTOR_BIND")
+    if artifact_stage_path.startswith(evidence_root + "/"):
+        evidence_stage_path = artifact_stage_path[len(evidence_root) + 1:]
+    else:
+        evidence_stage_path = artifact_stage_path
+        artifact_stage_path = f"{evidence_root}/{evidence_stage_path}"
+    stage_entry = result.get("stage_file")
+    if (
+        set(result)
+        != {
+            "schema",
+            "status",
+            "phase",
+            "role",
+            "old_descriptor_sha256",
+            "new_descriptor_sha256",
+            "stage_file",
+        }
+        or result.get("schema") != "rs9.nebular070-public-descriptor-bind.v1"
+        or result.get("status") != "pass"
+        or result.get("phase") != QUALIFICATION_INPUT_PHASE_PREP
+        or result.get("role") != "stage_a"
+        or not isinstance(stage_entry, Mapping)
+        or set(stage_entry) != {"path", "size", "sha256"}
+        or stage_entry.get("path") != evidence_stage_path
+        or type(stage_entry.get("size")) is not int
+        or stage_entry.get("size") < 0
+        or not _is_hex64(stage_entry.get("sha256"))
+        or not _is_hex64(result.get("old_descriptor_sha256"))
+        or not _is_hex64(result.get("new_descriptor_sha256"))
+    ):
+        fail("PUBLIC_INPUTS_DESCRIPTOR_BIND")
+    new_bytes = physical_bytes(descriptor_path, limit=4 * 1024 * 1024)
+    stage_bytes = physical_bytes(root / artifact_stage_path, limit=MAX_INPUT_BYTES)
+    if (
+        sha256(old_bytes) != result["old_descriptor_sha256"]
+        or sha256(new_bytes) != result["new_descriptor_sha256"]
+        or stage_entry["size"] != len(stage_bytes)
+        or stage_entry["sha256"] != sha256(stage_bytes)
+    ):
+        fail("PUBLIC_INPUTS_DESCRIPTOR_BIND")
+    return {
+        "schema": result["schema"],
+        "phase": result["phase"],
+        "role": result["role"],
+        "descriptor": {
+            "path": PUBLIC_INPUTS_DESCRIPTOR,
+            "bytes": len(new_bytes),
+            "sha256": sha256(new_bytes),
+        },
+        "stage_file": dict(stage_entry),
+        "stage_artifact_path": artifact_stage_path,
+    }
+
+
+def _read_public_stage_a_output(
+    root: Path,
+    output_rel: str,
+    result: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Authenticate the adapter's bounded output using the returned bytes."""
+    if (
+        set(result) != {"schema", "status", "output", "payload_sha256", "receipt_sha256"}
+        or result.get("status") != "pass"
+        or not isinstance(result.get("schema"), str)
+        or result.get("output") != output_rel
+        or not _is_hex64(result.get("payload_sha256"))
+        or not _is_hex64(result.get("receipt_sha256"))
+    ):
+        fail("PUBLIC_INPUTS_STAGE_A_RESULT")
+    output_dir = root / output_rel
+    payload_path = output_dir / "payload-portability.json"
+    receipt_path = output_dir / "stage-a-receipt.json"
+    _check_no_symlinks(output_dir, "PUBLIC_INPUTS_STAGE_A_OUTPUT")
+    _check_no_symlinks(payload_path, "PUBLIC_INPUTS_STAGE_A_OUTPUT")
+    _check_no_symlinks(receipt_path, "PUBLIC_INPUTS_STAGE_A_OUTPUT")
+    payload = physical_bytes(payload_path, limit=MAX_INPUT_BYTES)
+    receipt = physical_bytes(receipt_path, limit=4 * 1024 * 1024)
+    if sha256(payload) != result["payload_sha256"] or sha256(receipt) != result["receipt_sha256"]:
+        fail("PUBLIC_INPUTS_STAGE_A_RESULT")
+    return {
+        "schema": result["schema"],
+        "output": output_rel,
+        "payload": {
+            "path": f"{output_rel}/payload-portability.json",
+            "bytes": len(payload),
+            "sha256": sha256(payload),
+        },
+        "receipt": {
+            "path": f"{output_rel}/stage-a-receipt.json",
+            "bytes": len(receipt),
+            "sha256": sha256(receipt),
+        },
+    }
+
+
+PUBLIC_INPUTS_ARTIFACT_MAX_BYTES = 1024 * 1024 * 1024 + 64 * 1024 * 1024
+PUBLIC_EXTERNAL_ARTIFACT_NAMES = frozenset({
+    PUBLIC_INPUTS_ARTIFACT,
+    MANYLINUX_ADMISSION_ARTIFACT,
+})
+
+
+def validate_public_external_artifact_metadata(
+    api_dir: str | Path,
+    *,
+    capture: Mapping[str, Any],
+    names: Sequence[str] = tuple(sorted(PUBLIC_EXTERNAL_ARTIFACT_NAMES)),
+) -> dict[str, dict[str, Any]]:
+    """Validate same-run GitHub artifact metadata for the external input roots.
+
+    The public-input artifact is intentionally not part of the historical
+    qualification capture schema.  It is therefore bound to the captured run
+    using the run/head/repository fields and the server's immutable artifact
+    identity, while the already-captured Stage-B artifact is additionally
+    compared with its historical artifact row.
+    """
+    if not isinstance(capture, Mapping):
+        fail("PUBLIC_EXTERNAL_ARTIFACTS")
+    requested = tuple(names)
+    if not requested or set(requested) != PUBLIC_EXTERNAL_ARTIFACT_NAMES:
+        fail("PUBLIC_EXTERNAL_ARTIFACTS")
+    a_dir = _require_real_directory(api_dir, "PUBLIC_EXTERNAL_ARTIFACTS")
+    artifacts_path = a_dir / "artifacts.json"
+    _check_no_symlinks(artifacts_path, "PUBLIC_EXTERNAL_ARTIFACTS")
+    if not artifacts_path.is_file():
+        fail("PUBLIC_EXTERNAL_ARTIFACTS")
+    doc = strict_json(physical_bytes(artifacts_path, limit=4 * 1024 * 1024))
+    rows = doc.get("artifacts") if isinstance(doc, Mapping) else None
+    if not isinstance(rows, list):
+        fail("PUBLIC_EXTERNAL_ARTIFACTS")
+    by_name: dict[str, Mapping[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            fail("PUBLIC_EXTERNAL_ARTIFACTS")
+        name = row.get("name")
+        if name in requested:
+            if name in by_name:
+                fail("PUBLIC_EXTERNAL_ARTIFACTS")
+            by_name[str(name)] = row
+    if set(by_name) != set(requested):
+        fail("PUBLIC_EXTERNAL_ARTIFACTS")
+
+    repository = capture.get("repository")
+    run_id = capture.get("run_id")
+    head_sha = capture.get("qualification_source_commit")
+    head_branch = capture.get("head_branch")
+    if (
+        not isinstance(repository, str)
+        or type(run_id) is not int
+        or run_id <= 0
+        or not _is_hex40(head_sha)
+        or head_branch not in {"main", QUALIFY_BRANCH}
+    ):
+        fail("PUBLIC_EXTERNAL_ARTIFACTS")
+    result: dict[str, dict[str, Any]] = {}
+    historical = capture.get("artifacts")
+    for name in requested:
+        row = by_name[name]
+        art_id = row.get("id")
+        size = row.get("size_in_bytes")
+        url = row.get("archive_download_url")
+        workflow_run = row.get("workflow_run")
+        digest_value = row.get("digest")
+        digest_hex = (
+            digest_value[7:]
+            if isinstance(digest_value, str) and digest_value.startswith("sha256:")
+            else None
+        )
+        if (
+            type(art_id) is not int
+            or art_id <= 0
+            or type(size) is not int
+            or not 0 < size <= PUBLIC_INPUTS_ARTIFACT_MAX_BYTES
+            or row.get("expired") is not False
+            or url != f"https://api.github.com/repos/{repository}/actions/artifacts/{art_id}/zip"
+            or not isinstance(workflow_run, Mapping)
+            or workflow_run.get("id") != run_id
+            or workflow_run.get("head_sha") != head_sha
+            or workflow_run.get("head_branch") != head_branch
+            or (
+                digest_value is not None
+                and (
+                    not isinstance(digest_value, str)
+                    or not digest_value.startswith("sha256:")
+                    or not _is_hex64(digest_hex)
+                )
+            )
+        ):
+            fail("PUBLIC_EXTERNAL_ARTIFACTS")
+        expected = historical.get(name) if isinstance(historical, Mapping) else None
+        archive_sha256 = digest_hex
+        if name == MANYLINUX_ADMISSION_ARTIFACT:
+            if (
+                not isinstance(expected, Mapping)
+                or expected.get("id") != art_id
+                or expected.get("size_in_bytes") != size
+                or expected.get("archive_download_url") != url
+                or (
+                    digest_hex is not None
+                    and expected.get("archive_sha256") != digest_hex
+                )
+            ):
+                fail("PUBLIC_EXTERNAL_ARTIFACTS")
+            archive_sha256 = expected.get("archive_sha256")
+            if not _is_hex64(archive_sha256):
+                fail("PUBLIC_EXTERNAL_ARTIFACTS")
+        result[name] = {
+            "id": art_id,
+            "size_in_bytes": size,
+            "archive_download_url": url,
+            "archive_sha256": archive_sha256,
+        }
+    return result
+
+
+def extract_public_external_artifact(
+    archive: str | Path,
+    output: str | Path,
+    *,
+    artifact_name: str,
+) -> dict[str, Any]:
+    """Extract one held workflow artifact with a closed, no-follow ZIP boundary."""
+    if artifact_name not in PUBLIC_EXTERNAL_ARTIFACT_NAMES:
+        fail("PUBLIC_EXTERNAL_ARTIFACT")
+    archive_path = Path(archive)
+    _check_no_symlinks(archive_path, "PUBLIC_EXTERNAL_ARTIFACT")
+    if not archive_path.is_file():
+        fail("PUBLIC_EXTERNAL_ARTIFACT")
+    output_path = Path(output)
+    if not output_path.is_absolute():
+        fail("PUBLIC_EXTERNAL_ARTIFACT")
+    _check_no_symlinks(output_path, "PUBLIC_EXTERNAL_ARTIFACT")
+    if output_path.exists() and (not output_path.is_dir() or any(output_path.iterdir())):
+        fail("PUBLIC_EXTERNAL_ARTIFACT")
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            infos = zf.infolist()
+            if not infos or len(infos) > 1024:
+                fail("PUBLIC_EXTERNAL_ARTIFACT")
+            seen: set[str] = set()
+            files: list[zipfile.ZipInfo] = []
+            total = 0
+            for info in infos:
+                name = info.filename
+                if (
+                    not name
+                    or name.startswith("/")
+                    or "\\" in name
+                    or any(part in ("", ".", "..") for part in name.rstrip("/").split("/"))
+                    or name in seen
+                ):
+                    fail("PUBLIC_EXTERNAL_ARTIFACT")
+                seen.add(name)
+                file_type = (info.external_attr >> 16) & 0o170000
+                if file_type == stat.S_IFLNK:
+                    fail("PUBLIC_EXTERNAL_ARTIFACT")
+                if info.is_dir():
+                    if info.file_size != 0:
+                        fail("PUBLIC_EXTERNAL_ARTIFACT")
+                    continue
+                if file_type not in (0, stat.S_IFREG):
+                    fail("PUBLIC_EXTERNAL_ARTIFACT")
+                if info.file_size <= 0 or info.file_size > MAX_WHEEL_FILE_BYTES:
+                    fail("PUBLIC_EXTERNAL_ARTIFACT")
+                total += info.file_size
+                if total > PUBLIC_INPUTS_ARTIFACT_MAX_BYTES:
+                    fail("PUBLIC_EXTERNAL_ARTIFACT")
+                files.append(info)
+            file_names = {info.filename for info in files}
+            if artifact_name == MANYLINUX_ADMISSION_ARTIFACT:
+                if file_names != MANYLINUX_ADMISSION_MEMBERS:
+                    fail("PUBLIC_EXTERNAL_ARTIFACT")
+            else:
+                required = {
+                    PUBLIC_INPUTS_TEMPLATE_DESCRIPTOR,
+                    PUBLIC_INPUTS_DESCRIPTOR,
+                    "fetch-receipt.json",
+                    PUBLIC_INPUTS_PREPARATION_RECEIPT,
+                    f"{PUBLIC_STAGE_A_OUTPUT}/payload-portability.json",
+                    f"{PUBLIC_STAGE_A_OUTPUT}/stage-a-receipt.json",
+                }
+                if not required.issubset(file_names):
+                    fail("PUBLIC_EXTERNAL_ARTIFACT")
+            for info in files:
+                dest = output_path / info.filename
+                _check_no_symlinks(dest.parent, "PUBLIC_EXTERNAL_ARTIFACT")
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                _check_no_symlinks(dest, "PUBLIC_EXTERNAL_ARTIFACT")
+                with zf.open(info, "r") as source, dest.open("xb") as target:
+                    remaining = info.file_size
+                    while remaining:
+                        chunk = source.read(min(1024 * 1024, remaining))
+                        if not chunk:
+                            fail("PUBLIC_EXTERNAL_ARTIFACT")
+                        target.write(chunk)
+                        remaining -= len(chunk)
+                    if source.read(1):
+                        fail("PUBLIC_EXTERNAL_ARTIFACT")
+    except ContractError:
+        raise
+    except (OSError, zipfile.BadZipFile, RuntimeError, ValueError):
+        fail("PUBLIC_EXTERNAL_ARTIFACT")
+    return {
+        "artifact": artifact_name,
+        "archive_sha256": sha256(physical_bytes(archive_path, limit=PUBLIC_INPUTS_ARTIFACT_MAX_BYTES)),
+        "members": sorted(file_names),
+    }
+
+
+def prepare_public_inputs_070(
+    manifest: str | Path,
+    output: str | Path,
+    *,
+    repository: str | Path | None = None,
+    stage_a_spec: str = PUBLIC_STAGE_A_SPEC,
+    rs9_source: Mapping[str, str],
+    tf_producer_source: Mapping[str, str] = PUBLIC_TF_PRODUCER_SOURCE,
+) -> dict[str, Any]:
+    """Prepare the held public input root and detached Stage-A payload.
+
+    The generic transport owns release-asset download/authentication.  The
+    maintained Stage-A adapter owns source/runtime/body joins.  This caller
+    only binds those two already-authenticated stages to the current checkout
+    and validates the descriptor after Stage-A exists; it never manufactures
+    qualification facts.
+    """
+    root = repo_root(repository)
+    manifest_path = Path(manifest)
+    # The tracked manifest is repository-relative.  Keeping this boundary
+    # relative prevents a private runner path from entering the held receipt
+    # or accidentally selecting an untracked host file.
+    if manifest_path.is_absolute():
+        fail("PUBLIC_INPUTS_MANIFEST")
+    if not isinstance(rs9_source, Mapping) or set(rs9_source) != {"commit", "tree"}:
+        fail("PUBLIC_INPUTS_SOURCE")
+    if not _is_hex40(rs9_source.get("commit")) or not _is_hex40(rs9_source.get("tree")):
+        fail("PUBLIC_INPUTS_SOURCE")
+    if not isinstance(tf_producer_source, Mapping) or set(tf_producer_source) != {"commit", "tree"}:
+        fail("PUBLIC_INPUTS_SOURCE")
+    if not _is_hex40(tf_producer_source.get("commit")) or not _is_hex40(tf_producer_source.get("tree")):
+        fail("PUBLIC_INPUTS_SOURCE")
+    spec_rel = _public_relative_path(stage_a_spec, "PUBLIC_INPUTS_STAGE_A_SPEC")
+    output_path = Path(output)
+    if not output_path.is_absolute():
+        fail("PUBLIC_INPUTS_OUTPUT")
+    _check_no_symlinks(output_path, "PUBLIC_INPUTS_OUTPUT")
+    if output_path.exists():
+        fail("PUBLIC_INPUTS_OUTPUT")
+
+    try:
+        from rs9.nebular070_public_inputs import materialize_public_inputs
+
+        transport = materialize_public_inputs(
+            manifest_path, output_path, repository_root=root
+        )
+        template_descriptor_path = output_path / PUBLIC_INPUTS_TEMPLATE_DESCRIPTOR
+        template_descriptor_bytes = physical_bytes(
+            template_descriptor_path, limit=4 * 1024 * 1024
+        )
+        descriptor = strict_json(template_descriptor_bytes)
+        if not isinstance(descriptor, Mapping):
+            fail("PUBLIC_INPUTS_DESCRIPTOR")
+        evidence = descriptor.get("evidence")
+        if not isinstance(evidence, Mapping) or not isinstance(evidence.get("source_root"), str):
+            fail("PUBLIC_INPUTS_STAGE_A_DESCRIPTOR")
+        evidence_root = _public_relative_path(
+            evidence["source_root"], "PUBLIC_INPUTS_STAGE_A_DESCRIPTOR"
+        )
+        output_rel = f"{evidence_root}/generated-stage-a"
+        if output_rel != PUBLIC_STAGE_A_OUTPUT:
+            fail("PUBLIC_INPUTS_STAGE_A_DESCRIPTOR")
+        spec_path = output_path / spec_rel
+        _check_no_symlinks(spec_path, "PUBLIC_INPUTS_STAGE_A_SPEC")
+        if not spec_path.is_file():
+            fail("PUBLIC_INPUTS_STAGE_A_SPEC")
+
+        adapter = _load_public_stage_a_adapter()
+        assembler = adapter.assemble_stage_a_files
+        binder = adapter.bind_descriptor_phase
+        stage_result = assembler(
+            repository=root,
+            input_root=output_path,
+            spec=spec_rel,
+            output=output_rel,
+            expected_rs9_commit=str(rs9_source["commit"]),
+            expected_rs9_tree=str(rs9_source["tree"]),
+            expected_tf_producer_commit=str(tf_producer_source["commit"]),
+            expected_tf_producer_tree=str(tf_producer_source["tree"]),
+        )
+        if not isinstance(stage_result, Mapping):
+            fail("PUBLIC_INPUTS_STAGE_A_RESULT")
+        stage = _read_public_stage_a_output(output_path, output_rel, stage_result)
+
+        # The transport descriptor is an immutable template.  The maintained
+        # binder creates a fresh, phase-specific descriptor after the detached
+        # Stage-A bytes exist; callers must never relabel the template itself.
+        prepared_descriptor_path = output_path / PUBLIC_INPUTS_DESCRIPTOR
+        bind_result = binder(
+            descriptor_path=template_descriptor_path,
+            stage_file=stage["payload"]["path"],
+            output_path=prepared_descriptor_path,
+            repository=root,
+            inrun_root=output_path,
+            phase=QUALIFICATION_INPUT_PHASE_PREP,
+        )
+        if not isinstance(bind_result, Mapping):
+            fail("PUBLIC_INPUTS_DESCRIPTOR_BIND")
+        binding = _read_public_descriptor_bind_output(
+            output_path,
+            prepared_descriptor_path,
+            stage["payload"]["path"],
+            bind_result,
+        )
+        prepared_descriptor_bytes = physical_bytes(
+            prepared_descriptor_path, limit=4 * 1024 * 1024
+        )
+
+        # The descriptor is validated only after the adapter has created the
+        # descriptor-declared Stage-A member.  External roots are accepted by
+        # the maintained public-in-run route; bootstrap/expectations remain
+        # checkout-owned and unchanged.
+        validated = load_qualification_inputs_descriptor(
+            prepared_descriptor_path,
+            repository=root,
+            pending_code="PUBLIC_INPUTS_DESCRIPTOR_PENDING",
+            phase=QUALIFICATION_INPUT_PHASE_PREP,
+            inrun_root=output_path,
+        )
+        manylinux = validated.get("manylinux")
+        if not isinstance(manylinux, Mapping):
+            fail("PUBLIC_INPUTS_STAGE_A_DESCRIPTOR")
+        stage_a_binding = manylinux.get("stage_a")
+        if (
+            not isinstance(stage_a_binding, Mapping)
+            or stage_a_binding.get("path") != binding["stage_file"]["path"]
+            or binding.get("stage_artifact_path") != stage["payload"]["path"]
+        ):
+            fail("PUBLIC_INPUTS_STAGE_A_DESCRIPTOR")
+        receipt_bytes = canonical(transport)
+        prep = {
+            "schema": PUBLIC_INPUTS_PREPARATION_SCHEMA,
+            "status": "held",
+            "manifest": {
+                "path": manifest_path.as_posix(),
+                "sha256": transport["manifest_sha256"],
+                "release_id": transport["release_id"],
+            },
+            "transport": {
+                "schema": transport["schema"],
+                "receipt_sha256": sha256(receipt_bytes),
+                "descriptor": transport["descriptor"],
+                "metadata": transport["metadata"],
+                "payloads": transport["payloads"],
+            },
+            "descriptor": {
+                "path": PUBLIC_INPUTS_DESCRIPTOR,
+                "bytes": len(prepared_descriptor_bytes),
+                "sha256": sha256(prepared_descriptor_bytes),
+            },
+            "template_descriptor": {
+                "path": PUBLIC_INPUTS_TEMPLATE_DESCRIPTOR,
+                "bytes": len(template_descriptor_bytes),
+                "sha256": sha256(template_descriptor_bytes),
+            },
+            "stage_a": stage,
+            "binding": binding,
+            "source": {
+                "rs9": dict(rs9_source),
+                "tf_producer": dict(tf_producer_source),
+            },
+        }
+        prep_path = output_path / PUBLIC_INPUTS_PREPARATION_RECEIPT
+        _check_no_symlinks(prep_path, "PUBLIC_INPUTS_OUTPUT")
+        with prep_path.open("xb") as stream:
+            stream.write(canonical(prep))
+        return prep
+    except Exception:
+        # The transport owns its own partial-output cleanup.  Once Stage-A has
+        # started, this caller must not recursively delete a root it did not
+        # create; the run remains diagnosable and the workflow is held.
+        raise
 
 
 def _validate_file_digest_entry(
@@ -4387,6 +5523,8 @@ def _resolve_inrun_artifact_root(
 def _validate_descriptor_target_raw_release(
     target: str,
     t_entry: Any,
+    *,
+    evidence_files: Mapping[str, Any] | None = None,
 ) -> None:
     if (
         not isinstance(t_entry, Mapping)
@@ -4420,6 +5558,15 @@ def _validate_descriptor_target_raw_release(
     nc_target = nc_map.get(target)
     if not isinstance(nc_target, Mapping):
         fail("QUALIFICATION_INPUTS_RAW_RELEASE")
+    if "smoke_support" in nc_target:
+        from rs9.nebular070_smoke_support import validate_smoke_support
+        try:
+            validate_smoke_support(
+                nc_target["smoke_support"], target,
+                evidence_files=evidence_files, descriptor=evidence_files is not None,
+            )
+        except AdmissionError:
+            fail("QUALIFICATION_INPUTS_RAW_RELEASE")
     _validate_file_digest_entry(
         nc_target.get("qualification"), code="QUALIFICATION_INPUTS_RAW_RELEASE"
     )
@@ -4670,7 +5817,9 @@ def validate_qualification_inputs_descriptor(
     if not isinstance(rr_targets, Mapping) or set(rr_targets.keys()) != set(TARGETS):
         fail("QUALIFICATION_INPUTS_RAW_RELEASE")
     for target in TARGETS:
-        _validate_descriptor_target_raw_release(target, rr_targets.get(target))
+        _validate_descriptor_target_raw_release(
+            target, rr_targets.get(target), evidence_files=ev_files,
+        )
     validated = json.loads(canonical(doc))
     if manylinux_spec is not None:
         validated["manylinux"] = manylinux_spec
@@ -4977,7 +6126,27 @@ def _verify_handoff_matches_descriptor(
                 nc_desc["smoke"][channel][kind],
             )
     for meta_k in set(nc_desc.keys()) - {"qualification", "smoke"}:
-        if nc_hand.get(meta_k) != nc_desc.get(meta_k):
+        if meta_k == "smoke_support":
+            from rs9.nebular070_smoke_support import validate_smoke_support
+            descriptor_support = validate_smoke_support(
+                nc_desc[meta_k], target, descriptor=True,
+            )
+            handoff_support = validate_smoke_support(
+                nc_hand.get(meta_k), target,
+            )
+            descriptor_support["files"] = [
+                {key: item[key] for key in ("path", "size", "sha256", "blob", "role")}
+                for item in descriptor_support["files"]
+            ]
+            descriptor_support["source_binding"] = {
+                kind: {
+                    key: ref[key] for key in ("path", "size", "sha256")
+                }
+                for kind, ref in descriptor_support["source_binding"].items()
+            }
+            if handoff_support != descriptor_support:
+                fail("RAW_RELEASE_HANDOFF_BINDING")
+        elif nc_hand.get(meta_k) != nc_desc.get(meta_k):
             fail("RAW_RELEASE_HANDOFF_BINDING")
 
 
@@ -5072,6 +6241,28 @@ def validate_raw_release_handoff_binding(
             fail("RAW_RELEASE_HANDOFF_SCHEMA")
         _verify_bound_file(ch_spec.get("run"))
         _verify_bound_file(ch_spec.get("receipt"))
+
+    if "smoke_support" in nc_target:
+        from rs9.nebular070_smoke_support import (
+            SOURCE_ARCHIVE_SIZE,
+            SOURCE_AUTHORITY_SIZE,
+            validate_smoke_support,
+            verify_source_binding,
+        )
+        support = validate_smoke_support(nc_target["smoke_support"], target)
+        for item in support["files"]:
+            _verify_bound_file({
+                "path": f"{support['root']}/{item['path']}",
+                "size": item["size"],
+                "sha256": item["sha256"],
+            })
+        for ref in support["source_binding"].values():
+            _verify_bound_file({
+                "path": f"{support['root']}/{ref['path']}",
+                "size": ref["size"],
+                "sha256": ref["sha256"],
+            })
+        verify_source_binding(root_dir, support)
 
     loader_spec = nc_target.get("loader")
     closure_spec = nc_target.get("provider_closure")
@@ -5252,6 +6443,9 @@ def materialize_raw_release_handoff(
     artifact_root = _resolve_inrun_artifact_root(
         root, descriptor.get("manylinux"), inrun_root
     )
+    ev_root_raw = _validate_repo_relative_dir_spec(
+        descriptor["evidence"]["source_root"], code="QUALIFICATION_INPUTS_EVIDENCE"
+    )
     src_dir = _resolve_repo_contained_dir(
         artifact_root,
         rr_spec["source_root"],
@@ -5307,6 +6501,59 @@ def materialize_raw_release_handoff(
             nc_entry["smoke"][channel]["receipt"] = _stage_entry(
                 nc_entry["smoke"][channel]["receipt"]
             )
+        if "smoke_support" in nc_entry:
+            from rs9.nebular070_smoke_support import (
+                SOURCE_ARCHIVE_SIZE,
+                SOURCE_AUTHORITY_SIZE,
+                validate_smoke_support,
+            )
+            support = validate_smoke_support(
+                nc_entry["smoke_support"], target,
+                evidence_files=descriptor["evidence"]["files"], descriptor=True,
+            )
+            # Descriptor-only evidence_path fields must not leak into the
+            # staged handoff.  The consumer receives the normalized closure
+            # and the raw handoff validator intentionally accepts only the
+            # executable path/size/digest/blob/role records.
+            handoff_support = dict(support)
+            handoff_support["files"] = [
+                {key: item[key] for key in ("path", "size", "sha256", "blob", "role")}
+                for item in support["files"]
+            ]
+            handoff_support["source_binding"] = {
+                kind: {
+                    key: ref[key] for key in ("path", "size", "sha256")
+                }
+                for kind, ref in support["source_binding"].items()
+            }
+            nc_entry["smoke_support"] = handoff_support
+            evidence_dir = artifact_root / ev_root_raw
+            for item in support["files"]:
+                evidence_file = evidence_dir / item["evidence_path"]
+                _check_no_symlinks(evidence_file, "RAW_RELEASE_SYMLINK")
+                data = physical_bytes(evidence_file, limit=8 * 1024 * 1024)
+                if len(data) != item["size"] or sha256(data) != item["sha256"]:
+                    fail("RAW_RELEASE_HANDOFF_DIGEST")
+                destination = stage_dir / support["root"] / item["path"]
+                _check_no_symlinks(destination.parent, "RAW_RELEASE_SYMLINK")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if destination.exists() or destination.is_symlink():
+                    fail("RAW_RELEASE_HANDOFF_OUTPUT")
+                with destination.open("xb") as stream:
+                    stream.write(data)
+            for ref in support["source_binding"].values():
+                evidence_file = evidence_dir / ref["evidence_path"]
+                _check_no_symlinks(evidence_file, "RAW_RELEASE_SYMLINK")
+                data = physical_bytes(evidence_file, limit=SOURCE_ARCHIVE_SIZE if ref["path"].endswith(".tar.gz") else SOURCE_AUTHORITY_SIZE)
+                if len(data) != ref["size"] or sha256(data) != ref["sha256"]:
+                    fail("RAW_RELEASE_HANDOFF_DIGEST")
+                destination = stage_dir / support["root"] / ref["path"]
+                _check_no_symlinks(destination.parent, "RAW_RELEASE_SYMLINK")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if destination.exists() or destination.is_symlink():
+                    fail("RAW_RELEASE_HANDOFF_OUTPUT")
+                with destination.open("xb") as stream:
+                    stream.write(data)
 
         handoff_doc: dict[str, Any] = {
             "schema": RAW_RELEASE_HANDOFF_SCHEMA,
@@ -5546,6 +6793,7 @@ def qualify_native_target(
     home_dir: str | Path | None = None,
     consumer_host_role: str | None = None,
     consumer_capture_output: str | Path | None = None,
+    smoke_support: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Execute 0.7.0 native consumer qualification for one target with sandbox and user-state guards."""
     capture_path = _validate_consumer_capture_options(
@@ -5709,6 +6957,7 @@ def qualify_native_target(
         sandbox_prefix=eff_prefix,
         real_user_state_snapshot=eff_user_state,
         manylinux_stage_a=manylinux_stage_a,
+        smoke_support=smoke_support,
     )
     out_path = Path(output_path)
     if capture_path is None:
@@ -5991,6 +7240,16 @@ def parser() -> argparse.ArgumentParser:
     b_cmd.add_argument("--require-manylinux", action="store_true")
     b_cmd.add_argument("--require-clean", action="store_true")
 
+    pi_cmd = sub.add_parser("prepare-public-inputs-070")
+    pi_cmd.add_argument("--manifest", type=Path, default=PUBLIC_INPUTS_MANIFEST_PATH)
+    pi_cmd.add_argument("--output", type=Path, required=True)
+    pi_cmd.add_argument("--repository", type=Path, default=None)
+    pi_cmd.add_argument("--stage-a-spec", default=PUBLIC_STAGE_A_SPEC)
+    pi_cmd.add_argument("--rs9-commit", required=True)
+    pi_cmd.add_argument("--rs9-tree", required=True)
+    pi_cmd.add_argument("--tf-producer-commit", default=PUBLIC_TF_PRODUCER_SOURCE["commit"])
+    pi_cmd.add_argument("--tf-producer-tree", default=PUBLIC_TF_PRODUCER_SOURCE["tree"])
+
     mi_cmd = sub.add_parser("materialize-manylinux-inputs")
     mi_cmd.add_argument("--qualification-inputs", type=Path, required=True)
     mi_cmd.add_argument("--evidence", type=Path, required=True)
@@ -6139,6 +7398,20 @@ def main(
                 ),
                 require_manylinux=args.require_manylinux,
                 require_clean=args.require_clean,
+            )
+            sys.stdout.write(canonical(res).decode("utf-8"))
+            return 0
+        if args.operation == "prepare-public-inputs-070":
+            res = prepare_public_inputs_070(
+                args.manifest,
+                args.output,
+                repository=args.repository,
+                stage_a_spec=args.stage_a_spec,
+                rs9_source={"commit": args.rs9_commit, "tree": args.rs9_tree},
+                tf_producer_source={
+                    "commit": args.tf_producer_commit,
+                    "tree": args.tf_producer_tree,
+                },
             )
             sys.stdout.write(canonical(res).decode("utf-8"))
             return 0

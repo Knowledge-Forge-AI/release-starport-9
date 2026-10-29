@@ -12,16 +12,11 @@ from unittest.mock import patch
 import rs9.nebular_lineage as lineage
 from rs9.errors import ContractError
 from rs9.operator import release_bindings, validate_release_binding
-from rs9.release_core import ReleaseCapture, digest
+from rs9.release_core import ReleaseCapture
 from rs9.scratch import canonical
 
 
-PUBLIC_PROVENANCE = Path(
-    "/Users/Shared/agent-scratch/r/triad-20261029-003307-recovery2/"
-    "state/rs9-public-pypi-inputs2/candidate/evidence/public-release/assets/PROVENANCE.json"
-)
 FIXTURE = Path(__file__).parent / "fixtures" / "public-native-provenance-v1.json"
-PUBLIC_PROVENANCE_SHA256 = "535951387716f3100eaab33c8ee28b3d0794cd3a755c2b23f0071c3f5f88e92d"
 CURRENT_PROVENANCE = {
     "path": "PROVENANCE.json",
     "commit_field": "releaseCommit",
@@ -39,11 +34,6 @@ def _fixture_data() -> dict:
 
 
 def _provenance_bytes() -> bytes:
-    if PUBLIC_PROVENANCE.is_file():
-        raw = PUBLIC_PROVENANCE.read_bytes()
-        if digest(raw) != PUBLIC_PROVENANCE_SHA256:
-            raise AssertionError("held public provenance bytes changed")
-        return raw
     return canonical(_fixture_data()["provenance"])
 
 
@@ -99,7 +89,7 @@ class Nebular070NativeDirectLineageTests(unittest.TestCase):
                 patch.object(lineage, "authenticated_tree", return_value=tree):
             return lineage.verify_direct_release_lineage(capture, binding)
 
-    def test_actual_flat_public_provenance_roundtrips_through_release_capture(self):
+    def test_fixture_flat_public_provenance_roundtrips_through_release_capture(self):
         capture, binding = self._capture_and_binding()
         validate_release_binding(binding)
         facts = self._verify(capture, binding)

@@ -7,17 +7,20 @@ as the production assembler calls them.
 """
 from __future__ import annotations
 
+import base64
 import copy
 from dataclasses import replace
 import inspect
+import json
 import unittest
 from pathlib import Path
 from unittest import mock
 
 from rs9.errors import ContractError
+from rs9.nebular070_installed_smoke import _STEPS
 import rs9.nebular070_host_observation as host_observation
 from rs9.nebular070_manylinux import _digest, _wheel_snapshot
-from rs9.tf_pypi_archive import canonical as archive_canonical
+from rs9.tf_pypi_archive import canonical as archive_canonical, sha256
 from rs9.nebular070_public_consumers import (
     CONSUMER_KINDS,
     LINUX_CONSUMER_TARGETS,
@@ -220,12 +223,106 @@ class PublicStageBConsumerTests(unittest.TestCase):
     def _actual_result(self, target="linux-x64-gnu"):
         wheel = self.wheels[target]
         snapshot = _wheel_snapshot(wheel, target, self.fixture.stage_a.digest)
+        scenarios = ("C", "C-signal") if target == "linux-x64-gnu" else ("B",)
+        gui_path = "bin/theme-forge-nebular-fusion"
+        gui_sha = "1" * 64
+        triple = {
+            "linux-arm64-gnu": "aarch64-unknown-linux-gnu",
+            "linux-x64-gnu": "x86_64-unknown-linux-gnu",
+        }[target]
+
+        def artifact(data):
+            return {
+                "schema": "rs9.nebular070-installed-smoke-json-artifact.v1",
+                "encoding": "base64", "media_type": "application/json",
+                "size": len(data), "sha256": sha256(data),
+                "utf8_base64": base64.b64encode(data).decode("ascii"),
+            }
+
+        smoke_cases = []
+        for scenario in scenarios:
+            steps = [
+                {"id": step, "ok": True, "via": "native-rc-smoke", "ms": 1}
+                for step in _STEPS[scenario]
+            ]
+            receipt = {
+                "schema": "nebular.release-smoke-receipt-v1",
+                "applicationVersion": "0.7.0", "scenario": scenario,
+                "status": "pass", "failure": None, "target": triple,
+                "awaitingSignal": scenario == "C-signal",
+                "executable": {"sha256": gui_sha, "size": 1},
+                "driver": {
+                    "status": "pass", "scenario": scenario, "facts": [], "steps": steps,
+                },
+            }
+            receipt_data = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
+            receipt_sha = sha256(receipt_data)
+            checks = {
+                "orphans": [], "persistentUserState": {"changed": []},
+                "scratchHomeWrites": 1,
+                **({"sidecarRunningBeforeSignal": True} if scenario == "C-signal" else {}),
+            }
+            exit_info = (
+                {"code": None, "signal": "SIGTERM",
+                 "signalSent": {"signal": "SIGTERM", "at": 1}, "durationMs": 1}
+                if scenario == "C-signal" else
+                {"code": 0, "signal": None, "signalSent": None, "durationMs": 1}
+            )
+            run = {
+                "schema": "nebular.native-rc-smoke-run-v1", "status": "pass",
+                "platform": "linux-arm64" if target == "linux-arm64-gnu" else "linux-x64",
+                "scenario": scenario, "source": "raw-archive", "problems": [],
+                "executable": {"path": gui_path, "sha256": gui_sha, "size": 1},
+                "checks": checks, "exit": exit_info,
+                "finalization": {
+                    "schema": "nebular.native-rc-finalization-v1", "status": "complete",
+                    "phase": "complete", "exceptionFamily": None, "spawned": True,
+                    "exitObserved": True,
+                    "applicationReceiptObservation": "present-at-read",
+                    "applicationReceiptCopy": "written",
+                },
+                "receipt": {"status": "pass", "sha256": receipt_sha, "steps": steps},
+            }
+            run_data = json.dumps(run, sort_keys=True, separators=(",", ":")).encode()
+            run_sha = sha256(run_data)
+            smoke_cases.append({
+                "schema": "rs9.nebular070-installed-native-smoke.v1",
+                "status": "pass", "qualification_authority": True,
+                "target": target, "scenario": scenario, "source": "raw-archive",
+                "executable": {"path": gui_path, "sha256": gui_sha, "size": 1},
+                "run": {"schema": run["schema"], "status": run["status"],
+                        "sha256": run_sha, "size": len(run_data)},
+                "run_artifact": artifact(run_data),
+                "exit": exit_info, "finalization": run["finalization"],
+                "receipt": {"schema": receipt["schema"], "status": receipt["status"],
+                            "scenario": scenario, "sha256": receipt_sha,
+                            "awaitingSignal": scenario == "C-signal", "steps": steps},
+                "receipt_artifact": artifact(receipt_data),
+                "checks": {
+                    "orphans": [], "persistentUserStateChanged": [], "scratchHomeWrites": 1,
+                    **({"sidecarRunningBeforeSignal": True} if scenario == "C-signal" else {}),
+                },
+                "native_probe": {"status": "pass", "scenario": scenario,
+                                 "cleanup_known": True, "output_complete": True,
+                                 "forced_cleanup": False},
+            })
+        application_smoke = {
+            "schema": "rs9.nebular070-installed-native-smoke.v1",
+            "status": "pass", "qualification_authority": True,
+            "target": target, "source": "raw-archive", "scenarios": smoke_cases,
+            "native_probe": {"status": "pass", "protocol": "nebular.native-rc-smoke",
+                             "scenarios": list(scenarios), "cleanup_known": True,
+                             "output_complete": True, "forced_cleanup": False,
+                             "runs": {entry["scenario"]: entry["run"]["sha256"] for entry in smoke_cases},
+                             "receipts": {entry["scenario"]: entry["receipt"]["sha256"] for entry in smoke_cases}},
+        }
         consumer = {
             "schema": "rs9.nebular070-native-consumer.v1",
             "status": "native-consumer-passed",
             "fixture_only": False,
             "native_qualified": True,
             "target": target,
+            "candidate_rs9_source": copy.deepcopy(self.matrix["candidate_rs9_source"]),
             "wheel": {
                 "target": target,
                 "filename": self.fixture._filenames({target: wheel})[target],
@@ -243,6 +340,11 @@ class PublicStageBConsumerTests(unittest.TestCase):
                 "exit_code": 0, "cleanup_known": True, "output_complete": True,
                 "forced_cleanup": False,
             }},
+            "gui": {
+                "status": "verified", "type": "file", "executable": True,
+                "label": "gui", "smoke_path": gui_path, "sha256": gui_sha,
+            },
+            "application_smoke": application_smoke,
             "publication_admitted": False,
             "public_writes": 0,
         }
@@ -403,6 +505,10 @@ class PublicStageBConsumerTests(unittest.TestCase):
             lambda result: result["consumer"]["sandbox"].update(method="unknown"),
             lambda result: result["consumer"]["cleanup"].update(pip_uninstall_exit=1),
             lambda result: result["consumer"]["cleanup"].update(orphan_processes=1),
+            lambda result: result["consumer"]["gui"].update(
+                smoke_path="bin/not-the-authenticated-gui",
+            ),
+            lambda result: result["consumer"]["gui"].update(sha256="0" * 64),
         ):
             result = self._actual_result()
             mutate(result)
