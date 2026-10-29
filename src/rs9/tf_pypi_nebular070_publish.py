@@ -422,6 +422,21 @@ REQUIRED_QUALIFICATION_INPUTS_KEYS = frozenset({
 })
 OPTIONAL_QUALIFICATION_INPUTS_KEYS = frozenset({"manylinux"})
 MANYLINUX_INPUT_SPEC_KEYS = frozenset({"stage_a", "stage_b", "tf_producer_source"})
+PUBLIC_INRUN_MANYLINUX_SCHEMA = "rs9.tf-pypi-nebular070-public-inrun-manylinux.v1"
+PUBLIC_INRUN_MANYLINUX_ORIGIN_KIND = "public-in-run"
+PUBLIC_INRUN_MANYLINUX_INPUT_SPEC_KEYS = frozenset({
+    "schema",
+    "origin_kind",
+    "stage_a",
+    "stage_b",
+    "tf_producer_source",
+})
+QUALIFICATION_INPUT_PHASE_PREP = "qualification-prep"
+QUALIFICATION_INPUT_PHASE_PUBLICATION = "publication"
+QUALIFICATION_INPUT_PHASES = frozenset({
+    QUALIFICATION_INPUT_PHASE_PREP,
+    QUALIFICATION_INPUT_PHASE_PUBLICATION,
+})
 
 _HEX40_RE = re.compile(r"^[0-9a-f]{40}$")
 _HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -3425,7 +3440,10 @@ def prepare_resume(
         if not isinstance(tf_source, Mapping):
             fail("MANYLINUX_CAPTURE_MEMBER")
         if qual_repo is not None:
-            qual_inputs = load_qualification_inputs_descriptor(repository=qual_repo)
+            qual_inputs = load_qualification_inputs_descriptor(
+                repository=qual_repo,
+                phase=QUALIFICATION_INPUT_PHASE_PREP,
+            )
             qual_manylinux = qual_inputs.get("manylinux")
             if (
                 not isinstance(qual_manylinux, Mapping)
@@ -3646,7 +3664,8 @@ def workflow_070_qualify_jobs_text() -> str:
         run: |
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-inputs \\
             --qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()} \\
-            --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence" >> "$GITHUB_OUTPUT"
+            --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence" \\
+            --phase {QUALIFICATION_INPUT_PHASE_PREP} >> "$GITHUB_OUTPUT"
 
       - name: Build and verify 0.7.0 candidate bundle
         env:
@@ -3923,7 +3942,8 @@ def workflow_070_qualify_jobs_text() -> str:
         run: |
           MANYLINUX_OUT="$("${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-inputs \\
             --qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()} \\
-            --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence")"
+            --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence" \\
+            --phase {QUALIFICATION_INPUT_PHASE_PUBLICATION})"
           printf '%s\\n' "$MANYLINUX_OUT" >> "$GITHUB_OUTPUT"
           STAGE_B_PATH="$(printf '%s\\n' "$MANYLINUX_OUT" | sed -n 's/^stage_b=//p')"
           test -n "$STAGE_B_PATH"
@@ -4225,6 +4245,13 @@ def _validate_repo_relative_dir_spec(raw_rel: Any, *, code: str) -> str:
     return raw_rel
 
 
+def _validate_qualification_input_phase(phase: str) -> str:
+    """Validate the explicit phase of the v1 public-in-run descriptor route."""
+    if not isinstance(phase, str) or phase not in QUALIFICATION_INPUT_PHASES:
+        fail("QUALIFICATION_INPUTS_PHASE")
+    return phase
+
+
 def _resolve_repo_contained_dir(
     root: Path,
     rel_dir: str,
@@ -4307,9 +4334,39 @@ def _validate_manylinux_input_spec(
     value: Any,
     *,
     evidence_files: Mapping[str, Any],
+    phase: str = QUALIFICATION_INPUT_PHASE_PUBLICATION,
 ) -> dict[str, Any]:
-    """Validate externally-authenticated Stage-A/Stage-B paths in qualification inputs."""
-    if not isinstance(value, Mapping) or set(value.keys()) != set(MANYLINUX_INPUT_SPEC_KEYS):
+    """Validate the legacy v1 or explicit public-in-run manylinux route.
+
+    Legacy qualification-inputs v1 remains a closed precomputed Stage-A plus
+    Stage-B descriptor and is intentionally phase-insensitive.  The
+    phase-aware preparation/publication split is opt-in only through the
+    versioned nested ``manylinux.schema`` and ``origin_kind`` fields.
+    """
+    phase = _validate_qualification_input_phase(phase)
+    if not isinstance(value, Mapping):
+        fail("QUALIFICATION_INPUTS_MANYLINUX")
+    keys = set(value.keys())
+    public_inrun = (
+        value.get("schema") == PUBLIC_INRUN_MANYLINUX_SCHEMA
+        and value.get("origin_kind") == PUBLIC_INRUN_MANYLINUX_ORIGIN_KIND
+    )
+    if public_inrun:
+        required_keys = {"schema", "origin_kind", "stage_a", "tf_producer_source"}
+        if not required_keys.issubset(keys) or not keys.issubset(
+            PUBLIC_INRUN_MANYLINUX_INPUT_SPEC_KEYS
+        ):
+            fail("QUALIFICATION_INPUTS_MANYLINUX")
+        if phase == QUALIFICATION_INPUT_PHASE_PREP and "stage_b" in keys:
+            fail("QUALIFICATION_INPUTS_STAGE_B_EARLY")
+        if (
+            phase == QUALIFICATION_INPUT_PHASE_PUBLICATION
+            and keys != set(PUBLIC_INRUN_MANYLINUX_INPUT_SPEC_KEYS)
+        ):
+            fail("QUALIFICATION_INPUTS_MANYLINUX")
+    elif keys != set(MANYLINUX_INPUT_SPEC_KEYS):
+        # A caller-supplied phase must never reinterpret an unversioned v1
+        # descriptor as a new preparation/publication route.
         fail("QUALIFICATION_INPUTS_MANYLINUX")
     source = value.get("tf_producer_source")
     if (
@@ -4320,7 +4377,18 @@ def _validate_manylinux_input_spec(
     ):
         fail("QUALIFICATION_INPUTS_MANYLINUX")
     checked: dict[str, Any] = {"tf_producer_source": dict(source)}
-    for role in ("stage_a", "stage_b"):
+    if public_inrun:
+        checked = {
+            "schema": value["schema"],
+            "origin_kind": value["origin_kind"],
+            **checked,
+        }
+        roles = ("stage_a",)
+        if "stage_b" in keys:
+            roles = (*roles, "stage_b")
+    else:
+        roles = ("stage_a", "stage_b")
+    for role in roles:
         entry = _validate_file_digest_entry(
             value.get(role), code="QUALIFICATION_INPUTS_MANYLINUX"
         )
@@ -4341,10 +4409,12 @@ def validate_qualification_inputs_descriptor(
     *,
     repository: str | Path | None = None,
     pending_code: str = "RELEASE_INPUTS_PENDING",
+    phase: str = QUALIFICATION_INPUT_PHASE_PUBLICATION,
 ) -> dict[str, Any]:
-    """Validate the operator qualification-inputs descriptor for 0.7.0 Gate 1 and native consumer handoff."""
+    """Validate the v1 operator descriptor for its explicit public-in-run phase."""
     from rs9.operator import validate_release_binding
 
+    phase = _validate_qualification_input_phase(phase)
     if not isinstance(doc, Mapping):
         fail("QUALIFICATION_INPUTS_SCHEMA")
     status = doc.get("status")
@@ -4468,7 +4538,7 @@ def validate_qualification_inputs_descriptor(
     manylinux_spec = None
     if "manylinux" in doc:
         manylinux_spec = _validate_manylinux_input_spec(
-            doc["manylinux"], evidence_files=ev_files
+            doc["manylinux"], evidence_files=ev_files, phase=phase
         )
 
     rr_spec = doc.get("raw_release")
@@ -4497,6 +4567,7 @@ def load_qualification_inputs_descriptor(
     *,
     repository: str | Path | None = None,
     pending_code: str = "RELEASE_INPUTS_PENDING",
+    phase: str = QUALIFICATION_INPUT_PHASE_PUBLICATION,
 ) -> dict[str, Any]:
     """Load and validate the 0.7.0 operator qualification-inputs descriptor; fail closed when pending or absent."""
     root = repo_root(repository)
@@ -4528,6 +4599,7 @@ def load_qualification_inputs_descriptor(
         doc,
         repository=root,
         pending_code=pending_code,
+        phase=phase,
     )
 
 
@@ -4536,6 +4608,7 @@ def materialize_qualification_evidence(
     evidence_dir: str | Path,
     *,
     repository: str | Path | None = None,
+    phase: str = QUALIFICATION_INPUT_PHASE_PUBLICATION,
 ) -> dict[str, Any]:
     """Materialize or verify the digest-bound Gate 1 evidence directory from the qualification-inputs descriptor."""
     root = repo_root(repository)
@@ -4544,12 +4617,14 @@ def materialize_qualification_evidence(
             qualification_inputs,
             repository=root,
             pending_code="RELEASE_INPUTS_PENDING",
+            phase=phase,
         )
         if isinstance(qualification_inputs, Mapping)
         else load_qualification_inputs_descriptor(
             qualification_inputs,
             repository=root,
             pending_code="RELEASE_INPUTS_PENDING",
+            phase=phase,
         )
     )
     ev_spec = descriptor["evidence"]
@@ -4616,10 +4691,14 @@ def materialize_manylinux_inputs(
     evidence_dir: str | Path,
     *,
     repository: str | Path | None = None,
+    phase: str = QUALIFICATION_INPUT_PHASE_PUBLICATION,
 ) -> dict[str, Any]:
-    """Materialize and return the digest-bound external Stage-A/Stage-B paths."""
+    """Materialize digest-bound public-in-run inputs for the requested phase."""
     descriptor = materialize_qualification_evidence(
-        qualification_inputs, evidence_dir, repository=repository
+        qualification_inputs,
+        evidence_dir,
+        repository=repository,
+        phase=phase,
     )
     spec = descriptor.get("manylinux")
     if not isinstance(spec, Mapping):
@@ -4627,11 +4706,14 @@ def materialize_manylinux_inputs(
     root = Path(evidence_dir)
     result: dict[str, Any] = {
         "stage_a": str((root / spec["stage_a"]["path"]).resolve()),
-        "stage_b": str((root / spec["stage_b"]["path"]).resolve()),
         "tf_producer_commit": spec["tf_producer_source"]["commit"],
         "tf_producer_tree": spec["tf_producer_source"]["tree"],
     }
-    for role in ("stage_a", "stage_b"):
+    roles = ("stage_a",)
+    if "stage_b" in spec:
+        result["stage_b"] = str((root / spec["stage_b"]["path"]).resolve())
+        roles = (*roles, "stage_b")
+    for role in roles:
         path = Path(result[role])
         _check_no_symlinks(path, "MANYLINUX_INPUT")
         if not path.is_file():
@@ -4942,12 +5024,14 @@ def validate_raw_release_handoff_binding(
                 qualification_inputs,
                 repository=repository,
                 pending_code="RAW_RELEASE_HANDOFF_PENDING",
+                phase=QUALIFICATION_INPUT_PHASE_PREP,
             )
             if isinstance(qualification_inputs, Mapping)
             else load_qualification_inputs_descriptor(
                 qualification_inputs,
                 repository=repository,
                 pending_code="RAW_RELEASE_HANDOFF_PENDING",
+                phase=QUALIFICATION_INPUT_PHASE_PREP,
             )
         )
         _verify_handoff_matches_descriptor(raw_release, descriptor, target=target)
@@ -4993,12 +5077,14 @@ def materialize_raw_release_handoff(
             qualification_inputs,
             repository=root,
             pending_code="RAW_RELEASE_HANDOFF_PENDING",
+            phase=QUALIFICATION_INPUT_PHASE_PREP,
         )
         if isinstance(qualification_inputs, Mapping)
         else load_qualification_inputs_descriptor(
             qualification_inputs,
             repository=root,
             pending_code="RAW_RELEASE_HANDOFF_PENDING",
+            phase=QUALIFICATION_INPUT_PHASE_PREP,
         )
     )
     rr_spec = descriptor["raw_release"]
@@ -5332,12 +5418,14 @@ def qualify_native_target(
                 eff_qual_inputs,
                 repository=root,
                 pending_code="RAW_RELEASE_HANDOFF_PENDING",
+                phase=QUALIFICATION_INPUT_PHASE_PREP,
             )
             if isinstance(eff_qual_inputs, Mapping)
             else load_qualification_inputs_descriptor(
                 eff_qual_inputs,
                 repository=root,
                 pending_code="RAW_RELEASE_HANDOFF_PENDING",
+                phase=QUALIFICATION_INPUT_PHASE_PREP,
             )
         )
         _verify_handoff_matches_descriptor(raw_release, descriptor, target=target)
@@ -5355,12 +5443,14 @@ def qualify_native_target(
                 eff_qual_inputs,
                 repository=root,
                 pending_code="RAW_RELEASE_HANDOFF_PENDING",
+                phase=QUALIFICATION_INPUT_PHASE_PREP,
             )
             if isinstance(eff_qual_inputs, Mapping)
             else load_qualification_inputs_descriptor(
                 eff_qual_inputs,
                 repository=root,
                 pending_code="RAW_RELEASE_HANDOFF_PENDING",
+                phase=QUALIFICATION_INPUT_PHASE_PREP,
             )
         )
 
@@ -5457,6 +5547,7 @@ def build_candidates_bundle(
         qualification_inputs,
         eff_evidence,
         repository=root,
+        phase=QUALIFICATION_INPUT_PHASE_PREP,
     )
 
     manylinux_spec = descriptor.get("manylinux")
@@ -5637,6 +5728,11 @@ def parser() -> argparse.ArgumentParser:
     mi_cmd = sub.add_parser("materialize-manylinux-inputs")
     mi_cmd.add_argument("--qualification-inputs", type=Path, required=True)
     mi_cmd.add_argument("--evidence", type=Path, required=True)
+    mi_cmd.add_argument(
+        "--phase",
+        choices=sorted(QUALIFICATION_INPUT_PHASES),
+        default=QUALIFICATION_INPUT_PHASE_PUBLICATION,
+    )
 
     mc_cmd = sub.add_parser("materialize-manylinux-consumers")
     mc_cmd.add_argument("--admission", type=Path, required=True)
@@ -5762,9 +5858,11 @@ def main(
             res = materialize_manylinux_inputs(
                 args.qualification_inputs,
                 args.evidence,
+                phase=args.phase,
             )
             for key in ("stage_a", "stage_b", "tf_producer_commit", "tf_producer_tree"):
-                sys.stdout.write(f"{key}={res[key]}\n")
+                if key in res:
+                    sys.stdout.write(f"{key}={res[key]}\n")
             return 0
         if args.operation == "materialize-manylinux-consumers":
             materialize_manylinux_consumer_receipts(args.admission, args.output)
@@ -5797,6 +5895,7 @@ def main(
                     args.qualification_inputs,
                     repository=root,
                     pending_code="RELEASE_INPUTS_PENDING",
+                    phase=QUALIFICATION_INPUT_PHASE_PREP,
                 )
                 if args.qualification_inputs is not None
                 else None
