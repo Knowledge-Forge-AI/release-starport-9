@@ -388,6 +388,15 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      - name: Upload failed native harness report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-070-qualification-darwin-arm64-failure-diagnostic
+          path: '${{ runner.temp }}/tfnf-070-work-darwin-arm64/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
+
   native_consumer_070_linux_arm64_gnu:
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9/nebular-pypi-qualify') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
     name: Native consumer 0.7.0 (linux-arm64-gnu)
@@ -536,6 +545,15 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      - name: Upload failed native harness report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-070-qualification-linux-arm64-gnu-failure-diagnostic
+          path: '${{ runner.temp }}/tfnf-070-work-linux-arm64-gnu/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
+
   native_consumer_070_linux_x64_gnu:
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9/nebular-pypi-qualify') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
     name: Native consumer 0.7.0 (linux-x64-gnu)
@@ -683,6 +701,15 @@ jobs:
           path: '${{ runner.temp }}/tfnf-070-qual/'
           retention-days: 14
           if-no-files-found: error
+
+      - name: Upload failed native harness report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-070-qualification-linux-x64-gnu-failure-diagnostic
+          path: '${{ runner.temp }}/tfnf-070-work-linux-x64-gnu/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
 
   native_consumer_070_linux_arm64_gnu_floor:
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9/nebular-pypi-qualify') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
@@ -869,6 +896,15 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      - name: Upload failed native harness report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-070-qualification-linux-arm64-gnu-floor-failure-diagnostic
+          path: '${{ env.TFNF_CI_TEMP }}/tfnf-070-work-linux-arm64-gnu-floor/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
+
   native_consumer_070_linux_x64_gnu_floor:
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9/nebular-pypi-qualify') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
     name: Native consumer 0.7.0 (linux-x64-gnu floor)
@@ -1053,6 +1089,15 @@ jobs:
           compression-level: 0
           retention-days: 14
           if-no-files-found: error
+
+      - name: Upload failed native harness report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-070-qualification-linux-x64-gnu-floor-failure-diagnostic
+          path: '${{ env.TFNF_CI_TEMP }}/tfnf-070-work-linux-x64-gnu-floor/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
 
   qualification_gate_070:
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rs9/nebular-pypi-qualify') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'

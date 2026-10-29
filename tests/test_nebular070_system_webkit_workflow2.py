@@ -66,6 +66,20 @@ class SystemWebKitWorkflow2Tests(unittest.TestCase):
         }
         _validate_prior_run_job_steps(job_name, "success", skipped)
 
+    def test_failure_reports_are_separate_and_only_collected_after_failure(self) -> None:
+        text = workflow_070_jobs_text()
+        self.assertEqual(text.count("- name: Upload failed native harness report"), 5)
+        self.assertEqual(text.count("/installed-native-smoke/**/*.run.json"), 5)
+        for section in text.split("- name: Upload failed native harness report")[1:]:
+            diagnostic = section.split("\n\n", 1)[0]
+            self.assertIn("if: failure()", diagnostic)
+            self.assertIn("-failure-diagnostic", diagnostic)
+            self.assertIn("if-no-files-found: ignore", diagnostic)
+            self.assertNotIn("stdout.log", diagnostic)
+            self.assertNotIn("stderr.log", diagnostic)
+        for job in NATIVE_CONSUMER_070_JOB_NAMES:
+            self.assertIn(("Upload failed native harness report", True), WORKFLOW_STEP_PROFILES[job])
+
     def test_generated_linux_routes_keep_five_jobs_and_runtime_guards(self) -> None:
         text = workflow_070_jobs_text()
         self.assertEqual(text.count("\n  native_consumer_070_"), 5)

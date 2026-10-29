@@ -17,7 +17,7 @@ import time
 import venv
 from typing import Any, Callable, Mapping, Sequence
 
-from rs9.tf_pypi_archive import canonical, fail, physical_bytes, sha256
+from rs9.tf_pypi_archive import AdmissionError, canonical, fail, physical_bytes, sha256
 from rs9.tf_pypi_launcher import node_binary
 from rs9.tf_pypi_model import strict_json
 from rs9.tf_pypi_verify import read_wheel, verify_pair, verify_record
@@ -1004,8 +1004,15 @@ def _nebular_run(argv: Sequence[str], env: Mapping[str, str], cwd: Path,
     try:
         child = runner(command, cwd=str(cwd), env=dict(env), stdin=subprocess.DEVNULL,
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
-    except (OSError, subprocess.SubprocessError):
-        fail("NEBULAR_NATIVE_EXECUTION")
+    except OSError as error:
+        category = {
+            errno.ENOENT: "MISSING", errno.ENOTDIR: "NOT_DIRECTORY",
+            errno.EACCES: "PERMISSION", errno.EPERM: "PERMISSION",
+            errno.ENOEXEC: "FORMAT",
+        }.get(error.errno, "OS")
+        raise AdmissionError("TF_PYPI_NEBULAR_NATIVE_EXECUTION_SPAWN_" + category) from None
+    except subprocess.SubprocessError:
+        raise AdmissionError("TF_PYPI_NEBULAR_NATIVE_EXECUTION_SPAWN_SUBPROCESS") from None
     streams: dict[int, tuple[str, Any]] = {}
     selector = selectors.DefaultSelector()
     output = {"stdout": bytearray(), "stderr": bytearray()}
