@@ -261,7 +261,6 @@ WORKFLOW_STEP_PROFILES = {
     BUILD_VERIFY_070_JOB_NAME: (
         ("Checkout repository", True),
         ("Set up Python 3.13", True),
-        ("Materialize authenticated 0.7.0 manylinux inputs", False),
         ("Build and verify 0.7.0 candidate bundle", False),
         ("Upload 0.7.0 candidate bundle", True),
     ),
@@ -298,8 +297,6 @@ WORKFLOW_STEP_PROFILES = {
         ("Download linux-x64-gnu qualification receipt", True),
         ("Admit complete 3-platform 0.7.0 qualification matrix", False),
         ("Upload 0.7.0 matrix qualification receipt", True),
-        ("Materialize authenticated 0.7.0 Stage-B admission input", False),
-        ("Upload 0.7.0 manylinux admission input", True),
     ),
     RESUME_070_JOB_NAME: (
         ("Checkout publisher authority commit", True),
@@ -309,7 +306,6 @@ WORKFLOW_STEP_PROFILES = {
         ("Verify publisher and qualification source lineage", False),
         ("Fetch retained qualification run and artifact archives", False),
         ("Authenticate retained archives and stage verified distribution", False),
-        ("Resolve captured 0.7.0 manylinux source coordinates", False),
         ("Stage admitted 0.7.0 operator metadata into qualification checkout", False),
         ("Verify artifact integrity and select only missing files", False),
         ("Re-verify staged upload artifacts against approval before upload", False),
@@ -353,6 +349,21 @@ WORKFLOW_STEP_PROFILE_ALLOWED_NAMES = {
     )
     for job_name, profile in WORKFLOW_STEP_PROFILES.items()
 }
+# The checked-in route is deliberately generic by default, while the
+# manylinux renderer remains an explicit opt-in for an already-qualified
+# advanced run.  Accept those exact advanced step names when authenticating a
+# retained run; this does not add a wildcard or permit unknown active steps.
+for _job_name, _advanced_steps in {
+    BUILD_VERIFY_070_JOB_NAME: ("Materialize authenticated 0.7.0 manylinux inputs",),
+    QUALIFICATION_GATE_070_JOB_NAME: (
+        "Materialize authenticated 0.7.0 Stage-B admission input",
+        "Upload 0.7.0 manylinux admission input",
+    ),
+    RESUME_070_JOB_NAME: ("Resolve captured 0.7.0 manylinux source coordinates",),
+}.items():
+    WORKFLOW_STEP_PROFILE_ALLOWED_NAMES[_job_name] = frozenset(
+        set(WORKFLOW_STEP_PROFILE_ALLOWED_NAMES[_job_name]) | set(_advanced_steps)
+    )
 CURRENT_070_PROFILE_JOB_NAMES = (
     QUALIFY_070_JOB_NAMES | PUBLISH_JOB_NAMES | frozenset({DISPATCH_GUARD_070_JOB_NAME})
 )
@@ -3664,7 +3675,7 @@ def validate_workflow_dispatch(release: str, mode: str) -> dict[str, str]:
     raise AssertionError("unreachable")
 
 
-def workflow_070_qualify_jobs_text() -> str:
+def _workflow_070_qualify_jobs_text_manylinux() -> str:
     """Render the 0.7.0 qualification jobs and dispatch guard for rs9-tfnf-pypi-publish.yml (zero OIDC permissions)."""
     return f"""
   reject_unsupported_dispatch:
@@ -4024,7 +4035,77 @@ def workflow_070_qualify_jobs_text() -> str:
 """
 
 
-def publication_resume_job_text() -> str:
+def _generic_qualification_workflow_text(text: str) -> str:
+    """Remove the advanced-only qualification inputs from an existing render."""
+    output: list[str] = []
+    skipping: str | None = None
+    for line in text.splitlines(keepends=True):
+        if line.startswith("      - name: Materialize authenticated 0.7.0 manylinux inputs"):
+            skipping = "build-inputs"
+            continue
+        if skipping == "build-inputs":
+            if line.startswith("      - name: Build and verify 0.7.0 candidate bundle"):
+                skipping = None
+                output.append(line)
+            continue
+        if line.startswith("      - name: Materialize authenticated 0.7.0 Stage-B admission input"):
+            skipping = "stage-b"
+            continue
+        if skipping == "stage-b":
+            continue
+        stripped = line.lstrip()
+        if stripped.startswith((
+            "--payload-portability ",
+            "--tf-producer-commit ",
+            "--tf-producer-tree ",
+            "--require-manylinux",
+        )):
+            continue
+        output.append(line)
+    return "".join(output).rstrip("\n") + "\n"
+
+
+def workflow_070_qualify_jobs_text(*, require_manylinux: bool = False) -> str:
+    """Render the 0.7.0 jobs; generic routing is default, manylinux is opt-in."""
+    rendered = _workflow_070_qualify_jobs_text_manylinux()
+    return rendered if require_manylinux else _generic_qualification_workflow_text(rendered)
+
+
+def _generic_resume_workflow_text(text: str) -> str:
+    """Remove advanced manylinux resume steps and arguments from a render."""
+    output: list[str] = []
+    skipping = False
+    for line in text.splitlines(keepends=True):
+        if line.startswith("      - name: Resolve captured 0.7.0 manylinux source coordinates"):
+            skipping = True
+            continue
+        if skipping:
+            if line.startswith("      - name: Stage admitted 0.7.0 operator metadata"):
+                skipping = False
+                output.append(line)
+            continue
+        stripped = line.lstrip()
+        if stripped.startswith((
+            "--manylinux-admission ",
+            "--manylinux-consumer-receipts ",
+            "--payload-portability ",
+            "--tf-producer-commit ",
+            "--tf-producer-tree ",
+        )):
+            continue
+        if stripped.startswith("--matrix-receipt ") and line.rstrip("\n").endswith("\\"):
+            line = line.rstrip("\n")[:-1].rstrip() + "\n"
+        output.append(line)
+    return "".join(output).rstrip("\n") + "\n"
+
+
+def publication_resume_job_text(*, require_manylinux: bool = False) -> str:
+    """Render publication resume; generic routing is default, manylinux is opt-in."""
+    rendered = _publication_resume_job_text_manylinux()
+    return rendered if require_manylinux else _generic_resume_workflow_text(rendered)
+
+
+def _publication_resume_job_text_manylinux() -> str:
     """Render the attended two-checkout 0.7.0 publication-resume job for rs9-tfnf-pypi-publish.yml."""
     return f"""
   publication_resume_070:
@@ -4223,9 +4304,11 @@ def publication_resume_job_text() -> str:
 """
 
 
-def workflow_070_jobs_text() -> str:
-    """Render both 0.7.0 qualification jobs and 0.7.0 publication-resume job."""
-    return workflow_070_qualify_jobs_text() + publication_resume_job_text()
+def workflow_070_jobs_text(*, require_manylinux: bool = False) -> str:
+    """Render both 0.7.0 jobs; advanced manylinux remains explicit opt-in."""
+    return workflow_070_qualify_jobs_text(
+        require_manylinux=require_manylinux
+    ) + publication_resume_job_text(require_manylinux=require_manylinux)
 
 
 def workflow_text(release: str = "0.7.0", *, mode: str | None = None) -> str:

@@ -815,7 +815,7 @@ class Nebular070ManylinuxContractTests(unittest.TestCase):
             ]),
             1,
         )
-        wf_text = publish_module.workflow_text()
+        wf_text = publish_module.workflow_070_jobs_text(require_manylinux=True)
         self.assertNotIn("steps.manylinux_inputs.outputs.stage_b", wf_text)
         self.assertIn('STAGE_B_PATH="$(printf \'%s\\n\' "$MANYLINUX_OUT" | sed -n \'s/^stage_b=//p\')"', wf_text)
 

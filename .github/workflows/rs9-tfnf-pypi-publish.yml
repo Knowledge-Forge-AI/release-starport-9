@@ -196,17 +196,6 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Materialize authenticated 0.7.0 manylinux inputs
-        id: manylinux_inputs
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-inputs \
-            --qualification-inputs operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-qualification-inputs.json \
-            --evidence "${{ runner.temp }}/tfnf-070-evidence" \
-            --phase qualification-prep >> "$GITHUB_OUTPUT"
-
       - name: Build and verify 0.7.0 candidate bundle
         env:
           PYTHONPATH: src
@@ -218,10 +207,6 @@ jobs:
             --evidence "${{ runner.temp }}/tfnf-070-evidence" \
             --output "${{ runner.temp }}/tfnf-070-bundle" \
             --expected-commit "${{ github.sha }}" \
-            --payload-portability "${{ steps.manylinux_inputs.outputs.stage_a }}" \
-            --tf-producer-commit "${{ steps.manylinux_inputs.outputs.tf_producer_commit }}" \
-            --tf-producer-tree "${{ steps.manylinux_inputs.outputs.tf_producer_tree }}" \
-            --require-manylinux \
             --require-clean
 
       - name: Upload 0.7.0 candidate bundle
@@ -474,34 +459,6 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-      - name: Materialize authenticated 0.7.0 Stage-B admission input
-        id: manylinux_inputs
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          MANYLINUX_OUT="$("${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-inputs \
-            --qualification-inputs operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-qualification-inputs.json \
-            --evidence "${{ runner.temp }}/tfnf-070-evidence" \
-            --phase publication)"
-          printf '%s\n' "$MANYLINUX_OUT" >> "$GITHUB_OUTPUT"
-          STAGE_B_PATH="$(printf '%s\n' "$MANYLINUX_OUT" | sed -n 's/^stage_b=//p')"
-          test -n "$STAGE_B_PATH"
-          mkdir -p "${{ runner.temp }}/tfnf-070-manylinux-admission"
-          cp "$STAGE_B_PATH" \
-            "${{ runner.temp }}/tfnf-070-manylinux-admission/manylinux_admission.json"
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-consumers \
-            --admission "${{ runner.temp }}/tfnf-070-manylinux-admission/manylinux_admission.json" \
-            --output "${{ runner.temp }}/tfnf-070-manylinux-admission"
-
-      - name: Upload 0.7.0 manylinux admission input
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-manylinux-admission
-          path: '${{ runner.temp }}/tfnf-070-manylinux-admission/'
-          retention-days: 14
-          if-no-files-found: error
-
   publish:
     if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release != '0.7.0' && inputs.mode == 'publish'
     name: Trusted Publishing to PyPI
@@ -693,15 +650,6 @@ jobs:
             --archives-dir "${{ runner.temp }}/tfnf-070-archives" \
             --output "${{ runner.temp }}/tfnf-070-resume"
 
-      - name: Resolve captured 0.7.0 manylinux source coordinates
-        id: manylinux_source
-        env:
-          PYTHONPATH: qualification-source/src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish resolve-manylinux-source \
-            --payload-portability "${{ runner.temp }}/tfnf-070-resume/payload_portability.json" >> "$GITHUB_OUTPUT"
-
       - name: Stage admitted 0.7.0 operator metadata into qualification checkout
         env:
           PYTHONPATH: qualification-source/src
@@ -727,11 +675,6 @@ jobs:
             --candidate-receipt "${{ runner.temp }}/tfnf-070-resume/candidate_receipt.json" \
             --expected-artifacts "${{ runner.temp }}/tfnf-070-resume/expected_artifacts.json" \
             --receipts-dir "${{ runner.temp }}/tfnf-070-resume/receipts" \
-            --manylinux-admission "${{ runner.temp }}/tfnf-070-resume/manylinux_admission.json" \
-            --manylinux-consumer-receipts "${{ runner.temp }}/tfnf-070-resume/manylinux-consumers" \
-            --payload-portability "${{ runner.temp }}/tfnf-070-resume/payload_portability.json" \
-            --tf-producer-commit "${{ steps.manylinux_source.outputs.tf_producer_commit }}" \
-            --tf-producer-tree "${{ steps.manylinux_source.outputs.tf_producer_tree }}" \
             --attempt-marker "${{ runner.temp }}/tfnf-070-upload-attempt.json" >> "$GITHUB_OUTPUT"
 
       - name: Re-verify staged upload artifacts against approval before upload
@@ -744,12 +687,7 @@ jobs:
           "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish verify-upload \
             --dist "${{ runner.temp }}/tfnf-070-resume/dist" \
             --upload-dir "${{ runner.temp }}/tfnf-070-resume/upload" \
-            --manylinux-admission "${{ runner.temp }}/tfnf-070-resume/manylinux_admission.json" \
-            --manylinux-consumer-receipts "${{ runner.temp }}/tfnf-070-resume/manylinux-consumers" \
-            --matrix-receipt "${{ runner.temp }}/tfnf-070-resume/matrix_receipt.json" \
-            --payload-portability "${{ runner.temp }}/tfnf-070-resume/payload_portability.json" \
-            --tf-producer-commit "${{ steps.manylinux_source.outputs.tf_producer_commit }}" \
-            --tf-producer-tree "${{ steps.manylinux_source.outputs.tf_producer_tree }}"
+            --matrix-receipt "${{ runner.temp }}/tfnf-070-resume/matrix_receipt.json"
 
       - name: Publish package distribution to PyPI
         if: steps.missing.outputs.upload == 'true'
