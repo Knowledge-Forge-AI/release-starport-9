@@ -29,6 +29,11 @@ NEBULAR070_PROFILE = "operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-gate1.j
 NEBULAR070_BOOTSTRAP = "bootstrap/pre-rs9/theme-forge-nebular-0.7.0/manifest.json"
 NEBULAR070_EXPECTATIONS = "operators/tf-pypi/nebular-0.7.0/expectations.json"
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+_CURRENT_NATIVE_PROVENANCE = {
+    "path": "PROVENANCE.json",
+    "commit_field": "releaseCommit",
+    "tree_field": "testedTree",
+}
 
 
 def release_bindings(release: str) -> dict:
@@ -119,15 +124,13 @@ def validate_release_binding(binding: dict) -> dict:
     }:
         raise ContractError("RELEASE_BINDING", "Gate1 direct lineage mode is required")
     provenance = binding.get("provenance")
-    if not isinstance(provenance, dict) or set(provenance) != {
-        "path", "commit_field", "tree_field",
-    } or any(not isinstance(value, str) or not value for value in provenance.values()):
+    if not isinstance(provenance, dict):
         raise ContractError("RELEASE_BINDING", "Gate1 provenance field selection is required")
     if provenance != {
         "path": "PROVENANCE.json",
         "commit_field": "tagCommit",
         "tree_field": "tagTree",
-    }:
+    } and provenance != _CURRENT_NATIVE_PROVENANCE:
         raise ContractError("RELEASE_BINDING", "Gate1 provenance identity fields are fixed")
     if binding["status"] == "pending-release-inputs":
         return copy.deepcopy(binding)
