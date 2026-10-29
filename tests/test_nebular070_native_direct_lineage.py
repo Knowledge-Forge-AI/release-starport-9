@@ -27,6 +27,11 @@ CURRENT_PROVENANCE = {
     "commit_field": "releaseCommit",
     "tree_field": "testedTree",
 }
+INTAKE_PROVENANCE = {
+    "path": "PYPI-INTAKE-PROVENANCE.json",
+    "commit_field": "releaseCommit",
+    "tree_field": "testedTree",
+}
 
 
 def _fixture_data() -> dict:
@@ -43,7 +48,15 @@ def _provenance_bytes() -> bytes:
 
 
 class Nebular070NativeDirectLineageTests(unittest.TestCase):
-    def _capture_and_binding(self, *, document=None, record=None, provenance=None):
+    def _capture_and_binding(
+        self,
+        *,
+        document=None,
+        record=None,
+        provenance=None,
+        provenance_path="PROVENANCE.json",
+        selector=None,
+    ):
         fixture = _fixture_data()
         record = copy.deepcopy(record or fixture["capture"]["record"])
         raw = provenance if provenance is not None else _provenance_bytes()
@@ -53,7 +66,7 @@ class Nebular070NativeDirectLineageTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, root, True)
         capture = ReleaseCapture(
             record,
-            {}, {}, {}, {}, {"PROVENANCE.json": raw}, root,
+            {}, {}, {}, {}, {provenance_path: raw}, root,
         )
         binding = release_bindings("0.7.0")
         binding.update({
@@ -66,7 +79,10 @@ class Nebular070NativeDirectLineageTests(unittest.TestCase):
                 "bootstrap_sha256": "c" * 64,
                 "expectations_sha256": "d" * 64,
             },
-            "provenance": copy.deepcopy(CURRENT_PROVENANCE),
+            "provenance": copy.deepcopy(selector or {
+                **CURRENT_PROVENANCE,
+                "path": provenance_path,
+            }),
         })
         return capture, binding
 
@@ -101,6 +117,12 @@ class Nebular070NativeDirectLineageTests(unittest.TestCase):
     def test_operator_accepts_only_the_known_flat_selector(self):
         _capture, binding = self._capture_and_binding()
         self.assertEqual(validate_release_binding(binding)["provenance"], CURRENT_PROVENANCE)
+        intake_capture, intake_binding = self._capture_and_binding(
+            provenance_path=INTAKE_PROVENANCE["path"],
+            selector=INTAKE_PROVENANCE,
+        )
+        self.assertEqual(validate_release_binding(intake_binding)["provenance"], INTAKE_PROVENANCE)
+        self.assertEqual(self._verify(intake_capture, intake_binding)["provenance_path"], INTAKE_PROVENANCE["path"])
         with self.assertRaises(ContractError):
             validate_release_binding({
                 **binding,
@@ -109,6 +131,34 @@ class Nebular070NativeDirectLineageTests(unittest.TestCase):
                     "tree_field": "tagTree",
                 },
             })
+
+    def test_intake_selector_is_fixed_and_legacy_default_is_unchanged(self):
+        self.assertEqual(
+            release_bindings("0.7.0")["provenance"],
+            {"path": "PROVENANCE.json", "commit_field": "tagCommit", "tree_field": "tagTree"},
+        )
+        _capture, binding = self._capture_and_binding(
+            provenance_path=INTAKE_PROVENANCE["path"],
+            selector=INTAKE_PROVENANCE,
+        )
+        invalid_selectors = (
+            {**INTAKE_PROVENANCE, "path": "arbitrary.json"},
+            {**INTAKE_PROVENANCE, "tree_field": "tagTree"},
+            {**INTAKE_PROVENANCE, "extra": "not-allowed"},
+            {"path": INTAKE_PROVENANCE["path"], "commit_field": "tagCommit", "tree_field": "tagTree"},
+        )
+        for selector in invalid_selectors:
+            with self.subTest(selector=selector):
+                with self.assertRaises(ContractError):
+                    validate_release_binding({**binding, "provenance": selector})
+
+    def test_current_document_cannot_be_selected_through_legacy_schema(self):
+        capture, binding = self._capture_and_binding(
+            selector={"path": "PROVENANCE.json", "commit_field": "tagCommit", "tree_field": "tagTree"},
+        )
+        validate_release_binding(binding)
+        with self.assertRaises(ContractError):
+            self._verify(capture, binding)
 
     def test_flat_provenance_identity_and_schema_mismatches_refuse(self):
         fixture = _fixture_data()

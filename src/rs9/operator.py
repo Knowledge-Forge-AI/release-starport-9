@@ -34,6 +34,11 @@ _CURRENT_NATIVE_PROVENANCE = {
     "commit_field": "releaseCommit",
     "tree_field": "testedTree",
 }
+_CURRENT_NATIVE_INTAKE_PROVENANCE = {
+    "path": "PYPI-INTAKE-PROVENANCE.json",
+    "commit_field": "releaseCommit",
+    "tree_field": "testedTree",
+}
 
 
 def release_bindings(release: str) -> dict:
@@ -130,7 +135,8 @@ def validate_release_binding(binding: dict) -> dict:
         "path": "PROVENANCE.json",
         "commit_field": "tagCommit",
         "tree_field": "tagTree",
-    } and provenance != _CURRENT_NATIVE_PROVENANCE:
+    } and provenance != _CURRENT_NATIVE_PROVENANCE \
+            and provenance != _CURRENT_NATIVE_INTAKE_PROVENANCE:
         raise ContractError("RELEASE_BINDING", "Gate1 provenance identity fields are fixed")
     if binding["status"] == "pending-release-inputs":
         return copy.deepcopy(binding)
