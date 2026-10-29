@@ -1741,7 +1741,7 @@ def consume_nebular_candidate(
         else:
             command = work_path / "venv" / "bin" / capture["native"]["command"]
         if command.is_symlink() or not command.is_file() or not os.access(command, os.X_OK):
-            fail("NEBULAR_NATIVE_EXECUTION")
+            fail("NEBULAR_NATIVE_ENTRYPOINT")
 
         def require_clean(result: Mapping[str, Any], code: str) -> None:
             if (result.get("exit_code") != 0 or result.get("timed_out")

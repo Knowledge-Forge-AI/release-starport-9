@@ -174,7 +174,7 @@ def _system_wheel(raw: bytes, target: str) -> dict[str, Any]:
     members = manifest.get("members") if isinstance(manifest, Mapping) else None
     if (not isinstance(members, list)
             or provenance.get("payload_archive_sha256") != hashlib.sha256(files[payload_member][0]).hexdigest()
-            or provenance.get("manifest_sha256") != hashlib.sha256(archive_canonical(members)).hexdigest()):
+            or provenance.get("manifest_sha256") != hashlib.sha256(canonical(members)).hexdigest()):
         _fail("NEBULAR_STAGE_B_WHEEL", "System wheel payload identity is malformed")
     from rs9.wheel_nebular_successor import SYSTEM_WEBKIT_PROFILE, _validate_system_webkit_archive
     _validate_system_webkit_archive(

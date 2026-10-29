@@ -14,6 +14,23 @@ from rs9.tf_pypi_consumer import _nebular_payload_member
 
 
 class ReceiptIdentityTests(unittest.TestCase):
+    def test_native_execution_diagnostics_emit_only_closed_categories(self):
+        from rs9.nebular070_installed_smoke import _native_execution_failure_code
+        from rs9.tf_pypi_archive import fail
+        self.assertEqual(_native_execution_failure_code({"timed_out": True}),
+                         "NEBULAR_NATIVE_EXECUTION_TIMEOUT")
+        for stderr, suffix in (("ERR_MODULE_NOT_FOUND at /private/example", "NODE_MODULE"),
+                               ("ENOENT /private/example", "FILESYSTEM_MISSING"),
+                               ("SyntaxError: private text", "NODE_SYNTAX")):
+            self.assertEqual(_native_execution_failure_code({"stderr_token": stderr}),
+                             "NEBULAR_NATIVE_EXECUTION_" + suffix)
+        self.assertEqual(_native_execution_failure_code({"stderr_token": "unclassified private text"}),
+                         "NEBULAR_NATIVE_EXECUTION")
+        for code in ("NEBULAR_NATIVE_ENTRYPOINT", _native_execution_failure_code({"stderr_token": "SyntaxError"})):
+            with self.assertRaises(AdmissionError) as caught:
+                fail(code)
+            self.assertEqual(caught.exception.code, "TF_PYPI_" + code)
+
     def test_source_receipt_and_retained_copy_have_distinct_bound_bytes(self):
         original = b'{\n  "status": "pass"\n}'
         expected = sha256(original)

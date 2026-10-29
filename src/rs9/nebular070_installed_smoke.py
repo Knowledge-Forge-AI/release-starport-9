@@ -899,6 +899,29 @@ def validate_installed_smoke_summary(
     return dict(value)
 
 
+def _native_execution_failure_code(process: Mapping[str, Any]) -> str:
+    """Expose only fixed diagnostic categories, never raw child output."""
+    if process.get("timed_out"):
+        return "NEBULAR_NATIVE_EXECUTION_TIMEOUT"
+    if process.get("output_limit_exceeded"):
+        return "NEBULAR_NATIVE_EXECUTION_OUTPUT_LIMIT"
+    text = process.get("stderr_token", "")
+    if not isinstance(text, str):
+        return "NEBULAR_NATIVE_EXECUTION"
+    for category, tokens in (
+        ("NODE_MODULE", ("ERR_MODULE_NOT_FOUND", "Cannot find module")),
+        ("NODE_SYNTAX", ("SyntaxError",)),
+        ("FILESYSTEM_MISSING", ("ENOENT", "no such file or directory")),
+        ("FILESYSTEM_PERMISSION", ("EACCES", "EPERM", "Permission denied")),
+        ("LIBRARY", ("Library not loaded", "cannot open shared object", "dyld[")),
+        ("HARNESS_ARGUMENTS", ("Usage: native-rc-smoke.mjs",)),
+        ("CANDIDATE_PATH", ("candidate executable", "Candidate executable")),
+    ):
+        if any(token in text for token in tokens):
+            return "NEBULAR_NATIVE_EXECUTION_" + category
+    return "NEBULAR_NATIVE_EXECUTION"
+
+
 def run_installed_smoke(
     *,
     prepared: Mapping[str, Any],
@@ -995,7 +1018,7 @@ def run_installed_smoke(
         if (process.get("exit_code") != 0 or process.get("timed_out")
                 or process.get("output_limit_exceeded") or process.get("forced_cleanup")
                 or process.get("cleanup_known") is not True or process.get("output_complete") is not True):
-            fail("NEBULAR_SYSTEM_WEBKIT_MISSING" if system_entrypoint else "NEBULAR_NATIVE_EXECUTION")
+            fail(_native_execution_failure_code(process))
         run_path = scenario_dir / f"{label}.run.json"
         receipt_path = scenario_dir / f"{label}.receipt.json"
         run, run_data, run_sha = _json_file(run_path, "native smoke run")
