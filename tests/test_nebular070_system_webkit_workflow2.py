@@ -119,6 +119,12 @@ class SystemWebKitWorkflow2Tests(unittest.TestCase):
                 section = text[start:].split("\n  qualification_gate_070:", 1)[0]
             self.assertIn("defaults:\n      run:\n        shell: bash", section)
             self.assertIn("TFNF_CI_TEMP: /__w/_temp", section)
+            self.assertIn("working-directory: qualification-source", section)
+            self.assertIn("path: qualification-source", section)
+            self.assertEqual(section.count("working-directory: ${{ github.workspace }}"), 2)
+            self.assertIn('repository=Path(os.environ["GITHUB_WORKSPACE"]) / "qualification-source"', section)
+            self.assertNotIn("safe.directory", section)
+            self.assertNotIn("chown", section)
             self.assertNotIn("runner.temp", section)
             self.assertIn("Select pinned Bookworm Python 3.11", section)
             self.assertIn("python-path=/usr/bin/python3", section)

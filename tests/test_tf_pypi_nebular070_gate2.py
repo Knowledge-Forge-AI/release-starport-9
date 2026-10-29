@@ -1029,6 +1029,76 @@ class NebularGate2Fixture(unittest.TestCase):
                             if captured_child.poll() is None:
                                 captured_child.wait(timeout=_NEBULAR_TERMINATION_GRACE)
 
+    def test_normal_wrapper_descendants_can_finish_in_existing_post_exit_window(self):
+        import time
+        from rs9.tf_pypi_consumer import _NEBULAR_DRAIN_GRACE
+        work = self.root / "natural-wrapper-exit-work"
+        work.mkdir()
+        observed_exit = [None]
+        signals = []
+        def runner(command, **kwargs):
+            child = subprocess.Popen(command, **kwargs)
+            original_poll = child.poll
+            def poll():
+                code = original_poll()
+                if code is not None and observed_exit[0] is None:
+                    observed_exit[0] = time.monotonic()
+                return code
+            child.poll = poll
+            return child
+        def group_exists(_pid):
+            return observed_exit[0] is None or time.monotonic() - observed_exit[0] < _NEBULAR_DRAIN_GRACE / 2
+        with patch("rs9.tf_pypi_consumer._nebular_group_exists", side_effect=group_exists), patch(
+                "rs9.tf_pypi_consumer._nebular_signal_group",
+                side_effect=lambda _child, number: signals.append(number) or True):
+            result = _nebular_run([sys.executable, "-c", "pass"],
+                {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}, work, (), 5, runner=runner)
+        self.assertEqual(result["exit_code"], 0)
+        self.assertTrue(result["cleanup_known"])
+        self.assertTrue(result["output_complete"])
+        self.assertFalse(result["forced_cleanup"])
+        self.assertFalse(result["timed_out"])
+        self.assertEqual(signals, [])
+
+    def test_post_exit_cleanup_keeps_the_original_leader_exit_deadline(self):
+        import time
+        from rs9.tf_pypi_consumer import _NEBULAR_DRAIN_GRACE
+        work = self.root / "fixed-post-exit-budget-work"
+        work.mkdir()
+        observed_exit = [None]
+        signals = []
+        anchors = []
+        def runner(command, **kwargs):
+            child = subprocess.Popen(command, **kwargs)
+            original_poll = child.poll
+            def poll():
+                code = original_poll()
+                if code is not None and observed_exit[0] is None:
+                    observed_exit[0] = time.monotonic()
+                return code
+            child.poll = poll
+            return child
+        def grace(current, now):
+            if current is None:
+                anchors.append(now)
+            return _nebular_grace_deadline(current, now)
+        def send(_child, number):
+            signals.append((number, time.monotonic()))
+            return True
+        with patch("rs9.tf_pypi_consumer._nebular_group_exists",
+                   side_effect=lambda _pid: len(signals) < 2), patch(
+                "rs9.tf_pypi_consumer._nebular_signal_group", side_effect=send), patch(
+                "rs9.tf_pypi_consumer._nebular_grace_deadline", side_effect=grace):
+            result = _nebular_run([sys.executable, "-c", "pass"],
+                {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}, work, (), 5, runner=runner)
+        self.assertTrue(result["forced_cleanup"])
+        self.assertTrue(result["cleanup_known"])
+        self.assertEqual([number for number, _when in signals], [signal.SIGTERM, signal.SIGKILL])
+        self.assertEqual(len(anchors), 1)
+        self.assertLessEqual(anchors[0], observed_exit[0])
+        self.assertLessEqual(_NEBULAR_DRAIN_GRACE, _NEBULAR_TERMINATION_GRACE)
+        self.assertGreaterEqual(signals[0][1] - anchors[0], _NEBULAR_DRAIN_GRACE)
+
     def test_leader_exit_waits_for_group_observation_and_fails_closed_on_retained_group(self):
         """Leader EOF must not bypass the owned-group cleanup observation."""
         clean_work = self.root / "leader-exit-cleanup-work"

@@ -720,6 +720,7 @@ jobs:
     defaults:
       run:
         shell: bash
+        working-directory: qualification-source
     env:
       TFNF_CI_TEMP: /__w/_temp
     permissions:
@@ -732,6 +733,7 @@ jobs:
     steps:
       - name: Install pinned Bookworm floor tools
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
           mkdir -p "${{ env.TFNF_CI_TEMP }}"
@@ -746,6 +748,7 @@ jobs:
 
       - name: Verify Bookworm display tool class
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
           for tool in xvfb-run xauth dbus-run-session; do
@@ -768,6 +771,7 @@ jobs:
           ref: '${{ github.sha }}'
           fetch-depth: 1
           persist-credentials: false
+          path: qualification-source
 
       - name: Select pinned Bookworm Python 3.11
         id: setup_python
@@ -814,7 +818,7 @@ jobs:
 
           descriptor = load_qualification_inputs_descriptor(
               Path(os.environ["QUALIFICATION_INPUTS"]),
-              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]) / "qualification-source",
               phase="qualification-prep",
               inrun_root=Path(os.environ["INRUN_ROOT"]),
           )
@@ -914,6 +918,7 @@ jobs:
     defaults:
       run:
         shell: bash
+        working-directory: qualification-source
     env:
       TFNF_CI_TEMP: /__w/_temp
     permissions:
@@ -926,6 +931,7 @@ jobs:
     steps:
       - name: Install pinned Bookworm floor tools
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
           mkdir -p "${{ env.TFNF_CI_TEMP }}"
@@ -940,6 +946,7 @@ jobs:
 
       - name: Verify Bookworm display tool class
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
           for tool in xvfb-run xauth dbus-run-session; do
@@ -962,6 +969,7 @@ jobs:
           ref: '${{ github.sha }}'
           fetch-depth: 1
           persist-credentials: false
+          path: qualification-source
 
       - name: Select pinned Bookworm Python 3.11
         id: setup_python
@@ -1008,7 +1016,7 @@ jobs:
 
           descriptor = load_qualification_inputs_descriptor(
               Path(os.environ["QUALIFICATION_INPUTS"]),
-              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]) / "qualification-source",
               phase="qualification-prep",
               inrun_root=Path(os.environ["INRUN_ROOT"]),
           )

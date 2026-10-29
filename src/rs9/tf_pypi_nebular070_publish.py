@@ -4466,6 +4466,7 @@ def workflow_070_qualify_jobs_text() -> str:
     defaults:
       run:
         shell: bash
+        working-directory: qualification-source
     env:
       TFNF_CI_TEMP: /__w/_temp
     permissions:
@@ -4478,6 +4479,7 @@ def workflow_070_qualify_jobs_text() -> str:
     steps:
       - name: Install pinned Bookworm floor tools
         shell: bash
+        working-directory: ${{{{ github.workspace }}}}
         run: |
           set -euo pipefail
           mkdir -p "${{{{ env.TFNF_CI_TEMP }}}}"
@@ -4492,6 +4494,7 @@ def workflow_070_qualify_jobs_text() -> str:
 
       - name: Verify Bookworm display tool class
         shell: bash
+        working-directory: ${{{{ github.workspace }}}}
         run: |
           set -euo pipefail
           for tool in {" ".join(DISPLAY_TOOL_COMMANDS)}; do
@@ -4514,6 +4517,7 @@ def workflow_070_qualify_jobs_text() -> str:
           ref: '${{{{ github.sha }}}}'
           fetch-depth: 1
           persist-credentials: false
+          path: qualification-source
 
       - name: Select pinned Bookworm Python 3.11
         id: setup_python
@@ -4560,7 +4564,7 @@ def workflow_070_qualify_jobs_text() -> str:
 
           descriptor = load_qualification_inputs_descriptor(
               Path(os.environ["QUALIFICATION_INPUTS"]),
-              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]) / "qualification-source",
               phase="qualification-prep",
               inrun_root=Path(os.environ["INRUN_ROOT"]),
           )
@@ -4660,6 +4664,7 @@ def workflow_070_qualify_jobs_text() -> str:
     defaults:
       run:
         shell: bash
+        working-directory: qualification-source
     env:
       TFNF_CI_TEMP: /__w/_temp
     permissions:
@@ -4672,6 +4677,7 @@ def workflow_070_qualify_jobs_text() -> str:
     steps:
       - name: Install pinned Bookworm floor tools
         shell: bash
+        working-directory: ${{{{ github.workspace }}}}
         run: |
           set -euo pipefail
           mkdir -p "${{{{ env.TFNF_CI_TEMP }}}}"
@@ -4686,6 +4692,7 @@ def workflow_070_qualify_jobs_text() -> str:
 
       - name: Verify Bookworm display tool class
         shell: bash
+        working-directory: ${{{{ github.workspace }}}}
         run: |
           set -euo pipefail
           for tool in {" ".join(DISPLAY_TOOL_COMMANDS)}; do
@@ -4708,6 +4715,7 @@ def workflow_070_qualify_jobs_text() -> str:
           ref: '${{{{ github.sha }}}}'
           fetch-depth: 1
           persist-credentials: false
+          path: qualification-source
 
       - name: Select pinned Bookworm Python 3.11
         id: setup_python
@@ -4754,7 +4762,7 @@ def workflow_070_qualify_jobs_text() -> str:
 
           descriptor = load_qualification_inputs_descriptor(
               Path(os.environ["QUALIFICATION_INPUTS"]),
-              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]) / "qualification-source",
               phase="qualification-prep",
               inrun_root=Path(os.environ["INRUN_ROOT"]),
           )
