@@ -2325,6 +2325,8 @@ def verify_upload_dir(
     manylinux_consumer_receipts: str | Path | None = None,
     tf_producer_source: Mapping[str, str] | None = None,
     captured_matrix: Mapping[str, Any] | None = None,
+    qualification_inputs: str | Path | Mapping[str, Any] | None = None,
+    inrun_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Re-verify both dist/ (all 3 wheels) and staged upload/ bytes against the approval immediately before upload."""
     approved = verify_approved(
@@ -2333,6 +2335,12 @@ def verify_upload_dir(
         pin=pin,
         repository=repository,
         require_admitted=True,
+    )
+    _validate_optional_inrun_transport(
+        qualification_inputs,
+        repository=repository,
+        inrun_root=inrun_root,
+        phase=QUALIFICATION_INPUT_PHASE_PUBLICATION,
     )
     if approved.get("manylinux_stage_a_sha256") is not None:
         if (
@@ -2767,6 +2775,8 @@ def select_missing(
     payload_portability: str | Path | None = None,
     manylinux_consumer_receipts: str | Path | None = None,
     tf_producer_source: Mapping[str, str] | None = None,
+    qualification_inputs: str | Path | Mapping[str, Any] | None = None,
+    inrun_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Verify admitted pin, 3-wheel approval, and Gate 2 matrix receipts, then stage only missing 0.7.0 wheels."""
     env = environ if environ is not None else os.environ
@@ -2800,6 +2810,12 @@ def select_missing(
         pin=validated_pin,
         repository=repository,
         require_admitted=True,
+    )
+    _validate_optional_inrun_transport(
+        qualification_inputs,
+        repository=repository,
+        inrun_root=inrun_root,
+        phase=QUALIFICATION_INPUT_PHASE_PUBLICATION,
     )
 
     if (
@@ -2882,6 +2898,8 @@ def select_missing(
             manylinux_consumer_receipts=manylinux_consumer_receipts,
             tf_producer_source=tf_producer_source,
             captured_matrix=captured_matrix,
+            qualification_inputs=qualification_inputs,
+            inrun_root=inrun_root,
         )
 
     if missing and attempt_marker is not None:
@@ -3410,6 +3428,8 @@ def prepare_resume(
     *,
     publisher_dir: str | Path | None = None,
     qualification_dir: str | Path | None = None,
+    qualification_inputs: str | Path | None = None,
+    inrun_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Authenticate retained 0.7.0 qualification archives and stage verified dist + receipts for resume."""
     pub = _require_real_directory(publisher_dir or repo_root(), "RESUME_PREPARE")
@@ -3464,11 +3484,26 @@ def prepare_resume(
         tf_source = stage_a_record.get("tf_producer_source") if isinstance(stage_a_record, Mapping) else None
         if not isinstance(tf_source, Mapping):
             fail("MANYLINUX_CAPTURE_MEMBER")
-        if qual_repo is not None:
+        if (
+            qual_repo is not None
+            or qualification_inputs is not None
+            or inrun_root is not None
+        ):
+            descriptor_repository = qual_repo or pub
             qual_inputs = load_qualification_inputs_descriptor(
-                repository=qual_repo,
+                qualification_inputs,
+                repository=descriptor_repository,
                 phase=QUALIFICATION_INPUT_PHASE_PREP,
+                inrun_root=inrun_root,
             )
+            if (
+                qualification_inputs is not None
+                and inrun_root is None
+                and isinstance(qual_inputs.get("manylinux"), Mapping)
+                and qual_inputs["manylinux"].get("schema") == PUBLIC_INRUN_MANYLINUX_SCHEMA
+                and qual_inputs["manylinux"].get("origin_kind") == PUBLIC_INRUN_MANYLINUX_ORIGIN_KIND
+            ):
+                fail("QUALIFICATION_INPUTS_ROOT")
             qual_manylinux = qual_inputs.get("manylinux")
             if (
                 not isinstance(qual_manylinux, Mapping)
@@ -4298,6 +4333,57 @@ def _resolve_repo_contained_dir(
     return resolved
 
 
+def _resolve_inrun_artifact_root(
+    repository_root: Path,
+    manylinux_spec: Mapping[str, Any] | None,
+    inrun_root: str | Path | None,
+) -> Path:
+    """Resolve the optional external public-in-run evidence root.
+
+    Bootstrap and expectation files stay repository-owned.  Only the
+    versioned public-in-run manylinux descriptor may select an external
+    evidence root; legacy descriptors must not gain a root override.  The
+    root is deliberately not serialized into the descriptor, so private
+    runner paths cannot become release metadata.
+    """
+    if inrun_root is None:
+        return repository_root
+    if (
+        not isinstance(manylinux_spec, Mapping)
+        or manylinux_spec.get("schema") != PUBLIC_INRUN_MANYLINUX_SCHEMA
+        or manylinux_spec.get("origin_kind") != PUBLIC_INRUN_MANYLINUX_ORIGIN_KIND
+    ):
+        fail("QUALIFICATION_INPUTS_ROOT")
+    if not isinstance(inrun_root, (str, os.PathLike)):
+        fail("QUALIFICATION_INPUTS_ROOT")
+    candidate = Path(inrun_root)
+    if not candidate.is_absolute():
+        fail("QUALIFICATION_INPUTS_ROOT")
+    _check_no_symlinks(candidate, "QUALIFICATION_INPUTS_ROOT")
+    if not candidate.exists() or not candidate.is_dir():
+        fail("QUALIFICATION_INPUTS_ROOT")
+    try:
+        candidate_stat = candidate.stat()
+        candidate_real = candidate.resolve(strict=True)
+        repository_real = repository_root.resolve(strict=True)
+    except (OSError, RuntimeError):
+        fail("QUALIFICATION_INPUTS_ROOT")
+    if not stat.S_ISDIR(candidate_stat.st_mode):
+        fail("QUALIFICATION_INPUTS_ROOT")
+    if candidate_stat.st_uid != os.getuid() or candidate_stat.st_mode & 0o022:
+        fail("QUALIFICATION_INPUTS_ROOT")
+    try:
+        candidate_real.relative_to(repository_real)
+    except ValueError:
+        try:
+            repository_real.relative_to(candidate_real)
+        except ValueError:
+            return candidate_real
+        fail("QUALIFICATION_INPUTS_ROOT")
+    fail("QUALIFICATION_INPUTS_ROOT")
+    raise AssertionError("unreachable")
+
+
 def _validate_descriptor_target_raw_release(
     target: str,
     t_entry: Any,
@@ -4435,6 +4521,7 @@ def validate_qualification_inputs_descriptor(
     repository: str | Path | None = None,
     pending_code: str = "RELEASE_INPUTS_PENDING",
     phase: str = QUALIFICATION_INPUT_PHASE_PUBLICATION,
+    inrun_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Validate the v1 operator descriptor for its explicit public-in-run phase."""
     from rs9.operator import validate_release_binding
@@ -4526,7 +4613,6 @@ def validate_qualification_inputs_descriptor(
     ev_root_raw = _validate_repo_relative_dir_spec(
         ev_spec.get("source_root"), code="QUALIFICATION_INPUTS_EVIDENCE"
     )
-    _check_no_symlinks(root / ev_root_raw, "EVIDENCE_SYMLINK")
     ev_files = ev_spec.get("files")
     if not isinstance(ev_files, Mapping) or not ev_files:
         fail("QUALIFICATION_INPUTS_EVIDENCE")
@@ -4565,6 +4651,10 @@ def validate_qualification_inputs_descriptor(
         manylinux_spec = _validate_manylinux_input_spec(
             doc["manylinux"], evidence_files=ev_files, phase=phase
         )
+    artifact_root = _resolve_inrun_artifact_root(
+        root, manylinux_spec, inrun_root
+    )
+    _check_no_symlinks(artifact_root / ev_root_raw, "EVIDENCE_SYMLINK")
 
     rr_spec = doc.get("raw_release")
     if not isinstance(rr_spec, Mapping) or set(rr_spec.keys()) != {
@@ -4575,7 +4665,7 @@ def validate_qualification_inputs_descriptor(
     rr_root_raw = _validate_repo_relative_dir_spec(
         rr_spec.get("source_root"), code="QUALIFICATION_INPUTS_RAW_RELEASE"
     )
-    _check_no_symlinks(root / rr_root_raw, "RAW_RELEASE_SYMLINK")
+    _check_no_symlinks(artifact_root / rr_root_raw, "RAW_RELEASE_SYMLINK")
     rr_targets = rr_spec.get("targets")
     if not isinstance(rr_targets, Mapping) or set(rr_targets.keys()) != set(TARGETS):
         fail("QUALIFICATION_INPUTS_RAW_RELEASE")
@@ -4593,6 +4683,7 @@ def load_qualification_inputs_descriptor(
     repository: str | Path | None = None,
     pending_code: str = "RELEASE_INPUTS_PENDING",
     phase: str = QUALIFICATION_INPUT_PHASE_PUBLICATION,
+    inrun_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Load and validate the 0.7.0 operator qualification-inputs descriptor; fail closed when pending or absent."""
     root = repo_root(repository)
@@ -4625,7 +4716,38 @@ def load_qualification_inputs_descriptor(
         repository=root,
         pending_code=pending_code,
         phase=phase,
+        inrun_root=inrun_root,
     )
+
+
+def _validate_optional_inrun_transport(
+    qualification_inputs: str | Path | Mapping[str, Any] | None,
+    *,
+    repository: str | Path | None,
+    inrun_root: str | Path | None,
+    phase: str,
+) -> None:
+    """Validate a downstream consumer's explicit descriptor/root transport pair."""
+    if qualification_inputs is None and inrun_root is None:
+        return
+    if qualification_inputs is None:
+        fail("QUALIFICATION_INPUTS_ROOT")
+    if isinstance(qualification_inputs, Mapping):
+        validate_qualification_inputs_descriptor(
+            qualification_inputs,
+            repository=repository,
+            pending_code="RELEASE_INPUTS_PENDING",
+            phase=phase,
+            inrun_root=inrun_root,
+        )
+    else:
+        load_qualification_inputs_descriptor(
+            qualification_inputs,
+            repository=repository,
+            pending_code="RELEASE_INPUTS_PENDING",
+            phase=phase,
+            inrun_root=inrun_root,
+        )
 
 
 def materialize_qualification_evidence(
@@ -4634,6 +4756,7 @@ def materialize_qualification_evidence(
     *,
     repository: str | Path | None = None,
     phase: str = QUALIFICATION_INPUT_PHASE_PUBLICATION,
+    inrun_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Materialize or verify the digest-bound Gate 1 evidence directory from the qualification-inputs descriptor."""
     root = repo_root(repository)
@@ -4643,6 +4766,7 @@ def materialize_qualification_evidence(
             repository=root,
             pending_code="RELEASE_INPUTS_PENDING",
             phase=phase,
+            inrun_root=inrun_root,
         )
         if isinstance(qualification_inputs, Mapping)
         else load_qualification_inputs_descriptor(
@@ -4650,11 +4774,15 @@ def materialize_qualification_evidence(
             repository=root,
             pending_code="RELEASE_INPUTS_PENDING",
             phase=phase,
+            inrun_root=inrun_root,
         )
     )
     ev_spec = descriptor["evidence"]
+    artifact_root = _resolve_inrun_artifact_root(
+        root, descriptor.get("manylinux"), inrun_root
+    )
     src_dir = _resolve_repo_contained_dir(
-        root,
+        artifact_root,
         ev_spec["source_root"],
         symlink_code="EVIDENCE_SYMLINK",
         missing_code="RELEASE_INPUTS_PENDING",
@@ -4717,6 +4845,7 @@ def materialize_manylinux_inputs(
     *,
     repository: str | Path | None = None,
     phase: str = QUALIFICATION_INPUT_PHASE_PUBLICATION,
+    inrun_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Materialize digest-bound public-in-run inputs for the requested phase."""
     descriptor = materialize_qualification_evidence(
@@ -4724,6 +4853,7 @@ def materialize_manylinux_inputs(
         evidence_dir,
         repository=repository,
         phase=phase,
+        inrun_root=inrun_root,
     )
     spec = descriptor.get("manylinux")
     if not isinstance(spec, Mapping):
@@ -4859,6 +4989,7 @@ def validate_raw_release_handoff_binding(
     expected_artifacts: Mapping[str, Any] | None = None,
     qualification_inputs: str | Path | Mapping[str, Any] | None = None,
     repository: str | Path | None = None,
+    inrun_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Validate raw-release handoff schema, physical file digests, and cryptographic binding to the candidate bundle."""
     if target not in TARGETS:
@@ -5050,6 +5181,7 @@ def validate_raw_release_handoff_binding(
                 repository=repository,
                 pending_code="RAW_RELEASE_HANDOFF_PENDING",
                 phase=QUALIFICATION_INPUT_PHASE_PREP,
+                inrun_root=inrun_root,
             )
             if isinstance(qualification_inputs, Mapping)
             else load_qualification_inputs_descriptor(
@@ -5057,6 +5189,7 @@ def validate_raw_release_handoff_binding(
                 repository=repository,
                 pending_code="RAW_RELEASE_HANDOFF_PENDING",
                 phase=QUALIFICATION_INPUT_PHASE_PREP,
+                inrun_root=inrun_root,
             )
         )
         _verify_handoff_matches_descriptor(raw_release, descriptor, target=target)
@@ -5072,6 +5205,7 @@ def materialize_raw_release_handoff(
     candidate: Mapping[str, Any],
     expected_artifacts: Mapping[str, Any],
     repository: str | Path | None = None,
+    inrun_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Materialize a target-bound, digest-verified raw-release handoff directory and JSON descriptor."""
     if target not in TARGETS:
@@ -5103,6 +5237,7 @@ def materialize_raw_release_handoff(
             repository=root,
             pending_code="RAW_RELEASE_HANDOFF_PENDING",
             phase=QUALIFICATION_INPUT_PHASE_PREP,
+            inrun_root=inrun_root,
         )
         if isinstance(qualification_inputs, Mapping)
         else load_qualification_inputs_descriptor(
@@ -5110,11 +5245,15 @@ def materialize_raw_release_handoff(
             repository=root,
             pending_code="RAW_RELEASE_HANDOFF_PENDING",
             phase=QUALIFICATION_INPUT_PHASE_PREP,
+            inrun_root=inrun_root,
         )
     )
     rr_spec = descriptor["raw_release"]
+    artifact_root = _resolve_inrun_artifact_root(
+        root, descriptor.get("manylinux"), inrun_root
+    )
     src_dir = _resolve_repo_contained_dir(
-        root,
+        artifact_root,
         rr_spec["source_root"],
         symlink_code="RAW_RELEASE_SYMLINK",
         missing_code="RAW_RELEASE_HANDOFF_PENDING",
@@ -5197,6 +5336,7 @@ def materialize_raw_release_handoff(
             expected_artifacts=expected_artifacts,
             qualification_inputs=descriptor,
             repository=root,
+            inrun_root=inrun_root,
         )
         with out_file.open("xb") as stream:
             stream.write(canonical(validated))
@@ -5218,6 +5358,7 @@ def load_raw_release_handoff(
     expected_artifacts: Mapping[str, Any] | None = None,
     qualification_inputs: str | Path | Mapping[str, Any] | None = None,
     repository: str | Path | None = None,
+    inrun_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Load and validate the late-bound raw-release handoff for 0.7.0 native consumer qualification."""
     if target not in TARGETS:
@@ -5268,6 +5409,7 @@ def load_raw_release_handoff(
         expected_artifacts=exp_doc,
         qualification_inputs=qualification_inputs,
         repository=repository,
+        inrun_root=inrun_root,
     )
 
 
@@ -5398,6 +5540,7 @@ def qualify_native_target(
     raw_release_path: str | Path | None = None,
     qualification_inputs: str | Path | Mapping[str, Any] | None = None,
     repository: str | Path | None = None,
+    inrun_root: str | Path | None = None,
     sandbox_prefix: Sequence[str] | None = None,
     real_user_state_snapshot: Callable[[str, str], Mapping[str, Any]] | None = None,
     home_dir: str | Path | None = None,
@@ -5455,6 +5598,9 @@ def qualify_native_target(
             target=target,
             candidate=candidate,
             expected_artifacts=expected,
+            qualification_inputs=eff_qual_inputs,
+            repository=root,
+            inrun_root=inrun_root,
         )
         descriptor = (
             validate_qualification_inputs_descriptor(
@@ -5462,6 +5608,7 @@ def qualify_native_target(
                 repository=root,
                 pending_code="RAW_RELEASE_HANDOFF_PENDING",
                 phase=QUALIFICATION_INPUT_PHASE_PREP,
+                inrun_root=inrun_root,
             )
             if isinstance(eff_qual_inputs, Mapping)
             else load_qualification_inputs_descriptor(
@@ -5469,6 +5616,7 @@ def qualify_native_target(
                 repository=root,
                 pending_code="RAW_RELEASE_HANDOFF_PENDING",
                 phase=QUALIFICATION_INPUT_PHASE_PREP,
+                inrun_root=inrun_root,
             )
         )
         _verify_handoff_matches_descriptor(raw_release, descriptor, target=target)
@@ -5480,6 +5628,7 @@ def qualify_native_target(
             candidate=candidate,
             expected_artifacts=expected,
             repository=root,
+            inrun_root=inrun_root,
         )
         descriptor = (
             validate_qualification_inputs_descriptor(
@@ -5487,6 +5636,7 @@ def qualify_native_target(
                 repository=root,
                 pending_code="RAW_RELEASE_HANDOFF_PENDING",
                 phase=QUALIFICATION_INPUT_PHASE_PREP,
+                inrun_root=inrun_root,
             )
             if isinstance(eff_qual_inputs, Mapping)
             else load_qualification_inputs_descriptor(
@@ -5494,6 +5644,7 @@ def qualify_native_target(
                 repository=root,
                 pending_code="RAW_RELEASE_HANDOFF_PENDING",
                 phase=QUALIFICATION_INPUT_PHASE_PREP,
+                inrun_root=inrun_root,
             )
         )
 
@@ -5623,6 +5774,7 @@ def build_candidates_bundle(
     *,
     expected_commit: str,
     repository: str | Path | None = None,
+    inrun_root: str | Path | None = None,
     evidence_dir: str | Path | None = None,
     release_binding: Mapping[str, Any] | str | Path | None = None,
     qualification_inputs: Mapping[str, Any] | str | Path | None = None,
@@ -5660,6 +5812,7 @@ def build_candidates_bundle(
         eff_evidence,
         repository=root,
         phase=QUALIFICATION_INPUT_PHASE_PREP,
+        inrun_root=inrun_root,
     )
 
     manylinux_spec = descriptor.get("manylinux")
@@ -5829,6 +5982,7 @@ def parser() -> argparse.ArgumentParser:
     b_cmd.add_argument("--output", type=Path, required=True)
     b_cmd.add_argument("--expected-commit", required=True)
     b_cmd.add_argument("--qualification-inputs", type=Path, default=None)
+    b_cmd.add_argument("--inrun-root", type=Path, default=None)
     b_cmd.add_argument("--evidence", type=Path, default=None)
     b_cmd.add_argument("--release-binding", type=Path, default=None)
     b_cmd.add_argument("--payload-portability", type=Path, default=None)
@@ -5840,6 +5994,7 @@ def parser() -> argparse.ArgumentParser:
     mi_cmd = sub.add_parser("materialize-manylinux-inputs")
     mi_cmd.add_argument("--qualification-inputs", type=Path, required=True)
     mi_cmd.add_argument("--evidence", type=Path, required=True)
+    mi_cmd.add_argument("--inrun-root", type=Path, default=None)
     mi_cmd.add_argument(
         "--phase",
         choices=sorted(QUALIFICATION_INPUT_PHASES),
@@ -5853,6 +6008,7 @@ def parser() -> argparse.ArgumentParser:
     q_cmd = sub.add_parser("qualify-native")
     q_cmd.add_argument("--target", choices=TARGETS, required=True)
     q_cmd.add_argument("--qualification-inputs", type=Path, default=None)
+    q_cmd.add_argument("--inrun-root", type=Path, default=None)
     q_cmd.add_argument("--bundle", type=Path, required=True)
     q_cmd.add_argument("--work", type=Path, required=True)
     q_cmd.add_argument("--output", type=Path, required=True)
@@ -5879,6 +6035,7 @@ def parser() -> argparse.ArgumentParser:
     m_cmd.add_argument("--output", type=Path, required=True)
     m_cmd.add_argument("--expected-commit", required=True)
     m_cmd.add_argument("--qualification-inputs", type=Path, default=None)
+    m_cmd.add_argument("--inrun-root", type=Path, default=None)
     m_cmd.add_argument("--run-id", required=True)
     m_cmd.add_argument("--run-attempt", required=True)
 
@@ -5907,6 +6064,8 @@ def parser() -> argparse.ArgumentParser:
     pr_cmd = sub.add_parser("prepare-resume")
     pr_cmd.add_argument("--publisher-dir", type=Path, default=None)
     pr_cmd.add_argument("--qualification-dir", type=Path, default=None)
+    pr_cmd.add_argument("--qualification-inputs", type=Path, default=None)
+    pr_cmd.add_argument("--inrun-root", type=Path, default=None)
     pr_cmd.add_argument("--api-dir", type=Path, required=True)
     pr_cmd.add_argument("--archives-dir", type=Path, required=True)
     pr_cmd.add_argument("--output", type=Path, required=True)
@@ -5925,6 +6084,8 @@ def parser() -> argparse.ArgumentParser:
     sel_cmd.add_argument("--manylinux-admission", type=Path, default=None)
     sel_cmd.add_argument("--payload-portability", type=Path, default=None)
     sel_cmd.add_argument("--manylinux-consumer-receipts", type=Path, default=None)
+    sel_cmd.add_argument("--qualification-inputs", type=Path, default=None)
+    sel_cmd.add_argument("--inrun-root", type=Path, default=None)
     sel_cmd.add_argument("--tf-producer-commit", default=None)
     sel_cmd.add_argument("--tf-producer-tree", default=None)
 
@@ -5935,6 +6096,8 @@ def parser() -> argparse.ArgumentParser:
     vu_cmd.add_argument("--payload-portability", type=Path, default=None)
     vu_cmd.add_argument("--manylinux-consumer-receipts", type=Path, default=None)
     vu_cmd.add_argument("--matrix-receipt", type=Path, default=None)
+    vu_cmd.add_argument("--qualification-inputs", type=Path, default=None)
+    vu_cmd.add_argument("--inrun-root", type=Path, default=None)
     vu_cmd.add_argument("--tf-producer-commit", default=None)
     vu_cmd.add_argument("--tf-producer-tree", default=None)
 
@@ -5966,6 +6129,7 @@ def main(
                 args.output,
                 expected_commit=args.expected_commit,
                 evidence_dir=args.evidence,
+                inrun_root=args.inrun_root,
                 release_binding=args.release_binding,
                 qualification_inputs=args.qualification_inputs,
                 payload_portability=args.payload_portability,
@@ -5983,6 +6147,7 @@ def main(
                 args.qualification_inputs,
                 args.evidence,
                 phase=args.phase,
+                inrun_root=args.inrun_root,
             )
             for key in ("stage_a", "stage_b", "tf_producer_commit", "tf_producer_tree"):
                 if key in res:
@@ -6002,6 +6167,7 @@ def main(
                 run_attempt=args.run_attempt,
                 raw_release_path=args.raw_release,
                 qualification_inputs=args.qualification_inputs,
+                inrun_root=args.inrun_root,
                 consumer_host_role=args.consumer_host_role,
                 consumer_capture_output=args.consumer_capture_output,
             )
@@ -6022,6 +6188,7 @@ def main(
                     repository=root,
                     pending_code="RELEASE_INPUTS_PENDING",
                     phase=QUALIFICATION_INPUT_PHASE_PREP,
+                    inrun_root=args.inrun_root,
                 )
                 if args.qualification_inputs is not None
                 else None
@@ -6094,6 +6261,8 @@ def main(
                 args.output,
                 publisher_dir=args.publisher_dir,
                 qualification_dir=args.qualification_dir,
+                qualification_inputs=args.qualification_inputs,
+                inrun_root=args.inrun_root,
             )
             sys.stdout.write(canonical(res).decode("utf-8"))
             return 0
@@ -6113,6 +6282,8 @@ def main(
                 manylinux_admission=args.manylinux_admission,
                 payload_portability=args.payload_portability,
                 manylinux_consumer_receipts=args.manylinux_consumer_receipts,
+                qualification_inputs=args.qualification_inputs,
+                inrun_root=args.inrun_root,
                 tf_producer_source=(
                     {"commit": args.tf_producer_commit, "tree": args.tf_producer_tree}
                     if args.tf_producer_commit and args.tf_producer_tree else None
@@ -6134,6 +6305,8 @@ def main(
                 payload_portability=args.payload_portability,
                 manylinux_consumer_receipts=args.manylinux_consumer_receipts,
                 captured_matrix=captured_matrix,
+                qualification_inputs=args.qualification_inputs,
+                inrun_root=args.inrun_root,
                 tf_producer_source=(
                     {"commit": args.tf_producer_commit, "tree": args.tf_producer_tree}
                     if args.tf_producer_commit and args.tf_producer_tree else None
