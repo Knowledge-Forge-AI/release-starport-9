@@ -38,6 +38,7 @@ PROVENANCE_NAME = "PROVENANCE.json"
 PROVENANCE_SHA256 = "3645984085dc434b1678eec16440d79a8c87dd704836eb8731085425dc976d1c"
 PROVENANCE_SIZE = 14720
 PROVENANCE_ASSET_ID = 601953752
+CURRENT_NATIVE_PROVENANCE_SCHEMA = "nebular.public-native-ci-release-provenance.v1"
 
 _PROOF_TOKEN = object()
 _SHA1 = re.compile(r"[0-9a-f]{40}\Z")
@@ -390,15 +391,21 @@ def verify_direct_release_lineage(capture, binding):
         _fail("LINEAGE_CAPTURE", "Authenticated v0.7 tree is incomplete or differs")
 
     provenance = binding.get("provenance")
-    if not isinstance(provenance, dict) or set(provenance) != {
-        "path", "commit_field", "tree_field",
-    }:
-        _fail("LINEAGE_BINDING", "Direct provenance field selection is required")
-    if provenance != {
+    legacy_provenance = {
         "path": PROVENANCE_NAME,
         "commit_field": "tagCommit",
         "tree_field": "tagTree",
-    }:
+    }
+    current_provenance = {
+        "path": PROVENANCE_NAME,
+        "commit_field": "releaseCommit",
+        "tree_field": "testedTree",
+    }
+    if provenance == legacy_provenance:
+        provenance_kind = "legacy"
+    elif provenance == current_provenance:
+        provenance_kind = "current-native"
+    else:
         _fail("LINEAGE_BINDING", "Direct provenance identity fields are fixed")
     path = provenance["path"]
     if not isinstance(path, str) or not path:
@@ -420,20 +427,20 @@ def verify_direct_release_lineage(capture, binding):
         _fail("LINEAGE_PROVENANCE", "Authenticated v0.7 provenance source is not valid JSON")
     if not isinstance(document, dict):
         _fail("LINEAGE_PROVENANCE", "Authenticated v0.7 provenance document must be an object")
-    release_document = document.get("release")
-    if not isinstance(release_document, dict):
-        _fail("LINEAGE_PROVENANCE", "Authenticated v0.7 provenance release object is required")
+    if provenance_kind == "legacy":
+        release_document = document.get("release")
+        if not isinstance(release_document, dict):
+            _fail("LINEAGE_PROVENANCE", "Authenticated v0.7 provenance release object is required")
+    else:
+        # The current public-native schema stores releaseCommit/testedTree at
+        # the document root; its numeric ``release`` field is checked below.
+        release_document = document
     commit_field, tree_field = provenance["commit_field"], provenance["tree_field"]
-    if (
-        not isinstance(commit_field, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", commit_field)
-        or not isinstance(tree_field, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", tree_field)
-    ):
-        _fail("LINEAGE_BINDING", "Direct provenance field names are malformed")
     provenance_commit = release_document.get(commit_field)
     provenance_tree = release_document.get(tree_field)
     if provenance_commit != expected["tag_commit"] or provenance_tree != expected["tag_tree"]:
         _fail("LINEAGE_PROVENANCE", "v0.7 provenance commit/tree do not equal the authenticated tag")
-    return {
+    facts = {
         "schema": "rs9.nebular-direct-lineage.v1alpha1",
         "mode": "direct-tag-provenance-equality",
         "release": binding["release"],
@@ -449,6 +456,37 @@ def verify_direct_release_lineage(capture, binding):
         "author_rewrite_required": False,
         "authenticated_record_sha256": authenticated_record_hash(capture),
     }
+    if provenance_kind == "current-native":
+        if document.get("schema") != CURRENT_NATIVE_PROVENANCE_SCHEMA:
+            _fail("LINEAGE_PROVENANCE", "Current native provenance schema is not recognized")
+        document_release = document.get("release")
+        if (not isinstance(document.get("repository"), str)
+                or not isinstance(document.get("version"), str)
+                or type(document_release) is not int or document_release <= 0
+                or document.get("repository") != binding["repository"]
+                or document.get("version") != binding["release"]
+                or document_release != release.get("id")):
+            _fail("LINEAGE_PROVENANCE", "Current native provenance release identity disagrees")
+        for field in ("releaseCommit", "testedCommit", "testedTree"):
+            value = document.get(field)
+            if not isinstance(value, str) or not _SHA1.fullmatch(value):
+                _fail("LINEAGE_PROVENANCE", "Current native provenance contains an invalid commit identity")
+        if (document["releaseCommit"] != expected["tag_commit"]
+                or document["testedTree"] != expected["tag_tree"]
+                or document["testedTree"] != tree["sha"]):
+            _fail("LINEAGE_PROVENANCE", "Current native provenance commit/tree do not equal the authenticated tag")
+        for field in ("nativeCiRun", "nativeCiAttempt", "sourceCiRun"):
+            value = document.get(field)
+            if type(value) is not int or value <= 0:
+                _fail("LINEAGE_PROVENANCE", "Current native provenance contains an invalid CI identity")
+        facts.update({
+            "provenance_schema": document["schema"],
+            "tested_commit": document["testedCommit"],
+            "native_ci_run": document["nativeCiRun"],
+            "native_ci_attempt": document["nativeCiAttempt"],
+            "source_ci_run": document["sourceCiRun"],
+        })
+    return facts
 
 
 def is_current_forward_identity(capture):
