@@ -62,6 +62,15 @@ class SystemWebKitPublisherTests(unittest.TestCase):
                     path, file_record=record, approval=self.approval,
                 )
                 self.assertEqual(actual["sha256"], record["sha256"])
+                if record["target"].startswith("linux"):
+                    from rs9.nebular070_public_consumers import _system_wheel
+                    snapshot = _system_wheel(path.read_bytes(), record["target"])
+                    self.assertEqual(snapshot["archive_sha256"], record["sha256"])
+                else:
+                    import zipfile
+                    with zipfile.ZipFile(path) as archive:
+                        self.assertNotIn(b"libwebkit2gtk-4.1.so.0", archive.read(
+                            "theme_forge_nebular_fusion/launcher.py"))
 
     def test_runtime_selection_is_bound_by_set_digest_and_rejects_stage_a(self):
         publish.validate_pin(self.pin)

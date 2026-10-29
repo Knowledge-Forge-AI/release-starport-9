@@ -103,6 +103,11 @@ class SystemWebKitWorkflow2Tests(unittest.TestCase):
                 section = text[start:end]
             else:
                 section = text[start:]
+            tools = section.split("- name: Install pinned Bookworm floor tools", 1)[1]
+            self.assertLess(
+                tools.index('mkdir -p "${{ runner.temp }}"'),
+                tools.index("apt-get update"),
+            )
             self.assertLess(
                 section.index("Check Bookworm installed tfnf missing system WebKit"),
                 section.index("Install Bookworm system WebKit runtime packages"),
