@@ -108,8 +108,8 @@ class SystemWebKitInputTests(unittest.TestCase):
                 "manifest_sha256": "a" * 64,
                 "release_id": 426333162,
                 "descriptor": {"path": publish.PUBLIC_INPUTS_TEMPLATE_DESCRIPTOR,
-                               "bytes": len(raw), "sha256": transport_digest or sha256(raw)},
-                "metadata": {},
+                               "schema": publish.QUALIFICATION_INPUTS_SCHEMA},
+                "metadata": {"descriptor_sha256": transport_digest or sha256(raw)},
                 "payloads": [],
             }
 
@@ -146,6 +146,47 @@ class SystemWebKitInputTests(unittest.TestCase):
         self.assertEqual((self.output / publish.PUBLIC_INPUTS_DESCRIPTOR).read_bytes(), raw)
         self.assertEqual(result["descriptor"]["sha256"], sha256(raw))
         self.assertTrue((self.output / publish.PUBLIC_INPUTS_PREPARATION_RECEIPT).is_file())
+
+    def test_preparation_consumes_the_maintained_transport_receipt(self):
+        import json
+        from rs9.nebular070_public_inputs import materialize_public_inputs
+        from tests.test_nebular070_public_inputs import FakeClient, _manifest, _tar, _url
+        names = ("darwin.tar.gz", "aarch64-unknown-linux-gnu.tar.gz",
+                 "x86_64-unknown-linux-gnu.tar.gz", "wrapper.tgz")
+        payloads = [(name, "raw/" + name if not name.endswith(".tgz") else "evidence/" + name,
+                     name.encode()) for name in names]
+        descriptor = {
+            "schema": publish.QUALIFICATION_INPUTS_SCHEMA,
+            "project": "theme-forge-nebular-fusion", "version": "0.7.0",
+            "system_webkit": SPEC, "evidence": {"source_root": "evidence"},
+            "raw_release": {"source_root": "raw", "targets": {
+                target: {"payload": payloads[index][1]}
+                for index, target in enumerate(publish.TARGETS)
+            }}, "wrapper": payloads[3][1],
+        }
+        raw = canonical(descriptor)
+        metadata = _tar([("qualification-inputs.json", raw, "file", 0o644)])
+        manifest = _manifest(metadata, payloads)
+        bodies = {_url(manifest["metadata"]["name"]): metadata,
+                  **{_url(name): body for name, _, body in payloads}}
+        receipt = materialize_public_inputs(manifest, self.output,
+                                           client=FakeClient(bodies), repository_root=self.repository)
+        self.assertNotIn("sha256", receipt["descriptor"])
+        self.assertEqual(receipt["metadata"]["descriptor_sha256"], sha256(raw))
+        def git(_root, args, _code):
+            if args == ["rev-parse", "HEAD^{commit}"]: return self.source["commit"]
+            if args == ["rev-parse", "HEAD^{tree}"]: return self.source["tree"]
+            if args == ["status", "--porcelain", "--untracked-files=all"]: return ""
+            raise AssertionError(args)
+        with patch.object(publish, "_git_output", side_effect=git), patch.object(
+            publish, "validate_qualification_inputs_descriptor", return_value=descriptor,
+        ):
+            result = publish._prepare_system_webkit_public_descriptor(
+                root=self.repository, output_path=self.output, manifest_path=Path("inputs.json"),
+                transport=receipt, descriptor=descriptor, template_bytes=raw, rs9_source=self.source,
+            )
+        self.assertEqual(result["descriptor"]["sha256"], receipt["metadata"]["descriptor_sha256"])
+        self.assertEqual(json.loads((self.output / publish.PUBLIC_INPUTS_DESCRIPTOR).read_bytes()), descriptor)
 
     def test_dirty_source_and_changed_transport_descriptor_refuse_before_output(self):
         for dirty, digest in ((True, None), (False, "b" * 64)):
