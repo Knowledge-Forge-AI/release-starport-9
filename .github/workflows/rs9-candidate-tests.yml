@@ -1,4 +1,4 @@
-name: Nebular 0.7.0 Linux host observations (manual)
+name: Nebular 0.7.0 Bookworm host floor observations (manual)
 
 on:
   workflow_dispatch:
@@ -56,7 +56,7 @@ jobs:
       - name: Record bounded observer context and tool identities
         shell: bash
         env:
-          PYTHONPATH: ${{ github.workspace }}/src
+          PYTHONPATH: src
         run: |
           set -euo pipefail
           test "$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.11"
@@ -113,11 +113,11 @@ jobs:
       - name: Observe the actual Bookworm Linux host
         shell: bash
         env:
-          PYTHONPATH: ${{ github.workspace }}/src
+          PYTHONPATH: src
         run: |
           set -euo pipefail
           obs_dir="$RUNNER_TEMP/nebular-host-observations"
-          python3 src/rs9/nebular070_host_observation.py \
+          python3 -B -m rs9.nebular070_host_observation \
             --role "$NEBULAR_OBSERVATION_ROLE" \
             --output "$obs_dir/observation.json" \
             --extras "$obs_dir/observation-extras.json"
@@ -138,127 +138,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: nebular070-host-observation-bookworm-${{ matrix.arch }}-${{ github.run_id }}-a${{ github.run_attempt }}-diagnostics
-          path: ${{ runner.temp }}/nebular-host-observations/
-          if-no-files-found: warn
-          retention-days: 14
-          compression-level: 0
-          overwrite: false
-
-  ubuntu-newer:
-    name: Ubuntu 24.04 newer glibc / ${{ matrix.label }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - label: ARM64
-            arch: aarch64
-            target: linux-arm64-gnu
-            runner: ubuntu-24.04-arm
-          - label: AMD64
-            arch: x86_64
-            target: linux-x64-gnu
-            runner: ubuntu-24.04
-    env:
-      NEBULAR_OBSERVATION_ROLE: newer
-      NEBULAR_EXPECTED_ARCH: ${{ matrix.arch }}
-      NEBULAR_EXPECTED_TARGET: ${{ matrix.target }}
-      NEBULAR_OBSERVATION_CONTAINER: runner-host-ubuntu-24.04
-    steps:
-      - name: Check out the exact workflow/source revision
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Record bounded observer context and tool identities
-        shell: bash
-        env:
-          PYTHONPATH: ${{ github.workspace }}/src
-        run: |
-          set -euo pipefail
-          test -x /usr/bin/readelf
-          test -x /usr/bin/ldd
-          test "$(uname -m)" = "$NEBULAR_EXPECTED_ARCH"
-          obs_dir="$RUNNER_TEMP/nebular-host-observations"
-          test ! -L "$RUNNER_TEMP"
-          mkdir -p "$obs_dir"
-          test ! -L "$obs_dir"
-          export NEBULAR_OBSERVATION_DIR="$obs_dir"
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import os
-          import platform
-          from pathlib import Path
-
-          source = Path("src/rs9/nebular070_host_observation.py")
-          source_bytes = source.read_bytes()
-          out = Path(os.environ["NEBULAR_OBSERVATION_DIR"])
-          context = {
-              "schema": "rs9.nebular070-host-observation-ci-context.v1",
-              "run": {
-                  "id": os.environ["GITHUB_RUN_ID"],
-                  "attempt": os.environ["GITHUB_RUN_ATTEMPT"],
-                  "head_sha": os.environ["GITHUB_SHA"],
-                  "workflow": os.environ["GITHUB_WORKFLOW"],
-                  "job": os.environ["GITHUB_JOB"],
-              },
-              "observation": {
-                  "role": os.environ["NEBULAR_OBSERVATION_ROLE"],
-                  "expected_arch": os.environ["NEBULAR_EXPECTED_ARCH"],
-                  "expected_target": os.environ["NEBULAR_EXPECTED_TARGET"],
-                  "container": os.environ["NEBULAR_OBSERVATION_CONTAINER"],
-              },
-              "runner": {"system": platform.system(), "machine": platform.machine()},
-              "observer_source_sha256": hashlib.sha256(source_bytes).hexdigest(),
-              "observer_source_bytes": len(source_bytes),
-          }
-          (out / "ci-context.json").write_text(
-              json.dumps(context, sort_keys=True, separators=(",", ":")) + "\n",
-              encoding="utf-8",
-          )
-          PY
-          {
-            python3 --version
-            /usr/bin/readelf --version | sed -n '1p'
-            /usr/bin/ldd --version | sed -n '1p'
-            if command -v dpkg-query >/dev/null 2>&1; then
-              dpkg-query -W -f='${Package} ${Version} ${Architecture}\n' libc6 libstdc++6 binutils python3
-            fi
-            sha256sum src/rs9/nebular070_host_observation.py
-          } > "$obs_dir/tool-versions.txt"
-
-      - name: Observe the actual newer Ubuntu host
-        shell: bash
-        env:
-          PYTHONPATH: ${{ github.workspace }}/src
-        run: |
-          set -euo pipefail
-          obs_dir="$RUNNER_TEMP/nebular-host-observations"
-          python3 src/rs9/nebular070_host_observation.py \
-            --role "$NEBULAR_OBSERVATION_ROLE" \
-            --output "$obs_dir/observation.json" \
-            --extras "$obs_dir/observation-extras.json"
-
-      - name: Upload the successful Ubuntu newer observation
-        if: ${{ success() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: nebular070-host-observation-ubuntu-newer-${{ matrix.arch }}-${{ github.run_id }}-a${{ github.run_attempt }}
-          path: ${{ runner.temp }}/nebular-host-observations/
-          if-no-files-found: error
-          retention-days: 14
-          compression-level: 0
-          overwrite: false
-
-      - name: Retain bounded Ubuntu diagnostics after a failure
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: nebular070-host-observation-ubuntu-newer-${{ matrix.arch }}-${{ github.run_id }}-a${{ github.run_attempt }}-diagnostics
           path: ${{ runner.temp }}/nebular-host-observations/
           if-no-files-found: warn
           retention-days: 14
