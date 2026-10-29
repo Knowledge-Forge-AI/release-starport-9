@@ -65,6 +65,8 @@ from rs9.wheel_native import (
 from rs9.wheel_nebular_successor import (
     DESCRIPTION_070_PATH,
     GATE1_PROFILE,
+    SYSTEM_WEBKIT_PROFILE,
+    _validate_system_webkit_archive,
     _render_successor_launcher,
     _successor_entry_points_bytes,
     _successor_init_bytes,
@@ -94,6 +96,9 @@ EXPECTED_OPTIONAL_LICENSE_FILES = ("COMMERCIAL-LICENSE.md",)
 
 DESCRIPTION_BASENAME = "nebular-fusion-0.7.0.md"
 DESCRIPTION_PATH = Path(DESCRIPTION_070_PATH)
+SYSTEM_WEBKIT_DESCRIPTION_PATH = Path(
+    "operators/tf-pypi/descriptions/nebular-fusion-0.7.0-system-webkitgtk.md"
+)
 GATE1_PROFILE_PATH = Path("operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-gate1.json")
 
 PIN_BASENAME = "theme-forge-nebular-fusion-0.7.0.json"
@@ -114,6 +119,7 @@ PUBLIC_STAGE_A_SPEC = "stage-a-files.json"
 PUBLIC_STAGE_A_OUTPUT = "evidence/public-release/generated-stage-a"
 PUBLIC_INPUTS_PREPARATION_RECEIPT = "public-inputs-preparation.json"
 PUBLIC_INPUTS_PREPARATION_SCHEMA = "rs9.tf-pypi-nebular070-public-inputs-preparation.v1"
+SYSTEM_PUBLIC_INPUTS_PREPARATION_SCHEMA = "rs9.tf-pypi-nebular070-public-inputs-preparation.v2"
 PUBLIC_TF_PRODUCER_SOURCE = {
     "commit": "79c67bb70d800701b4b0cdbb9caa9be2bbc7c2ff",
     "tree": "e663c9cf15144578a17d3cd501cf031ac83a7e0e",
@@ -265,6 +271,29 @@ UBUNTU_DISPLAY_TOOL_PACKAGES = ("xvfb", "xauth", "dbus-x11")
 DISPLAY_TOOL_COMMANDS = ("xvfb-run", "xauth", "dbus-run-session")
 
 RESUME_070_JOB_NAME = "Attended Nebular 0.7.0 PyPI publication resume"
+# The system-WebKit profile owns the host GTK/WebKit closure.  Keep the
+# distro package lists explicit and separate from the display-tool class so a
+# portable/manylinux run never installs or records the system profile.
+UBUNTU_SYSTEM_WEBKIT_PACKAGES = (
+    "libgtk-3-0t64",
+    "libcairo2",
+    "libpango-1.0-0",
+    "libgdk-pixbuf-2.0-0",
+    "libsoup-3.0-0",
+    "libwebkit2gtk-4.1-0",
+    "libjavascriptcoregtk-4.1-0",
+)
+BOOKWORM_SYSTEM_WEBKIT_PACKAGES = (
+    "libgtk-3-0",
+    "libcairo2",
+    "libpango-1.0-0",
+    "libgdk-pixbuf-2.0-0",
+    "libsoup-3.0-0",
+    "libwebkit2gtk-4.1-0",
+    "libjavascriptcoregtk-4.1-0",
+)
+
+RESUME_070_JOB_NAME = "Attended Nebular 0.7.0 PyPI publication resume"
 PREPARE_PUBLIC_INPUTS_070_JOB_NAME = "Prepare held Nebular 0.7.0 public inputs"
 PUBLISH_JOB_NAMES = frozenset({
     RESUME_070_JOB_NAME,
@@ -319,11 +348,12 @@ WORKFLOW_STEP_PROFILES = {
         ("Fail closed on unsupported release and mode combination", False),
     ),
     BUILD_VERIFY_070_JOB_NAME: (
-        ("Checkout repository", True),
-        ("Set up Python 3.13", True),
-        ("Download 0.7.0 public inputs", True),
-        ("Build and verify 0.7.0 candidate bundle", False),
-        ("Upload 0.7.0 candidate bundle", True),
+        ('Checkout repository', True),
+        ('Set up Python 3.13', True),
+        ('Download 0.7.0 public inputs', True),
+        ('Validate explicit 0.7.0 runtime profile', False),
+        ('Build and verify 0.7.0 candidate bundle', False),
+        ('Upload 0.7.0 candidate bundle', True),
     ),
     "Native consumer 0.7.0 (darwin-arm64)": (
         ("Checkout exact source", True),
@@ -342,6 +372,9 @@ WORKFLOW_STEP_PROFILES = {
         ("Verify Ubuntu display tool class", False),
         ("Download 0.7.0 candidate bundle", True),
         ("Download 0.7.0 public inputs", True),
+        ("Resolve explicit Linux runtime profile", False),
+        ("Install Ubuntu system WebKit runtime packages", False),
+        ("Verify Ubuntu system WebKit runtime packages", False),
         ("Qualify native consumer on linux-arm64-gnu", False),
         ("Upload linux-arm64-gnu qualification receipt", True),
     ),
@@ -353,6 +386,9 @@ WORKFLOW_STEP_PROFILES = {
         ("Verify Ubuntu display tool class", False),
         ("Download 0.7.0 candidate bundle", True),
         ("Download 0.7.0 public inputs", True),
+        ("Resolve explicit Linux runtime profile", False),
+        ("Install Ubuntu system WebKit runtime packages", False),
+        ("Verify Ubuntu system WebKit runtime packages", False),
         ("Qualify native consumer on linux-x64-gnu", False),
         ("Upload linux-x64-gnu qualification receipt", True),
     ),
@@ -364,6 +400,10 @@ WORKFLOW_STEP_PROFILES = {
         ("Set up Node 22", True),
         ("Download 0.7.0 candidate bundle", True),
         ("Download 0.7.0 public inputs", True),
+        ("Resolve explicit Linux runtime profile", False),
+        ("Check Bookworm installed tfnf missing system WebKit before runtime install", False),
+        ("Install Bookworm system WebKit runtime packages", False),
+        ("Verify Bookworm system WebKit runtime packages", False),
         ("Qualify native consumer on linux-arm64-gnu floor", False),
         ("Upload linux-arm64-gnu floor qualification receipt", True),
     ),
@@ -375,24 +415,30 @@ WORKFLOW_STEP_PROFILES = {
         ("Set up Node 22", True),
         ("Download 0.7.0 candidate bundle", True),
         ("Download 0.7.0 public inputs", True),
+        ("Resolve explicit Linux runtime profile", False),
+        ("Check Bookworm installed tfnf missing system WebKit before runtime install", False),
+        ("Install Bookworm system WebKit runtime packages", False),
+        ("Verify Bookworm system WebKit runtime packages", False),
         ("Qualify native consumer on linux-x64-gnu floor", False),
         ("Upload linux-x64-gnu floor qualification receipt", True),
     ),
     QUALIFICATION_GATE_070_JOB_NAME: (
-        ("Checkout exact source", True),
-        ("Set up Python 3.13", True),
-        ("Download 0.7.0 candidate bundle", True),
-        ("Download 0.7.0 public inputs", True),
-        ("Download darwin-arm64 qualification receipt", True),
-        ("Download linux-arm64-gnu qualification receipt", True),
-        ("Download linux-x64-gnu qualification receipt", True),
-        ("Download linux-arm64-gnu floor qualification receipt", True),
-        ("Download linux-x64-gnu floor qualification receipt", True),
-        ("Verify floor consumer receipts", False),
-        ("Admit complete 3-platform 0.7.0 qualification matrix", False),
-        ("Upload 0.7.0 matrix qualification receipt", True),
-        ("Assemble authenticated 0.7.0 Stage-B admission input", False),
-        ("Upload 0.7.0 manylinux admission input", True),
+        ('Checkout exact source', True),
+        ('Set up Python 3.13', True),
+        ('Download 0.7.0 candidate bundle', True),
+        ('Download 0.7.0 public inputs', True),
+        ('Validate explicit 0.7.0 runtime profile for matrix', False),
+        ('Download darwin-arm64 qualification receipt', True),
+        ('Download linux-arm64-gnu qualification receipt', True),
+        ('Download linux-x64-gnu qualification receipt', True),
+        ('Download linux-arm64-gnu floor qualification receipt', True),
+        ('Download linux-x64-gnu floor qualification receipt', True),
+        ('Verify floor consumer receipts', False),
+        ('Admit complete 3-platform 0.7.0 qualification matrix', False),
+        ('Upload 0.7.0 matrix qualification receipt', True),
+        ('Assemble authenticated 0.7.0 Stage-B admission input', False),
+        ('Verify system-WebKit matrix has no manylinux admission', False),
+        ('Upload 0.7.0 manylinux admission input', True),
     ),
     RESUME_070_JOB_NAME: (
         ("Checkout publisher authority commit", True),
@@ -515,7 +561,11 @@ REQUIRED_QUALIFICATION_INPUTS_KEYS = frozenset({
     "evidence",
     "raw_release",
 })
-OPTIONAL_QUALIFICATION_INPUTS_KEYS = frozenset({"manylinux"})
+OPTIONAL_QUALIFICATION_INPUTS_KEYS = frozenset({"manylinux", "system_webkit"})
+SYSTEM_WEBKIT_INPUT_SCHEMA = "rs9.tf-pypi-nebular070-public-inrun-system-webkit.v1"
+SYSTEM_WEBKIT_PROFILE_ID = "nebular-fusion-0.7.0-system-webkitgtk-4.1-v1"
+SYSTEM_WEBKIT_RUNTIME_PROFILE = "system-webkitgtk-4.1"
+SYSTEM_WEBKIT_INPUT_KEYS = frozenset({"schema", "origin_kind", "profile_id"})
 MANYLINUX_INPUT_SPEC_KEYS = frozenset({"stage_a", "stage_b", "tf_producer_source"})
 PUBLIC_INRUN_MANYLINUX_SCHEMA = "rs9.tf-pypi-nebular070-public-inrun-manylinux.v1"
 PUBLIC_INRUN_MANYLINUX_ORIGIN_KIND = "public-in-run"
@@ -637,6 +687,16 @@ def fail(code: str) -> None:
     raise AdmissionError(f"TF_PYPI_{code}")
 
 
+def _system_runtime_profile(value: Mapping[str, Any]) -> bool:
+    """Require an explicit system profile; missing portability is not selection."""
+    if "linux_runtime_profile" not in value:
+        return False
+    if (value["linux_runtime_profile"] != SYSTEM_WEBKIT_RUNTIME_PROFILE
+            or "manylinux_stage_a_sha256" in value):
+        fail("RUNTIME_PROFILE")
+    return True
+
+
 def repo_root(repository: str | Path | None = None) -> Path:
     """Return physical repository root and reject symlinked paths."""
     root = (
@@ -687,11 +747,12 @@ def _is_hex64(val: Any) -> bool:
     return isinstance(val, str) and bool(_HEX64_RE.fullmatch(val))
 
 
-def _normalize_description_field(value: Any) -> str:
+def _normalize_description_field(value: Any, *, system_webkit: bool = False) -> str:
     if not isinstance(value, str) or not value:
         fail("PIN_DESCRIPTION")
-    if value in (DESCRIPTION_BASENAME, str(DESCRIPTION_PATH)):
-        return str(DESCRIPTION_PATH)
+    expected = SYSTEM_WEBKIT_DESCRIPTION_PATH if system_webkit else DESCRIPTION_PATH
+    if value in (expected.name, str(expected)):
+        return str(expected)
     fail("PIN_DESCRIPTION")
     raise AssertionError("unreachable")
 
@@ -768,7 +829,7 @@ def validate_pin(pin: Mapping[str, Any]) -> dict[str, Any]:
     """Validate the closed 0.7.0 Nebular publication pin schema."""
     if not isinstance(pin, dict):
         fail("PIN_SCHEMA")
-    allowed_pin_keys = set(REQUIRED_PIN_KEYS) | {"admission_sha256"}
+    allowed_pin_keys = set(REQUIRED_PIN_KEYS) | {"admission_sha256", "linux_runtime_profile"}
     if not REQUIRED_PIN_KEYS.issubset(pin.keys()) or (set(pin.keys()) - allowed_pin_keys):
         fail("PIN_SCHEMA")
 
@@ -786,7 +847,7 @@ def validate_pin(pin: Mapping[str, Any]) -> dict[str, Any]:
     if lic != EXPECTED_LICENSE_EXPRESSION:
         fail("PIN_LICENSE")
 
-    _normalize_description_field(pin.get("description"))
+    _normalize_description_field(pin.get("description"), system_webkit=_system_runtime_profile(pin))
 
     if (
         pin.get("candidate_platforms") != list(TARGETS)
@@ -904,7 +965,9 @@ def validate_approval(doc: Mapping[str, Any]) -> dict[str, Any]:
     """Validate the closed 3-wheel 0.7.0 artifact approval manifest schema, set_sha256, and admission_sha256."""
     if not isinstance(doc, dict):
         fail("APPROVAL_SCHEMA")
-    allowed_approval_keys = set(REQUIRED_APPROVAL_KEYS) | {"admission_sha256", "manylinux_stage_a_sha256"}
+    allowed_approval_keys = set(REQUIRED_APPROVAL_KEYS) | {
+        "admission_sha256", "manylinux_stage_a_sha256", "linux_runtime_profile",
+    }
     if not REQUIRED_APPROVAL_KEYS.issubset(doc.keys()) or (set(doc.keys()) - allowed_approval_keys):
         fail("APPROVAL_SCHEMA")
 
@@ -925,6 +988,7 @@ def validate_approval(doc: Mapping[str, Any]) -> dict[str, Any]:
 
     if doc.get("license_expression") != EXPECTED_LICENSE_EXPRESSION:
         fail("APPROVAL_LICENSE")
+    system_webkit = _system_runtime_profile(doc)
 
     lic_files = doc.get("license_files")
     if not isinstance(lic_files, dict):
@@ -950,7 +1014,9 @@ def validate_approval(doc: Mapping[str, Any]) -> dict[str, Any]:
     if (
         not isinstance(readme, dict)
         or set(readme.keys()) not in ({"path", "sha256"}, {"path", "size", "sha256"})
-        or readme.get("path") != str(DESCRIPTION_PATH)
+        or readme.get("path") != str(
+            SYSTEM_WEBKIT_DESCRIPTION_PATH if system_webkit else DESCRIPTION_PATH
+        )
         or not _is_hex64(readme.get("sha256"))
     ):
         fail("APPROVAL_README")
@@ -1068,6 +1134,8 @@ def _cross_check_pin_and_approval(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     v_pin = validate_pin(pin)
     v_app = validate_approval(approval)
+    if _system_runtime_profile(v_pin) != _system_runtime_profile(v_app):
+        fail("PIN_APPROVAL_MISMATCH")
     if v_pin["source_status"] != "READY" or v_pin["qualified_platforms"] != list(TARGETS):
         fail("PIN_NOT_READY")
     if v_pin["qualification"] != v_app["qualification"]:
@@ -1101,6 +1169,10 @@ def inspect_candidate_wheel(
     if not w_path.is_file():
         fail("WHEEL_MISSING")
 
+    system_webkit = _system_runtime_profile(approval)
+    profile = SYSTEM_WEBKIT_PROFILE if system_webkit else GATE1_PROFILE
+    if system_webkit and manylinux_stage_a_digest is not None:
+        fail("WHEEL_LINUX_POLICY")
     target = str(file_record.get("target") or "")
     if target not in TARGETS:
         fail("WHEEL_TARGET")
@@ -1301,7 +1373,7 @@ def inspect_candidate_wheel(
         or prov.get("manifest_sha256") != manifest_sha
         or prov.get("license_expression") != EXPECTED_LICENSE_EXPRESSION
         or prov.get("legal_files") != license_files_map
-        or prov.get("readme_path") != str(DESCRIPTION_PATH)
+        or prov.get("readme_path") != profile.description_path
         or prov.get("readme_sha256") != approval["readme"]["sha256"]
         or prov.get("metadata_sha256") != sha256(metadata_bytes)
         or prov.get("helper_source_sha256") != {name: sha256(data) for name, data in helpers.items()}
@@ -1327,8 +1399,9 @@ def inspect_candidate_wheel(
         fail("SOURCE_IDENTITY_CONFLATED")
 
     linux_policy = prov.get("linux_runtime_policy")
-    expected_profile_rec = gate1_profile_record(GATE1_PROFILE)
-    if linux_policy != expected_profile_rec["linux_runtime_policy"]:
+    expected_profile_rec = gate1_profile_record(profile)
+    if (linux_policy != expected_profile_rec["linux_runtime_policy"]
+            or prov.get("candidate_profile") != expected_profile_rec):
         fail("WHEEL_LINUX_POLICY")
 
     family = "darwin" if target == "darwin-arm64" else "linux"
@@ -1347,6 +1420,7 @@ def inspect_candidate_wheel(
         arch,
         application_version=VERSION,
         distribution_version=DISTRIBUTION_VERSION,
+        system_webkit=system_webkit and target.startswith("linux"),
     )
     if (
         entries[launcher_member] != expected_launcher
@@ -1358,7 +1432,7 @@ def inspect_candidate_wheel(
         try:
             floor_ev = validate_darwin_payload_floor(
                 payload_bytes,
-                required_floor=GATE1_PROFILE.darwin_floor,
+                required_floor=profile.darwin_floor,
             )
         except ContractError:
             fail("WHEEL_DARWIN_FLOOR")
@@ -1367,6 +1441,15 @@ def inspect_candidate_wheel(
     else:
         if prov.get("darwin_floor_evidence") is not None:
             fail("WHEEL_DARWIN_FLOOR")
+
+    if system_webkit:
+        try:
+            _validate_system_webkit_archive(
+                manifest_doc, payload_name=payload_name, system=expected_system,
+                profile=profile,
+            )
+        except ContractError:
+            fail("WHEEL_LINUX_POLICY")
 
     return {
         "target": target,
@@ -1525,7 +1608,12 @@ def verify_matrix_receipts(
         fail("CANDIDATE_SOURCE_MISMATCH")
 
     if (
-        candidate.get("readme") != {"path": str(DESCRIPTION_PATH), "sha256": approved["readme"]["sha256"]}
+        candidate.get("readme") != {
+            "path": approved["readme"]["path"], "sha256": approved["readme"]["sha256"],
+        }
+        or candidate.get("profile") != gate1_profile_record(
+            SYSTEM_WEBKIT_PROFILE if _system_runtime_profile(approved) else GATE1_PROFILE
+        )
         or candidate.get("license", {}).get("expression") != EXPECTED_LICENSE_EXPRESSION
     ):
         fail("CANDIDATE_METADATA_MISMATCH")
@@ -1551,6 +1639,15 @@ def verify_matrix_receipts(
             hosted_root, ["rev-parse", "--verify", "HEAD^{tree}"], "HOSTED_COMMIT"
         )
 
+    system_floors = None
+    if _system_runtime_profile(approved):
+        captured = load_captured_matrix_receipt(r_dir.parent / MATRIX_RECEIPT_MEMBER)
+        if (sha256(canonical(captured)) != approved["matrix_receipt_sha256"]
+                or captured.get("linux_runtime_profile") != SYSTEM_WEBKIT_RUNTIME_PROFILE):
+            fail("MATRIX_RECEIPT_DIGEST")
+        system_floors = captured.get("system_floor_receipts")
+        if not isinstance(system_floors, Mapping):
+            fail("MATRIX_TARGETS_MISMATCH")
     matrix = admit_nebular070_matrix(
         candidate,
         expected_artifacts,
@@ -1561,6 +1658,7 @@ def verify_matrix_receipts(
         candidate_receipt_sha256=approved["candidate_receipt_sha256"],
         run_id=qual["qualification_run_id"],
         run_attempt=qual["qualification_run_attempt"],
+        **({"system_floor_receipts": system_floors} if system_floors is not None else {}),
     )
 
     matrix_sha = sha256(canonical(matrix))
@@ -2456,6 +2554,15 @@ def verify_upload_dir(
             dist=dist,
             captured_matrix=captured_matrix,
         )
+    if _system_runtime_profile(approved):
+        if any(value is not None for value in (
+            manylinux_admission, payload_portability, manylinux_consumer_receipts, tf_producer_source,
+        )):
+            fail("SYSTEM_WEBKIT_INPUT")
+        if (not isinstance(captured_matrix, Mapping)
+                or captured_matrix.get("linux_runtime_profile") != SYSTEM_WEBKIT_RUNTIME_PROFILE
+                or sha256(canonical(captured_matrix)) != approved["matrix_receipt_sha256"]):
+            fail("MATRIX_RECEIPT_DIGEST")
     u_path = Path(upload_dir)
     _check_no_symlinks(u_path, "UPLOAD_DIR")
     if not u_path.is_dir():
@@ -3883,22 +3990,66 @@ def workflow_070_qualify_jobs_text() -> str:
           name: {PUBLIC_INPUTS_ARTIFACT}
           path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
 
+      - name: Validate explicit 0.7.0 runtime profile
+        id: runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}'
+          INRUN_ROOT: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{{{ steps.setup_python.outputs.python-path }}}}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
       - name: Build and verify 0.7.0 candidate bundle
         env:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
           RS9_GITHUB_READ_TOKEN: ${{{{ github.token }}}}
         run: |
-          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish build-candidates \\
-            --qualification-inputs "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
-            --inrun-root "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
-            --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence" \\
-            --output "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
-            --expected-commit "${{{{ github.sha }}}}" \\
-            --tf-producer-commit {PUBLIC_TF_PRODUCER_SOURCE['commit']} \\
-            --tf-producer-tree {PUBLIC_TF_PRODUCER_SOURCE['tree']} \\
-            --require-manylinux \\
+          build_args=(
+            build-candidates
+            --qualification-inputs "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}"
+            --inrun-root "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}"
+            --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence"
+            --output "${{{{ runner.temp }}}}/tfnf-070-bundle"
+            --expected-commit "${{{{ github.sha }}}}"
             --require-clean
+          )
+          if [[ "${{{{ steps.runtime_profile.outputs.profile }}}}" == "manylinux" ]]; then
+            build_args+=(
+              --tf-producer-commit {PUBLIC_TF_PRODUCER_SOURCE['commit']}
+              --tf-producer-tree {PUBLIC_TF_PRODUCER_SOURCE['tree']}
+              --require-manylinux
+            )
+          fi
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish "${{build_args[@]}}"
 
       - name: Upload 0.7.0 candidate bundle
         uses: {UPLOAD_ARTIFACT_ACTION}
@@ -4037,6 +4188,62 @@ def workflow_070_qualify_jobs_text() -> str:
           name: {PUBLIC_INPUTS_ARTIFACT}
           path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
 
+      - name: Resolve explicit Linux runtime profile
+        id: linux_runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}'
+          INRUN_ROOT: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{{{ steps.setup_python.outputs.python-path }}}}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Install Ubuntu system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \\
+            {" ".join(UBUNTU_SYSTEM_WEBKIT_PACKAGES)}
+
+      - name: Verify Ubuntu system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-query -W -f='${{Package}}\\t${{Version}}\\n' {" ".join(UBUNTU_SYSTEM_WEBKIT_PACKAGES)} \\
+            | tee "${{{{ runner.temp }}}}/tfnf-070-system-webkit-packages.tsv"
+          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
+          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
+
       - name: Qualify native consumer on linux-arm64-gnu
         env:
           PYTHONPATH: src
@@ -4128,6 +4335,62 @@ def workflow_070_qualify_jobs_text() -> str:
         with:
           name: {PUBLIC_INPUTS_ARTIFACT}
           path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+
+      - name: Resolve explicit Linux runtime profile
+        id: linux_runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}'
+          INRUN_ROOT: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{{{ steps.setup_python.outputs.python-path }}}}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Install Ubuntu system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \\
+            {" ".join(UBUNTU_SYSTEM_WEBKIT_PACKAGES)}
+
+      - name: Verify Ubuntu system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-query -W -f='${{Package}}\\t${{Version}}\\n' {" ".join(UBUNTU_SYSTEM_WEBKIT_PACKAGES)} \\
+            | tee "${{{{ runner.temp }}}}/tfnf-070-system-webkit-packages.tsv"
+          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
+          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
 
       - name: Qualify native consumer on linux-x64-gnu
         env:
@@ -4231,6 +4494,79 @@ def workflow_070_qualify_jobs_text() -> str:
         with:
           name: {PUBLIC_INPUTS_ARTIFACT}
           path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+
+      - name: Resolve explicit Linux runtime profile
+        id: linux_runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}'
+          INRUN_ROOT: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{{{ steps.setup_python.outputs.python-path }}}}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Check Bookworm installed tfnf missing system WebKit before runtime install
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish check-system-webkit-missing \\
+            --target linux-arm64-gnu \\
+            --bundle "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
+            --work "${{{{ runner.temp }}}}/tfnf-070-preflight-linux-arm64-gnu-floor" \\
+            --output "${{{{ runner.temp }}}}/tfnf-070-floor/linux-arm64-gnu/missing-runtime.json" \\
+            --expected-commit "${{{{ github.sha }}}}" \\
+            --run-id "${{{{ github.run_id }}}}" \\
+            --run-attempt "${{{{ github.run_attempt }}}}"
+
+      - name: Install Bookworm system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends \\
+            {" ".join(BOOKWORM_SYSTEM_WEBKIT_PACKAGES)}
+
+      - name: Verify Bookworm system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-query -W -f='${{Package}}\\t${{Version}}\\n' {" ".join(BOOKWORM_SYSTEM_WEBKIT_PACKAGES)} \\
+            | tee "${{{{ runner.temp }}}}/tfnf-070-floor-system-webkit-packages.tsv"
+          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
+          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
 
       - name: Qualify native consumer on linux-arm64-gnu floor
         env:
@@ -4336,6 +4672,79 @@ def workflow_070_qualify_jobs_text() -> str:
           name: {PUBLIC_INPUTS_ARTIFACT}
           path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
 
+      - name: Resolve explicit Linux runtime profile
+        id: linux_runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}'
+          INRUN_ROOT: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{{{ steps.setup_python.outputs.python-path }}}}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Check Bookworm installed tfnf missing system WebKit before runtime install
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish check-system-webkit-missing \\
+            --target linux-x64-gnu \\
+            --bundle "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
+            --work "${{{{ runner.temp }}}}/tfnf-070-preflight-linux-x64-gnu-floor" \\
+            --output "${{{{ runner.temp }}}}/tfnf-070-floor/linux-x64-gnu/missing-runtime.json" \\
+            --expected-commit "${{{{ github.sha }}}}" \\
+            --run-id "${{{{ github.run_id }}}}" \\
+            --run-attempt "${{{{ github.run_attempt }}}}"
+
+      - name: Install Bookworm system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends \\
+            {" ".join(BOOKWORM_SYSTEM_WEBKIT_PACKAGES)}
+
+      - name: Verify Bookworm system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-query -W -f='${{Package}}\\t${{Version}}\\n' {" ".join(BOOKWORM_SYSTEM_WEBKIT_PACKAGES)} \\
+            | tee "${{{{ runner.temp }}}}/tfnf-070-floor-system-webkit-packages.tsv"
+          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
+          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
+
       - name: Qualify native consumer on linux-x64-gnu floor
         env:
           PYTHONPATH: src
@@ -4403,6 +4812,43 @@ def workflow_070_qualify_jobs_text() -> str:
           name: {PUBLIC_INPUTS_ARTIFACT}
           path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
 
+      - name: Validate explicit 0.7.0 runtime profile for matrix
+        id: runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}'
+          INRUN_ROOT: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{{{ steps.setup_python.outputs.python-path }}}}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
       - name: Download darwin-arm64 qualification receipt
         uses: {DOWNLOAD_ARTIFACT_ACTION}
         with:
@@ -4445,6 +4891,11 @@ def workflow_070_qualify_jobs_text() -> str:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
+          set -euo pipefail
+          FLOOR_ARGS=()
+          if [ "${{{{ steps.runtime_profile.outputs.profile }}}}" = system-webkitgtk-4.1 ]; then
+            FLOOR_ARGS=(--system-floor-receipts "${{{{ runner.temp }}}}/tfnf-070-floor-receipts")
+          fi
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish admit-matrix \\
             --bundle "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
             --receipts-dir "${{{{ runner.temp }}}}/tfnf-070-receipts" \\
@@ -4453,7 +4904,8 @@ def workflow_070_qualify_jobs_text() -> str:
             --qualification-inputs "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
             --inrun-root "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
             --run-id "${{{{ github.run_id }}}}" \\
-            --run-attempt "${{{{ github.run_attempt }}}}"
+            --run-attempt "${{{{ github.run_attempt }}}}" \\
+            "${{FLOOR_ARGS[@]}}"
 
       - name: Upload 0.7.0 matrix qualification receipt
         uses: {UPLOAD_ARTIFACT_ACTION}
@@ -4464,6 +4916,7 @@ def workflow_070_qualify_jobs_text() -> str:
           if-no-files-found: error
 
       - name: Assemble authenticated 0.7.0 Stage-B admission input
+        if: steps.runtime_profile.outputs.profile == 'manylinux'
         env:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
@@ -4494,7 +4947,39 @@ def workflow_070_qualify_jobs_text() -> str:
             --rs9-release-commit "${{{{ github.sha }}}}" \\
             --rs9-release-tree "$RS9_TREE"
 
+      - name: Verify system-WebKit matrix has no manylinux admission
+        if: steps.runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}'
+          INRUN_ROOT: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+        run: |
+          set -euo pipefail
+          "${{{{ steps.setup_python.outputs.python-path }}}}" -B - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import load_qualification_inputs_descriptor
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" not in descriptor or "manylinux" in descriptor:
+              raise SystemExit("system profile binding mismatch")
+          bundle = Path(os.environ["RUNNER_TEMP"]) / "tfnf-070-bundle"
+          if (bundle / "payload_portability.json").exists():
+              raise SystemExit("system profile unexpectedly has Stage-A payload")
+          candidate = json.loads((bundle / "candidate_receipt.json").read_bytes())
+          if "manylinux_stage_a_sha256" in candidate:
+              raise SystemExit("system profile unexpectedly has Stage-A receipt")
+          PY
+
       - name: Upload 0.7.0 manylinux admission input
+        if: steps.runtime_profile.outputs.profile == 'manylinux'
         uses: {UPLOAD_ARTIFACT_ACTION}
         with:
           name: {MANYLINUX_ADMISSION_ARTIFACT}
@@ -4545,13 +5030,17 @@ def publication_resume_job_text() -> str:
         run: |
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -c '
           from pathlib import Path
-          from rs9.tf_pypi_nebular070_publish import load_approval, load_pin, load_qualification_capture
+          from rs9.tf_pypi_nebular070_publish import (
+              _system_runtime_profile, load_approval, load_pin, load_qualification_capture,
+          )
           pub = Path("publisher-authority")
           pin = load_pin(pub)
           app = load_approval(pub)
           cap = load_qualification_capture(pub, pin=pin, approval=app)
           print(f"qualification_commit={{cap[\"qualification_source_commit\"]}}")
           print(f"qualification_run_id={{cap[\"run_id\"]}}")
+          profile = "system-webkitgtk-4.1" if _system_runtime_profile(app) else "manylinux"
+          print(f"runtime_profile={{profile}}")
           ' >> "$GITHUB_OUTPUT"
 
       - name: Checkout exact qualified source commit
@@ -4617,6 +5106,7 @@ def publication_resume_job_text() -> str:
           from rs9.tf_pypi_nebular070_publish import (
               PUBLIC_INPUTS_ARTIFACT,
               MANYLINUX_ADMISSION_ARTIFACT,
+              load_approval,
               load_qualification_capture,
               validate_public_external_artifact_metadata,
           )
@@ -4626,6 +5116,7 @@ def publication_resume_job_text() -> str:
           rows = validate_public_external_artifact_metadata(
               Path(os.environ["RUNNER_TEMP"]) / "tfnf-070-api",
               capture=cap,
+              approval=load_approval(pub),
           )
           out_dir = Path(os.environ["RUNNER_TEMP"]) / "tfnf-070-external-archives"
           for name, row in rows.items():
@@ -4670,7 +5161,9 @@ def publication_resume_job_text() -> str:
           from rs9.tf_pypi_nebular070_publish import (
               PUBLIC_INPUTS_ARTIFACT,
               MANYLINUX_ADMISSION_ARTIFACT,
+              _system_runtime_profile,
               extract_public_external_artifact,
+              load_approval,
           )
           temp = Path(os.environ["RUNNER_TEMP"])
           extract_public_external_artifact(
@@ -4678,11 +5171,12 @@ def publication_resume_job_text() -> str:
               temp / "tfnf-070-public-inputs",
               artifact_name=PUBLIC_INPUTS_ARTIFACT,
           )
-          extract_public_external_artifact(
-              temp / "tfnf-070-external-archives" / f"{{MANYLINUX_ADMISSION_ARTIFACT}}.zip",
-              temp / "tfnf-070-external-manylinux",
-              artifact_name=MANYLINUX_ADMISSION_ARTIFACT,
-          )
+          if not _system_runtime_profile(load_approval(Path("publisher-authority"))):
+              extract_public_external_artifact(
+                  temp / "tfnf-070-external-archives" / f"{{MANYLINUX_ADMISSION_ARTIFACT}}.zip",
+                  temp / "tfnf-070-external-manylinux",
+                  artifact_name=MANYLINUX_ADMISSION_ARTIFACT,
+              )
           '
 
       - name: Authenticate retained archives and stage verified distribution
@@ -4700,6 +5194,7 @@ def publication_resume_job_text() -> str:
             --output "${{{{ runner.temp }}}}/tfnf-070-resume"
 
       - name: Verify external Stage-B and Stage-A bindings
+        if: steps.resolve_qual.outputs.runtime_profile == 'manylinux'
         env:
           PYTHONPATH: qualification-source/src
           PYTHONDONTWRITEBYTECODE: '1'
@@ -4732,6 +5227,7 @@ def publication_resume_job_text() -> str:
 
       - name: Resolve captured 0.7.0 manylinux source coordinates
         id: manylinux_source
+        if: steps.resolve_qual.outputs.runtime_profile == 'manylinux'
         env:
           PYTHONPATH: qualification-source/src
           PYTHONDONTWRITEBYTECODE: '1'
@@ -4758,19 +5254,26 @@ def publication_resume_job_text() -> str:
           RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED: ${{{{ vars.RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED }}}}
           GITHUB_RUN_ATTEMPT: ${{{{ github.run_attempt }}}}
         run: |
+          set -euo pipefail
+          PORTABILITY_ARGS=()
+          if [ "${{{{ steps.resolve_qual.outputs.runtime_profile }}}}" = manylinux ]; then
+            PORTABILITY_ARGS=(
+              --manylinux-admission "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_ADMISSION_MEMBER}"
+              --manylinux-consumer-receipts "${{{{ runner.temp }}}}/tfnf-070-resume/manylinux-consumers"
+              --payload-portability "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_STAGE_A_MEMBER}"
+              --tf-producer-commit "${{{{ steps.manylinux_source.outputs.tf_producer_commit }}}}"
+              --tf-producer-tree "${{{{ steps.manylinux_source.outputs.tf_producer_tree }}}}"
+            )
+          fi
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish select-missing \\
             --dist "${{{{ runner.temp }}}}/tfnf-070-resume/dist" \\
             --upload-dir "${{{{ runner.temp }}}}/tfnf-070-resume/upload" \\
             --candidate-receipt "${{{{ runner.temp }}}}/tfnf-070-resume/candidate_receipt.json" \\
             --expected-artifacts "${{{{ runner.temp }}}}/tfnf-070-resume/expected_artifacts.json" \\
             --receipts-dir "${{{{ runner.temp }}}}/tfnf-070-resume/receipts" \\
-            --manylinux-admission "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_ADMISSION_MEMBER}" \\
-            --manylinux-consumer-receipts "${{{{ runner.temp }}}}/tfnf-070-resume/manylinux-consumers" \\
-            --payload-portability "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_STAGE_A_MEMBER}" \\
             --qualification-inputs "${{{{ runner.temp }}}}/tfnf-070-public-inputs/{PUBLIC_INPUTS_DESCRIPTOR}" \\
             --inrun-root "${{{{ runner.temp }}}}/tfnf-070-public-inputs" \\
-            --tf-producer-commit "${{{{ steps.manylinux_source.outputs.tf_producer_commit }}}}" \\
-            --tf-producer-tree "${{{{ steps.manylinux_source.outputs.tf_producer_tree }}}}" \\
+            "${{PORTABILITY_ARGS[@]}}" \\
             --attempt-marker "${{{{ runner.temp }}}}/tfnf-070-upload-attempt.json" >> "$GITHUB_OUTPUT"
 
       - name: Re-verify staged upload artifacts against approval before upload
@@ -4780,17 +5283,24 @@ def publication_resume_job_text() -> str:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
+          set -euo pipefail
+          PORTABILITY_ARGS=()
+          if [ "${{{{ steps.resolve_qual.outputs.runtime_profile }}}}" = manylinux ]; then
+            PORTABILITY_ARGS=(
+              --manylinux-admission "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_ADMISSION_MEMBER}"
+              --manylinux-consumer-receipts "${{{{ runner.temp }}}}/tfnf-070-resume/manylinux-consumers"
+              --payload-portability "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_STAGE_A_MEMBER}"
+              --tf-producer-commit "${{{{ steps.manylinux_source.outputs.tf_producer_commit }}}}"
+              --tf-producer-tree "${{{{ steps.manylinux_source.outputs.tf_producer_tree }}}}"
+            )
+          fi
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish verify-upload \\
             --dist "${{{{ runner.temp }}}}/tfnf-070-resume/dist" \\
             --upload-dir "${{{{ runner.temp }}}}/tfnf-070-resume/upload" \\
-            --manylinux-admission "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_ADMISSION_MEMBER}" \\
-            --manylinux-consumer-receipts "${{{{ runner.temp }}}}/tfnf-070-resume/manylinux-consumers" \\
             --matrix-receipt "${{{{ runner.temp }}}}/tfnf-070-resume/{MATRIX_RECEIPT_MEMBER}" \\
-            --payload-portability "${{{{ runner.temp }}}}/tfnf-070-resume/{MANYLINUX_STAGE_A_MEMBER}" \\
             --qualification-inputs "${{{{ runner.temp }}}}/tfnf-070-public-inputs/{PUBLIC_INPUTS_DESCRIPTOR}" \\
             --inrun-root "${{{{ runner.temp }}}}/tfnf-070-public-inputs" \\
-            --tf-producer-commit "${{{{ steps.manylinux_source.outputs.tf_producer_commit }}}}" \\
-            --tf-producer-tree "${{{{ steps.manylinux_source.outputs.tf_producer_tree }}}}"
+            "${{PORTABILITY_ARGS[@]}}"
 
       - name: Publish package distribution to PyPI
         if: steps.missing.outputs.upload == 'true'
@@ -5028,7 +5538,8 @@ def validate_public_external_artifact_metadata(
     api_dir: str | Path,
     *,
     capture: Mapping[str, Any],
-    names: Sequence[str] = tuple(sorted(PUBLIC_EXTERNAL_ARTIFACT_NAMES)),
+    names: Sequence[str] | None = None,
+    approval: Mapping[str, Any] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Validate same-run GitHub artifact metadata for the external input roots.
 
@@ -5040,8 +5551,14 @@ def validate_public_external_artifact_metadata(
     """
     if not isinstance(capture, Mapping):
         fail("PUBLIC_EXTERNAL_ARTIFACTS")
-    requested = tuple(names)
-    if not requested or set(requested) != PUBLIC_EXTERNAL_ARTIFACT_NAMES:
+    expected_names = (
+        frozenset({PUBLIC_INPUTS_ARTIFACT})
+        if approval is not None and _system_runtime_profile(approval)
+        else PUBLIC_EXTERNAL_ARTIFACT_NAMES
+    )
+    requested = tuple(sorted(expected_names)) if names is None else tuple(names)
+    if (not requested or len(requested) != len(expected_names)
+            or set(requested) != expected_names):
         fail("PUBLIC_EXTERNAL_ARTIFACTS")
     a_dir = _require_real_directory(api_dir, "PUBLIC_EXTERNAL_ARTIFACTS")
     artifacts_path = a_dir / "artifacts.json"
@@ -5233,6 +5750,64 @@ def extract_public_external_artifact(
     }
 
 
+def _prepare_system_webkit_public_descriptor(
+    *,
+    root: Path,
+    output_path: Path,
+    manifest_path: Path,
+    transport: Mapping[str, Any],
+    descriptor: Mapping[str, Any],
+    template_bytes: bytes,
+    rs9_source: Mapping[str, str],
+) -> dict[str, Any]:
+    """Hold system-runtime inputs without inventing a manylinux Stage A."""
+    _validate_system_webkit_input_spec(descriptor.get("system_webkit"))
+    if "manylinux" in descriptor:
+        fail("QUALIFICATION_INPUTS_RUNTIME_PROFILE")
+    if (_git_output(root, ["rev-parse", "HEAD^{commit}"], "PUBLIC_INPUTS_SOURCE") != rs9_source["commit"]
+            or _git_output(root, ["rev-parse", "HEAD^{tree}"], "PUBLIC_INPUTS_SOURCE") != rs9_source["tree"]
+            or _git_output(root, ["status", "--porcelain", "--untracked-files=all"], "PUBLIC_INPUTS_SOURCE")):
+        fail("PUBLIC_INPUTS_SOURCE")
+    validated = validate_qualification_inputs_descriptor(
+        descriptor, repository=root, phase=QUALIFICATION_INPUT_PHASE_PREP,
+        inrun_root=output_path,
+    )
+    if canonical(validated) != canonical(descriptor):
+        fail("PUBLIC_INPUTS_DESCRIPTOR_BIND")
+    if sha256(template_bytes) != transport["descriptor"]["sha256"]:
+        fail("PUBLIC_INPUTS_DESCRIPTOR_BIND")
+    prepared_path = output_path / PUBLIC_INPUTS_DESCRIPTOR
+    _check_no_symlinks(prepared_path, "PUBLIC_INPUTS_OUTPUT")
+    fd = os.open(prepared_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(template_bytes)
+        stream.flush()
+        os.fsync(stream.fileno())
+    prep = {
+        "schema": SYSTEM_PUBLIC_INPUTS_PREPARATION_SCHEMA,
+        "status": "held",
+        "runtime_profile": SYSTEM_WEBKIT_RUNTIME_PROFILE,
+        "manifest": {"path": manifest_path.as_posix(),
+                     "sha256": transport["manifest_sha256"], "release_id": transport["release_id"]},
+        "transport": {"schema": transport["schema"], "receipt_sha256": sha256(canonical(transport)),
+                      "descriptor": transport["descriptor"], "metadata": transport["metadata"],
+                      "payloads": transport["payloads"]},
+        "descriptor": {"path": PUBLIC_INPUTS_DESCRIPTOR, "bytes": len(template_bytes),
+                       "sha256": sha256(template_bytes)},
+        "template_descriptor": {"path": PUBLIC_INPUTS_TEMPLATE_DESCRIPTOR,
+                                "bytes": len(template_bytes), "sha256": sha256(template_bytes)},
+        "source": {"rs9": dict(rs9_source)},
+    }
+    prep_path = output_path / PUBLIC_INPUTS_PREPARATION_RECEIPT
+    _check_no_symlinks(prep_path, "PUBLIC_INPUTS_OUTPUT")
+    fd = os.open(prep_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(canonical(prep))
+        stream.flush()
+        os.fsync(stream.fileno())
+    return prep
+
+
 def prepare_public_inputs_070(
     manifest: str | Path,
     output: str | Path,
@@ -5286,6 +5861,12 @@ def prepare_public_inputs_070(
         descriptor = strict_json(template_descriptor_bytes)
         if not isinstance(descriptor, Mapping):
             fail("PUBLIC_INPUTS_DESCRIPTOR")
+        if "system_webkit" in descriptor:
+            return _prepare_system_webkit_public_descriptor(
+                root=root, output_path=output_path, manifest_path=manifest_path,
+                transport=transport, descriptor=descriptor,
+                template_bytes=template_descriptor_bytes, rs9_source=rs9_source,
+            )
         evidence = descriptor.get("evidence")
         if not isinstance(evidence, Mapping) or not isinstance(evidence.get("source_root"), str):
             fail("PUBLIC_INPUTS_STAGE_A_DESCRIPTOR")
@@ -5457,6 +6038,16 @@ def _validate_repo_relative_dir_spec(raw_rel: Any, *, code: str) -> str:
     return raw_rel
 
 
+def _validate_system_webkit_input_spec(value: Any) -> dict[str, str]:
+    """Select the explicit host-WebKit profile without implying qualification."""
+    if (not isinstance(value, Mapping) or set(value) != SYSTEM_WEBKIT_INPUT_KEYS
+            or value.get("schema") != SYSTEM_WEBKIT_INPUT_SCHEMA
+            or value.get("origin_kind") != PUBLIC_INRUN_MANYLINUX_ORIGIN_KIND
+            or value.get("profile_id") != SYSTEM_WEBKIT_PROFILE_ID):
+        fail("SYSTEM_WEBKIT_INPUT")
+    return dict(value)
+
+
 def _validate_qualification_input_phase(phase: str) -> str:
     """Validate the explicit phase of the v1 public-in-run descriptor route."""
     if not isinstance(phase, str) or phase not in QUALIFICATION_INPUT_PHASES:
@@ -5489,22 +6080,28 @@ def _resolve_inrun_artifact_root(
     repository_root: Path,
     manylinux_spec: Mapping[str, Any] | None,
     inrun_root: str | Path | None,
+    *,
+    system_webkit_spec: Mapping[str, Any] | None = None,
 ) -> Path:
     """Resolve the optional external public-in-run evidence root.
 
     Bootstrap and expectation files stay repository-owned.  Only the
-    versioned public-in-run manylinux descriptor may select an external
+    versioned public-in-run runtime descriptor may select an external
     evidence root; legacy descriptors must not gain a root override.  The
     root is deliberately not serialized into the descriptor, so private
     runner paths cannot become release metadata.
     """
     if inrun_root is None:
         return repository_root
-    if (
-        not isinstance(manylinux_spec, Mapping)
-        or manylinux_spec.get("schema") != PUBLIC_INRUN_MANYLINUX_SCHEMA
-        or manylinux_spec.get("origin_kind") != PUBLIC_INRUN_MANYLINUX_ORIGIN_KIND
-    ):
+    manylinux_inrun = (
+        isinstance(manylinux_spec, Mapping)
+        and manylinux_spec.get("schema") == PUBLIC_INRUN_MANYLINUX_SCHEMA
+        and manylinux_spec.get("origin_kind") == PUBLIC_INRUN_MANYLINUX_ORIGIN_KIND
+    )
+    if system_webkit_spec is not None:
+        _validate_system_webkit_input_spec(system_webkit_spec)
+    if (manylinux_spec is not None and system_webkit_spec is not None
+            or not (manylinux_inrun or system_webkit_spec is not None)):
         fail("QUALIFICATION_INPUTS_ROOT")
     if not isinstance(inrun_root, (str, os.PathLike)):
         fail("QUALIFICATION_INPUTS_ROOT")
@@ -5536,11 +6133,41 @@ def _resolve_inrun_artifact_root(
     raise AssertionError("unreachable")
 
 
+def _validate_system_native_raw_input(
+    value: Any,
+    raw_target: Mapping[str, Any],
+    *,
+    target: str,
+    descriptor: bool = False,
+    evidence_files: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Authenticate static inputs without consuming a previous native result."""
+    from rs9.nebular070_installed_smoke import validate_system_webkit_native_input
+
+    checked = validate_system_webkit_native_input(
+        value, target=target, descriptor=descriptor, evidence_files=evidence_files,
+    )
+    payload = raw_target["payload"]
+    manifest = raw_target["manifest"]
+    if (
+        checked["archive"]["payload"] != {
+            "name": Path(payload["path"]).name,
+            "size": payload["size"], "sha256": payload["sha256"],
+        }
+        or checked["archive"]["manifest"] != {
+            key: manifest[key] for key in ("path", "size", "sha256")
+        }
+    ):
+        fail("RAW_RELEASE_HANDOFF_BINDING")
+    return checked
+
+
 def _validate_descriptor_target_raw_release(
     target: str,
     t_entry: Any,
     *,
     evidence_files: Mapping[str, Any] | None = None,
+    system_webkit: bool = False,
 ) -> None:
     if (
         not isinstance(t_entry, Mapping)
@@ -5574,6 +6201,14 @@ def _validate_descriptor_target_raw_release(
     nc_target = nc_map.get(target)
     if not isinstance(nc_target, Mapping):
         fail("QUALIFICATION_INPUTS_RAW_RELEASE")
+    if system_webkit and target.startswith("linux"):
+        if set(nc_map) != {target}:
+            fail("QUALIFICATION_INPUTS_RAW_RELEASE")
+        _validate_system_native_raw_input(
+            nc_target, t_entry, target=target, descriptor=True,
+            evidence_files=evidence_files,
+        )
+        return
     if "smoke_support" in nc_target:
         from rs9.nebular070_smoke_support import validate_smoke_support
         try:
@@ -5809,13 +6444,18 @@ def validate_qualification_inputs_descriptor(
         if checked.get("path", rel_key) != rel_key:
             fail("QUALIFICATION_INPUTS_EVIDENCE")
 
+    if "manylinux" in doc and "system_webkit" in doc:
+        fail("QUALIFICATION_INPUTS_RUNTIME_PROFILE")
+    system_webkit_spec = None
+    if "system_webkit" in doc:
+        system_webkit_spec = _validate_system_webkit_input_spec(doc["system_webkit"])
     manylinux_spec = None
     if "manylinux" in doc:
         manylinux_spec = _validate_manylinux_input_spec(
             doc["manylinux"], evidence_files=ev_files, phase=phase
         )
     artifact_root = _resolve_inrun_artifact_root(
-        root, manylinux_spec, inrun_root
+        root, manylinux_spec, inrun_root, system_webkit_spec=system_webkit_spec,
     )
     _check_no_symlinks(artifact_root / ev_root_raw, "EVIDENCE_SYMLINK")
 
@@ -5835,10 +6475,13 @@ def validate_qualification_inputs_descriptor(
     for target in TARGETS:
         _validate_descriptor_target_raw_release(
             target, rr_targets.get(target), evidence_files=ev_files,
+            system_webkit=system_webkit_spec is not None,
         )
     validated = json.loads(canonical(doc))
     if manylinux_spec is not None:
         validated["manylinux"] = manylinux_spec
+    if system_webkit_spec is not None:
+        validated["system_webkit"] = system_webkit_spec
     return validated
 
 
@@ -5944,7 +6587,8 @@ def materialize_qualification_evidence(
     )
     ev_spec = descriptor["evidence"]
     artifact_root = _resolve_inrun_artifact_root(
-        root, descriptor.get("manylinux"), inrun_root
+        root, descriptor.get("manylinux"), inrun_root,
+        system_webkit_spec=descriptor.get("system_webkit"),
     )
     src_dir = _resolve_repo_contained_dir(
         artifact_root,
@@ -6135,16 +6779,23 @@ def _verify_handoff_matches_descriptor(
     nc_desc = t_spec["native_consumer"][target]
     if set(nc_hand.keys()) != set(nc_desc.keys()):
         fail("RAW_RELEASE_HANDOFF_BINDING")
-    _verify_handoff_file_entry_matches_descriptor(
-        nc_hand["qualification"],
-        nc_desc["qualification"],
-    )
-    for channel in ("raw-archive", "npm-package"):
-        for kind in ("run", "receipt"):
-            _verify_handoff_file_entry_matches_descriptor(
-                nc_hand["smoke"][channel][kind],
-                nc_desc["smoke"][channel][kind],
-            )
+    system_webkit = "system_webkit" in descriptor and target.startswith("linux")
+    if system_webkit:
+        _validate_system_native_raw_input(
+            nc_desc, t_spec, target=target, descriptor=True,
+            evidence_files=descriptor["evidence"]["files"],
+        )
+        _validate_system_native_raw_input(nc_hand, raw_release, target=target)
+    else:
+        _verify_handoff_file_entry_matches_descriptor(
+            nc_hand["qualification"], nc_desc["qualification"],
+        )
+        for channel in ("raw-archive", "npm-package"):
+            for kind in ("run", "receipt"):
+                _verify_handoff_file_entry_matches_descriptor(
+                    nc_hand["smoke"][channel][kind],
+                    nc_desc["smoke"][channel][kind],
+                )
     for meta_k in set(nc_desc.keys()) - {"qualification", "smoke"}:
         if meta_k == "smoke_support":
             from rs9.nebular070_smoke_support import validate_smoke_support
@@ -6248,19 +6899,27 @@ def validate_raw_release_handoff_binding(
         fail("RAW_RELEASE_HANDOFF_SCHEMA")
     if "target" in nc_target and nc_target["target"] != target:
         fail("RAW_RELEASE_HANDOFF_BINDING")
-    _verify_bound_file(nc_target.get("qualification"))
-    smoke_map = nc_target.get("smoke")
-    if not isinstance(smoke_map, Mapping) or set(smoke_map.keys()) != {
-        "raw-archive",
-        "npm-package",
-    }:
-        fail("RAW_RELEASE_HANDOFF_SCHEMA")
-    for channel in ("raw-archive", "npm-package"):
-        ch_spec = smoke_map.get(channel)
-        if not isinstance(ch_spec, Mapping):
+    from rs9.nebular070_installed_smoke import SYSTEM_WEBKIT_NATIVE_INPUT_SCHEMA
+    system_webkit = nc_target.get("schema") == SYSTEM_WEBKIT_NATIVE_INPUT_SCHEMA
+    if candidate is not None and target.startswith("linux"):
+        candidate_system = candidate.get("profile") == gate1_profile_record(SYSTEM_WEBKIT_PROFILE)
+        if candidate_system != system_webkit:
+            fail("RAW_RELEASE_HANDOFF_BINDING")
+    if system_webkit:
+        _validate_system_native_raw_input(nc_target, raw_release, target=target)
+    else:
+        _verify_bound_file(nc_target.get("qualification"))
+        smoke_map = nc_target.get("smoke")
+        if not isinstance(smoke_map, Mapping) or set(smoke_map.keys()) != {
+            "raw-archive", "npm-package",
+        }:
             fail("RAW_RELEASE_HANDOFF_SCHEMA")
-        _verify_bound_file(ch_spec.get("run"))
-        _verify_bound_file(ch_spec.get("receipt"))
+        for channel in ("raw-archive", "npm-package"):
+            ch_spec = smoke_map.get(channel)
+            if not isinstance(ch_spec, Mapping):
+                fail("RAW_RELEASE_HANDOFF_SCHEMA")
+            _verify_bound_file(ch_spec.get("run"))
+            _verify_bound_file(ch_spec.get("receipt"))
 
     if "smoke_support" in nc_target:
         from rs9.nebular070_smoke_support import (
@@ -6284,12 +6943,15 @@ def validate_raw_release_handoff_binding(
             })
         verify_source_binding(root_dir, support)
 
-    loader_spec = nc_target.get("loader")
-    closure_spec = nc_target.get("provider_closure")
-    if not isinstance(loader_spec, Mapping) or not isinstance(closure_spec, Mapping):
-        fail("RAW_RELEASE_HANDOFF_SCHEMA")
-    if closure_spec.get("target") not in (None, target):
-        fail("RAW_RELEASE_HANDOFF_BINDING")
+    if system_webkit:
+        loader_spec = nc_target["members"]["launcher"]
+    else:
+        loader_spec = nc_target.get("loader")
+        closure_spec = nc_target.get("provider_closure")
+        if not isinstance(loader_spec, Mapping) or not isinstance(closure_spec, Mapping):
+            fail("RAW_RELEASE_HANDOFF_SCHEMA")
+        if closure_spec.get("target") not in (None, target):
+            fail("RAW_RELEASE_HANDOFF_BINDING")
 
     if candidate is not None:
         if not isinstance(candidate, Mapping):
@@ -6461,7 +7123,8 @@ def materialize_raw_release_handoff(
     )
     rr_spec = descriptor["raw_release"]
     artifact_root = _resolve_inrun_artifact_root(
-        root, descriptor.get("manylinux"), inrun_root
+        root, descriptor.get("manylinux"), inrun_root,
+        system_webkit_spec=descriptor.get("system_webkit"),
     )
     ev_root_raw = _validate_repo_relative_dir_spec(
         descriptor["evidence"]["source_root"], code="QUALIFICATION_INPUTS_EVIDENCE"
@@ -6513,14 +7176,16 @@ def materialize_raw_release_handoff(
 
     try:
         nc_entry = json.loads(canonical(t_spec["native_consumer"][target]))
-        nc_entry["qualification"] = _stage_entry(nc_entry["qualification"])
-        for channel in ("raw-archive", "npm-package"):
-            nc_entry["smoke"][channel]["run"] = _stage_entry(
-                nc_entry["smoke"][channel]["run"]
-            )
-            nc_entry["smoke"][channel]["receipt"] = _stage_entry(
-                nc_entry["smoke"][channel]["receipt"]
-            )
+        system_webkit = "system_webkit" in descriptor and target.startswith("linux")
+        if not system_webkit:
+            nc_entry["qualification"] = _stage_entry(nc_entry["qualification"])
+            for channel in ("raw-archive", "npm-package"):
+                nc_entry["smoke"][channel]["run"] = _stage_entry(
+                    nc_entry["smoke"][channel]["run"]
+                )
+                nc_entry["smoke"][channel]["receipt"] = _stage_entry(
+                    nc_entry["smoke"][channel]["receipt"]
+                )
         if "smoke_support" in nc_entry:
             from rs9.nebular070_smoke_support import (
                 SOURCE_ARCHIVE_SIZE,
@@ -6923,7 +7588,10 @@ def qualify_native_target(
         expected_commit=expected_commit,
         expected_tree=tree,
     )
-    if capture_path is not None and manylinux_stage_a is None:
+    system_profile = candidate.get("profile") == gate1_profile_record(SYSTEM_WEBKIT_PROFILE)
+    if system_profile != ("system_webkit" in descriptor):
+        fail("QUALIFICATION_INPUTS_RUNTIME_PROFILE")
+    if capture_path is not None and manylinux_stage_a is None and not system_profile:
         fail("CONSUMER_CAPTURE_STAGE_A")
     target_system = SYSTEM_BY_TARGET[target]
     target_row = next(
@@ -6946,12 +7614,13 @@ def qualify_native_target(
         # create a circular import during normal CLI startup.
         from rs9.nebular070_host_observation import observe_host
         from rs9.nebular070_manylinux import _wheel_snapshot
+        from rs9.nebular070_public_consumers import _system_wheel
 
         capture_host_body, capture_host_extras = observe_host(consumer_host_role)
-        capture_wheel = _wheel_snapshot(
-            physical_bytes(wheel_path, limit=MAX_WHEEL_FILE_BYTES),
-            target,
-            manylinux_stage_a.digest,
+        wheel_bytes = physical_bytes(wheel_path, limit=MAX_WHEEL_FILE_BYTES)
+        capture_wheel = (
+            _system_wheel(wheel_bytes, target) if system_profile
+            else _wheel_snapshot(wheel_bytes, target, manylinux_stage_a.digest)
         )
     eff_prefix = (
         tuple(sandbox_prefix)
@@ -6961,6 +7630,20 @@ def qualify_native_target(
     eff_user_state = real_user_state_snapshot or make_real_user_state_snapshotter(
         target, home_dir=home_dir
     )
+    system_options: dict[str, Any] = {}
+    if system_profile and target.startswith("linux"):
+        if capture_host_body is None:
+            fail("CONSUMER_CAPTURE_INPUTS")
+        from rs9.nebular070_system_webkit import observe_provider
+        system_options = {
+            "system_webkit_native_input": raw_release["native_consumer"][target],
+            "system_webkit_host_observation_identity": capture_host_body["identity"],
+            "system_webkit_host_observation": {
+                "identity": capture_host_body["identity"], "role": consumer_host_role,
+                "class": "bookworm-floor" if consumer_host_role == "floor" else "ubuntu-newer",
+            },
+            "system_webkit_provider_observation": observe_provider(target),
+        }
     qual_res = qualify_nebular070(
         candidate,
         wheel_path,
@@ -6978,6 +7661,7 @@ def qualify_native_target(
         real_user_state_snapshot=eff_user_state,
         manylinux_stage_a=manylinux_stage_a,
         smoke_support=smoke_support,
+        **system_options,
     )
     out_path = Path(output_path)
     if capture_path is None:
@@ -7084,6 +7768,13 @@ def build_candidates_bundle(
         inrun_root=inrun_root,
     )
 
+    system_webkit = "system_webkit" in descriptor
+    candidate_profile = SYSTEM_WEBKIT_PROFILE if system_webkit else GATE1_PROFILE
+    if system_webkit:
+        _validate_system_webkit_input_spec(descriptor["system_webkit"])
+        if ("manylinux" in descriptor or require_manylinux
+                or payload_portability is not None or tf_producer_source is not None):
+            fail("SYSTEM_WEBKIT_INPUT")
     manylinux_spec = descriptor.get("manylinux")
     if require_manylinux:
         if not isinstance(manylinux_spec, Mapping):
@@ -7180,6 +7871,7 @@ def build_candidates_bundle(
                 rs9_source_commit=commit,
                 rs9_source_tree=tree,
                 payload_portability=stage_a,
+                candidate_profile=candidate_profile,
             )
             receipt_path = out / "candidate_receipt.json"
             write_gate1_receipt(
@@ -7187,6 +7879,7 @@ def build_candidates_bundle(
                 receipt,
                 authenticated=authenticated,
                 output_dir=cand_dir,
+                candidate_profile=candidate_profile,
             )
         except ContractError as exc:
             fail(f"GATE1_{exc.code}")
@@ -7246,6 +7939,24 @@ def build_candidates_bundle(
     }
 
 
+def _load_system_floor_receipts(path: str | Path | None) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    root = _require_real_directory(path, "MATRIX_RECEIPTS_MISSING")
+    targets = tuple(target for target in TARGETS if target.startswith("linux"))
+    if sorted(item.name for item in root.iterdir()) != sorted(targets):
+        fail("MATRIX_TARGETS_MISMATCH")
+    result = {}
+    for target in targets:
+        target_root = root / target
+        _check_no_symlinks(target_root, "MATRIX_RECEIPTS_MISSING")
+        result[target] = {
+            "qualification": _read_json_object(target_root / "result.json", "MATRIX_RECEIPTS_MISSING"),
+            "missing_runtime": _read_json_object(target_root / "missing-runtime.json", "MATRIX_RECEIPTS_MISSING"),
+        }
+    return result
+
+
 def parser() -> argparse.ArgumentParser:
     """Build CLI parser for tf_pypi_nebular070_publish operations."""
     p = argparse.ArgumentParser(description=__doc__)
@@ -7263,6 +7974,15 @@ def parser() -> argparse.ArgumentParser:
     b_cmd.add_argument("--tf-producer-tree", default=None)
     b_cmd.add_argument("--require-manylinux", action="store_true")
     b_cmd.add_argument("--require-clean", action="store_true")
+
+    negative = sub.add_parser("check-system-webkit-missing")
+    negative.add_argument("--bundle", type=Path, required=True)
+    negative.add_argument("--target", choices=("linux-arm64-gnu", "linux-x64-gnu"), required=True)
+    negative.add_argument("--work", type=Path, required=True)
+    negative.add_argument("--output", type=Path, required=True)
+    negative.add_argument("--expected-commit", required=True)
+    negative.add_argument("--run-id", required=True)
+    negative.add_argument("--run-attempt", required=True)
 
     pi_cmd = sub.add_parser("prepare-public-inputs-070")
     pi_cmd.add_argument("--manifest", type=Path, default=PUBLIC_INPUTS_MANIFEST_PATH)
@@ -7315,6 +8035,7 @@ def parser() -> argparse.ArgumentParser:
     m_cmd = sub.add_parser("admit-matrix")
     m_cmd.add_argument("--bundle", type=Path, required=True)
     m_cmd.add_argument("--receipts-dir", type=Path, required=True)
+    m_cmd.add_argument("--system-floor-receipts", type=Path, default=None)
     m_cmd.add_argument("--output", type=Path, required=True)
     m_cmd.add_argument("--expected-commit", required=True)
     m_cmd.add_argument("--qualification-inputs", type=Path, default=None)
@@ -7425,6 +8146,34 @@ def main(
             )
             sys.stdout.write(canonical(res).decode("utf-8"))
             return 0
+        if args.operation == "check-system-webkit-missing":
+            from rs9.nebular070_system_webkit import check_missing_runtime
+            bundle = _require_real_directory(args.bundle, "BUNDLE_DIR")
+            _validate_bundle_file_set(bundle)
+            candidate = _read_json_object(bundle / "candidate_receipt.json", "CANDIDATE_RECEIPT_SCHEMA")
+            if candidate.get("profile") != gate1_profile_record(SYSTEM_WEBKIT_PROFILE):
+                fail("SYSTEM_WEBKIT_INPUT")
+            root = repo_root()
+            commit = _git_output(root, ["rev-parse", "--verify", "HEAD^{commit}"], "HOSTED_COMMIT")
+            tree = _git_output(root, ["rev-parse", "--verify", "HEAD^{tree}"], "HOSTED_COMMIT")
+            if (commit != args.expected_commit or args.run_attempt != "1"
+                    or not re.fullmatch(r"[1-9][0-9]*", args.run_id)):
+                fail("HOSTED_COMMIT")
+            row = next(row for row in candidate["rows"] if row["system"] == SYSTEM_BY_TARGET[args.target])
+            wheel = bundle / "dist" / row["wheel"]["filename"]
+            if sha256(physical_bytes(wheel, limit=MAX_WHEEL_FILE_BYTES)) != row["wheel"]["sha256"]:
+                fail("WHEEL_SHA256")
+            result = check_missing_runtime(
+                wheel, args.work, target=args.target, source={"commit": commit, "tree": tree},
+                run_id=args.run_id, run_attempt=args.run_attempt,
+                prefix=default_sandbox_prefix(args.target),
+            )
+            output = args.output
+            _check_no_symlinks(output, "QUALIFY_OUTPUT")
+            output.parent.mkdir(parents=True, exist_ok=True)
+            with output.open("xb") as stream:
+                stream.write(canonical(result))
+            return 0
         if args.operation == "prepare-public-inputs-070":
             res = prepare_public_inputs_070(
                 args.manifest,
@@ -7506,6 +8255,7 @@ def main(
                 candidate_receipt_sha256=sha256(canonical(candidate)),
                 run_id=args.run_id,
                 run_attempt=args.run_attempt,
+                system_floor_receipts=_load_system_floor_receipts(args.system_floor_receipts),
                 manylinux_stage_a=manylinux_stage_a,
             )
             out_path = Path(args.output)

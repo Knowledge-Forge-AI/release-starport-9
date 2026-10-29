@@ -3227,6 +3227,7 @@ class Nebular070PublisherSeamTests(unittest.TestCase):
             [
                 f"qualification_commit={QUALIFICATION_COMMIT}",
                 f"qualification_run_id={RUN_ID}",
+                "runtime_profile=manylinux",
             ],
         )
 

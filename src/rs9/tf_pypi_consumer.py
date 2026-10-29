@@ -264,6 +264,9 @@ _NEBULAR_MAX_OUTPUT = 1024 * 1024
 # ceiling; a future larger artifact needs a new measured contract, not a
 # silent cap widening.
 _NEBULAR_MAX_ARTIFACT_BYTES = 64 * 1024 * 1024
+# The compressed thin archives fit the artifact bound; the native sidecar
+# inside them is 116-120 MiB. Bound executable extraction independently.
+_NEBULAR_MAX_EXECUTABLE_BYTES = 256 * 1024 * 1024
 _NEBULAR_IO_CHUNK = 64 * 1024
 _NEBULAR_TERMINATION_GRACE = 0.5
 _NEBULAR_DRAIN_GRACE = 0.5
@@ -395,6 +398,35 @@ _NEBULAR_LINUX_RUNTIME_POLICY = {
     "manylinux_claim": False,
     "dynamic_closure": "pending",
 }
+NEBULAR070_SYSTEM_WEBKIT_PROFILE = "system-webkitgtk-4.1"
+NEBULAR070_SYSTEM_WEBKIT_PROFILE_ID = "nebular-fusion-0.7.0-system-webkitgtk-4.1-v1"
+_NEBULAR_SYSTEM_LINUX_RUNTIME_POLICY = {
+    "wheel_tag_policy": "generic-linux",
+    "glibc_floor": "2.36",
+    "glibcxx_floor": "3.4.30",
+    "provider_baseline": "system-webkitgtk-4.1",
+    "manylinux_claim": False,
+    "dynamic_closure": "host-managed",
+    "required_sonames": ["libwebkit2gtk-4.1.so.0"],
+}
+_NEBULAR_SYSTEM_FIELDS = {
+    "construction_stage", "release_admission", "manylinux_construction_receipt_sha256",
+}
+
+
+def _nebular_runtime_profile(candidate: Mapping[str, Any]) -> str:
+    profile = candidate.get("profile") if isinstance(candidate, Mapping) else None
+    profile_id = profile.get("profile_id") if isinstance(profile, Mapping) else None
+    if profile_id == NEBULAR070_SYSTEM_WEBKIT_PROFILE_ID:
+        return NEBULAR070_SYSTEM_WEBKIT_PROFILE
+    if (profile_id == "nebular-fusion-0.7.0-gate1-agpl-floor13-v1"
+            or (profile_id is None and isinstance(profile, Mapping))):
+        return "gate1"
+    fail("NEBULAR_PROFILE_BINDING")
+
+
+def is_system_webkit_candidate(candidate: Mapping[str, Any]) -> bool:
+    return _nebular_runtime_profile(candidate) == NEBULAR070_SYSTEM_WEBKIT_PROFILE
 _NEBULAR_DARWIN_FLOOR = {"major": 13, "minor": 0}
 
 
@@ -464,22 +496,32 @@ def _nebular_profile_contract(candidate: Mapping[str, Any], row: Mapping[str, An
         fail("NEBULAR_TARGET")
     license_info = candidate.get("license")
     profile = candidate.get("profile")
+    runtime_profile = _nebular_runtime_profile(candidate)
+    expected_policy = (_NEBULAR_SYSTEM_LINUX_RUNTIME_POLICY
+                       if runtime_profile == NEBULAR070_SYSTEM_WEBKIT_PROFILE
+                       else _NEBULAR_LINUX_RUNTIME_POLICY)
     if (not isinstance(license_info, Mapping)
             or license_info.get("expression") != _NEBULAR_LICENSE_EXPRESSION
             or not isinstance(profile, Mapping)
             or profile.get("license_expression") != _NEBULAR_LICENSE_EXPRESSION
             or profile.get("darwin_floor") != _NEBULAR_DARWIN_FLOOR
-            or profile.get("linux_runtime_policy") != _NEBULAR_LINUX_RUNTIME_POLICY
-            or candidate.get("linux_runtime_policy") != _NEBULAR_LINUX_RUNTIME_POLICY):
+            or profile.get("linux_runtime_policy") != expected_policy
+            or candidate.get("linux_runtime_policy") != expected_policy):
         fail("NEBULAR_LICENSE")
     row_profile = row.get("candidate_profile")
     source_legal = row.get("source_legal_profile")
     if (not isinstance(row_profile, Mapping)
             or row_profile.get("license_expression") != _NEBULAR_LICENSE_EXPRESSION
-            or row_profile.get("linux_runtime_policy") != _NEBULAR_LINUX_RUNTIME_POLICY
+            or row_profile.get("linux_runtime_policy") != expected_policy
+            or row_profile.get("profile_id") != profile.get("profile_id")
             or not isinstance(source_legal, Mapping)
             or source_legal.get("expression") != _NEBULAR_LICENSE_EXPRESSION):
         fail("NEBULAR_LICENSE")
+    if runtime_profile == NEBULAR070_SYSTEM_WEBKIT_PROFILE:
+        if any(key in candidate or key in row for key in _NEBULAR_SYSTEM_FIELDS):
+            fail("NEBULAR_PROVENANCE_BINDING")
+        if profile.get("profile_id") != NEBULAR070_SYSTEM_WEBKIT_PROFILE_ID:
+            fail("NEBULAR_PROFILE_BINDING")
     construction_digest = row.get("manylinux_construction_receipt_sha256")
     manylinux_candidate = target.startswith("linux") and construction_digest is not None
     if manylinux_candidate:
@@ -510,8 +552,9 @@ def _nebular_profile_contract(candidate: Mapping[str, Any], row: Mapping[str, An
     elif floor is not None:
         fail("NEBULAR_FLOOR_BINDING")
     return {
+        "linux_runtime_profile": runtime_profile,
         "license_expression": _NEBULAR_LICENSE_EXPRESSION,
-        "linux_runtime_policy": _NEBULAR_LINUX_RUNTIME_POLICY,
+        "linux_runtime_policy": expected_policy,
         "darwin_floor_evidence": floor,
         "wheel_tag": expected_tag,
         "manylinux_construction_receipt_sha256": construction_digest if manylinux_candidate else None,
@@ -536,7 +579,7 @@ def _nebular_payload_member(root: Path, payload: bytes, member: Mapping[str, Any
     expected_sha = member.get("sha256")
     expected_size = member.get("size")
     if (type(expected_size) is not int or expected_size <= 0
-            or expected_size > _NEBULAR_MAX_ARTIFACT_BYTES
+            or expected_size > _NEBULAR_MAX_EXECUTABLE_BYTES
             or not _NEBULAR_HEX64.fullmatch(str(expected_sha))):
         fail("NEBULAR_NATIVE_CONTRACT")
     # The raw-release root contains descriptors and the archive itself; it is
@@ -549,7 +592,7 @@ def _nebular_payload_member(root: Path, payload: bytes, member: Mapping[str, Any
             if not item.isfile():
                 fail("NEBULAR_NATIVE_CONTRACT")
             stream = archive.extractfile(item)
-            data = stream.read(_NEBULAR_MAX_ARTIFACT_BYTES + 1) if stream is not None else b""
+            data = stream.read(_NEBULAR_MAX_EXECUTABLE_BYTES + 1) if stream is not None else b""
     except (KeyError, OSError, tarfile.TarError, EOFError):
         fail("NEBULAR_NATIVE_CONTRACT")
     if len(data) != expected_size or sha256(data) != expected_sha:
@@ -577,7 +620,8 @@ def _nebular_native_evidence(root: Path, native: Mapping[str, Any], *, target: s
                              fixture_only: bool,
                              loader: Mapping[str, Any], gui: Mapping[str, Any],
                              sidecar: Mapping[str, Any],
-                             provider: Mapping[str, Any]) -> dict[str, Any]:
+                             provider: Mapping[str, Any],
+                             system_webkit_preflight: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Bind Gate 2 to maintained native-rc qualification and smoke receipts.
 
     The old contract accepted caller-provided ``verified`` booleans and a
@@ -603,9 +647,14 @@ def _nebular_native_evidence(root: Path, native: Mapping[str, Any], *, target: s
     if len({loader.get("sha256"), gui.get("sha256"), sidecar.get("sha256")}) != 3:
         fail("NEBULAR_NATIVE_EVIDENCE")
     if target.startswith("linux"):
+        provider_check = (
+            "system-webkit-preflight"
+            if system_webkit_preflight is not None
+            else "private-runtime-closure"
+        )
         required = ("executable-header", "launcher", "sidecar-runtime", "mode:gui",
                     "mode:sidecar", "mode:launcher", "glibc:gui", "glibc:sidecar",
-                    "glibc-floor", "linkage", "private-runtime-closure")
+                    "glibc-floor", "linkage", provider_check)
     else:
         required = ("executable-header", "launcher", "sidecar-runtime", "legal-notices", "codesign")
     checks = _nebular_check_rows(qualification, required)
@@ -621,7 +670,11 @@ def _nebular_native_evidence(root: Path, native: Mapping[str, Any], *, target: s
     if (loader.get("status") != "verified"
             or loader.get("qualification_check_id") != "launcher"):
         fail("NEBULAR_NATIVE_EVIDENCE")
-    provider_check_id = "private-runtime-closure" if target.startswith("linux") else "sidecar-runtime"
+    provider_check_id = (
+        "system-webkit-preflight"
+        if system_webkit_preflight is not None and target.startswith("linux")
+        else ("private-runtime-closure" if target.startswith("linux") else "sidecar-runtime")
+    )
     provider_detail = checks[provider_check_id].get("detail")
     if target.startswith("linux"):
         if (not isinstance(provider_detail, Mapping)
@@ -635,6 +688,9 @@ def _nebular_native_evidence(root: Path, native: Mapping[str, Any], *, target: s
                 or provider_detail["toolEvidence"].get("resolutionToolRole") != "actual-consumer-ldd"
                 or provider_detail["toolEvidence"].get("cleanupFacts", {}).get("noSurvivingProcessFamily") is not True):
             fail("NEBULAR_NATIVE_EVIDENCE")
+        if system_webkit_preflight is not None:
+            if provider_detail.get("preflightIdentity") != system_webkit_preflight.get("identity"):
+                fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
     provider_detail_digest = sha256(canonical(provider_detail))
     smoke = native.get("smoke")
     if not isinstance(smoke, Mapping):
@@ -646,7 +702,13 @@ def _nebular_native_evidence(root: Path, native: Mapping[str, Any], *, target: s
         if not isinstance(entry, Mapping):
             fail("NEBULAR_NATIVE_EVIDENCE")
         run, run_digest = _nebular_json_descriptor(root, entry.get("run"), f"native-rc smoke {source}")
-        receipt, receipt_digest = _nebular_json_descriptor(root, entry.get("receipt"), f"native-rc receipt {source}")
+        receipt_bytes, receipt_digest = _nebular_descriptor(root, entry.get("receipt"), f"native-rc receipt {source}")
+        try:
+            receipt = strict_json(receipt_bytes)
+        except (ValueError, UnicodeError):
+            fail("NEBULAR_NATIVE_EVIDENCE")
+        if not isinstance(receipt, Mapping):
+            fail("NEBULAR_NATIVE_EVIDENCE")
         if (run.get("schema") != "nebular.native-rc-smoke-run-v1"
                 or run.get("status") != "pass"
                 or run.get("platform") != native_platform
@@ -655,9 +717,10 @@ def _nebular_native_evidence(root: Path, native: Mapping[str, Any], *, target: s
                 or run.get("problems") != []
                 or run.get("executable", {}).get("path") != gui.get("smoke_path")
                 or run.get("executable", {}).get("sha256") != executable_sha
-                or run.get("receipt", {}).get("status") != "pass"
-                or run.get("receipt", {}).get("sha256") != receipt_digest):
+                or run.get("receipt", {}).get("status") != "pass"):
             fail("NEBULAR_NATIVE_EVIDENCE")
+        from rs9.nebular070_installed_smoke import verified_application_receipt_digest
+        verified_application_receipt_digest(receipt_bytes, run["receipt"].get("sha256"))
         run_checks = run.get("checks")
         if (not isinstance(run_checks, Mapping)
                 or run_checks.get("orphans") != []
@@ -707,7 +770,56 @@ def _nebular_native_evidence(root: Path, native: Mapping[str, Any], *, target: s
         "launcher_sha256": loader["sha256"],
         "sidecar_sha256": sidecar["sha256"],
         "provider_evidence": provider_evidence,
+        **({"system_webkit_preflight_identity": system_webkit_preflight["identity"]}
+           if system_webkit_preflight is not None else {}),
     }
+
+
+def _nebular_static_system_native(
+    value: Mapping[str, Any], *, target: str, manifest: Mapping[str, Any],
+    payload_digest: str, manifest_digest: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Turn static system inputs into the narrow runtime invocation spec.
+
+    No qualification, smoke, loader, or provider result is manufactured here.
+    Those observations are produced by the installed consumer after this
+    static archive/member contract has been authenticated.
+    """
+    from rs9.nebular070_installed_smoke import validate_system_webkit_native_input
+
+    checked = validate_system_webkit_native_input(value, target=target)
+    archive = checked["archive"]
+    if (archive["payload"]["sha256"] != payload_digest
+            or archive["manifest"]["sha256"] != manifest_digest):
+        fail("NEBULAR_NATIVE_CONTRACT")
+    members = manifest.get("members")
+    if not isinstance(members, list):
+        fail("NEBULAR_NATIVE_CONTRACT")
+    by_path = {
+        row.get("path"): row for row in members
+        if isinstance(row, Mapping) and isinstance(row.get("path"), str)
+    }
+    checked_members = checked["members"]
+    role_paths = _nebular_native_role_paths(target, manifest)
+    for role in ("gui", "launcher", "sidecar"):
+        declared = checked_members[role]
+        actual = by_path.get(declared["path"])
+        if (declared["path"] != role_paths[role]
+                or not isinstance(actual, Mapping)
+                or actual.get("type") != "file"
+                or any(actual.get(key) != declared[key] for key in ("path", "size", "mode", "sha256"))):
+            fail("NEBULAR_NATIVE_CONTRACT")
+    protocol = checked["protocol"]
+    native = {
+        "command": protocol["command"], "protocol": protocol["protocol"],
+        "platform": protocol["platform"], "scenario": protocol["scenario"],
+        "argv": list(protocol["argv"]), "timeout_seconds": protocol["timeout_seconds"],
+        "state_paths": list(protocol["state_paths"]),
+        "user_state_protocol": dict(protocol["user_state_protocol"]),
+        "smoke_support": checked["smoke_support"],
+        "system_static_input": checked,
+    }
+    return native, checked
 
 
 def _nebular_candidate_row(candidate: Mapping[str, Any], target: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -1093,7 +1205,13 @@ def _nebular_identity_observed(host_identity: Mapping[str, Any] | None, target: 
 
 def _nebular_validate_capture(candidate: Mapping[str, Any], row: Mapping[str, Any], context: Mapping[str, Any],
                               raw_release: Mapping[str, Any], *, target: str,
-                              fixture_only: bool) -> dict[str, Any]:
+                              fixture_only: bool,
+                              system_webkit_native_input: Mapping[str, Any] | None = None,
+                              system_webkit_preflight: Mapping[str, Any] | None = None,
+                              system_webkit_source: Mapping[str, str] | None = None,
+                              run_id: str | None = None,
+                              run_attempt: str | None = None,
+                              host_observation_identity: str | None = None) -> dict[str, Any]:
     root_raw = raw_release.get("root")
     if not isinstance(root_raw, str) or not os.path.isabs(root_raw):
         fail("NEBULAR_CAPTURE_ROOT")
@@ -1152,7 +1270,22 @@ def _nebular_validate_capture(candidate: Mapping[str, Any], row: Mapping[str, An
         and direct_release.get("tagCommit") == identity["commit"]
         and direct_release.get("tagTree") == identity["tree"]
     )
-    if not (provenance_matches_candidate or provenance_matches_release):
+    release_binding = candidate.get("release_binding")
+    release_expected = release_binding.get("expected") if isinstance(release_binding, Mapping) else None
+    native_release_id = release_expected.get("release_id") if isinstance(release_expected, Mapping) else None
+    provenance_matches_public_native = (
+        isinstance(provenance, Mapping)
+        and provenance.get("schema") == "nebular.public-native-ci-release-provenance.v1"
+        and provenance.get("repository") == identity["repository"]
+        and provenance.get("version") == "0.7.0"
+        and identity["tag"] == "v0.7.0"
+        and provenance.get("releaseCommit") == identity["commit"]
+        and provenance.get("testedTree") == identity["tree"]
+        and type(native_release_id) is int and native_release_id > 0
+        and type(provenance.get("release")) is int
+        and provenance["release"] == native_release_id
+    )
+    if not (provenance_matches_candidate or provenance_matches_release or provenance_matches_public_native):
         fail("NEBULAR_PROVENANCE_BINDING")
     payload_desc = raw_release.get("payload")
     payload_bytes, payload_digest = _nebular_descriptor(root, payload_desc, "payload")
@@ -1196,8 +1329,45 @@ def _nebular_validate_capture(candidate: Mapping[str, Any], row: Mapping[str, An
         fail("NEBULAR_NATIVE_CONTRACT")
     native_rows = raw_release.get("native_consumer")
     native = native_rows.get(target) if isinstance(native_rows, Mapping) else None
-    if not isinstance(manifest, Mapping) or not isinstance(native, Mapping):
+    system_profile = _nebular_runtime_profile(candidate) if target.startswith("linux") else None
+    static_system_input = system_webkit_native_input
+    if (system_profile == NEBULAR070_SYSTEM_WEBKIT_PROFILE
+            and static_system_input is None
+            and isinstance(native, Mapping)
+            and native.get("schema") == "rs9.tf-pypi-nebular070-system-native-consumer-input.v1"):
+        static_system_input = native
+    static_system = False
+    if not isinstance(manifest, Mapping):
         fail("NEBULAR_NATIVE_CONTRACT")
+    if system_profile == NEBULAR070_SYSTEM_WEBKIT_PROFILE and static_system_input is not None:
+        native, static_system_input = _nebular_static_system_native(
+            static_system_input, target=target, manifest=manifest,
+            payload_digest=payload_digest, manifest_digest=manifest_digest,
+        )
+        static_system = True
+    elif not isinstance(native, Mapping):
+        fail("NEBULAR_NATIVE_CONTRACT")
+    from rs9.nebular070_installed_smoke import validate_system_webkit_preflight
+    if system_profile == NEBULAR070_SYSTEM_WEBKIT_PROFILE and not static_system:
+        if (not target.startswith("linux") or system_webkit_preflight is None
+                or not isinstance(system_webkit_source, Mapping)):
+            fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
+        validate_system_webkit_preflight(
+            system_webkit_preflight,
+            target=target,
+            wheel_sha256=str(row.get("wheel", {}).get("sha256")),
+            wheel_tag=str(row.get("wheel", {}).get("tag")),
+            payload_archive_sha256=str(row.get("payload_archive_sha256")),
+            payload_manifest_sha256=str(row.get("manifest_sha256")),
+            source=system_webkit_source,
+            run_id=run_id,
+            run_attempt=run_attempt,
+            host_observation_identity=host_observation_identity,
+        )
+    elif system_profile != NEBULAR070_SYSTEM_WEBKIT_PROFILE and system_webkit_preflight is not None:
+        fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
+    elif system_profile == NEBULAR070_SYSTEM_WEBKIT_PROFILE and static_system and system_webkit_preflight is not None:
+        fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
     loader = native.get("loader")
     provider = native.get("provider_closure")
     members = manifest.get("members")
@@ -1243,23 +1413,23 @@ def _nebular_validate_capture(candidate: Mapping[str, Any], row: Mapping[str, An
         declared = commands[command_name]
         if any(declared.get(key) != role[key] for key in ("path", "sha256", "size", "mode")):
             fail("NEBULAR_NATIVE_CONTRACT")
-    if (not isinstance(loader, Mapping)
+    if (not static_system and (not isinstance(loader, Mapping)
             or loader.get("path") != launcher["path"]
             or loader.get("sha256") != launcher["sha256"]
             or not isinstance(provider, Mapping)
-            or loader.get("status") != "verified"):
+            or loader.get("status") != "verified")):
         fail("NEBULAR_NATIVE_CONTRACT")
     gui["smoke_path"] = roles["smoke_gui"]
     # Keep the PREP3 result field as an alias for downstream readers while
     # making the smoke-vs-materialized path distinction explicit.
     gui["runtime_path"] = roles["smoke_gui"]
     gui["materialized_path"] = roles["materialized_gui"]
-    if provider.get("target") != target or provider.get("emulated") is True:
+    if not static_system and (provider.get("target") != target or provider.get("emulated") is True):
         fail("NEBULAR_PROVIDER_CLOSURE")
-    if fixture_only:
+    if not static_system and fixture_only:
         if provider.get("mode") != "controlled-fixture":
             fail("NEBULAR_PROVIDER_CLOSURE")
-    elif provider.get("mode") != "host-observed":
+    elif not static_system and provider.get("mode") != "host-observed":
         fail("NEBULAR_PROVIDER_CLOSURE")
     native_platform = _NEBULAR_NATIVE_RC_PLATFORMS.get(target)
     expected_scenario = _NEBULAR_NATIVE_RC_SCENARIOS.get(target, {}).get("raw-archive")
@@ -1277,15 +1447,17 @@ def _nebular_validate_capture(candidate: Mapping[str, Any], row: Mapping[str, An
             or native["user_state_protocol"].get("method") != "native-rc-smoke.persistentStateLocations+snapshotLocations"
             or native["user_state_protocol"].get("scope") != "real-user-state"):
         fail("NEBULAR_NATIVE_CONTRACT")
-    evidence = _nebular_native_evidence(
+    evidence = None if static_system else _nebular_native_evidence(
         root, native, target=target, fixture_only=fixture_only,
         loader=loader, gui=gui, sidecar=sidecar, provider=provider,
+        system_webkit_preflight=system_webkit_preflight,
     )
     return {"root": root, "readme_bytes": readme_bytes, "payload_bytes": payload_bytes,
             "manifest": manifest, "manifest_sha256": manifest_digest, "provenance": provenance,
-            "provenance_sha256": provenance_digest, "native": dict(native), "provider": dict(provider),
-            "loader": dict(loader), "gui": gui, "sidecar": sidecar,
-            "native_evidence": evidence}
+            "provenance_sha256": provenance_digest, "native": dict(native),
+            "provider": dict(provider) if isinstance(provider, Mapping) else {},
+            "loader": dict(loader) if isinstance(loader, Mapping) else {}, "gui": gui, "sidecar": sidecar,
+            "native_evidence": evidence, "system_static_input": static_system_input if static_system else None}
 
 
 def consume_nebular_candidate(
@@ -1295,6 +1467,8 @@ def consume_nebular_candidate(
     work: str | Path,
     *,
     target: str,
+    run_id: str = "1",
+    run_attempt: str = "1",
     sandbox_prefix: Sequence[str] = (),
     sandbox_probe: Callable[[Mapping[str, str], Sequence[str]], Mapping[str, Any]] | None = None,
     host_identity: Mapping[str, Any] | None = None,
@@ -1305,6 +1479,12 @@ def consume_nebular_candidate(
     real_user_state_snapshot: Callable[[str, str], Mapping[str, Any]] | None = None,
     offline_pip_bootstrap: Mapping[str, Any] | None = None,
     smoke_support: Mapping[str, Any] | None = None,
+    system_webkit_native_input: Mapping[str, Any] | None = None,
+    system_webkit_preflight: Mapping[str, Any] | None = None,
+    system_webkit_source: Mapping[str, str] | None = None,
+    system_webkit_host_observation_identity: str | None = None,
+    system_webkit_host_observation: Mapping[str, Any] | None = None,
+    system_webkit_provider_observation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Qualify one authenticated Nebular 0.7 wheel through a real installed native probe.
 
@@ -1321,9 +1501,34 @@ def consume_nebular_candidate(
     wheel_file = checked_live_path(wheel_path, code="NEBULAR_WHEEL_BINDING")
     work_path = checked_live_path(work, code="NEBULAR_WORK_DIR")
     row, wheel, context = _nebular_candidate_row(candidate, target)
+    system_linux = (target.startswith("linux")
+                    and _nebular_runtime_profile(candidate) == NEBULAR070_SYSTEM_WEBKIT_PROFILE)
+    if system_linux and not fixture_only:
+        system_host = system_webkit_host_observation
+        if (not isinstance(system_host, Mapping)
+                or set(system_host) != {"identity", "role", "class"}
+                or not _NEBULAR_HEX64.fullmatch(str(system_host.get("identity")))
+                or (system_host.get("role"), system_host.get("class")) not in {
+                    ("floor", "bookworm-floor"), ("newer", "ubuntu-newer")}
+                or not isinstance(system_webkit_source, Mapping)
+                or set(system_webkit_source) != {"commit", "tree"}
+                or any(not re.fullmatch(r"[0-9a-f]{40}", str(value))
+                       for value in system_webkit_source.values())
+                or (system_webkit_host_observation_identity is not None
+                    and system_webkit_host_observation_identity != system_host["identity"])):
+            fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
     host = _nebular_identity_observed(host_identity, target, fixture_only)
     capture = _nebular_validate_capture(candidate, row, context, raw_release,
-                                        target=target, fixture_only=fixture_only)
+                                        target=target, fixture_only=fixture_only,
+                                        system_webkit_native_input=system_webkit_native_input,
+                                        system_webkit_preflight=system_webkit_preflight,
+                                        system_webkit_source=system_webkit_source,
+                                        run_id=run_id,
+                                        run_attempt=run_attempt,
+                                        host_observation_identity=(
+                                            system_webkit_host_observation_identity
+                                            or (host.get("identity") if isinstance(host, Mapping) else None)
+                                        ))
     pip_source = _nebular_offline_pip_input(offline_pip_bootstrap, target)
     if wheel_file.is_symlink() or not wheel_file.is_file() or wheel_file.name != wheel["filename"]:
         fail("NEBULAR_WHEEL_BINDING")
@@ -1420,6 +1625,7 @@ def consume_nebular_candidate(
     home.mkdir(mode=0o700)
     temp.mkdir(mode=0o700)
     smoke_prepared = None
+    system_static = capture.get("system_static_input") is not None
     if not fixture_only:
         from rs9.nebular070_smoke_support import materialize_smoke_support
         declared_support = capture["native"].get("smoke_support")
@@ -1563,7 +1769,7 @@ def consume_nebular_candidate(
                 or resolved_gui.is_symlink()
                 or not resolved_gui.is_file()
                 or not os.access(resolved_gui, os.X_OK)
-                or sha256(physical_bytes(resolved_gui, limit=_NEBULAR_MAX_ARTIFACT_BYTES))
+                or sha256(physical_bytes(resolved_gui, limit=_NEBULAR_MAX_EXECUTABLE_BYTES))
                 != capture["gui"]["sha256"]):
             fail("NEBULAR_COMMAND_CONTRACT")
         application_smoke = None
@@ -1580,6 +1786,23 @@ def consume_nebular_candidate(
                 fail("NEBULAR_SMOKE_CLOSURE")
             smoke_prepared["expected_members"] = expected_members
             smoke_prepared["manifest_sha256"] = sha256(canonical(expected_members))
+            system_host = system_webkit_host_observation
+            system_context = None
+            if system_linux:
+                provider_context = system_webkit_provider_observation
+                if provider_context is None and isinstance(system_webkit_preflight, Mapping):
+                    provider_context = system_webkit_preflight.get("provider")
+                system_context = {
+                    "target": target,
+                    "wheel_sha256": wheel["sha256"],
+                    "wheel_tag": wheel.get("tag"),
+                    "payload_archive_sha256": row["payload_archive_sha256"],
+                    "payload_manifest_sha256": row["manifest_sha256"],
+                    "source": dict(system_webkit_source),
+                    "run_id": run_id, "run_attempt": run_attempt,
+                    "host": system_host,
+                    "provider": dict(provider_context) if isinstance(provider_context, Mapping) else {},
+                }
             application_smoke = run_installed_smoke(
                 prepared=smoke_prepared,
                 target=target,
@@ -1591,6 +1814,10 @@ def consume_nebular_candidate(
                 gui=capture["gui"],
                 runner=runner,
                 timeout=native_spec["timeout_seconds"],
+                python_launcher=python,
+                installed_command=command if target.startswith("linux") and _nebular_runtime_profile(candidate) == NEBULAR070_SYSTEM_WEBKIT_PROFILE else None,
+                system_webkit_context=system_context,
+                system_webkit_preflight=system_webkit_preflight,
             )
             native = application_smoke["native_probe"]
         if fixture_only:
@@ -1664,6 +1891,19 @@ def consume_nebular_candidate(
         "publication_admitted": False,
         "public_writes": 0,
     }
+    runtime_profile = _nebular_runtime_profile(candidate) if target.startswith("linux") else None
+    if runtime_profile == NEBULAR070_SYSTEM_WEBKIT_PROFILE:
+        result["linux_runtime_profile"] = runtime_profile
+        if capture.get("native_evidence") is not None:
+            result["native_evidence"] = capture["native_evidence"]
+        native_evidence = capture.get("native_evidence")
+        result["system_webkit_host_observation_identity"] = (
+            system_webkit_host_observation_identity
+            or (native_evidence.get("host_observation_identity")
+                if isinstance(native_evidence, Mapping) else None)
+        )
+    if system_webkit_preflight is not None:
+        result["system_webkit_preflight"] = dict(system_webkit_preflight)
     if pip_source is not None:
         result["pip_bootstrap"] = {
             "schema": "rs9.nebular070-offline-pip-bootstrap.v1",
@@ -1677,4 +1917,22 @@ def consume_nebular_candidate(
         }
     if application_smoke is not None:
         result["application_smoke"] = application_smoke
+        if target.startswith("linux") and runtime_profile == NEBULAR070_SYSTEM_WEBKIT_PROFILE and application_smoke.get("system_webkit_preflight") is not None:
+            preflight = application_smoke["system_webkit_preflight"]
+            result["system_webkit_preflight"] = preflight
+            result["system_webkit_host_observation_identity"] = preflight["host"]["identity"]
+            result["provider_closure"] = {
+                "status": "verified", "target": target, "mode": "host-observed",
+                "emulated": False, "qualification_check_id": "system-webkit-preflight",
+                "evidence_sha256": sha256(canonical({
+                    "preflight_identity": preflight["identity"],
+                    "smoke_receipts": application_smoke["native_probe"]["receipts"],
+                })),
+            }
+            result["loader"] = preflight["loader"]
+            result["native_evidence"] = {
+                "schema": "rs9.nebular070-system-webkit-native-evidence.v1",
+                "mode": "observed", "preflight_identity": preflight["identity"],
+                "smoke_receipts": dict(application_smoke["native_probe"]["receipts"]),
+            }
     return result

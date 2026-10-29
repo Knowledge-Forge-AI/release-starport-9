@@ -10,7 +10,13 @@ import sys
 from typing import Any, Mapping, Sequence
 
 from rs9.tf_pypi_archive import AdmissionError, canonical, fail, physical_bytes, sha256
-from rs9.tf_pypi_consumer import consume_nebular_candidate, smoke
+from rs9.tf_pypi_consumer import (
+    NEBULAR070_SYSTEM_WEBKIT_PROFILE,
+    NEBULAR070_SYSTEM_WEBKIT_PROFILE_ID,
+    consume_nebular_candidate,
+    is_system_webkit_candidate,
+    smoke,
+)
 from rs9.tf_pypi_model import PRODUCTS, TARGETS, load_pin, strict_json, validate_pin
 from rs9.tf_pypi_platform import host_key
 from rs9.tf_pypi_verify import host_view, verify_aggregate
@@ -392,6 +398,15 @@ NEBULAR070_LINUX_RUNTIME_POLICY = {
     "manylinux_claim": False,
     "dynamic_closure": "pending",
 }
+NEBULAR070_SYSTEM_WEBKIT_RUNTIME_POLICY = {
+    "wheel_tag_policy": "generic-linux",
+    "glibc_floor": "2.36",
+    "glibcxx_floor": "3.4.30",
+    "provider_baseline": "system-webkitgtk-4.1",
+    "manylinux_claim": False,
+    "dynamic_closure": "host-managed",
+    "required_sonames": ["libwebkit2gtk-4.1.so.0"],
+}
 _NEBULAR070_STAGE_A_FIELDS = {
     "construction_stage", "release_admission", "manylinux_construction_receipt_sha256",
 }
@@ -481,6 +496,9 @@ def _nebular_expected_artifacts(
     manylinux_stage_a: ValidatedPayloadPortability | None = None,
 ) -> dict[str, Any]:
     stage_a_digest = _nebular_stage_a_digest(manylinux_stage_a)
+    system_profile = is_system_webkit_candidate(candidate)
+    if system_profile and stage_a_digest is not None:
+        fail("NEBULAR_EXPECTED_ARTIFACTS")
     if (not isinstance(record, Mapping)
             or record.get("schema") != NEBULAR070_EXPECTED_ARTIFACT_SCHEMA
             or record.get("candidate_rs9_source") != candidate.get("candidate_rs9_source")
@@ -496,8 +514,15 @@ def _nebular_expected_artifacts(
             or not isinstance(profile, Mapping)
             or profile.get("license_expression") != NEBULAR070_LICENSE_EXPRESSION
             or profile.get("darwin_floor") != {"major": 13, "minor": 0}
-            or profile.get("linux_runtime_policy") != NEBULAR070_LINUX_RUNTIME_POLICY
-            or candidate.get("linux_runtime_policy") != NEBULAR070_LINUX_RUNTIME_POLICY):
+            or profile.get("linux_runtime_policy") != (
+                NEBULAR070_SYSTEM_WEBKIT_RUNTIME_POLICY
+                if system_profile else NEBULAR070_LINUX_RUNTIME_POLICY
+            )
+            or candidate.get("linux_runtime_policy") != (
+                NEBULAR070_SYSTEM_WEBKIT_RUNTIME_POLICY
+                if system_profile else NEBULAR070_LINUX_RUNTIME_POLICY
+            )
+            or (system_profile and profile.get("profile_id") != NEBULAR070_SYSTEM_WEBKIT_PROFILE_ID)):
         fail("NEBULAR_EXPECTED_ARTIFACTS")
     rows = []
     for wheel in record["wheels"]:
@@ -541,7 +566,11 @@ def _nebular_expected_artifacts(
                 or row.get("wheel") != expected_wheel
                 or not isinstance(row_profile, Mapping)
                 or row_profile.get("license_expression") != NEBULAR070_LICENSE_EXPRESSION
-                or row.get("linux_runtime_policy") != NEBULAR070_LINUX_RUNTIME_POLICY):
+                or row_profile.get("profile_id") != profile.get("profile_id")
+                or row.get("linux_runtime_policy") != (
+                    NEBULAR070_SYSTEM_WEBKIT_RUNTIME_POLICY
+                    if system_profile else NEBULAR070_LINUX_RUNTIME_POLICY
+                )):
             fail("NEBULAR_EXPECTED_ARTIFACTS")
         if stage_a_digest is not None and target in NEBULAR070_MANYLINUX_TARGETS:
             if any(row.get(key) != value for key, value in {
@@ -554,6 +583,8 @@ def _nebular_expected_artifacts(
             fail("NEBULAR_EXPECTED_ARTIFACTS")
     result = {"schema": record["schema"], "candidate_rs9_source": record["candidate_rs9_source"],
               "wheels": rows, "record_sha256": record["record_sha256"]}
+    if system_profile:
+        result["linux_runtime_profile"] = NEBULAR070_SYSTEM_WEBKIT_PROFILE
     if stage_a_digest is not None:
         result["manylinux_stage_a_sha256"] = stage_a_digest
     return result
@@ -584,6 +615,11 @@ def qualify_nebular070(
     offline_pip_bootstrap: Mapping[str, Any] | None = None,
     manylinux_stage_a: ValidatedPayloadPortability | None = None,
     smoke_support: Mapping[str, Any] | None = None,
+    system_webkit_native_input: Mapping[str, Any] | None = None,
+    system_webkit_preflight: Mapping[str, Any] | None = None,
+    system_webkit_host_observation_identity: str | None = None,
+    system_webkit_host_observation: Mapping[str, Any] | None = None,
+    system_webkit_provider_observation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run one Nebular 0.7 candidate through the post-path native consumer.
 
@@ -617,6 +653,13 @@ def qualify_nebular070(
         "profile_sha256": profile_sha256,
     }
     artifacts = _nebular_expected_artifacts(expected_artifacts, candidate, manylinux_stage_a)
+    system_profile = is_system_webkit_candidate(candidate)
+    if (target.startswith("linux") and system_profile
+            and system_webkit_preflight is None
+            and system_webkit_native_input is None):
+        fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
+    if not system_profile and system_webkit_preflight is not None:
+        fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
     # Consumer-side validation also proves the candidate row and actual wheel
     # bytes agree with the expected record before a native process is spawned.
     expected_wheel = next(row for row in artifacts["wheels"] if row["target"] == target)
@@ -624,6 +667,8 @@ def qualify_nebular070(
         fail("NEBULAR_EXPECTED_ARTIFACTS")
     consume_kwargs = {
         "target": target,
+        "run_id": run_id,
+        "run_attempt": run_attempt,
         "sandbox_prefix": sandbox_prefix,
         "sandbox_probe": sandbox_probe,
         "host_identity": host_identity,
@@ -631,6 +676,12 @@ def qualify_nebular070(
         "process_observer": process_observer,
         "state_snapshot": state_snapshot,
         "real_user_state_snapshot": real_user_state_snapshot,
+        "system_webkit_preflight": system_webkit_preflight,
+        "system_webkit_native_input": system_webkit_native_input,
+        "system_webkit_source": {"commit": commit, "tree": tree},
+        "system_webkit_host_observation_identity": system_webkit_host_observation_identity,
+        "system_webkit_host_observation": system_webkit_host_observation,
+        "system_webkit_provider_observation": system_webkit_provider_observation,
     }
     if offline_pip_bootstrap is not None:
         consume_kwargs["offline_pip_bootstrap"] = offline_pip_bootstrap
@@ -660,6 +711,8 @@ def qualify_nebular070(
         "publication_admitted": False,
         "public_writes": 0,
     }
+    if system_profile and target.startswith("linux"):
+        result["linux_runtime_profile"] = NEBULAR070_SYSTEM_WEBKIT_PROFILE
     if "manylinux_stage_a_sha256" in artifacts:
         consumer["manylinux_stage_a_sha256"] = artifacts["manylinux_stage_a_sha256"]
         result["manylinux_stage_a_sha256"] = artifacts["manylinux_stage_a_sha256"]
@@ -678,6 +731,7 @@ def admit_nebular070_matrix(
     run_id: str,
     run_attempt: str,
     manylinux_stage_a: ValidatedPayloadPortability | None = None,
+    system_floor_receipts: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Admit only genuine three-host Gate 2 receipts; fixture receipts fail closed."""
     run_id = _run_id(run_id)
@@ -694,6 +748,13 @@ def admit_nebular070_matrix(
         fail("NEBULAR_MATRIX_RECEIPTS")
     stage_a_digest = _nebular_stage_a_digest(manylinux_stage_a)
     expected = _nebular_expected_artifacts(expected_artifacts, candidate, manylinux_stage_a)
+    system_profile = is_system_webkit_candidate(candidate)
+    linux_targets = {target for target in TARGET_SYSTEMS if target.startswith("linux")}
+    if system_profile:
+        if not isinstance(system_floor_receipts, Mapping) or set(system_floor_receipts) != linux_targets:
+            fail("NEBULAR_MATRIX_FLOOR_RECEIPTS")
+    elif system_floor_receipts is not None:
+        fail("NEBULAR_MATRIX_FLOOR_RECEIPTS")
     candidate_source = candidate.get("candidate_rs9_source")
     if not isinstance(candidate_source, Mapping):
         fail("NEBULAR_CANDIDATE_SCHEMA")
@@ -702,15 +763,7 @@ def admit_nebular070_matrix(
         fail("NEBULAR_MATRIX_RECEIPTS")
     verified: dict[str, Any] = {}
     qualification_sources: dict[str, Any] = {}
-    for target in sorted(TARGET_SYSTEMS):
-        target_dir = root / target
-        result_path = target_dir / "result.json"
-        if target_dir.is_symlink() or not target_dir.is_dir() or result_path.is_symlink() or not result_path.is_file():
-            fail("NEBULAR_MATRIX_RECEIPTS")
-        try:
-            result = strict_json(physical_bytes(result_path, limit=4 * 1024 * 1024))
-        except Exception:
-            fail("NEBULAR_MATRIX_RECEIPT")
+    def validate_result(result: Any, target: str, role: str | None) -> Mapping[str, Any]:
         if (not isinstance(result, Mapping)
                 or result.get("schema") != NEBULAR070_HOSTED_SCHEMA
                 or result.get("status") != "native-consumer-passed"
@@ -729,6 +782,13 @@ def admit_nebular070_matrix(
                 or result.get("publication_admitted") is not False
                 or not isinstance(result.get("qualification_rs9_source"), Mapping)):
             fail("NEBULAR_MATRIX_RECEIPT")
+        if target.startswith("linux"):
+            if system_profile and result.get("linux_runtime_profile") != NEBULAR070_SYSTEM_WEBKIT_PROFILE:
+                fail("NEBULAR_MATRIX_RECEIPT")
+            if not system_profile and "linux_runtime_profile" in result:
+                fail("NEBULAR_MATRIX_RECEIPT")
+        elif "linux_runtime_profile" in result:
+            fail("NEBULAR_MATRIX_RECEIPT")
         # The matrix must carry the complete actual installed-consumer result
         # for every primary target, including Darwin.  The older shallow
         # booleans below are retained as cheap early checks; this maintained
@@ -743,6 +803,8 @@ def admit_nebular070_matrix(
                 or qualification.get("run_id") != run_id
                 or qualification.get("run_attempt") != "1"
                 or qualification.get("profile_sha256") != profile_sha256
+                or (system_profile and qualification.get("commit") != expected_commit)
+                or (system_profile and qualification.get("tree") != expected_tree)
                 or not re.fullmatch(r"[0-9a-f]{40}", str(qualification.get("commit")))
                 or not re.fullmatch(r"[0-9a-f]{40}", str(qualification.get("tree")))):
             fail("NEBULAR_MATRIX_RECEIPT")
@@ -762,8 +824,44 @@ def admit_nebular070_matrix(
         expected_wheel = next(row for row in expected["wheels"] if row["target"] == target)
         if result.get("consumer", {}).get("wheel") != expected_wheel:
             fail("NEBULAR_MATRIX_RECEIPT")
+        if system_profile and target.startswith("linux"):
+            preflight = consumer.get("system_webkit_preflight")
+            expected_class = "bookworm-floor" if role == "floor" else "ubuntu-newer"
+            if (not isinstance(preflight, Mapping)
+                    or preflight.get("host", {}).get("role") != role
+                    or preflight.get("host", {}).get("class") != expected_class):
+                fail("NEBULAR_MATRIX_HOST_CLASS")
+        return qualification
+
+    for target in sorted(TARGET_SYSTEMS):
+        target_dir = root / target
+        result_path = target_dir / "result.json"
+        if target_dir.is_symlink() or not target_dir.is_dir() or result_path.is_symlink() or not result_path.is_file():
+            fail("NEBULAR_MATRIX_RECEIPTS")
+        try:
+            result = strict_json(physical_bytes(result_path, limit=4 * 1024 * 1024))
+        except Exception:
+            fail("NEBULAR_MATRIX_RECEIPT")
+        qualification = validate_result(result, target, "newer" if target.startswith("linux") else None)
         verified[target] = result
         qualification_sources[target] = qualification
+    floors: dict[str, Any] = {}
+    if system_profile:
+        from rs9.nebular070_system_webkit import validate_missing_runtime
+        for target in sorted(linux_targets):
+            envelope = system_floor_receipts[target]
+            if not isinstance(envelope, Mapping) or set(envelope) != {"qualification", "missing_runtime"}:
+                fail("NEBULAR_MATRIX_FLOOR_RECEIPTS")
+            floor = envelope["qualification"]
+            validate_result(floor, target, "floor")
+            wheel = next(row for row in expected["wheels"] if row["target"] == target)
+            validate_missing_runtime(
+                envelope["missing_runtime"], target=target,
+                source={"commit": expected_commit, "tree": expected_tree},
+                run_id=run_id, run_attempt=run_attempt, wheel=wheel,
+                host_identity=floor["consumer"]["system_webkit_preflight"]["host"]["identity"],
+            )
+            floors[target] = dict(envelope)
     _nebular_tree(expected_tree)
     source_commit(expected_commit)
     result = {
@@ -782,6 +880,9 @@ def admit_nebular070_matrix(
         "publication_admitted": False,
         "public_writes": 0,
     }
+    if system_profile:
+        result["linux_runtime_profile"] = NEBULAR070_SYSTEM_WEBKIT_PROFILE
+        result["system_floor_receipts"] = floors
     if stage_a_digest is not None:
         result["manylinux_stage_a_sha256"] = stage_a_digest
     return result

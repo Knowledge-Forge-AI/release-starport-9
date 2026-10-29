@@ -82,9 +82,12 @@ from rs9.wheel_nebular_successor import (
     _successor_wheel_info_bytes,
     _generic_successor_contract,
     GATE1_PROFILE,
+    SYSTEM_WEBKIT_PROFILE,
     SuccessorCandidateProfile,
+    _is_system_webkit_profile,
     build_successor_wheel,
     build_gate1_successor_wheel,
+    canonical_candidate_profile,
     gate1_profile_record,
     successor_release,
 )
@@ -129,6 +132,19 @@ def validate_nebular070_payload_portability(
 
 def _error(code: str, message: str) -> ContractError:
     return ContractError(code, message)
+
+
+def _candidate_profile(profile: SuccessorCandidateProfile | None) -> SuccessorCandidateProfile:
+    selected = GATE1_PROFILE if profile is None else profile
+    selected = canonical_candidate_profile(selected)
+    if (
+        selected.application_version != "0.7.0"
+        or selected.distribution_version != "0.7.0"
+    ):
+        raise _error("PROFILE_BINDING", "Candidate profile must select the 0.7.0 release")
+    if selected.manylinux_claim:
+        raise _error("PROFILE_POLICY", "Candidate profiles cannot claim manylinux")
+    return selected
 
 
 @dataclass(frozen=True)
@@ -631,6 +647,8 @@ def _validate_wheel_artifact(
         if key in row
     }
     manylinux_candidate = system.endswith("-linux") and bool(construction_fields)
+    if _is_system_webkit_profile(candidate_profile) and construction_fields:
+        raise _error("RECEIPT_BINDING", "System-WebKit rows cannot contain manylinux construction fields")
     if manylinux_candidate and set(construction_fields) != _MANYLINUX_PROVENANCE_KEYS:
         raise _error("RECEIPT_BINDING", "Manylinux construction identity is incomplete")
     if manylinux_candidate:
@@ -656,6 +674,7 @@ def _validate_wheel_artifact(
         expected_asset["launcher_path"], expected_asset["gui_path"], family, arch,
         application_version=release.application_version,
         distribution_version=release.distribution_version,
+        system_webkit=_is_system_webkit_profile(candidate_profile) and system.endswith("-linux"),
     )
     expected_helpers = get_embedded_rs9_helpers()
     names = set(entries)
@@ -1019,12 +1038,14 @@ def _gate1_receipt(
     rows: list[dict[str, Any]],
     *,
     candidate_rs9_source: dict[str, Any],
+    candidate_profile: SuccessorCandidateProfile = GATE1_PROFILE,
 ) -> dict[str, Any]:
     first = rows[0]
     binding = authenticated.release_binding
     if not isinstance(binding, dict) or binding.get("status") != "ready":
         raise _error("RELEASE_INPUTS_PENDING", "Ready v0.7 release binding is required for a candidate receipt")
-    profile_record = gate1_profile_record(GATE1_PROFILE)
+    profile = _candidate_profile(candidate_profile)
+    profile_record = gate1_profile_record(profile)
     return {
         "schema": "rs9.nebular-successor-candidate.v2alpha1",
         "application_version": "0.7.0",
@@ -1040,7 +1061,7 @@ def _gate1_receipt(
         "profile": profile_record,
         "readme": first["readme"],
         "legal_files": first["legal_files"],
-        "license": {"expression": GATE1_PROFILE.license_expression, "files": first["legal_files"]},
+        "license": {"expression": profile.license_expression, "files": first["legal_files"]},
         "rows": rows,
         "flags": {
             "candidate_only": True,
@@ -1066,8 +1087,10 @@ def validate_gate1_receipt(
     authenticated: AuthenticatedSuccessorInputs,
     *,
     output_dir: str | Path,
+    candidate_profile: SuccessorCandidateProfile = GATE1_PROFILE,
 ) -> dict[str, Any]:
     """Validate the new closed 0.7 profile/metadata/floor candidate receipt."""
+    profile = _candidate_profile(candidate_profile)
     if not isinstance(authenticated, AuthenticatedSuccessorInputs) or authenticated.release.distribution_version != "0.7.0":
         raise _error("RECEIPT_AUTHORITY", "Authenticated v0.7 successor inputs are required")
     if not isinstance(authenticated.release_binding, dict) or authenticated.release_binding.get("status") != "ready":
@@ -1103,20 +1126,20 @@ def validate_gate1_receipt(
     if receipt.get("bootstrap_sha256") != authenticated.bootstrap_sha256 \
             or receipt.get("direct_lineage") != authenticated.lineage_facts:
         raise _error("RECEIPT_BINDING", "Gate1 capture or lineage identity is cross-wired")
-    if receipt.get("profile") != gate1_profile_record(GATE1_PROFILE):
+    if receipt.get("profile") != gate1_profile_record(profile):
         raise _error("RECEIPT_BINDING", "Gate1 profile revision is cross-wired")
     if receipt.get("qualification_rs9_source") != {"status": "not-run", "reason": "gate1-only"}:
         raise _error("RECEIPT_BINDING", "Gate1 must not claim a hosted qualification source")
-    expected_legal = _expected_gate1_legal_files(authenticated)
+    expected_legal = _expected_gate1_legal_files(authenticated, profile)
     expected_readme = receipt.get("readme")
     if not isinstance(expected_readme, dict) or set(expected_readme) != {"path", "sha256"}:
         raise _error("RECEIPT_BINDING", "Gate1 README identity is incomplete")
-    if expected_readme["path"] != GATE1_PROFILE.description_path \
+    if expected_readme["path"] != profile.description_path \
             or not re.fullmatch(r"[0-9a-f]{64}", expected_readme.get("sha256", "")):
         raise _error("RECEIPT_BINDING", "Gate1 README identity is not the corrected profile input")
     if receipt.get("legal_files") != expected_legal:
         raise _error("RECEIPT_BINDING", "Gate1 legal files are not authenticated source facts")
-    if receipt.get("license") != {"expression": GATE1_PROFILE.license_expression, "files": expected_legal}:
+    if receipt.get("license") != {"expression": profile.license_expression, "files": expected_legal}:
         raise _error("RECEIPT_BINDING", "Gate1 AGPL-only license facts are not authenticated")
     if receipt.get("flags") != {
         "candidate_only": True,
@@ -1131,7 +1154,7 @@ def validate_gate1_receipt(
         raise _error("PUBLICATION_HOLD", "Gate1 source/policy closure must remain pending")
     if receipt.get("profile_result_sha256") != record_sha256(authenticated.profile):
         raise _error("RECEIPT_BINDING", "Gate1 profile result identity is cross-wired")
-    profile_record = gate1_profile_record(GATE1_PROFILE)
+    profile_record = gate1_profile_record(profile)
     if receipt.get("linux_runtime_policy") != profile_record["linux_runtime_policy"]:
         raise _error("RECEIPT_BINDING", "Gate1 Linux runtime policy is cross-wired")
     rows = receipt.get("rows")
@@ -1171,6 +1194,8 @@ def validate_gate1_receipt(
             "source_legal_profile", "linux_runtime_policy", "darwin_floor_evidence",
         }
         if any(key in row for key in _MANYLINUX_PROVENANCE_KEYS):
+            if _is_system_webkit_profile(profile):
+                raise _error("RECEIPT_ROWS", "System-WebKit rows cannot contain manylinux construction fields")
             expected_row_fields |= _MANYLINUX_PROVENANCE_KEYS
         if set(row) != expected_row_fields:
             raise _error("RECEIPT_ROWS", "Gate1 row fields are not closed")
@@ -1179,9 +1204,9 @@ def validate_gate1_receipt(
         if row.get("candidate_rs9_source") != expected_rs9_source \
                 or row.get("candidate_profile") != profile_record \
                 or row.get("source_legal_profile") != {
-                    "expression": GATE1_PROFILE.license_expression,
-                    "required_files": list(GATE1_PROFILE.required_legal_files),
-                    "optional_files": list(GATE1_PROFILE.optional_legal_files),
+                    "expression": profile.license_expression,
+                    "required_files": list(profile.required_legal_files),
+                    "optional_files": list(profile.optional_legal_files),
                     "observed_files": sorted(expected_legal),
                 }:
             raise _error("RECEIPT_BINDING", "Gate1 row profile/source identity is cross-wired")
@@ -1218,7 +1243,7 @@ def validate_gate1_receipt(
             expected_legal,
             expected_readme,
             expected_rs9_source,
-            candidate_profile=GATE1_PROFILE,
+            candidate_profile=profile,
         )
     return receipt
 
@@ -1231,9 +1256,11 @@ def build_gate1_candidates(
     rs9_source_tree: str,
     description_path: str | Path | None = None,
     payload_portability: ValidatedPayloadPortability | None = None,
+    candidate_profile: SuccessorCandidateProfile = GATE1_PROFILE,
     deterministic_timestamp: tuple[int, int, int, int, int, int] | None = None,
 ) -> dict[str, Any]:
     """Build fresh v0.7 Gate1 candidates only from a ready real capture."""
+    profile = _candidate_profile(candidate_profile)
     if not isinstance(authenticated, AuthenticatedSuccessorInputs) \
             or authenticated.release.distribution_version != "0.7.0" \
             or not isinstance(authenticated.release_binding, dict) \
@@ -1244,6 +1271,8 @@ def build_gate1_candidates(
         raise _error("RS9_SOURCE_IDENTITY", "Explicit reviewed candidate source commit and tree are required")
     if payload_portability is not None and not isinstance(payload_portability, ValidatedPayloadPortability):
         raise _error("MANYLINUX_INPUT", "Validated 0.7.0 payload portability evidence is required")
+    if _is_system_webkit_profile(profile) and payload_portability is not None:
+        raise _error("PROFILE_POLICY", "System-WebKit candidates cannot consume manylinux portability evidence")
     destination = Path(output_dir).absolute()
     if destination.is_symlink() or any(parent.is_symlink() for parent in (destination, *destination.parents)):
         raise _error("OUTPUT_CONFINEMENT", "Gate1 candidate output ancestry contains a symlink")
@@ -1272,6 +1301,7 @@ def build_gate1_candidates(
             rs9_source_tree=rs9_source_tree,
             lineage_proof=authenticated.lineage_facts,
             candidate_only=candidate_only,
+            candidate_profile=profile,
             payload_portability=payload_portability if candidate_only else None,
             deterministic_timestamp=deterministic_timestamp,
         )
@@ -1283,8 +1313,18 @@ def build_gate1_candidates(
         rows.append(row)
     if len(rows) != 3 or candidate_source is None:
         raise _error("RECEIPT_ROWS", "Exactly three Gate1 candidates must be built")
-    receipt = _gate1_receipt(authenticated, rows, candidate_rs9_source=candidate_source)
-    return validate_gate1_receipt(receipt, authenticated, output_dir=destination)
+    receipt = _gate1_receipt(
+        authenticated,
+        rows,
+        candidate_rs9_source=candidate_source,
+        candidate_profile=profile,
+    )
+    return validate_gate1_receipt(
+        receipt,
+        authenticated,
+        output_dir=destination,
+        candidate_profile=profile,
+    )
 
 
 def build_successor_candidates(
@@ -1360,9 +1400,16 @@ def write_gate1_receipt(
     *,
     authenticated: AuthenticatedSuccessorInputs,
     output_dir: str | Path,
+    candidate_profile: SuccessorCandidateProfile = GATE1_PROFILE,
 ) -> None:
     """Write one exclusive Gate1 receipt after validating fresh wheel bytes."""
-    validate_gate1_receipt(receipt, authenticated, output_dir=output_dir)
+    profile = _candidate_profile(candidate_profile)
+    validate_gate1_receipt(
+        receipt,
+        authenticated,
+        output_dir=output_dir,
+        candidate_profile=profile,
+    )
     target = Path(path).absolute()
     if target.is_symlink() or any(parent.is_symlink() for parent in (target, *target.parents)):
         raise _error("OUTPUT_CONFINEMENT", "Gate1 receipt ancestry contains a symlink")

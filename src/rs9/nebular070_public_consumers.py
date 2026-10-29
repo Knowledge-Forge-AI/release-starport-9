@@ -52,7 +52,14 @@ from rs9.nebular070_payload import ARCHIVE_PORTABILITY_SCHEMA, ValidatedPayloadP
 from rs9.scratch import canonical
 from rs9.tf_pypi_archive import canonical as archive_canonical, physical_bytes
 from rs9.tf_pypi_model import strict_json
+from rs9.tf_pypi_verify import read_wheel, verify_record
 from rs9.tf_pypi_hosted import qualify_nebular070
+from rs9.tf_pypi_consumer import (
+    NEBULAR070_TARGET_SYSTEMS,
+    NEBULAR070_SYSTEM_WEBKIT_PROFILE,
+    NEBULAR070_SYSTEM_WEBKIT_PROFILE_ID,
+    is_system_webkit_candidate,
+)
 from rs9.tf_pypi_nebular070_publish import (
     MANYLINUX_ADMISSION_MEMBER,
     default_sandbox_prefix,
@@ -113,6 +120,80 @@ def _wheel(raw: bytes, target: str, stage_a: ValidatedPayloadPortability) -> dic
     return snapshot
 
 
+def _system_wheel(raw: bytes, target: str) -> dict[str, Any]:
+    """Read back a generic-tag system-WebKit wheel without Stage-A data."""
+    if not isinstance(raw, bytes):
+        _fail("NEBULAR_STAGE_B_WHEEL", "Authenticated wheel bytes are required")
+    files = read_wheel(raw, max_total_bytes=MAX_WHEEL_BYTES, max_member_bytes=MAX_WHEEL_BYTES)
+    dist_infos = sorted({name.split("/", 1)[0] for name in files if name.endswith(".dist-info/WHEEL")})
+    if len(dist_infos) != 1:
+        _fail("NEBULAR_STAGE_B_WHEEL", "System wheel metadata is ambiguous")
+    dist_info = dist_infos[0]
+    verify_record(files, dist_info)
+    wheel_name = f"{dist_info}/WHEEL"
+    try:
+        tags = [line[5:] for line in files[wheel_name][0].decode("utf-8").splitlines()
+                if line.startswith("Tag: ")]
+    except (KeyError, UnicodeDecodeError):
+        _fail("NEBULAR_STAGE_B_WHEEL", "System wheel tag metadata is malformed")
+    expected_tag = {
+        "linux-arm64-gnu": "py3-none-linux_aarch64",
+        "linux-x64-gnu": "py3-none-linux_x86_64",
+    }.get(target)
+    if expected_tag is None or tags != [expected_tag]:
+        _fail("NEBULAR_STAGE_B_WHEEL", "System wheel tag does not match its target")
+    provenance_name = "theme_forge_nebular_fusion/_rs9/provenance.json"
+    try:
+        provenance = strict_json(files[provenance_name][0])
+    except (KeyError, ValueError, UnicodeDecodeError):
+        _fail("NEBULAR_STAGE_B_WHEEL", "System wheel provenance is malformed")
+    profile = provenance.get("candidate_profile") if isinstance(provenance, Mapping) else None
+    policy = provenance.get("linux_runtime_policy") if isinstance(provenance, Mapping) else None
+    if (not isinstance(provenance, Mapping)
+            or not isinstance(profile, Mapping)
+            or profile.get("profile_id") != NEBULAR070_SYSTEM_WEBKIT_PROFILE_ID
+            or provenance.get("wheel_tag") != expected_tag
+            or not isinstance(policy, Mapping)
+            or policy.get("provider_baseline") != "system-webkitgtk-4.1"
+            or any(key in provenance for key in (
+                "construction_stage", "release_admission", "manylinux_construction_receipt_sha256",
+            ))):
+        _fail("NEBULAR_STAGE_B_WHEEL", "System wheel provenance is not host-managed")
+    payload_name = provenance.get("payload_archive_name")
+    if (not isinstance(payload_name, str) or not payload_name or "/" in payload_name
+            or "\\" in payload_name or payload_name in {".", ".."}):
+        _fail("NEBULAR_STAGE_B_WHEEL", "System wheel payload name is unsafe")
+    payload_member = f"theme_forge_nebular_fusion/payload/{payload_name}"
+    manifest_member = "theme_forge_nebular_fusion/payload/manifest.json"
+    if payload_member not in files or manifest_member not in files:
+        _fail("NEBULAR_STAGE_B_WHEEL", "System wheel payload members are missing")
+    try:
+        manifest = strict_json(files[manifest_member][0])
+    except (ValueError, UnicodeDecodeError):
+        _fail("NEBULAR_STAGE_B_WHEEL", "System wheel manifest is malformed")
+    members = manifest.get("members") if isinstance(manifest, Mapping) else None
+    if (not isinstance(members, list)
+            or provenance.get("payload_archive_sha256") != hashlib.sha256(files[payload_member][0]).hexdigest()
+            or provenance.get("manifest_sha256") != hashlib.sha256(archive_canonical(members)).hexdigest()):
+        _fail("NEBULAR_STAGE_B_WHEEL", "System wheel payload identity is malformed")
+    from rs9.wheel_nebular_successor import SYSTEM_WEBKIT_PROFILE, _validate_system_webkit_archive
+    _validate_system_webkit_archive(
+        manifest, payload_name=payload_name, system=NEBULAR070_TARGET_SYSTEMS[target],
+        profile=SYSTEM_WEBKIT_PROFILE,
+    )
+    return {
+        "archive_sha256": hashlib.sha256(raw).hexdigest(),
+        "size": len(raw),
+        "wheel_member_sha256": hashlib.sha256(files[wheel_name][0]).hexdigest(),
+        "record_member_sha256": hashlib.sha256(files[f"{dist_info}/RECORD"][0]).hexdigest(),
+        "provenance_member_sha256": hashlib.sha256(files[provenance_name][0]).hexdigest(),
+        "payload_archive_sha256": hashlib.sha256(files[payload_member][0]).hexdigest(),
+        "manifest_sha256": provenance["manifest_sha256"],
+        "tag": expected_tag,
+        "linux_runtime_profile": NEBULAR070_SYSTEM_WEBKIT_PROFILE,
+    }
+
+
 def _required_actual_result(result: Mapping[str, Any], *, target: str) -> Mapping[str, Any]:
     if not isinstance(result, Mapping) or not _REQUIRED_CONSUMER_RESULT <= set(result):
         _fail("NEBULAR_STAGE_B_CONSUMER", "The maintained consumer result is incomplete")
@@ -147,6 +228,42 @@ def _required_actual_result(result: Mapping[str, Any], *, target: str) -> Mappin
         or consumer.get("candidate_rs9_source") != result.get("candidate_rs9_source")
     ):
         _fail("NEBULAR_STAGE_B_CONSUMER", "The nested consumer result is not actual")
+    runtime_profile = consumer.get("linux_runtime_profile")
+    if target.startswith("linux") and runtime_profile == NEBULAR070_SYSTEM_WEBKIT_PROFILE:
+        preflight = consumer.get("system_webkit_preflight")
+        qualification_source = result.get("qualification_rs9_source")
+        wheel = consumer.get("wheel")
+        raw_release = consumer.get("raw_release")
+        host_observation_identity = consumer.get("system_webkit_host_observation_identity")
+        from rs9.nebular070_installed_smoke import validate_system_webkit_preflight
+        if not isinstance(qualification_source, Mapping) or not isinstance(wheel, Mapping) \
+                or not isinstance(raw_release, Mapping) or not isinstance(host_observation_identity, str):
+            _fail("NEBULAR_STAGE_B_PREFLIGHT", "System-WebKit joins are incomplete")
+        validate_system_webkit_preflight(
+            preflight,
+            target=target,
+            wheel_sha256=wheel.get("sha256"),
+            wheel_tag=wheel.get("tag"),
+            payload_archive_sha256=raw_release.get("payload_sha256"),
+            payload_manifest_sha256=raw_release.get("manifest_sha256"),
+            source={"commit": qualification_source.get("commit"), "tree": qualification_source.get("tree")},
+            run_id=qualification_source.get("run_id"),
+            run_attempt=qualification_source.get("run_attempt"),
+            host_observation_identity=host_observation_identity,
+        )
+        application_smoke = consumer.get("application_smoke")
+        if (not isinstance(application_smoke, Mapping)
+                or application_smoke.get("system_webkit_preflight") != preflight
+                or preflight.get("loader", {}).get("command") != "installed-tfnf"):
+            _fail("NEBULAR_STAGE_B_PREFLIGHT", "System preflight is not the fresh installed-launcher result")
+        native_evidence = consumer.get("native_evidence")
+        if (not isinstance(native_evidence, Mapping)
+                or (native_evidence.get("system_webkit_preflight_identity")
+                    or native_evidence.get("preflight_identity")) != preflight.get("identity")):
+            _fail("NEBULAR_STAGE_B_PREFLIGHT", "System-WebKit preflight is not joined to qualification")
+    elif runtime_profile is not None and runtime_profile != NEBULAR070_SYSTEM_WEBKIT_PROFILE:
+        if "system_webkit_preflight" in consumer:
+            _fail("NEBULAR_STAGE_B_PREFLIGHT", "Portable consumer carries system-WebKit evidence")
     process = consumer.get("process_observer")
     user_state = consumer.get("user_state")
     sandbox = consumer.get("sandbox")
@@ -278,6 +395,9 @@ def capture_public_consumer(
     run_id: str = "1",
     run_attempt: str = "1",
     manylinux_stage_a: ValidatedPayloadPortability | None = None,
+    system_webkit_native_input: Mapping[str, Any] | None = None,
+    system_webkit_preflight: Mapping[str, Any] | None = None,
+    system_webkit_provider_observation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run the actual hosted consumer and return body plus private join proof.
 
@@ -290,20 +410,48 @@ def capture_public_consumer(
     """
     target = _target(target)
     kind = _kind(kind)
-    if manylinux_stage_a is None:
+    # Existing contract tests use a minimal candidate only to exercise the
+    # maintained qualifier wiring.  Inspect the profile discriminator without
+    # invoking the strict production parser for that seam; real candidates are
+    # still validated strictly by the downstream admission path.
+    profile = candidate.get("profile") if isinstance(candidate, Mapping) else None
+    system_profile = (
+        target.startswith("linux")
+        and isinstance(profile, Mapping)
+        and profile.get("profile_id") == NEBULAR070_SYSTEM_WEBKIT_PROFILE_ID
+    )
+    if system_profile and manylinux_stage_a is not None:
+        _fail("NEBULAR_STAGE_B_PROFILE", "System-WebKit captures cannot carry Stage-A evidence")
+    if system_profile and system_webkit_preflight is None and system_webkit_native_input is None:
+        _fail("NEBULAR_STAGE_B_PREFLIGHT", "System-WebKit captures require static inputs or a host preflight")
+    if not system_profile and system_webkit_preflight is not None:
+        _fail("NEBULAR_STAGE_B_PROFILE", "Portable captures cannot carry system-WebKit evidence")
+    if not system_profile and manylinux_stage_a is None:
         _fail("NEBULAR_STAGE_B_STAGE_A", "Stage-A portability evidence is required")
-    if (
+    if manylinux_stage_a is not None and (
         manylinux_stage_a.fixture_only is not False
         or not isinstance(manylinux_stage_a.record, Mapping)
         or manylinux_stage_a.record.get("evidence_mode") != "actual"
     ):
         _fail("NEBULAR_STAGE_B_STAGE_A", "Fixture Stage-A evidence is not admissible")
     wheel_bytes = physical_bytes(wheel_path, limit=MAX_WHEEL_BYTES)
-    wheel = _wheel(wheel_bytes, target, manylinux_stage_a)
+    wheel = _system_wheel(wheel_bytes, target) if system_profile else _wheel(wheel_bytes, target, manylinux_stage_a)
     # Establish the role and loader floor before the installed-wheel command
     # can run; a wrong hosted image therefore fails closed without a consumer
     # side effect.
     host_body, host_extras = observe_host(kind)
+    system_host = None
+    if system_profile:
+        from rs9.nebular070_system_webkit import observe_provider
+        current_provider = observe_provider(target)
+        if (system_webkit_provider_observation is not None
+                and canonical(system_webkit_provider_observation) != canonical(current_provider)):
+            _fail("NEBULAR_STAGE_B_PREFLIGHT", "System-WebKit provider changed before capture")
+        system_webkit_provider_observation = current_provider
+        system_host = {
+            "identity": host_body["identity"], "role": kind,
+            "class": "bookworm-floor" if kind == "floor" else "ubuntu-newer",
+        }
     kwargs: dict[str, Any] = {
         "expected_artifacts": expected_artifacts,
         "expected_commit": expected_commit,
@@ -317,6 +465,13 @@ def capture_public_consumer(
         "real_user_state_snapshot": make_real_user_state_snapshotter(target),
         "fixture_only": False,
         "manylinux_stage_a": manylinux_stage_a,
+        "system_webkit_native_input": system_webkit_native_input,
+        "system_webkit_preflight": system_webkit_preflight,
+        "system_webkit_host_observation": system_host,
+        "system_webkit_provider_observation": system_webkit_provider_observation,
+        "system_webkit_host_observation_identity": (
+            host_body.get("identity") if system_profile else None
+        ),
     }
     qualification = qualify_nebular070(candidate, wheel_path, raw_release, work, **kwargs)
     body = consumer_body_from_actual(
@@ -350,6 +505,15 @@ def _capture_body(
             capture.get("host_observation"), capture.get("host_extras"),
             target=target, kind=kind,
         )
+        consumer = capture["qualification"].get("consumer")
+        if isinstance(consumer, Mapping) and consumer.get("linux_runtime_profile") == NEBULAR070_SYSTEM_WEBKIT_PROFILE:
+            preflight = consumer.get("system_webkit_preflight")
+            host = capture.get("host_observation")
+            preflight_host = preflight.get("host") if isinstance(preflight, Mapping) else None
+            if (not isinstance(preflight_host, Mapping) or not isinstance(host, Mapping)
+                    or preflight_host.get("role") != kind
+                    or preflight_host.get("identity") != host.get("identity")):
+                _fail("NEBULAR_STAGE_B_PREFLIGHT", "System-WebKit host preflight does not join host observation")
     elif not (allow_fixture and mode == _FIXTURE_CAPTURE_MODE):
         _fail("NEBULAR_STAGE_B_CONSUMER", "Only actual captures are admitted")
     body = capture.get("body")
