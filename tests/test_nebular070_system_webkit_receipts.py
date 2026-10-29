@@ -80,6 +80,101 @@ class ReceiptIdentityTests(unittest.TestCase):
         self.assertEqual(_native_execution_failure_code({"stdout_token": "{", "stderr_token": ""}),
                          "NEBULAR_NATIVE_EXECUTION")
 
+    def test_spawn_git_and_cleanup_failures_keep_closed_diagnostics(self):
+        import errno
+        import subprocess
+        import traceback
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from rs9.nebular070_installed_smoke import _native_execution_failure_code
+        from rs9.tf_pypi_consumer import _nebular_run
+        from rs9.tf_pypi_nebular070_publish import _git_output
+        spawn_cases = [
+            (errno.ENOENT, "MISSING"), (errno.ENOTDIR, "NOT_DIRECTORY"),
+            (errno.EACCES, "PERMISSION"), (errno.EPERM, "PERMISSION"),
+            (errno.ENOEXEC, "FORMAT"), (errno.EIO, "OS"), (None, "OS"),
+        ]
+        for number, suffix in spawn_cases:
+            def broken(*args, **kwargs):
+                raise OSError(number, "private", "/private/example")
+            with self.subTest(errno=number), self.assertRaises(AdmissionError) as caught:
+                _nebular_run(["missing"], {}, Path("."), (), 1, runner=broken)
+            self.assertEqual(caught.exception.code, "TF_PYPI_NEBULAR_NATIVE_EXECUTION_SPAWN_" + suffix)
+            rendered = str(caught.exception) + repr(caught.exception) + "".join(traceback.format_exception(caught.exception))
+            self.assertNotIn("/private/example", rendered)
+        def subprocess_error(*args, **kwargs):
+            raise subprocess.SubprocessError("/private/example")
+        with self.assertRaises(AdmissionError) as caught:
+            _nebular_run(["missing"], {}, Path("."), (), 1, runner=subprocess_error)
+        self.assertEqual(caught.exception.code, "TF_PYPI_NEBULAR_NATIVE_EXECUTION_SPAWN_SUBPROCESS")
+        self.assertNotIn("/private/example", "".join(traceback.format_exception(caught.exception)))
+        git_cases = [
+            ("fatal: detected dubious ownership in /private/example", "HOSTED_COMMIT", "HOSTED_COMMIT_OWNERSHIP"),
+            ("fatal: not a git repository /private/example", "HOSTED_COMMIT", "HOSTED_COMMIT_REPOSITORY"),
+            ("fatal: detected dubious ownership in /private/example", "SOURCE_LINEAGE", "SOURCE_LINEAGE"),
+            ("unrecognized /private/example", "HOSTED_COMMIT", "HOSTED_COMMIT"),
+            (b"not a git repository /private/example", "HOSTED_COMMIT", "HOSTED_COMMIT"),
+            (None, "HOSTED_COMMIT", "HOSTED_COMMIT"),
+        ]
+        for stderr, code, expected in git_cases:
+            with self.subTest(git_code=code, stderr_type=type(stderr).__name__), patch(
+                    "rs9.tf_pypi_nebular070_publish.subprocess.run",
+                    return_value=SimpleNamespace(returncode=128, stdout="", stderr=stderr)):
+                with self.assertRaises(AdmissionError) as caught:
+                    _git_output(Path("."), ["rev-parse", "HEAD"], code)
+                self.assertEqual(caught.exception.code, "TF_PYPI_" + expected)
+                rendered = str(caught.exception) + repr(caught.exception) + "".join(traceback.format_exception(caught.exception))
+                self.assertNotIn("/private/example", rendered)
+        cases = [
+            ({"forced_cleanup": True}, "FORCED_CLEANUP"),
+            ({"cleanup_known": False}, "CLEANUP_UNOBSERVED"),
+            ({"output_complete": False}, "OUTPUT_INCOMPLETE"),
+            ({"exit_code": 127}, "EXIT_COMMAND_NOT_FOUND"),
+            ({"exit_code": 126}, "EXIT_PERMISSION"),
+            ({"exit_code": 1}, "EXIT_NONZERO"),
+            ({"exit_code": -9}, "SIGNAL"),
+            ({"exit_code": 127, "forced_cleanup": True}, "EXIT_COMMAND_NOT_FOUND"),
+            ({"exit_code": -9, "forced_cleanup": True}, "FORCED_CLEANUP"),
+            ({"exit_code": 1, "cleanup_known": False, "output_complete": False}, "CLEANUP_UNOBSERVED"),
+            ({"stderr_token": "ENOENT /private/example", "forced_cleanup": True}, "FILESYSTEM_MISSING"),
+        ]
+        for process, suffix in cases:
+            with self.subTest(process=process):
+                self.assertEqual(_native_execution_failure_code(process), "NEBULAR_NATIVE_EXECUTION_" + suffix)
+        for value in (0, 256, -256, True, 1.0, "127", None):
+            with self.subTest(invalid_exit_type=type(value).__name__, invalid_exit=value):
+                self.assertEqual(_native_execution_failure_code({"exit_code": value}), "NEBULAR_NATIVE_EXECUTION")
+        self.assertEqual(_native_execution_failure_code({}), "NEBULAR_NATIVE_EXECUTION")
+
+    def test_missing_runtime_cli_keeps_commit_and_run_coordinate_refusals(self):
+        import contextlib
+        from unittest.mock import patch
+        from rs9.tf_pypi_nebular070_publish import main
+        from rs9.wheel_nebular_successor import SYSTEM_WEBKIT_PROFILE, gate1_profile_record
+        cases = [
+            ("b" * 40, "1", "123", "HOSTED_COMMIT_MISMATCH"),
+            ("a" * 40, "2", "123", "HOSTED_COMMIT_RUN_COORDINATES"),
+            ("a" * 40, "1", "bad", "HOSTED_COMMIT_RUN_COORDINATES"),
+            ("b" * 40, "2", "bad", "HOSTED_COMMIT_MISMATCH"),
+        ]
+        for expected, attempt, run_id, code in cases:
+            stderr = io.StringIO()
+            with self.subTest(code=code, attempt=attempt, run=run_id), contextlib.ExitStack() as stack:
+                stack.enter_context(patch("rs9.tf_pypi_nebular070_publish._require_real_directory", return_value=Path(".")))
+                stack.enter_context(patch("rs9.tf_pypi_nebular070_publish._validate_bundle_file_set"))
+                stack.enter_context(patch("rs9.tf_pypi_nebular070_publish._read_json_object",
+                                         return_value={"profile": gate1_profile_record(SYSTEM_WEBKIT_PROFILE)}))
+                stack.enter_context(patch("rs9.tf_pypi_nebular070_publish.repo_root", return_value=Path(".")))
+                stack.enter_context(patch("rs9.tf_pypi_nebular070_publish._git_output", side_effect=["a" * 40, "c" * 40]))
+                check = stack.enter_context(patch("rs9.nebular070_system_webkit.check_missing_runtime"))
+                stack.enter_context(contextlib.redirect_stderr(stderr))
+                result = main(["check-system-webkit-missing", "--bundle", ".", "--target", "linux-x64-gnu",
+                               "--work", "unused", "--output", "unused.json", "--expected-commit", expected,
+                               "--run-id", run_id, "--run-attempt", attempt])
+                self.assertEqual(result, 1)
+                self.assertEqual(stderr.getvalue().strip(), "TF_PYPI_" + code)
+                check.assert_not_called()
+
     def test_source_receipt_and_retained_copy_have_distinct_bound_bytes(self):
         original = b'{\n  "status": "pass"\n}'
         expected = sha256(original)

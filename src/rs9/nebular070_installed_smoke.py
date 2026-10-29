@@ -962,6 +962,23 @@ def _native_execution_failure_code(
     ):
         if any(token in problem for token in tokens for problem in problems):
             return "NEBULAR_NATIVE_EXECUTION_" + category
+    exit_code = process.get("exit_code")
+    # Shell launch failures remain useful even if descendant cleanup was
+    # subsequently required. Otherwise forced cleanup explains the failed
+    # process contract more directly than a resulting TERM/KILL exit.
+    if type(exit_code) is int and exit_code in (126, 127):
+        suffix = "EXIT_PERMISSION" if exit_code == 126 else "EXIT_COMMAND_NOT_FOUND"
+        return "NEBULAR_NATIVE_EXECUTION_" + suffix
+    if process.get("forced_cleanup") is True:
+        return "NEBULAR_NATIVE_EXECUTION_FORCED_CLEANUP"
+    if process.get("cleanup_known") is False:
+        return "NEBULAR_NATIVE_EXECUTION_CLEANUP_UNOBSERVED"
+    if process.get("output_complete") is False:
+        return "NEBULAR_NATIVE_EXECUTION_OUTPUT_INCOMPLETE"
+    if type(exit_code) is int and 0 < exit_code <= 255:
+        return "NEBULAR_NATIVE_EXECUTION_EXIT_NONZERO"
+    if type(exit_code) is int and -64 <= exit_code < 0:
+        return "NEBULAR_NATIVE_EXECUTION_SIGNAL"
     return "NEBULAR_NATIVE_EXECUTION"
 
 

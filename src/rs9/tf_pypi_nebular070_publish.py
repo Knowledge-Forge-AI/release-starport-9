@@ -363,6 +363,7 @@ WORKFLOW_STEP_PROFILES = {
         ("Download 0.7.0 public inputs", True),
         ("Qualify native consumer on darwin-arm64", False),
         ("Upload darwin-arm64 qualification receipt", True),
+        ("Upload failed native harness report", True),
     ),
     "Native consumer 0.7.0 (linux-arm64-gnu)": (
         ("Checkout exact source", True),
@@ -377,6 +378,7 @@ WORKFLOW_STEP_PROFILES = {
         ("Verify Ubuntu system WebKit runtime packages", False),
         ("Qualify native consumer on linux-arm64-gnu", False),
         ("Upload linux-arm64-gnu qualification receipt", True),
+        ("Upload failed native harness report", True),
     ),
     "Native consumer 0.7.0 (linux-x64-gnu)": (
         ("Checkout exact source", True),
@@ -391,6 +393,7 @@ WORKFLOW_STEP_PROFILES = {
         ("Verify Ubuntu system WebKit runtime packages", False),
         ("Qualify native consumer on linux-x64-gnu", False),
         ("Upload linux-x64-gnu qualification receipt", True),
+        ("Upload failed native harness report", True),
     ),
     "Native consumer 0.7.0 (linux-arm64-gnu floor)": (
         ("Install pinned Bookworm floor tools", False),
@@ -406,6 +409,7 @@ WORKFLOW_STEP_PROFILES = {
         ("Verify Bookworm system WebKit runtime packages", False),
         ("Qualify native consumer on linux-arm64-gnu floor", False),
         ("Upload linux-arm64-gnu floor qualification receipt", True),
+        ("Upload failed native harness report", True),
     ),
     "Native consumer 0.7.0 (linux-x64-gnu floor)": (
         ("Install pinned Bookworm floor tools", False),
@@ -421,6 +425,7 @@ WORKFLOW_STEP_PROFILES = {
         ("Verify Bookworm system WebKit runtime packages", False),
         ("Qualify native consumer on linux-x64-gnu floor", False),
         ("Upload linux-x64-gnu floor qualification receipt", True),
+        ("Upload failed native harness report", True),
     ),
     QUALIFICATION_GATE_070_JOB_NAME: (
         ('Checkout exact source', True),
@@ -3384,6 +3389,12 @@ def _git_output(repo: Path, args: Sequence[str], code: str = "SOURCE_LINEAGE") -
     except (OSError, subprocess.SubprocessError):
         fail(code)
     if completed.returncode != 0:
+        if code == "HOSTED_COMMIT":
+            stderr = completed.stderr if isinstance(completed.stderr, str) else ""
+            if "detected dubious ownership" in stderr:
+                fail("HOSTED_COMMIT_OWNERSHIP")
+            if "not a git repository" in stderr:
+                fail("HOSTED_COMMIT_REPOSITORY")
         fail(code)
     return completed.stdout.strip()
 
@@ -4123,6 +4134,15 @@ def workflow_070_qualify_jobs_text() -> str:
           retention-days: 14
           if-no-files-found: error
 
+      - name: Upload failed native harness report
+        if: failure()
+        uses: {UPLOAD_ARTIFACT_ACTION}
+        with:
+          name: {TARGET_QUALIFICATION_ARTIFACTS['darwin-arm64']}-failure-diagnostic
+          path: '${{{{ runner.temp }}}}/tfnf-070-work-darwin-arm64/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
+
   native_consumer_070_linux_arm64_gnu:
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/{QUALIFY_BRANCH}') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
     name: Native consumer 0.7.0 (linux-arm64-gnu)
@@ -4271,6 +4291,15 @@ def workflow_070_qualify_jobs_text() -> str:
           retention-days: 14
           if-no-files-found: error
 
+      - name: Upload failed native harness report
+        if: failure()
+        uses: {UPLOAD_ARTIFACT_ACTION}
+        with:
+          name: {TARGET_QUALIFICATION_ARTIFACTS['linux-arm64-gnu']}-failure-diagnostic
+          path: '${{{{ runner.temp }}}}/tfnf-070-work-linux-arm64-gnu/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
+
   native_consumer_070_linux_x64_gnu:
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/{QUALIFY_BRANCH}') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
     name: Native consumer 0.7.0 (linux-x64-gnu)
@@ -4418,6 +4447,15 @@ def workflow_070_qualify_jobs_text() -> str:
           path: '${{{{ runner.temp }}}}/tfnf-070-qual/'
           retention-days: 14
           if-no-files-found: error
+
+      - name: Upload failed native harness report
+        if: failure()
+        uses: {UPLOAD_ARTIFACT_ACTION}
+        with:
+          name: {TARGET_QUALIFICATION_ARTIFACTS['linux-x64-gnu']}-failure-diagnostic
+          path: '${{{{ runner.temp }}}}/tfnf-070-work-linux-x64-gnu/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
 
   native_consumer_070_linux_arm64_gnu_floor:
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/{QUALIFY_BRANCH}') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
@@ -4604,6 +4642,15 @@ def workflow_070_qualify_jobs_text() -> str:
           retention-days: 14
           if-no-files-found: error
 
+      - name: Upload failed native harness report
+        if: failure()
+        uses: {UPLOAD_ARTIFACT_ACTION}
+        with:
+          name: {FLOOR_TARGET_QUALIFICATION_ARTIFACTS['linux-arm64-gnu']}-failure-diagnostic
+          path: '${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-work-linux-arm64-gnu-floor/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
+
   native_consumer_070_linux_x64_gnu_floor:
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/{QUALIFY_BRANCH}') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
     name: Native consumer 0.7.0 (linux-x64-gnu floor)
@@ -4788,6 +4835,15 @@ def workflow_070_qualify_jobs_text() -> str:
           compression-level: 0
           retention-days: 14
           if-no-files-found: error
+
+      - name: Upload failed native harness report
+        if: failure()
+        uses: {UPLOAD_ARTIFACT_ACTION}
+        with:
+          name: {FLOOR_TARGET_QUALIFICATION_ARTIFACTS['linux-x64-gnu']}-failure-diagnostic
+          path: '${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-work-linux-x64-gnu-floor/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
 
   qualification_gate_070:
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/{QUALIFY_BRANCH}') && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'qualify'
@@ -8177,9 +8233,10 @@ def main(
             root = repo_root()
             commit = _git_output(root, ["rev-parse", "--verify", "HEAD^{commit}"], "HOSTED_COMMIT")
             tree = _git_output(root, ["rev-parse", "--verify", "HEAD^{tree}"], "HOSTED_COMMIT")
-            if (commit != args.expected_commit or args.run_attempt != "1"
-                    or not re.fullmatch(r"[1-9][0-9]*", args.run_id)):
-                fail("HOSTED_COMMIT")
+            if commit != args.expected_commit:
+                fail("HOSTED_COMMIT_MISMATCH")
+            if (args.run_attempt != "1" or not re.fullmatch(r"[1-9][0-9]*", args.run_id)):
+                fail("HOSTED_COMMIT_RUN_COORDINATES")
             row = next(row for row in candidate["rows"] if row["system"] == SYSTEM_BY_TARGET[args.target])
             wheel = bundle / "dist" / row["wheel"]["filename"]
             if sha256(physical_bytes(wheel, limit=MAX_WHEEL_FILE_BYTES)) != row["wheel"]["sha256"]:
