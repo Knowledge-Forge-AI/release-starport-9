@@ -15,6 +15,8 @@ import json
 import os
 import re
 import stat
+import subprocess
+import sys
 import tempfile
 import zipfile
 from collections.abc import Mapping
@@ -61,6 +63,10 @@ SUPPORTED_SUCCESSOR_SYSTEMS = frozenset({"aarch64-darwin", "x86_64-linux", "aarc
 DEFAULT_DESCRIPTION_PATH = "operators/tf-pypi/descriptions/nebular-fusion.md"
 DESCRIPTION_070_PATH = "operators/tf-pypi/descriptions/nebular-fusion-0.7.0.md"
 GATE1_DESCRIPTION_070_PATH = "operators/tf-pypi/descriptions/nebular-fusion-0.7.0-gate1.md"
+SYSTEM_WEBKIT_DESCRIPTION_070_PATH = (
+    "operators/tf-pypi/descriptions/nebular-fusion-0.7.0-system-webkitgtk.md"
+)
+SYSTEM_WEBKIT_SONAME = "libwebkit2gtk-4.1.so.0"
 HISTORICAL_RELEASE = DISTRIBUTION_VERSION
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _ARCHIVE_NAME_VERSION_RE = re.compile(
@@ -92,6 +98,9 @@ class SuccessorCandidateProfile:
     linux_glibc_floor: str
     linux_glibcxx_floor: str
     manylinux_claim: bool
+    provider_baseline: str = "manylinux236-named-provenance-only"
+    dynamic_closure: str = "pending"
+    required_sonames: tuple[str, ...] = ()
 
 
 GATE1_PROFILE = SuccessorCandidateProfile(
@@ -110,10 +119,68 @@ GATE1_PROFILE = SuccessorCandidateProfile(
 )
 
 
-def gate1_profile_record(profile: SuccessorCandidateProfile = GATE1_PROFILE) -> dict[str, Any]:
-    """Return the closed JSON-facing Gate1 profile without release hashes."""
+SYSTEM_WEBKIT_PROFILE = SuccessorCandidateProfile(
+    profile_id="nebular-fusion-0.7.0-system-webkitgtk-4.1-v1",
+    application_version="0.7.0",
+    distribution_version="0.7.0",
+    description_path=SYSTEM_WEBKIT_DESCRIPTION_070_PATH,
+    provenance_schema="rs9.wheel-provenance.v3alpha1",
+    license_expression="AGPL-3.0-or-later",
+    required_legal_files=("LICENSE", "NOTICE"),
+    optional_legal_files=("COMMERCIAL-LICENSE.md",),
+    darwin_floor=(13, 0),
+    linux_glibc_floor="2.36",
+    linux_glibcxx_floor="3.4.30",
+    manylinux_claim=False,
+    provider_baseline="system-webkitgtk-4.1",
+    dynamic_closure="host-managed",
+    required_sonames=(SYSTEM_WEBKIT_SONAME,),
+)
+
+
+_CANONICAL_PROFILE_REGISTRY = {
+    GATE1_PROFILE.profile_id: GATE1_PROFILE,
+    SYSTEM_WEBKIT_PROFILE.profile_id: SYSTEM_WEBKIT_PROFILE,
+}
+
+
+def canonical_candidate_profile(
+    profile: SuccessorCandidateProfile,
+) -> SuccessorCandidateProfile:
+    """Return one of the immutable, source-owned candidate profiles."""
     if not isinstance(profile, SuccessorCandidateProfile):
         raise _error("PROFILE_SCHEMA", "Successor candidate profile is required")
+    canonical_profile = _CANONICAL_PROFILE_REGISTRY.get(profile.profile_id)
+    if canonical_profile is None or profile != canonical_profile:
+        raise _error(
+            "PROFILE_BINDING",
+            "Candidate profile must exactly match a closed source-owned profile",
+            profile_id=profile.profile_id,
+        )
+    return canonical_profile
+
+
+def _is_system_webkit_profile(profile: SuccessorCandidateProfile | None) -> bool:
+    return profile == SYSTEM_WEBKIT_PROFILE
+
+
+def _linux_runtime_policy(profile: SuccessorCandidateProfile) -> dict[str, Any]:
+    policy: dict[str, Any] = {
+        "wheel_tag_policy": "generic-linux",
+        "glibc_floor": profile.linux_glibc_floor,
+        "glibcxx_floor": profile.linux_glibcxx_floor,
+        "provider_baseline": profile.provider_baseline,
+        "manylinux_claim": profile.manylinux_claim,
+        "dynamic_closure": profile.dynamic_closure,
+    }
+    if profile.required_sonames:
+        policy["required_sonames"] = list(profile.required_sonames)
+    return policy
+
+
+def gate1_profile_record(profile: SuccessorCandidateProfile = GATE1_PROFILE) -> dict[str, Any]:
+    """Return the closed JSON-facing Gate1 profile without release hashes."""
+    profile = canonical_candidate_profile(profile)
     return {
         "schema": "rs9.nebular070-candidate-profile.v1alpha1",
         "profile_id": profile.profile_id,
@@ -125,14 +192,7 @@ def gate1_profile_record(profile: SuccessorCandidateProfile = GATE1_PROFILE) -> 
         "required_legal_files": list(profile.required_legal_files),
         "optional_legal_files": list(profile.optional_legal_files),
         "darwin_floor": {"major": profile.darwin_floor[0], "minor": profile.darwin_floor[1]},
-        "linux_runtime_policy": {
-            "wheel_tag_policy": "generic-linux",
-            "glibc_floor": profile.linux_glibc_floor,
-            "glibcxx_floor": profile.linux_glibcxx_floor,
-            "provider_baseline": "manylinux236-named-provenance-only",
-            "manylinux_claim": profile.manylinux_claim,
-            "dynamic_closure": "pending",
-        },
+        "linux_runtime_policy": _linux_runtime_policy(profile),
         "source_status": "pending-release-inputs",
         "publication_admitted": False,
     }
@@ -539,6 +599,83 @@ def _profile_license_facts(profile_result: Mapping[str, Any] | None) -> dict[str
     }
 
 
+def _system_webkit_probe_command() -> list[str]:
+    """Return the fixed, stdlib-only child probe used by the Linux launcher."""
+    return [
+        sys.executable,
+        "-I",
+        "-c",
+        f"import ctypes; ctypes.CDLL({SYSTEM_WEBKIT_SONAME!r})",
+    ]
+
+
+def _run_system_webkit_probe(
+    runner: Any | None = None,
+    *,
+    timeout_seconds: float = 5.0,
+) -> None:
+    """Run the bounded fixed-SONAME probe and raise a friendly runtime error."""
+    if timeout_seconds <= 0:
+        raise ValueError("timeout_seconds must be positive")
+    execute = runner or subprocess.run
+    try:
+        result = execute(
+            _system_webkit_probe_command(),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "WebKitGTK 4.1 could not be checked before the launch timeout; "
+            "install your distribution's WebKitGTK 4.1 runtime package."
+        ) from exc
+    except OSError as exc:
+        raise RuntimeError(
+            "WebKitGTK 4.1 could not be checked; install your distribution's "
+            "WebKitGTK 4.1 runtime package."
+        ) from exc
+    if getattr(result, "returncode", None) != 0:
+        raise RuntimeError(
+            "WebKitGTK 4.1 is unavailable; install your distribution's "
+            "WebKitGTK 4.1 runtime package before launching Theme Forge. "
+            "Debian/Ubuntu: sudo apt install libwebkit2gtk-4.1-0; "
+            "Fedora: sudo dnf install webkit2gtk4.1; "
+            "Arch: sudo pacman -S webkit2gtk-4.1. Then run tfnf again."
+        )
+
+
+def _validate_system_webkit_archive(
+    archive_manifest: Mapping[str, Any],
+    *,
+    payload_name: str,
+    system: str,
+    profile: SuccessorCandidateProfile | None,
+) -> None:
+    """Reject portable/private or manylinux material from a system-profile wheel."""
+    if profile is not None:
+        profile = canonical_candidate_profile(profile)
+    if not _is_system_webkit_profile(profile) or not system.endswith("-linux"):
+        return
+    if any(token in payload_name.lower() for token in ("manylinux", "musllinux")):
+        raise _error("SYSTEM_WEBKIT_LAYOUT", "System-WebKit payload cannot carry a manylinux tag")
+    members = archive_manifest.get("members")
+    if not isinstance(members, list):
+        raise _error("SYSTEM_WEBKIT_LAYOUT", "System-WebKit payload member manifest is unavailable")
+    for row in members:
+        if not isinstance(row, Mapping) or not isinstance(row.get("path"), str):
+            raise _error("SYSTEM_WEBKIT_LAYOUT", "System-WebKit payload member is malformed")
+        segments = set(row["path"].split("/"))
+        if "nebular-private" in segments or ("opt" in segments and "nebular-private" in segments):
+            raise _error("SYSTEM_WEBKIT_LAYOUT", "System-WebKit payload must not embed private runtime files")
+    for key in archive_manifest:
+        lowered_key = str(key).lower()
+        if "manylinux" in lowered_key or "musllinux" in lowered_key:
+            raise _error("SYSTEM_WEBKIT_LAYOUT", "System-WebKit payload cannot carry portable Linux metadata")
+
+
 def _render_successor_launcher(
     archive_name: str,
     archive_sha256: str,
@@ -550,10 +687,12 @@ def _render_successor_launcher(
     *,
     application_version: str = APPLICATION_VERSION,
     distribution_version: str = DISTRIBUTION_VERSION,
+    system_webkit: bool = False,
 ) -> bytes:
     source = '''"""Theme Forge Nebular Fusion successor launcher; offline and identity-bound."""
 from __future__ import annotations
 import hashlib, json, os, platform, sys
+__SYSTEM_WEBKIT_IMPORT__
 from pathlib import Path
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
@@ -573,7 +712,7 @@ SHELL_TARGET = __SHELL_TARGET__
 GUI_TARGET = __GUI_TARGET__
 TARGET_FAMILY = __FAMILY__
 TARGET_ARCH = __ARCH__
-
+__SYSTEM_WEBKIT_FUNCTION__
 def _cache_dir() -> Path:
     if "THEME_FORGE_CACHE_DIR" in os.environ:
         raw = os.environ["THEME_FORGE_CACHE_DIR"]
@@ -618,6 +757,7 @@ def run_launcher(command_name: str = "tfnf", argv: list[str] | None = None) -> i
         print("Usage: tfnf [--version|--help|--path] [application args...]")
         return 0
     _platform_check()
+__SYSTEM_WEBKIT_GUARD__
     payload = _PACKAGE_DIR / "payload" / ARCHIVE_FILENAME
     if payload.is_symlink() or not payload.is_file():
         raise RuntimeError("Embedded payload is unavailable")
@@ -635,7 +775,7 @@ def run_launcher(command_name: str = "tfnf", argv: list[str] | None = None) -> i
     return 0
 
 def main_tfnf() -> None:
-    sys.exit(run_launcher("tfnf"))
+__SYSTEM_WEBKIT_MAIN__
 '''
     replacements = {
         "__APP_VERSION__": repr(application_version),
@@ -647,6 +787,53 @@ def main_tfnf() -> None:
         "__GUI_TARGET__": repr(gui_path),
         "__FAMILY__": repr(family),
         "__ARCH__": repr(arch),
+        "__SYSTEM_WEBKIT_IMPORT__\n": "import subprocess\n" if system_webkit else "",
+        "__SYSTEM_WEBKIT_GUARD__\n": (
+            '    if argv != ["--path"]:\n        _run_system_webkit_preflight()\n'
+            if system_webkit else ""
+        ),
+        "__SYSTEM_WEBKIT_MAIN__": (
+            '''    try:
+        sys.exit(run_launcher("tfnf"))
+    except RuntimeError as exc:
+        if "WebKitGTK 4.1" not in str(exc):
+            raise
+        print(f"Theme Forge launch unavailable: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None'''
+            if system_webkit else '    sys.exit(run_launcher("tfnf"))'
+        ),
+        "__SYSTEM_WEBKIT_FUNCTION__": (
+            """
+def _run_system_webkit_preflight() -> None:
+    try:
+        result = subprocess.run(
+            [sys.executable, "-I", "-c", "import ctypes; ctypes.CDLL('libwebkit2gtk-4.1.so.0')"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=5.0,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "WebKitGTK 4.1 could not be checked before the launch timeout; "
+            "install your distribution's WebKitGTK 4.1 runtime package."
+        ) from exc
+    except OSError as exc:
+        raise RuntimeError(
+            "WebKitGTK 4.1 could not be checked; install your distribution's "
+            "WebKitGTK 4.1 runtime package."
+        ) from exc
+    if result.returncode != 0:
+        raise RuntimeError(
+            "WebKitGTK 4.1 is unavailable; install your distribution's "
+            "WebKitGTK 4.1 runtime package before launching Theme Forge. "
+            "Debian/Ubuntu: sudo apt install libwebkit2gtk-4.1-0; "
+            "Fedora: sudo dnf install webkit2gtk4.1; "
+            "Arch: sudo pacman -S webkit2gtk-4.1. Then run tfnf again."
+        )
+""" if system_webkit else ""
+        ),
     }
     for marker, value in replacements.items():
         source = source.replace(marker, value)
@@ -754,13 +941,17 @@ def build_successor_wheel(
         raise _error("UNSUPPORTED_PRODUCT", "Successor builder only supports Nebular Fusion")
     release = _release_for_versions(application_version, distribution_version)
     if candidate_profile is not None:
-        if not isinstance(candidate_profile, SuccessorCandidateProfile):
-            raise _error("PROFILE_SCHEMA", "Successor candidate profile is required")
+        candidate_profile = canonical_candidate_profile(candidate_profile)
         if (candidate_profile.application_version != application_version
                 or candidate_profile.distribution_version != distribution_version):
             raise _error("PROFILE_BINDING", "Candidate profile version differs from the selected release")
         if candidate_profile.manylinux_claim:
             raise _error("PROFILE_POLICY", "Gate1 candidate profile cannot claim manylinux")
+        if _is_system_webkit_profile(candidate_profile) and payload_portability is not None:
+            raise _error(
+                "PROFILE_POLICY",
+                "System-WebKit candidates cannot consume manylinux portability evidence",
+            )
     if payload_portability is not None:
         if not isinstance(payload_portability, ValidatedPayloadPortability):
             raise _error("MANYLINUX_INPUT", "Validated 0.7.0 payload portability evidence is required")
@@ -839,6 +1030,12 @@ def build_successor_wheel(
     if archive_manifest is None or payload_bytes is None or payload_name is None:
         raise _error("MISSING_ASSET", "Archive and manifest inputs are unavailable")
     parse_manifest_members(archive_manifest)
+    _validate_system_webkit_archive(
+        archive_manifest,
+        payload_name=payload_name,
+        system=effective_system,
+        profile=candidate_profile,
+    )
     shell_path, actual_gui_path = _path_from_capture_or_fixture(
         archive_manifest, captured_shell, captured_gui, launcher_path, gui_path
     )
@@ -942,6 +1139,7 @@ def build_successor_wheel(
         arch,
         application_version=release.application_version,
         distribution_version=release.distribution_version,
+        system_webkit=_is_system_webkit_profile(candidate_profile) and is_linux,
     )
     dist_name = DISTRIBUTION_NAME.replace("-", "_")
     dist_info = f"{dist_name}-{release.distribution_version}.dist-info"
@@ -1069,12 +1267,12 @@ def build_successor_wheel(
 
 
 def build_gate1_successor_wheel(*args: Any, **kwargs: Any) -> WheelBuildResult:
-    """Build one v0.7.0 Gate1 candidate with its immutable profile contract."""
-    if "candidate_profile" in kwargs and kwargs["candidate_profile"] is not GATE1_PROFILE:
-        raise _error("PROFILE_BINDING", "Gate1 builder owns one immutable candidate profile")
-    if len(args) >= 2 and args[1] != GATE1_PROFILE.application_version:
+    """Build one v0.7.0 candidate with an explicit, immutable profile contract."""
+    profile = canonical_candidate_profile(kwargs.get("candidate_profile", GATE1_PROFILE))
+    kwargs["candidate_profile"] = profile
+    if len(args) >= 2 and args[1] != profile.application_version:
         raise _error("PROFILE_BINDING", "Gate1 builder owns application version 0.7.0")
-    if len(args) >= 3 and args[2] != GATE1_PROFILE.distribution_version:
+    if len(args) >= 3 and args[2] != profile.distribution_version:
         raise _error("PROFILE_BINDING", "Gate1 builder owns distribution version 0.7.0")
     # The positional release arguments are accepted only when they already
     # select the Gate1 release; remove them before supplying the owned keyword
@@ -1083,7 +1281,7 @@ def build_gate1_successor_wheel(*args: Any, **kwargs: Any) -> WheelBuildResult:
         args = (args[0], *args[3:])
     elif len(args) >= 2:
         args = (args[0], *args[2:])
-    kwargs["candidate_profile"] = GATE1_PROFILE
-    kwargs.setdefault("application_version", GATE1_PROFILE.application_version)
-    kwargs.setdefault("distribution_version", GATE1_PROFILE.distribution_version)
+    kwargs["candidate_profile"] = profile
+    kwargs.setdefault("application_version", profile.application_version)
+    kwargs.setdefault("distribution_version", profile.distribution_version)
     return build_successor_wheel(*args, **kwargs)

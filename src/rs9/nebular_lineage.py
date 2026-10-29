@@ -408,7 +408,10 @@ def verify_direct_release_lineage(capture, binding):
     }
     if provenance == legacy_provenance:
         provenance_kind = "legacy"
-    elif provenance == current_provenance or provenance == current_intake_provenance:
+    elif provenance == current_provenance or provenance == current_intake_provenance or provenance == {
+        "path": "nebular-v0.7.0-native-ci-provenance.json",
+        "commit_field": "releaseCommit", "tree_field": "testedTree",
+    }:
         provenance_kind = "current-native"
     else:
         _fail("LINEAGE_BINDING", "Direct provenance identity fields are fixed")

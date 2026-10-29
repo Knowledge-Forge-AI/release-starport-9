@@ -116,8 +116,11 @@ def validate_release_binding(binding: dict) -> dict:
             or binding["distribution_version"] != "0.7.0" \
             or binding["repository"] != "Knowledge-Forge-AI/theme-forge-nebular-fusion" \
             or binding["tag"] != "v0.7.0" \
-            or binding["bootstrap_path"] != NEBULAR070_BOOTSTRAP \
-            or binding["expectations_path"] != NEBULAR070_EXPECTATIONS \
+            or (binding["bootstrap_path"], binding["expectations_path"]) not in (
+                (NEBULAR070_BOOTSTRAP, NEBULAR070_EXPECTATIONS),
+                ("bootstrap/pre-rs9/theme-forge-nebular-0.7.0-system-webkit/manifest.json",
+                 "operators/tf-pypi/nebular-0.7.0/system-webkit-expectations.json"),
+            ) \
             or binding.get("profile_path") != NEBULAR070_PROFILE:
         raise ContractError("RELEASE_BINDING", "Only the 0.7.0 Gate1 binding is accepted")
     if binding["status"] not in {"pending-release-inputs", "ready"}:
@@ -136,7 +139,11 @@ def validate_release_binding(binding: dict) -> dict:
         "commit_field": "tagCommit",
         "tree_field": "tagTree",
     } and provenance != _CURRENT_NATIVE_PROVENANCE \
-            and provenance != _CURRENT_NATIVE_INTAKE_PROVENANCE:
+            and provenance != _CURRENT_NATIVE_INTAKE_PROVENANCE \
+            and provenance != {
+                "path": "nebular-v0.7.0-native-ci-provenance.json",
+                "commit_field": "releaseCommit", "tree_field": "testedTree",
+            }:
         raise ContractError("RELEASE_BINDING", "Gate1 provenance identity fields are fixed")
     if binding["status"] == "pending-release-inputs":
         return copy.deepcopy(binding)

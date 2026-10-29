@@ -316,14 +316,17 @@ def _actual_runtime(body: Any, *, target: str, triple: str, source_candidate: st
     return body
 
 
-def _runtime_provider_row(provider: Any, *, target: str, expected_machines: set[str]) -> str:
+def _runtime_provider_row(
+    provider: Any, *, target: str, expected_machines: set[str],
+    classifications: frozenset[str] = frozenset({"external-floor", "interpreter"}),
+) -> str:
     provider = _closed(provider, {
         "soname", "classification", "requestedPath", "terminalPath", "aliasChain", "terminalFull9",
         "bytes", "sha256", "elfMachine", "elfClass", "versionDefinitions", "readelfEvidenceSha256",
     }, f"{target} runtime provider")
     if not isinstance(provider["soname"], str) or not SONAME_RE.fullmatch(provider["soname"]):
         raise _fail("NEBULAR_MANYLINUX_RECEIPT", f"{target} runtime provider SONAME is malformed")
-    if provider["classification"] not in {"external-floor", "interpreter"}:
+    if provider["classification"] not in classifications:
         raise _fail("NEBULAR_MANYLINUX_RECEIPT", f"{target} runtime provider classification is unsupported")
     for key in ("requestedPath", "terminalPath"):
         if not isinstance(provider[key], str) or not provider[key].startswith("/") \

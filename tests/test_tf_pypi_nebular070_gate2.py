@@ -643,6 +643,16 @@ class NebularGate2Fixture(unittest.TestCase):
             real_user_state_snapshot=self.real_user_state_snapshot,
         )
 
+    def test_malformed_native_receipt_retains_coded_refusal(self):
+        target = "darwin-arm64"
+        raw = self.raw_for(target)
+        descriptor = raw["native_consumer"][target]["smoke"]["raw-archive"]["receipt"]
+        (self.capture / descriptor["path"]).write_bytes(b"{")
+        descriptor.update(size=1, sha256=sha256(b"{"))
+        with self.assertRaises(AdmissionError) as context:
+            self.consume_direct(self.candidate, target, raw=raw)
+        self.assertEqual(context.exception.code, "TF_PYPI_NEBULAR_NATIVE_EVIDENCE")
+
     def test_connected_fixture_runs_post_path_native_probe_for_three_targets(self):
         receipts = self.root / "receipts"
         for target in TARGETS:

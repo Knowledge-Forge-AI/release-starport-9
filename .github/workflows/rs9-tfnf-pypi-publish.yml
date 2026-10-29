@@ -255,22 +255,66 @@ jobs:
           name: tfnf-070-public-inputs
           path: '${{ runner.temp }}/tfnf-070-public-inputs'
 
+      - name: Validate explicit 0.7.0 runtime profile
+        id: runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json'
+          INRUN_ROOT: '${{ runner.temp }}/tfnf-070-public-inputs'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
       - name: Build and verify 0.7.0 candidate bundle
         env:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
           RS9_GITHUB_READ_TOKEN: ${{ github.token }}
         run: |
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish build-candidates \
-            --qualification-inputs "${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json" \
-            --inrun-root "${{ runner.temp }}/tfnf-070-public-inputs" \
-            --evidence "${{ runner.temp }}/tfnf-070-evidence" \
-            --output "${{ runner.temp }}/tfnf-070-bundle" \
-            --expected-commit "${{ github.sha }}" \
-            --tf-producer-commit 79c67bb70d800701b4b0cdbb9caa9be2bbc7c2ff \
-            --tf-producer-tree e663c9cf15144578a17d3cd501cf031ac83a7e0e \
-            --require-manylinux \
+          build_args=(
+            build-candidates
+            --qualification-inputs "${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json"
+            --inrun-root "${{ runner.temp }}/tfnf-070-public-inputs"
+            --evidence "${{ runner.temp }}/tfnf-070-evidence"
+            --output "${{ runner.temp }}/tfnf-070-bundle"
+            --expected-commit "${{ github.sha }}"
             --require-clean
+          )
+          if [[ "${{ steps.runtime_profile.outputs.profile }}" == "manylinux" ]]; then
+            build_args+=(
+              --tf-producer-commit 79c67bb70d800701b4b0cdbb9caa9be2bbc7c2ff
+              --tf-producer-tree e663c9cf15144578a17d3cd501cf031ac83a7e0e
+              --require-manylinux
+            )
+          fi
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish "${build_args[@]}"
 
       - name: Upload 0.7.0 candidate bundle
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -409,6 +453,62 @@ jobs:
           name: tfnf-070-public-inputs
           path: '${{ runner.temp }}/tfnf-070-public-inputs'
 
+      - name: Resolve explicit Linux runtime profile
+        id: linux_runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json'
+          INRUN_ROOT: '${{ runner.temp }}/tfnf-070-public-inputs'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Install Ubuntu system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-0t64 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
+
+      - name: Verify Ubuntu system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-query -W -f='${Package}\t${Version}\n' libgtk-3-0t64 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 \
+            | tee "${{ runner.temp }}/tfnf-070-system-webkit-packages.tsv"
+          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
+          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
+
       - name: Qualify native consumer on linux-arm64-gnu
         env:
           PYTHONPATH: src
@@ -500,6 +600,62 @@ jobs:
         with:
           name: tfnf-070-public-inputs
           path: '${{ runner.temp }}/tfnf-070-public-inputs'
+
+      - name: Resolve explicit Linux runtime profile
+        id: linux_runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json'
+          INRUN_ROOT: '${{ runner.temp }}/tfnf-070-public-inputs'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Install Ubuntu system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-0t64 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
+
+      - name: Verify Ubuntu system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-query -W -f='${Package}\t${Version}\n' libgtk-3-0t64 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 \
+            | tee "${{ runner.temp }}/tfnf-070-system-webkit-packages.tsv"
+          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
+          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
 
       - name: Qualify native consumer on linux-x64-gnu
         env:
@@ -603,6 +759,79 @@ jobs:
         with:
           name: tfnf-070-public-inputs
           path: '${{ runner.temp }}/tfnf-070-public-inputs'
+
+      - name: Resolve explicit Linux runtime profile
+        id: linux_runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json'
+          INRUN_ROOT: '${{ runner.temp }}/tfnf-070-public-inputs'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Check Bookworm installed tfnf missing system WebKit before runtime install
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish check-system-webkit-missing \
+            --target linux-arm64-gnu \
+            --bundle "${{ runner.temp }}/tfnf-070-bundle" \
+            --work "${{ runner.temp }}/tfnf-070-preflight-linux-arm64-gnu-floor" \
+            --output "${{ runner.temp }}/tfnf-070-floor/linux-arm64-gnu/missing-runtime.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Install Bookworm system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            libgtk-3-0 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
+
+      - name: Verify Bookworm system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-query -W -f='${Package}\t${Version}\n' libgtk-3-0 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 \
+            | tee "${{ runner.temp }}/tfnf-070-floor-system-webkit-packages.tsv"
+          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
+          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
 
       - name: Qualify native consumer on linux-arm64-gnu floor
         env:
@@ -708,6 +937,79 @@ jobs:
           name: tfnf-070-public-inputs
           path: '${{ runner.temp }}/tfnf-070-public-inputs'
 
+      - name: Resolve explicit Linux runtime profile
+        id: linux_runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json'
+          INRUN_ROOT: '${{ runner.temp }}/tfnf-070-public-inputs'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Check Bookworm installed tfnf missing system WebKit before runtime install
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish check-system-webkit-missing \
+            --target linux-x64-gnu \
+            --bundle "${{ runner.temp }}/tfnf-070-bundle" \
+            --work "${{ runner.temp }}/tfnf-070-preflight-linux-x64-gnu-floor" \
+            --output "${{ runner.temp }}/tfnf-070-floor/linux-x64-gnu/missing-runtime.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Install Bookworm system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            libgtk-3-0 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
+
+      - name: Verify Bookworm system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-query -W -f='${Package}\t${Version}\n' libgtk-3-0 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 \
+            | tee "${{ runner.temp }}/tfnf-070-floor-system-webkit-packages.tsv"
+          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
+          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
+
       - name: Qualify native consumer on linux-x64-gnu floor
         env:
           PYTHONPATH: src
@@ -775,6 +1077,43 @@ jobs:
           name: tfnf-070-public-inputs
           path: '${{ runner.temp }}/tfnf-070-public-inputs'
 
+      - name: Validate explicit 0.7.0 runtime profile for matrix
+        id: runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json'
+          INRUN_ROOT: '${{ runner.temp }}/tfnf-070-public-inputs'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
       - name: Download darwin-arm64 qualification receipt
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -817,6 +1156,11 @@ jobs:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
+          set -euo pipefail
+          FLOOR_ARGS=()
+          if [ "${{ steps.runtime_profile.outputs.profile }}" = system-webkitgtk-4.1 ]; then
+            FLOOR_ARGS=(--system-floor-receipts "${{ runner.temp }}/tfnf-070-floor-receipts")
+          fi
           "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish admit-matrix \
             --bundle "${{ runner.temp }}/tfnf-070-bundle" \
             --receipts-dir "${{ runner.temp }}/tfnf-070-receipts" \
@@ -825,7 +1169,8 @@ jobs:
             --qualification-inputs "${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json" \
             --inrun-root "${{ runner.temp }}/tfnf-070-public-inputs" \
             --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}"
+            --run-attempt "${{ github.run_attempt }}" \
+            "${FLOOR_ARGS[@]}"
 
       - name: Upload 0.7.0 matrix qualification receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -836,6 +1181,7 @@ jobs:
           if-no-files-found: error
 
       - name: Assemble authenticated 0.7.0 Stage-B admission input
+        if: steps.runtime_profile.outputs.profile == 'manylinux'
         env:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
@@ -866,7 +1212,39 @@ jobs:
             --rs9-release-commit "${{ github.sha }}" \
             --rs9-release-tree "$RS9_TREE"
 
+      - name: Verify system-WebKit matrix has no manylinux admission
+        if: steps.runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json'
+          INRUN_ROOT: '${{ runner.temp }}/tfnf-070-public-inputs'
+        run: |
+          set -euo pipefail
+          "${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular070_publish import load_qualification_inputs_descriptor
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+          )
+          if "system_webkit" not in descriptor or "manylinux" in descriptor:
+              raise SystemExit("system profile binding mismatch")
+          bundle = Path(os.environ["RUNNER_TEMP"]) / "tfnf-070-bundle"
+          if (bundle / "payload_portability.json").exists():
+              raise SystemExit("system profile unexpectedly has Stage-A payload")
+          candidate = json.loads((bundle / "candidate_receipt.json").read_bytes())
+          if "manylinux_stage_a_sha256" in candidate:
+              raise SystemExit("system profile unexpectedly has Stage-A receipt")
+          PY
+
       - name: Upload 0.7.0 manylinux admission input
+        if: steps.runtime_profile.outputs.profile == 'manylinux'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: tfnf-070-manylinux-admission
@@ -987,13 +1365,17 @@ jobs:
         run: |
           "${{ steps.setup_python.outputs.python-path }}" -B -c '
           from pathlib import Path
-          from rs9.tf_pypi_nebular070_publish import load_approval, load_pin, load_qualification_capture
+          from rs9.tf_pypi_nebular070_publish import (
+              _system_runtime_profile, load_approval, load_pin, load_qualification_capture,
+          )
           pub = Path("publisher-authority")
           pin = load_pin(pub)
           app = load_approval(pub)
           cap = load_qualification_capture(pub, pin=pin, approval=app)
           print(f"qualification_commit={cap["qualification_source_commit"]}")
           print(f"qualification_run_id={cap["run_id"]}")
+          profile = "system-webkitgtk-4.1" if _system_runtime_profile(app) else "manylinux"
+          print(f"runtime_profile={profile}")
           ' >> "$GITHUB_OUTPUT"
 
       - name: Checkout exact qualified source commit
@@ -1059,6 +1441,7 @@ jobs:
           from rs9.tf_pypi_nebular070_publish import (
               PUBLIC_INPUTS_ARTIFACT,
               MANYLINUX_ADMISSION_ARTIFACT,
+              load_approval,
               load_qualification_capture,
               validate_public_external_artifact_metadata,
           )
@@ -1068,6 +1451,7 @@ jobs:
           rows = validate_public_external_artifact_metadata(
               Path(os.environ["RUNNER_TEMP"]) / "tfnf-070-api",
               capture=cap,
+              approval=load_approval(pub),
           )
           out_dir = Path(os.environ["RUNNER_TEMP"]) / "tfnf-070-external-archives"
           for name, row in rows.items():
@@ -1112,7 +1496,9 @@ jobs:
           from rs9.tf_pypi_nebular070_publish import (
               PUBLIC_INPUTS_ARTIFACT,
               MANYLINUX_ADMISSION_ARTIFACT,
+              _system_runtime_profile,
               extract_public_external_artifact,
+              load_approval,
           )
           temp = Path(os.environ["RUNNER_TEMP"])
           extract_public_external_artifact(
@@ -1120,11 +1506,12 @@ jobs:
               temp / "tfnf-070-public-inputs",
               artifact_name=PUBLIC_INPUTS_ARTIFACT,
           )
-          extract_public_external_artifact(
-              temp / "tfnf-070-external-archives" / f"{MANYLINUX_ADMISSION_ARTIFACT}.zip",
-              temp / "tfnf-070-external-manylinux",
-              artifact_name=MANYLINUX_ADMISSION_ARTIFACT,
-          )
+          if not _system_runtime_profile(load_approval(Path("publisher-authority"))):
+              extract_public_external_artifact(
+                  temp / "tfnf-070-external-archives" / f"{MANYLINUX_ADMISSION_ARTIFACT}.zip",
+                  temp / "tfnf-070-external-manylinux",
+                  artifact_name=MANYLINUX_ADMISSION_ARTIFACT,
+              )
           '
 
       - name: Authenticate retained archives and stage verified distribution
@@ -1142,6 +1529,7 @@ jobs:
             --output "${{ runner.temp }}/tfnf-070-resume"
 
       - name: Verify external Stage-B and Stage-A bindings
+        if: steps.resolve_qual.outputs.runtime_profile == 'manylinux'
         env:
           PYTHONPATH: qualification-source/src
           PYTHONDONTWRITEBYTECODE: '1'
@@ -1174,6 +1562,7 @@ jobs:
 
       - name: Resolve captured 0.7.0 manylinux source coordinates
         id: manylinux_source
+        if: steps.resolve_qual.outputs.runtime_profile == 'manylinux'
         env:
           PYTHONPATH: qualification-source/src
           PYTHONDONTWRITEBYTECODE: '1'
@@ -1200,19 +1589,26 @@ jobs:
           RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED: ${{ vars.RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
+          set -euo pipefail
+          PORTABILITY_ARGS=()
+          if [ "${{ steps.resolve_qual.outputs.runtime_profile }}" = manylinux ]; then
+            PORTABILITY_ARGS=(
+              --manylinux-admission "${{ runner.temp }}/tfnf-070-resume/manylinux_admission.json"
+              --manylinux-consumer-receipts "${{ runner.temp }}/tfnf-070-resume/manylinux-consumers"
+              --payload-portability "${{ runner.temp }}/tfnf-070-resume/payload_portability.json"
+              --tf-producer-commit "${{ steps.manylinux_source.outputs.tf_producer_commit }}"
+              --tf-producer-tree "${{ steps.manylinux_source.outputs.tf_producer_tree }}"
+            )
+          fi
           "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish select-missing \
             --dist "${{ runner.temp }}/tfnf-070-resume/dist" \
             --upload-dir "${{ runner.temp }}/tfnf-070-resume/upload" \
             --candidate-receipt "${{ runner.temp }}/tfnf-070-resume/candidate_receipt.json" \
             --expected-artifacts "${{ runner.temp }}/tfnf-070-resume/expected_artifacts.json" \
             --receipts-dir "${{ runner.temp }}/tfnf-070-resume/receipts" \
-            --manylinux-admission "${{ runner.temp }}/tfnf-070-resume/manylinux_admission.json" \
-            --manylinux-consumer-receipts "${{ runner.temp }}/tfnf-070-resume/manylinux-consumers" \
-            --payload-portability "${{ runner.temp }}/tfnf-070-resume/payload_portability.json" \
             --qualification-inputs "${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json" \
             --inrun-root "${{ runner.temp }}/tfnf-070-public-inputs" \
-            --tf-producer-commit "${{ steps.manylinux_source.outputs.tf_producer_commit }}" \
-            --tf-producer-tree "${{ steps.manylinux_source.outputs.tf_producer_tree }}" \
+            "${PORTABILITY_ARGS[@]}" \
             --attempt-marker "${{ runner.temp }}/tfnf-070-upload-attempt.json" >> "$GITHUB_OUTPUT"
 
       - name: Re-verify staged upload artifacts against approval before upload
@@ -1222,17 +1618,24 @@ jobs:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
+          set -euo pipefail
+          PORTABILITY_ARGS=()
+          if [ "${{ steps.resolve_qual.outputs.runtime_profile }}" = manylinux ]; then
+            PORTABILITY_ARGS=(
+              --manylinux-admission "${{ runner.temp }}/tfnf-070-resume/manylinux_admission.json"
+              --manylinux-consumer-receipts "${{ runner.temp }}/tfnf-070-resume/manylinux-consumers"
+              --payload-portability "${{ runner.temp }}/tfnf-070-resume/payload_portability.json"
+              --tf-producer-commit "${{ steps.manylinux_source.outputs.tf_producer_commit }}"
+              --tf-producer-tree "${{ steps.manylinux_source.outputs.tf_producer_tree }}"
+            )
+          fi
           "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish verify-upload \
             --dist "${{ runner.temp }}/tfnf-070-resume/dist" \
             --upload-dir "${{ runner.temp }}/tfnf-070-resume/upload" \
-            --manylinux-admission "${{ runner.temp }}/tfnf-070-resume/manylinux_admission.json" \
-            --manylinux-consumer-receipts "${{ runner.temp }}/tfnf-070-resume/manylinux-consumers" \
             --matrix-receipt "${{ runner.temp }}/tfnf-070-resume/matrix_receipt.json" \
-            --payload-portability "${{ runner.temp }}/tfnf-070-resume/payload_portability.json" \
             --qualification-inputs "${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json" \
             --inrun-root "${{ runner.temp }}/tfnf-070-public-inputs" \
-            --tf-producer-commit "${{ steps.manylinux_source.outputs.tf_producer_commit }}" \
-            --tf-producer-tree "${{ steps.manylinux_source.outputs.tf_producer_tree }}"
+            "${PORTABILITY_ARGS[@]}"
 
       - name: Publish package distribution to PyPI
         if: steps.missing.outputs.upload == 'true'
