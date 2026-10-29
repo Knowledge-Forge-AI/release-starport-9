@@ -19,6 +19,7 @@ from rs9.tf_pypi_archive import AdmissionError, canonical, fail, physical_bytes,
 from rs9.tf_pypi_launcher import node_binary
 from rs9.tf_pypi_model import strict_json
 from rs9.nebular070_smoke_support import checked_live_path
+from rs9.nebular070_darwin_harness import prepare_darwin_harness, validate_darwin_harness
 
 
 _HEX64 = re.compile(r"[0-9a-f]{64}")
@@ -867,6 +868,13 @@ def validate_installed_smoke_summary(
             or len(scenarios) != len(expected["scenarios"])):
         fail("NEBULAR_INSTALLED_SMOKE")
     native_probe = _summary_native_probe(value.get("native_probe"), expected)
+    darwin_harness = value.get("darwin_process_harness")
+    if darwin_harness is not None:
+        checked_harness = validate_darwin_harness(darwin_harness)
+        if (target != "darwin-arm64" or native_probe.get("darwin_process_harness") != checked_harness):
+            fail("NEBULAR_DARWIN_HARNESS")
+    elif native_probe.get("darwin_process_harness") is not None:
+        fail("NEBULAR_DARWIN_HARNESS")
     system_probe = value.get("system_webkit_preflight")
     if system_probe is not None:
         _summary_system_webkit(system_probe, target=target)
@@ -1101,6 +1109,9 @@ def run_installed_smoke(
         fail("NEBULAR_SMOKE_CLOSURE")
     system_probe = None
     installed_harness = None
+    darwin_harness = None
+    if target == "darwin-arm64":
+        harness, darwin_harness = prepare_darwin_harness(prepared)
     if system_webkit_preflight is not None and not system_entrypoint:
         if python_launcher is None:
             fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
@@ -1242,6 +1253,8 @@ def run_installed_smoke(
     }
     if system_probe is not None:
         native_probe["system_webkit_preflight"] = system_probe
+    if darwin_harness is not None:
+        native_probe["darwin_process_harness"] = darwin_harness
     if system_entrypoint:
         native_probe["system_webkit_entrypoint"] = {
             "command": "installed-tfnf",
@@ -1257,4 +1270,5 @@ def run_installed_smoke(
         "native_probe": native_probe,
         **({"system_webkit_preflight": system_probe} if system_probe is not None else {}),
         **({"installed_launcher_harness": installed_harness} if installed_harness is not None else {}),
+        **({"darwin_process_harness": darwin_harness} if darwin_harness is not None else {}),
     }
