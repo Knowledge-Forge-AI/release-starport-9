@@ -16,6 +16,7 @@ from unittest.mock import patch
 from rs9.errors import ContractError
 from rs9.nebular070_public_inputs import (
     _archive_members,
+    OPAQUE_METADATA_ARCHIVES,
     REPOSITORY,
     SCHEMA,
     VERSION,
@@ -229,6 +230,65 @@ class PublicInputTransportTests(unittest.TestCase):
         with self.assertRaises(ContractError) as ctx:
             _archive_members(gzip.compress(expanded.getvalue()))
         self.assertEqual(ctx.exception.code, "UNSAFE_MEMBER")
+
+    def test_exact_notice_archive_member_is_admitted_only_by_pinned_digest(self):
+        path = "evidence/public-release/assets/nebular-v0.7.0-third-party-notices.tar.gz"
+        body = b"tiny authenticated notices fixture\n"
+        expected = ((path, len(body), hashlib.sha256(body).hexdigest()),)
+        metadata = _tar([("qualification-inputs.json", b"{}", "file", 0o644),
+                         (path, body, "file", 0o644)])
+        with patch("rs9.nebular070_public_inputs.OPAQUE_METADATA_ARCHIVES", expected):
+            entries = _archive_members(metadata)
+        self.assertIn(path, {entry["path"] for entry in entries})
+
+    def test_production_opaque_allowlist_is_exactly_pinned(self):
+        self.assertEqual(OPAQUE_METADATA_ARCHIVES, (
+            ("evidence/public-release/assets/nebular-v0.7.0-third-party-notices.tar.gz",
+             30212, "c8ab80d6601947a505eb68e482985672dd4c4a697ff57ecb1bacb9ca9935dbde"),
+            ("evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-source.tar.gz",
+             4453031, "183f99f5af7228eb6498ab990fa514bb501586e8a0ff31a93a7bc05c736a805a"),
+        ))
+
+    def test_exact_source_archive_member_is_admitted_only_by_pinned_digest(self):
+        path = "evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-source.tar.gz"
+        body = b"tiny authenticated source fixture\n"
+        expected = ((path, len(body), hashlib.sha256(body).hexdigest()),)
+        metadata = _tar([("qualification-inputs.json", b"{}", "file", 0o644),
+                         (path, body, "file", 0o644)])
+        with patch("rs9.nebular070_public_inputs.OPAQUE_METADATA_ARCHIVES", expected):
+            entries = _archive_members(metadata)
+        self.assertIn(path, {entry["path"] for entry in entries})
+
+    def test_exact_opaque_archive_member_rejects_wrong_size_or_digest(self):
+        path = "evidence/public-release/assets/nebular-v0.7.0-third-party-notices.tar.gz"
+        body = b"tiny authenticated notices fixture\n"
+        metadata = _tar([("qualification-inputs.json", b"{}", "file", 0o644),
+                         (path, body, "file", 0o644)])
+        for expected in ((path, len(body) + 1, hashlib.sha256(body).hexdigest()),
+                         (path, len(body), "0" * 64)):
+            with patch("rs9.nebular070_public_inputs.OPAQUE_METADATA_ARCHIVES", (expected,)):
+                with self.subTest(expected=expected[1]), self.assertRaises(ContractError) as ctx:
+                    _archive_members(metadata)
+            self.assertEqual(ctx.exception.code, "OPAQUE_MEMBER_MISMATCH")
+
+    def test_exact_opaque_archive_member_must_be_regular(self):
+        path = "evidence/public-release/assets/nebular-v0.7.0-third-party-notices.tar.gz"
+        metadata = _tar([("qualification-inputs.json", b"{}", "file", 0o644),
+                         (path, "target", tarfile.SYMTYPE, 0o644)])
+        with self.assertRaises(ContractError) as ctx:
+            _archive_members(metadata)
+        self.assertEqual(ctx.exception.code, "UNSAFE_MEMBER")
+
+    def test_alternate_archive_path_and_payload_member_remain_banned(self):
+        for name in (
+            "evidence/public-release/assets/other-notices.tar.gz",
+            "evidence/public-release/assets/payload.tgz",
+        ):
+            metadata = _tar([("qualification-inputs.json", b"{}", "file", 0o644),
+                             (name, b"not an admitted opaque member", "file", 0o644)])
+            with self.subTest(name=name), self.assertRaises(ContractError) as ctx:
+                _archive_members(metadata)
+            self.assertEqual(ctx.exception.code, "UNSAFE_MEMBER")
 
 
 if __name__ == "__main__":
