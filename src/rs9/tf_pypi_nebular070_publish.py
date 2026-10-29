@@ -559,6 +559,31 @@ def _check_no_symlinks(path: Path, code: str = "SYMLINK") -> None:
         fail(code)
 
 
+def _validate_consumer_capture_options(
+    target: str,
+    consumer_host_role: str | None,
+    consumer_capture_output: str | Path | None,
+) -> Path | None:
+    """Validate the opt-in Linux Stage-B capture destination before native work."""
+    if (consumer_host_role is None) != (consumer_capture_output is None):
+        fail("CONSUMER_CAPTURE_OPTIONS")
+    if consumer_host_role is None:
+        return None
+    if target not in ("linux-arm64-gnu", "linux-x64-gnu"):
+        fail("CONSUMER_CAPTURE_TARGET")
+    if consumer_host_role not in MANYLINUX_CONSUMER_KINDS:
+        fail("CONSUMER_CAPTURE_ROLE")
+    if not isinstance(consumer_capture_output, (str, os.PathLike)):
+        fail("CONSUMER_CAPTURE_OUTPUT")
+    path = Path(consumer_capture_output)
+    _check_no_symlinks(path, "CONSUMER_CAPTURE_SYMLINK")
+    if path.exists():
+        fail("CONSUMER_CAPTURE_OUTPUT")
+    if path.parent.exists() and not path.parent.is_dir():
+        fail("CONSUMER_CAPTURE_OUTPUT")
+    return path
+
+
 def _is_hex40(val: Any) -> bool:
     return isinstance(val, str) and bool(_HEX40_RE.fullmatch(val))
 
@@ -5376,8 +5401,22 @@ def qualify_native_target(
     sandbox_prefix: Sequence[str] | None = None,
     real_user_state_snapshot: Callable[[str, str], Mapping[str, Any]] | None = None,
     home_dir: str | Path | None = None,
+    consumer_host_role: str | None = None,
+    consumer_capture_output: str | Path | None = None,
 ) -> dict[str, Any]:
     """Execute 0.7.0 native consumer qualification for one target with sandbox and user-state guards."""
+    capture_path = _validate_consumer_capture_options(
+        target, consumer_host_role, consumer_capture_output,
+    )
+    if capture_path is not None:
+        qualify_output = Path(output_path)
+        _check_no_symlinks(qualify_output, "QUALIFY_OUTPUT")
+        if qualify_output.exists() or (
+            qualify_output.parent.exists() and not qualify_output.parent.is_dir()
+        ):
+            fail("QUALIFY_OUTPUT")
+        if capture_path.resolve() == qualify_output.resolve():
+            fail("CONSUMER_CAPTURE_OUTPUT")
     bundle = _require_real_directory(bundle_dir, "BUNDLE_DIR")
     _validate_bundle_file_set(bundle)
     cand_file = bundle / "candidate_receipt.json"
@@ -5404,6 +5443,10 @@ def qualify_native_target(
             / f"tfnf-070-raw-release-{target}"
             / "raw_release.json"
         )
+    if capture_path is not None and rr_out_path.resolve() in {
+        capture_path.resolve(), Path(output_path).resolve(),
+    }:
+        fail("CONSUMER_CAPTURE_OUTPUT")
     _check_no_symlinks(rr_out_path, "RAW_RELEASE_SYMLINK")
     descriptor: Mapping[str, Any]
     if rr_out_path.is_file():
@@ -5461,6 +5504,8 @@ def qualify_native_target(
         expected_commit=expected_commit,
         expected_tree=tree,
     )
+    if capture_path is not None and manylinux_stage_a is None:
+        fail("CONSUMER_CAPTURE_STAGE_A")
     target_system = SYSTEM_BY_TARGET[target]
     target_row = next(
         (row for row in candidate.get("rows", [])
@@ -5473,6 +5518,22 @@ def qualify_native_target(
     if not isinstance(wheel_name, str):
         fail("CANDIDATE_RECEIPT_SCHEMA")
     wheel_path = bundle / "dist" / wheel_name
+    capture_host_body: Mapping[str, Any] | None = None
+    capture_host_extras: Mapping[str, Any] | None = None
+    capture_wheel: Mapping[str, Any] | None = None
+    if capture_path is not None:
+        # Keep these imports local: public_consumers imports this module for
+        # the existing sandbox/user-state owners, so a top-level import would
+        # create a circular import during normal CLI startup.
+        from rs9.nebular070_host_observation import observe_host
+        from rs9.nebular070_manylinux import _wheel_snapshot
+
+        capture_host_body, capture_host_extras = observe_host(consumer_host_role)
+        capture_wheel = _wheel_snapshot(
+            physical_bytes(wheel_path, limit=MAX_WHEEL_FILE_BYTES),
+            target,
+            manylinux_stage_a.digest,
+        )
     eff_prefix = (
         tuple(sandbox_prefix)
         if sandbox_prefix is not None
@@ -5499,10 +5560,61 @@ def qualify_native_target(
         manylinux_stage_a=manylinux_stage_a,
     )
     out_path = Path(output_path)
+    if capture_path is None:
+        _check_no_symlinks(out_path.parent, "QUALIFY_OUTPUT")
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("xb") as stream:
+            stream.write(canonical(qual_res))
+        return qual_res
+
+    from rs9.nebular070_public_consumers import (
+        PUBLIC_CONSUMER_CAPTURE_SCHEMA,
+        consumer_body_from_actual,
+    )
+
+    if capture_host_body is None or capture_host_extras is None or capture_wheel is None:
+        fail("CONSUMER_CAPTURE_INPUTS")
+    capture_body = consumer_body_from_actual(
+        qual_res,
+        capture_host_body,
+        capture_host_extras,
+        target=target,
+        kind=consumer_host_role,
+        wheel=capture_wheel,
+    )
+    capture_doc = {
+        "schema": PUBLIC_CONSUMER_CAPTURE_SCHEMA,
+        "evidence_mode": "actual",
+        "target": target,
+        "kind": consumer_host_role,
+        "body": capture_body,
+        "qualification": qual_res,
+        "host_observation": capture_host_body,
+        "host_extras": capture_host_extras,
+    }
+    # Build and validate both complete documents before either exclusive write,
+    # so a projection mismatch cannot leave a status-pass receipt behind.
+    qual_bytes = canonical(qual_res)
+    capture_bytes = canonical(capture_doc)
     _check_no_symlinks(out_path.parent, "QUALIFY_OUTPUT")
+    _check_no_symlinks(capture_path.parent, "CONSUMER_CAPTURE_OUTPUT")
+    if out_path.exists():
+        fail("QUALIFY_OUTPUT")
+    if capture_path.exists():
+        fail("CONSUMER_CAPTURE_OUTPUT")
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    capture_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("xb") as stream:
-        stream.write(canonical(qual_res))
+        stream.write(qual_bytes)
+    try:
+        with capture_path.open("xb") as stream:
+            stream.write(capture_bytes)
+    except Exception:
+        try:
+            out_path.unlink()
+        except OSError:
+            pass
+        raise
     return qual_res
 
 
@@ -5748,6 +5860,18 @@ def parser() -> argparse.ArgumentParser:
     q_cmd.add_argument("--run-id", required=True)
     q_cmd.add_argument("--run-attempt", required=True)
     q_cmd.add_argument("--raw-release", type=Path, default=None)
+    q_cmd.add_argument(
+        "--consumer-host-role",
+        choices=MANYLINUX_CONSUMER_KINDS,
+        default=None,
+        help="Opt in to one actual Linux Stage-B host capture (floor or newer).",
+    )
+    q_cmd.add_argument(
+        "--consumer-capture-output",
+        type=Path,
+        default=None,
+        help="Exclusive output path for the opt-in actual Stage-B capture envelope.",
+    )
 
     m_cmd = sub.add_parser("admit-matrix")
     m_cmd.add_argument("--bundle", type=Path, required=True)
@@ -5878,6 +6002,8 @@ def main(
                 run_attempt=args.run_attempt,
                 raw_release_path=args.raw_release,
                 qualification_inputs=args.qualification_inputs,
+                consumer_host_role=args.consumer_host_role,
+                consumer_capture_output=args.consumer_capture_output,
             )
             return 0
         if args.operation == "admit-matrix":
