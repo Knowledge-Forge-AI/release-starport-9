@@ -2725,14 +2725,19 @@ def _load_candidate_stage_a(
     envelope = strict_json(stage_a_bytes)
     expected_input_schemas = {PORTABILITY_INPUT_SCHEMA, ARCHIVE_PORTABILITY_INPUT_SCHEMA}
     expected_record_schemas = {PORTABILITY_SCHEMA, ARCHIVE_PORTABILITY_SCHEMA}
+    envelope_schema = envelope.get("schema") if isinstance(envelope, Mapping) else None
+    record = envelope.get("record") if isinstance(envelope, Mapping) else None
+    record_schema = record.get("schema") if isinstance(record, Mapping) else None
     if (not isinstance(envelope, Mapping)
             or set(envelope) != {"schema", "record", "bodies"}
-            or envelope["schema"] not in expected_input_schemas
-            or not isinstance(envelope["record"], Mapping)
-            or envelope["record"].get("schema") not in expected_record_schemas
-            or envelope["schema"] != (
+            or not isinstance(envelope_schema, str)
+            or envelope_schema not in expected_input_schemas
+            or not isinstance(record, Mapping)
+            or not isinstance(record_schema, str)
+            or record_schema not in expected_record_schemas
+            or envelope_schema != (
                 ARCHIVE_PORTABILITY_INPUT_SCHEMA
-                if envelope["record"].get("schema") == ARCHIVE_PORTABILITY_SCHEMA
+                if record_schema == ARCHIVE_PORTABILITY_SCHEMA
                 else PORTABILITY_INPUT_SCHEMA
             )
             or not isinstance(envelope["bodies"], Mapping)):
@@ -6084,9 +6089,11 @@ def _validate_bundle_file_set(bundle: Path) -> None:
             envelope = strict_json(physical_bytes(bundle / "payload_portability.json", limit=8 * 1024 * 1024))
         except (AdmissionError, OSError, ValueError):
             fail("BUNDLE_MANYLINUX_INPUT")
-        if not isinstance(envelope, Mapping) or envelope.get("schema") not in {
-                PORTABILITY_INPUT_SCHEMA, ARCHIVE_PORTABILITY_INPUT_SCHEMA,
-        }:
+        if (not isinstance(envelope, Mapping)
+                or not isinstance(envelope.get("schema"), str)
+                or envelope["schema"] not in {
+                    PORTABILITY_INPUT_SCHEMA, ARCHIVE_PORTABILITY_INPUT_SCHEMA,
+                }):
             fail("BUNDLE_MANYLINUX_INPUT")
 
 

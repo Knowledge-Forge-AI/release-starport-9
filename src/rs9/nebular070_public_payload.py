@@ -456,12 +456,14 @@ def _validate_runtime_input(
 def _validate_artifact_metadata(value: Any, *, target: str) -> dict[str, Any]:
     metadata, _raw_sha, _raw = _json_value(value, f"{target} Stage-A artifact metadata")
     triple = TRIPLE_BY_TARGET[target]
-    archive_aware = metadata.get("schema") == ARCHIVE_ARTIFACT_METADATA_SCHEMA
+    schema = metadata.get("schema")
+    archive_aware = schema == ARCHIVE_ARTIFACT_METADATA_SCHEMA
     expected = {"schema", "target", "triple", "payload_archive", "package_manifest"}
     if archive_aware:
         expected.add("archive_member_manifest_sha256")
     if set(metadata) != expected \
-            or metadata["schema"] not in {ARTIFACT_METADATA_SCHEMA, ARCHIVE_ARTIFACT_METADATA_SCHEMA} \
+            or not isinstance(schema, str) \
+            or schema not in {ARTIFACT_METADATA_SCHEMA, ARCHIVE_ARTIFACT_METADATA_SCHEMA} \
             or metadata["target"] != target or metadata["triple"] != triple:
         raise _fail("NEBULAR_STAGE_A_INPUT", f"{target} artifact metadata does not join")
     for key in ("payload_archive", "package_manifest"):

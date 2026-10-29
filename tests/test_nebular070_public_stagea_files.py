@@ -161,6 +161,14 @@ class StageAFileAdapterTests(unittest.TestCase):
                 raw_archive,
             )
 
+    def test_nonstring_spec_schema_refuses_with_stage_a_error(self) -> None:
+        spec = self._spec()
+        spec["schema"] = []
+        spec_name = self._write_spec(spec, "malformed-schema.json")
+        with self.assertRaises(ContractError) as context:
+            self._run(spec_name, "malformed-schema-out")
+        self.assertEqual(context.exception.code, "STAGE_A_SCHEMA")
+
     def test_declared_digest_and_symlink_are_refused(self) -> None:
         spec = self._spec()
         spec_name = self._write_spec(spec)

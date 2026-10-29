@@ -440,6 +440,23 @@ class PublicStageAAssemblerTests(unittest.TestCase):
         with self.assertRaises(ContractError):
             self._assemble(tampered_metadata)
 
+    def test_nonstring_schema_values_refuse_with_contract_errors(self) -> None:
+        envelope = self._assemble()
+        malformed_record = copy.deepcopy(envelope["record"])
+        malformed_record["schema"] = []
+        with self.assertRaises(ContractError):
+            validate_nebular070_payload_portability(
+                malformed_record,
+                envelope["bodies"],
+                expected_tf_producer_source=self.producer_source,
+                expected_rs9_tool_source=self.rs9_source,
+            )
+
+        malformed_metadata = copy.deepcopy(self.inputs)
+        malformed_metadata["artifact_metadata"]["linux-arm64-gnu"]["schema"] = {}
+        with self.assertRaises(ContractError):
+            self._assemble(malformed_metadata)
+
     def test_wrong_product_source_refuses(self) -> None:
         inputs = copy.deepcopy(self.inputs)
         inputs["source_origins"]["linux-arm64-gnu"]["source"]["commit"] = "c" * 40
