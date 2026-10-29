@@ -5774,7 +5774,12 @@ def _prepare_system_webkit_public_descriptor(
     )
     if canonical(validated) != canonical(descriptor):
         fail("PUBLIC_INPUTS_DESCRIPTOR_BIND")
-    if sha256(template_bytes) != transport["descriptor"]["sha256"]:
+    transport_descriptor = transport.get("descriptor")
+    transport_metadata = transport.get("metadata")
+    if (not isinstance(transport_descriptor, Mapping)
+            or transport_descriptor.get("path") != PUBLIC_INPUTS_TEMPLATE_DESCRIPTOR
+            or not isinstance(transport_metadata, Mapping)
+            or sha256(template_bytes) != transport_metadata.get("descriptor_sha256")):
         fail("PUBLIC_INPUTS_DESCRIPTOR_BIND")
     prepared_path = output_path / PUBLIC_INPUTS_DESCRIPTOR
     _check_no_symlinks(prepared_path, "PUBLIC_INPUTS_OUTPUT")
