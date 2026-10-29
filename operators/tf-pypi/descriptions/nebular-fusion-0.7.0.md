@@ -52,13 +52,13 @@ The 0.7.0 wheel set has exactly these target tags:
 | Host target | Wheel tag |
 | --- | --- |
 | Apple Silicon macOS 13 or newer | `macosx_13_0_arm64` |
-| Linux ARM64 | `linux_aarch64` |
-| Linux AMD64/x86_64 | `linux_x86_64` |
+| Linux ARM64 | `manylinux_2_36_aarch64` |
+| Linux AMD64/x86_64 | `manylinux_2_36_x86_64` |
 
 The Linux profile requires GNU glibc 2.36 or newer and a libstdc++ symbol
-floor of `GLIBCXX_3.4.30`. These are the selected generic-Linux compatibility
-requirements for this release. The tags above do **not** claim `manylinux`,
-`musllinux`, or universal `any` compatibility; an unsupported libc or
+floor of `GLIBCXX_3.4.30`. Linux publication requires the corresponding
+manylinux qualification and installed-wheel consumer checks. The wheels do
+not claim musllinux or universal `any` compatibility; an unsupported libc or
 architecture fails closed.
 
 Linux wheels carry the selected private user-space GTK3, WebKitGTK 4.1, and
