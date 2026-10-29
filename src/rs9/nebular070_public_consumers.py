@@ -48,7 +48,7 @@ from rs9.nebular070_manylinux import (
     validate_nebular070_release_admission,
 )
 from rs9.nebular070_release import _consumer_body
-from rs9.nebular070_payload import ValidatedPayloadPortability
+from rs9.nebular070_payload import ARCHIVE_PORTABILITY_SCHEMA, ValidatedPayloadPortability
 from rs9.scratch import canonical
 from rs9.tf_pypi_archive import canonical as archive_canonical, physical_bytes
 from rs9.tf_pypi_model import strict_json
@@ -97,7 +97,20 @@ def _kind(kind: str) -> str:
 def _wheel(raw: bytes, target: str, stage_a: ValidatedPayloadPortability) -> dict[str, Any]:
     if not isinstance(raw, bytes):
         _fail("NEBULAR_STAGE_B_WHEEL", "Authenticated wheel bytes are required")
-    return _wheel_snapshot(raw, target, stage_a.digest)
+    snapshot = _wheel_snapshot(raw, target, stage_a.digest)
+    if not stage_a.fixture_only:
+        if stage_a.record.get("schema") != ARCHIVE_PORTABILITY_SCHEMA:
+            _fail(
+                "NEBULAR_STAGE_B_MANIFEST",
+                "A production Linux consumer requires archive-aware Stage-A evidence",
+            )
+        row = stage_a.target(target)
+        if snapshot.get("manifest_sha256") != row.get("archive_member_manifest_sha256"):
+            _fail(
+                "NEBULAR_STAGE_B_MANIFEST",
+                "Stage-A complete archive manifest does not match the selected wheel",
+            )
+    return snapshot
 
 
 def _required_actual_result(result: Mapping[str, Any], *, target: str) -> Mapping[str, Any]:

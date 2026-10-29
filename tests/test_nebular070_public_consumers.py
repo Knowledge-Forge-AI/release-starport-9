@@ -20,6 +20,7 @@ from rs9.errors import ContractError
 from rs9.nebular070_installed_smoke import _STEPS
 import rs9.nebular070_host_observation as host_observation
 from rs9.nebular070_manylinux import _digest, _wheel_snapshot
+from rs9.nebular070_payload import ARCHIVE_PORTABILITY_SCHEMA
 from rs9.tf_pypi_archive import canonical as archive_canonical, sha256
 from rs9.nebular070_public_consumers import (
     CONSUMER_KINDS,
@@ -30,6 +31,7 @@ from rs9.nebular070_public_consumers import (
     capture_public_consumer,
     consumer_body_from_actual,
     validate_actual_consumer_result,
+    _wheel,
 )
 import tests.test_nebular070_host_observation as host_fixture
 import tests.test_nebular070_manylinux as fixture_module
@@ -188,10 +190,15 @@ class PublicStageBConsumerTests(unittest.TestCase):
         # Stop at the real consumer call: this proves wiring without installing
         # a wheel, inspecting user state, or invoking the native application.
         target = "linux-x64-gnu"
+        actual_record = copy.deepcopy(self.fixture.stage_a.record)
+        actual_record["schema"] = ARCHIVE_PORTABILITY_SCHEMA
+        for row in actual_record["targets"]:
+            row["archive_member_manifest_sha256"] = self.fixture.manifest["manifest_sha256"]
+        actual_record["identity"] = _digest({key: value for key, value in actual_record.items() if key != "identity"})
         stage_a = replace(
             self.fixture.stage_a,
             fixture_only=False,
-            record={**self.fixture.stage_a.record, "evidence_mode": "actual"},
+            record={**actual_record, "evidence_mode": "actual"},
         )
         wheel_path = self.fixture.root / "capture-wiring.whl"
         wheel_path.write_bytes(self.wheels[target])
@@ -459,6 +466,9 @@ class PublicStageBConsumerTests(unittest.TestCase):
 
     def test_actual_shaped_path_runs_real_validator_and_materializer(self) -> None:
         actual_record = copy.deepcopy(self.fixture.stage_a.record)
+        actual_record["schema"] = ARCHIVE_PORTABILITY_SCHEMA
+        for row in actual_record["targets"]:
+            row["archive_member_manifest_sha256"] = self.fixture.manifest["manifest_sha256"]
         actual_record["evidence_mode"] = "actual"
         actual_stage_a = replace(self.fixture.stage_a, record=actual_record, fixture_only=False)
         captures = {}
@@ -497,6 +507,20 @@ class PublicStageBConsumerTests(unittest.TestCase):
             sorted(path.name for path in Path(result["output_dir"]).rglob("*.json")),
             ["floor.json", "floor.json", "manylinux_admission.json", "newer.json", "newer.json"],
         )
+
+    def test_production_wheel_consumer_rejects_archive_manifest_mismatch(self) -> None:
+        actual_record = copy.deepcopy(self.fixture.stage_a.record)
+        actual_record["schema"] = ARCHIVE_PORTABILITY_SCHEMA
+        for row in actual_record["targets"]:
+            row["archive_member_manifest_sha256"] = self.fixture.manifest["manifest_sha256"]
+        actual_record["evidence_mode"] = "actual"
+        actual_stage_a = replace(self.fixture.stage_a, record=actual_record, fixture_only=False)
+        target = "linux-x64-gnu"
+        next(row for row in actual_stage_a.record["targets"] if row["target"] == target)[
+            "archive_member_manifest_sha256"
+        ] = "0" * 64
+        with self.assertRaises(ContractError):
+            _wheel(self.wheels[target], target, actual_stage_a)
 
     def test_actual_result_rejects_failed_consumer_network_and_cleanup(self) -> None:
         for mutate in (

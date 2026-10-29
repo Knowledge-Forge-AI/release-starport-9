@@ -32,6 +32,7 @@ from rs9.tf_pypi_nebular070_publish import (
     main as publish_main,
 )
 import rs9.nebular070_manylinux as manylinux
+from rs9.nebular070_payload import ARCHIVE_PORTABILITY_INPUT_SCHEMA, ARCHIVE_PORTABILITY_SCHEMA
 import rs9.tf_pypi_nebular070_publish as publish_module
 from tests.test_nebular070_gate1_roundtrip import _darwin_payload
 from tests.test_wheel_nebular_successor import _legal, _linux_archive
@@ -828,6 +829,9 @@ class Nebular070ManylinuxContractTests(unittest.TestCase):
 
     def test_main_cli_admits_stage_b_only_with_actual_approval_matrix_and_wheel_bytes(self) -> None:
         actual_record = copy.deepcopy(self.stage_a_record)
+        actual_record["schema"] = ARCHIVE_PORTABILITY_SCHEMA
+        for row in actual_record["targets"]:
+            row["archive_member_manifest_sha256"] = self.manifest["manifest_sha256"]
         actual_record["evidence_mode"] = "actual"
         actual_record["identity"] = manylinux._digest({k: v for k, v in actual_record.items() if k != "identity"})
         actual_stage_a = manylinux.validate_nebular070_payload_portability(
@@ -849,7 +853,7 @@ class Nebular070ManylinuxContractTests(unittest.TestCase):
         approval_path.write_bytes(manylinux.canonical(approval))
         stage_a_path = self.root / "payload-portability.json"
         stage_a_path.write_bytes(manylinux.canonical({
-            "schema": manylinux.PORTABILITY_INPUT_SCHEMA,
+            "schema": ARCHIVE_PORTABILITY_INPUT_SCHEMA,
             "record": actual_record,
             "bodies": self.receipt_bodies,
         }))

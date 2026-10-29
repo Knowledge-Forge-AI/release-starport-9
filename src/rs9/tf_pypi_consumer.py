@@ -415,15 +415,24 @@ def _nebular_floor_evidence(value: Any) -> dict[str, Any]:
         fail("NEBULAR_FLOOR_BINDING")
     macho = value.get("macho")
     scripts = value.get("scripts")
-    if (not isinstance(macho, list) or not macho or not isinstance(scripts, list) or not scripts
-            or any(not isinstance(row, Mapping)
-                   or row.get("major") != _NEBULAR_DARWIN_FLOOR["major"]
-                   or row.get("minor") != _NEBULAR_DARWIN_FLOOR["minor"]
-                   or not isinstance(row.get("path"), str)
-                   or not isinstance(row.get("role"), str)
-                   for row in macho)
-            or any(not isinstance(row, Mapping) or row.get("role") != "script"
-                   or not isinstance(row.get("path"), str) for row in scripts)):
+    if not isinstance(macho, list) or not macho or not isinstance(scripts, list) or not scripts:
+        fail("NEBULAR_FLOOR_BINDING")
+    for row in macho:
+        if (not isinstance(row, Mapping)
+                or not isinstance(row.get("path"), str)
+                or not isinstance(row.get("role"), str)
+                or type(row.get("major")) is not int
+                or type(row.get("minor")) is not int
+                or type(row.get("patch")) is not int
+                or not 0 <= row["major"] <= 0xFFFF
+                or not 0 <= row["minor"] <= 0xFF
+                or not 0 <= row["patch"] <= 0xFF
+                or (row["major"], row["minor"]) > (
+                    _NEBULAR_DARWIN_FLOOR["major"], _NEBULAR_DARWIN_FLOOR["minor"]
+                )):
+            fail("NEBULAR_FLOOR_BINDING")
+    if any(not isinstance(row, Mapping) or row.get("role") != "script"
+           or not isinstance(row.get("path"), str) for row in scripts):
         fail("NEBULAR_FLOOR_BINDING")
     return dict(value)
 

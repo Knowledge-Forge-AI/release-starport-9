@@ -10,14 +10,18 @@ import hashlib
 import json
 import os
 import stat
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from rs9.errors import ContractError
+from rs9.archives import inspect_archive
 from rs9.scratch import canonical
 from rs9.nebular070_payload import (
     CLAIM,
+    ARCHIVE_PORTABILITY_INPUT_SCHEMA,
+    ARCHIVE_PORTABILITY_SCHEMA,
     LINUX_TARGETS,
     MAX_INPUT_BYTES,
     PORTABILITY_INPUT_SCHEMA,
@@ -51,6 +55,7 @@ BODY_SCHEMAS = {
     "cpu": "rs9.nebular070-cpu-baseline-observation.v1",
 }
 ARTIFACT_METADATA_SCHEMA = "rs9.nebular070-stage-a-artifact-metadata.v1"
+ARCHIVE_ARTIFACT_METADATA_SCHEMA = "rs9.nebular070-stage-a-artifact-metadata.v2"
 PRODUCER_RECEIPT_SCHEMA = "rs9.nebular070-stage-a-producer-receipt.v1"
 METADATA_SCHEMA = "rs9.nebular070-stage-a-producer-metadata.v1"
 MAX_ARTIFACT_BYTES = 512 * 1024 * 1024
@@ -153,12 +158,13 @@ def _validate_artifact_metadata(
     target: str,
     triple: str,
 ) -> dict[str, Any]:
-    result = _closed(
-        value,
-        {"schema", "target", "triple", "payload_archive", "package_manifest"},
-        f"{target} artifact metadata",
-    )
-    if result["schema"] != ARTIFACT_METADATA_SCHEMA             or result["target"] != target or result["triple"] != triple:
+    archive_aware = value.get("schema") == ARCHIVE_ARTIFACT_METADATA_SCHEMA if isinstance(value, Mapping) else False
+    fields = {"schema", "target", "triple", "payload_archive", "package_manifest"}
+    if archive_aware:
+        fields.add("archive_member_manifest_sha256")
+    result = _closed(value, fields, f"{target} artifact metadata")
+    if result["schema"] not in {ARTIFACT_METADATA_SCHEMA, ARCHIVE_ARTIFACT_METADATA_SCHEMA} \
+            or result["target"] != target or result["triple"] != triple:
         raise _fail("NEBULAR_STAGE_A_INPUT", f"{target} artifact metadata does not join")
     for name in ("payload_archive", "package_manifest"):
         descriptor = _closed(
@@ -170,7 +176,77 @@ def _validate_artifact_metadata(
         if type(descriptor["bytes"]) is not int or not 0 < descriptor["bytes"] <= MAX_ARTIFACT_BYTES:
             raise _fail("NEBULAR_STAGE_A_INPUT", f"{target} {name} size is unresolved")
         result[name] = descriptor
+    if archive_aware:
+        _hex(result["archive_member_manifest_sha256"], f"{target} archive member manifest")
     return result
+
+
+def _inspect_archive_path(
+    path_value: str | os.PathLike[str],
+    *,
+    target: str,
+    expected_size: int,
+    expected_sha256: str,
+) -> Mapping[str, Any]:
+    """Inspect one authenticated archive snapshot, never a reopened path."""
+    if getattr(os, "O_NOFOLLOW", None) is None:
+        raise _fail("NEBULAR_STAGE_A_ARCHIVE", "nofollow archive opening is unavailable")
+    path = Path(path_value)
+    if any(candidate.is_symlink() for candidate in (path, *path.parents)):
+        raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{target} archive path traverses a symlink")
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    try:
+        fd = os.open(path, flags)
+    except OSError as exc:
+        raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{target} archive path cannot be opened") from exc
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{target} archive path is not regular")
+        if before.st_size <= 0 or before.st_size > MAX_ARTIFACT_BYTES:
+            raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{target} archive exceeds the bounded size")
+        if before.st_size != expected_size:
+            raise _fail("NEBULAR_STAGE_A_JOIN", f"{target} archive size does not join metadata")
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(fd, min(4 * 1024 * 1024, MAX_ARTIFACT_BYTES - total + 1))
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_ARTIFACT_BYTES:
+                raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{target} archive exceeds the bounded size")
+            chunks.append(chunk)
+        after = os.fstat(fd)
+    except ContractError:
+        raise
+    except OSError as exc:
+        raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{target} archive could not be read") from exc
+    finally:
+        os.close(fd)
+    raw = b"".join(chunks)
+    if len(raw) != expected_size or hashlib.sha256(raw).hexdigest() != expected_sha256:
+        raise _fail("NEBULAR_STAGE_A_JOIN", f"{target} archive bytes do not join metadata")
+    if (
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mtime_ns,
+    ) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+    ):
+        raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{target} archive changed during read")
+    with tempfile.TemporaryDirectory(prefix="rs9-nebular070-archive-") as temporary:
+        snapshot = (Path(temporary) / "payload.tar.gz").resolve()
+        try:
+            snapshot.write_bytes(raw)
+            os.chmod(snapshot, 0o600)
+            return inspect_archive(snapshot, commands={})
+        except (OSError, ContractError) as exc:
+            raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{target} archive inspection failed") from exc
 
 
 def _require_equal(values: list[Any], label: str) -> Any:
@@ -199,6 +275,7 @@ def _derive_target_row(
     bodies: Mapping[str, Mapping[str, Any]],
     metadata: Mapping[str, Any],
     source_input_snapshot_sha256: str,
+    archive_manifest: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     triple = LINUX_TARGETS[target][0]
     _validate_body_headers(bodies, target=target, triple=triple)
@@ -242,7 +319,7 @@ def _derive_target_row(
         f"{target} sourceCandidate",
     )
 
-    return {
+    row = {
         "target": target,
         "triple": triple,
         "payload_archive_sha256": payload_archive_sha256,
@@ -259,6 +336,11 @@ def _derive_target_row(
         "host_newer_observation_sha256": _body_digest(bodies[f"{target}:host_newer"]),
         "cpu_baseline_sha256": _body_digest(bodies[f"{target}:cpu"]),
     }
+    if metadata["schema"] == ARCHIVE_ARTIFACT_METADATA_SCHEMA:
+        if archive_manifest is None or archive_manifest.get("manifest_sha256") != metadata["archive_member_manifest_sha256"]:
+            raise _fail("NEBULAR_STAGE_A_JOIN", f"{target} complete archive manifest does not join metadata")
+        row["archive_member_manifest_sha256"] = archive_manifest["manifest_sha256"]
+    return row
 
 
 def _validate_output_parent(output_path: Path) -> None:
@@ -356,6 +438,8 @@ def assemble_payload_portability(
     rs9_tool_source: Mapping[str, str],
     source_input_snapshot_sha256: str,
     output_path: str | os.PathLike[str],
+    *,
+    target_archive_paths: Mapping[str, str | os.PathLike[str]] | None = None,
 ) -> dict[str, Any]:
     """Assemble and admit an actual Stage-A bundle before exclusive output."""
     body_paths = _validate_path_map(body_paths, label="body")
@@ -368,17 +452,40 @@ def assemble_payload_portability(
     loaded_bodies, body_file_info = _load_body_set(body_paths)
     loaded_metadata, metadata_file_info = _load_metadata_set(target_metadata_paths)
 
+    metadata_schemas = {loaded_metadata[target].get("schema") for target in LINUX_TARGETS}
+    if len(metadata_schemas) != 1:
+        raise _fail("NEBULAR_STAGE_A_SCHEMA", "Both target artifact metadata records must use the same schema")
+    archive_aware = ARCHIVE_ARTIFACT_METADATA_SCHEMA in metadata_schemas
+    archive_manifests: dict[str, Mapping[str, Any]] | None = None
+    if archive_aware:
+        if not isinstance(target_archive_paths, Mapping) or set(target_archive_paths) != set(LINUX_TARGETS):
+            raise _fail("NEBULAR_STAGE_A_ARCHIVE", "Archive-aware metadata requires both exact archive paths")
+        archive_manifests = {}
+        for target in LINUX_TARGETS:
+            metadata = loaded_metadata[target]
+            archive_manifests[target] = _inspect_archive_path(
+                target_archive_paths[target],
+                target=target,
+                expected_size=metadata["payload_archive"]["bytes"],
+                expected_sha256=metadata["payload_archive"]["sha256"],
+            )
+            if archive_manifests[target]["manifest_sha256"] != metadata["archive_member_manifest_sha256"]:
+                raise _fail("NEBULAR_STAGE_A_JOIN", f"{target} archive manifest does not join metadata")
+    elif target_archive_paths is not None:
+        raise _fail("NEBULAR_STAGE_A_ARCHIVE", "Package-only metadata cannot consume archive paths")
+
     rows = [
         _derive_target_row(
             target,
             bodies=loaded_bodies,
             metadata=loaded_metadata[target],
             source_input_snapshot_sha256=source_snapshot,
+            archive_manifest=archive_manifests[target] if archive_manifests is not None else None,
         )
         for target in LINUX_TARGETS
     ]
     record: dict[str, Any] = {
-        "schema": PORTABILITY_SCHEMA,
+        "schema": ARCHIVE_PORTABILITY_SCHEMA if archive_aware else PORTABILITY_SCHEMA,
         "version": VERSION,
         "claim": CLAIM,
         "construction_status": "payload-qualified",
@@ -404,7 +511,11 @@ def assemble_payload_portability(
 
     output_path = Path(output_path)
     _validate_output_parent(output_path)
-    output_bytes = canonical({"schema": PORTABILITY_INPUT_SCHEMA, "record": record, "bodies": bodies})
+    output_bytes = canonical({
+        "schema": ARCHIVE_PORTABILITY_INPUT_SCHEMA if archive_aware else PORTABILITY_INPUT_SCHEMA,
+        "record": record,
+        "bodies": bodies,
+    })
     if len(output_bytes) > MAX_INPUT_BYTES:
         raise _fail("NEBULAR_STAGE_A_INPUT", "Assembled bundle exceeds the maintained loader input bound")
     metadata = {
@@ -452,4 +563,7 @@ def assemble_payload_portability(
     }
 
 
-__all__ = ["assemble_payload_portability", "BODY_KINDS", "ARTIFACT_METADATA_SCHEMA"]
+__all__ = [
+    "assemble_payload_portability", "BODY_KINDS", "ARTIFACT_METADATA_SCHEMA",
+    "ARCHIVE_ARTIFACT_METADATA_SCHEMA",
+]

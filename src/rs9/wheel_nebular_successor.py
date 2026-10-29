@@ -848,12 +848,17 @@ def build_successor_wheel(
         raise _error("MANIFEST_IDENTITY", "Payload manifest digest is not self-consistent")
     if payload_portability is not None:
         portability_row = payload_portability.target(policy_target)  # type: ignore[arg-type]
+        expected_manifest = (
+            portability_row.get("manifest_sha256")
+            if payload_portability.fixture_only
+            else portability_row.get("archive_member_manifest_sha256")
+        )
         if portability_row.get("triple") != target_triple \
                 or portability_row.get("payload_archive_sha256") != payload_sha \
-                or portability_row.get("manifest_sha256") != manifest_sha:
+                or expected_manifest != manifest_sha:
             raise _error(
                 "MANYLINUX_INPUT",
-                "Stage A payload and manifest identities do not match the selected archive",
+                "Stage A payload and complete archive identities do not match the selected archive",
             )
     darwin_floor_evidence = None
     if candidate_profile is not None and not is_linux:

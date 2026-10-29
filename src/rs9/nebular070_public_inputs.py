@@ -40,6 +40,10 @@ VERSION = "0.7.0"
 TAG = "v0.7.0"
 DESCRIPTOR_SCHEMA = "rs9.tf-pypi-nebular070-qualification-inputs.v1"
 DESCRIPTOR_NAME = "qualification-inputs.json"
+# The npm wrapper has one historical consumer path in addition to the
+# canonical release-asset path.  This is deliberately a fixed compatibility
+# view, not a general alias facility.
+COMPATIBILITY_WRAPPER_PATH = "npm/package.tgz"
 MAX_METADATA_BYTES = 32 * 1024 * 1024
 MAX_METADATA_MEMBERS = 512
 MAX_METADATA_MEMBER_BYTES = 8 * 1024 * 1024
@@ -253,6 +257,52 @@ def _descriptor_from_entries(entries: tuple[dict, ...]) -> tuple[dict, str, str,
     return descriptor, roots["evidence"], roots["raw_release"], hashlib.sha256(body).hexdigest()
 
 
+def _compatibility_wrapper_alias(descriptor: dict, evidence_root: str, wrapper_row: dict,
+                                 metadata_entries: tuple[dict, ...], payload_paths: set[str]) -> str | None:
+    """Validate the one declared npm wrapper compatibility view.
+
+    Older manifests do not declare ``evidence.files`` and therefore retain
+    their existing single-path behavior.  A newer descriptor may declare the
+    exact fixed ``npm/package.tgz`` record; only then do we materialize the
+    second view.  The declaration is checked against the already pinned
+    wrapper row before any metadata or payload bytes are written.
+    """
+    evidence = descriptor.get("evidence")
+    if type(evidence) is not dict or "files" not in evidence:
+        return None
+    files = evidence["files"]
+    if type(files) is not dict:
+        _fail("DESCRIPTOR_JOIN", "Qualification evidence.files must be a closed mapping")
+    declared = files.get(COMPATIBILITY_WRAPPER_PATH)
+    if declared is None:
+        return None
+    if type(declared) is not dict or set(declared) != {"path", "size", "sha256"}:
+        _fail("DESCRIPTOR_JOIN", "npm wrapper compatibility record has an unexpected shape")
+    if declared["path"] != COMPATIBILITY_WRAPPER_PATH:
+        _fail("DESCRIPTOR_JOIN", "npm wrapper compatibility record has an unexpected path")
+    _positive_int(declared["size"], "evidence.files.npm/package.tgz.size")
+    _sha(declared["sha256"], "evidence.files.npm/package.tgz.sha256")
+    if declared["size"] != wrapper_row["bytes"] or declared["sha256"] != wrapper_row["sha256"]:
+        _fail("COMPATIBILITY_ALIAS_MISMATCH", "npm wrapper compatibility record disagrees with the pinned asset")
+    alias_path = evidence_root.rstrip("/") + "/" + COMPATIBILITY_WRAPPER_PATH
+    validate_safe_relative_posix_path(alias_path, "compatibility output path")
+    for entry in metadata_entries:
+        metadata_path = entry["path"]
+        if (metadata_path == alias_path or metadata_path.startswith(alias_path + "/")
+                or (alias_path.startswith(metadata_path + "/") and entry["type"] != "directory")):
+            _fail("OUTPUT_COLLISION", "npm wrapper compatibility path collides with metadata")
+    for payload_path in payload_paths:
+        if payload_path == wrapper_row["path"]:
+            continue
+        if (payload_path == alias_path or payload_path.startswith(alias_path + "/")
+                or alias_path.startswith(payload_path + "/")):
+            _fail("OUTPUT_COLLISION", "npm wrapper compatibility path collides with a payload")
+    # A legacy manifest may already use the compatibility path as the
+    # canonical wrapper output.  It still receives all declaration checks,
+    # but must not be written twice through the exclusive writer.
+    return None if alias_path == wrapper_row["path"] else alias_path
+
+
 def _strings(value, *, limit=20000):
     found, seen = [], 0
     def visit(item):
@@ -369,6 +419,10 @@ def materialize_public_inputs(manifest, output, *, client=None, repository_root=
                     _fail("DESCRIPTOR_JOIN", "Payload output path is not bound by the descriptor")
                 if row["path"] in metadata_paths:
                     _fail("OUTPUT_COLLISION", "Payload output path collides with metadata")
+            wrapper_row = next(row for row in value["payloads"] if row["name"].endswith(".tgz"))
+            compatibility_alias = _compatibility_wrapper_alias(
+                descriptor, evidence_root, wrapper_row, entries,
+                {row["path"] for row in value["payloads"]})
             _write_metadata(writer, entries)
             payload_records = []
             for row in value["payloads"]:
@@ -378,6 +432,8 @@ def materialize_public_inputs(manifest, output, *, client=None, repository_root=
                 if actual_sha != row["sha256"]:
                     _fail("DIGEST_MISMATCH", "Payload asset digest differs from the manifest")
                 writer.write(row["path"], body)
+                if compatibility_alias is not None and row["name"].endswith(".tgz"):
+                    writer.write(compatibility_alias, body)
                 payload_records.append({"asset_id": row["asset_id"], "name": row["name"],
                                         "path": row["path"], "bytes": len(body), "sha256": actual_sha})
             receipt = {"schema": "rs9.nebular070-public-input-receipt.v1", "manifest_sha256": hashlib.sha256(canonical(value)).hexdigest(),

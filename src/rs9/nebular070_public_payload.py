@@ -17,11 +17,16 @@ import base64
 import hashlib
 import json
 import re
+import tempfile
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
+from rs9.archives import inspect_archive
 from rs9.errors import ContractError
 from rs9.nebular070_payload import (
+    ARCHIVE_PORTABILITY_INPUT_SCHEMA,
+    ARCHIVE_PORTABILITY_SCHEMA,
     CLAIM,
     LINUX_TARGETS,
     PORTABILITY_INPUT_SCHEMA,
@@ -62,6 +67,7 @@ BODY_SCHEMAS = {
     "cpu": "rs9.nebular070-cpu-baseline-observation.v1",
 }
 ARTIFACT_METADATA_SCHEMA = "rs9.nebular070-stage-a-artifact-metadata.v1"
+ARCHIVE_ARTIFACT_METADATA_SCHEMA = "rs9.nebular070-stage-a-artifact-metadata.v2"
 PRODUCT_COMMIT = "cadb40c4972f68f314096ff60fbcfb4da950c161"
 PRODUCT_TREE = "27c643b6375c2aafde314799c4f08e844c14992c"
 MAX_JSON_BYTES = 8 * 1024 * 1024
@@ -185,6 +191,27 @@ def _positive_int(value: Any, label: str, maximum: int = 2**63 - 1) -> int:
     if type(value) is not int or value < 1 or value > maximum:
         raise _fail("NEBULAR_STAGE_A_SCHEMA", f"{label} is malformed")
     return value
+
+
+def _archive_manifest_from_bytes(raw: bytes, label: str) -> dict[str, Any]:
+    """Derive the complete archive-domain manifest from held bytes.
+
+    ``inspect_archive`` is intentionally path-oriented.  The temporary file is
+    phase-owned, regular, and removed on every outcome; no caller path or
+    detached manifest is trusted as an authority.
+    """
+    if not isinstance(raw, bytes) or not raw or len(raw) > MAX_ARCHIVE_BYTES:
+        raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{label} is outside the bounded archive size")
+    try:
+        with tempfile.TemporaryDirectory(prefix="rs9-nebular070-archive-") as temporary:
+            path = Path(temporary).resolve() / "payload.tar.gz"
+            path.write_bytes(raw)
+            path.chmod(0o600)
+            return inspect_archive(path, commands={})
+    except ContractError as exc:
+        raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{label} failed maintained archive inspection") from exc
+    except OSError as exc:
+        raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{label} could not be inspected") from exc
 
 
 def _runtime_manifest(value: Any) -> tuple[dict[str, Any], str]:
@@ -429,13 +456,20 @@ def _validate_runtime_input(
 def _validate_artifact_metadata(value: Any, *, target: str) -> dict[str, Any]:
     metadata, _raw_sha, _raw = _json_value(value, f"{target} Stage-A artifact metadata")
     triple = TRIPLE_BY_TARGET[target]
-    if set(metadata) != {"schema", "target", "triple", "payload_archive", "package_manifest"} \
-            or metadata["schema"] != ARTIFACT_METADATA_SCHEMA or metadata["target"] != target or metadata["triple"] != triple:
+    archive_aware = metadata.get("schema") == ARCHIVE_ARTIFACT_METADATA_SCHEMA
+    expected = {"schema", "target", "triple", "payload_archive", "package_manifest"}
+    if archive_aware:
+        expected.add("archive_member_manifest_sha256")
+    if set(metadata) != expected \
+            or metadata["schema"] not in {ARTIFACT_METADATA_SCHEMA, ARCHIVE_ARTIFACT_METADATA_SCHEMA} \
+            or metadata["target"] != target or metadata["triple"] != triple:
         raise _fail("NEBULAR_STAGE_A_INPUT", f"{target} artifact metadata does not join")
     for key in ("payload_archive", "package_manifest"):
         descriptor = _closed(metadata[key], {"sha256", "bytes"}, f"{target} {key} metadata")
         _require_digest(descriptor["sha256"], f"{target} {key} sha256")
         _positive_int(descriptor["bytes"], f"{target} {key} bytes", MAX_ARCHIVE_BYTES)
+    if archive_aware:
+        _require_digest(metadata["archive_member_manifest_sha256"], f"{target} archive member manifest")
     return metadata
 
 
@@ -447,6 +481,7 @@ def _source_snapshot_and_rows(
     metadata: dict[str, dict[str, Any]],
     origins: dict[str, tuple[dict[str, Any], str]],
     source_snapshot: str,
+    archive_manifests: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for target in LINUX_TARGETS:
@@ -477,7 +512,7 @@ def _source_snapshot_and_rows(
                 or runtime_floor.get("expectedNativePayload") != inventory
                 or runtime_floor.get("materialDigest") != material):
             raise _fail("NEBULAR_STAGE_A_JOIN", f"{target} native payload/runtime material identities do not join")
-        rows.append({
+        row = {
             "target": target,
             "triple": triple,
             "payload_archive_sha256": source["payloadArchiveSha256"],
@@ -493,7 +528,16 @@ def _source_snapshot_and_rows(
             "host_floor_observation_sha256": _body_digest(bodies[f"{target}:host_floor"]),
             "host_newer_observation_sha256": _body_digest(bodies[f"{target}:host_newer"]),
             "cpu_baseline_sha256": _body_digest(bodies[f"{target}:cpu"]),
-        })
+        }
+        if metadata[target]["schema"] == ARCHIVE_ARTIFACT_METADATA_SCHEMA:
+            if archive_manifests is None or target not in archive_manifests:
+                raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{target} complete archive manifest is missing")
+            actual_manifest = archive_manifests[target]
+            actual_sha = actual_manifest.get("manifest_sha256")
+            if actual_sha != metadata[target]["archive_member_manifest_sha256"]:
+                raise _fail("NEBULAR_STAGE_A_JOIN", f"{target} complete archive manifest does not join metadata")
+            row["archive_member_manifest_sha256"] = actual_sha
+        rows.append(row)
     return rows
 
 
@@ -518,9 +562,11 @@ def assemble_public_payload(
     """
     if not isinstance(inputs, Mapping):
         raise _fail("NEBULAR_STAGE_A_INPUT", "Stage-A inputs must be a mapping")
-    expected_keys = {"product_source", "producer_source", "runtime_manifest", "runtime_inputs", "source_origins", "bodies", "artifact_metadata", "rs9_tool_source"}
-    if set(inputs) != expected_keys:
+    legacy_keys = {"product_source", "producer_source", "runtime_manifest", "runtime_inputs", "source_origins", "bodies", "artifact_metadata", "rs9_tool_source"}
+    archive_keys = legacy_keys | {"payload_archives"}
+    if set(inputs) != legacy_keys and set(inputs) != archive_keys:
         raise _fail("NEBULAR_STAGE_A_INPUT", "Stage-A input fields are not closed")
+    archive_aware_input = set(inputs) == archive_keys
     product_source = _source(inputs["product_source"], "product source")
     if product_source != {"commit": PRODUCT_COMMIT, "tree": PRODUCT_TREE}:
         raise _fail("NEBULAR_STAGE_A_SOURCE", "product source is not the authenticated CADB/tree27 product")
@@ -555,6 +601,25 @@ def assemble_public_payload(
                 raise _fail("NEBULAR_STAGE_A_SCHEMA", f"{target}/{kind} schema is not maintained")
             bodies[f"{target}:{kind}"] = body
     metadata = {target: _validate_artifact_metadata(metadata_input[target], target=target) for target in LINUX_TARGETS}
+    archive_manifests: dict[str, dict[str, Any]] | None = None
+    if archive_aware_input:
+        archive_values = _closed(inputs["payload_archives"], set(LINUX_TARGETS), "payload archives")
+        archive_manifests = {}
+        for target in LINUX_TARGETS:
+            raw = archive_values[target]
+            if not isinstance(raw, (bytes, bytearray, memoryview)):
+                raise _fail("NEBULAR_STAGE_A_ARCHIVE", f"{target} payload archive is not detached bytes")
+            raw = bytes(raw)
+            descriptor = metadata[target]["payload_archive"]
+            if metadata[target]["schema"] != ARCHIVE_ARTIFACT_METADATA_SCHEMA:
+                raise _fail("NEBULAR_STAGE_A_SCHEMA", f"{target} archive input requires artifact metadata v2")
+            if len(raw) != descriptor["bytes"] or _digest_bytes(raw) != descriptor["sha256"]:
+                raise _fail("NEBULAR_STAGE_A_JOIN", f"{target} payload archive bytes do not join metadata")
+            archive_manifests[target] = _archive_manifest_from_bytes(raw, f"{target} payload archive")
+            if archive_manifests[target]["manifest_sha256"] != metadata[target]["archive_member_manifest_sha256"]:
+                raise _fail("NEBULAR_STAGE_A_JOIN", f"{target} archive member manifest does not join")
+    elif any(metadata[target]["schema"] == ARCHIVE_ARTIFACT_METADATA_SCHEMA for target in LINUX_TARGETS):
+        raise _fail("NEBULAR_STAGE_A_ARCHIVE", "Archive artifact metadata requires the exact raw archive inputs")
     origins: dict[str, tuple[dict[str, Any], str]] = {}
     for target in LINUX_TARGETS:
         closed_body, receipt, _closed_sha = closed[target]
@@ -578,9 +643,13 @@ def assemble_public_payload(
         metadata=metadata,
         origins=origins,
         source_snapshot=snapshot,
+        archive_manifests=archive_manifests,
     )
+    archive_aware = archive_manifests is not None
+    record_schema = ARCHIVE_PORTABILITY_SCHEMA if archive_aware else PORTABILITY_SCHEMA
+    input_schema = ARCHIVE_PORTABILITY_INPUT_SCHEMA if archive_aware else PORTABILITY_INPUT_SCHEMA
     record: dict[str, Any] = {
-        "schema": PORTABILITY_SCHEMA,
+        "schema": record_schema,
         "version": VERSION,
         "claim": CLAIM,
         "construction_status": "payload-qualified",
@@ -592,7 +661,7 @@ def assemble_public_payload(
     }
     record["identity"] = _digest(record)
     envelope = {
-        "schema": PORTABILITY_INPUT_SCHEMA,
+        "schema": input_schema,
         "record": record,
         "bodies": {key: bodies[key] for key in sorted(bodies)},
     }
@@ -614,6 +683,7 @@ assemble_payload_portability = assemble_public_payload
 
 __all__ = [
     "ARTIFACT_METADATA_SCHEMA",
+    "ARCHIVE_ARTIFACT_METADATA_SCHEMA",
     "BODY_KINDS",
     "BODY_SCHEMAS",
     "PRODUCT_COMMIT",

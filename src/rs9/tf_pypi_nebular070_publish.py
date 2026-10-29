@@ -34,8 +34,11 @@ from rs9.errors import ContractError
 from rs9.github import PublicClient
 from rs9.materialize import parse_manifest_members
 from rs9.nebular070_manylinux import (
+    ARCHIVE_PORTABILITY_INPUT_SCHEMA,
+    ARCHIVE_PORTABILITY_SCHEMA,
     MAX_INPUT_BYTES,
     PORTABILITY_INPUT_SCHEMA,
+    PORTABILITY_SCHEMA,
     validate_nebular070_payload_portability,
     ValidatedPayloadPortability,
     ValidatedReleaseAdmission,
@@ -2720,10 +2723,18 @@ def _load_candidate_stage_a(
         fail("BUNDLE_MANYLINUX_INPUT")
     # Validate the exact authenticated read, without reopening the mutable path.
     envelope = strict_json(stage_a_bytes)
+    expected_input_schemas = {PORTABILITY_INPUT_SCHEMA, ARCHIVE_PORTABILITY_INPUT_SCHEMA}
+    expected_record_schemas = {PORTABILITY_SCHEMA, ARCHIVE_PORTABILITY_SCHEMA}
     if (not isinstance(envelope, Mapping)
             or set(envelope) != {"schema", "record", "bodies"}
-            or envelope["schema"] != PORTABILITY_INPUT_SCHEMA
+            or envelope["schema"] not in expected_input_schemas
             or not isinstance(envelope["record"], Mapping)
+            or envelope["record"].get("schema") not in expected_record_schemas
+            or envelope["schema"] != (
+                ARCHIVE_PORTABILITY_INPUT_SCHEMA
+                if envelope["record"].get("schema") == ARCHIVE_PORTABILITY_SCHEMA
+                else PORTABILITY_INPUT_SCHEMA
+            )
             or not isinstance(envelope["bodies"], Mapping)):
         fail("BUNDLE_MANYLINUX_INPUT")
     return validate_nebular070_payload_portability(
@@ -3835,6 +3846,7 @@ def workflow_070_qualify_jobs_text() -> str:
         with:
           name: {PUBLIC_INPUTS_ARTIFACT}
           path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/'
+          include-hidden-files: true
           compression-level: 0
           retention-days: 14
           if-no-files-found: error
@@ -3878,7 +3890,6 @@ def workflow_070_qualify_jobs_text() -> str:
             --evidence "${{{{ runner.temp }}}}/tfnf-070-evidence" \\
             --output "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
             --expected-commit "${{{{ github.sha }}}}" \\
-            --payload-portability "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_STAGE_A_OUTPUT}/payload-portability.json" \\
             --tf-producer-commit {PUBLIC_TF_PRODUCER_SOURCE['commit']} \\
             --tf-producer-tree {PUBLIC_TF_PRODUCER_SOURCE['tree']} \\
             --require-manylinux \\
@@ -6073,7 +6084,9 @@ def _validate_bundle_file_set(bundle: Path) -> None:
             envelope = strict_json(physical_bytes(bundle / "payload_portability.json", limit=8 * 1024 * 1024))
         except (AdmissionError, OSError, ValueError):
             fail("BUNDLE_MANYLINUX_INPUT")
-        if not isinstance(envelope, Mapping) or envelope.get("schema") != "rs9.nebular070-payload-portability-input.v2":
+        if not isinstance(envelope, Mapping) or envelope.get("schema") not in {
+                PORTABILITY_INPUT_SCHEMA, ARCHIVE_PORTABILITY_INPUT_SCHEMA,
+        }:
             fail("BUNDLE_MANYLINUX_INPUT")
 
 
@@ -7210,7 +7223,11 @@ def build_candidates_bundle(
     (out / "expected_artifacts.json").write_bytes(canonical(expected_artifacts))
     if stage_a is not None:
         (out / "payload_portability.json").write_bytes(canonical({
-            "schema": "rs9.nebular070-payload-portability-input.v2",
+            "schema": (
+                ARCHIVE_PORTABILITY_INPUT_SCHEMA
+                if stage_a.record.get("schema") == ARCHIVE_PORTABILITY_SCHEMA
+                else PORTABILITY_INPUT_SCHEMA
+            ),
             "record": stage_a.record,
             "bodies": stage_a.receipt_bodies,
         }))

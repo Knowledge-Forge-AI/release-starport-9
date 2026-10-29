@@ -223,6 +223,7 @@ jobs:
         with:
           name: tfnf-070-public-inputs
           path: '${{ runner.temp }}/tfnf-070-public-inputs/'
+          include-hidden-files: true
           compression-level: 0
           retention-days: 14
           if-no-files-found: error
@@ -266,7 +267,6 @@ jobs:
             --evidence "${{ runner.temp }}/tfnf-070-evidence" \
             --output "${{ runner.temp }}/tfnf-070-bundle" \
             --expected-commit "${{ github.sha }}" \
-            --payload-portability "${{ runner.temp }}/tfnf-070-public-inputs/evidence/public-release/generated-stage-a/payload-portability.json" \
             --tf-producer-commit 79c67bb70d800701b4b0cdbb9caa9be2bbc7c2ff \
             --tf-producer-tree e663c9cf15144578a17d3cd501cf031ac83a7e0e \
             --require-manylinux \

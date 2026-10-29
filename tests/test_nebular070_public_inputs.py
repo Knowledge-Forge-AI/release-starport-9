@@ -16,6 +16,8 @@ from unittest.mock import patch
 from rs9.errors import ContractError
 from rs9.nebular070_public_inputs import (
     _archive_members,
+    _compatibility_wrapper_alias,
+    COMPATIBILITY_WRAPPER_PATH,
     OPAQUE_METADATA_ARCHIVES,
     REPOSITORY,
     SCHEMA,
@@ -114,6 +116,59 @@ class PublicInputTransportTests(unittest.TestCase):
         self.bodies = {_url(self.manifest["metadata"]["name"]): self.metadata}
         self.bodies.update({_url(name): body for name, _path, body in self.payloads})
 
+    def _compatibility_fixture(self, *, declared=True, mismatch=False, collision=False,
+                               protected_root=False, wrapper_first=False,
+                               metadata_ancestor_file=False,
+                               metadata_ancestor_directory=False,
+                               metadata_alias_descendant=False):
+        """Return a canonical asset-view manifest with optional alias mutations."""
+        descriptor = {
+            "schema": "rs9.tf-pypi-nebular070-qualification-inputs.v1",
+            "project": "theme-forge-nebular-fusion",
+            "version": VERSION,
+            "evidence": {"source_root": ".git" if protected_root else "evidence/public-release"},
+            "raw_release": {"source_root": "raw-release", "targets": {
+                "darwin-arm64": {"payload": self.payloads[0][1]},
+                "linux-arm64-gnu": {"payload": self.payloads[1][1]},
+                "linux-x64-gnu": {"payload": self.payloads[2][1]},
+            }},
+        }
+        wrapper_name, _old_path, wrapper_body = self.payloads[3]
+        canonical_wrapper_path = "evidence/public-release/assets/" + wrapper_name
+        descriptor["evidence"]["files"] = {
+            "assets/" + wrapper_name: {"path": "assets/" + wrapper_name,
+                                        "size": len(wrapper_body),
+                                        "sha256": hashlib.sha256(wrapper_body).hexdigest()}
+        }
+        if declared:
+            descriptor["evidence"]["files"][COMPATIBILITY_WRAPPER_PATH] = {
+                "path": COMPATIBILITY_WRAPPER_PATH,
+                "size": len(wrapper_body) + (1 if mismatch else 0),
+                "sha256": ("0" * 64 if mismatch else hashlib.sha256(wrapper_body).hexdigest()),
+            }
+        payloads = list(self.payloads)
+        payloads[3] = (wrapper_name, canonical_wrapper_path, wrapper_body)
+        if collision:
+            descriptor["evidence"]["source_root"] = "raw-release"
+            canonical_wrapper_path = "raw-release/assets/" + wrapper_name
+            payloads[3] = (wrapper_name, canonical_wrapper_path, wrapper_body)
+            payloads[0] = (payloads[0][0], "raw-release/npm/package.tgz", payloads[0][2])
+        if wrapper_first:
+            payloads = [payloads[3], payloads[0], payloads[1], payloads[2]]
+        descriptor_bytes = json.dumps(descriptor, sort_keys=True).encode()
+        metadata_files = [("qualification-inputs.json", descriptor_bytes, "file", 0o644)]
+        if metadata_ancestor_file:
+            metadata_files.append(("evidence/public-release/npm", b"regular file", "file", 0o644))
+        if metadata_ancestor_directory:
+            metadata_files.append(("evidence/public-release/npm", "", tarfile.DIRTYPE, 0o755))
+        if metadata_alias_descendant:
+            metadata_files.append(("evidence/public-release/npm/package.tgz/child", b"descendant", "file", 0o644))
+        metadata = _tar(metadata_files)
+        manifest = _manifest(metadata, payloads)
+        bodies = {_url(manifest["metadata"]["name"]): metadata}
+        bodies.update({_url(name): body for name, _path, body in payloads})
+        return manifest, bodies, canonical_wrapper_path
+
     def test_positive_materializes_descriptor_shared_paths_and_receipt(self):
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp).resolve() / ".scratch" / "nebular070-inputs"
@@ -135,6 +190,137 @@ class PublicInputTransportTests(unittest.TestCase):
             self.assertEqual((output / self.payloads[3][1]).read_bytes(), b"wrapper")
             self.assertEqual(json.loads((output / "fetch-receipt.json").read_text())["metadata"]["descriptor_sha256"],
                              hashlib.sha256((output / "qualification-inputs.json").read_bytes()).hexdigest())
+
+    def test_canonical_wrapper_and_declared_compatibility_view_share_bytes(self):
+        manifest, bodies, canonical_path = self._compatibility_fixture()
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp).resolve() / "out"
+            materialize_public_inputs(manifest, output, client=FakeClient(bodies))
+            self.assertEqual((output / canonical_path).read_bytes(), b"wrapper")
+            alias = output / "evidence/public-release" / COMPATIBILITY_WRAPPER_PATH
+            self.assertEqual(alias.read_bytes(), b"wrapper")
+            self.assertEqual(alias.stat().st_mode & 0o777, 0o644)
+
+    def test_canonical_asset_view_binds_all_four_payloads(self):
+        root = "evidence/public-release"
+        canonical_payloads = [
+            (name, f"{root}/assets/{name}", body) for name, _path, body in self.payloads
+        ]
+        descriptor = {
+            "schema": "rs9.tf-pypi-nebular070-qualification-inputs.v1",
+            "project": "theme-forge-nebular-fusion",
+            "version": VERSION,
+            "evidence": {"source_root": root, "files": {}},
+            "raw_release": {"source_root": root, "targets": {}},
+        }
+        for name, _path, body in canonical_payloads:
+            relative = "assets/" + name
+            descriptor["evidence"]["files"][relative] = {
+                "path": relative, "size": len(body), "sha256": hashlib.sha256(body).hexdigest()
+            }
+        wrapper_name, _wrapper_path, wrapper_body = canonical_payloads[3]
+        descriptor["evidence"]["files"][COMPATIBILITY_WRAPPER_PATH] = {
+            "path": COMPATIBILITY_WRAPPER_PATH, "size": len(wrapper_body),
+            "sha256": hashlib.sha256(wrapper_body).hexdigest()
+        }
+        for name, _path, _body in canonical_payloads[:3]:
+            descriptor["raw_release"]["targets"][name] = {"payload": "assets/" + name}
+        metadata = _tar([("qualification-inputs.json", json.dumps(descriptor, sort_keys=True).encode(), "file", 0o644)])
+        manifest = _manifest(metadata, canonical_payloads)
+        bodies = {_url(manifest["metadata"]["name"]): metadata}
+        bodies.update({_url(name): body for name, _path, body in canonical_payloads})
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp).resolve() / "out"
+            materialize_public_inputs(manifest, output, client=FakeClient(bodies))
+            for _name, path, body in canonical_payloads:
+                self.assertEqual((output / path).read_bytes(), body)
+            self.assertEqual((output / root / COMPATIBILITY_WRAPPER_PATH).read_bytes(), wrapper_body)
+
+    def test_missing_compatibility_declaration_keeps_canonical_only(self):
+        manifest, bodies, canonical_path = self._compatibility_fixture(declared=False)
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp).resolve() / "out"
+            materialize_public_inputs(manifest, output, client=FakeClient(bodies))
+            self.assertEqual((output / canonical_path).read_bytes(), b"wrapper")
+            self.assertFalse((output / "evidence/public-release" / COMPATIBILITY_WRAPPER_PATH).exists())
+
+    def test_mismatched_compatibility_declaration_fails_before_output_writes(self):
+        manifest, bodies, _canonical_path = self._compatibility_fixture(mismatch=True)
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp).resolve() / "out"
+            with self.assertRaises(ContractError) as ctx:
+                materialize_public_inputs(manifest, output, client=FakeClient(bodies))
+            self.assertEqual(ctx.exception.code, "COMPATIBILITY_ALIAS_MISMATCH")
+            self.assertFalse(output.exists())
+
+    def test_compatibility_alias_collision_is_rejected_before_metadata_write(self):
+        manifest, bodies, _canonical_path = self._compatibility_fixture(collision=True)
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp).resolve() / "out"
+            with self.assertRaises(ContractError) as ctx:
+                materialize_public_inputs(manifest, output, client=FakeClient(bodies))
+            self.assertEqual(ctx.exception.code, "OUTPUT_COLLISION")
+            self.assertFalse(output.exists())
+
+    def test_compatibility_alias_metadata_file_ancestor_is_rejected_preflight(self):
+        manifest, bodies, _canonical_path = self._compatibility_fixture(metadata_ancestor_file=True)
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp).resolve() / "out"
+            with self.assertRaises(ContractError) as ctx:
+                materialize_public_inputs(manifest, output, client=FakeClient(bodies))
+            self.assertEqual(ctx.exception.code, "OUTPUT_COLLISION")
+            self.assertFalse(output.exists())
+
+    def test_compatibility_alias_exact_directory_entry_is_rejected_preflight(self):
+        manifest, bodies, _canonical_path = self._compatibility_fixture()
+        entries = _archive_members(bodies[_url(manifest["metadata"]["name"])])
+        descriptor = json.loads(next(entry["body"] for entry in entries
+                                     if entry["path"] == "qualification-inputs.json"))
+        wrapper_row = next(row for row in manifest["payloads"] if row["name"].endswith(".tgz"))
+        metadata_entries = entries + ({"path": "evidence/public-release/npm/package.tgz",
+                                       "type": "directory"},)
+        with self.assertRaises(ContractError) as ctx:
+            _compatibility_wrapper_alias(
+                descriptor, "evidence/public-release", wrapper_row,
+                metadata_entries, {row["path"] for row in manifest["payloads"]})
+        self.assertEqual(ctx.exception.code, "OUTPUT_COLLISION")
+
+    def test_compatibility_alias_metadata_descendant_is_rejected_preflight(self):
+        manifest, bodies, _canonical_path = self._compatibility_fixture(metadata_alias_descendant=True)
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp).resolve() / "out"
+            with self.assertRaises(ContractError) as ctx:
+                materialize_public_inputs(manifest, output, client=FakeClient(bodies))
+            self.assertEqual(ctx.exception.code, "OUTPUT_COLLISION")
+            self.assertFalse(output.exists())
+
+    def test_compatibility_alias_directory_ancestor_is_allowed(self):
+        manifest, bodies, _canonical_path = self._compatibility_fixture(metadata_ancestor_directory=True)
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp).resolve() / "out"
+            materialize_public_inputs(manifest, output, client=FakeClient(bodies))
+            alias = output / "evidence/public-release" / COMPATIBILITY_WRAPPER_PATH
+            self.assertEqual(alias.read_bytes(), b"wrapper")
+
+    def test_compatibility_alias_protected_source_root_is_rejected(self):
+        manifest, bodies, _canonical_path = self._compatibility_fixture(protected_root=True)
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp).resolve() / "out"
+            with self.assertRaises(ContractError) as ctx:
+                materialize_public_inputs(manifest, output, client=FakeClient(bodies))
+            self.assertEqual(ctx.exception.code, "PROTECTED_PATH")
+            self.assertFalse(output.exists())
+
+    def test_compatibility_partial_failure_cleans_both_views(self):
+        manifest, bodies, canonical_path = self._compatibility_fixture(wrapper_first=True)
+        failing_name = manifest["payloads"][1]["name"]
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp).resolve() / "out"
+            with self.assertRaises(ContractError) as ctx:
+                materialize_public_inputs(manifest, output,
+                                          client=FakeClient(bodies, fail_name=failing_name))
+            self.assertEqual(ctx.exception.code, "FETCH_FAILED")
+            self.assertFalse(output.exists())
 
     def test_manifest_closed_shape_and_exact_four_payload_roles(self):
         bad = copy.deepcopy(self.manifest)

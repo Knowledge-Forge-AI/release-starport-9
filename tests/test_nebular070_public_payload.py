@@ -18,6 +18,7 @@ from pathlib import Path
 from rs9.errors import ContractError
 from rs9.nebular070_payload import _digest, validate_nebular070_payload_portability
 from rs9.nebular070_public_payload import (
+    ARCHIVE_ARTIFACT_METADATA_SCHEMA,
     ARTIFACT_METADATA_SCHEMA,
     BODY_KINDS,
     PRODUCT_COMMIT,
@@ -404,6 +405,40 @@ class PublicStageAAssemblerTests(unittest.TestCase):
             envelope["record"]["source_input_snapshot_sha256"]
         })
         self.assertEqual(envelope["schema"], "rs9.nebular070-payload-portability-input.v2")
+
+    def test_archive_domain_derives_v3_without_relabeling_package_manifest(self) -> None:
+        inputs = copy.deepcopy(self.inputs)
+        archive_sha = hashlib.sha256(self.fixture.archive).hexdigest()
+        complete_sha = self.fixture.manifest["manifest_sha256"]
+        for target in ("linux-arm64-gnu", "linux-x64-gnu"):
+            metadata = inputs["artifact_metadata"][target]
+            metadata["schema"] = ARCHIVE_ARTIFACT_METADATA_SCHEMA
+            metadata["payload_archive"] = {"sha256": archive_sha, "bytes": len(self.fixture.archive)}
+            metadata["archive_member_manifest_sha256"] = complete_sha
+        inputs["payload_archives"] = {
+            "linux-arm64-gnu": self.fixture.archive,
+            "linux-x64-gnu": self.fixture.archive,
+        }
+        envelope = self._assemble(inputs)
+        self.assertEqual(envelope["schema"], "rs9.nebular070-payload-portability-input.v3")
+        self.assertEqual(envelope["record"]["schema"], "rs9.nebular070-payload-portability.v3")
+        for target in ("linux-arm64-gnu", "linux-x64-gnu"):
+            row = next(item for item in envelope["record"]["targets"] if item["target"] == target)
+            source = envelope["bodies"][f"{target}:source"]
+            self.assertEqual(row["archive_member_manifest_sha256"], complete_sha)
+            self.assertEqual(row["manifest_sha256"], source["manifestSha256"])
+
+        tampered = copy.deepcopy(inputs)
+        tampered["payload_archives"]["linux-x64-gnu"] = b"not-the-authenticated-archive"
+        with self.assertRaises(ContractError):
+            self._assemble(tampered)
+
+        tampered_metadata = copy.deepcopy(inputs)
+        tampered_metadata["artifact_metadata"]["linux-x64-gnu"][
+            "archive_member_manifest_sha256"
+        ] = "0" * 64
+        with self.assertRaises(ContractError):
+            self._assemble(tampered_metadata)
 
     def test_wrong_product_source_refuses(self) -> None:
         inputs = copy.deepcopy(self.inputs)
