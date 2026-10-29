@@ -487,10 +487,18 @@ WORKFLOW_STEP_PROFILES = {
         ("Read back published PyPI state", False),
     ),
 }
+# GitHub injects these lifecycle records for the two declared container jobs.
+# They are runner steps, not additional workflow actions or arbitrary uploads.
+WORKFLOW_CONTAINER_JOB_NAMES = frozenset({
+    "Native consumer 0.7.0 (linux-arm64-gnu floor)",
+    "Native consumer 0.7.0 (linux-x64-gnu floor)",
+})
 WORKFLOW_STEP_PROFILE_ALLOWED_NAMES = {
     job_name: frozenset(
         {step_name for step_name, _is_action in profile}
         | {"Set up job", "Complete job"}
+        | ({"Initialize containers", "Stop containers"}
+           if job_name in WORKFLOW_CONTAINER_JOB_NAMES else set())
         | {
             f"Post {step_name}"
             for step_name, is_action in profile
@@ -4281,7 +4289,7 @@ def workflow_070_qualify_jobs_text() -> str:
             --run-id "${{{{ github.run_id }}}}" \\
             --run-attempt "${{{{ github.run_attempt }}}}" \\
             --consumer-host-role newer \\
-            --consumer-capture-output "${{{{ runner.temp }}}}/tfnf-070-qual/linux-arm64-gnu/newer.json"
+            --consumer-capture-output "${{{{ runner.temp }}}}/tfnf-070-linux-arm64-gnu-newer.json"
 
       - name: Upload linux-arm64-gnu qualification receipt
         uses: {UPLOAD_ARTIFACT_ACTION}
@@ -4438,7 +4446,7 @@ def workflow_070_qualify_jobs_text() -> str:
             --run-id "${{{{ github.run_id }}}}" \\
             --run-attempt "${{{{ github.run_attempt }}}}" \\
             --consumer-host-role newer \\
-            --consumer-capture-output "${{{{ runner.temp }}}}/tfnf-070-qual/linux-x64-gnu/newer.json"
+            --consumer-capture-output "${{{{ runner.temp }}}}/tfnf-070-linux-x64-gnu-newer.json"
 
       - name: Upload linux-x64-gnu qualification receipt
         uses: {UPLOAD_ARTIFACT_ACTION}
