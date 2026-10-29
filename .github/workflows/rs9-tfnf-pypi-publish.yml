@@ -204,7 +204,8 @@ jobs:
         run: |
           "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-inputs \
             --qualification-inputs operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-qualification-inputs.json \
-            --evidence "${{ runner.temp }}/tfnf-070-evidence" >> "$GITHUB_OUTPUT"
+            --evidence "${{ runner.temp }}/tfnf-070-evidence" \
+            --phase qualification-prep >> "$GITHUB_OUTPUT"
 
       - name: Build and verify 0.7.0 candidate bundle
         env:
@@ -481,7 +482,8 @@ jobs:
         run: |
           MANYLINUX_OUT="$("${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish materialize-manylinux-inputs \
             --qualification-inputs operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-qualification-inputs.json \
-            --evidence "${{ runner.temp }}/tfnf-070-evidence")"
+            --evidence "${{ runner.temp }}/tfnf-070-evidence" \
+            --phase publication)"
           printf '%s\n' "$MANYLINUX_OUT" >> "$GITHUB_OUTPUT"
           STAGE_B_PATH="$(printf '%s\n' "$MANYLINUX_OUT" | sed -n 's/^stage_b=//p')"
           test -n "$STAGE_B_PATH"

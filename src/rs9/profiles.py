@@ -204,6 +204,120 @@ def evaluate_profile(capture, profile, intent, *, roles=None, corroboration=None
     return result
 
 
+CURRENT_NATIVE_PROVENANCE_SCHEMA = "nebular.public-native-ci-release-provenance.v1"
+_HEX40 = re.compile(r"[0-9a-f]{40}\Z")
+_HEX64 = re.compile(r"[0-9a-f]{64}\Z")
+_CURRENT_NATIVE_PLATFORMS = frozenset({"darwin-arm64", "linux-arm64", "linux-x64"})
+
+
+def _validate_current_native_provenance(
+    provenance,
+    *,
+    normalized,
+    capture,
+    repository,
+    obj,
+    tree_sha,
+    inputs,
+    metadata,
+    roles,
+):
+    """Validate the versioned public native-CI provenance contract."""
+    required = {
+        "schema", "version", "release", "repository", "releaseCommit",
+        "testedCommit", "testedTree", "nativeCiRun", "nativeCiAttempt",
+        "sourceCiRun", "nativePlatforms", "assets",
+        "nativeQualificationAndPackagedSmoke", "pypiWheels", "wrapper",
+    }
+    if (
+        not isinstance(provenance, dict)
+        or provenance.get("schema") != CURRENT_NATIVE_PROVENANCE_SCHEMA
+        or not required.issubset(provenance)
+    ):
+        raise ContractError("INVALID_EVIDENCE", "Current native provenance schema is incomplete")
+
+    release = capture.record.get("release")
+    tag = capture.record.get("tag")
+    if (
+        not isinstance(release, dict)
+        or not isinstance(tag, dict)
+        or type(provenance["release"]) is not int
+        or provenance["release"] <= 0
+        or provenance["release"] != release.get("id")
+        or provenance["repository"] != repository.get("full_name")
+        or provenance["version"] != normalized.get("version")
+        or release.get("tag") != normalized.get("tag")
+        or provenance["releaseCommit"] != obj.get("sha")
+        or provenance["releaseCommit"] != tag.get("commit")
+        or provenance["testedTree"] != tree_sha
+        or provenance["testedTree"] != tag.get("tree")
+    ):
+        raise ContractError("PROVENANCE_MISMATCH", "Current native provenance identity disagrees")
+
+    for field in ("releaseCommit", "testedCommit", "testedTree"):
+        if not isinstance(provenance[field], str) or _HEX40.fullmatch(provenance[field]) is None:
+            raise ContractError("INVALID_EVIDENCE", "Current native provenance revision is malformed")
+    for field in ("nativeCiRun", "nativeCiAttempt", "sourceCiRun"):
+        if type(provenance[field]) is not int or provenance[field] <= 0:
+            raise ContractError("INVALID_EVIDENCE", "Current native provenance run identity is malformed")
+    if (
+        not isinstance(provenance["nativePlatforms"], list)
+        or any(not isinstance(value, str) for value in provenance["nativePlatforms"])
+        or set(provenance["nativePlatforms"]) != _CURRENT_NATIVE_PLATFORMS
+    ):
+        raise ContractError("PROVENANCE_MISMATCH", "Current native platform set disagrees")
+    for field in ("nativeQualificationAndPackagedSmoke", "pypiWheels", "wrapper"):
+        if not isinstance(provenance[field], str) or not provenance[field].strip():
+            raise ContractError("INVALID_EVIDENCE", "Current native provenance summary is malformed")
+    if "manualAppleConfirmation" in provenance and not isinstance(provenance["manualAppleConfirmation"], str):
+        raise ContractError("INVALID_EVIDENCE", "Current native manual-confirmation field is malformed")
+
+    rows = provenance["assets"]
+    if not isinstance(rows, list) or not rows:
+        raise ContractError("INVALID_EVIDENCE", "Current native provenance assets are malformed")
+    seen = set()
+    bound_names = {roles["npm-wrapper"], *(asset["name"] for asset in normalized["assets"])}
+    for row in rows:
+        if (
+            not isinstance(row, dict)
+            or not isinstance(row.get("name"), str)
+            or row["name"] in seen
+            or type(row.get("bytes")) is not int
+            or row["bytes"] <= 0
+            or not isinstance(row.get("sha256"), str)
+            or _HEX64.fullmatch(row["sha256"]) is None
+            or not isinstance(row.get("role"), str)
+        ):
+            raise ContractError("INVALID_EVIDENCE", "Current native provenance asset row is malformed")
+        seen.add(row["name"])
+        selected = metadata.get(row["name"])
+        if selected is not None and (
+            row["bytes"] != selected.get("size") or row["sha256"] != selected.get("sha256")
+        ):
+            raise ContractError("PROVENANCE_MISMATCH", "Current native artifact hash disagrees")
+        if row["name"] in bound_names and row["name"] not in metadata:
+            raise ContractError("PROVENANCE_MISMATCH", "Current native artifact is not capture-bound")
+    if not bound_names.issubset(seen):
+        raise ContractError("PROVENANCE_MISMATCH", "Current native provenance omits a captured artifact")
+
+    # The archive inspector already produced the authoritative executable hashes;
+    # require those records to remain present and well-formed before accepting
+    # the provenance branch.
+    for item in inputs:
+        for field in ("commands", "launchers"):
+            records = item.get(field)
+            if not isinstance(records, dict) or not records:
+                raise ContractError("INVALID_EVIDENCE", "Current native executable records are missing")
+            for record in records.values():
+                if (
+                    not isinstance(record, dict)
+                    or not isinstance(record.get("path"), str)
+                    or not isinstance(record.get("sha256"), str)
+                    or _HEX64.fullmatch(record["sha256"]) is None
+                ):
+                    raise ContractError("INVALID_EVIDENCE", "Current native executable hash is malformed")
+
+
 def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False, corroboration=None,
                     lineage_correction=None):
     profile = TAURI_AUTHORITY_PROFILE if repository_authority else TAURI_PROFILE
@@ -269,8 +383,26 @@ def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False, c
     except (ValueError, UnicodeError):
         raise ContractError("INVALID_EVIDENCE", "Invalid provenance JSON") from None
     # Publisher assertions are consistency evidence, not signatures or attestations.
-    assertions = provenance.get("release", {})
-    if lineage_facts is not None:
+    if not isinstance(provenance, dict):
+        raise ContractError("INVALID_EVIDENCE", "Provenance JSON object required")
+    if provenance.get("schema") == CURRENT_NATIVE_PROVENANCE_SCHEMA:
+        _validate_current_native_provenance(
+            provenance,
+            normalized=normalized,
+            capture=capture,
+            repository=repository,
+            obj=obj,
+            tree_sha=tree_sha,
+            inputs=inputs,
+            metadata=metadata,
+            roles=roles,
+        )
+        assertions = {}
+    else:
+        assertions = provenance.get("release", {})
+        if not isinstance(assertions, dict):
+            raise ContractError("INVALID_EVIDENCE", "Legacy provenance assertions must be an object")
+    if provenance.get("schema") != CURRENT_NATIVE_PROVENANCE_SCHEMA and lineage_facts is not None:
         expected_assertions = {
             "repository": repository["full_name"],
             "tag": normalized["tag"],
@@ -281,7 +413,7 @@ def _evaluate_tauri(capture, normalized, roles, *, repository_authority=False, c
         if (not isinstance(assertions, dict)
                 or any(assertions.get(key) != expected for key, expected in expected_assertions.items())):
             raise ContractError("PROVENANCE_MISMATCH", "Publisher lineage assertion disagrees")
-    else:
+    elif provenance.get("schema") != CURRENT_NATIVE_PROVENANCE_SCHEMA:
         for key, expected in {"repository": repository["full_name"], "tag": normalized["tag"],
                               "tagTarget": obj["sha"], "mergedMainTree": tree_sha}.items():
             if key in assertions and assertions[key] != expected:

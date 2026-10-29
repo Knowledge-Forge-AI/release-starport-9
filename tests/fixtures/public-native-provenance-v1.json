@@ -1,0 +1,199 @@
+{
+  "capture": {
+    "inputs": [
+      {
+        "commands": {
+          "tfnf": {
+            "path": "Theme Forge Nebular Fusion.app/Contents/MacOS/theme-forge-nebular-fusion",
+            "sha256": "8aee6af893f2a3ab01b1e4ad84dc1cad8eab2067f00200149cfb5301274232b5"
+          }
+        },
+        "launchers": {
+          "tfnf": {
+            "path": "Theme Forge Nebular Fusion.app/Contents/Resources/bin/tfnf",
+            "sha256": "c46bc5c96cd401caf7ba44eaf136927ba2464ee04fd3d59479f63c99d7f8077b"
+          }
+        },
+        "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz"
+      },
+      {
+        "commands": {
+          "tfnf": {
+            "path": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+            "sha256": "9dcd5953dc3696f0159323fd02ef009178a4eb2fed6427dde52eb9a26283e06e"
+          }
+        },
+        "launchers": {
+          "tfnf": {
+            "path": "theme-forge-nebular-fusion/bin/tfnf",
+            "sha256": "b15c5e9b15498f62442d3d6fe6793d065c7dfb050554be42ee7fdc8bd247897e"
+          }
+        },
+        "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz"
+      },
+      {
+        "commands": {
+          "tfnf": {
+            "path": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+            "sha256": "6213ca853a49af3a74ee271216743e47c24edfccb4c2ac92025b049e96cad99d"
+          }
+        },
+        "launchers": {
+          "tfnf": {
+            "path": "theme-forge-nebular-fusion/bin/tfnf",
+            "sha256": "b15c5e9b15498f62442d3d6fe6793d065c7dfb050554be42ee7fdc8bd247897e"
+          }
+        },
+        "name": "theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz"
+      }
+    ],
+    "metadata": {
+      "knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz": {
+        "sha256": "d4bef1172a773c27eced3067e148aaa353152c577001f1203a0dc95ab4cb9f00",
+        "size": 22564
+      },
+      "theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz": {
+        "sha256": "52f626bfcbfb4235298675669841ca9fbea8113118e9d25f0310e0a26489a470",
+        "size": 47355011
+      },
+      "theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz": {
+        "sha256": "eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c",
+        "size": 54553557
+      },
+      "theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz": {
+        "sha256": "4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27",
+        "size": 54425294
+      }
+    },
+    "record": {
+      "release": {
+        "draft": false,
+        "id": 426333162,
+        "prerelease": false,
+        "tag": "v0.7.0"
+      },
+      "repository": {
+        "full_name": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+        "id": 1358643872
+      },
+      "tag": {
+        "commit": "cadb40c4972f68f314096ff60fbcfb4da950c161",
+        "tag_objects": [],
+        "target_basis": "sha-match",
+        "tree": "27c643b6375c2aafde314799c4f08e844c14992c"
+      }
+    }
+  },
+  "normalized": {
+    "assets": [
+      {
+        "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz"
+      },
+      {
+        "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz"
+      },
+      {
+        "name": "theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz"
+      }
+    ],
+    "tag": "v0.7.0",
+    "version": "0.7.0"
+  },
+  "provenance": {
+    "assets": [
+      {
+        "bytes": 47353361,
+        "httpStatus": 200,
+        "id": 687086524,
+        "name": "knowledge-forge-ai-theme-forge-nebular-fusion-darwin-arm64-0.7.0.tgz",
+        "role": "npm-package",
+        "sha256": "1708f75b70e20f3fc6b78522b62d4c8e176787f2812d3c06345371ab4962774e",
+        "unauthenticatedReadback": true,
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/knowledge-forge-ai-theme-forge-nebular-fusion-darwin-arm64-0.7.0.tgz"
+      },
+      {
+        "bytes": 47355011,
+        "httpStatus": 200,
+        "id": 687086526,
+        "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz",
+        "role": "raw-archive",
+        "sha256": "52f626bfcbfb4235298675669841ca9fbea8113118e9d25f0310e0a26489a470",
+        "unauthenticatedReadback": true,
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz"
+      },
+      {
+        "bytes": 54507800,
+        "httpStatus": 200,
+        "id": 687086523,
+        "name": "knowledge-forge-ai-theme-forge-nebular-fusion-linux-arm64-0.7.0.tgz",
+        "role": "npm-package",
+        "sha256": "ea145d0782345f1fe9a8e4c9b42deadb6710752cbd345ca5cd503aa684df25b4",
+        "unauthenticatedReadback": true,
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/knowledge-forge-ai-theme-forge-nebular-fusion-linux-arm64-0.7.0.tgz"
+      },
+      {
+        "bytes": 54553557,
+        "httpStatus": 200,
+        "id": 687086522,
+        "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz",
+        "role": "raw-archive",
+        "sha256": "eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c",
+        "unauthenticatedReadback": true,
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz"
+      },
+      {
+        "bytes": 54371912,
+        "httpStatus": 200,
+        "id": 687086525,
+        "name": "knowledge-forge-ai-theme-forge-nebular-fusion-linux-x64-0.7.0.tgz",
+        "role": "npm-package",
+        "sha256": "50ab8f89a399b4975a5d19a23e45d70b9847a5cc9ef75b8f83afca734758a3d2",
+        "unauthenticatedReadback": true,
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/knowledge-forge-ai-theme-forge-nebular-fusion-linux-x64-0.7.0.tgz"
+      },
+      {
+        "bytes": 54425294,
+        "httpStatus": 200,
+        "id": 687086740,
+        "name": "theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz",
+        "role": "raw-archive",
+        "sha256": "4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27",
+        "unauthenticatedReadback": true,
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz"
+      },
+      {
+        "bytes": 22564,
+        "httpStatus": 200,
+        "id": 687086750,
+        "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz",
+        "role": "npm-wrapper",
+        "sha256": "d4bef1172a773c27eced3067e148aaa353152c577001f1203a0dc95ab4cb9f00",
+        "unauthenticatedReadback": true,
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz"
+      }
+    ],
+    "manualAppleConfirmation": "advisory; not recorded here",
+    "nativeCiAttempt": 1,
+    "nativeCiRun": 40792039041,
+    "nativePlatforms": [
+      "darwin-arm64",
+      "linux-arm64",
+      "linux-x64"
+    ],
+    "nativeQualificationAndPackagedSmoke": "passed in public hosted native CI",
+    "pypiWheels": "not included; installed-wheel checks remain separate",
+    "release": 426333162,
+    "releaseCommit": "cadb40c4972f68f314096ff60fbcfb4da950c161",
+    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+    "schema": "nebular.public-native-ci-release-provenance.v1",
+    "sourceCiRun": 40792040378,
+    "testedCommit": "6357e8c650105c843f1518a01566eccc551354b4",
+    "testedTree": "27c643b6375c2aafde314799c4f08e844c14992c",
+    "version": "0.7.0",
+    "wrapper": "source-only pack, seven exact files, bound to all three qualified platform manifests"
+  },
+  "roles": {
+    "npm-wrapper": "knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz"
+  },
+  "schema": "triad.rs9-public-native-provenance-fixture.v1"
+}
