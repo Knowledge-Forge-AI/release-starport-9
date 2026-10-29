@@ -519,8 +519,10 @@ def _validate_payload_envelope(
         "schema", "version", "claim", "construction_status", "tf_producer_source",
         "rs9_tool_source", "evidence_mode", "source_input_snapshot_sha256", "targets", "identity",
     }, "payload portability")
-    archive_aware = top["schema"] == ARCHIVE_PORTABILITY_SCHEMA
-    if top["schema"] not in {PORTABILITY_SCHEMA, ARCHIVE_PORTABILITY_SCHEMA} or top["version"] != VERSION \
+    schema = top["schema"]
+    archive_aware = schema == ARCHIVE_PORTABILITY_SCHEMA
+    if (not isinstance(schema, str) or schema not in {PORTABILITY_SCHEMA, ARCHIVE_PORTABILITY_SCHEMA}
+            or top["version"] != VERSION) \
             or top["claim"] != CLAIM or top["construction_status"] != "payload-qualified" \
             or top["evidence_mode"] != ("fixture" if allow_fixture else "actual"):
         raise _fail("NEBULAR_MANYLINUX_POLICY", "Payload portability policy is not the 0.7.0 construction contract")
@@ -743,20 +745,24 @@ def load_payload_portability_bundle(
         }
     else:
         envelope = _read_input_json(root, "Stage-A input")
-    if set(envelope) != {"schema", "record", "bodies"} or envelope["schema"] not in {
-        PORTABILITY_INPUT_SCHEMA, ARCHIVE_PORTABILITY_INPUT_SCHEMA,
-    }:
+    if not isinstance(envelope, Mapping) or set(envelope) != {"schema", "record", "bodies"}:
+        raise _fail("NEBULAR_MANYLINUX_INPUT", "Stage-A input envelope is not closed")
+    envelope_schema = envelope["schema"]
+    if (not isinstance(envelope_schema, str)
+            or envelope_schema not in {PORTABILITY_INPUT_SCHEMA, ARCHIVE_PORTABILITY_INPUT_SCHEMA}):
         raise _fail("NEBULAR_MANYLINUX_INPUT", "Stage-A input envelope is not closed")
     record = envelope["record"]
     bodies = envelope["bodies"]
     if not isinstance(record, Mapping) or not isinstance(bodies, Mapping):
         raise _fail("NEBULAR_MANYLINUX_INPUT", "Stage-A input record/bodies are malformed")
     record_schema = record.get("schema")
+    if not isinstance(record_schema, str):
+        raise _fail("NEBULAR_MANYLINUX_SCHEMA", "Stage-A record schema is not a string")
     expected_input_schema = {
         PORTABILITY_SCHEMA: PORTABILITY_INPUT_SCHEMA,
         ARCHIVE_PORTABILITY_SCHEMA: ARCHIVE_PORTABILITY_INPUT_SCHEMA,
     }.get(record_schema)
-    if envelope["schema"] != expected_input_schema:
+    if envelope_schema != expected_input_schema:
         raise _fail("NEBULAR_MANYLINUX_SCHEMA", "Stage-A input and record schemas are not a matching pair")
     return validate_nebular070_payload_portability(
         record,

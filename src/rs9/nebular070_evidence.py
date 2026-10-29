@@ -158,12 +158,14 @@ def _validate_artifact_metadata(
     target: str,
     triple: str,
 ) -> dict[str, Any]:
-    archive_aware = value.get("schema") == ARCHIVE_ARTIFACT_METADATA_SCHEMA if isinstance(value, Mapping) else False
+    schema = value.get("schema") if isinstance(value, Mapping) else None
+    archive_aware = schema == ARCHIVE_ARTIFACT_METADATA_SCHEMA
     fields = {"schema", "target", "triple", "payload_archive", "package_manifest"}
     if archive_aware:
         fields.add("archive_member_manifest_sha256")
     result = _closed(value, fields, f"{target} artifact metadata")
-    if result["schema"] not in {ARTIFACT_METADATA_SCHEMA, ARCHIVE_ARTIFACT_METADATA_SCHEMA} \
+    if (not isinstance(schema, str)
+            or schema not in {ARTIFACT_METADATA_SCHEMA, ARCHIVE_ARTIFACT_METADATA_SCHEMA}) \
             or result["target"] != target or result["triple"] != triple:
         raise _fail("NEBULAR_STAGE_A_INPUT", f"{target} artifact metadata does not join")
     for name in ("payload_archive", "package_manifest"):
@@ -451,6 +453,12 @@ def assemble_payload_portability(
 
     loaded_bodies, body_file_info = _load_body_set(body_paths)
     loaded_metadata, metadata_file_info = _load_metadata_set(target_metadata_paths)
+    for target in LINUX_TARGETS:
+        loaded_metadata[target] = _validate_artifact_metadata(
+            loaded_metadata[target],
+            target=target,
+            triple=LINUX_TARGETS[target][0],
+        )
 
     metadata_schemas = {loaded_metadata[target].get("schema") for target in LINUX_TARGETS}
     if len(metadata_schemas) != 1:

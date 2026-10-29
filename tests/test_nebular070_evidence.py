@@ -135,6 +135,27 @@ class Nebular070EvidenceProducerTests(unittest.TestCase):
             __import__("hashlib").sha256(self.output.read_bytes()).hexdigest(),
         )
 
+    def test_loader_refuses_missing_and_extra_envelope_fields(self) -> None:
+        self._assemble()
+        original = json.loads(self.output.read_bytes())
+        variants = []
+        for missing in ("schema", "record", "bodies"):
+            malformed = dict(original)
+            malformed.pop(missing)
+            variants.append(("missing-" + missing, malformed))
+        variants.append(("extra-field", {**original, "unexpected": True}))
+        for label, malformed in variants:
+            with self.subTest(label=label):
+                path = self.root / (label + ".json")
+                path.write_bytes(canonical(malformed))
+                with self.assertRaises(ContractError) as context:
+                    load_payload_portability_bundle(
+                        path,
+                        expected_tf_producer_source=self.tf_source,
+                        expected_rs9_tool_source=self.rs9_source,
+                    )
+                self.assertEqual(context.exception.code, "NEBULAR_MANYLINUX_INPUT")
+
     def test_loader_rejects_archive_envelope_for_package_record(self) -> None:
         self._assemble()
         envelope = json.loads(self.output.read_bytes())
@@ -186,6 +207,37 @@ class Nebular070EvidenceProducerTests(unittest.TestCase):
         with self.assertRaises(ContractError) as context:
             self._assemble()
         self.assertEqual(context.exception.code, "NEBULAR_STAGE_A_SCHEMA")
+
+    def test_nonstring_artifact_metadata_schema_is_a_coded_refusal(self) -> None:
+        metadata_path = self.metadata_paths["linux-arm64-gnu"]
+        metadata = json.loads(metadata_path.read_bytes())
+        metadata["schema"] = {}
+        metadata_path.write_bytes(canonical(metadata))
+        with self.assertRaises(ContractError) as context:
+            self._assemble()
+        self.assertEqual(context.exception.code, "NEBULAR_STAGE_A_INPUT")
+
+    def test_loader_nonstring_schemas_are_coded_refusals(self) -> None:
+        self._assemble()
+        envelope = json.loads(self.output.read_bytes())
+        for field, value in (("schema", []), ("record.schema", {})):
+            with self.subTest(field=field):
+                candidate = json.loads(self.output.read_bytes())
+                if field == "schema":
+                    candidate["schema"] = value
+                else:
+                    candidate["record"]["schema"] = value
+                mixed = self.root / f"malformed-{field.replace('.', '-')}.json"
+                mixed.write_bytes(canonical(candidate))
+                with self.assertRaises(ContractError) as context:
+                    load_payload_portability_bundle(
+                        mixed,
+                        expected_tf_producer_source=self.tf_source,
+                        expected_rs9_tool_source=self.rs9_source,
+                    )
+                self.assertIn(context.exception.code, {
+                    "NEBULAR_MANYLINUX_INPUT", "NEBULAR_MANYLINUX_SCHEMA",
+                })
 
     def test_missing_body_refuses_before_output(self) -> None:
         self.body_paths["linux-x64-gnu"]["cpu"].unlink()

@@ -105,14 +105,32 @@ class DarwinFloorCompatibilityTests(unittest.TestCase):
         self.assertIn("DARWIN_FLOOR_MISMATCH", str(ctx.exception))
 
     def test_info_plist_below_gate1_floor_is_rejected(self) -> None:
+        for plist_floor, component_floor in (("11.0", (11, 0, 0)), ("12.0", (12, 0, 0))):
+            with self.subTest(plist_floor=plist_floor), self.assertRaises(ContractError) as ctx:
+                validate_darwin_payload_floor(
+                    _darwin_bundle(
+                        {
+                            "Contents/MacOS/theme-forge-nebular-fusion": component_floor,
+                            "Contents/MacOS/tfsb-studio-service": component_floor,
+                            "Contents/Resources/native/addon.node": component_floor,
+                        },
+                        plist_floor=plist_floor,
+                    )
+                )
+            self.assertEqual(ctx.exception.code, "DARWIN_FLOOR")
+
+    def test_required_floor_above_advertised_floor_is_rejected(self) -> None:
         with self.assertRaises(ContractError) as ctx:
             validate_darwin_payload_floor(
                 _darwin_bundle(
-                    {"Contents/MacOS/theme-forge-nebular-fusion": (13, 0, 0)},
-                    plist_floor="11.0",
-                )
+                    {
+                        "Contents/MacOS/theme-forge-nebular-fusion": (13, 0, 0),
+                        "Contents/MacOS/tfsb-studio-service": (13, 0, 0),
+                    }
+                ),
+                required_floor=(14, 0),
             )
-        self.assertIn("DARWIN_FLOOR", str(ctx.exception))
+        self.assertEqual(ctx.exception.code, "DARWIN_FLOOR")
 
     def test_malformed_macho_is_rejected(self) -> None:
         with self.assertRaises(ContractError) as ctx:

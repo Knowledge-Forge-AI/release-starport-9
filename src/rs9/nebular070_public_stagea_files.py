@@ -402,9 +402,11 @@ def _refs(value: Any, keys: set[str], label: str) -> dict[str, Any]:
 
 
 def _validate_spec(spec: Mapping[str, Any]) -> dict[str, Any]:
-    archive_aware = spec.get("schema") == ARCHIVE_SCHEMA
+    schema = spec.get("schema")
+    archive_aware = schema == ARCHIVE_SCHEMA
     expected_fields = SPEC_FIELDS | ({"payload_archives"} if archive_aware else set())
-    if set(spec) != expected_fields or spec.get("schema") not in {SCHEMA, ARCHIVE_SCHEMA} or spec.get("version") != VERSION:
+    if (set(spec) != expected_fields or not isinstance(schema, str)
+            or schema not in {SCHEMA, ARCHIVE_SCHEMA} or spec.get("version") != VERSION):
         raise _error("STAGE_A_SCHEMA", "Stage-A file specification is not the maintained version")
     product = _source(spec["product_source"], "product_source")
     producer = _source(spec["producer_source"], "producer_source")

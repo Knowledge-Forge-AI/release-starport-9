@@ -150,6 +150,20 @@ def _stage_a_descriptor(bundle):
 
 
 class Nebular070VersionedConsumerTests(unittest.TestCase):
+    def test_bundle_file_set_refuses_non_string_stage_a_schema(self):
+        fixture = _fixture()
+        self.addCleanup(fixture.tearDown)
+        bundle = _candidate_bundle(fixture, _actual_stage_a())
+        publish._validate_bundle_file_set(bundle)
+        payload = bundle / "payload_portability.json"
+        original = json.loads(payload.read_bytes())
+        for schema in ([], {}, None, False, 0):
+            with self.subTest(schema=schema):
+                payload.write_bytes(canonical({**original, "schema": schema}))
+                with self.assertRaises(AdmissionError) as context:
+                    publish._validate_bundle_file_set(bundle)
+                self.assertEqual(str(context.exception), "TF_PYPI_BUNDLE_MANYLINUX_INPUT")
+
     def test_consumer_floor_subset_parses_as_python311_and_has_closed_imports(self):
         """Bookworm's Python 3.11 floor must parse the consumer/helper subset."""
         root = Path(__file__).resolve().parents[1]
@@ -286,6 +300,31 @@ class Nebular070VersionedConsumerTests(unittest.TestCase):
                     qualify.assert_not_called()
                     admit.assert_not_called()
         stage_path.write_bytes(original)
+
+    def test_candidate_stage_a_nonstring_schema_is_an_admission_error(self):
+        stage_a = _actual_stage_a()
+        fixture = _manylinux_fixture(_fixture(), stage_a)
+        self.addCleanup(fixture.doCleanups)
+        bundle = _candidate_bundle(fixture, stage_a)
+        stage_path = bundle / "payload_portability.json"
+        envelope = json.loads(stage_path.read_bytes())
+        descriptor_source = stage_a.record["rs9_tool_source"]
+        for field, value in (("schema", {}), ("record.schema", [])):
+            with self.subTest(field=field):
+                candidate = copy.deepcopy(envelope)
+                if field == "schema":
+                    candidate["schema"] = value
+                else:
+                    candidate["record"]["schema"] = value
+                stage_path.write_bytes(canonical(candidate))
+                descriptor = _stage_a_descriptor(bundle)
+                with self.assertRaises(AdmissionError):
+                    publish._load_candidate_stage_a(
+                        bundle,
+                        descriptor,
+                        expected_commit=descriptor_source["commit"],
+                        expected_tree=descriptor_source["tree"],
+                    )
 
     def test_validated_stage_a_reaches_existing_consumer_boundary(self):
         stage_a = _actual_stage_a()
