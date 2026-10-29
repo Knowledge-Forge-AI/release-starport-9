@@ -401,9 +401,14 @@ def verify_direct_release_lineage(capture, binding):
         "commit_field": "releaseCommit",
         "tree_field": "testedTree",
     }
+    current_intake_provenance = {
+        "path": "PYPI-INTAKE-PROVENANCE.json",
+        "commit_field": "releaseCommit",
+        "tree_field": "testedTree",
+    }
     if provenance == legacy_provenance:
         provenance_kind = "legacy"
-    elif provenance == current_provenance:
+    elif provenance == current_provenance or provenance == current_intake_provenance:
         provenance_kind = "current-native"
     else:
         _fail("LINEAGE_BINDING", "Direct provenance identity fields are fixed")
