@@ -175,6 +175,39 @@ class ReceiptIdentityTests(unittest.TestCase):
                 self.assertEqual(stderr.getvalue().strip(), "TF_PYPI_" + code)
                 check.assert_not_called()
 
+    def test_darwin_spawn_probe_retains_only_fixed_fields_under_same_prefix(self):
+        import json
+        import tempfile
+        from unittest.mock import patch
+        from rs9.nebular070_installed_smoke import _collect_darwin_spawn_diagnostic
+        row = {"error_code": "EPERM", "status": None, "stdout_type": "undefined",
+               "stdout_bytes": 0, "marker_observed": False}
+        value = {"ps_is_setuid": True, "rows": {"ps": row, "node": dict(
+            row, error_code=None, status=0, stdout_type="string", stdout_bytes=3, marker_observed=True)}}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for index, content in enumerate([value, {**value, "private": "/private/example"}]):
+                evidence = root / str(index)
+                evidence.mkdir()
+                process = {"exit_code": 0, "cleanup_known": True, "output_complete": True,
+                           "forced_cleanup": False, "stdout_token": json.dumps(content)}
+                with patch.dict("os.environ", {"GITHUB_ACTIONS": "true"}), patch(
+                        "rs9.nebular070_installed_smoke.sys.platform", "darwin"), patch(
+                        "rs9.tf_pypi_consumer._nebular_run", return_value=process) as run:
+                    _collect_darwin_spawn_diagnostic("/fixed/node", env={"PATH": "/bin"},
+                        cwd=root, prefix=("/fixed/sandbox",), runner=object(), evidence=evidence)
+                self.assertEqual(run.call_args.args[3], ("/fixed/sandbox",))
+                self.assertEqual(run.call_args.args[4], 5)
+                self.assertEqual(run.call_args.args[0][0], "/fixed/node")
+                path = evidence / "darwin-spawn-diagnostic.run.json"
+                if index == 0:
+                    report = json.loads(path.read_bytes())
+                    self.assertFalse(report["qualification_authority"])
+                    self.assertEqual(report["rows"], value["rows"])
+                    self.assertNotIn("/private/example", path.read_text())
+                else:
+                    self.assertFalse(path.exists())
+
     def test_source_receipt_and_retained_copy_have_distinct_bound_bytes(self):
         original = b'{\n  "status": "pass"\n}'
         expected = sha256(original)

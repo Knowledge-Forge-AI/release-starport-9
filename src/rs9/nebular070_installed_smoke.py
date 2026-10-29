@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import os
+import sys
 import re
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -899,6 +900,78 @@ def validate_installed_smoke_summary(
     return dict(value)
 
 
+_DARWIN_SPAWN_PROBE = r"""const cp = require("node:child_process");
+const fs = require("node:fs");
+const codes = new Set(["EPERM", "EACCES", "ENOENT", "ENOBUFS", "ETIMEDOUT"]);
+function probe(file, args) {
+  const result = cp.spawnSync(file, args, {encoding: "utf8", timeout: 2000, maxBuffer: 65536});
+  const error = result.error && typeof result.error.code === "string" ? result.error.code : null;
+  return {
+    error_code: error === null ? null : codes.has(error) ? error : "OTHER",
+    status: Number.isInteger(result.status) ? result.status : null,
+    stdout_type: ["string", "undefined", "object"].includes(typeof result.stdout) ? typeof result.stdout : "other",
+    stdout_bytes: typeof result.stdout === "string" ? Buffer.byteLength(result.stdout) : 0,
+    marker_observed: result.stdout === "OK\n"
+  };
+}
+process.stdout.write(JSON.stringify({
+  ps_is_setuid: Boolean(fs.statSync("/bin/ps").mode & 0o4000),
+  rows: {
+    ps: probe("/bin/ps", ["-p", String(process.pid), "-o", "pid="]),
+    node: probe(process.execPath, ["-e", 'process.stdout.write("OK\\n")'])
+  }
+}));"""
+
+
+def _collect_darwin_spawn_diagnostic(
+    node: str, *, env: Mapping[str, str], cwd: Path, prefix: Sequence[str],
+    runner: Any, evidence: Path,
+) -> None:
+    """Observe two existing tools under the unchanged public Darwin sandbox."""
+    if os.environ.get("GITHUB_ACTIONS") != "true" or sys.platform != "darwin":
+        return
+    from rs9.tf_pypi_consumer import _nebular_run
+    process = _nebular_run([node, "-e", _DARWIN_SPAWN_PROBE], env, cwd, prefix, 5, runner=runner)
+    value = strict_json(str(process.get("stdout_token", "")).encode("utf-8"))
+    if (not isinstance(value, Mapping) or set(value) != {"ps_is_setuid", "rows"}
+            or type(value["ps_is_setuid"]) is not bool or not isinstance(value["rows"], Mapping)
+            or set(value["rows"]) != {"ps", "node"}):
+        return
+    for row in value["rows"].values():
+        if (not isinstance(row, Mapping) or set(row) != {
+                "error_code", "status", "stdout_type", "stdout_bytes", "marker_observed"}
+                or row["error_code"] not in {None, "EPERM", "EACCES", "ENOENT", "ENOBUFS", "ETIMEDOUT", "OTHER"}
+                or (row["status"] is not None and (
+                    type(row["status"]) is not int or not -64 <= row["status"] <= 255))
+                or row["stdout_type"] not in {"string", "undefined", "object", "other"}
+                or type(row["stdout_bytes"]) is not int or not 0 <= row["stdout_bytes"] <= 65536
+                or type(row["marker_observed"]) is not bool):
+            return
+    record = {
+        "schema": "rs9.nebular070-darwin-spawn-diagnostic.v1",
+        "evidence_mode": "diagnostic-only", "qualification_authority": False,
+        **dict(value),
+        "probe_process": {
+            "completed_cleanly": process.get("exit_code") == 0
+                and process.get("cleanup_known") is True and process.get("output_complete") is True
+                and process.get("forced_cleanup") is False,
+            "timed_out": process.get("timed_out") is True,
+            "output_limit_exceeded": process.get("output_limit_exceeded") is True,
+        },
+    }
+    destination = evidence / "darwin-spawn-diagnostic.run.json"
+    fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    try:
+        remaining = memoryview(canonical(record))
+        while remaining:
+            count = os.write(fd, remaining)
+            if count <= 0:
+                raise OSError("diagnostic write did not progress")
+            remaining = remaining[count:]
+    finally:
+        os.close(fd)
+
+
 def _native_execution_failure_code(
     process: Mapping[str, Any], *, report: Mapping[str, Any] | None = None,
 ) -> str:
@@ -1085,6 +1158,14 @@ def run_installed_smoke(
                 report, _, _ = _json_file(run_path, "failed native smoke run")
             except Exception:
                 pass
+            try:
+                if target == "darwin-arm64":
+                    _collect_darwin_spawn_diagnostic(
+                        command[0], env=env, cwd=process_cwd, prefix=prefix,
+                        runner=runner, evidence=scenario_dir,
+                    )
+            except Exception:
+                pass  # Optional diagnostics cannot mask or admit a failed run.
             fail(_native_execution_failure_code(process, report=report))
         run, run_data, run_sha = _json_file(run_path, "native smoke run")
         receipt, receipt_data, receipt_sha = _json_file(receipt_path, "native smoke receipt")

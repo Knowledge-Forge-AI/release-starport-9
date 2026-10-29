@@ -1026,6 +1026,7 @@ def _nebular_run(argv: Sequence[str], env: Mapping[str, str], cwd: Path,
     kill_sent = False
     cleanup_deadline: float | None = None
     post_exit_deadline: float | None = None
+    post_exit_group_pending = False
     started = time.monotonic()
     try:
         for name, stream in (("stdout", child.stdout), ("stderr", child.stderr)):
@@ -1036,7 +1037,10 @@ def _nebular_run(argv: Sequence[str], env: Mapping[str, str], cwd: Path,
             selector.register(fd, selectors.EVENT_READ, (name, stream))
             streams[fd] = (name, stream)
 
-        def request_termination(reason: str, *, timeout_reason: bool = False) -> None:
+        def request_termination(
+            reason: str, *, timeout_reason: bool = False,
+            grace_started_at: float | None = None,
+        ) -> None:
             nonlocal cleanup_deadline, forced_cleanup, termination_reason, timed_out, term_sent
             forced_cleanup = True
             termination_reason = termination_reason or reason
@@ -1044,7 +1048,10 @@ def _nebular_run(argv: Sequence[str], env: Mapping[str, str], cwd: Path,
             if not term_sent:
                 _nebular_signal_group(child, signal.SIGTERM)
                 term_sent = True
-            cleanup_deadline = _nebular_grace_deadline(cleanup_deadline, time.monotonic())
+            cleanup_deadline = _nebular_grace_deadline(
+                cleanup_deadline,
+                time.monotonic() if grace_started_at is None else grace_started_at,
+            )
 
         def escalate() -> None:
             nonlocal cleanup_deadline, forced_cleanup, kill_sent
@@ -1062,8 +1069,20 @@ def _nebular_run(argv: Sequence[str], env: Mapping[str, str], cwd: Path,
                 request_termination("native probe timeout", timeout_reason=True)
             elif code is not None and post_exit_deadline is None:
                 post_exit_deadline = now + _NEBULAR_DRAIN_GRACE
-                if _nebular_group_exists(child.pid):
-                    request_termination("native probe descendant cleanup")
+                post_exit_group_pending = _nebular_group_exists(child.pid)
+            # Give normal wrapper descendants the existing post-exit drain
+            # window. If they remain, retain the original leader-exit-anchored
+            # TERM/KILL deadlines; this never adds another grace period.
+            if (post_exit_group_pending and code is not None
+                    and post_exit_deadline is not None and not term_sent):
+                if not _nebular_group_exists(child.pid):
+                    # Never target a group after observing that it disappeared.
+                    post_exit_group_pending = False
+                elif now >= post_exit_deadline:
+                    request_termination(
+                        "native probe descendant cleanup",
+                        grace_started_at=post_exit_deadline - _NEBULAR_DRAIN_GRACE,
+                    )
             if cleanup_deadline is not None and now >= cleanup_deadline and not kill_sent:
                 escalate()
             if code is not None and streams and post_exit_deadline is not None and now >= post_exit_deadline:
