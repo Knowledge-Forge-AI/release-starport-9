@@ -52,6 +52,9 @@ class InstalledSmokeDriverTests(unittest.TestCase):
         tools.mkdir(parents=True)
         harness = tools / "native-rc-smoke.mjs"
         harness.write_text("export const runSmoke = () => {};\n", encoding="utf-8")
+        if target == "darwin-arm64":
+            from tests.test_nebular070_darwin_harness import ORIGINAL_FUNCTION
+            harness.write_text(ORIGINAL_FUNCTION, encoding="utf-8")
         runtime = root / "runtime"
         runtime.mkdir()
         target_info = {
@@ -294,6 +297,36 @@ class InstalledSmokeDriverTests(unittest.TestCase):
             validate_installed_smoke_summary(
                 candidate, target="linux-x64-gnu", authenticated_gui=gui,
             )
+
+    def test_darwin_harness_identity_must_match_the_native_probe(self):
+        temporary, prepared, runtime, native, gui, fake_run = self._fixture(target="darwin-arm64")
+        self.addCleanup(temporary.cleanup)
+        def checked_run(command, *args, **kwargs):
+            self.assertEqual(Path(command[1]).name, "native-rc-smoke-darwin.mjs")
+            self.assertNotIn(str(prepared["tools"] / "native-rc-smoke.mjs"), command)
+            return fake_run(command, *args, **kwargs)
+        with patch("rs9.tf_pypi_consumer._nebular_run", side_effect=checked_run), \
+                patch("rs9.nebular070_installed_smoke.node_binary", return_value="/usr/bin/true"):
+            baseline = run_installed_smoke(
+                prepared=prepared, target="darwin-arm64", runtime_root=runtime,
+                env={"PATH": "/usr/bin:/bin"}, prefix=(), evidence=Path(temporary.name) / "evidence",
+                native=native, gui=gui, runner=object(), timeout=20,
+            )
+        validate_installed_smoke_summary(baseline, target="darwin-arm64", authenticated_gui=gui)
+        for operation in ("hash", "missing-top", "missing-nested", "tool"):
+            with self.subTest(operation=operation), self.assertRaises(AdmissionError):
+                candidate = copy.deepcopy(baseline)
+                if operation == "hash":
+                    candidate["native_probe"]["darwin_process_harness"] = {
+                        **candidate["native_probe"]["darwin_process_harness"], "derived_sha256": "0" * 64,
+                    }
+                elif operation == "missing-top":
+                    candidate.pop("darwin_process_harness")
+                elif operation == "missing-nested":
+                    candidate["native_probe"].pop("darwin_process_harness")
+                else:
+                    candidate["darwin_process_harness"]["process_tool"] = "/bin/ps"
+                validate_installed_smoke_summary(candidate, target="darwin-arm64", authenticated_gui=gui)
 
     def test_strict_reloaded_matrix_covers_all_primary_targets(self):
         for target in ("darwin-arm64", "linux-arm64-gnu", "linux-x64-gnu"):

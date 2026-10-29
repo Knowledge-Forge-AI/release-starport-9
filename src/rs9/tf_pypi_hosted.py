@@ -824,6 +824,11 @@ def admit_nebular070_matrix(
         expected_wheel = next(row for row in expected["wheels"] if row["target"] == target)
         if result.get("consumer", {}).get("wheel") != expected_wheel:
             fail("NEBULAR_MATRIX_RECEIPT")
+        if system_profile and target == "darwin-arm64":
+            from rs9.nebular070_darwin_harness import require_release_darwin_harness
+            require_release_darwin_harness(
+                consumer.get("application_smoke", {}).get("darwin_process_harness"),
+            )
         if system_profile and target.startswith("linux"):
             preflight = consumer.get("system_webkit_preflight")
             expected_class = "bookworm-floor" if role == "floor" else "ubuntu-newer"
