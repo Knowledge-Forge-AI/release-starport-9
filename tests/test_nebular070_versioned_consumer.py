@@ -42,6 +42,9 @@ def _actual_stage_a():
     source.setUp()
     try:
         record = copy.deepcopy(source.stage_a_record)
+        record["schema"] = manylinux.ARCHIVE_PORTABILITY_SCHEMA
+        for row in record["targets"]:
+            row["archive_member_manifest_sha256"] = source.manifest["manifest_sha256"]
         record["evidence_mode"] = "actual"
         unsigned = dict(record)
         unsigned.pop("identity")
@@ -130,7 +133,7 @@ def _candidate_bundle(fixture, stage_a):
     for target in ("darwin-arm64", *TARGETS):
         shutil.copyfile(fixture.wheels[target], bundle / "dist" / fixture.wheels[target].name)
     (bundle / "payload_portability.json").write_bytes(b" " + canonical({
-        "schema": "rs9.nebular070-payload-portability-input.v2",
+        "schema": manylinux.ARCHIVE_PORTABILITY_INPUT_SCHEMA,
         "record": stage_a.record,
         "bodies": stage_a.receipt_bodies,
     }))
@@ -194,6 +197,30 @@ class Nebular070VersionedConsumerTests(unittest.TestCase):
         )
         with self.assertRaises(AdmissionError):
             hosted._nebular_expected_artifacts(fixture.expected, fixture.candidate, fixture_only)
+
+    def test_nonfixture_package_projection_stage_a_is_refused_by_hosted_gate(self):
+        archive_stage_a = _actual_stage_a()
+        record = copy.deepcopy(archive_stage_a.record)
+        record["schema"] = manylinux.PORTABILITY_SCHEMA
+        for row in record["targets"]:
+            row.pop("archive_member_manifest_sha256")
+        unsigned = dict(record)
+        unsigned.pop("identity")
+        record["identity"] = manylinux._digest(unsigned)
+        package_stage_a = manylinux.validate_nebular070_payload_portability(
+            record,
+            archive_stage_a.receipt_bodies,
+            expected_tf_producer_source={
+                "commit": record["tf_producer_source"]["commit"],
+                "tree": record["tf_producer_source"]["tree"],
+            },
+            expected_rs9_tool_source={
+                "commit": record["rs9_tool_source"]["commit"],
+                "tree": record["rs9_tool_source"]["tree"],
+            },
+        )
+        with self.assertRaises(AdmissionError):
+            hosted._nebular_stage_a_digest(package_stage_a)
 
     def test_generic_route_refuses_unsolicited_stage_a_fields(self):
         fixture = _fixture()

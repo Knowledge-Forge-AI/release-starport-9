@@ -15,6 +15,7 @@ from rs9.tf_pypi_model import PRODUCTS, TARGETS, load_pin, strict_json, validate
 from rs9.tf_pypi_platform import host_key
 from rs9.tf_pypi_verify import host_view, verify_aggregate
 from rs9.nebular070_manylinux import (
+    ARCHIVE_PORTABILITY_SCHEMA as NEBULAR070_ARCHIVE_PORTABILITY_SCHEMA,
     CLAIM as NEBULAR070_MANYLINUX_CLAIM,
     LINUX_TARGETS as NEBULAR070_MANYLINUX_TARGETS,
     PORTABILITY_SCHEMA as NEBULAR070_PORTABILITY_SCHEMA,
@@ -412,7 +413,10 @@ def _nebular_stage_a_digest(stage_a: ValidatedPayloadPortability | None) -> str 
                 "schema", "version", "claim", "construction_status", "tf_producer_source",
                 "rs9_tool_source", "evidence_mode", "source_input_snapshot_sha256", "targets", "identity",
             }
-            or record.get("schema") != NEBULAR070_PORTABILITY_SCHEMA
+            or record.get("schema") not in {
+                NEBULAR070_PORTABILITY_SCHEMA,
+                NEBULAR070_ARCHIVE_PORTABILITY_SCHEMA,
+            }
             or record.get("version") != NEBULAR070_MANYLINUX_VERSION
             or record.get("claim") != NEBULAR070_MANYLINUX_CLAIM
             or record.get("construction_status") != "payload-qualified"
@@ -445,7 +449,10 @@ def _nebular_stage_a_digest(stage_a: ValidatedPayloadPortability | None) -> str 
         if (not isinstance(row, Mapping)
                 or not isinstance(row.get("target"), str)
                 or row.get("target") not in NEBULAR070_MANYLINUX_TARGETS
-                or row.get("triple") != NEBULAR070_MANYLINUX_TARGETS[row["target"]][0]):
+                or row.get("triple") != NEBULAR070_MANYLINUX_TARGETS[row["target"]][0]
+                or not (record.get("schema") == NEBULAR070_ARCHIVE_PORTABILITY_SCHEMA
+                        and isinstance(row.get("archive_member_manifest_sha256"), str)
+                        and re.fullmatch(r"[0-9a-f]{64}", row["archive_member_manifest_sha256"]))):
             fail("NEBULAR_EXPECTED_ARTIFACTS")
     return digest
 

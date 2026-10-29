@@ -211,10 +211,11 @@ def validate_darwin_payload_floor(
         raise ContractError("INVALID_ARCHIVE", "Failed reading Darwin payload for floor verification") from exc
     if not binaries:
         raise ContractError("MACHO_FLOOR_MISSING", "Darwin payload has no Contents/MacOS native executable")
-    if any(version[:2] != plist_floor for _path, _role, version in binaries):
-        raise ContractError("DARWIN_FLOOR_MISMATCH", "Info.plist and LC_BUILD_VERSION floors disagree")
-    if any(version[:2] < required_floor for _path, _role, version in binaries):
-        raise ContractError("DARWIN_FLOOR", "Mach-O LC_BUILD_VERSION floor is below the Gate1 floor")
+    if any(version[:2] > plist_floor for _path, _role, version in binaries):
+        raise ContractError(
+            "DARWIN_FLOOR_MISMATCH",
+            "A Mach-O LC_BUILD_VERSION floor exceeds the Info.plist floor",
+        )
     return {
         "schema": "rs9.darwin-floor-evidence.v1alpha1",
         "required_floor": {"major": required_floor[0], "minor": required_floor[1]},

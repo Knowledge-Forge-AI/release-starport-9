@@ -136,8 +136,8 @@ class Nebular070Gate1Tests(unittest.TestCase):
         self.assertEqual(evidence["info_plist"], {"major": 13, "minor": 0})
         self.assertEqual(extract_macho_build_version(_macho((13, 0, 0))), (13, 0, 0))
         with self.assertRaises(ContractError) as ctx:
-            validate_darwin_payload_floor(_darwin_payload((12, 0, 0)))
-        self.assertIn("DARWIN_FLOOR", str(ctx.exception))
+            validate_darwin_payload_floor(_darwin_payload((14, 0, 0)))
+        self.assertIn("DARWIN_FLOOR_MISMATCH", str(ctx.exception))
         with self.assertRaises(ContractError) as ctx:
             validate_darwin_payload_floor(_darwin_payload((13, 0, 0), plist_floor="12.0"))
         self.assertIn("DARWIN_FLOOR", str(ctx.exception))

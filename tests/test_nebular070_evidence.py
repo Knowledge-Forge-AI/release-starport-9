@@ -15,7 +15,12 @@ from rs9.nebular070_evidence import (
     BODY_KINDS,
     assemble_payload_portability,
 )
-from rs9.nebular070_manylinux import PORTABILITY_INPUT_SCHEMA, _digest, load_payload_portability_bundle
+from rs9.nebular070_manylinux import (
+    ARCHIVE_PORTABILITY_INPUT_SCHEMA,
+    PORTABILITY_INPUT_SCHEMA,
+    _digest,
+    load_payload_portability_bundle,
+)
 from rs9.nebular070_payload import MAX_INPUT_BYTES
 from rs9.scratch import canonical
 from tests.test_nebular070_manylinux import Nebular070ManylinuxContractTests
@@ -65,6 +70,7 @@ class Nebular070EvidenceProducerTests(unittest.TestCase):
         self.output = self.root / "payload_portability.json"
 
     def _assemble(self, **kwargs):
+        target_archive_paths = kwargs.pop("target_archive_paths", None)
         return assemble_payload_portability(
             self.body_paths,
             self.metadata_paths,
@@ -72,7 +78,27 @@ class Nebular070EvidenceProducerTests(unittest.TestCase):
             kwargs.pop("rs9_tool_source", self.rs9_source),
             kwargs.pop("source_input_snapshot_sha256", self.snapshot),
             kwargs.pop("output_path", self.output),
+            target_archive_paths=target_archive_paths,
         )
+
+    def test_archive_aware_metadata_joins_complete_archive_domain(self) -> None:
+        archive_paths = {}
+        for target in self.body_paths:
+            archive_path = self.root / target / "payload.tar.gz"
+            archive_path.write_bytes(self.fixture.archive)
+            archive_paths[target] = archive_path
+            metadata_path = self.metadata_paths[target]
+            metadata = json.loads(metadata_path.read_bytes())
+            metadata["schema"] = "rs9.nebular070-stage-a-artifact-metadata.v2"
+            metadata["payload_archive"] = {
+                "sha256": __import__("hashlib").sha256(self.fixture.archive).hexdigest(),
+                "bytes": len(self.fixture.archive),
+            }
+            metadata["archive_member_manifest_sha256"] = self.fixture.manifest["manifest_sha256"]
+            metadata_path.write_bytes(canonical(metadata))
+        result = self._assemble(target_archive_paths=archive_paths)
+        self.assertEqual(result["record"]["schema"], "rs9.nebular070-payload-portability.v3")
+        self.assertTrue(all("archive_member_manifest_sha256" in row for row in result["record"]["targets"]))
 
     def test_actual_writer_emits_closed_bundle_and_receipt(self) -> None:
         result = self._assemble()
@@ -108,6 +134,58 @@ class Nebular070EvidenceProducerTests(unittest.TestCase):
             receipt["output"]["sha256"],
             __import__("hashlib").sha256(self.output.read_bytes()).hexdigest(),
         )
+
+    def test_loader_rejects_archive_envelope_for_package_record(self) -> None:
+        self._assemble()
+        envelope = json.loads(self.output.read_bytes())
+        envelope["schema"] = ARCHIVE_PORTABILITY_INPUT_SCHEMA
+        mixed = self.root / "mixed-archive-envelope.json"
+        mixed.write_bytes(canonical(envelope))
+        with self.assertRaises(ContractError) as context:
+            load_payload_portability_bundle(
+                mixed,
+                expected_tf_producer_source=self.tf_source,
+                expected_rs9_tool_source=self.rs9_source,
+            )
+        self.assertEqual(context.exception.code, "NEBULAR_MANYLINUX_SCHEMA")
+
+    def test_loader_rejects_package_envelope_for_archive_record(self) -> None:
+        archive_paths = {}
+        for target in self.body_paths:
+            archive_path = self.root / target / "payload.tar.gz"
+            archive_path.write_bytes(self.fixture.archive)
+            archive_paths[target] = archive_path
+            metadata_path = self.metadata_paths[target]
+            metadata = json.loads(metadata_path.read_bytes())
+            metadata["schema"] = "rs9.nebular070-stage-a-artifact-metadata.v2"
+            metadata["payload_archive"] = {
+                "sha256": __import__("hashlib").sha256(self.fixture.archive).hexdigest(),
+                "bytes": len(self.fixture.archive),
+            }
+            metadata["archive_member_manifest_sha256"] = self.fixture.manifest["manifest_sha256"]
+            metadata_path.write_bytes(canonical(metadata))
+        self._assemble(target_archive_paths=archive_paths)
+        envelope = json.loads(self.output.read_bytes())
+        envelope["schema"] = PORTABILITY_INPUT_SCHEMA
+        mixed = self.root / "mixed-package-envelope.json"
+        mixed.write_bytes(canonical(envelope))
+        with self.assertRaises(ContractError) as context:
+            load_payload_portability_bundle(
+                mixed,
+                expected_tf_producer_source=self.tf_source,
+                expected_rs9_tool_source=self.rs9_source,
+            )
+        self.assertEqual(context.exception.code, "NEBULAR_MANYLINUX_SCHEMA")
+
+    def test_mixed_artifact_metadata_schemas_refuse_before_archive_lookup(self) -> None:
+        metadata_path = self.metadata_paths["linux-arm64-gnu"]
+        metadata = json.loads(metadata_path.read_bytes())
+        metadata["schema"] = "rs9.nebular070-stage-a-artifact-metadata.v2"
+        metadata["archive_member_manifest_sha256"] = "a" * 64
+        metadata_path.write_bytes(canonical(metadata))
+        with self.assertRaises(ContractError) as context:
+            self._assemble()
+        self.assertEqual(context.exception.code, "NEBULAR_STAGE_A_SCHEMA")
 
     def test_missing_body_refuses_before_output(self) -> None:
         self.body_paths["linux-x64-gnu"]["cpu"].unlink()

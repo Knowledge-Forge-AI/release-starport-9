@@ -35,11 +35,13 @@ from rs9.security import validate_safe_relative_posix_path
 
 
 SCHEMA = "rs9.nebular070-public-stage-a-files.v1"
+ARCHIVE_SCHEMA = "rs9.nebular070-public-stage-a-files.v2"
 OUTPUT_SCHEMA = "rs9.nebular070-public-stage-a-output.v1"
 VERSION = "0.7.0"
 MAX_SPEC_BYTES = 2 * 1024 * 1024
 MAX_BODY_BYTES = 8 * 1024 * 1024
 MAX_MANIFEST_BYTES = 16 * 1024 * 1024
+MAX_ARCHIVE_BYTES = 2 * 1024 * 1024 * 1024
 MAX_OUTPUT_BYTES = 32 * 1024 * 1024
 HEX64 = set("0123456789abcdef")
 PROTECTED_COMPONENTS = frozenset({
@@ -176,11 +178,11 @@ def _safe_relative(value: Any, label: str) -> str:
     return value
 
 
-def _file_ref(value: Any, label: str) -> dict[str, Any]:
+def _file_ref(value: Any, label: str, *, max_bytes: int = MAX_MANIFEST_BYTES) -> dict[str, Any]:
     if not isinstance(value, Mapping) or set(value) != FILE_REF_FIELDS:
         raise _error("STAGE_A_SCHEMA", f"{label} is not a closed file reference")
     path = _safe_relative(value["path"], f"{label}.path")
-    if type(value["bytes"]) is not int or value["bytes"] < 1 or value["bytes"] > MAX_MANIFEST_BYTES:
+    if type(value["bytes"]) is not int or value["bytes"] < 1 or value["bytes"] > max_bytes:
         raise _error("STAGE_A_SCHEMA", f"{label}.bytes is malformed")
     digest = _hex(value["sha256"], 64, f"{label}.sha256")
     return {"path": path, "bytes": value["bytes"], "sha256": digest}
@@ -204,7 +206,7 @@ def _open_relative(root: Path, relative: str, label: str) -> tuple[int, int]:
 
 
 def _read_ref(root: Path, ref: Any, label: str, *, limit: int) -> bytes:
-    checked = _file_ref(ref, label)
+    checked = _file_ref(ref, label, max_bytes=limit)
     try:
         fd, directory_fd = _open_relative(root, checked["path"], label)
     except ContractError:
@@ -400,7 +402,9 @@ def _refs(value: Any, keys: set[str], label: str) -> dict[str, Any]:
 
 
 def _validate_spec(spec: Mapping[str, Any]) -> dict[str, Any]:
-    if set(spec) != SPEC_FIELDS or spec.get("schema") != SCHEMA or spec.get("version") != VERSION:
+    archive_aware = spec.get("schema") == ARCHIVE_SCHEMA
+    expected_fields = SPEC_FIELDS | ({"payload_archives"} if archive_aware else set())
+    if set(spec) != expected_fields or spec.get("schema") not in {SCHEMA, ARCHIVE_SCHEMA} or spec.get("version") != VERSION:
         raise _error("STAGE_A_SCHEMA", "Stage-A file specification is not the maintained version")
     product = _source(spec["product_source"], "product_source")
     producer = _source(spec["producer_source"], "producer_source")
@@ -410,18 +414,25 @@ def _validate_spec(spec: Mapping[str, Any]) -> dict[str, Any]:
     origins = _refs(spec["source_origins"], set(TARGETS), "source_origins")
     metadata = _refs(spec["artifact_metadata"], set(TARGETS), "artifact_metadata")
     bodies = _refs(spec["bodies"], set(TARGETS), "bodies")
+    payload_archives = _refs(spec["payload_archives"], set(TARGETS), "payload_archives") if archive_aware else None
     normalized_bodies: dict[str, dict[str, Any]] = {}
     for target in TARGETS:
         runtime_inputs[target] = _refs(runtime_inputs[target], {"closed_manifest", "runtime_receipt"},
                                        f"runtime_inputs.{target}")
         bodies[target] = _refs(bodies[target], set(BODY_KINDS), f"bodies.{target}")
         normalized_bodies[target] = dict(bodies[target])
+        if payload_archives is not None:
+            payload_archives[target] = _file_ref(
+                payload_archives[target], f"payload_archives.{target}", max_bytes=MAX_ARCHIVE_BYTES,
+            )
     normalized = {
-        "schema": SCHEMA, "version": VERSION, "product_source": product,
+        "schema": ARCHIVE_SCHEMA if archive_aware else SCHEMA, "version": VERSION, "product_source": product,
         "producer_source": producer, "runtime_manifest": _file_ref(spec["runtime_manifest"], "runtime_manifest"),
         "runtime_inputs": runtime_inputs, "source_origins": origins,
         "bodies": normalized_bodies, "artifact_metadata": metadata,
     }
+    if payload_archives is not None:
+        normalized["payload_archives"] = payload_archives
     return normalized
 
 
@@ -432,6 +443,16 @@ def _read_inputs(root: Path, spec: Mapping[str, Any]) -> dict[str, Any]:
         "runtime_manifest": _read_ref(root, spec["runtime_manifest"], "runtime_manifest", limit=MAX_MANIFEST_BYTES),
         "runtime_inputs": {}, "source_origins": {}, "bodies": {}, "artifact_metadata": {},
     }
+    if "payload_archives" in spec:
+        inputs["payload_archives"] = {
+            target: _read_ref(
+                root,
+                spec["payload_archives"][target],
+                f"payload_archives.{target}",
+                limit=MAX_ARCHIVE_BYTES,
+            )
+            for target in TARGETS
+        }
     for target in TARGETS:
         lane = spec["runtime_inputs"][target]
         inputs["runtime_inputs"][target] = {

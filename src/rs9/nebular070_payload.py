@@ -23,6 +23,8 @@ HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 PORTABILITY_SCHEMA = "rs9.nebular070-payload-portability.v2"
 PORTABILITY_INPUT_SCHEMA = "rs9.nebular070-payload-portability-input.v2"
+ARCHIVE_PORTABILITY_SCHEMA = "rs9.nebular070-payload-portability.v3"
+ARCHIVE_PORTABILITY_INPUT_SCHEMA = "rs9.nebular070-payload-portability-input.v3"
 LEGACY_PORTABILITY_SCHEMA = "rs9.nebular070-payload-portability.v1"
 ADMISSION_SCHEMA = "rs9.nebular070-manylinux-release-admission.v1"
 PAYLOAD_RECEIPT_SCHEMA = "rs9.nebular070-payload-evidence.v1"
@@ -49,6 +51,7 @@ PAYLOAD_ROW_FIELDS = {
     "host_floor_observation_sha256", "host_newer_observation_sha256",
     "cpu_baseline_sha256",
 }
+ARCHIVE_PAYLOAD_ROW_FIELDS = PAYLOAD_ROW_FIELDS | {"archive_member_manifest_sha256"}
 ACTUAL_QUALIFICATION_SCHEMA = "nebular.native-rc-qualification-v1"
 ELF_PORTABILITY_SCHEMA = "nebular-native-elf-portability-observation-set-v1"
 RUNTIME_RECEIPT_SCHEMA = "nebular-native-runtime-material-receipt-v1"
@@ -511,12 +514,13 @@ def _validate_payload_envelope(
     expected_tf_producer_source: Mapping[str, str],
     expected_rs9_tool_source: Mapping[str, str],
     allow_fixture: bool,
-) -> tuple[dict[str, Any], list[Mapping[str, Any]]]:
+) -> tuple[dict[str, Any], list[Mapping[str, Any]], bool]:
     top = _closed(record, {
         "schema", "version", "claim", "construction_status", "tf_producer_source",
         "rs9_tool_source", "evidence_mode", "source_input_snapshot_sha256", "targets", "identity",
     }, "payload portability")
-    if top["schema"] != PORTABILITY_SCHEMA or top["version"] != VERSION \
+    archive_aware = top["schema"] == ARCHIVE_PORTABILITY_SCHEMA
+    if top["schema"] not in {PORTABILITY_SCHEMA, ARCHIVE_PORTABILITY_SCHEMA} or top["version"] != VERSION \
             or top["claim"] != CLAIM or top["construction_status"] != "payload-qualified" \
             or top["evidence_mode"] != ("fixture" if allow_fixture else "actual"):
         raise _fail("NEBULAR_MANYLINUX_POLICY", "Payload portability policy is not the 0.7.0 construction contract")
@@ -541,7 +545,7 @@ def _validate_payload_envelope(
     }
     if set(receipt_bodies) != expected_receipts:
         raise _fail("NEBULAR_MANYLINUX_RECEIPT", "Receipt body set is not exactly the reviewed target/kind set")
-    return top, targets
+    return top, targets, archive_aware
 
 
 def _join_payload_body(body: Mapping[str, Any], row: Mapping[str, Any], field: str, target: str) -> None:
@@ -550,9 +554,13 @@ def _join_payload_body(body: Mapping[str, Any], row: Mapping[str, Any], field: s
 
 
 def _validate_payload_target_row(
-    row: Mapping[str, Any], *, source_snapshot: str
+    row: Mapping[str, Any], *, source_snapshot: str, archive_aware: bool
 ) -> dict[str, Any]:
-    row = _closed(row, PAYLOAD_ROW_FIELDS, "payload target")
+    row = _closed(
+        row,
+        ARCHIVE_PAYLOAD_ROW_FIELDS if archive_aware else PAYLOAD_ROW_FIELDS,
+        "payload target",
+    )
     target = row["target"]
     if target not in LINUX_TARGETS or row["triple"] != LINUX_TARGETS[target][0]:
         raise _fail("NEBULAR_MANYLINUX_TARGET", "Payload target/triple does not match the reviewed set")
@@ -564,6 +572,8 @@ def _validate_payload_target_row(
         "host_newer_observation_sha256", "cpu_baseline_sha256",
     ):
         _hex(row[field], f"{target} {field}")
+    if archive_aware:
+        _hex(row["archive_member_manifest_sha256"], f"{target} archive member manifest")
     if row["source_input_snapshot_sha256"] != source_snapshot:
         raise _fail("NEBULAR_MANYLINUX_SOURCE", f"{target} source/input snapshot does not join the record")
     return row
@@ -643,8 +653,11 @@ def _validate_payload_target(
     receipt_bodies: Mapping[str, Mapping[str, Any]],
     *,
     source_snapshot: str,
+    archive_aware: bool,
 ) -> dict[str, dict[str, Any]]:
-    row = _validate_payload_target_row(row, source_snapshot=source_snapshot)
+    row = _validate_payload_target_row(
+        row, source_snapshot=source_snapshot, archive_aware=archive_aware,
+    )
     checked = _validate_payload_target_native(row, receipt_bodies)
     checked.update(_validate_payload_target_host(row, receipt_bodies))
     return checked
@@ -659,7 +672,7 @@ def validate_nebular070_payload_portability(
     allow_fixture: bool = False,
 ) -> ValidatedPayloadPortability:
     """Validate the maintained native portability evidence before wheel construction."""
-    top, targets = _validate_payload_envelope(
+    top, targets, archive_aware = _validate_payload_envelope(
         record,
         receipt_bodies,
         expected_tf_producer_source=expected_tf_producer_source,
@@ -669,7 +682,10 @@ def validate_nebular070_payload_portability(
     checked: dict[str, dict[str, Any]] = {}
     for row in targets:
         checked.update(_validate_payload_target(
-            row, receipt_bodies, source_snapshot=top["source_input_snapshot_sha256"]
+            row,
+            receipt_bodies,
+            source_snapshot=top["source_input_snapshot_sha256"],
+            archive_aware=archive_aware,
         ))
     unsigned = dict(top)
     unsigned.pop("identity")
@@ -713,19 +729,35 @@ def load_payload_portability_bundle(
     if root.is_symlink():
         raise _fail("NEBULAR_MANYLINUX_INPUT", "Stage-A input path must not be a symlink")
     if root.is_dir():
+        record = _read_input_json(root / "record.json", "Stage-A record")
+        record_schema = record.get("schema") if isinstance(record, Mapping) else None
+        input_schema = (
+            ARCHIVE_PORTABILITY_INPUT_SCHEMA
+            if record_schema == ARCHIVE_PORTABILITY_SCHEMA
+            else PORTABILITY_INPUT_SCHEMA
+        )
         envelope: Mapping[str, Any] = {
-            "schema": PORTABILITY_INPUT_SCHEMA,
-            "record": _read_input_json(root / "record.json", "Stage-A record"),
+            "schema": input_schema,
+            "record": record,
             "bodies": _read_input_json(root / "bodies.json", "Stage-A bodies"),
         }
     else:
         envelope = _read_input_json(root, "Stage-A input")
-    if set(envelope) != {"schema", "record", "bodies"} or envelope["schema"] != PORTABILITY_INPUT_SCHEMA:
+    if set(envelope) != {"schema", "record", "bodies"} or envelope["schema"] not in {
+        PORTABILITY_INPUT_SCHEMA, ARCHIVE_PORTABILITY_INPUT_SCHEMA,
+    }:
         raise _fail("NEBULAR_MANYLINUX_INPUT", "Stage-A input envelope is not closed")
     record = envelope["record"]
     bodies = envelope["bodies"]
     if not isinstance(record, Mapping) or not isinstance(bodies, Mapping):
         raise _fail("NEBULAR_MANYLINUX_INPUT", "Stage-A input record/bodies are malformed")
+    record_schema = record.get("schema")
+    expected_input_schema = {
+        PORTABILITY_SCHEMA: PORTABILITY_INPUT_SCHEMA,
+        ARCHIVE_PORTABILITY_SCHEMA: ARCHIVE_PORTABILITY_INPUT_SCHEMA,
+    }.get(record_schema)
+    if envelope["schema"] != expected_input_schema:
+        raise _fail("NEBULAR_MANYLINUX_SCHEMA", "Stage-A input and record schemas are not a matching pair")
     return validate_nebular070_payload_portability(
         record,
         bodies,

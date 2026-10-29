@@ -8,10 +8,12 @@ hash-bound bytes and never exposes unsafe input/output paths.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import subprocess
 import tempfile
+import tarfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -118,6 +120,46 @@ class StageAFileAdapterTests(unittest.TestCase):
         self.assertEqual(receipt["source"]["rs9"], self.rs9)
         self.assertEqual(receipt["payload"]["path"], "payload-portability.json")
         self.assertNotIn(str(self.root), json.dumps(receipt))
+
+    def test_archive_aware_spec_detaches_both_bounded_archive_refs(self) -> None:
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w:gz") as archive:
+            info = tarfile.TarInfo("payload-root/")
+            info.type = tarfile.DIRTYPE
+            info.mode = 0o755
+            archive.addfile(info)
+            info = tarfile.TarInfo("payload-root/LICENSE")
+            content = b"AGPL-3.0-or-later\n"
+            info.size = len(content)
+            info.mode = 0o644
+            archive.addfile(info, io.BytesIO(content))
+        raw_archive = stream.getvalue()
+        spec = self._spec()
+        spec["schema"] = adapter.ARCHIVE_SCHEMA
+        spec["payload_archives"] = {
+            target: self._file(f"{target}/payload.tar.gz", raw_archive)
+            for target in LINUX_TARGETS
+        }
+        spec_name = self._write_spec(spec, "archive-spec.json")
+        result = self._run(spec_name, "archive-out")
+        for target in LINUX_TARGETS:
+            self.assertEqual(result["recorded"]["inputs"]["payload_archives"][target], raw_archive)
+
+    def test_archive_ref_uses_archive_bound_above_manifest_default(self) -> None:
+        raw_archive = b"a" * (adapter.MAX_MANIFEST_BYTES + 1)
+        spec = self._spec()
+        spec["schema"] = adapter.ARCHIVE_SCHEMA
+        spec["payload_archives"] = {
+            target: self._file(f"{target}/large-payload.tar.gz", raw_archive)
+            for target in LINUX_TARGETS
+        }
+        spec_name = self._write_spec(spec, "large-archive-spec.json")
+        result = self._run(spec_name, "large-archive-out")
+        for target in LINUX_TARGETS:
+            self.assertEqual(
+                result["recorded"]["inputs"]["payload_archives"][target],
+                raw_archive,
+            )
 
     def test_declared_digest_and_symlink_are_refused(self) -> None:
         spec = self._spec()

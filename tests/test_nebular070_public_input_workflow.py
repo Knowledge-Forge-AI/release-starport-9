@@ -28,9 +28,13 @@ from rs9.tf_pypi_nebular070_publish import (
     PUBLIC_INPUTS_PREPARATION_RECEIPT,
     PUBLIC_INPUTS_TEMPLATE_DESCRIPTOR,
     PUBLIC_STAGE_A_OUTPUT,
+    PUBLIC_INRUN_MANYLINUX_ORIGIN_KIND,
+    PUBLIC_INRUN_MANYLINUX_SCHEMA,
+    _public_stage_a_output_from_descriptor,
     _load_public_stage_a_adapter,
     _read_public_descriptor_bind_output,
     _resume_stage_b_member_path,
+    build_candidates_bundle,
     extract_public_external_artifact,
     prepare_public_inputs_070,
     publication_resume_job_text,
@@ -125,6 +129,73 @@ class Nebular070PublicInputWorkflowTests(unittest.TestCase):
             "  build_verify_070:", 1
         )[0]
         self.assertNotIn("\n    needs:", prepare)
+
+    def test_public_input_upload_keeps_hidden_transport_and_build_uses_descriptor_stage_a(self):
+        text = workflow_070_jobs_text()
+        public_upload = text.split(
+            "      - name: Upload 0.7.0 public inputs\n", 1
+        )[1].split("\n  build_verify_070:", 1)[0]
+        self.assertIn("include-hidden-files: true", public_upload)
+        self.assertIn(
+            "path: '${{ runner.temp }}/tfnf-070-public-inputs/'", public_upload
+        )
+        self.assertEqual(text.count("include-hidden-files: true"), 1)
+
+        build = text.split("  build_verify_070:\n", 1)[1].split(
+            "\n  native_consumer_070_darwin_arm64:", 1
+        )[0]
+        self.assertNotIn("--payload-portability", build)
+        self.assertIn("--require-manylinux", build)
+        self.assertIn(
+            "--tf-producer-commit 79c67bb70d800701b4b0cdbb9caa9be2bbc7c2ff",
+            build,
+        )
+        self.assertIn(
+            "--tf-producer-tree e663c9cf15144578a17d3cd501cf031ac83a7e0e",
+            build,
+        )
+
+    def test_descriptor_stage_a_default_and_source_override_guard_remain_closed(self):
+        descriptor = {
+            "manylinux": {
+                "schema": PUBLIC_INRUN_MANYLINUX_SCHEMA,
+                "origin_kind": PUBLIC_INRUN_MANYLINUX_ORIGIN_KIND,
+                "stage_a": {"path": "generated-stage-a/payload-portability.json"},
+            }
+        }
+        self.assertEqual(
+            _public_stage_a_output_from_descriptor(descriptor), "generated-stage-a"
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            evidence = root / "evidence"
+            evidence.mkdir()
+            wrong = root / "wrong-payload-portability.json"
+            wrong.write_bytes(b"{}")
+            with (
+                patch(
+                    "rs9.tf_pypi_nebular070_publish.repo_root",
+                    return_value=root,
+                ),
+                patch(
+                    "rs9.tf_pypi_nebular070_publish._git_output",
+                    return_value="a" * 40,
+                ),
+                patch(
+                    "rs9.tf_pypi_nebular070_publish.materialize_qualification_evidence",
+                    return_value=descriptor,
+                ),
+            ):
+                with self.assertRaises(AdmissionError) as ctx:
+                    build_candidates_bundle(
+                        root / "bundle",
+                        expected_commit="a" * 40,
+                        evidence_dir=evidence,
+                        payload_portability=wrong,
+                        tf_producer_source={"commit": "c" * 40, "tree": "d" * 40},
+                        require_manylinux=True,
+                    )
+            self.assertEqual(ctx.exception.code, "TF_PYPI_MANYLINUX_INPUT")
 
     def test_stage_b_resume_layout_matches_prepare_resume_materialization(self):
         resume = Path("resume")
@@ -281,6 +352,35 @@ class Nebular070PublicInputWorkflowTests(unittest.TestCase):
             )
             self.assertEqual(result["artifact"], MANYLINUX_ADMISSION_ARTIFACT)
             self.assertEqual(set(result["members"]), set(MANYLINUX_ADMISSION_MEMBERS))
+
+    def test_public_input_archive_preserves_six_hidden_tfsb_members(self):
+        hidden = {
+            "docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-dark.toml",
+            "docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-light.toml",
+            "docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand-package.toml",
+            "docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand.toml",
+            "docs/examples/v0.4/brand-system/core-minimal/.tfsb/companions/GUIDANCE.md",
+            "docs/examples/v0.4/brand-system/core-minimal/.tfsb/project.toml",
+        }
+        files = {
+            PUBLIC_INPUTS_TEMPLATE_DESCRIPTOR: b"{}",
+            PUBLIC_INPUTS_DESCRIPTOR: b"{}",
+            "fetch-receipt.json": b"{}",
+            PUBLIC_INPUTS_PREPARATION_RECEIPT: b"{}",
+            f"{PUBLIC_STAGE_A_OUTPUT}/payload-portability.json": b"{}",
+            f"{PUBLIC_STAGE_A_OUTPUT}/stage-a-receipt.json": b"{}",
+        }
+        files.update({name: b"fixture" for name in hidden})
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            archive = root / "public-inputs.zip"
+            archive.write_bytes(_zip_bytes(files))
+            result = extract_public_external_artifact(
+                archive,
+                root / "out",
+                artifact_name=PUBLIC_INPUTS_ARTIFACT,
+            )
+            self.assertTrue(hidden.issubset(set(result["members"])))
 
     def test_external_archive_rejects_symlinks_and_traversal(self):
         with tempfile.TemporaryDirectory() as temp:
