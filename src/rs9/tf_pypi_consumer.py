@@ -1785,7 +1785,7 @@ def consume_nebular_candidate(
             if not isinstance(expected_members, list) or not expected_members:
                 fail("NEBULAR_SMOKE_CLOSURE")
             smoke_prepared["expected_members"] = expected_members
-            smoke_prepared["manifest_sha256"] = sha256(canonical(expected_members))
+            smoke_prepared["manifest_sha256"] = capture["manifest_sha256"]
             system_host = system_webkit_host_observation
             system_context = None
             if system_linux:

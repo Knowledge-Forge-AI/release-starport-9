@@ -54,6 +54,32 @@ class ReceiptIdentityTests(unittest.TestCase):
                 fail(code)
             self.assertEqual(caught.exception.code, "TF_PYPI_" + code)
 
+    def test_failed_harness_reports_expose_only_closed_diagnostic_categories(self):
+        import json
+        from rs9.nebular070_installed_smoke import _native_execution_failure_code
+        def summary(problems):
+            return {"stdout_token": json.dumps({"label": "owned-run", "status": "fail",
+                                                "problems": problems}), "stderr_token": ""}
+        cases = [
+            (["harness error: ENOENT /private/example"], "FILESYSTEM_MISSING"),
+            (["required step app-shell failed: private payload"], "STEP_APP_SHELL"),
+            (["application exit code 134 signal null"], "APPLICATION_EXIT"),
+            (["persistent user state changed: /private/example"], "USER_STATE"),
+            (["private unrecognized payload"], None),
+        ]
+        for problems, category in cases:
+            expected = "NEBULAR_NATIVE_EXECUTION" + ("_" + category if category else "")
+            self.assertEqual(_native_execution_failure_code(summary(problems)), expected)
+        report = {"finalization": {"schema": "nebular.native-rc-finalization-v1",
+                  "status": "failed", "phase": "pre-spawn", "exceptionFamily": "filesystem"}}
+        self.assertEqual(_native_execution_failure_code({}, report=report),
+                         "NEBULAR_NATIVE_EXECUTION_HARNESS_PRE_SPAWN_FILESYSTEM")
+        report["finalization"]["phase"] = "/private/example"
+        self.assertEqual(_native_execution_failure_code({}, report=report),
+                         "NEBULAR_NATIVE_EXECUTION")
+        self.assertEqual(_native_execution_failure_code({"stdout_token": "{", "stderr_token": ""}),
+                         "NEBULAR_NATIVE_EXECUTION")
+
     def test_source_receipt_and_retained_copy_have_distinct_bound_bytes(self):
         original = b'{\n  "status": "pass"\n}'
         expected = sha256(original)

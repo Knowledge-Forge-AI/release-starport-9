@@ -899,7 +899,9 @@ def validate_installed_smoke_summary(
     return dict(value)
 
 
-def _native_execution_failure_code(process: Mapping[str, Any]) -> str:
+def _native_execution_failure_code(
+    process: Mapping[str, Any], *, report: Mapping[str, Any] | None = None,
+) -> str:
     """Expose only fixed diagnostic categories, never raw child output."""
     if process.get("timed_out"):
         return "NEBULAR_NATIVE_EXECUTION_TIMEOUT"
@@ -907,7 +909,22 @@ def _native_execution_failure_code(process: Mapping[str, Any]) -> str:
         return "NEBULAR_NATIVE_EXECUTION_OUTPUT_LIMIT"
     text = process.get("stderr_token", "")
     if not isinstance(text, str):
-        return "NEBULAR_NATIVE_EXECUTION"
+        text = ""
+    problems: list[str] = []
+    stdout = process.get("stdout_token", "")
+    if isinstance(stdout, str) and len(stdout.encode("utf-8")) <= 64 * 1024:
+        try:
+            summary = strict_json(stdout.encode("utf-8"))
+            if (isinstance(summary, Mapping) and set(summary) == {"label", "status", "problems"}
+                    and summary.get("status") == "fail"
+                    and isinstance(summary.get("problems"), list)
+                    and len(summary["problems"]) <= 64
+                    and all(isinstance(item, str) and len(item) <= 4096
+                            for item in summary["problems"])):
+                problems = summary["problems"]
+                text += "\n" + "\n".join(problems)
+        except Exception:
+            pass  # Diagnostics cannot replace the original failed result.
     for category, tokens in (
         ("NODE_MODULE", ("ERR_MODULE_NOT_FOUND", "Cannot find module")),
         ("NODE_SYNTAX", ("SyntaxError",)),
@@ -916,8 +933,34 @@ def _native_execution_failure_code(process: Mapping[str, Any]) -> str:
         ("LIBRARY", ("Library not loaded", "cannot open shared object", "dyld[")),
         ("HARNESS_ARGUMENTS", ("Usage: native-rc-smoke.mjs",)),
         ("CANDIDATE_PATH", ("candidate executable", "Candidate executable")),
+        ("CANDIDATE_LAUNCHER", ("candidate launcher", "Candidate launcher")),
     ):
         if any(token in text for token in tokens):
+            return "NEBULAR_NATIVE_EXECUTION_" + category
+    finalization = report.get("finalization") if isinstance(report, Mapping) else None
+    if (isinstance(finalization, Mapping)
+            and finalization.get("schema") == "nebular.native-rc-finalization-v1"
+            and finalization.get("status") == "failed"
+            and finalization.get("phase") in {"pre-spawn", "post-exit", "receipt-copy", "cleanup"}
+            and finalization.get("exceptionFamily") in {
+                "state", "parse", "timeout", "process", "filesystem", "unknown"}):
+        phase = finalization["phase"].replace("-", "_").upper()
+        family = finalization["exceptionFamily"].upper()
+        return f"NEBULAR_NATIVE_EXECUTION_HARNESS_{phase}_{family}"
+    for problem in problems:
+        step = re.search(r"required step ([a-z-]+) (?:failed|missing)", problem)
+        if step and step.group(1) in {item for values in _STEPS.values() for item in values}:
+            return "NEBULAR_NATIVE_EXECUTION_STEP_" + step.group(1).replace("-", "_").upper()
+    for category, tokens in (
+        ("APPLICATION_TIMEOUT", ("the application did not exit within its bound",)),
+        ("APPLICATION_EXIT", ("application exit code ", "application ended by ")),
+        ("RECEIPT", ("receipt status ", "receipt schema", "smoke receipt")),
+        ("ORPHANS", ("orphan candidate processes remained",)),
+        ("USER_STATE", ("persistent user state changed",)),
+        ("FIXTURE", ("read-only fixture ", "the case-distinct sibling", "the derived asset")),
+        ("CLEANUP", ("harness cleanup of the owned scratch directory failed",)),
+    ):
+        if any(token in problem for token in tokens for problem in problems):
             return "NEBULAR_NATIVE_EXECUTION_" + category
     return "NEBULAR_NATIVE_EXECUTION"
 
@@ -1014,13 +1057,18 @@ def run_installed_smoke(
         process_cwd = source
         if target.startswith("linux"):
             command = ["xvfb-run", "-a", "dbus-run-session", "--", *command]
+        run_path = scenario_dir / f"{label}.run.json"
+        receipt_path = scenario_dir / f"{label}.receipt.json"
         process = _nebular_run(command, env, process_cwd, prefix, timeout, runner=runner)
         if (process.get("exit_code") != 0 or process.get("timed_out")
                 or process.get("output_limit_exceeded") or process.get("forced_cleanup")
                 or process.get("cleanup_known") is not True or process.get("output_complete") is not True):
-            fail(_native_execution_failure_code(process))
-        run_path = scenario_dir / f"{label}.run.json"
-        receipt_path = scenario_dir / f"{label}.receipt.json"
+            report = None
+            try:
+                report, _, _ = _json_file(run_path, "failed native smoke run")
+            except Exception:
+                pass
+            fail(_native_execution_failure_code(process, report=report))
         run, run_data, run_sha = _json_file(run_path, "native smoke run")
         receipt, receipt_data, receipt_sha = _json_file(receipt_path, "native smoke receipt")
         checked = validate_installed_receipts(

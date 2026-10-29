@@ -742,11 +742,13 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Set up Python 3.13
+      - name: Select pinned Bookworm Python 3.11
         id: setup_python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.13'
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B -c 'import sys; assert sys.version_info[:2] == (3, 11)'
+          dpkg-query -W python3 python3.11 python3.11-venv
+          echo 'python-path=/usr/bin/python3' >> "$GITHUB_OUTPUT"
 
       - name: Set up Node 22
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
@@ -925,11 +927,13 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Set up Python 3.13
+      - name: Select pinned Bookworm Python 3.11
         id: setup_python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.13'
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B -c 'import sys; assert sys.version_info[:2] == (3, 11)'
+          dpkg-query -W python3 python3.11 python3.11-venv
+          echo 'python-path=/usr/bin/python3' >> "$GITHUB_OUTPUT"
 
       - name: Set up Node 22
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
