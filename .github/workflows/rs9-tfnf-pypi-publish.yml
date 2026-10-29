@@ -535,7 +535,7 @@ jobs:
             --run-id "${{ github.run_id }}" \
             --run-attempt "${{ github.run_attempt }}" \
             --consumer-host-role newer \
-            --consumer-capture-output "${{ runner.temp }}/tfnf-070-qual/linux-arm64-gnu/newer.json"
+            --consumer-capture-output "${{ runner.temp }}/tfnf-070-linux-arm64-gnu-newer.json"
 
       - name: Upload linux-arm64-gnu qualification receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -692,7 +692,7 @@ jobs:
             --run-id "${{ github.run_id }}" \
             --run-attempt "${{ github.run_attempt }}" \
             --consumer-host-role newer \
-            --consumer-capture-output "${{ runner.temp }}/tfnf-070-qual/linux-x64-gnu/newer.json"
+            --consumer-capture-output "${{ runner.temp }}/tfnf-070-linux-x64-gnu-newer.json"
 
       - name: Upload linux-x64-gnu qualification receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
