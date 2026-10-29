@@ -1,148 +1,158 @@
 # Theme Forge Nebular Fusion
 
-Theme Forge Nebular Fusion is the Python distribution of the Nebular Fusion
-desktop application. The upstream application and this Python distribution are
-version **0.7.0**. The wheel packages the offline launcher and authenticated
-native application payload while keeping the captured payload byte-for-byte
-intact.
+Theme Forge Nebular Fusion 0.7.0 is a native desktop workbench for reviewing,
+inspecting, and managing Theme Forge brand systems and artifacts. This Python
+distribution provides the authenticated native application through Python 3
+and pip; it is not a Python reimplementation and it does not compile a
+replacement application at install or first launch.
 
-It is a desktop workbench for reviewing, inspecting, and managing Theme Forge
-brand systems and artifacts. This distribution exposes that workflow through
-Python 3 and pip while retaining the native application's platform selection,
-payload authentication, and fail-closed launch behavior; it is not a Python
-reimplementation or a source-build fallback.
+The wheel contains a small offline launcher, the selected native payload, its
+complete authenticated manifest, and the isolated materialization helpers.
+The launcher verifies those inputs before it resolves the captured application
+launcher. It does not download application content, check out source, invoke a
+compiler, or fall back to a foreign architecture.
 
-The workbench component targets for this release are Stellar Burst 0.7.0,
-Stellar Loom 0.5.0, and Solar Sail 0.3.0. Component payloads are authenticated
-before the workbench uses them.
+## Install and use
 
-## What this package contains
+Use Python 3.10 or newer. A virtual environment is recommended for an
+application installation:
 
-The wheel contains the released native application archive, its authenticated
-archive manifest, and a small isolated materialization runtime. The runtime
-extracts the archive into a private cache, checks the archive and manifest
-digests, checks every extracted member against the manifest, and then resolves
-the exact captured application launcher. It does not download application
-content or execute a guessed path.
+```console
+$ python3 -m venv .venv
+$ . .venv/bin/activate
+$ python3 -m pip install theme-forge-nebular-fusion==0.7.0
+$ tfnf --version
+theme-forge-nebular-fusion 0.7.0
+$ tfnf
+```
 
-Linux wheels also carry private user-space GTK3, WebKitGTK 4.1,
-JavaScriptCoreGTK 4.1, and the required bundled runtime libraries used by the
-native application. The wheel does not install host packages. Those private
-runtime files are covered by the authenticated payload and manifest checks.
+For an offline wheel-only installation, select the wheel whose target tag
+matches the host and disable index, dependency, and source-distribution
+fallback:
 
-The console command is `tfnf`. It selects exactly one platform payload for the
-current operating system and CPU architecture; it has no foreign-architecture
-fallback. Normal invocation forwards ordinary arguments to the captured
-application launcher. The diagnostic options are available before
-materialization:
+```console
+$ python3 -m pip install --no-index --no-deps --only-binary=:all: \
+    ./theme_forge_nebular_fusion-0.7.0-<target>.whl
+$ tfnf --help
+```
+
+The package is intended to be installed as a native application wheel. A
+source distribution, source build, compiler fallback, or downloaded runtime
+is not part of this delivery profile. Remove the installed wheel with pip when
+it is no longer wanted:
+
+```console
+$ python3 -m pip uninstall theme-forge-nebular-fusion
+```
+
+## Wheel targets and Linux compatibility
+
+The 0.7.0 wheel set has exactly these target tags:
+
+| Host target | Wheel tag |
+| --- | --- |
+| Apple Silicon macOS 13 or newer | `macosx_13_0_arm64` |
+| Linux ARM64 | `linux_aarch64` |
+| Linux AMD64/x86_64 | `linux_x86_64` |
+
+The Linux profile requires GNU glibc 2.36 or newer and a libstdc++ symbol
+floor of `GLIBCXX_3.4.30`. These are the selected generic-Linux compatibility
+requirements for this release. The tags above do **not** claim `manylinux`,
+`musllinux`, or universal `any` compatibility; an unsupported libc or
+architecture fails closed.
+
+Linux wheels carry the selected private user-space GTK3, WebKitGTK 4.1, and
+JavaScriptCoreGTK 4.1 runtime projection used by the native application,
+along with its authenticated supporting libraries. They do not install host
+packages and do not promise to link against an unrelated host GTK/WebKit
+installation. The bundled user-space runtime does not provide a display
+server, compositor, session bus, GPU, DRM device, graphics driver, or other
+host desktop facility.
+
+## Commands and launch behavior
+
+The installed command is `tfnf`:
 
 ```console
 $ tfnf --version
 theme-forge-nebular-fusion 0.7.0
 $ tfnf --help
 Usage: tfnf [--version|--help|--path] [application args...]
-```
-
-After the archive has passed platform, manifest, and executable-path checks,
-`tfnf --path` prints the absolute path of the captured GUI executable. This is
-useful for integrations that need to inspect the resolved application without
-starting it.
-
-## Installation and use
-
-Install the matching wheel with Python 3.10 or newer and pip:
-
-```console
-$ python3 -m pip install theme-forge-nebular-fusion==0.7.0
-$ tfnf
-```
-
-For an offline, wheel-only installation, provide a local wheel and disable
-index, dependency, and source-distribution fallback:
-
-```console
-$ python3 -m pip install --no-index --no-deps --only-binary=:all: ./theme_forge_nebular_fusion-0.7.0-<platform>.whl
-```
-
-This release publishes no source distribution and does not fall back to a
-source build or compile a replacement Python/native runtime. The wheel must be
-selected for the host platform before installation. Remove it with pip when it
-is no longer needed:
-
-```console
-$ python3 -m pip uninstall theme-forge-nebular-fusion
-```
-
-Use a virtual environment when installing an application for a project:
-
-```console
-$ python3 -m venv .venv
-$ . .venv/bin/activate
-$ python3 -m pip install theme-forge-nebular-fusion==0.7.0
 $ tfnf --path
+/absolute/path/to/the/authenticated/gui
 ```
 
-The cache location can be selected with `THEME_FORGE_CACHE_DIR`. When it is
-unset, macOS uses `~/Library/Caches/rs9/theme-forge-nebular-fusion` and Linux
-uses `$XDG_CACHE_HOME/rs9/theme-forge-nebular-fusion` or
-`~/.cache/rs9/theme-forge-nebular-fusion`. The cache is content-addressed by
-the authenticated manifest and is safe to remove when the application is not
-running. The selected cache directory is created with mode `0700`; set
-`THEME_FORGE_CACHE_DIR` to a dedicated absolute directory. Empty or relative
-values are rejected for that variable, and empty or relative `XDG_CACHE_HOME`
-values are ignored.
+`--version` and `--help` are local diagnostic queries. `--path` performs the
+platform, archive, manifest, and executable-path checks, materializes the
+authenticated payload if necessary, and prints the canonical GUI path without
+launching it. A normal `tfnf [application args...]` invocation performs the
+same checks and then executes the manifest-selected shell launcher with the
+application arguments.
 
-## Supported wheel targets
+The Python launcher uses `os.execv` for that final handoff, so the Python
+entry process is replaced by the authenticated launcher. This distribution
+does not claim the npm wrapper's separate child-process signal-forwarding or
+fixed termination-escalation behavior. Process and signal handling after the
+handoff belongs to the selected native launcher.
 
-The intended 0.7.0 wheel set contains exactly these three targets:
+## Integrity and fail-closed checks
 
-- Apple Silicon macOS 13.0 or newer;
-- Linux ARM64 with GNU glibc 2.36 or newer; and
-- Linux AMD64/x86_64 with GNU glibc 2.36 or newer.
+Before use, the launcher checks the captured operating-system family and CPU,
+requires GNU glibc on Linux, verifies the embedded payload archive SHA-256,
+and validates the authenticated manifest. Materialization then checks the
+complete archive and extracted tree, including:
 
-The corresponding wheel tags are `macosx_13_0_arm64`,
-`manylinux_2_36_aarch64`, and `manylinux_2_36_x86_64`. The Linux wheels use
-the `manylinux_2_36` GNU/glibc floor; they do not claim musllinux or universal
-compatibility. Private user-space GTK3, WebKitGTK 4.1, JavaScriptCoreGTK 4.1,
-and the required bundled runtime libraries are inside each Linux payload. The
-host still needs a working display/session and a compatible host graphics
-stack for the native application. Bundling these user-space libraries does
-not supply the host display server, compositor, GPU, DRM, or driver facilities.
+- a bounded manifest and complete member inventory;
+- package version, OS, CPU, payload-root, and executable-path identity;
+- relative path containment with no empty, `.`, `..`, backslash, NUL, or
+  traversal segment;
+- regular files, directories, and contained relative symlinks only;
+- declared member types, sizes, SHA-256 values, modes, and symlink targets;
+- no duplicate, missing, unexpected, special, or escaping members; and
+- an executable regular file at the authenticated launcher path.
 
-This release is wheel-only: exactly three platform wheels, with no source
-distribution or source-build fallback. Select the artifact whose platform tag
-matches the host; release metadata identifies the three target wheels.
+The cache and payload are rechecked when an existing materialization is
+reused. Changes to the wheel, archive, manifest, cache tree, symlinks, or
+resolved executable cause refusal rather than an alternate-path launch.
 
-## Offline and reproducible behavior
+## Cache and offline operation
 
-The launcher is offline after installation. It verifies the embedded payload
-archive and manifest before materializing anything. Extraction rejects unsafe
-paths, privileged modes, hard links, escaping links, duplicate members, and
-manifest mismatches. The materialized launcher and GUI executable are selected
-from authenticated release metadata and are checked for executable regular
-files before use.
+The materialized runtime is content-addressed by the authenticated manifest
+digest and stored outside the virtual environment. Set
+`THEME_FORGE_CACHE_DIR` to a dedicated non-empty absolute directory when a
+custom location is needed. An empty or relative value is rejected. Otherwise,
+an absolute `XDG_CACHE_HOME` selects
+`$XDG_CACHE_HOME/rs9/theme-forge-nebular-fusion`; macOS falls back to
+`~/Library/Caches/rs9/theme-forge-nebular-fusion`, and Linux falls back to
+`~/.cache/rs9/theme-forge-nebular-fusion`. Empty or relative
+`XDG_CACHE_HOME` values are ignored.
 
-The wheel's `_rs9/provenance.json` records the PEP 639 license expression
-`AGPL-3.0-or-later`, the `LICENSE` and `NOTICE` files, the Markdown project
-description path and digest, the upstream release identity, the payload and
-manifest digests, and the source hashes of the isolated helper modules. These
-provenance fields are separate from the PEP 639 headers in `METADATA`.
+The cache root and staged entries are created with restrictive `0700`
+permissions, protected by a per-manifest lock, and verified before reuse. It
+may be removed separately when the application is not running. No first-launch
+network access or host-package installation is required.
 
-Archive, manifest, platform, and executable-path checks run immediately before
-materialization. `tfnf --path` reports the resolved GUI path without launching
-the application. Do not rename, replace, or mutate the wheel, cache archive,
-manifest, or resolved executable between those checks and use; changes made by
-another process after resolution are outside this package's guarantee.
+## Desktop requirements
+
+Provide the host facilities expected by a native desktop application: a
+working X11 or Wayland display, session/DBus environment where applicable,
+and a compatible graphics stack with the required GPU, DRM, and driver
+access. These facilities are intentionally outside the wheel. The package
+does not claim to create a display server, provide a compositor, or bundle a
+host GPU driver.
+
+On macOS, the qualified profile is Apple Silicon on macOS 13 or newer. The
+developer app is ad-hoc signed, not Developer ID signed, and not notarized.
+No Gatekeeper bypass, quarantine removal, or installation workaround is
+provided or recommended.
 
 ## License
 
-This Python distribution and its embedded Nebular application are offered
-under **AGPL-3.0-or-later**. Review `LICENSE` and `NOTICE` before use and
-preserve those notices when conveying the package.
+Theme Forge Nebular Fusion and this Python distribution are offered under
+**AGPL-3.0-or-later**. Review and preserve the distributed `LICENSE` and
+`NOTICE` files when using or conveying the package.
 
-## Reporting problems
-
-When reporting a packaging problem, include the output of `python3 -m pip
-show theme-forge-nebular-fusion`, the wheel filename, and the result of
-`tfnf --version`. Do not include tokens, private keys, personal credentials, or
-private release evidence in an issue report.
+For a packaging issue, include the wheel filename and the output of
+`python3 -m pip show theme-forge-nebular-fusion` and `tfnf --version`. Do not
+include credentials, tokens, private keys, or private release evidence in a
+bug report.
