@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import copy
+import base64
+import hashlib
 import io
 import json
 import os
@@ -22,6 +24,17 @@ from rs9.profiles import selection_for_intent
 from rs9.release_core import authenticate_release, digest
 from rs9.scratch import canonical as gate1_canonical
 from rs9.tf_pypi_archive import AdmissionError, canonical, sha256
+from rs9.nebular070_smoke_support import (
+    SMOKE_SUPPORT_SCHEMA,
+    SOURCE_ARCHIVE_NAME,
+    SOURCE_ARCHIVE_SHA256,
+    SOURCE_ARCHIVE_SIZE,
+    SOURCE_AUTHORITY_IDENTITY,
+    SOURCE_AUTHORITY_NAME,
+    SOURCE_AUTHORITY_SHA256,
+    SOURCE_AUTHORITY_SIZE,
+)
+from rs9.nebular070_installed_smoke import _STEPS
 from rs9.tf_pypi_hosted import (
     NEBULAR070_EXPECTED_ARTIFACT_SCHEMA,
     NEBULAR070_HOSTED_SCHEMA,
@@ -120,6 +133,12 @@ from rs9.tf_pypi_nebular_successor import (
 )
 from rs9.wheel import _record_digest
 from tests.test_nebular070_gate1_roundtrip import _macho_13, _prepare_fixture, _tar
+from tests.nebular070_smoke_fixtures import (
+    FIXTURE_PATHS as _SMOKE_FIXTURE_PATHS,
+    TOOL_NAMES as _SMOKE_TOOL_NAMES,
+    patched_source_contract,
+    source_members,
+)
 from tests.tf_pypi_fixtures import ROOT
 
 
@@ -132,6 +151,111 @@ QUALIFICATION_TREE = subprocess.check_output(
     ["git", "-C", str(ROOT), "rev-parse", "HEAD^{tree}"], text=True
 ).strip()
 RUN_ID = "9007001"
+def _data8_source_members() -> dict[str, bytes]:
+    return source_members()
+
+
+def _complete_smoke_summary(
+    target: str, scenarios: tuple[str, ...], *, gui_path: str, gui_sha: str,
+) -> dict[str, object]:
+    """Build non-admitting, byte-backed smoke fixtures for matrix tests."""
+    triple = {
+        "darwin-arm64": "aarch64-apple-darwin",
+        "linux-arm64-gnu": "aarch64-unknown-linux-gnu",
+        "linux-x64-gnu": "x86_64-unknown-linux-gnu",
+    }[target]
+    platform = {
+        "darwin-arm64": "darwin-arm64",
+        "linux-arm64-gnu": "linux-arm64",
+        "linux-x64-gnu": "linux-x64",
+    }[target]
+
+    def artifact(data: bytes) -> dict[str, object]:
+        return {
+            "schema": "rs9.nebular070-installed-smoke-json-artifact.v1",
+            "encoding": "base64", "media_type": "application/json",
+            "size": len(data), "sha256": sha256(data),
+            "utf8_base64": base64.b64encode(data).decode("ascii"),
+        }
+
+    entries = []
+    for scenario in scenarios:
+        steps = [
+            {"id": step, "ok": True, "via": "native-rc-smoke", "ms": 1}
+            for step in _STEPS[scenario]
+        ]
+        receipt = {
+            "schema": "nebular.release-smoke-receipt-v1",
+            "applicationVersion": "0.7.0", "scenario": scenario,
+            "status": "pass", "failure": None, "target": triple,
+            "awaitingSignal": scenario == "C-signal",
+            "executable": {"sha256": gui_sha, "size": 1},
+            "driver": {"status": "pass", "scenario": scenario, "facts": [], "steps": steps},
+        }
+        receipt_data = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
+        receipt_sha = sha256(receipt_data)
+        checks = {
+            "orphans": [], "persistentUserState": {"changed": []},
+            "scratchHomeWrites": 1,
+            **({"sidecarRunningBeforeSignal": True} if scenario == "C-signal" else {}),
+        }
+        exit_info = (
+            {"code": None, "signal": "SIGTERM",
+             "signalSent": {"signal": "SIGTERM", "at": 1}, "durationMs": 1}
+            if scenario == "C-signal" else
+            {"code": 0, "signal": None, "signalSent": None, "durationMs": 1}
+        )
+        run = {
+            "schema": "nebular.native-rc-smoke-run-v1", "status": "pass",
+            "platform": platform, "scenario": scenario, "source": "raw-archive",
+            "problems": [],
+            "executable": {"path": gui_path, "sha256": gui_sha, "size": 1},
+            "checks": checks, "exit": exit_info,
+            "finalization": {
+                "schema": "nebular.native-rc-finalization-v1", "status": "complete",
+                "phase": "complete", "exceptionFamily": None, "spawned": True,
+                "exitObserved": True,
+                "applicationReceiptObservation": "present-at-read",
+                "applicationReceiptCopy": "written",
+            },
+            "receipt": {"status": "pass", "sha256": receipt_sha, "steps": steps},
+        }
+        run_data = json.dumps(run, sort_keys=True, separators=(",", ":")).encode()
+        run_sha = sha256(run_data)
+        entries.append({
+            "schema": "rs9.nebular070-installed-native-smoke.v1",
+            "status": "pass", "qualification_authority": True,
+            "target": target, "scenario": scenario, "source": "raw-archive",
+            "executable": {"path": gui_path, "sha256": gui_sha, "size": 1},
+            "run": {"schema": run["schema"], "status": run["status"],
+                    "sha256": run_sha, "size": len(run_data)},
+            "run_artifact": artifact(run_data), "exit": exit_info,
+            "finalization": run["finalization"],
+            "receipt": {"schema": receipt["schema"], "status": receipt["status"],
+                        "scenario": scenario, "target": triple, "sha256": receipt_sha,
+                        "awaitingSignal": scenario == "C-signal", "steps": steps},
+            "receipt_artifact": artifact(receipt_data),
+            "checks": {
+                "orphans": [], "persistentUserStateChanged": [], "scratchHomeWrites": 1,
+                **({"sidecarRunningBeforeSignal": True} if scenario == "C-signal" else {}),
+            },
+            "native_probe": {"status": "pass", "protocol": "nebular.native-rc-smoke",
+                             "scenario": scenario, "cleanup_known": True,
+                             "output_complete": True, "forced_cleanup": False},
+        })
+    return {
+        "schema": "rs9.nebular070-installed-native-smoke.v1",
+        "status": "pass", "qualification_authority": True,
+        "target": target, "source": "raw-archive", "scenarios": entries,
+        "native_probe": {
+            "exit_code": 0, "signal": None, "cleanup_known": True,
+            "output_complete": True, "forced_cleanup": False,
+            "status": "pass", "protocol": "nebular.native-rc-smoke",
+            "scenarios": list(scenarios),
+            "runs": {entry["scenario"]: entry["run"]["sha256"] for entry in entries},
+            "receipts": {entry["scenario"]: entry["receipt"]["sha256"] for entry in entries},
+        },
+    }
 
 
 def _fill_current_profile_steps(raw_jobs: list[dict]) -> list[dict]:
@@ -411,6 +535,90 @@ def _build_qualification_inputs_descriptor_for_repo(
     if repo_ev_dir.exists():
         shutil.rmtree(repo_ev_dir)
     shutil.copytree(evidence, repo_ev_dir)
+    smoke_support_by_target = {}
+    source_members = _data8_source_members()
+    smoke_fixture_root = "docs/examples/v0.4/brand-system/core-minimal"
+    for target in TARGETS:
+        support_records = []
+        support_root = f"smoke-support/{target}"
+        support_paths = [*(f"tools/{name}" for name in _SMOKE_TOOL_NAMES),
+                         *_SMOKE_FIXTURE_PATHS]
+        for relative in support_paths:
+            data = source_members[relative]
+            evidence_path = f"{support_root}/{relative}"
+            for evidence_base in (repo_ev_dir, evidence):
+                evidence_file = evidence_base / evidence_path
+                evidence_file.parent.mkdir(parents=True, exist_ok=True)
+                evidence_file.write_bytes(data)
+            support_records.append({
+                "path": relative,
+                "size": len(data),
+                "sha256": sha256(data),
+                "blob": hashlib.sha1(
+                    b"blob " + str(len(data)).encode() + b"\0" + data
+                ).hexdigest(),
+                "role": (
+                    "fixture" if relative.startswith(smoke_fixture_root + "/")
+                    else "application-smoke"
+                    if relative == "tools/native-rc-smoke.mjs"
+                    else "verifier-module"
+                ),
+                "evidence_path": evidence_path,
+            })
+        support_records.sort(key=lambda item: item["path"])
+        support = {
+            "schema": SMOKE_SUPPORT_SCHEMA,
+            "target": target,
+            "source": {
+                "authority": "authenticated-product-source",
+                "repository": binding["repository"],
+                "commit": "cadb40c4972f68f314096ff60fbcfb4da950c161",
+                "tree": "27c643b6375c2aafde314799c4f08e844c14992c",
+                "record_sha256": SOURCE_AUTHORITY_SHA256,
+                "authority_identity": SOURCE_AUTHORITY_IDENTITY,
+            },
+            "root": support_root,
+            "tool_root": "tools",
+            "fixture_root": smoke_fixture_root,
+            "source_binding": {
+                "archive": {
+                    "path": f"source-authority/{SOURCE_ARCHIVE_NAME}",
+                    "size": SOURCE_ARCHIVE_SIZE,
+                    "sha256": SOURCE_ARCHIVE_SHA256,
+                    "evidence_path": f"{support_root}/source/{SOURCE_ARCHIVE_NAME}",
+                },
+                "authority": {
+                    "path": f"source-authority/{SOURCE_AUTHORITY_NAME}",
+                    "size": SOURCE_AUTHORITY_SIZE,
+                    "sha256": SOURCE_AUTHORITY_SHA256,
+                    "evidence_path": f"{support_root}/source/{SOURCE_AUTHORITY_NAME}",
+                },
+            },
+            "files": support_records,
+        }
+        for kind, ref in support["source_binding"].items():
+            data = source_members[Path(ref["path"]).name]
+            for evidence_base in (repo_ev_dir, evidence):
+                evidence_file = evidence_base / ref["evidence_path"]
+                evidence_file.parent.mkdir(parents=True, exist_ok=True)
+                evidence_file.write_bytes(data)
+        digest_body = {
+            key: support[key]
+            for key in (
+                "schema", "target", "source", "root", "tool_root", "fixture_root",
+                "source_binding", "files",
+            )
+        }
+        digest_body["source_binding"] = {
+            kind: {key: ref[key] for key in ("path", "size", "sha256")}
+            for kind, ref in support["source_binding"].items()
+        }
+        digest_body["files"] = [
+            {key: item[key] for key in ("path", "size", "sha256", "blob", "role")}
+            for item in support_records
+        ]
+        support["closure_sha256"] = sha256(canonical(digest_body))
+        smoke_support_by_target[target] = support
     raw_src = repo / raw_rel_root
     raw_src.mkdir(parents=True, exist_ok=True)
 
@@ -715,6 +923,7 @@ def _build_qualification_inputs_descriptor_for_repo(
                         "qualification_check_id": provider_check_id,
                         "evidence_sha256": sha256(canonical(provider_evidence)),
                     },
+                    "smoke_support": smoke_support_by_target[target],
                 }
             },
         }
@@ -909,6 +1118,116 @@ def _controlled_native_consumer_driver(
             _fail("NEBULAR_HOSTED_TREE")
         return expected
 
+    def _fake_verify_nebular_runtime(runtime_root, prepared, system, **_kwargs):
+        # The publisher tests exercise the real handoff/materialization and
+        # consumer wiring.  Keep the product GUI itself out of this unit
+        # fixture; the maintained application-smoke protocol has its own
+        # focused integration tests.
+        assert prepared["records"]
+        return {
+            "sidecar": {"verified": True},
+            "scenarios": [{"system": system, "status": "pass"}],
+            "source_bindings": prepared["records"],
+        }
+
+    def _fake_installed_smoke(**kwargs):
+        target = kwargs["target"]
+        native = kwargs["native"]
+        gui = kwargs["gui"]
+        triple = {
+            "darwin-arm64": "aarch64-apple-darwin",
+            "linux-arm64-gnu": "aarch64-unknown-linux-gnu",
+            "linux-x64-gnu": "x86_64-unknown-linux-gnu",
+        }[target]
+        scenarios = ("C", "C-signal") if target == "linux-x64-gnu" else (native["scenario"],)
+
+        def artifact(data):
+            return {
+                "schema": "rs9.nebular070-installed-smoke-json-artifact.v1",
+                "encoding": "base64", "media_type": "application/json",
+                "size": len(data), "sha256": sha256(data),
+                "utf8_base64": base64.b64encode(data).decode("ascii"),
+            }
+
+        entries = []
+        for scenario in scenarios:
+            steps = [
+                {"id": step, "ok": True, "via": "native-rc-smoke", "ms": 1}
+                for step in _STEPS[scenario]
+            ]
+            receipt = {
+                "schema": "nebular.release-smoke-receipt-v1",
+                "applicationVersion": "0.7.0", "scenario": scenario,
+                "status": "pass", "failure": None, "target": triple,
+                "awaitingSignal": scenario == "C-signal",
+                "executable": {"sha256": gui["sha256"], "size": 1},
+                "driver": {
+                    "status": "pass", "scenario": scenario, "facts": [], "steps": steps,
+                },
+            }
+            receipt_data = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
+            receipt_sha = sha256(receipt_data)
+            checks = {
+                "orphans": [], "persistentUserState": {"changed": []},
+                "scratchHomeWrites": 1,
+                **({"sidecarRunningBeforeSignal": True} if scenario == "C-signal" else {}),
+            }
+            exit_info = (
+                {"code": None, "signal": "SIGTERM",
+                 "signalSent": {"signal": "SIGTERM", "at": 1}, "durationMs": 1}
+                if scenario == "C-signal" else
+                {"code": 0, "signal": None, "signalSent": None, "durationMs": 1}
+            )
+            run = {
+                "schema": "nebular.native-rc-smoke-run-v1", "status": "pass",
+                "platform": "linux-arm64" if target == "linux-arm64-gnu"
+                else "linux-x64" if target == "linux-x64-gnu" else "darwin-arm64",
+                "scenario": scenario, "source": "raw-archive", "problems": [],
+                "executable": {"path": gui["smoke_path"], "sha256": gui["sha256"], "size": 1},
+                "checks": checks, "exit": exit_info,
+                "finalization": {
+                    "schema": "nebular.native-rc-finalization-v1", "status": "complete",
+                    "phase": "complete", "exceptionFamily": None, "spawned": True,
+                    "exitObserved": True,
+                    "applicationReceiptObservation": "present-at-read",
+                    "applicationReceiptCopy": "written",
+                },
+                "receipt": {"status": "pass", "sha256": receipt_sha, "steps": steps},
+            }
+            run_data = json.dumps(run, sort_keys=True, separators=(",", ":")).encode()
+            run_sha = sha256(run_data)
+            entries.append({
+                "schema": "rs9.nebular070-installed-native-smoke.v1",
+                "status": "pass", "qualification_authority": True,
+                "target": target, "scenario": scenario, "source": "raw-archive",
+                "executable": {"path": gui["smoke_path"], "sha256": gui["sha256"], "size": 1},
+                "run": {"schema": run["schema"], "status": run["status"],
+                        "sha256": run_sha, "size": len(run_data)},
+                "run_artifact": artifact(run_data), "exit": exit_info,
+                "finalization": run["finalization"],
+                "receipt": {"schema": receipt["schema"], "status": receipt["status"],
+                            "scenario": scenario, "target": triple, "sha256": receipt_sha,
+                            "awaitingSignal": scenario == "C-signal", "steps": steps},
+                "receipt_artifact": artifact(receipt_data), "checks": {
+                    "orphans": [], "persistentUserStateChanged": [], "scratchHomeWrites": 1,
+                    **({"sidecarRunningBeforeSignal": True} if scenario == "C-signal" else {}),
+                },
+                "native_probe": {"status": "pass", "protocol": "nebular.native-rc-smoke",
+                                 "scenario": scenario, "cleanup_known": True,
+                                 "output_complete": True, "forced_cleanup": False},
+            })
+        return {
+            "schema": "rs9.nebular070-installed-native-smoke.v1",
+            "status": "pass", "qualification_authority": True,
+            "target": target, "source": "raw-archive", "scenarios": entries,
+            "native_probe": {"exit_code": 0, "signal": None, "cleanup_known": True,
+                             "output_complete": True, "forced_cleanup": False,
+                             "status": "pass", "protocol": "nebular.native-rc-smoke",
+                             "scenarios": list(scenarios),
+                             "runs": {entry["scenario"]: entry["run"]["sha256"] for entry in entries},
+                             "receipts": {entry["scenario"]: entry["receipt"]["sha256"] for entry in entries}},
+        }
+
     with (
         patch("rs9.nebular_host_state.operator_home", return_value=clean_home),
         patch("rs9.tf_pypi_consumer.platform.system", return_value=sys_name),
@@ -926,6 +1245,8 @@ def _controlled_native_consumer_driver(
         ),
         patch("rs9.tf_pypi_hosted.source_commit", side_effect=_repo_aware_source_commit),
         patch("rs9.tf_pypi_hosted._nebular_tree", side_effect=_repo_aware_nebular_tree),
+        patch("rs9.hosted_smoke.verify_nebular_runtime", side_effect=_fake_verify_nebular_runtime),
+        patch("rs9.nebular070_installed_smoke.run_installed_smoke", side_effect=_fake_installed_smoke),
     ):
         yield
 
@@ -933,6 +1254,9 @@ def _controlled_native_consumer_driver(
 class Nebular070PublisherSeamTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        cls._fixture_contract_context = patched_source_contract(sys.modules[__name__])
+        cls._fixture_contract_context.__enter__()
+        cls.addClassCleanup(cls._fixture_contract_context.__exit__, None, None, None)
         cls._class_tmp = tempfile.TemporaryDirectory(prefix="rs9-neb070-pub-cls-")
         cls.fixture_root = Path(cls._class_tmp.name).resolve()
         repo, evidence, _intent, binding = _prepare_fixture(cls.fixture_root / "gate1")
@@ -995,6 +1319,16 @@ class Nebular070PublisherSeamTests(unittest.TestCase):
                 "run_attempt": "1",
                 "profile_sha256": cls.profile_sha,
             }
+            scenarios = (("C", "C-signal") if target == "linux-x64-gnu" else
+                         ("A",) if target == "darwin-arm64" else ("B",))
+            run_digests = {
+                scenario: ("a" if scenario == "C" else "c" if scenario == "C-signal" else "e") * 64
+                for scenario in scenarios
+            }
+            receipt_digests = {
+                scenario: ("b" if scenario == "C" else "d" if scenario == "C-signal" else "f") * 64
+                for scenario in scenarios
+            }
             t_receipt = {
                 "schema": NEBULAR070_HOSTED_SCHEMA,
                 "status": "native-consumer-passed",
@@ -1008,13 +1342,32 @@ class Nebular070PublisherSeamTests(unittest.TestCase):
                 "run_id": RUN_ID,
                 "run_attempt": "1",
                 "consumer": {
+                    "schema": "rs9.nebular070-native-consumer.v1",
+                    "status": "native-consumer-passed",
                     "fixture_only": False,
                     "native_qualified": True,
+                    "target": target,
+                    "candidate_rs9_source": cls.candidate_receipt["candidate_rs9_source"],
                     "wheel": w_summary,
                     "process_observer": {"orphan_count": 0},
                     "user_state": {"unchanged": True},
-                    "sandbox": {"network_disabled": True},
+                    "sandbox": {"network_disabled": True, "method": "explicit-isolation-prefix"},
                     "provider_closure": {"status": "verified"},
+                    "cleanup": {"pip_uninstall_exit": 0, "orphan_processes": 0},
+                    "probes": {"native": {
+                        "exit_code": 0, "cleanup_known": True,
+                        "output_complete": True, "forced_cleanup": False,
+                    }},
+                    "gui": {
+                        "status": "verified", "type": "file", "executable": True,
+                        "label": "gui", "smoke_path": "bin/theme-forge-nebular-fusion",
+                        "sha256": "1" * 64,
+                    },
+                    "application_smoke": _complete_smoke_summary(
+                        target, scenarios, gui_path="bin/theme-forge-nebular-fusion", gui_sha="1" * 64,
+                    ),
+                    "publication_admitted": False,
+                    "public_writes": 0,
                 },
                 "publication_admitted": False,
                 "public_writes": 0,
@@ -1617,6 +1970,38 @@ class Nebular070PublisherSeamTests(unittest.TestCase):
                 approval=bad_app,
             )
         self.assertEqual(ctx_qsrc.exception.code, "TF_PYPI_QUALIFICATION_SOURCE_MISMATCH")
+
+    def test_matrix_requires_complete_actual_consumer_cases_for_every_target(self) -> None:
+        hosted_commit = subprocess.check_output(
+            ["git", "-C", str(ROOT), "rev-parse", "HEAD^{commit}"], text=True,
+        ).strip()
+        hosted_tree = subprocess.check_output(
+            ["git", "-C", str(ROOT), "rev-parse", "HEAD^{tree}"], text=True,
+        ).strip()
+        mutations = {
+            "consumer-schema": lambda doc: doc["consumer"].pop("schema"),
+            "consumer-target": lambda doc: doc["consumer"].update(target="linux-x64-gnu"),
+            "cleanup": lambda doc: doc["consumer"]["cleanup"].update(orphan_processes=1),
+            "native": lambda doc: doc["consumer"]["application_smoke"]["scenarios"].pop(),
+            "source-join": lambda doc: doc.update(candidate_rs9_source={"commit": "0" * 40}),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(label=label):
+                receipts = self.root / f"strict-negative-{label}"
+                shutil.copytree(self.receipts_dir, receipts)
+                target = "linux-x64-gnu" if label in {"native", "cleanup"} else "darwin-arm64"
+                result_path = receipts / target / "result.json"
+                document = json.loads(result_path.read_bytes())
+                mutate(document)
+                result_path.write_bytes(canonical(document))
+                with self.assertRaises(AdmissionError):
+                    admit_nebular070_matrix(
+                        self.candidate_receipt, self.expected_artifacts, receipts,
+                        expected_commit=hosted_commit, expected_tree=hosted_tree,
+                        profile_sha256=self.profile_sha,
+                        candidate_receipt_sha256=self.candidate_receipt_sha,
+                        run_id=RUN_ID, run_attempt="1",
+                    )
 
     def test_multi_wheel_remote_state_exact_state_and_reader_limits(self) -> None:
         self.assertEqual(MAX_WHEEL_FILE_BYTES, 512 * 1024 * 1024)
@@ -2846,10 +3231,11 @@ class Nebular070PublisherSeamTests(unittest.TestCase):
         )
 
     def test_r2_r3_rendered_workflow_cli_end_to_end_and_handoff_negatives(self) -> None:
-        # 1. Verify rendered workflow YAML wires --qualification-inputs, --evidence, and --raw-release on all 0.7.0 qualify jobs
+        # 1. Verify rendered workflow YAML wires the held external qualification
+        # root, --evidence, and --raw-release on all 0.7.0 qualify jobs.
         qual_yaml = workflow_070_qualify_jobs_text()
         self.assertIn(
-            f"--qualification-inputs {QUALIFICATION_INPUTS_PATH.as_posix()}",
+            '--qualification-inputs "${{ runner.temp }}/tfnf-070-public-inputs/qualification-inputs-prep.json"',
             qual_yaml,
         )
         self.assertIn('--evidence "${{ runner.temp }}/tfnf-070-evidence"', qual_yaml)

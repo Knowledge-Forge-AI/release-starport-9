@@ -676,6 +676,26 @@ class NebularGate2Fixture(unittest.TestCase):
             )
         self.assertEqual(caught.exception.code, "TF_PYPI_NEBULAR_MATRIX_RECEIPT")
 
+    @unittest.skipUnless(
+        platform.system() == "Darwin" and platform.machine().lower() in {"arm64", "aarch64"},
+        "requires the current Darwin ARM64 consumer target",
+    )
+    def test_real_consumer_requires_authenticated_smoke_support_before_native(self):
+        target = "darwin-arm64"
+        raw = self.raw_for(target)
+        raw["native_consumer"][target]["provider_closure"]["mode"] = "host-observed"
+        with self.assertRaises(AdmissionError) as caught:
+            consume_nebular_candidate(
+                self.candidate,
+                self.wheels[target],
+                raw,
+                self.root / "work-real-without-smoke-support",
+                target=target,
+                sandbox_probe=self.sandbox_probe,
+                real_user_state_snapshot=self.real_user_state_snapshot,
+            )
+        self.assertEqual(caught.exception.code, "TF_PYPI_NEBULAR_SMOKE_CLOSURE")
+
     def test_actual_consumer_path_and_digest_mismatches_fail_closed(self):
         target = "darwin-arm64"
         wheel_path = self.wheels[target]
@@ -1595,7 +1615,7 @@ class NebularGate1ToGate2Fixture(unittest.TestCase):
             self.candidate["readme"],
             {
                 "path": "operators/tf-pypi/descriptions/nebular-fusion-0.7.0.md",
-                "sha256": "c590e84005aed24a726160213d1bcd89e5855b006cc39612dcb7769238568078",
+                "sha256": "6bd13e05b0ad87ef1c1c9635a320f2e1b9341577e81c42d78e61b6cb94a72dc3",
             },
         )
         for target, (expected, raw_release, wheel) in self.handoffs.items():

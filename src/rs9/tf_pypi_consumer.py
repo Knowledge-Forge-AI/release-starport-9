@@ -285,6 +285,8 @@ def _nebular_safe_rel(value: Any) -> str:
 
 def _nebular_descriptor(root: Path, descriptor: Mapping[str, Any], label: str,
                         *, limit: int = _NEBULAR_MAX_ARTIFACT_BYTES) -> tuple[bytes, str]:
+    from rs9.nebular070_smoke_support import checked_live_path
+
     if not isinstance(descriptor, Mapping):
         fail("NEBULAR_CAPTURE_BINDING")
     path = _nebular_safe_rel(descriptor.get("path"))
@@ -293,9 +295,10 @@ def _nebular_descriptor(root: Path, descriptor: Mapping[str, Any], label: str,
     if (type(size) is not int or size <= 0 or size > limit
             or not isinstance(digest, str) or not _NEBULAR_HEX64.fullmatch(digest)):
         fail("NEBULAR_CAPTURE_BINDING")
+    root = checked_live_path(root, code="NEBULAR_CAPTURE_ROOT")
     if root.is_symlink() or not root.is_dir():
         fail("NEBULAR_CAPTURE_ROOT")
-    target = root.joinpath(*path.split("/"))
+    target = checked_live_path(root.joinpath(*path.split("/")), code="NEBULAR_CAPTURE_PATH")
     try:
         target.relative_to(root)
     except ValueError:
@@ -1085,7 +1088,8 @@ def _nebular_validate_capture(candidate: Mapping[str, Any], row: Mapping[str, An
     root_raw = raw_release.get("root")
     if not isinstance(root_raw, str) or not os.path.isabs(root_raw):
         fail("NEBULAR_CAPTURE_ROOT")
-    root = Path(root_raw).resolve()
+    from rs9.nebular070_smoke_support import checked_live_path
+    root = checked_live_path(root_raw, code="NEBULAR_CAPTURE_ROOT")
     identity = context["identity"]
     record_bytes, _ = _nebular_descriptor(root, raw_release.get("record"), "release-record")
     record = strict_json(record_bytes)
@@ -1251,7 +1255,7 @@ def _nebular_validate_capture(candidate: Mapping[str, Any], row: Mapping[str, An
     native_platform = _NEBULAR_NATIVE_RC_PLATFORMS.get(target)
     expected_scenario = _NEBULAR_NATIVE_RC_SCENARIOS.get(target, {}).get("raw-archive")
     protocol = native.get("protocol")
-    if (not isinstance(native.get("command"), str) or not native["command"]
+    if (native.get("command") != "tfnf"
             or protocol != "nebular.native-rc-smoke"
             or native.get("platform") != native_platform
             or native.get("scenario") != expected_scenario
@@ -1291,6 +1295,7 @@ def consume_nebular_candidate(
     state_snapshot: Callable[[Path, Sequence[str]], dict[str, Any]] | None = None,
     real_user_state_snapshot: Callable[[str, str], Mapping[str, Any]] | None = None,
     offline_pip_bootstrap: Mapping[str, Any] | None = None,
+    smoke_support: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Qualify one authenticated Nebular 0.7 wheel through a real installed native probe.
 
@@ -1303,12 +1308,14 @@ def consume_nebular_candidate(
     """
     if not isinstance(raw_release, Mapping):
         fail("NEBULAR_CAPTURE_BINDING")
+    from rs9.nebular070_smoke_support import checked_live_path
+    wheel_file = checked_live_path(wheel_path, code="NEBULAR_WHEEL_BINDING")
+    work_path = checked_live_path(work, code="NEBULAR_WORK_DIR")
     row, wheel, context = _nebular_candidate_row(candidate, target)
     host = _nebular_identity_observed(host_identity, target, fixture_only)
     capture = _nebular_validate_capture(candidate, row, context, raw_release,
                                         target=target, fixture_only=fixture_only)
     pip_source = _nebular_offline_pip_input(offline_pip_bootstrap, target)
-    wheel_file = Path(wheel_path)
     if wheel_file.is_symlink() or not wheel_file.is_file() or wheel_file.name != wheel["filename"]:
         fail("NEBULAR_WHEEL_BINDING")
     wheel_bytes = physical_bytes(wheel_file, limit=_NEBULAR_MAX_ARTIFACT_BYTES)
@@ -1396,7 +1403,6 @@ def consume_nebular_candidate(
                 capture["root"], raw_release["legal_files"][name], "legal")[0]:
             fail("NEBULAR_WHEEL_BINDING")
 
-    work_path = Path(work).resolve()
     if work_path.exists() or work_path.is_symlink():
         fail("NEBULAR_WORK_DIR")
     work_path.mkdir(parents=True, mode=0o700)
@@ -1404,6 +1410,19 @@ def consume_nebular_candidate(
     temp = work_path / "tmp"
     home.mkdir(mode=0o700)
     temp.mkdir(mode=0o700)
+    smoke_prepared = None
+    if not fixture_only:
+        from rs9.nebular070_smoke_support import materialize_smoke_support
+        declared_support = capture["native"].get("smoke_support")
+        if smoke_support is not None and declared_support is not None:
+            if canonical(smoke_support) != canonical(declared_support):
+                fail("NEBULAR_SMOKE_CLOSURE")
+        support = smoke_support if smoke_support is not None else declared_support
+        if not isinstance(support, Mapping):
+            fail("NEBULAR_SMOKE_CLOSURE")
+        smoke_prepared = materialize_smoke_support(
+            capture["root"], support, work_path / "smoke-support", target=target,
+        )
     base_env = {
         "PATH": "/usr/bin:/bin",
         "HOME": str(home),
@@ -1526,7 +1545,7 @@ def consume_nebular_candidate(
         path_lines = path_probe.get("stdout_token", "").splitlines()
         if len(path_lines) != 1 or not path_lines[0].strip():
             fail("NEBULAR_COMMAND_CONTRACT")
-        resolved_gui = Path(path_lines[0].strip())
+        resolved_gui = checked_live_path(path_lines[0].strip(), code="NEBULAR_COMMAND_CONTRACT")
         try:
             observed_relative = resolved_gui.resolve().relative_to(home.resolve())
         except (OSError, ValueError):
@@ -1538,9 +1557,33 @@ def consume_nebular_candidate(
                 or sha256(physical_bytes(resolved_gui, limit=_NEBULAR_MAX_ARTIFACT_BYTES))
                 != capture["gui"]["sha256"]):
             fail("NEBULAR_COMMAND_CONTRACT")
-        native = _nebular_run([command, *capture["native"]["argv"]], install_env, work_path,
-                              sandbox_prefix, capture["native"]["timeout_seconds"], runner=runner)
-        require_clean(native, "NEBULAR_NATIVE_CONTRACT")
+        application_smoke = None
+        native_spec = capture["native"]
+        if fixture_only:
+            native = _nebular_run([command, *capture["native"]["argv"]], install_env, work_path,
+                                  sandbox_prefix, capture["native"]["timeout_seconds"], runner=runner)
+            require_clean(native, "NEBULAR_NATIVE_CONTRACT")
+        else:
+            from rs9.nebular070_installed_smoke import run_installed_smoke
+            from rs9.nebular070_smoke_support import installed_runtime_root
+            expected_members = capture["manifest"].get("members")
+            if not isinstance(expected_members, list) or not expected_members:
+                fail("NEBULAR_SMOKE_CLOSURE")
+            smoke_prepared["expected_members"] = expected_members
+            smoke_prepared["manifest_sha256"] = sha256(canonical(expected_members))
+            application_smoke = run_installed_smoke(
+                prepared=smoke_prepared,
+                target=target,
+                runtime_root=installed_runtime_root(resolved_gui, target),
+                env=install_env,
+                prefix=sandbox_prefix,
+                evidence=work_path / "installed-native-smoke",
+                native=native_spec,
+                gui=capture["gui"],
+                runner=runner,
+                timeout=native_spec["timeout_seconds"],
+            )
+            native = application_smoke["native_probe"]
         if fixture_only:
             shutil.rmtree(site)
             uninstall = {"exit_code": 0, "signal": None, "stdout_sha256": sha256(b""),
@@ -1623,4 +1666,6 @@ def consume_nebular_candidate(
             "regular_bytes": pip_source["regular_bytes"],
             "primary_cli": "pip --python <venv> --version",
         }
+    if application_smoke is not None:
+        result["application_smoke"] = application_smoke
     return result

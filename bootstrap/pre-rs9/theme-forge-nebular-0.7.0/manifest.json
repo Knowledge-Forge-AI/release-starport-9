@@ -1,0 +1,29 @@
+{
+  "bootstrap-pre-rs9": true,
+  "future-releases": "forbidden",
+  "projects": [
+    {
+      "config_sha256": "4266ad31518b175ae0b2647387e079836b0c22ffa4e8c1e864160ac657afd7ca",
+      "configuration": "theme-forge-nebular-fusion",
+      "license_authority": {
+        "basis": "manager-direction-and-authenticated-tagged-repository",
+        "expression": "AGPL-3.0-or-later",
+        "files": [
+          "LICENSE",
+          "NOTICE",
+          "COMMERCIAL-LICENSE.md"
+        ]
+      },
+      "release_id": 426333162,
+      "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+      "repository_id": 1358643872,
+      "tag": "v0.7.0",
+      "tag_commit": "cadb40c4972f68f314096ff60fbcfb4da950c161",
+      "tag_tree": "27c643b6375c2aafde314799c4f08e844c14992c",
+      "version": "0.7.0"
+    }
+  ],
+  "release-contains-rs9": false,
+  "schema": "rs9.bootstrap-tenant-manifest.v1alpha1",
+  "scope": "exact-generation"
+}

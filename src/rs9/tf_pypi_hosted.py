@@ -576,6 +576,7 @@ def qualify_nebular070(
     real_user_state_snapshot: Any = None,
     offline_pip_bootstrap: Mapping[str, Any] | None = None,
     manylinux_stage_a: ValidatedPayloadPortability | None = None,
+    smoke_support: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run one Nebular 0.7 candidate through the post-path native consumer.
 
@@ -626,6 +627,8 @@ def qualify_nebular070(
     }
     if offline_pip_bootstrap is not None:
         consume_kwargs["offline_pip_bootstrap"] = offline_pip_bootstrap
+    if smoke_support is not None:
+        consume_kwargs["smoke_support"] = smoke_support
     if runner is not None:
         consume_kwargs["runner"] = runner
     consumer = consume_nebular_candidate(candidate, wheel_path, raw_release, work, **consume_kwargs)
@@ -719,6 +722,15 @@ def admit_nebular070_matrix(
                 or result.get("publication_admitted") is not False
                 or not isinstance(result.get("qualification_rs9_source"), Mapping)):
             fail("NEBULAR_MATRIX_RECEIPT")
+        # The matrix must carry the complete actual installed-consumer result
+        # for every primary target, including Darwin.  The older shallow
+        # booleans below are retained as cheap early checks; this maintained
+        # validator owns the fresh A/B/C and x64 C-signal receipt contract.
+        try:
+            from rs9.nebular070_public_consumers import _required_actual_result
+            _required_actual_result(result, target=target)
+        except Exception as exc:
+            raise AdmissionError("TF_PYPI_MATRIX_CONSUMER") from exc
         qualification = result["qualification_rs9_source"]
         if (qualification.get("status") != "executing-qualification-source"
                 or qualification.get("run_id") != run_id
