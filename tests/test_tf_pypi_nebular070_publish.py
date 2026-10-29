@@ -1600,7 +1600,7 @@ class Nebular070PublisherSeamTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name).resolve()
 
-    def test_committed_repository_fails_closed_without_fabricated_pins_or_captures(self) -> None:
+    def test_missing_operator_documents_fail_closed_without_fabrication(self) -> None:
         desc_file = ROOT / DESCRIPTION_PATH
         self.assertTrue(desc_file.is_file())
         desc_bytes = desc_file.read_bytes()
@@ -1610,19 +1610,23 @@ class Nebular070PublisherSeamTests(unittest.TestCase):
             "6bd13e05b0ad87ef1c1c9635a320f2e1b9341577e81c42d78e61b6cb94a72dc3",
         )
 
+        # Genuine publication documents may be committed after qualification.
+        # Exercise the missing-document contract in an isolated operator root.
+        missing_root = self.root / "missing-operator-state"
+        missing_root.mkdir()
         for absent_name in (PIN_BASENAME, APPROVAL_BASENAME, CAPTURE_BASENAME):
-            self.assertFalse((ROOT / "operators/tf-pypi" / absent_name).exists())
+            self.assertFalse((missing_root / "operators/tf-pypi" / absent_name).exists())
 
         with self.assertRaises(AdmissionError) as ctx_pin:
-            load_pin(ROOT)
+            load_pin(missing_root)
         self.assertEqual(ctx_pin.exception.code, "TF_PYPI_PIN_ABSENT")
 
         with self.assertRaises(AdmissionError) as ctx_app:
-            load_approval(ROOT)
+            load_approval(missing_root)
         self.assertEqual(ctx_app.exception.code, "TF_PYPI_APPROVAL_ABSENT")
 
         with self.assertRaises(AdmissionError) as ctx_cap:
-            load_qualification_capture(ROOT)
+            load_qualification_capture(missing_root)
         self.assertEqual(ctx_cap.exception.code, "TF_PYPI_QUALIFICATION_CAPTURE_ABSENT")
 
         head_commit = subprocess.check_output(
