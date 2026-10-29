@@ -124,10 +124,10 @@ class Nebular070Gate1Tests(unittest.TestCase):
         self.assertEqual({k: raw_profile[k] for k in profile}, profile)
         self.assertEqual(raw_profile["description_path"], DESCRIPTION_070_PATH)
         desc_bytes = (repo_root / DESCRIPTION_070_PATH).read_bytes()
-        self.assertEqual(len(desc_bytes), 6671)
+        self.assertEqual(len(desc_bytes), 6796)
         self.assertEqual(
             digest(desc_bytes),
-            "c590e84005aed24a726160213d1bcd89e5855b006cc39612dcb7769238568078",
+            "6bd13e05b0ad87ef1c1c9635a320f2e1b9341577e81c42d78e61b6cb94a72dc3",
         )
 
     def test_darwin_floor_cross_checks_macho_and_info_plist(self) -> None:
