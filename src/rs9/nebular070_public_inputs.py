@@ -52,6 +52,16 @@ MAX_PAYLOAD_TOTAL = 1024 * 1024 * 1024
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 PROTECTED_COMPONENTS = frozenset({".git", ".serena", "DB", "RAW", ".ninja_deps", ".ninja_log"})
 ARCHIVE_SUFFIXES = (".tgz", ".tar", ".tar.gz", ".zip", ".whl", ".deb", ".dylib", ".dll", ".so")
+# These are opaque, authenticated release evidence members, not payload
+# inputs.  They are admitted only at these exact paths and only after their
+# regular-member bytes match the independently pinned size and digest.  The
+# contents are never unpacked or executed by this transport.
+OPAQUE_METADATA_ARCHIVES = (
+    ("evidence/public-release/assets/nebular-v0.7.0-third-party-notices.tar.gz",
+     30212, "c8ab80d6601947a505eb68e482985672dd4c4a697ff57ecb1bacb9ca9935dbde"),
+    ("evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-source.tar.gz",
+     4453031, "183f99f5af7228eb6498ab990fa514bb501586e8a0ff31a93a7bc05c736a805a"),
+)
 TOP_KEYS = frozenset({"schema", "repository", "version", "release_id", "metadata", "payloads"})
 ASSET_KEYS = frozenset({"asset_id", "name", "url", "bytes", "sha256"})
 PAYLOAD_KEYS = ASSET_KEYS | {"path"}
@@ -147,7 +157,8 @@ def _safe_member_name(name: str) -> str:
     parts = name.split("/")
     if any(part in PROTECTED_COMPONENTS for part in parts):
         _fail("PROTECTED_PATH", "Metadata archive contains a protected path component")
-    if name == "fetch-receipt.json" or name.endswith(ARCHIVE_SUFFIXES):
+    opaque = any(name == path for path, _size, _sha256 in OPAQUE_METADATA_ARCHIVES)
+    if name == "fetch-receipt.json" or (name.endswith(ARCHIVE_SUFFIXES) and not opaque):
         _fail("UNSAFE_MEMBER", "Metadata archive contains a payload-like member")
     return name
 
@@ -166,6 +177,10 @@ def _archive_members(data: bytes) -> tuple[dict, ...]:
                 if len(entries) >= MAX_METADATA_MEMBERS:
                     _fail("METADATA_LIMIT", "Metadata member count exceeds the bound")
                 name = _safe_member_name(member.name)
+                expected_opaque = next((entry[1:] for entry in OPAQUE_METADATA_ARCHIVES
+                                       if entry[0] == name), None)
+                if expected_opaque is not None and not member.isfile():
+                    _fail("UNSAFE_MEMBER", "Approved opaque member must be a regular file")
                 if name in entries:
                     _fail("DUPLICATE_MEMBER", "Metadata archive contains a duplicate member")
                 if member.pax_headers:
@@ -190,6 +205,12 @@ def _archive_members(data: bytes) -> tuple[dict, ...]:
                 body = source.read(member.size + 1)
                 if len(body) != member.size:
                     _fail("INVALID_ARCHIVE", "Metadata regular member is truncated")
+                if expected_opaque is not None:
+                    expected_size, expected_sha256 = expected_opaque
+                    if member.size != expected_size:
+                        _fail("OPAQUE_MEMBER_MISMATCH", "Approved opaque member has an unexpected size")
+                    if hashlib.sha256(body).hexdigest() != expected_sha256:
+                        _fail("OPAQUE_MEMBER_MISMATCH", "Approved opaque member has an unexpected digest")
                 scan_bytes_for_credentials(body)
                 entries[name] = {"path": name, "type": "file", "mode": member.mode & 0o777, "body": body}
     except ContractError:
