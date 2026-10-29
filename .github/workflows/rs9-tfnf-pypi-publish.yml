@@ -1570,12 +1570,14 @@ jobs:
               load_approval,
           )
           temp = Path(os.environ["RUNNER_TEMP"])
+          is_system_runtime = _system_runtime_profile(load_approval(Path("publisher-authority")))
           extract_public_external_artifact(
               temp / "tfnf-070-external-archives" / f"{PUBLIC_INPUTS_ARTIFACT}.zip",
               temp / "tfnf-070-public-inputs",
               artifact_name=PUBLIC_INPUTS_ARTIFACT,
+              runtime_profile="system-webkitgtk-4.1" if is_system_runtime else "manylinux",
           )
-          if not _system_runtime_profile(load_approval(Path("publisher-authority"))):
+          if not is_system_runtime:
               extract_public_external_artifact(
                   temp / "tfnf-070-external-archives" / f"{MANYLINUX_ADMISSION_ARTIFACT}.zip",
                   temp / "tfnf-070-external-manylinux",
