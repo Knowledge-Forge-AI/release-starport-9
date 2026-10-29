@@ -102,10 +102,13 @@ class SystemWebKitWorkflow2Tests(unittest.TestCase):
                 end = text.index(f"  {floor_jobs[index + 1]}", start)
                 section = text[start:end]
             else:
-                section = text[start:]
+                section = text[start:].split("\n  qualification_gate_070:", 1)[0]
+            self.assertIn("defaults:\n      run:\n        shell: bash", section)
+            self.assertIn("TFNF_CI_TEMP: /__w/_temp", section)
+            self.assertNotIn("runner.temp", section)
             tools = section.split("- name: Install pinned Bookworm floor tools", 1)[1]
             self.assertLess(
-                tools.index('mkdir -p "${{ runner.temp }}"'),
+                tools.index('mkdir -p "${{ env.TFNF_CI_TEMP }}"'),
                 tools.index("apt-get update"),
             )
             self.assertLess(

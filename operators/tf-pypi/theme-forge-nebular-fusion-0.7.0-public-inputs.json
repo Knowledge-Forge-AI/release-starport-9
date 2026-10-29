@@ -1,1 +1,47 @@
-{"metadata":{"asset_id":689148159,"bytes":4848250,"name":"nebular-v0.7.0-pypi-inputs-0e81f1ba479aebf5.tar.gz","sha256":"0e81f1ba479aebf53366f794e5afb477dd6c79ce80b85928866ff29bfea3ea5d","url":"https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/nebular-v0.7.0-pypi-inputs-0e81f1ba479aebf5.tar.gz"},"payloads":[{"asset_id":687086526,"bytes":47355011,"name":"theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz","path":"evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz","sha256":"52f626bfcbfb4235298675669841ca9fbea8113118e9d25f0310e0a26489a470","url":"https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz"},{"asset_id":687086522,"bytes":54553557,"name":"theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz","path":"evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz","sha256":"eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c","url":"https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz"},{"asset_id":687086740,"bytes":54425294,"name":"theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz","path":"evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz","sha256":"4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27","url":"https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz"},{"asset_id":687086750,"bytes":22564,"name":"knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz","path":"evidence/public-release/assets/knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz","sha256":"d4bef1172a773c27eced3067e148aaa353152c577001f1203a0dc95ab4cb9f00","url":"https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz"}],"release_id":426333162,"repository":"Knowledge-Forge-AI/theme-forge-nebular-fusion","schema":"rs9.nebular070-public-input-manifest.v1","version":"0.7.0"}
+{
+  "metadata": {
+    "asset_id": 689330547,
+    "bytes": 4848809,
+    "name": "nebular-v0.7.0-pypi-inputs-10f0c994524ef61e.tar.gz",
+    "sha256": "10f0c994524ef61e54c4351bfeda9a70d0af570dcad9e3e63879ef471aab25cc",
+    "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/nebular-v0.7.0-pypi-inputs-10f0c994524ef61e.tar.gz"
+  },
+  "payloads": [
+    {
+      "asset_id": 687086526,
+      "bytes": 47355011,
+      "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz",
+      "path": "evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz",
+      "sha256": "52f626bfcbfb4235298675669841ca9fbea8113118e9d25f0310e0a26489a470",
+      "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz"
+    },
+    {
+      "asset_id": 687086522,
+      "bytes": 54553557,
+      "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz",
+      "path": "evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz",
+      "sha256": "eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c",
+      "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz"
+    },
+    {
+      "asset_id": 687086740,
+      "bytes": 54425294,
+      "name": "theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz",
+      "path": "evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27",
+      "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz"
+    },
+    {
+      "asset_id": 687086750,
+      "bytes": 22564,
+      "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz",
+      "path": "evidence/public-release/assets/knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz",
+      "sha256": "d4bef1172a773c27eced3067e148aaa353152c577001f1203a0dc95ab4cb9f00",
+      "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz"
+    }
+  ],
+  "release_id": 426333162,
+  "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+  "schema": "rs9.nebular070-public-input-manifest.v1",
+  "version": "0.7.0"
+}

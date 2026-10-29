@@ -6,6 +6,7 @@ import os
 import platform
 import re
 import stat
+import struct
 import sys
 import venv
 from pathlib import Path
@@ -17,6 +18,69 @@ from rs9.tf_pypi_archive import canonical, fail, physical_bytes, sha256
 def _frame(value: os.stat_result) -> list[int]:
     return [value.st_dev, value.st_ino, value.st_size, value.st_mode,
             value.st_mtime_ns, value.st_ctime_ns, value.st_uid, value.st_gid, value.st_nlink]
+
+
+def _provider_version_definitions(data: bytes) -> list[str]:
+    """Read ELF64 little-endian definition names without dumping symbol rows."""
+    try:
+        if len(data) < 64 or data[:6] != b"\x7fELF\x02\x01":
+            raise ValueError
+        table = struct.unpack_from("<Q", data, 40)[0]
+        stride, count = struct.unpack_from("<HH", data, 58)
+        if table < 64 or stride != 64 or not count or table + stride * count > len(data):
+            raise ValueError
+        sections = [struct.unpack_from("<IIQQQQIIQQ", data, table + i * stride)
+                    for i in range(count)]
+        definitions = [row for row in sections if row[1] == 0x6FFFFFFD]
+        if not definitions:
+            return []
+        if len(definitions) != 1:
+            raise ValueError
+        row = definitions[0]
+        start, size, link, entries = row[4:8]
+        if start < 64 or link >= count or entries > 4096 or start + size > len(data):
+            raise ValueError
+        strings = sections[link]
+        string_start, string_size = strings[4:6]
+        if strings[1] != 3 or string_start < 64 or string_start + string_size > len(data):
+            raise ValueError
+        names, cursor = [], start
+        for index in range(entries):
+            if cursor + 20 > start + size:
+                raise ValueError
+            version, _, _, auxiliary_count, _, auxiliary, following = struct.unpack_from("<HHHHIII", data, cursor)
+            if version != 1 or not 1 <= auxiliary_count <= 256 or auxiliary < 20:
+                raise ValueError
+            auxiliary_cursor = cursor + auxiliary
+            for number in range(auxiliary_count):
+                if auxiliary_cursor + 8 > start + size:
+                    raise ValueError
+                name_offset, next_auxiliary = struct.unpack_from("<II", data, auxiliary_cursor)
+                if name_offset >= string_size:
+                    raise ValueError
+                offset = string_start + name_offset
+                end = data.find(b"\0", offset, min(string_start + string_size, offset + 512))
+                if end <= offset:
+                    raise ValueError
+                if number == 0:
+                    names.append(data[offset:end].decode("utf-8"))
+                if number + 1 == auxiliary_count:
+                    if next_auxiliary != 0:
+                        raise ValueError
+                elif next_auxiliary < 8:
+                    raise ValueError
+                auxiliary_cursor += next_auxiliary
+            if index + 1 == entries:
+                if following != 0:
+                    raise ValueError
+            elif following < 20:
+                raise ValueError
+            cursor += following
+        if not entries and size:
+            raise ValueError
+        return sorted(set(names))
+    except (ValueError, struct.error, UnicodeError):
+        fail("NEBULAR_SYSTEM_PROVIDER_ELF")
 
 
 def observe_provider(target: str) -> dict[str, Any]:
@@ -59,12 +123,11 @@ def observe_provider(target: str) -> dict[str, Any]:
     parsed = parse_elf(data)
     if parsed.get("machine") != machine or parsed.get("soname") != soname:
         fail("NEBULAR_SYSTEM_PROVIDER_ELF")
-    stdout, stderr, proof = _bounded_tool(["/usr/bin/readelf", "-h", "-d", "-V", "--wide", str(cursor)])
-    text = stdout.decode("utf-8", errors="strict")
-    definitions = text.split("Version definition section", 1)
-    versions = [] if len(definitions) == 1 else sorted(set(re.findall(
-        r"Name:\s+(\S+)", definitions[1].split("Version needs section", 1)[0],
-    )))
+    # -V also prints the complete symbol-version table, exceeding the existing
+    # host probe's stream cap for WebKit. Keep that cap and observe the small
+    # header/dynamic table; definition names come from the same hashed bytes.
+    stdout, stderr, proof = _bounded_tool(["/usr/bin/readelf", "-h", "-d", "--wide", str(cursor)])
+    versions = _provider_version_definitions(data)
     if stderr or _frame(cursor.lstat()) != _frame(before):
         fail("NEBULAR_SYSTEM_PROVIDER_CHANGED")
     for alias in aliases:

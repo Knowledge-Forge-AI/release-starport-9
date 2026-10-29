@@ -4425,6 +4425,11 @@ def workflow_070_qualify_jobs_text() -> str:
     needs: [build_verify_070]
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      TFNF_CI_TEMP: /__w/_temp
     permissions:
       contents: read
     # Release-scoped Bookworm/SYS_ADMIN floor policy; held pending its
@@ -4437,7 +4442,7 @@ def workflow_070_qualify_jobs_text() -> str:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "${{{{ runner.temp }}}}"
+          mkdir -p "${{{{ env.TFNF_CI_TEMP }}}}"
           apt-get update
           apt-get install -y --no-install-recommends \\
             ca-certificates git python3 python3-venv=3.11.2-1+b1 \\
@@ -4463,7 +4468,7 @@ def workflow_070_qualify_jobs_text() -> str:
             for tool in {" ".join(DISPLAY_TOOL_COMMANDS)}; do
               printf 'tool=%s path=%s\\n' "$tool" "$(command -v "$tool")"
             done
-          }} | tee "${{{{ runner.temp }}}}/tfnf-070-floor-display-tools.tsv"
+          }} | tee "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-floor-display-tools.tsv"
 
       - name: Checkout exact source
         uses: {CHECKOUT_ACTION}
@@ -4488,21 +4493,21 @@ def workflow_070_qualify_jobs_text() -> str:
         uses: {DOWNLOAD_ARTIFACT_ACTION}
         with:
           name: {CANDIDATE_BUNDLE_ARTIFACT}
-          path: '${{{{ runner.temp }}}}/tfnf-070-bundle'
+          path: '${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-bundle'
 
       - name: Download 0.7.0 public inputs
         uses: {DOWNLOAD_ARTIFACT_ACTION}
         with:
           name: {PUBLIC_INPUTS_ARTIFACT}
-          path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+          path: '${{{{ env.TFNF_CI_TEMP }}}}/{PUBLIC_INPUTS_ARTIFACT}'
 
       - name: Resolve explicit Linux runtime profile
         id: linux_runtime_profile
         env:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
-          QUALIFICATION_INPUTS: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}'
-          INRUN_ROOT: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+          QUALIFICATION_INPUTS: '${{{{ env.TFNF_CI_TEMP }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}'
+          INRUN_ROOT: '${{{{ env.TFNF_CI_TEMP }}}}/{PUBLIC_INPUTS_ARTIFACT}'
         run: |
           set -euo pipefail
           PROFILE="$("${{{{ steps.setup_python.outputs.python-path }}}}" -B - <<'PY'
@@ -4543,9 +4548,9 @@ def workflow_070_qualify_jobs_text() -> str:
           set -euo pipefail
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish check-system-webkit-missing \\
             --target linux-arm64-gnu \\
-            --bundle "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
-            --work "${{{{ runner.temp }}}}/tfnf-070-preflight-linux-arm64-gnu-floor" \\
-            --output "${{{{ runner.temp }}}}/tfnf-070-floor/linux-arm64-gnu/missing-runtime.json" \\
+            --bundle "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-bundle" \\
+            --work "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-preflight-linux-arm64-gnu-floor" \\
+            --output "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-floor/linux-arm64-gnu/missing-runtime.json" \\
             --expected-commit "${{{{ github.sha }}}}" \\
             --run-id "${{{{ github.run_id }}}}" \\
             --run-attempt "${{{{ github.run_attempt }}}}"
@@ -4565,7 +4570,7 @@ def workflow_070_qualify_jobs_text() -> str:
         run: |
           set -euo pipefail
           dpkg-query -W -f='${{Package}}\\t${{Version}}\\n' {" ".join(BOOKWORM_SYSTEM_WEBKIT_PACKAGES)} \\
-            | tee "${{{{ runner.temp }}}}/tfnf-070-floor-system-webkit-packages.tsv"
+            | tee "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-floor-system-webkit-packages.tsv"
           ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
           ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
 
@@ -4577,13 +4582,13 @@ def workflow_070_qualify_jobs_text() -> str:
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish qualify-native \\
             --target linux-arm64-gnu \\
             --consumer-host-role floor \\
-            --consumer-capture-output "${{{{ runner.temp }}}}/tfnf-070-floor/linux-arm64-gnu/floor.json" \\
-            --qualification-inputs "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
-            --inrun-root "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
-            --raw-release "${{{{ runner.temp }}}}/tfnf-070-raw-release-linux-arm64-gnu-floor/raw_release.json" \\
-            --bundle "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
-            --work "${{{{ runner.temp }}}}/tfnf-070-work-linux-arm64-gnu-floor" \\
-            --output "${{{{ runner.temp }}}}/tfnf-070-floor/linux-arm64-gnu/result.json" \\
+            --consumer-capture-output "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-floor/linux-arm64-gnu/floor.json" \\
+            --qualification-inputs "${{{{ env.TFNF_CI_TEMP }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
+            --inrun-root "${{{{ env.TFNF_CI_TEMP }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
+            --raw-release "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-raw-release-linux-arm64-gnu-floor/raw_release.json" \\
+            --bundle "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-bundle" \\
+            --work "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-work-linux-arm64-gnu-floor" \\
+            --output "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-floor/linux-arm64-gnu/result.json" \\
             --expected-commit "${{{{ github.sha }}}}" \\
             --run-id "${{{{ github.run_id }}}}" \\
             --run-attempt "${{{{ github.run_attempt }}}}"
@@ -4592,7 +4597,7 @@ def workflow_070_qualify_jobs_text() -> str:
         uses: {UPLOAD_ARTIFACT_ACTION}
         with:
           name: {FLOOR_TARGET_QUALIFICATION_ARTIFACTS['linux-arm64-gnu']}
-          path: '${{{{ runner.temp }}}}/tfnf-070-floor/'
+          path: '${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-floor/'
           compression-level: 0
           retention-days: 14
           if-no-files-found: error
@@ -4603,6 +4608,11 @@ def workflow_070_qualify_jobs_text() -> str:
     needs: [build_verify_070]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      TFNF_CI_TEMP: /__w/_temp
     permissions:
       contents: read
     # Release-scoped Bookworm/SYS_ADMIN floor policy; held pending its
@@ -4615,7 +4625,7 @@ def workflow_070_qualify_jobs_text() -> str:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "${{{{ runner.temp }}}}"
+          mkdir -p "${{{{ env.TFNF_CI_TEMP }}}}"
           apt-get update
           apt-get install -y --no-install-recommends \\
             ca-certificates git python3 python3-venv=3.11.2-1+b1 \\
@@ -4641,7 +4651,7 @@ def workflow_070_qualify_jobs_text() -> str:
             for tool in {" ".join(DISPLAY_TOOL_COMMANDS)}; do
               printf 'tool=%s path=%s\\n' "$tool" "$(command -v "$tool")"
             done
-          }} | tee "${{{{ runner.temp }}}}/tfnf-070-floor-display-tools.tsv"
+          }} | tee "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-floor-display-tools.tsv"
 
       - name: Checkout exact source
         uses: {CHECKOUT_ACTION}
@@ -4666,21 +4676,21 @@ def workflow_070_qualify_jobs_text() -> str:
         uses: {DOWNLOAD_ARTIFACT_ACTION}
         with:
           name: {CANDIDATE_BUNDLE_ARTIFACT}
-          path: '${{{{ runner.temp }}}}/tfnf-070-bundle'
+          path: '${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-bundle'
 
       - name: Download 0.7.0 public inputs
         uses: {DOWNLOAD_ARTIFACT_ACTION}
         with:
           name: {PUBLIC_INPUTS_ARTIFACT}
-          path: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+          path: '${{{{ env.TFNF_CI_TEMP }}}}/{PUBLIC_INPUTS_ARTIFACT}'
 
       - name: Resolve explicit Linux runtime profile
         id: linux_runtime_profile
         env:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: '1'
-          QUALIFICATION_INPUTS: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}'
-          INRUN_ROOT: '${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}'
+          QUALIFICATION_INPUTS: '${{{{ env.TFNF_CI_TEMP }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}'
+          INRUN_ROOT: '${{{{ env.TFNF_CI_TEMP }}}}/{PUBLIC_INPUTS_ARTIFACT}'
         run: |
           set -euo pipefail
           PROFILE="$("${{{{ steps.setup_python.outputs.python-path }}}}" -B - <<'PY'
@@ -4721,9 +4731,9 @@ def workflow_070_qualify_jobs_text() -> str:
           set -euo pipefail
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish check-system-webkit-missing \\
             --target linux-x64-gnu \\
-            --bundle "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
-            --work "${{{{ runner.temp }}}}/tfnf-070-preflight-linux-x64-gnu-floor" \\
-            --output "${{{{ runner.temp }}}}/tfnf-070-floor/linux-x64-gnu/missing-runtime.json" \\
+            --bundle "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-bundle" \\
+            --work "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-preflight-linux-x64-gnu-floor" \\
+            --output "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-floor/linux-x64-gnu/missing-runtime.json" \\
             --expected-commit "${{{{ github.sha }}}}" \\
             --run-id "${{{{ github.run_id }}}}" \\
             --run-attempt "${{{{ github.run_attempt }}}}"
@@ -4743,7 +4753,7 @@ def workflow_070_qualify_jobs_text() -> str:
         run: |
           set -euo pipefail
           dpkg-query -W -f='${{Package}}\\t${{Version}}\\n' {" ".join(BOOKWORM_SYSTEM_WEBKIT_PACKAGES)} \\
-            | tee "${{{{ runner.temp }}}}/tfnf-070-floor-system-webkit-packages.tsv"
+            | tee "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-floor-system-webkit-packages.tsv"
           ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
           ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
 
@@ -4755,13 +4765,13 @@ def workflow_070_qualify_jobs_text() -> str:
           "${{{{ steps.setup_python.outputs.python-path }}}}" -B -m rs9.tf_pypi_nebular070_publish qualify-native \\
             --target linux-x64-gnu \\
             --consumer-host-role floor \\
-            --consumer-capture-output "${{{{ runner.temp }}}}/tfnf-070-floor/linux-x64-gnu/floor.json" \\
-            --qualification-inputs "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
-            --inrun-root "${{{{ runner.temp }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
-            --raw-release "${{{{ runner.temp }}}}/tfnf-070-raw-release-linux-x64-gnu-floor/raw_release.json" \\
-            --bundle "${{{{ runner.temp }}}}/tfnf-070-bundle" \\
-            --work "${{{{ runner.temp }}}}/tfnf-070-work-linux-x64-gnu-floor" \\
-            --output "${{{{ runner.temp }}}}/tfnf-070-floor/linux-x64-gnu/result.json" \\
+            --consumer-capture-output "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-floor/linux-x64-gnu/floor.json" \\
+            --qualification-inputs "${{{{ env.TFNF_CI_TEMP }}}}/{PUBLIC_INPUTS_ARTIFACT}/{PUBLIC_INPUTS_DESCRIPTOR}" \\
+            --inrun-root "${{{{ env.TFNF_CI_TEMP }}}}/{PUBLIC_INPUTS_ARTIFACT}" \\
+            --raw-release "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-raw-release-linux-x64-gnu-floor/raw_release.json" \\
+            --bundle "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-bundle" \\
+            --work "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-work-linux-x64-gnu-floor" \\
+            --output "${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-floor/linux-x64-gnu/result.json" \\
             --expected-commit "${{{{ github.sha }}}}" \\
             --run-id "${{{{ github.run_id }}}}" \\
             --run-attempt "${{{{ github.run_attempt }}}}"
@@ -4770,7 +4780,7 @@ def workflow_070_qualify_jobs_text() -> str:
         uses: {UPLOAD_ARTIFACT_ACTION}
         with:
           name: {FLOOR_TARGET_QUALIFICATION_ARTIFACTS['linux-x64-gnu']}
-          path: '${{{{ runner.temp }}}}/tfnf-070-floor/'
+          path: '${{{{ env.TFNF_CI_TEMP }}}}/tfnf-070-floor/'
           compression-level: 0
           retention-days: 14
           if-no-files-found: error
