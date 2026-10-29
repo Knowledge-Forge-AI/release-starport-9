@@ -5254,12 +5254,14 @@ def publication_resume_job_text() -> str:
               load_approval,
           )
           temp = Path(os.environ["RUNNER_TEMP"])
+          is_system_runtime = _system_runtime_profile(load_approval(Path("publisher-authority")))
           extract_public_external_artifact(
               temp / "tfnf-070-external-archives" / f"{{PUBLIC_INPUTS_ARTIFACT}}.zip",
               temp / "tfnf-070-public-inputs",
               artifact_name=PUBLIC_INPUTS_ARTIFACT,
+              runtime_profile="{SYSTEM_WEBKIT_RUNTIME_PROFILE}" if is_system_runtime else "manylinux",
           )
-          if not _system_runtime_profile(load_approval(Path("publisher-authority"))):
+          if not is_system_runtime:
               extract_public_external_artifact(
                   temp / "tfnf-070-external-archives" / f"{{MANYLINUX_ADMISSION_ARTIFACT}}.zip",
                   temp / "tfnf-070-external-manylinux",
@@ -5747,9 +5749,13 @@ def extract_public_external_artifact(
     output: str | Path,
     *,
     artifact_name: str,
+    runtime_profile: str = "manylinux",
 ) -> dict[str, Any]:
     """Extract one held workflow artifact with a closed, no-follow ZIP boundary."""
-    if artifact_name not in PUBLIC_EXTERNAL_ARTIFACT_NAMES:
+    if (artifact_name not in PUBLIC_EXTERNAL_ARTIFACT_NAMES
+            or runtime_profile not in ("manylinux", SYSTEM_WEBKIT_RUNTIME_PROFILE)
+            or (runtime_profile == SYSTEM_WEBKIT_RUNTIME_PROFILE
+                and artifact_name != PUBLIC_INPUTS_ARTIFACT)):
         fail("PUBLIC_EXTERNAL_ARTIFACT")
     archive_path = Path(archive)
     _check_no_symlinks(archive_path, "PUBLIC_EXTERNAL_ARTIFACT")
@@ -5807,9 +5813,14 @@ def extract_public_external_artifact(
                     PUBLIC_INPUTS_DESCRIPTOR,
                     "fetch-receipt.json",
                     PUBLIC_INPUTS_PREPARATION_RECEIPT,
-                    f"{PUBLIC_STAGE_A_OUTPUT}/payload-portability.json",
-                    f"{PUBLIC_STAGE_A_OUTPUT}/stage-a-receipt.json",
                 }
+                if runtime_profile == "manylinux":
+                    required.update({
+                        f"{PUBLIC_STAGE_A_OUTPUT}/payload-portability.json",
+                        f"{PUBLIC_STAGE_A_OUTPUT}/stage-a-receipt.json",
+                    })
+                elif any(name.startswith(f"{PUBLIC_STAGE_A_OUTPUT}/") for name in file_names):
+                    fail("PUBLIC_EXTERNAL_ARTIFACT")
                 if not required.issubset(file_names):
                     fail("PUBLIC_EXTERNAL_ARTIFACT")
             for info in files:

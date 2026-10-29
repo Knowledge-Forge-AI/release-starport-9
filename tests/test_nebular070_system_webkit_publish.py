@@ -146,7 +146,9 @@ class SystemWebKitPublisherTests(unittest.TestCase):
         workflow = publish.publication_resume_job_text()
         self.assertIn("runtime_profile=", workflow)
         self.assertIn("if: steps.resolve_qual.outputs.runtime_profile == 'manylinux'", workflow)
-        self.assertIn('if not _system_runtime_profile(load_approval(Path("publisher-authority"))):', workflow)
+        self.assertIn('is_system_runtime = _system_runtime_profile(load_approval(Path("publisher-authority")))', workflow)
+        self.assertIn('runtime_profile="system-webkitgtk-4.1" if is_system_runtime else "manylinux"', workflow)
+        self.assertIn('if not is_system_runtime:', workflow)
         self.assertIn("approval=load_approval(pub)", workflow)
         for name, next_name in (
             ("Verify artifact integrity and select only missing files",
