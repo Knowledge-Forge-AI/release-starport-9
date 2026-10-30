@@ -1082,6 +1082,10 @@ class NixHostedTests(unittest.TestCase):
         observe.assert_called_once()
 
     def test_execute_linux_nix_fhs_success_unaltered(self):
+        self._execute_nix_success_fixture()
+
+    def _execute_nix_success_fixture(self, system="x86_64-linux", generation=None,
+                                     prepared=None, expected_observation=False):
         with tempfile.TemporaryDirectory() as td:
             scratch = Path(td) / "scratch"
             scratch.mkdir()
@@ -1090,9 +1094,11 @@ class NixHostedTests(unittest.TestCase):
             install_dir.mkdir(parents=True)
 
             pin_val = "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60"
+            if system == "aarch64-darwin":
+                pin_val = "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8"
             identity_doc = {
                 "version": "2.31.2",
-                "system": "x86_64-linux",
+                "system": system,
                 "sha256": pin_val,
                 "pin_provenance": "source-pinned",
                 "status": "pass",
@@ -1153,7 +1159,7 @@ class NixHostedTests(unittest.TestCase):
                 raise ValueError(f"Unexpected mock_command argv: {argv}")
 
             context = {
-                "system": "x86_64-linux",
+                "system": system,
                 "repository": ROOT,
                 "scratch": scratch,
                 "pins": {
@@ -1161,7 +1167,7 @@ class NixHostedTests(unittest.TestCase):
                         "installer_version": "2.31.2",
                         "installer_sha256_by_system": {
                             "aarch64-darwin": "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8",
-                            "x86_64-linux": pin_val,
+                            "x86_64-linux": "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60",
                             "aarch64-linux": "64db528412096d718b4bf8f78f85e5ac2b714b774e5005500dee37d23f560456",
                         },
                         "nixpkgs_revision": "0" * 40,
@@ -1172,6 +1178,9 @@ class NixHostedTests(unittest.TestCase):
                 "client": Mock(),
             }
 
+            if generation is not None:
+                context["generation"] = generation
+
             with patch.dict(os.environ, {"RUNNER_TEMP": str(runner_temp)}), \
                  patch("rs9.hosted_nix.prepare_input", return_value=(scratch, scratch, products)), \
                  patch("rs9.hosted_nix.command", side_effect=mock_command), \
@@ -1181,7 +1190,7 @@ class NixHostedTests(unittest.TestCase):
                  patch("rs9.hosted_nix.record_direct_loader_evaluation", side_effect=_mock_dbus_loader_facts), \
                  patch("rs9.hosted_nix.fhs_runtime_smoke", return_value={"name": "nix-fhs-runtime-smoke", "status": "pass"}), \
                  patch("rs9.hosted_nix.snapshot_nebular_runtime", return_value={"runtime_root_sha256": "a" * 64}), \
-                 patch("rs9.hosted_nix.prepare_smoke", return_value={}), \
+                 patch("rs9.hosted_nix.prepare_smoke", return_value={} if prepared is None else prepared), \
                  patch("rs9.hosted_nix.verifier_import_preflight", return_value={"status": "pass"}), \
                  patch("rs9.hosted_nix.verify_nebular_runtime", return_value={"status": "pass"}) as verify_runtime:
 
@@ -1193,21 +1202,41 @@ class NixHostedTests(unittest.TestCase):
                 result = execute(context)
                 self.assertIn("outputs", result["details"])
                 gate_names = [g["name"] for g in result["gates"]]
-                self.assertIn("nix-fhs-runtime-smoke", gate_names)
+                if system.endswith("linux"):
+                    self.assertIn("nix-fhs-runtime-smoke", gate_names)
                 self.assertIn("nix-store-archive-readback", gate_names)
                 self.assertIn("nix-native-closure", gate_names)
                 self.assertIn("nix-build-check-run", gate_names)
-                self.assertEqual(verify_runtime.call_args.kwargs["session_bus_argv"], [
+                self.assertEqual(verify_runtime.call_args.kwargs["diagnostic_initial_observation"], expected_observation)
+                self.assertEqual(verify_runtime.call_args.kwargs["session_bus_argv"], None if system.endswith("darwin") else [
                     "/nix/store/" + "a" * 32 + "-dbus-1/bin/dbus-run-session",
                     "--dbus-daemon=/nix/store/" + "a" * 32 + "-dbus-1/bin/dbus-daemon",
                     "--config-file=/nix/store/" + "a" * 32 + "-dbus-1/share/dbus-1/session.conf",
                     "--",
                 ])
 
-                lanes = [l for l in contract(ROOT)["lanes"] if l.get("lane") == "nix" and l.get("system") == "x86_64-linux"]
+                lanes = [l for l in contract(ROOT)["lanes"] if l.get("lane") == "nix" and l.get("system") == system]
                 self.assertEqual(len(lanes), 1)
                 blockers = gate_blockers(lanes[0], result)
                 self.assertEqual(blockers, [])
+
+    def test_execute_initial_observation_routes_real_prepared_current_capture(self):
+        from tests.test_current_smoke_source_transport import CurrentSourceTransportTests
+        from rs9.current_generation import CURRENT_GENERATION, HISTORICAL_GENERATION
+        fixture = CurrentSourceTransportTests()
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        prepared = fixture.prepared
+        self.assertEqual(prepared["source_generation"], CURRENT_GENERATION)
+        self.assertIsNotNone(prepared["capture"])
+        self.assertIsNotNone(prepared["fixture_capture"])
+        for system, generation, expected in [
+            ("x86_64-linux", CURRENT_GENERATION, True),
+            ("x86_64-linux", HISTORICAL_GENERATION, False),
+            ("aarch64-darwin", CURRENT_GENERATION, False),
+        ]:
+            with self.subTest(system=system, generation=generation):
+                self._execute_nix_success_fixture(system, generation, prepared, expected)
 
 
 if __name__ == "__main__":

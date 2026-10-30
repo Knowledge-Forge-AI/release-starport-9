@@ -72,6 +72,10 @@ CURRENT_REPLAY_PROGRESS_PROFILE = {'id': 'nebular070',
 REPLAY_PROGRESS_SCHEMA = "rs9.application-smoke-replay-progress.v1"
 REPLAY_PROGRESS_MAX_BYTES = 16 * 1024
 REPLAY_PROGRESS_MAX_EVENTS = 32
+INITIAL_OBSERVATION_SCHEMA = "rs9.application-smoke-initial-observation.v1"
+INITIAL_OBSERVATION_KIND = "initial-observation"
+INITIAL_OBSERVATION_MAX_BYTES = 16 * 1024
+INITIAL_OBSERVATION_MAX_STREAM_BYTES = 1024 * 1024
 REPLAY_PROGRESS_EVENTS = {
     ("harness", "import-start"), ("harness", "imported"),
     ("harness", "import-failed"), ("harness", "export-missing"),
@@ -82,6 +86,13 @@ REPLAY_PROGRESS_EVENTS = {
     ("receipt", "write-failed"), ("run-record", "write-start"),
     ("run-record", "finalized"), ("run-record", "write-failed"),
 }
+INITIAL_ERROR_CATEGORIES = frozenset({
+    "dbus-session-conf-missing", "dbus-daemon-error", "xvfb-display-error", "xvfb-auth-error",
+    "module-not-found", "command-not-found", "shared-library-missing", "webkit-crash",
+    "assertion", "socket-unavailable",
+})
+INITIAL_HELPER_IDENTIFIERS = frozenset({"dbus-run-session", "dbus-daemon", "node", "native-rc-smoke.mjs"})
+INITIAL_CATEGORY_COUNT_MAX = 4096
 REPLAY_RECEIPT_PROJECTION_SCHEMA = "rs9.application-smoke-replay-receipt-stage.v1"
 REPLAY_RECEIPT_MAX_STEPS = 64
 REPLAY_LINUX_SCENARIOS = {"linux-arm64": "B", "linux-x64": "C"}
@@ -545,6 +556,103 @@ def _read_replay_progress(path):
     return {"status": "observed", "event_count": len(events), "events": events}
 
 
+def _initial_observation_profile(profile):
+    if not isinstance(profile, dict) or not isinstance(profile.get("modules"), dict):
+        return None
+    harness = profile["modules"].get("native-rc-smoke.mjs")
+    if not isinstance(harness, dict):
+        return None
+    closure = {name: row.get("sha256") for name, row in profile["modules"].items()
+               if isinstance(name, str) and isinstance(row, dict)}
+    return {
+        "id": profile.get("id"), "source_commit": profile.get("commit"),
+        "source_tree": profile.get("tree"), "harness_sha256": harness.get("sha256"),
+        "closure_sha256s": closure,
+    }
+
+
+def _unobserved_initial_observation(reason):
+    return {"schema": INITIAL_OBSERVATION_SCHEMA, "status": "unobserved",
+            "attempt_kind": INITIAL_OBSERVATION_KIND, "reason": reason,
+            "non_admitting": True}
+
+
+def _read_initial_observation(path, expected_profile=None):
+    """Read only the closed live-observation summary; never retain child bytes."""
+    raw, _meta, error = _read_regular(path, INITIAL_OBSERVATION_MAX_BYTES)
+    if error:
+        return _unobserved_initial_observation("missing" if error == "missing" else error)
+    try:
+        text = raw.decode("utf-8")
+        scan_for_credentials(text)
+        value = json.loads(text)
+        required = {"schema", "attempt_kind", "non_admitting", "status", "source_profile",
+                    "phase_events", "error_counts", "error_category_counts", "helper_identifier_counts",
+                    "streams", "truncated"}
+        if not isinstance(value, dict) or set(value) != required:
+            raise ValueError("initial observation fields")
+        if (value["schema"] != INITIAL_OBSERVATION_SCHEMA
+                or value["attempt_kind"] != INITIAL_OBSERVATION_KIND
+                or value["non_admitting"] is not True
+                or value["status"] not in {"observing", "partial", "completed", "failed"}
+                or type(value["truncated"]) is not bool):
+            raise ValueError("initial observation identity")
+        profile = value["source_profile"]
+        profile_keys = {"id", "source_commit", "source_tree", "harness_sha256", "closure_sha256s"}
+        if (not isinstance(profile, dict) or set(profile) != profile_keys
+                or not all(isinstance(profile[key], str) for key in profile_keys - {"closure_sha256s"})
+                or not re.fullmatch(r"[0-9a-f]{64}", profile["harness_sha256"])
+                or not isinstance(profile["closure_sha256s"], dict)
+                or len(profile["closure_sha256s"]) > 8
+                or any(not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9._-]+\.mjs", name)
+                       or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{64}", sha)
+                       for name, sha in profile["closure_sha256s"].items())):
+            raise ValueError("initial observation source profile")
+        events = value["phase_events"]
+        if not isinstance(events, list) or len(events) > REPLAY_PROGRESS_MAX_EVENTS:
+            raise ValueError("initial observation phase bound")
+        for expected_seq, event in enumerate(events, 1):
+            if (not isinstance(event, dict) or set(event) != {"seq", "stage", "event"}
+                    or event["seq"] != expected_seq or type(event["seq"]) is not int
+                    or (event["stage"], event["event"]) not in REPLAY_PROGRESS_EVENTS):
+                raise ValueError("initial observation phase")
+        counts = value["error_counts"]
+        if (not isinstance(counts, dict) or set(counts) != {"observer-fault", "stream-fault", "write-failure"}
+                or any(type(item) is not int or item < 0 for item in counts.values())):
+            raise ValueError("initial observation errors")
+        categories = value["error_category_counts"]
+        if (not isinstance(categories, dict) or set(categories) != INITIAL_ERROR_CATEGORIES
+                or any(type(item) is not int or not 0 <= item <= INITIAL_CATEGORY_COUNT_MAX
+                       for item in categories.values())):
+            raise ValueError("initial observation error categories")
+        helpers = value["helper_identifier_counts"]
+        if (not isinstance(helpers, dict) or set(helpers) != INITIAL_HELPER_IDENTIFIERS
+                or any(type(item) is not int or not 0 <= item <= INITIAL_CATEGORY_COUNT_MAX
+                       for item in helpers.values())):
+            raise ValueError("initial observation helper identifiers")
+        streams = value["streams"]
+        stream_keys = {"bytes_seen", "bytes_hashed", "sha256", "truncated"}
+        if not isinstance(streams, dict) or set(streams) != {"stdout", "stderr"}:
+            raise ValueError("initial observation streams")
+        for stream in streams.values():
+            if (not isinstance(stream, dict) or set(stream) != stream_keys
+                    or type(stream["bytes_seen"]) is not int
+                    or type(stream["bytes_hashed"]) is not int
+                    or stream["bytes_seen"] < 0
+                    or stream["bytes_seen"] > INITIAL_OBSERVATION_MAX_STREAM_BYTES + 1
+                    or stream["bytes_hashed"] < 0
+                    or stream["bytes_hashed"] > INITIAL_OBSERVATION_MAX_STREAM_BYTES
+                    or stream["bytes_hashed"] > stream["bytes_seen"]
+                    or not re.fullmatch(r"[0-9a-f]{64}", stream["sha256"])
+                    or type(stream["truncated"]) is not bool):
+                raise ValueError("initial observation stream")
+        if expected_profile is not None and profile != _initial_observation_profile(expected_profile):
+            return _unobserved_initial_observation("source-binding-mismatch")
+        return value
+    except (ContractError, UnicodeError, ValueError, TypeError, json.JSONDecodeError, RecursionError):
+        return _unobserved_initial_observation("invalid")
+
+
 def read_and_validate_receipt(path, command_details):
     raw, meta, error = _read_regular(path, MAX_RECEIPT)
     command_details["receipt_identity"] = meta
@@ -862,11 +970,14 @@ def run_boundary_probes(*, prefix=(), env=None, session_bus_argv=None):
 
 
 def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
-             session_bus_argv=None, harness_timeout_ms=None, replay_progress=None):
+             session_bus_argv=None, harness_timeout_ms=None, replay_progress=None,
+             initial_observation=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
-    harness = replay_progress["wrapper"] if replay_progress else prepared["tools"] / "native-rc-smoke.mjs"
+    harness = (replay_progress["wrapper"] if replay_progress else
+               initial_observation["wrapper"] if initial_observation else
+               prepared["tools"] / "native-rc-smoke.mjs")
     command = ["node", str(harness), "--platform", platform,
         "--scenario", scenario, "--launch-root", str(launch_root),
         "--checkout", str(prepared.get("checkout", prepared["source"])),
@@ -891,6 +1002,26 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
             command[2:2] = [
                 "--rs9-replay-progress-closure-member", name + "=" + expected_sha256,
             ]
+    if initial_observation is not None:
+        if replay_progress is not None or harness_timeout_ms is not None:
+            raise ContractError("APPLICATION_SMOKE", "Initial observation options cannot be combined with replay timeout")
+        profile = initial_observation.get("profile")
+        if profile != CURRENT_REPLAY_PROGRESS_PROFILE:
+            raise ContractError("APPLICATION_SMOKE", "Unknown initial observation source profile")
+        command[2:2] = [
+            "--rs9-replay-progress-harness", str(initial_observation["harness"]),
+            "--rs9-replay-progress-file", str(initial_observation["progress"]),
+            "--rs9-replay-progress-expected-sha256",
+            profile["modules"]["native-rc-smoke.mjs"]["sha256"],
+            "--rs9-initial-observation-kind", INITIAL_OBSERVATION_KIND,
+            "--rs9-initial-observation-file", str(initial_observation["path"]),
+            "--rs9-replay-progress-profile", profile["id"],
+            "--rs9-replay-progress-source-commit", profile["commit"],
+            "--rs9-replay-progress-source-tree", profile["tree"],
+            "--rs9-replay-progress-support-member", "package.json=" + profile["support"]["sha256"],
+        ]
+        for name, row in profile["modules"].items():
+            command[2:2] = ["--rs9-replay-progress-closure-member", name + "=" + row["sha256"]]
     if harness_timeout_ms is not None:
         if harness_timeout_ms != DIAGNOSTIC_REPLAY_HARNESS_TIMEOUT_MS:
             raise ContractError("APPLICATION_SMOKE", "Unsupported diagnostic harness timeout")
@@ -905,13 +1036,13 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
 
 
 def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, extras, timeout=240, session_bus_argv=None,
-             system=None, harness_timeout_ms=None, replay_progress=None):
+             system=None, harness_timeout_ms=None, replay_progress=None, initial_observation=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
     command = _command(prepared, platform, scenario, launch_root, evidence, extras=extras,
                        session_bus_argv=session_bus_argv, harness_timeout_ms=harness_timeout_ms,
-                       replay_progress=replay_progress)
+                       replay_progress=replay_progress, initial_observation=initial_observation)
     start = time.monotonic()
     error, rc, out, err = None, None, b"", b""
     sizes, cleanup_error, child_reaped = None, None, None
@@ -948,6 +1079,9 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
     record, receipt_error, codes = read_and_validate_receipt(evidence / (platform+"-"+scenario+".run.json"), fields)
     fields["receipt"] = sanitize_receipt_summary(record, fields.pop("receipt_identity"))
     fields["receipt_error"], fields["problem_codes"] = receipt_error, codes
+    if initial_observation is not None:
+        fields["initial_observation"] = _read_initial_observation(
+            initial_observation["path"], expected_profile=initial_observation.get("profile"))
     fields["cause"] = error or classify_smoke_cause(exit_code=ec_val, signal=sig_val, timed_out=(error == "process-timeout"), receipt_error=receipt_error,
         log_categories=fields["log_categories"], has_problems=bool(codes))
     if cleanup_error and fields["cause"] == "unknown":
@@ -1099,6 +1233,18 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
     if boundary_probes:
         record["boundary_probes"] = probes
     raw = canonical(record)
+    if len(raw) > MAX_DIAGNOSTIC and "initial_observation" in record["initial_run"]:
+        # The live stream projection is optional; shed it before pruning any
+        # established failure fields. If even its typed omission marker would
+        # exceed the legacy diagnostic bound, remove the optional field.
+        initial = dict(record["initial_run"])
+        initial["initial_observation"] = _unobserved_initial_observation("diagnostic-size-cap")
+        record["initial_run"] = initial
+        raw = canonical(record)
+        if len(raw) > MAX_DIAGNOSTIC:
+            initial.pop("initial_observation")
+            record["initial_run"] = initial
+            raw = canonical(record)
     if len(raw) > MAX_DIAGNOSTIC and isinstance(replay, dict) and "replay_receipt_projection" in replay:
         # Keep a small typed omission marker instead of allowing the new optional
         # projection to exceed the established diagnostic cap.
@@ -1119,7 +1265,7 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
         raw = canonical(record)
     if len(raw) > MAX_DIAGNOSTIC and "harness_problem_categories" in fields:
         # The new optional field must not turn an otherwise bounded legacy diagnostic into an error.
-        initial = dict(fields)
+        initial = dict(record["initial_run"])
         initial.pop("harness_problem_categories")
         record["initial_run"] = initial
         raw = canonical(record)
@@ -1138,7 +1284,8 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
 
 
 def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=None, diagnostic_extras=False,
-                             diagnostic_boundary_probes=False, diagnostic_replay=False, session_bus_argv=None):
+                             diagnostic_boundary_probes=False, diagnostic_replay=False,
+                             diagnostic_initial_observation=False, session_bus_argv=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
@@ -1151,14 +1298,29 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
     runs = []
     for index, scenario in enumerate(scenarios):
         # Keep the qualification attempt comparable with run 15/16. Only a
-        # separate diagnostic replay uses the instrumented process/argv path.
+        # explicitly requested initial observation uses the instrumented process/argv path.
+        initial_observation = None
+        if diagnostic_initial_observation:
+            if not system.endswith("-linux"):
+                raise ContractError("APPLICATION_SMOKE", "Initial observation is Linux-only")
+            wrapper = _replay_progress_wrapper(prepared)
+            profile = _current_replay_progress_profile(prepared) if wrapper is not None else None
+            if wrapper is None or profile is None:
+                raise ContractError("APPLICATION_SMOKE", "Authenticated initial-observation source is unavailable")
+            initial_observation = {
+                "wrapper": wrapper,
+                "harness": prepared["tools"] / "native-rc-smoke.mjs",
+                "progress": evidence / (platform + "-" + scenario + ".initial-progress.jsonl"),
+                "path": evidence / (platform + "-" + scenario + ".initial-observation.json"),
+                "profile": profile,
+            }
         fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, False, session_bus_argv=session_bus_argv,
-                          system=system)
+                          system=system, initial_observation=initial_observation)
         if fields["failed"]:
             from rs9.pages_smoke_diagnostic import validate_smoke_observation
             observation = validate_smoke_observation(fields, system=system)
             details = _failure_details(fields, extras=extras, receipt_name=platform+"-"+scenario+".run.json")
-            if extras or diagnostic_boundary_probes or diagnostic_replay:
+            if extras or diagnostic_boundary_probes or diagnostic_replay or diagnostic_initial_observation:
                 details["diagnostic_sha256"] = _retain_failure(prepared, system, platform, scenario,
                     launch_root, prefix, env, fields, scenarios[index+1:], session_bus_argv=session_bus_argv,
                     include_replay=(extras or diagnostic_replay), boundary_probes=diagnostic_boundary_probes)

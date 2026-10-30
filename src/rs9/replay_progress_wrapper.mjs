@@ -59,6 +59,46 @@ const CURRENT_PROFILE = Object.freeze({
 const PROGRESS_SCHEMA = "rs9.application-smoke-replay-progress.v1";
 const MAX_PROGRESS_BYTES = 16 * 1024;
 const MAX_PROGRESS_EVENTS = 32;
+const INITIAL_OBSERVATION_SCHEMA = "rs9.application-smoke-initial-observation.v1";
+const INITIAL_OBSERVATION_KIND = "initial-observation";
+const MAX_INITIAL_OBSERVATION_BYTES = 16 * 1024;
+const MAX_INITIAL_STREAM_BYTES = 1024 * 1024;
+const MAX_INITIAL_SNAPSHOT_WRITES = 32;
+const INITIAL_SNAPSHOT_INTERVAL_MS = 8_000;
+const FIXED_PROGRESS_EVENTS = new Set([
+  "harness|import-start", "harness|imported", "harness|import-failed", "harness|export-missing",
+  "candidate|launch-failed", "candidate|launched", "candidate|exited",
+  "application|release-smoke-active", "run-smoke|enter", "run-smoke|returned", "run-smoke|error",
+  "receipt|write-start", "receipt|finalized", "receipt|write-failed",
+  "run-record|write-start", "run-record|finalized", "run-record|write-failed",
+]);
+const INITIAL_ERROR_CATEGORIES = Object.freeze([
+  "dbus-session-conf-missing", "dbus-daemon-error", "xvfb-display-error", "xvfb-auth-error",
+  "module-not-found", "command-not-found", "shared-library-missing", "webkit-crash",
+  "assertion", "socket-unavailable",
+]);
+const INITIAL_HELPER_IDENTIFIERS = Object.freeze([
+  "dbus-run-session", "dbus-daemon", "node", "native-rc-smoke.mjs",
+]);
+const INITIAL_ERROR_PATTERNS = Object.freeze([
+  ["dbus-session-conf-missing", /session\.conf.*(?:no such|failed|missing|not found)/i],
+  ["dbus-daemon-error", /(?:dbus-daemon|dbus-run-session).*(?:failed|error|no such|not found|refused)/i],
+  ["xvfb-display-error", /(?:cannot open display|xvfb failed|x server failed|xvfb-run: error)/i],
+  ["xvfb-auth-error", /(?:xauth: error|authorization required|no protocol specified)/i],
+  ["module-not-found", /(?:err_module_not_found|cannot find module)/i],
+  ["command-not-found", /(?:command not found|failed to exec.*(?:no such|not found))/i],
+  ["shared-library-missing", /error while loading shared libraries/i],
+  ["webkit-crash", /webkit(?:web)?process crashed/i],
+  ["assertion", /assertion(?:error| failed)/i],
+  ["socket-unavailable", /(?:failed to bind socket|socket: no such file|connection refused)/i],
+]);
+const INITIAL_HELPER_PATTERNS = Object.freeze(INITIAL_HELPER_IDENTIFIERS.map(identifier => [
+  identifier,
+  new RegExp("(^|[^a-z0-9._-])" + identifier.replace(/[\^$.*+?()[\]{}|]/g, "\\$&")
+    + "($|[^a-z0-9._-])", "i"),
+]));
+const MAX_INITIAL_CATEGORY_COUNT = 4096;
+const INITIAL_SCAN_TAIL_CHARS = 2048;
 const MAX_HARNESS_BYTES = 4 * 1024 * 1024;
 const MAX_CLOSURE_FILES = 8;
 const MAX_CLOSURE_BYTES = 8 * 1024 * 1024;
@@ -72,6 +112,8 @@ const INTERNAL = Object.freeze({
   commit: "--rs9-replay-progress-source-commit",
   tree: "--rs9-replay-progress-source-tree",
   support: "--rs9-replay-progress-support-member",
+  initialKind: "--rs9-initial-observation-kind",
+  initialFile: "--rs9-initial-observation-file",
 });
 
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -83,6 +125,8 @@ function parseInternalArgs(argv) {
   const closureMembers = [];
   const currentArgs = new Map();
   const forwarded = [];
+  let initialObservationKind;
+  let initialObservationPath;
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     const value = argv[index + 1];
@@ -98,6 +142,17 @@ function parseInternalArgs(argv) {
       if (flag === INTERNAL.expected) expectedSha256 = value;
       if (flag === INTERNAL.closure) closureMembers.push(value);
       index += 1;
+    } else if (flag === INTERNAL.initialKind || flag === INTERNAL.initialFile) {
+      if (value === undefined) throw new Error("Initial observation argument is incomplete");
+      if (flag === INTERNAL.initialKind) {
+        if (initialObservationKind !== undefined || value !== INITIAL_OBSERVATION_KIND)
+          throw new Error("Initial observation kind is invalid");
+        initialObservationKind = value;
+      } else {
+        if (initialObservationPath !== undefined) throw new Error("Initial observation file is duplicated");
+        initialObservationPath = value;
+      }
+      index += 1;
     } else {
       forwarded.push(flag);
     }
@@ -106,7 +161,10 @@ function parseInternalArgs(argv) {
       || !/^[0-9a-f]{64}$/.test(expectedSha256 ?? "")) {
     throw new Error("Authenticated released smoke harness and progress sink are required");
   }
-  return { harnessPath, progressPath, expectedSha256, closureMembers, forwarded, currentArgs };
+  if ((initialObservationKind === undefined) !== (initialObservationPath === undefined))
+    throw new Error("Initial observation arguments must be paired");
+  return { harnessPath, progressPath, expectedSha256, closureMembers, forwarded, currentArgs,
+    initialObservationKind, initialObservationPath };
 }
 
 function parseSmokeArgs(argv) {
@@ -261,13 +319,17 @@ function installAuthenticatedLoader(closure) {
   return hooks;
 }
 
-function installProgressObservers(progressPath, current = null, options = null) {
+function installProgressObservers(progressPath, current = null, options = null, initialObservation = null) {
   const originalSpawn = childProcess.spawn;
   const originalWriteFileSync = fs.writeFileSync;
   let sequence = 0;
   let launchObserved = false;
   const streamRestores = [];
   const emit = (stage, event) => {
+    if (initialObservation) {
+      initialObservation.addPhase(stage, event);
+      return;
+    }
     if (sequence >= MAX_PROGRESS_EVENTS) return;
     const record = JSON.stringify({ schema: PROGRESS_SCHEMA, seq: sequence + 1, stage, event }) + "\n";
     const bytes = Buffer.from(record, "utf8");
@@ -325,8 +387,17 @@ function installProgressObservers(progressPath, current = null, options = null) 
           } catch { /* Optional observation cannot change the released stream path. */ }
         };
         const observedEmit = function(event, ...values) {
-          if (event === "data") observe(values[0]);
-          return originalEmit.call(this, event, ...values);
+          if (!initialObservation) {
+            if (event === "data") observe(values[0]);
+            return originalEmit.call(this, event, ...values);
+          }
+          // Deliver the released stream first, preserving its return or exception.
+          const result = originalEmit.call(this, event, ...values);
+          if (event === "data") {
+            observe(values[0]);
+            initialObservation.capture("stderr", values[0]);
+          }
+          return result;
         };
         try {
           Object.defineProperty(stream, "emit", {value: observedEmit, writable: true, configurable: true});
@@ -336,6 +407,24 @@ function installProgressObservers(progressPath, current = null, options = null) 
             else delete stream.emit;
           });
         } catch { /* A stream that cannot be observed stays untouched. */ }
+      }
+      if (initialObservation && typeof child?.stdout?.emit === "function") {
+        const stream = child.stdout;
+        const originalEmit = stream.emit;
+        const ownEmit = Object.getOwnPropertyDescriptor(stream, "emit");
+        const observedEmit = function(event, ...values) {
+          const result = originalEmit.call(this, event, ...values);
+          if (event === "data") initialObservation.capture("stdout", values[0]);
+          return result;
+        };
+        try {
+          Object.defineProperty(stream, "emit", {value: observedEmit, writable: true, configurable: true});
+          streamRestores.push(() => {
+            if (stream.emit !== observedEmit) return;
+            if (ownEmit) Object.defineProperty(stream, "emit", ownEmit);
+            else delete stream.emit;
+          });
+        } catch { initialObservation.noteError("observer-fault"); }
       }
       if (child && typeof child.once === "function") {
         child.once("exit", () => emit("candidate", "exited"));
@@ -368,6 +457,7 @@ function installProgressObservers(progressPath, current = null, options = null) 
   syncBuiltinESMExports();
   return {
     emit,
+    finish: status => { if (initialObservation) initialObservation.finish(status); },
     restore: () => {
       for (const restore of streamRestores) restore();
       childProcess.spawn = originalSpawn;
@@ -441,6 +531,193 @@ function installCurrentSupport(current) {
   };
 }
 
+function initialObservationProfile(profile) {
+  return {
+    id: profile.id,
+    source_commit: profile.commit,
+    source_tree: profile.tree,
+    harness_sha256: profile.modules["native-rc-smoke.mjs"].sha256,
+    closure_sha256s: Object.fromEntries(Object.entries(profile.modules)
+      .map(([name, pin]) => [name, pin.sha256])),
+  };
+}
+
+function makeInitialObservation(path, profile) {
+  const state = {
+    schema: INITIAL_OBSERVATION_SCHEMA,
+    attempt_kind: INITIAL_OBSERVATION_KIND,
+    non_admitting: true,
+    status: "observing",
+    source_profile: initialObservationProfile(profile),
+    phase_events: [],
+    error_counts: {"observer-fault": 0, "stream-fault": 0, "write-failure": 0},
+    error_category_counts: Object.fromEntries(INITIAL_ERROR_CATEGORIES.map(name => [name, 0])),
+    helper_identifier_counts: Object.fromEntries(INITIAL_HELPER_IDENTIFIERS.map(name => [name, 0])),
+    streams: {
+      stdout: {bytes_seen: 0, bytes_hashed: 0, sha256: sha256(Buffer.alloc(0)), truncated: false},
+      stderr: {bytes_seen: 0, bytes_hashed: 0, sha256: sha256(Buffer.alloc(0)), truncated: false},
+    },
+    truncated: false,
+  };
+  const hashes = {stdout: crypto.createHash("sha256"), stderr: crypto.createHash("sha256")};
+  let disabled = false;
+  let writing = false;
+  let snapshotWrites = 0;
+  let snapshotScheduled = false;
+  let finished = false;
+  const pending = {stdout: "", stderr: ""};
+
+  const noteError = kind => {
+    if (Object.prototype.hasOwnProperty.call(state.error_counts, kind)) state.error_counts[kind] += 1;
+    else state.error_counts["observer-fault"] += 1;
+    state.status = "partial";
+  };
+
+  const count = (table, name) => {
+    if (table[name] < MAX_INITIAL_CATEGORY_COUNT) table[name] += 1;
+    else state.truncated = true;
+  };
+
+  const classifyLine = line => {
+    const text = line.toLowerCase();
+    for (const [name, pattern] of INITIAL_ERROR_PATTERNS) {
+      if (pattern.test(text)) count(state.error_category_counts, name);
+    }
+    for (const [name, pattern] of INITIAL_HELPER_PATTERNS) {
+      if (pattern.test(text)) count(state.helper_identifier_counts, name);
+    }
+  };
+
+  const scan = (name, text, final = false) => {
+    const combined = pending[name] + text;
+    const lines = combined.split(/\r?\n/);
+    const tail = lines.pop() ?? "";
+    if (final) {
+      if (tail) lines.push(tail);
+      pending[name] = "";
+    } else {
+      pending[name] = tail.slice(-INITIAL_SCAN_TAIL_CHARS);
+    }
+    for (const line of lines) classifyLine(line.replace(/\r$/, ""));
+  };
+
+  const snapshot = () => {
+    const streams = {};
+    for (const name of ["stdout", "stderr"]) {
+      const row = state.streams[name];
+      let digest = row.sha256;
+      try { digest = hashes[name].copy().digest("hex"); } catch { noteError("stream-fault"); }
+      streams[name] = {...row, sha256: digest};
+    }
+    return {...state, streams, phase_events: [...state.phase_events]};
+  };
+
+  const writeSnapshot = (final = false) => {
+    const limit = final ? MAX_INITIAL_SNAPSHOT_WRITES : MAX_INITIAL_SNAPSHOT_WRITES - 1;
+    if (disabled || writing || snapshotWrites >= limit) return;
+    writing = true;
+    snapshotWrites += 1;
+    // Reserve one final write. A saturated live sink explicitly reports partial data.
+    if (!final && snapshotWrites === MAX_INITIAL_SNAPSHOT_WRITES - 1) {
+      state.truncated = true;
+      state.status = "partial";
+    }
+    let temporary;
+    let fd;
+    try {
+      const destination = resolve(path);
+      try {
+        const existing = fs.lstatSync(destination);
+        if (!existing.isFile() || existing.isSymbolicLink()) throw new Error("Initial observation destination is not regular");
+      } catch (error) {
+        if (error?.code !== "ENOENT") throw error;
+      }
+      let value = snapshot();
+      let bytes = Buffer.from(JSON.stringify(value) + "\n", "utf8");
+      if (bytes.length > MAX_INITIAL_OBSERVATION_BYTES) {
+        state.truncated = true;
+        state.phase_events = state.phase_events.slice(0, 8);
+        value = snapshot();
+        bytes = Buffer.from(JSON.stringify(value) + "\n", "utf8");
+      }
+      if (bytes.length > MAX_INITIAL_OBSERVATION_BYTES) throw new Error("Initial observation output bound exceeded");
+      temporary = `${destination}.tmp-${process.pid}`;
+      fd = fs.openSync(temporary, fs.constants.O_WRONLY | fs.constants.O_CREAT
+        | fs.constants.O_EXCL | O_NOFOLLOW, 0o600);
+      const written = fs.writeSync(fd, bytes, 0, bytes.length);
+      if (written !== bytes.length) throw new Error("Initial observation write was short");
+      fs.closeSync(fd); fd = undefined;
+      fs.renameSync(temporary, destination);
+      temporary = undefined;
+    } catch {
+      disabled = true;
+      noteError("write-failure");
+    } finally {
+      if (fd !== undefined) { try { fs.closeSync(fd); } catch { /* diagnostic only */ } }
+      if (temporary !== undefined) { try { fs.unlinkSync(temporary); } catch { /* diagnostic only */ } }
+      writing = false;
+    }
+  };
+
+  const requestSnapshot = () => {
+    if (disabled || finished || snapshotScheduled
+        || snapshotWrites >= MAX_INITIAL_SNAPSHOT_WRITES - 1) return;
+    snapshotScheduled = true;
+    const timer = setTimeout(() => {
+      snapshotScheduled = false;
+      if (!finished) writeSnapshot();
+    }, INITIAL_SNAPSHOT_INTERVAL_MS);
+    timer.unref();
+  };
+
+  const addPhase = (stage, event) => {
+    if (!FIXED_PROGRESS_EVENTS.has(`${stage}|${event}`)) return;
+    if (state.phase_events.length >= MAX_PROGRESS_EVENTS) state.truncated = true;
+    else state.phase_events.push({seq: state.phase_events.length + 1, stage, event});
+    requestSnapshot();
+  };
+
+  const capture = (name, value) => {
+    if (disabled || finished || state.streams[name].truncated) return;
+    try {
+      const bytes = Buffer.isBuffer(value) ? value : Buffer.from(value);
+      const row = state.streams[name];
+      const remaining = Math.max(0, MAX_INITIAL_STREAM_BYTES - row.bytes_hashed);
+      let bounded = Buffer.alloc(0);
+      if (remaining > 0) {
+        bounded = bytes.subarray(0, remaining);
+        hashes[name].update(bounded);
+        row.bytes_hashed += bounded.length;
+      }
+      if (bounded.length > 0) scan(name, bounded.toString("utf8"));
+      row.bytes_seen = Math.min(MAX_INITIAL_STREAM_BYTES + 1, row.bytes_seen + bytes.length);
+      if (row.bytes_seen > MAX_INITIAL_STREAM_BYTES) {
+        row.truncated = true;
+        state.truncated = true;
+      }
+      requestSnapshot();
+    } catch {
+      noteError("stream-fault");
+      requestSnapshot();
+    }
+  };
+
+  writeSnapshot();
+  return {
+    addPhase,
+    capture,
+    noteError,
+    finish: status => {
+      if (finished) return;
+      finished = true;
+      scan("stdout", "", true);
+      scan("stderr", "", true);
+      state.status = status;
+      writeSnapshot(true);
+    },
+  };
+}
+
 function writeLegacyError(error) {
   if (error && typeof error === "object" && error.finalization) {
     process.stderr.write(`${JSON.stringify({ finalization: error.finalization, reportWriteFamily: error.reportWriteFamily })}\n`);
@@ -451,15 +728,22 @@ function writeLegacyError(error) {
 
 async function main() {
   const args = parseInternalArgs(process.argv.slice(2));
-  const { harnessPath, progressPath, expectedSha256, closureMembers, forwarded } = args;
+  const { harnessPath, progressPath, expectedSha256, closureMembers, forwarded,
+    initialObservationKind, initialObservationPath } = args;
   const current = currentProfile(args);
+  if (initialObservationKind !== undefined && !current)
+    throw new Error("Initial observation requires the authenticated current profile");
   const closure = buildAuthenticatedClosure(harnessPath, expectedSha256, closureMembers, current);
   const options = current ? parseSmokeArgs(forwarded) : null;
   if (current && !((options.platform === "linux-x64" && ["C", "C-signal"].includes(options.scenario))
       || (options.platform === "linux-arm64" && options.scenario === "B"))) throw new Error("Current replay scenario differs");
+  if (initialObservationKind !== undefined && options.timeoutMs !== undefined)
+    throw new Error("Initial observation must use the released smoke default timeout");
+  const initialObservation = initialObservationKind === INITIAL_OBSERVATION_KIND
+    ? makeInitialObservation(initialObservationPath, CURRENT_PROFILE) : null;
   const restoreSupport = installCurrentSupport(current);
   const loader = installAuthenticatedLoader(closure);
-  const observer = installProgressObservers(progressPath, current, options);
+  const observer = installProgressObservers(progressPath, current, options, initialObservation);
   let harness;
   let result;
   try {
@@ -474,8 +758,10 @@ async function main() {
     observer.emit("run-smoke", "enter");
     result = await harness.runSmoke(parseSmokeArgs(forwarded));
     observer.emit("run-smoke", "returned");
+    observer.finish(result?.status === "pass" ? "completed" : "failed");
   } catch (error) {
     observer.emit(harness ? "run-smoke" : "harness", harness ? "error" : "import-failed");
+    observer.finish("failed");
     throw error;
   } finally {
     loader.deregister();
