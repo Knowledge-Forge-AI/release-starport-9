@@ -1,0 +1,461 @@
+{
+  "api": {
+    "artifacts.json": {
+      "sha256": "349834c4f06942dc0e835a21f84107faf7b565e9c7504726d83fcfb338e45600",
+      "size": 5994
+    },
+    "jobs.json": {
+      "sha256": "31154b79929a1929d5ffaa8291971f6da47de89e455c549a516ddce4d9dfee36",
+      "size": 34594
+    },
+    "run.json": {
+      "sha256": "edb875f9de42198b7fb281cdf308d629631b0c94d23b21de67493b28f61301e1",
+      "size": 13988
+    }
+  },
+  "artifacts": {
+    "tfnf-070-universal-candidate-bundle": {
+      "archive_sha256": "50ee68c343692bb43017a0a220783ba605680aa79ef1de9f3d446272fe06317c",
+      "files": {
+        "bundle.json": {
+          "sha256": "58f1bb9c7363fe982b53c7d3d30be41363340c7cb336d686e0475e04ff70929f",
+          "size": 1008
+        },
+        "dist/theme_forge_nebular_fusion-0.7.0-py3-none-any.whl": {
+          "sha256": "6e82672404a896ea2fd0cde760275db437f77f641e62ea6296288f4f879f951b",
+          "size": 224271
+        },
+        "universal-build-receipt.json": {
+          "sha256": "3659ac8f2e1e71222926886d7918293926aee6ffd9fe95190fae3d035373ac6e",
+          "size": 546
+        }
+      },
+      "id": 12943384616,
+      "size_in_bytes": 223636
+    },
+    "tfnf-070-universal-matrix-receipt": {
+      "archive_sha256": "d198062a48a93c6147a73c836ba174aa5d3c9bb991270aa65074acd0b2ca328e",
+      "files": {
+        "matrix_receipt.json": {
+          "sha256": "f7a1a4815d73f4e90198207240418551a318fc8c882f7820d5f996ff9bbc523f",
+          "size": 3586
+        }
+      },
+      "id": 12944811403,
+      "size_in_bytes": 1618
+    },
+    "tfnf-070-universal-public-inputs": {
+      "archive_sha256": "5c72c51a537acecf33e4c102695780dcd9990d739caab5e4a9c79a417516bd66",
+      "files": {
+        "evidence/public-release/api/commit.json": {
+          "sha256": "51828ea75007e060d8fe805bd7d168b033bd1cf5dd083b5cac2608d64fb8d5a8",
+          "size": 1484
+        },
+        "evidence/public-release/api/ref.json": {
+          "sha256": "da03743452daaa82df939a102d4aa44ebb8ff46eb18b66fc058c63bc3a70cf38",
+          "size": 430
+        },
+        "evidence/public-release/api/release.json": {
+          "sha256": "0fd660ae95ee397de74823135f46b310e5e76dc85ce19d360234eb4e2a7940a5",
+          "size": 41799
+        },
+        "evidence/public-release/api/repository.json": {
+          "sha256": "c89ca2d0134731b24940292b174c2ee4e2a06c92ded5a1ea1739037f002fef5a",
+          "size": 8273
+        },
+        "evidence/public-release/api/tags.json": {
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "size": 3
+        },
+        "evidence/public-release/api/tree.json": {
+          "sha256": "d1990e01f96a531d5cde08799f2ef2ae081e2ccedf9d37455c141cfd381de023",
+          "size": 241857
+        },
+        "evidence/public-release/assets/PROVENANCE.json": {
+          "sha256": "7e42fba4500d2ffdca45b957c22f9f7ebf3391754d40dfa6e01e1fe70a7c232b",
+          "size": 4624
+        },
+        "evidence/public-release/assets/PYPI-INTAKE-PROVENANCE.json": {
+          "sha256": "7e42fba4500d2ffdca45b957c22f9f7ebf3391754d40dfa6e01e1fe70a7c232b",
+          "size": 4624
+        },
+        "evidence/public-release/assets/SHA256SUMS": {
+          "sha256": "7ba8445ca16289bf6e5ab459101aaae2ec7c76db4457bf2855c77e53f5582cf2",
+          "size": 2764
+        },
+        "evidence/public-release/assets/knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz": {
+          "sha256": "d4bef1172a773c27eced3067e148aaa353152c577001f1203a0dc95ab4cb9f00",
+          "size": 22564
+        },
+        "evidence/public-release/assets/nebular-compiled-public-build-source-authority-v0.7.0.json": {
+          "sha256": "c0cb518e56f3dd17e9d48fe3d98255780671fe3e4c63a6c81aaf59ea58e250d2",
+          "size": 1767
+        },
+        "evidence/public-release/assets/nebular-v0.7.0-native-ci-provenance.json": {
+          "sha256": "535951387716f3100eaab33c8ee28b3d0794cd3a755c2b23f0071c3f5f88e92d",
+          "size": 4290
+        },
+        "evidence/public-release/assets/nebular-v0.7.0-sbom.spdx.json": {
+          "sha256": "e95e984096d6767959711bf98f8790e7d100328719fdfb59ac13ff34fd4c9225",
+          "size": 63796
+        },
+        "evidence/public-release/assets/nebular-v0.7.0-third-party-notices.tar.gz": {
+          "sha256": "c8ab80d6601947a505eb68e482985672dd4c4a697ff57ecb1bacb9ca9935dbde",
+          "size": 30212
+        },
+        "evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz": {
+          "sha256": "52f626bfcbfb4235298675669841ca9fbea8113118e9d25f0310e0a26489a470",
+          "size": 47355011
+        },
+        "evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz": {
+          "sha256": "eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c",
+          "size": 54553557
+        },
+        "evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-source.tar.gz": {
+          "sha256": "183f99f5af7228eb6498ab990fa514bb501586e8a0ff31a93a7bc05c736a805a",
+          "size": 4453031
+        },
+        "evidence/public-release/assets/theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz": {
+          "sha256": "4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27",
+          "size": 54425294
+        },
+        "evidence/public-release/npm/metadata.json": {
+          "sha256": "28000dc01e14bde803cb3a9c87d4b1cacc2b429e00f58c4b34b1fa6bb481193f",
+          "size": 1363
+        },
+        "evidence/public-release/npm/package.tgz": {
+          "sha256": "d4bef1172a773c27eced3067e148aaa353152c577001f1203a0dc95ab4cb9f00",
+          "size": 22564
+        },
+        "evidence/public-release/operators/tf-pypi/descriptions/nebular-fusion-0.7.0-system-webkitgtk.md": {
+          "sha256": "76a5eff28c55848b09c15b18ef3e21c99d0475ba27bba535a4de2e340b7c2680",
+          "size": 3165
+        },
+        "evidence/public-release/raw-handoff/darwin-arm64/consumer/qualification.json": {
+          "sha256": "ebc2838f8a4cad586f90c3d194fa78c90e75c3015f03ae4e35503762ab362680",
+          "size": 1997
+        },
+        "evidence/public-release/raw-handoff/darwin-arm64/consumer/smoke/npm-package-receipt.json": {
+          "sha256": "e7cb4e4eb5773d0c686e58eab7298f634dec5a673bc76a7f5ff0e6294fc82057",
+          "size": 2843
+        },
+        "evidence/public-release/raw-handoff/darwin-arm64/consumer/smoke/npm-package-run.json": {
+          "sha256": "38927543b8132fb0b9bef9d77d7986403b48498cdb6ecfd52a661ee2a8a2b7de",
+          "size": 2348
+        },
+        "evidence/public-release/raw-handoff/darwin-arm64/consumer/smoke/raw-archive-receipt.json": {
+          "sha256": "45681545c083a6992e4671bc670d3d9bbaa5eb11e5b9bd2e88f81adcc5383f01",
+          "size": 2828
+        },
+        "evidence/public-release/raw-handoff/darwin-arm64/consumer/smoke/raw-archive-run.json": {
+          "sha256": "b39e510becab5beb8b7ee35d6881b350986d6dba65101abeb14f0f66297e3da3",
+          "size": 2349
+        },
+        "evidence/public-release/raw-handoff/darwin-arm64/legal/COMMERCIAL-LICENSE.md": {
+          "sha256": "29fa83d6c8a530e7fb08c605ba01d8781c16e43a4644de3333b2058e4cc09281",
+          "size": 943
+        },
+        "evidence/public-release/raw-handoff/darwin-arm64/legal/LICENSE": {
+          "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+          "size": 34460
+        },
+        "evidence/public-release/raw-handoff/darwin-arm64/legal/NOTICE": {
+          "sha256": "84c3bfd695449b5330344ba7e5d355f3bb3a1a7f8925aea3b2755145709db1e0",
+          "size": 614
+        },
+        "evidence/public-release/raw-handoff/darwin-arm64/manifest.json": {
+          "sha256": "fde07e938f2df6fc0d78662c19e60713e71e302b2e2828529d5928e0c493d988",
+          "size": 402520
+        },
+        "evidence/public-release/raw-handoff/darwin-arm64/provenance.json": {
+          "sha256": "535951387716f3100eaab33c8ee28b3d0794cd3a755c2b23f0071c3f5f88e92d",
+          "size": 4290
+        },
+        "evidence/public-release/raw-handoff/darwin-arm64/readme/README.md": {
+          "sha256": "1fe075b4ed11d3b1cef071fb2268c9262469bc15523e7bd0e071d45fa90cd6cd",
+          "size": 833
+        },
+        "evidence/public-release/raw-handoff/darwin-arm64/record.json": {
+          "sha256": "1972986dbc731128aecab1bec3c2d7e384bc9dc858af54667b69a60df2cc581f",
+          "size": 7832
+        },
+        "evidence/public-release/raw-handoff/linux-arm64-gnu/manifest.json": {
+          "sha256": "d50f0305a2bcefaab7232f8f4d42f23d6bef7dfb0ff1385bd16bd59d6e4a1305",
+          "size": 437635
+        },
+        "evidence/public-release/raw-handoff/linux-arm64-gnu/provenance.json": {
+          "sha256": "535951387716f3100eaab33c8ee28b3d0794cd3a755c2b23f0071c3f5f88e92d",
+          "size": 4290
+        },
+        "evidence/public-release/raw-handoff/linux-arm64-gnu/record.json": {
+          "sha256": "1972986dbc731128aecab1bec3c2d7e384bc9dc858af54667b69a60df2cc581f",
+          "size": 7832
+        },
+        "evidence/public-release/raw-handoff/linux-x64-gnu/manifest.json": {
+          "sha256": "a24612208747013984a370959f3f2dfe78249fcd5f523cb5a9d78bd1e3614d44",
+          "size": 437629
+        },
+        "evidence/public-release/raw-handoff/linux-x64-gnu/provenance.json": {
+          "sha256": "535951387716f3100eaab33c8ee28b3d0794cd3a755c2b23f0071c3f5f88e92d",
+          "size": 4290
+        },
+        "evidence/public-release/raw-handoff/linux-x64-gnu/record.json": {
+          "sha256": "1972986dbc731128aecab1bec3c2d7e384bc9dc858af54667b69a60df2cc581f",
+          "size": 7832
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-dark.toml": {
+          "sha256": "6a95e550c0c3e92793a873251eed3bc888e5e4c4a3355124d5230eaebe479387",
+          "size": 371
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-light.toml": {
+          "sha256": "8e53627c743ba21b079b281638804f3a9214895686514dbf5fec0c279db71667",
+          "size": 375
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand-package.toml": {
+          "sha256": "d205c6db34f0af25d6657a8133593d1d67b50dda8e4cfc34973450dd141c7bd4",
+          "size": 1194
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand.toml": {
+          "sha256": "1017ebaca28269b4d4397e84bf29696ddea3f615ef1a8e5a6d67606a369c8b41",
+          "size": 1012
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/.tfsb/companions/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/.tfsb/project.toml": {
+          "sha256": "932378720ed558961f520df7c6d74da2a3b11c6a5f31263cbe565a22d5e801c3",
+          "size": 69
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/bundle/assets/fixture-mark-on-dark.svg": {
+          "sha256": "1068a15abd03564d4a48257825914baa14ae26990aad96c0c8f46e2d5a27a15b",
+          "size": 345
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/bundle/assets/fixture-mark-on-light.svg": {
+          "sha256": "a1bf2b63584d6c5e7832d2e7c29f9137f6f15c4a0d004b9e71c1ee599d75d75f",
+          "size": 348
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/bundle/brand/brand-package.toml": {
+          "sha256": "d205c6db34f0af25d6657a8133593d1d67b50dda8e4cfc34973450dd141c7bd4",
+          "size": 1194
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/bundle/brand/brand.toml": {
+          "sha256": "1017ebaca28269b4d4397e84bf29696ddea3f615ef1a8e5a6d67606a369c8b41",
+          "size": 1012
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/bundle/companions/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/bundle/tfsb-brand-manifest.json": {
+          "sha256": "c9c652e36d881775d14ed467bad4a1e5494d3ef55b2aade0252f74c6299a28e4",
+          "size": 1874
+        },
+        "evidence/public-release/smoke-support/shared/docs/examples/v0.4/brand-system/core-minimal/bundle/tfsb-manifest.json": {
+          "sha256": "53ece77670595a24f49bbdfb0af0498e093e5a08366ecaff090814a02c9f70e8",
+          "size": 1110
+        },
+        "evidence/public-release/smoke-support/shared/package.json": {
+          "sha256": "15d3f118dfdc0014129fc37d63533a6a02cf355fdb89961a215eca77e95b7cd2",
+          "size": 1833
+        },
+        "evidence/public-release/smoke-support/shared/tools/build-inputs.mjs": {
+          "sha256": "92cc77082ffc399a9c39ad4fce41811e9ac8aba7e2d852ac223cdf0e193381bc",
+          "size": 16400
+        },
+        "evidence/public-release/smoke-support/shared/tools/build-settings.mjs": {
+          "sha256": "f7578fccf935e14aee190a2de4378a986a182b038e41b261f3f9355e33449cd0",
+          "size": 24182
+        },
+        "evidence/public-release/smoke-support/shared/tools/candidate-provenance.mjs": {
+          "sha256": "20244b6765d6e7d0ee5fd86452096a4546f189103b0acb9f065c4a1479c23155",
+          "size": 15484
+        },
+        "evidence/public-release/smoke-support/shared/tools/darwin-linkage-validator.mjs": {
+          "sha256": "67073d25aa00bc6c8086e8d10a2bd7302cc46c6416894bcba553880edf83f0f9",
+          "size": 7678
+        },
+        "evidence/public-release/smoke-support/shared/tools/fs-snapshot.mjs": {
+          "sha256": "30ad6c3f0394126a7d3e5534507fe46c78c34946edd15bd5c91b36e2b36df351",
+          "size": 13794
+        },
+        "evidence/public-release/smoke-support/shared/tools/native-launcher.mjs": {
+          "sha256": "3595cfaf0a2f1ac51a48862dc5f6aa842db6d3431a62159bcb93cb0abc812f2d",
+          "size": 7193
+        },
+        "evidence/public-release/smoke-support/shared/tools/native-rc-package.mjs": {
+          "sha256": "0ef948c2f9f45a9343586288681ae5ed6f6527b85912a52bd8c37aa50e3682c6",
+          "size": 33102
+        },
+        "evidence/public-release/smoke-support/shared/tools/native-rc-smoke.mjs": {
+          "sha256": "874355e36496884e55a6e4dae6986ecde817d20863bb3fe26d1b1b5a1d283e69",
+          "size": 30732
+        },
+        "evidence/public-release/smoke-support/shared/tools/native-runtime.mjs": {
+          "sha256": "a9d6c8e885b9db41877c5d2d79efe48f2e47daf791e0f1ad1ca06636d37d962e",
+          "size": 118749
+        },
+        "evidence/public-release/smoke-support/shared/tools/node-runtime-authority.mjs": {
+          "sha256": "962014ba74a1b0285388b85026016d7d664adea6353ebca5c61a407a6c7ee653",
+          "size": 37930
+        },
+        "evidence/public-release/smoke-support/shared/tools/platform-targets.mjs": {
+          "sha256": "35321c7e888038210589612873136c96bf697789f6f4e90918442faa41e13aec",
+          "size": 7292
+        },
+        "evidence/public-release/smoke-support/shared/tools/sidecar-common.mjs": {
+          "sha256": "e0ca4d4a4bba4abd756f1399e31a768a20873eefb6c50ac26a75adddccc1978c",
+          "size": 81902
+        },
+        "evidence/public-release/smoke-support/shared/tools/sidecar-verify.mjs": {
+          "sha256": "fba7f292b3c01ed062f4727e0c22912bc269b6ca76fca8328fb5329c098aac77",
+          "size": 1906
+        },
+        "evidence/public-release/source/COMMERCIAL-LICENSE.md": {
+          "sha256": "29fa83d6c8a530e7fb08c605ba01d8781c16e43a4644de3333b2058e4cc09281",
+          "size": 943
+        },
+        "evidence/public-release/source/LICENSE": {
+          "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+          "size": 34460
+        },
+        "evidence/public-release/source/NOTICE": {
+          "sha256": "84c3bfd695449b5330344ba7e5d355f3bb3a1a7f8925aea3b2755145709db1e0",
+          "size": 614
+        },
+        "evidence/public-release/source/README.md": {
+          "sha256": "1fe075b4ed11d3b1cef071fb2268c9262469bc15523e7bd0e071d45fa90cd6cd",
+          "size": 833
+        },
+        "evidence/public-release/source/package.json": {
+          "sha256": "15d3f118dfdc0014129fc37d63533a6a02cf355fdb89961a215eca77e95b7cd2",
+          "size": 1833
+        },
+        "evidence/public-release/source/src-tauri/Cargo.toml": {
+          "sha256": "98f0cd315ca2dfb40a6cc575ec3eb302c2f866a89aa58e180541f93c29cc31ee",
+          "size": 1235
+        },
+        "evidence/public-release/source/src-tauri/icons/icon.png": {
+          "sha256": "2d65e8c69a675b6c939ac11757c6a47a123f63b3f83b6d58305aaf7231aca160",
+          "size": 8814
+        },
+        "evidence/public-release/source/src-tauri/tauri.conf.json": {
+          "sha256": "d078aa55c8c41f1d58c6a70d6c9ae325f020101bde9fa696a61fa309ffc374e9",
+          "size": 1530
+        },
+        "fetch-receipt.json": {
+          "sha256": "23ab284da44b2546c155aef1f9d1a353a2a76767c7ac3468d233a96a9cfdac61",
+          "size": 2205
+        },
+        "public-inputs-preparation.json": {
+          "sha256": "b8f542349216e6dc941b540f6578a035ef82bd5fe154613783f1b9a34a2ad9fd",
+          "size": 2531
+        },
+        "qualification-inputs-prep.json": {
+          "sha256": "3c264f78f62f341904b0b76bd63408d881b76be26b5380880996449bba3418c4",
+          "size": 56666
+        },
+        "qualification-inputs.json": {
+          "sha256": "3c264f78f62f341904b0b76bd63408d881b76be26b5380880996449bba3418c4",
+          "size": 56666
+        }
+      },
+      "id": 12944601221,
+      "size_in_bytes": 163200120
+    },
+    "tfnf-070-universal-qualification-darwin-arm64": {
+      "archive_sha256": "508e5faf4f20672b908333f02fa8836ae38658a9ade653e0f1d309392f7dbe0c",
+      "files": {
+        "darwin-arm64/result.json": {
+          "sha256": "e79d99721f71cd22ccf5da24fbb5f045c057cafd8bc84c55bb1c8a2ca06af058",
+          "size": 20242
+        }
+      },
+      "id": 12944532447,
+      "size_in_bytes": 5723
+    },
+    "tfnf-070-universal-qualification-linux-arm64-gnu": {
+      "archive_sha256": "24e0ccb6563b03e9357c0ccf03fd70b86fa49d76d6cb8783b714392d697ebc62",
+      "files": {
+        "linux-arm64-gnu/result.json": {
+          "sha256": "b50a948294330a62b4aeed126069557b79b8dacaf3f4706a6d519a71ac349977",
+          "size": 34814
+        }
+      },
+      "id": 12943994542,
+      "size_in_bytes": 7608
+    },
+    "tfnf-070-universal-qualification-linux-arm64-gnu-floor": {
+      "archive_sha256": "e03af8998628590c015e83b4118ee1e4a9fb0f72e119345969dde51267cbccba",
+      "files": {
+        "linux-arm64-gnu/missing-runtime.json": {
+          "sha256": "193c5558f3a700a49265f8d1e7e589ea40192d66d458ce2bb27fdbda0d574955",
+          "size": 7898
+        },
+        "linux-arm64-gnu/result.json": {
+          "sha256": "00bfff554f96b1bc401b37834ea902390ad5ed6fa98dbcdaa28ee594fb54ba29",
+          "size": 34801
+        }
+      },
+      "id": 12943604135,
+      "size_in_bytes": 43031
+    },
+    "tfnf-070-universal-qualification-linux-x64-gnu": {
+      "archive_sha256": "1d71b366c9621571d1947ebcc4cda8126f2d37374809a40f63505e93fbcb26eb",
+      "files": {
+        "linux-x64-gnu/result.json": {
+          "sha256": "eab0f84f7892238ed5db7fc309a08c58bb82abb7dc422190efa9dc778c1495cd",
+          "size": 47803
+        }
+      },
+      "id": 12944443027,
+      "size_in_bytes": 10452
+    },
+    "tfnf-070-universal-qualification-linux-x64-gnu-floor": {
+      "archive_sha256": "2e14b6fa2658733e7e0a79ef133ae3fbb0383ee6dcacd1f23824b7dff2dc3dca",
+      "files": {
+        "linux-x64-gnu/missing-runtime.json": {
+          "sha256": "823fec899d7dcdedc9dfed6eb69c39ad68dd880b1b2a20a190762f534534e4e0",
+          "size": 7892
+        },
+        "linux-x64-gnu/result.json": {
+          "sha256": "c7f629e7b1d9b433a05409f2fd427a6d4b684de04706a56f35e6ad4568775bb6",
+          "size": 47766
+        }
+      },
+      "id": 12943454598,
+      "size_in_bytes": 55982
+    }
+  },
+  "description_sha256": "90afb3dc1260d016c36d25a810d12051f432e448a471523e0a7cc17ac8ed851c",
+  "distribution": "universal-launcher",
+  "environment": "pypi",
+  "identity": "5b753db3df3b451168e4d31ad9c69e594bd40436993c8c862fbf5e3959801003",
+  "matrix_sha256": "f7a1a4815d73f4e90198207240418551a318fc8c882f7820d5f996ff9bbc523f",
+  "project": "theme-forge-nebular-fusion",
+  "repository": "Knowledge-Forge-AI/release-starport-9",
+  "run": {
+    "attempt": "1",
+    "id": "40980285764"
+  },
+  "runtime_index_sha256": "17673f85b239fb04319fc905b3ca505db01b8d55e8f8b939604466a6f6420940",
+  "runtime_inputs_sha256": "5e8b369a803ad0594219911673774e64f8dd3cec7a6752286bc1485a408aa93e",
+  "schema": "rs9.nebular070-universal-publication.v1",
+  "source": {
+    "commit": "97f40792823302a0b8fa19227537f31024032ff7",
+    "tree": "ae5e76f892cedaf4fec762b692f84ec654c97e78"
+  },
+  "version": "0.7.0",
+  "wheel": {
+    "filename": "theme_forge_nebular_fusion-0.7.0-py3-none-any.whl",
+    "sha256": "6e82672404a896ea2fd0cde760275db437f77f641e62ea6296288f4f879f951b",
+    "size": 224271,
+    "tag": "py3-none-any",
+    "version": "0.7.0"
+  },
+  "workflow": "rs9-tfnf-pypi-publish.yml"
+}
