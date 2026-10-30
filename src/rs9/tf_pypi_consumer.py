@@ -1497,6 +1497,272 @@ def _nebular_validate_capture(candidate: Mapping[str, Any], row: Mapping[str, An
             "native_evidence": evidence, "system_static_input": static_system_input if static_system else None}
 
 
+def _nebular_installed_consumer(
+    capture: Mapping[str, Any], wheel_file: Path, work_path: Path, *,
+    target: str, pip_source: Mapping[str, Any] | None = None,
+    sandbox_prefix: Sequence[str] = (),
+    sandbox_probe: Callable[[Mapping[str, str], Sequence[str]], Mapping[str, Any]] | None = None,
+    fixture_only: bool = False, runner: Any = subprocess.Popen,
+    process_observer: Callable[[Path], dict[str, Any]] | None = None,
+    state_snapshot: Callable[[Path, Sequence[str]], dict[str, Any]] | None = None,
+    real_user_state_snapshot: Callable[[str, str], Mapping[str, Any]] | None = None,
+    smoke_support: Mapping[str, Any] | None = None,
+    system_webkit_preflight: Mapping[str, Any] | None = None,
+    system_context: Mapping[str, Any] | None = None,
+    runtime_setup: Callable[..., Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Shared installed execution guards after distribution-specific admission.
+
+    The caller authenticates wheel/capture bytes first. An explicit setup hook
+    runs only within the same user-state/process observation window; ordinary
+    launch and smoke retain the original network-denial prefix.
+    """
+    from rs9.nebular070_smoke_support import checked_live_path
+    if work_path.exists() or work_path.is_symlink():
+        fail("NEBULAR_WORK_DIR")
+    work_path.mkdir(parents=True, mode=0o700)
+    home = work_path / "home"
+    temp = work_path / "tmp"
+    home.mkdir(mode=0o700)
+    temp.mkdir(mode=0o700)
+    smoke_prepared = None
+    if not fixture_only:
+        from rs9.nebular070_smoke_support import materialize_smoke_support
+        declared_support = capture["native"].get("smoke_support")
+        if smoke_support is not None and declared_support is not None:
+            if canonical(smoke_support) != canonical(declared_support):
+                fail("NEBULAR_SMOKE_CLOSURE")
+        support = smoke_support if smoke_support is not None else declared_support
+        if not isinstance(support, Mapping):
+            fail("NEBULAR_SMOKE_CLOSURE")
+        smoke_prepared = materialize_smoke_support(
+            capture["root"], support, work_path / "smoke-support", target=target,
+        )
+    base_env = {
+        "PATH": "/usr/bin:/bin",
+        "HOME": str(home),
+        "TMPDIR": str(temp),
+        "TEMP": str(temp),
+        "TMP": str(temp),
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PIP_CONFIG_FILE": os.devnull,
+        "PIP_NO_INDEX": "1",
+        "PIP_NO_CACHE_DIR": "1",
+        "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "XDG_CACHE_HOME": str(home / ".cache"),
+        "XDG_CONFIG_HOME": str(home / ".config"),
+        "XDG_DATA_HOME": str(home / ".local/share"),
+        "XDG_STATE_HOME": str(home / ".local/state"),
+    }
+    if sandbox_probe is None:
+        node = node_binary()
+        sandbox = network_denial(sys.executable, node, base_env, sandbox_prefix)
+    else:
+        sandbox = dict(sandbox_probe(base_env, sandbox_prefix))
+    if sandbox.get("network_disabled") is not True:
+        fail("NEBULAR_SANDBOX")
+    observer = process_observer or _nebular_process_snapshot
+    states = state_snapshot or _nebular_state_snapshot
+    if real_user_state_snapshot is None:
+        fail("NEBULAR_USER_STATE_GUARD")
+    before_process = observer(work_path)
+    before_state = states(home, capture["native"].get("state_paths", []))
+    real_before = _nebular_real_user_state(
+        real_user_state_snapshot("before", target), target=target, phase="before",
+    )
+    try:
+        materialized_cache = home / ".cache" / "rs9" / "theme-forge-nebular-fusion"
+        expected_materialized_path = (
+            materialized_cache / "entries" / capture["manifest_sha256"] / "payload"
+            / capture["gui"]["materialized_path"]
+        )
+        expected_gui_relative = expected_materialized_path.relative_to(home)
+        if fixture_only:
+            # A fixture may describe another host architecture, but it must
+            # remain explicitly non-qualification evidence.  pip's target
+            # install authenticates the wheel without pretending the current
+            # host can execute a foreign platform wheel.
+            site = work_path / "site"
+            site.mkdir(mode=0o700)
+            python = Path(sys.executable)
+            install_env = {**base_env, "PATH": str(python.parent) + os.pathsep + base_env["PATH"]}
+            pip_platform = {
+                "darwin-arm64": "macosx_13_0_arm64",
+                "linux-arm64-gnu": "linux_aarch64",
+                "linux-x64-gnu": "linux_x86_64",
+            }[target]
+            install_args = _nebular_pip_command(
+                python,
+                ["install", "--no-index", "--no-deps", "--only-binary=:all:",
+                 "--no-cache-dir", "--target", site, "--platform", pip_platform,
+                 wheel_file.resolve()],
+                pip_source,
+            )
+        else:
+            venv_root = work_path / "venv"
+            venv.EnvBuilder(with_pip=pip_source is None, clear=False).create(venv_root)
+            python = venv_root / "bin/python"
+            install_env = {**base_env, "PATH": str(python.parent) + os.pathsep + base_env["PATH"]}
+            if pip_source is not None:
+                bootstrap = _nebular_run(
+                    _nebular_pip_command(
+                        python, ["--python", str(python), "--version"], pip_source,
+                    ),
+                    install_env, work_path, sandbox_prefix, 30, runner=runner,
+                )
+                _nebular_require_pip_bootstrap(bootstrap)
+            install_args = _nebular_pip_command(
+                python,
+                ["install", "--no-index", "--no-deps", "--only-binary=:all:",
+                 "--no-cache-dir", wheel_file.resolve()],
+                pip_source,
+            )
+        install = _nebular_run(
+            install_args,
+            install_env, work_path, sandbox_prefix, 60, runner=runner,
+        )
+        if (install["exit_code"] != 0 or install.get("timed_out")
+                or install.get("output_limit_exceeded") or not install.get("cleanup_known")
+                or not install.get("output_complete") or install.get("forced_cleanup")):
+            fail("NEBULAR_WHEEL_INSTALL")
+        if fixture_only:
+            # The installed fixture launcher must materialize its own
+            # embedded wheel payload.  Pre-populating this cache here would
+            # make --path prove only the consumer's setup, not the wheel.
+            command = work_path / "bin" / capture["native"]["command"]
+            command.parent.mkdir(mode=0o700)
+            code = ("import sys;sys.path.insert(0," + repr(str(site)) + ");"
+                    "from theme_forge_nebular_fusion.launcher import main_tfnf;main_tfnf()")
+            command.write_text("#!/bin/sh\nexec " + shlex.quote(str(python)) + " -I -c "
+                               + shlex.quote(code) + " \"$@\"\n", encoding="utf-8")
+            command.chmod(0o755)
+        else:
+            command = work_path / "venv" / "bin" / capture["native"]["command"]
+        if command.is_symlink() or not command.is_file() or not os.access(command, os.X_OK):
+            fail("NEBULAR_NATIVE_ENTRYPOINT")
+
+        def require_clean(result: Mapping[str, Any], code: str) -> None:
+            if (result.get("exit_code") != 0 or result.get("timed_out")
+                    or result.get("output_limit_exceeded") or not result.get("cleanup_known")
+                    or not result.get("output_complete") or result.get("forced_cleanup")):
+                fail(code)
+
+        version = _nebular_run([command, "--version"], install_env, work_path,
+                               sandbox_prefix, 30, runner=runner)
+        require_clean(version, "NEBULAR_COMMAND_CONTRACT")
+        if b"0.7.0" not in version.get("stdout_token", "").encode():
+            fail("NEBULAR_COMMAND_CONTRACT")
+        setup_result = None
+        if runtime_setup is not None:
+            setup_result = runtime_setup(
+                command=command, python=python, env=dict(install_env), work=work_path,
+                prefix=tuple(sandbox_prefix), runner=runner,
+            )
+        path_probe = _nebular_run([command, "--path"], install_env, work_path,
+                                  sandbox_prefix, 30, runner=runner)
+        require_clean(path_probe, "NEBULAR_COMMAND_CONTRACT")
+        path_lines = path_probe.get("stdout_token", "").splitlines()
+        if len(path_lines) != 1 or not path_lines[0].strip():
+            fail("NEBULAR_COMMAND_CONTRACT")
+        resolved_gui = checked_live_path(path_lines[0].strip(), code="NEBULAR_COMMAND_CONTRACT")
+        try:
+            observed_relative = resolved_gui.resolve().relative_to(home.resolve())
+        except (OSError, ValueError):
+            fail("NEBULAR_COMMAND_CONTRACT")
+        if (observed_relative != expected_gui_relative
+                or resolved_gui.is_symlink()
+                or not resolved_gui.is_file()
+                or not os.access(resolved_gui, os.X_OK)
+                or sha256(physical_bytes(resolved_gui, limit=_NEBULAR_MAX_EXECUTABLE_BYTES))
+                != capture["gui"]["sha256"]):
+            fail("NEBULAR_COMMAND_CONTRACT")
+        application_smoke = None
+        native_spec = capture["native"]
+        if fixture_only:
+            native = _nebular_run([command, *capture["native"]["argv"]], install_env, work_path,
+                                  sandbox_prefix, capture["native"]["timeout_seconds"], runner=runner)
+            require_clean(native, "NEBULAR_NATIVE_CONTRACT")
+        else:
+            from rs9.nebular070_installed_smoke import run_installed_smoke
+            from rs9.nebular070_smoke_support import installed_runtime_root
+            expected_members = capture["manifest"].get("members")
+            if not isinstance(expected_members, list) or not expected_members:
+                fail("NEBULAR_SMOKE_CLOSURE")
+            smoke_prepared["expected_members"] = expected_members
+            smoke_prepared["manifest_sha256"] = capture["manifest_sha256"]
+            application_smoke = run_installed_smoke(
+                prepared=smoke_prepared,
+                target=target,
+                runtime_root=installed_runtime_root(resolved_gui, target),
+                env=install_env,
+                prefix=sandbox_prefix,
+                evidence=work_path / "installed-native-smoke",
+                native=native_spec,
+                gui=capture["gui"],
+                runner=runner,
+                timeout=native_spec["timeout_seconds"],
+                python_launcher=python,
+                installed_command=command if system_context is not None else None,
+                system_webkit_context=system_context,
+                system_webkit_preflight=system_webkit_preflight,
+            )
+            native = application_smoke["native_probe"]
+        if fixture_only:
+            shutil.rmtree(site)
+            uninstall = {"exit_code": 0, "signal": None, "stdout_sha256": sha256(b""),
+                         "stderr_sha256": sha256(b"")}
+        else:
+            uninstall = _nebular_run(
+                _nebular_pip_command(
+                    python, ["uninstall", "--yes", "theme-forge-nebular-fusion"], pip_source,
+                ),
+                install_env, work_path, sandbox_prefix, 60, runner=runner,
+            )
+        if (uninstall["exit_code"] != 0 or uninstall.get("timed_out")
+                or uninstall.get("output_limit_exceeded") or uninstall.get("forced_cleanup")
+                or uninstall.get("cleanup_known", True) is not True):
+            fail("NEBULAR_CLEANUP")
+    finally:
+        after_process = observer(work_path)
+        after_state = states(home, capture["native"].get("state_paths", []))
+        real_after = _nebular_real_user_state(
+            real_user_state_snapshot("after", target), target=target, phase="after",
+        )
+    if after_process.get("orphan_count") != 0:
+        fail("NEBULAR_ORPHAN_PROCESSES")
+    if before_state != after_state:
+        fail("NEBULAR_USER_STATE")
+    if (real_before.get("snapshot_sha256") != real_after.get("snapshot_sha256")
+            or real_after.get("changed") != []):
+        fail("NEBULAR_USER_STATE_GUARD")
+    result = {
+        "sandbox": {key: value for key, value in sandbox.items() if key in {"network_disabled", "method", "proof_sha256"}},
+        "process_observer": {"before": before_process, "after": after_process, "orphan_count": 0},
+        "user_state": {
+            "scratch": {"before": before_state, "after": after_state, "unchanged": True},
+            "real_user_state": {"before": real_before, "after": real_after, "unchanged": True},
+            "unchanged": True,
+        },
+        "probes": {
+            "version": {key: value for key, value in version.items() if key != "stdout_token"},
+            "path": {
+                **{key: value for key, value in path_probe.items() if key != "stdout_token"},
+                "resolved_relative": observed_relative.as_posix(),
+                "resolved_sha256": capture["gui"]["sha256"],
+            },
+            "native": {key: value for key, value in native.items() if key != "stdout_token"},
+        },
+        "cleanup": {"pip_uninstall_exit": 0, "orphan_processes": 0},
+    }
+    if application_smoke is not None:
+        result["application_smoke"] = application_smoke
+    if setup_result is not None:
+        result["runtime_setup"] = setup_result
+    return result
+
+
 def consume_nebular_candidate(
     candidate: Mapping[str, Any],
     wheel_path: str | Path,
@@ -1654,237 +1920,32 @@ def consume_nebular_candidate(
                 capture["root"], raw_release["legal_files"][name], "legal")[0]:
             fail("NEBULAR_WHEEL_BINDING")
 
-    if work_path.exists() or work_path.is_symlink():
-        fail("NEBULAR_WORK_DIR")
-    work_path.mkdir(parents=True, mode=0o700)
-    home = work_path / "home"
-    temp = work_path / "tmp"
-    home.mkdir(mode=0o700)
-    temp.mkdir(mode=0o700)
-    smoke_prepared = None
-    system_static = capture.get("system_static_input") is not None
-    if not fixture_only:
-        from rs9.nebular070_smoke_support import materialize_smoke_support
-        declared_support = capture["native"].get("smoke_support")
-        if smoke_support is not None and declared_support is not None:
-            if canonical(smoke_support) != canonical(declared_support):
-                fail("NEBULAR_SMOKE_CLOSURE")
-        support = smoke_support if smoke_support is not None else declared_support
-        if not isinstance(support, Mapping):
-            fail("NEBULAR_SMOKE_CLOSURE")
-        smoke_prepared = materialize_smoke_support(
-            capture["root"], support, work_path / "smoke-support", target=target,
-        )
-    base_env = {
-        "PATH": "/usr/bin:/bin",
-        "HOME": str(home),
-        "TMPDIR": str(temp),
-        "TEMP": str(temp),
-        "TMP": str(temp),
-        "LANG": "C",
-        "LC_ALL": "C",
-        "PIP_CONFIG_FILE": os.devnull,
-        "PIP_NO_INDEX": "1",
-        "PIP_NO_CACHE_DIR": "1",
-        "PIP_DISABLE_PIP_VERSION_CHECK": "1",
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "XDG_CACHE_HOME": str(home / ".cache"),
-        "XDG_CONFIG_HOME": str(home / ".config"),
-        "XDG_DATA_HOME": str(home / ".local/share"),
-        "XDG_STATE_HOME": str(home / ".local/state"),
-    }
-    if sandbox_probe is None:
-        node = node_binary()
-        sandbox = network_denial(sys.executable, node, base_env, sandbox_prefix)
-    else:
-        sandbox = dict(sandbox_probe(base_env, sandbox_prefix))
-    if sandbox.get("network_disabled") is not True:
-        fail("NEBULAR_SANDBOX")
-    observer = process_observer or _nebular_process_snapshot
-    states = state_snapshot or _nebular_state_snapshot
-    if real_user_state_snapshot is None:
-        fail("NEBULAR_USER_STATE_GUARD")
-    before_process = observer(work_path)
-    before_state = states(home, capture["native"].get("state_paths", []))
-    real_before = _nebular_real_user_state(
-        real_user_state_snapshot("before", target), target=target, phase="before",
+    system_host = system_webkit_host_observation
+    system_context = None
+    if system_linux and not fixture_only:
+        provider_context = system_webkit_provider_observation
+        if provider_context is None and isinstance(system_webkit_preflight, Mapping):
+            provider_context = system_webkit_preflight.get("provider")
+        system_context = {
+            "target": target,
+            "wheel_sha256": wheel["sha256"],
+            "wheel_tag": wheel.get("tag"),
+            "payload_archive_sha256": row["payload_archive_sha256"],
+            "payload_manifest_sha256": row["manifest_sha256"],
+            "source": dict(system_webkit_source),
+            "run_id": run_id, "run_attempt": run_attempt,
+            "host": system_host,
+            "provider": dict(provider_context) if isinstance(provider_context, Mapping) else {},
+        }
+    installed = _nebular_installed_consumer(
+        capture, wheel_file, work_path, target=target, pip_source=pip_source,
+        sandbox_prefix=sandbox_prefix, sandbox_probe=sandbox_probe,
+        fixture_only=fixture_only, runner=runner, process_observer=process_observer,
+        state_snapshot=state_snapshot, real_user_state_snapshot=real_user_state_snapshot,
+        smoke_support=smoke_support, system_webkit_preflight=system_webkit_preflight,
+        system_context=system_context,
     )
-    try:
-        materialized_cache = home / ".cache" / "rs9" / "theme-forge-nebular-fusion"
-        expected_materialized_path = (
-            materialized_cache / "entries" / capture["manifest_sha256"] / "payload"
-            / capture["gui"]["materialized_path"]
-        )
-        expected_gui_relative = expected_materialized_path.relative_to(home)
-        if fixture_only:
-            # A fixture may describe another host architecture, but it must
-            # remain explicitly non-qualification evidence.  pip's target
-            # install authenticates the wheel without pretending the current
-            # host can execute a foreign platform wheel.
-            site = work_path / "site"
-            site.mkdir(mode=0o700)
-            python = Path(sys.executable)
-            install_env = {**base_env, "PATH": str(python.parent) + os.pathsep + base_env["PATH"]}
-            pip_platform = {
-                "darwin-arm64": "macosx_13_0_arm64",
-                "linux-arm64-gnu": "linux_aarch64",
-                "linux-x64-gnu": "linux_x86_64",
-            }[target]
-            install_args = _nebular_pip_command(
-                python,
-                ["install", "--no-index", "--no-deps", "--only-binary=:all:",
-                 "--no-cache-dir", "--target", site, "--platform", pip_platform,
-                 wheel_file.resolve()],
-                pip_source,
-            )
-        else:
-            venv_root = work_path / "venv"
-            venv.EnvBuilder(with_pip=pip_source is None, clear=False).create(venv_root)
-            python = venv_root / "bin/python"
-            install_env = {**base_env, "PATH": str(python.parent) + os.pathsep + base_env["PATH"]}
-            if pip_source is not None:
-                bootstrap = _nebular_run(
-                    _nebular_pip_command(
-                        python, ["--python", str(python), "--version"], pip_source,
-                    ),
-                    install_env, work_path, sandbox_prefix, 30, runner=runner,
-                )
-                _nebular_require_pip_bootstrap(bootstrap)
-            install_args = _nebular_pip_command(
-                python,
-                ["install", "--no-index", "--no-deps", "--only-binary=:all:",
-                 "--no-cache-dir", wheel_file.resolve()],
-                pip_source,
-            )
-        install = _nebular_run(
-            install_args,
-            install_env, work_path, sandbox_prefix, 60, runner=runner,
-        )
-        if (install["exit_code"] != 0 or install.get("timed_out")
-                or install.get("output_limit_exceeded") or not install.get("cleanup_known")
-                or not install.get("output_complete") or install.get("forced_cleanup")):
-            fail("NEBULAR_WHEEL_INSTALL")
-        if fixture_only:
-            # The installed fixture launcher must materialize its own
-            # embedded wheel payload.  Pre-populating this cache here would
-            # make --path prove only the consumer's setup, not the wheel.
-            command = work_path / "bin" / capture["native"]["command"]
-            command.parent.mkdir(mode=0o700)
-            code = ("import sys;sys.path.insert(0," + repr(str(site)) + ");"
-                    "from theme_forge_nebular_fusion.launcher import main_tfnf;main_tfnf()")
-            command.write_text("#!/bin/sh\nexec " + shlex.quote(str(python)) + " -I -c "
-                               + shlex.quote(code) + " \"$@\"\n", encoding="utf-8")
-            command.chmod(0o755)
-        else:
-            command = work_path / "venv" / "bin" / capture["native"]["command"]
-        if command.is_symlink() or not command.is_file() or not os.access(command, os.X_OK):
-            fail("NEBULAR_NATIVE_ENTRYPOINT")
-
-        def require_clean(result: Mapping[str, Any], code: str) -> None:
-            if (result.get("exit_code") != 0 or result.get("timed_out")
-                    or result.get("output_limit_exceeded") or not result.get("cleanup_known")
-                    or not result.get("output_complete") or result.get("forced_cleanup")):
-                fail(code)
-
-        version = _nebular_run([command, "--version"], install_env, work_path,
-                               sandbox_prefix, 30, runner=runner)
-        require_clean(version, "NEBULAR_COMMAND_CONTRACT")
-        if b"0.7.0" not in version.get("stdout_token", "").encode():
-            fail("NEBULAR_COMMAND_CONTRACT")
-        path_probe = _nebular_run([command, "--path"], install_env, work_path,
-                                  sandbox_prefix, 30, runner=runner)
-        require_clean(path_probe, "NEBULAR_COMMAND_CONTRACT")
-        path_lines = path_probe.get("stdout_token", "").splitlines()
-        if len(path_lines) != 1 or not path_lines[0].strip():
-            fail("NEBULAR_COMMAND_CONTRACT")
-        resolved_gui = checked_live_path(path_lines[0].strip(), code="NEBULAR_COMMAND_CONTRACT")
-        try:
-            observed_relative = resolved_gui.resolve().relative_to(home.resolve())
-        except (OSError, ValueError):
-            fail("NEBULAR_COMMAND_CONTRACT")
-        if (observed_relative != expected_gui_relative
-                or resolved_gui.is_symlink()
-                or not resolved_gui.is_file()
-                or not os.access(resolved_gui, os.X_OK)
-                or sha256(physical_bytes(resolved_gui, limit=_NEBULAR_MAX_EXECUTABLE_BYTES))
-                != capture["gui"]["sha256"]):
-            fail("NEBULAR_COMMAND_CONTRACT")
-        application_smoke = None
-        native_spec = capture["native"]
-        if fixture_only:
-            native = _nebular_run([command, *capture["native"]["argv"]], install_env, work_path,
-                                  sandbox_prefix, capture["native"]["timeout_seconds"], runner=runner)
-            require_clean(native, "NEBULAR_NATIVE_CONTRACT")
-        else:
-            from rs9.nebular070_installed_smoke import run_installed_smoke
-            from rs9.nebular070_smoke_support import installed_runtime_root
-            expected_members = capture["manifest"].get("members")
-            if not isinstance(expected_members, list) or not expected_members:
-                fail("NEBULAR_SMOKE_CLOSURE")
-            smoke_prepared["expected_members"] = expected_members
-            smoke_prepared["manifest_sha256"] = capture["manifest_sha256"]
-            system_host = system_webkit_host_observation
-            system_context = None
-            if system_linux:
-                provider_context = system_webkit_provider_observation
-                if provider_context is None and isinstance(system_webkit_preflight, Mapping):
-                    provider_context = system_webkit_preflight.get("provider")
-                system_context = {
-                    "target": target,
-                    "wheel_sha256": wheel["sha256"],
-                    "wheel_tag": wheel.get("tag"),
-                    "payload_archive_sha256": row["payload_archive_sha256"],
-                    "payload_manifest_sha256": row["manifest_sha256"],
-                    "source": dict(system_webkit_source),
-                    "run_id": run_id, "run_attempt": run_attempt,
-                    "host": system_host,
-                    "provider": dict(provider_context) if isinstance(provider_context, Mapping) else {},
-                }
-            application_smoke = run_installed_smoke(
-                prepared=smoke_prepared,
-                target=target,
-                runtime_root=installed_runtime_root(resolved_gui, target),
-                env=install_env,
-                prefix=sandbox_prefix,
-                evidence=work_path / "installed-native-smoke",
-                native=native_spec,
-                gui=capture["gui"],
-                runner=runner,
-                timeout=native_spec["timeout_seconds"],
-                python_launcher=python,
-                installed_command=command if target.startswith("linux") and _nebular_runtime_profile(candidate) == NEBULAR070_SYSTEM_WEBKIT_PROFILE else None,
-                system_webkit_context=system_context,
-                system_webkit_preflight=system_webkit_preflight,
-            )
-            native = application_smoke["native_probe"]
-        if fixture_only:
-            shutil.rmtree(site)
-            uninstall = {"exit_code": 0, "signal": None, "stdout_sha256": sha256(b""),
-                         "stderr_sha256": sha256(b"")}
-        else:
-            uninstall = _nebular_run(
-                _nebular_pip_command(
-                    python, ["uninstall", "--yes", "theme-forge-nebular-fusion"], pip_source,
-                ),
-                install_env, work_path, sandbox_prefix, 60, runner=runner,
-            )
-        if (uninstall["exit_code"] != 0 or uninstall.get("timed_out")
-                or uninstall.get("output_limit_exceeded") or uninstall.get("forced_cleanup")
-                or uninstall.get("cleanup_known", True) is not True):
-            fail("NEBULAR_CLEANUP")
-    finally:
-        after_process = observer(work_path)
-        after_state = states(home, capture["native"].get("state_paths", []))
-        real_after = _nebular_real_user_state(
-            real_user_state_snapshot("after", target), target=target, phase="after",
-        )
-    if after_process.get("orphan_count") != 0:
-        fail("NEBULAR_ORPHAN_PROCESSES")
-    if before_state != after_state:
-        fail("NEBULAR_USER_STATE")
-    if (real_before.get("snapshot_sha256") != real_after.get("snapshot_sha256")
-            or real_after.get("changed") != []):
-        fail("NEBULAR_USER_STATE_GUARD")
+    application_smoke = installed.pop("application_smoke", None)
     result = {
         "schema": NEBULAR070_CONSUMER_SCHEMA,
         "status": "fixture-native-consumer-passed" if fixture_only else "native-consumer-passed",
@@ -1908,23 +1969,7 @@ def consume_nebular_candidate(
         "provider_closure": capture["provider"],
         "loader": capture["loader"],
         "gui": capture["gui"],
-        "sandbox": {key: value for key, value in sandbox.items() if key in {"network_disabled", "method", "proof_sha256"}},
-        "process_observer": {"before": before_process, "after": after_process, "orphan_count": 0},
-        "user_state": {
-            "scratch": {"before": before_state, "after": after_state, "unchanged": True},
-            "real_user_state": {"before": real_before, "after": real_after, "unchanged": True},
-            "unchanged": True,
-        },
-        "probes": {
-            "version": {key: value for key, value in version.items() if key != "stdout_token"},
-            "path": {
-                **{key: value for key, value in path_probe.items() if key != "stdout_token"},
-                "resolved_relative": observed_relative.as_posix(),
-                "resolved_sha256": capture["gui"]["sha256"],
-            },
-            "native": {key: value for key, value in native.items() if key != "stdout_token"},
-        },
-        "cleanup": {"pip_uninstall_exit": 0, "orphan_processes": 0},
+        **installed,
         "publication_admitted": False,
         "public_writes": 0,
     }

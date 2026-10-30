@@ -816,7 +816,9 @@ class Nebular070ManylinuxContractTests(unittest.TestCase):
             ]),
             1,
         )
-        wf_text = publish_module.workflow_text()
+        # The portable platform-wheel route remains a historical reader and
+        # renderer. The registered 0.7 workflow now selects the universal wheel.
+        wf_text = publish_module.workflow_070_jobs_text()
         self.assertNotIn("steps.manylinux_inputs.outputs.stage_b", wf_text)
         # Stage-B is now assembled directly from the authenticated Stage-A
         # path and the four retained consumer receipts.  Keep this assertion

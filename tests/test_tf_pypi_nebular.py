@@ -333,7 +333,8 @@ class NebularPyPIContractTests(unittest.TestCase):
         self.assertIn("actions: read", publish_section)
         self.assertIn("RS9_GITHUB_READ_TOKEN: ${{ github.token }}", publish_section)
         self.assertIn("needs: [build_verify, native_consumer]", publish_section)
-        self.assertIn("publication_resume_070:", publish_section)
+        self.assertIn("universal_publication_070:", publish_section)
+        self.assertNotIn("publication_resume_070:", text)
 
     def test_committed_approval_manifest_and_set_sha256_invariance(self) -> None:
         doc = self.committed_approval
@@ -1880,7 +1881,8 @@ class NebularPyPIContractTests(unittest.TestCase):
         from rs9.tf_pypi_nebular import _nebular_import_closure_paths
 
         closure_paths = _nebular_import_closure_paths(ROOT)
-        self.assertEqual(len(closure_paths), 107)
+        self.assertEqual(len(closure_paths), 108)
+        self.assertIn("src/rs9/nebular070_universal_workflow.py", closure_paths)
         self.assertIn("src/rs9/nebular_lineage.py", closure_paths)
         self.assertIn("src/rs9/tf_pypi_nebular070_publish.py", closure_paths)
         self.assertTrue({
