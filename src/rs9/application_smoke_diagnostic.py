@@ -688,6 +688,20 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
             ) if k in diagnostic})
         except Exception:
             pass
+    if fields["failed"] and extras:
+        # Reuse only the closed enum/count projection of the already-read replay
+        # receipt. Its original-attempt envelope must not label replay evidence.
+        from rs9.smoke_stream_tokens import project_problem_categories
+        try:
+            categories = project_problem_categories(
+                record, fields["receipt"], system=system, platform=platform, scenario=scenario)
+            if categories is not None:
+                fields["harness_problem_categories"] = {
+                    "origin": "diagnostic-replay", "receipt": categories["receipt"],
+                    "problems": categories["problems"],
+                }
+        except Exception:
+            pass
     if extras:
         raw, meta, log_error = _read_regular(evidence / "xvfb-error.log", MAX_LOG)
         fields["display_log"] = {**meta, "error": log_error,
@@ -698,7 +712,7 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
 
 
 def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
-               scratch, timeout=240, session_bus_argv=None, replay_progress_wrapper=None):
+               scratch, timeout=240, session_bus_argv=None, replay_progress_wrapper=None, system=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
@@ -724,7 +738,7 @@ def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
             },
         }
     fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, True, timeout,
-                      session_bus_argv=session_bus_argv,
+                      session_bus_argv=session_bus_argv, system=system,
                       harness_timeout_ms=harness_timeout_ms, replay_progress=replay_progress)
     label = "replay-reproduced" if fields["failed"] else "replay-passed"
     if fields["error"] == "harness-error" or fields["cleanup_error"]:
@@ -762,7 +776,7 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
         _, replay = run_replay(scenario=scenario, platform=platform, launch_root=launch_root,
             checkout=prepared.get("checkout", prepared["source"]), tools=prepared["tools"], prefix=prefix,
             env=env, scratch=prepared["scratch"], session_bus_argv=session_bus_argv,
-            replay_progress_wrapper=replay_progress_wrapper)
+            replay_progress_wrapper=replay_progress_wrapper, system=system)
     else:
         replay = {"status": "not-run", "reason": "boundary-probe-only"}
     if boundary_probes:
@@ -793,6 +807,12 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
     if boundary_probes:
         record["boundary_probes"] = probes
     raw = canonical(record)
+    if len(raw) > MAX_DIAGNOSTIC and "harness_problem_categories" in replay:
+        # Optional replay projection cannot displace the original failure record.
+        replay = dict(replay)
+        replay.pop("harness_problem_categories")
+        record["replay"] = replay
+        raw = canonical(record)
     if len(raw) > MAX_DIAGNOSTIC and "harness_problem_categories" in fields:
         # The new optional field must not turn an otherwise bounded legacy diagnostic into an error.
         initial = dict(fields)
