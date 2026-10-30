@@ -9,6 +9,53 @@ import { registerHooks, syncBuiltinESMExports } from "node:module";
 import { basename, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+const CURRENT_PROFILE = Object.freeze({
+  "id": "nebular070",
+  "commit": "cadb40c4972f68f314096ff60fbcfb4da950c161",
+  "tree": "27c643b6375c2aafde314799c4f08e844c14992c",
+  "modules": {
+    "candidate-provenance.mjs": {
+      "sha256": "20244b6765d6e7d0ee5fd86452096a4546f189103b0acb9f065c4a1479c23155",
+      "blob": "129b0da16329d07697daab619f8fdbc5690f72fa",
+      "size": 15484
+    },
+    "fs-snapshot.mjs": {
+      "sha256": "30ad6c3f0394126a7d3e5534507fe46c78c34946edd15bd5c91b36e2b36df351",
+      "blob": "841cfecd874517d0c619cf9a3866c2697e12ecd6",
+      "size": 13794
+    },
+    "native-launcher.mjs": {
+      "sha256": "3595cfaf0a2f1ac51a48862dc5f6aa842db6d3431a62159bcb93cb0abc812f2d",
+      "blob": "9c84fff880957edcb98925bbaea941fc0f7e66fe",
+      "size": 7193
+    },
+    "native-rc-package.mjs": {
+      "sha256": "0ef948c2f9f45a9343586288681ae5ed6f6527b85912a52bd8c37aa50e3682c6",
+      "blob": "570d4d2b6cee8551bb0d77417e54ee4a0d308ca8",
+      "size": 33102
+    },
+    "native-rc-smoke.mjs": {
+      "sha256": "874355e36496884e55a6e4dae6986ecde817d20863bb3fe26d1b1b5a1d283e69",
+      "blob": "cbf6a2148c11ed1516ba5d7fc2d4dd32dee3ee9f",
+      "size": 30732
+    },
+    "native-runtime.mjs": {
+      "sha256": "a9d6c8e885b9db41877c5d2d79efe48f2e47daf791e0f1ad1ca06636d37d962e",
+      "blob": "333192471147289f232bd915c6813ae23b39f1bb",
+      "size": 118749
+    },
+    "platform-targets.mjs": {
+      "sha256": "35321c7e888038210589612873136c96bf697789f6f4e90918442faa41e13aec",
+      "blob": "ebe518bbf27856c496541bca46bf13066805a606",
+      "size": 7292
+    }
+  },
+  "support": {
+    "sha256": "15d3f118dfdc0014129fc37d63533a6a02cf355fdb89961a215eca77e95b7cd2",
+    "blob": "161ee788b7a8660916e2b6fbbebbac0de4a87f42",
+    "size": 1833
+  }
+});
 const PROGRESS_SCHEMA = "rs9.application-smoke-replay-progress.v1";
 const MAX_PROGRESS_BYTES = 16 * 1024;
 const MAX_PROGRESS_EVENTS = 32;
@@ -21,6 +68,10 @@ const INTERNAL = Object.freeze({
   progress: "--rs9-replay-progress-file",
   expected: "--rs9-replay-progress-expected-sha256",
   closure: "--rs9-replay-progress-closure-member",
+  profile: "--rs9-replay-progress-profile",
+  commit: "--rs9-replay-progress-source-commit",
+  tree: "--rs9-replay-progress-source-tree",
+  support: "--rs9-replay-progress-support-member",
 });
 
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -30,11 +81,16 @@ function parseInternalArgs(argv) {
   let progressPath;
   let expectedSha256;
   const closureMembers = [];
+  const currentArgs = new Map();
   const forwarded = [];
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     const value = argv[index + 1];
-    if (flag === INTERNAL.harness || flag === INTERNAL.progress || flag === INTERNAL.expected
+    if ([INTERNAL.profile, INTERNAL.commit, INTERNAL.tree, INTERNAL.support].includes(flag)) {
+      if (value === undefined || currentArgs.has(flag)) throw new Error("Current replay profile arguments differ");
+      currentArgs.set(flag, value);
+      index += 1;
+    } else if (flag === INTERNAL.harness || flag === INTERNAL.progress || flag === INTERNAL.expected
         || flag === INTERNAL.closure) {
       if (value === undefined) throw new Error("Replay progress wrapper internal argument is incomplete");
       if (flag === INTERNAL.harness) harnessPath = value;
@@ -50,7 +106,7 @@ function parseInternalArgs(argv) {
       || !/^[0-9a-f]{64}$/.test(expectedSha256 ?? "")) {
     throw new Error("Authenticated released smoke harness and progress sink are required");
   }
-  return { harnessPath, progressPath, expectedSha256, closureMembers, forwarded };
+  return { harnessPath, progressPath, expectedSha256, closureMembers, forwarded, currentArgs };
 }
 
 function parseSmokeArgs(argv) {
@@ -129,7 +185,7 @@ function closurePath(root, name) {
   return path;
 }
 
-function buildAuthenticatedClosure(harnessPath, expectedSha256, rawMembers) {
+function buildAuthenticatedClosure(harnessPath, expectedSha256, rawMembers, current = null) {
   const entryPath = resolve(harnessPath);
   const root = dirname(entryPath);
   const entryName = basename(entryPath);
@@ -143,15 +199,16 @@ function buildAuthenticatedClosure(harnessPath, expectedSha256, rawMembers) {
   if (expected.get(entryName) !== expectedSha256) {
     throw new Error("Authenticated replay source entry is not bound to its closure");
   }
-  if (expected.size > MAX_CLOSURE_FILES) throw new Error("Authenticated replay source closure is too large");
+  if (expected.size + (current ? 1 : 0) > MAX_CLOSURE_FILES) throw new Error("Authenticated replay source closure is too large");
 
   const sources = new Map();
   const visited = new Set();
-  let totalBytes = 0;
+  let totalBytes = current ? current.supportBytes.length : 0;
   const visit = (name) => {
     if (visited.has(name)) return;
     const path = closurePath(root, name);
     const bytes = readHeldRegular(path, expected.get(name));
+    if (current) verifyCurrentBytes(bytes, CURRENT_PROFILE.modules[name]);
     totalBytes += bytes.length;
     if (totalBytes > MAX_CLOSURE_BYTES) throw new Error("Authenticated replay source closure is too large");
     visited.add(name);
@@ -204,11 +261,12 @@ function installAuthenticatedLoader(closure) {
   return hooks;
 }
 
-function installProgressObservers(progressPath) {
+function installProgressObservers(progressPath, current = null, options = null) {
   const originalSpawn = childProcess.spawn;
   const originalWriteFileSync = fs.writeFileSync;
   let sequence = 0;
   let launchObserved = false;
+  const streamRestores = [];
   const emit = (stage, event) => {
     if (sequence >= MAX_PROGRESS_EVENTS) return;
     const record = JSON.stringify({ schema: PROGRESS_SCHEMA, seq: sequence + 1, stage, event }) + "\n";
@@ -242,7 +300,43 @@ function installProgressObservers(progressPath) {
     }
     if (!launchObserved) {
       launchObserved = true;
-      emit("candidate", "launched");
+      if (!current || typeof child?.pid === "number") emit("candidate", "launched");
+      if (current && typeof child?.stderr?.emit === "function") {
+        const stream = child.stderr;
+        const originalEmit = stream.emit;
+        const ownEmit = Object.getOwnPropertyDescriptor(stream, "emit");
+        let pending = "";
+        let observedBytes = 0;
+        let active = false;
+        const marker = `TFSB Studio release smoke scenario ${options.scenario} active`;
+        const observe = chunk => {
+          try {
+            if (active || observedBytes >= 64 * 1024) return;
+            const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            const bounded = bytes.subarray(0, 64 * 1024 - observedBytes);
+            observedBytes += bounded.length;
+            pending += bounded.toString("utf8");
+            const lines = pending.split("\n");
+            pending = lines.pop().slice(-512);
+            if (lines.some(line => line.replace(/\r$/, "") === marker)) {
+              active = true;
+              emit("application", "release-smoke-active");
+            }
+          } catch { /* Optional observation cannot change the released stream path. */ }
+        };
+        const observedEmit = function(event, ...values) {
+          if (event === "data") observe(values[0]);
+          return originalEmit.call(this, event, ...values);
+        };
+        try {
+          Object.defineProperty(stream, "emit", {value: observedEmit, writable: true, configurable: true});
+          streamRestores.push(() => {
+            if (stream.emit !== observedEmit) return;
+            if (ownEmit) Object.defineProperty(stream, "emit", ownEmit);
+            else delete stream.emit;
+          });
+        } catch { /* A stream that cannot be observed stays untouched. */ }
+      }
       if (child && typeof child.once === "function") {
         child.once("exit", () => emit("candidate", "exited"));
       }
@@ -252,8 +346,12 @@ function installProgressObservers(progressPath) {
 
   fs.writeFileSync = function observedWriteFileSync(filePath, ...args) {
     const name = typeof filePath === "string" ? basename(filePath) : "";
-    const receipt = name.endsWith(".receipt.json");
-    const report = name.endsWith(".run.json");
+    const receipt = current
+      ? typeof filePath === "string" && resolve(filePath) === resolve(options.evidenceDir, `${options.label ?? `${options.platform}-${options.scenario}`}.receipt.json`)
+      : name.endsWith(".receipt.json");
+    const report = current
+      ? typeof filePath === "string" && resolve(filePath) === resolve(options.evidenceDir, `${options.label ?? `${options.platform}-${options.scenario}`}.run.json`)
+      : name.endsWith(".run.json");
     if (receipt) emit("receipt", "write-start");
     if (report) emit("run-record", "write-start");
     try {
@@ -271,10 +369,75 @@ function installProgressObservers(progressPath) {
   return {
     emit,
     restore: () => {
+      for (const restore of streamRestores) restore();
       childProcess.spawn = originalSpawn;
       fs.writeFileSync = originalWriteFileSync;
       syncBuiltinESMExports();
     },
+  };
+}
+
+function verifyCurrentBytes(bytes, pin) {
+  if (!pin || bytes.length !== pin.size || sha256(bytes) !== pin.sha256
+      || crypto.createHash("sha1").update(Buffer.concat([
+        Buffer.from(`blob ${bytes.length}\0`), bytes,
+      ])).digest("hex") !== pin.blob) throw new Error("Current replay source binding differs");
+}
+
+function currentProfile(args) {
+  if (args.currentArgs.size === 0) return null;
+  const expected = new Map([
+    [INTERNAL.profile, CURRENT_PROFILE.id], [INTERNAL.commit, CURRENT_PROFILE.commit],
+    [INTERNAL.tree, CURRENT_PROFILE.tree],
+    [INTERNAL.support, `package.json=${CURRENT_PROFILE.support.sha256}`],
+  ]);
+  if (args.currentArgs.size !== expected.size
+      || [...expected].some(([key, value]) => args.currentArgs.get(key) !== value)
+      || basename(args.harnessPath) !== "native-rc-smoke.mjs"
+      || args.expectedSha256 !== CURRENT_PROFILE.modules["native-rc-smoke.mjs"].sha256) {
+    throw new Error("Current replay profile binding differs");
+  }
+  const members = new Map();
+  for (const raw of args.closureMembers) {
+    const item = parseClosureMember(raw);
+    if (members.has(item.name)) throw new Error("Current replay closure duplicated");
+    members.set(item.name, item.expectedSha256);
+  }
+  const pins = CURRENT_PROFILE.modules;
+  if (members.size !== Object.keys(pins).length || [...members].some(([name, hash]) => pins[name]?.sha256 !== hash)) {
+    throw new Error("Current replay closure differs");
+  }
+  const toolsRoot = dirname(resolve(args.harnessPath));
+  for (const root of [toolsRoot, dirname(toolsRoot)]) {
+    const info = fs.lstatSync(root);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Current replay source root differs");
+  }
+  const supportPath = resolve(toolsRoot, "../package.json");
+  const supportBytes = readHeldRegular(supportPath, CURRENT_PROFILE.support.sha256);
+  verifyCurrentBytes(supportBytes, CURRENT_PROFILE.support);
+  if (JSON.parse(supportBytes.toString("utf8")).version !== "0.7.0") throw new Error("Current replay version differs");
+  return { supportPath, supportBytes };
+}
+
+function installCurrentSupport(current) {
+  if (!current) return () => {};
+  const originalRead = fs.readFileSync;
+  fs.readFileSync = function heldSupportRead(path, options) {
+    const name = path instanceof URL ? fileURLToPath(path) : typeof path === "string" ? resolve(path) : null;
+    if (name === current.supportPath) {
+      if (options === "utf8") return current.supportBytes.toString("utf8");
+      if (options === undefined) return Buffer.from(current.supportBytes);
+      throw new Error("Current replay support read differs");
+    }
+    return originalRead.call(this, path, options);
+  };
+  syncBuiltinESMExports();
+  let restored = false;
+  return () => {
+    if (restored) return;
+    restored = true;
+    fs.readFileSync = originalRead;
+    syncBuiltinESMExports();
   };
 }
 
@@ -287,15 +450,22 @@ function writeLegacyError(error) {
 }
 
 async function main() {
-  const { harnessPath, progressPath, expectedSha256, closureMembers, forwarded } = parseInternalArgs(process.argv.slice(2));
-  const closure = buildAuthenticatedClosure(harnessPath, expectedSha256, closureMembers);
+  const args = parseInternalArgs(process.argv.slice(2));
+  const { harnessPath, progressPath, expectedSha256, closureMembers, forwarded } = args;
+  const current = currentProfile(args);
+  const closure = buildAuthenticatedClosure(harnessPath, expectedSha256, closureMembers, current);
+  const options = current ? parseSmokeArgs(forwarded) : null;
+  if (current && !((options.platform === "linux-x64" && ["C", "C-signal"].includes(options.scenario))
+      || (options.platform === "linux-arm64" && options.scenario === "B"))) throw new Error("Current replay scenario differs");
+  const restoreSupport = installCurrentSupport(current);
   const loader = installAuthenticatedLoader(closure);
-  const observer = installProgressObservers(progressPath);
+  const observer = installProgressObservers(progressPath, current, options);
   let harness;
   let result;
   try {
     observer.emit("harness", "import-start");
     harness = await import(pathToFileURL(closure.entryPath).href);
+    restoreSupport();
     observer.emit("harness", "imported");
     if (!harness || typeof harness.runSmoke !== "function") {
       observer.emit("harness", "export-missing");
@@ -310,6 +480,7 @@ async function main() {
   } finally {
     loader.deregister();
     observer.restore();
+    restoreSupport();
   }
   process.stdout.write(`${JSON.stringify({ label: result.label, status: result.status, problems: result.problems })}\n`);
   if (result.status !== "pass") process.exitCode = 1;

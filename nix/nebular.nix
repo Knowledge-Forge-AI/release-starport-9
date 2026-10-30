@@ -23,6 +23,27 @@ let
       xorg.libX11 xorg.libXcomposite xorg.libXdamage xorg.libXext xorg.libXfixes
       xorg.libXrandr xorg.libXrender xorg.libXtst xorg.libxcb
     ];
+  # Diagnostic metadata only. Roots are existing public Nix outputs already in
+  # runtimePackages; no package, path, provider, or environment is added here.
+  guiDiscovery = {
+    schema = "rs9.nix-fhs-gui-discovery.v1";
+    roots = {
+      glib = "${pkgs.glib}";
+      gtk = "${pkgs.gtk3}";
+      webkit = "${pkgs.webkitgtk_4_1}";
+      pixbuf = "${pkgs.gdk-pixbuf}";
+    };
+    # The realized runtime package roots are the sealed symlink target set;
+    # discovery rejects normalized link target strings outside this set.
+    # Physical intermediate-component sealing is not claimed by this diagnostic.
+    closure_roots = lib.unique (map (package: "${package}") (runtimePackages pkgs));
+    max_entries = 4096;
+    max_bytes = 64 * 1024 * 1024;
+    max_file_bytes = 4 * 1024 * 1024;
+    max_symlink_hops = 16;
+    categories = [ "helper" "libexec" "gio-module" "gsettings-schema"
+                   "pixbuf-loader" "font" "data" ];
+  };
   runtimeFacts = writeText "rs9-nebular-loader-facts.json" (builtins.toJSON {
     loader = "${pkgs.glibc}/lib/${if stdenv.hostPlatform.isAarch64 then "ld-linux-aarch64.so.1" else "ld-linux-x86-64.so.2"}";
     glibc_lib = "${pkgs.glibc}/lib";
@@ -33,6 +54,7 @@ let
     dbus_run_session = "${pkgs.dbus}/bin/dbus-run-session";
     dbus_daemon = "${pkgs.dbus}/bin/dbus-daemon";
     dbus_session_config = "${pkgs.dbus}/share/dbus-1/session.conf";
+    gui_discovery = guiDiscovery;
   });
   runtime = buildFHSEnv {
     name = "rs9-nebular-fhs";

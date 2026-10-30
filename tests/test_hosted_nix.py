@@ -12,6 +12,7 @@ from rs9.errors import ContractError
 from rs9.hosted_nix import (_pinned_session_bus_argv, command, execute, fhs_runtime_smoke,
                             prepare_input, record_direct_loader_evaluation, PRODUCTS, SYSTEMS)
 from rs9.hosted_summary import contract, gate_blockers
+from rs9.nix_gui_discovery import NODE_FS_SOURCE, _discovery_request, record_fhs_gui_discovery
 from rs9.scratch import canonical
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +56,119 @@ class NixHostedTests(unittest.TestCase):
         self.assertIn('dbus_run_session = "${pkgs.dbus}/bin/dbus-run-session";', source)
         self.assertIn('dbus_daemon = "${pkgs.dbus}/bin/dbus-daemon";', source)
         self.assertIn('dbus_session_config = "${pkgs.dbus}/share/dbus-1/session.conf";', source)
+
+    def test_nix_runtime_facts_source_emits_only_existing_gui_store_roots(self):
+        source = (ROOT / "nix/nebular.nix").read_text()
+        self.assertIn('schema = "rs9.nix-fhs-gui-discovery.v1";', source)
+        for package in ("glib", "gtk3", "webkitgtk_4_1", "gdk-pixbuf"):
+            self.assertIn(f'"${{pkgs.{package}}}"', source)
+        self.assertIn("closure_roots = lib.unique", source)
+        self.assertIn('gui_discovery = guiDiscovery;', source)
+        self.assertNotIn("GIO_EXTRA_MODULES", source)
+        self.assertNotIn("GSETTINGS_SCHEMA_DIR", source)
+
+    def test_gui_discovery_request_is_closed_and_bounded(self):
+        root = "/nix/store/" + "a" * 32 + "-gui"
+        facts = {
+            "node": root + "/bin/node",
+            "gui_discovery": {
+                "schema": "rs9.nix-fhs-gui-discovery.v1",
+                "roots": {role: "/nix/store/" + "a" * 32 + "-" + role
+                          for role in ("glib", "gtk", "webkit", "pixbuf")},
+                "closure_roots": ["/nix/store/" + "a" * 32 + "-" + role
+                                  for role in ("glib", "gtk", "webkit", "pixbuf")],
+                "max_entries": 4096,
+                "max_bytes": 64 * 1024 * 1024,
+                "max_file_bytes": 4 * 1024 * 1024,
+                "max_symlink_hops": 16,
+                "categories": ["helper", "libexec", "gio-module", "gsettings-schema",
+                               "pixbuf-loader", "font", "data"],
+            },
+        }
+        request = _discovery_request(facts)
+        self.assertEqual(request["schema"], "rs9.nix-fhs-gui-discovery-request.v1")
+        for mutation in (
+            {"gui_discovery": {**facts["gui_discovery"], "max_entries": 4097}},
+            {"gui_discovery": {**facts["gui_discovery"], "roots": {"glib": root}}},
+            {"node": "/tmp/node"},
+        ):
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                _discovery_request({**facts, **mutation})
+
+    def test_gui_discovery_is_optional_diagnostic_and_never_a_gate(self):
+        from subprocess import CompletedProcess
+        root = "/nix/store/" + "b" * 32 + "-gui"
+        facts = {
+            "node": root + "/bin/node",
+            "gui_discovery": {
+                "schema": "rs9.nix-fhs-gui-discovery.v1",
+                "roots": {role: "/nix/store/" + "b" * 32 + "-" + role
+                          for role in ("glib", "gtk", "webkit", "pixbuf")},
+                "closure_roots": ["/nix/store/" + "b" * 32 + "-" + role
+                                  for role in ("glib", "gtk", "webkit", "pixbuf")],
+                "max_entries": 4096,
+                "max_bytes": 64 * 1024 * 1024,
+                "max_file_bytes": 4 * 1024 * 1024,
+                "max_symlink_hops": 16,
+                "categories": ["helper", "libexec", "gio-module", "gsettings-schema",
+                               "pixbuf-loader", "font", "data"],
+            },
+        }
+        with tempfile.TemporaryDirectory() as td:
+            destination = Path(td) / "nix-gui-discovery.json"
+            with patch("rs9.nix_gui_discovery.subprocess.run", side_effect=OSError("fixture")):
+                result = record_fhs_gui_discovery(facts, ["prefix"], ["runtime"], {}, destination)
+            self.assertEqual(result["status"], "fail")
+            self.assertTrue(result["diagnostic_only"])
+            self.assertEqual(json.loads(destination.read_bytes())["status"], "fail")
+
+    def test_gui_discovery_uses_node_fs_only_script_and_bound_input(self):
+        from subprocess import CompletedProcess
+        root = "/nix/store/" + "c" * 32 + "-gui"
+        facts = {
+            "node": root + "/bin/node",
+            "gui_discovery": {
+                "schema": "rs9.nix-fhs-gui-discovery.v1",
+                "roots": {role: "/nix/store/" + "c" * 32 + "-" + role
+                          for role in ("glib", "gtk", "webkit", "pixbuf")},
+                "closure_roots": ["/nix/store/" + "c" * 32 + "-" + role
+                                  for role in ("glib", "gtk", "webkit", "pixbuf")],
+                "max_entries": 4096,
+                "max_bytes": 64 * 1024 * 1024,
+                "max_file_bytes": 4 * 1024 * 1024,
+                "max_symlink_hops": 16,
+                "categories": ["helper", "libexec", "gio-module", "gsettings-schema",
+                               "pixbuf-loader", "font", "data"],
+            },
+        }
+        response = json.dumps({
+            "schema": "rs9.nix-fhs-gui-observation.v1", "status": "pass",
+            "roots": {
+                role: {
+                    "path": "/nix/store/" + "c" * 32 + "-" + role,
+                    "full9": {key: "0" if key in {"mtimeNs", "ctimeNs"} else 0 for key in ("dev", "ino", "size", "mode", "mtimeNs",
+                                                  "ctimeNs", "uid", "gid", "nlink")},
+                    "records": 0,
+                }
+                for role in ("glib", "gtk", "webkit", "pixbuf")
+            },
+            "totals": {"entries": 0, "read_bytes": 0, "skipped_uncategorized": 0,
+                       "skipped_oversize": 0},
+            "categories": ["helper", "libexec", "gio-module", "gsettings-schema",
+                           "pixbuf-loader", "font", "data"],
+            "records": [],
+        }).encode()
+        with tempfile.TemporaryDirectory() as td, patch(
+                "rs9.nix_gui_discovery.subprocess.run",
+                return_value=CompletedProcess([], 0, response, b"")) as run:
+            result = record_fhs_gui_discovery(facts, ["prefix"], ["runtime"], {}, Path(td) / "out.json")
+        self.assertEqual(result["status"], "pass")
+        argv = run.call_args.args[0]
+        self.assertEqual(argv[-2:], ["-e", NODE_FS_SOURCE])
+        self.assertEqual(run.call_args.kwargs["input"], canonical(_discovery_request(facts)))
+        self.assertIn("node:fs", NODE_FS_SOURCE)
+        self.assertIn("node:crypto", NODE_FS_SOURCE)
+        self.assertNotIn("child_process", NODE_FS_SOURCE)
 
     def test_loader_facts_capture_preserves_dbus_bindings_without_expanding_loader_contract(self):
         with tempfile.TemporaryDirectory() as td:
@@ -897,6 +1011,75 @@ class NixHostedTests(unittest.TestCase):
                 err = ctx.exception
                 self.assertEqual(err.code, "NIX_FHS_RUNTIME")
                 self.assertFalse(hasattr(err, "partial_result"))
+
+    def test_optional_discovery_success_retains_artifact_without_gate_admission(self):
+        original_facts = _mock_dbus_loader_facts
+        original_execute = execute
+        captured = []
+        def facts_with_gui(*args, **kwargs):
+            result = original_facts(*args, **kwargs)
+            kwargs["facts_out"]["gui_discovery"] = {}
+            return result
+        def observe(facts, prefix, runtime, env, destination):
+            destination.write_bytes(canonical({"status": "pass", "diagnostic_only": True}))
+            return {"status": "pass", "diagnostic_only": True}
+        def capture(context):
+            result = original_execute(context)
+            captured.append(result)
+            return result
+        with patch(__name__ + "._mock_dbus_loader_facts", side_effect=facts_with_gui), patch(
+                "rs9.hosted_nix.record_fhs_gui_discovery", side_effect=observe), patch(
+                __name__ + ".execute", side_effect=capture):
+            self.test_execute_linux_nix_fhs_success_unaltered()
+        self.assertEqual(len(captured), 1)
+        self.assertTrue(any(Path(path).name == "nix-gui-discovery.json" and Path(path).parent.name == "diagnostics"
+                            for path in captured[0]["artifacts"]))
+        self.assertFalse(any("discovery" in gate["name"] for gate in captured[0]["gates"]))
+
+    def test_pipeline_failure_retains_gui_observation_through_existing_custody(self):
+        from types import SimpleNamespace
+        from rs9.hosted_pipeline import run_lane
+        from rs9.hosted_custody import verify_set
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp).resolve();scratch=root/'scratch';scratch.mkdir()
+            inputs=root/'inputs';inputs.mkdir()
+            (inputs/'artifact-manifest.json').write_bytes(canonical({'release_ingestion_sha256':'a'*64}))
+            def capture(repository,output,**kwargs):
+                (output/'summary').mkdir();(output/'summary/authentication.json').write_bytes(b'{}')
+                return []
+            def bind(captures,repository,output,*,generation):
+                path=output/'command-bindings.json';path.write_bytes(b'{}');return path
+            def fail_after_observation(context):
+                destination=context['scratch']/'diagnostics/nix-gui-discovery.json'
+                destination.parent.mkdir()
+                record_fhs_gui_discovery({},[],[],{},destination)
+                raise ContractError('APPLICATION_SMOKE','controlled later smoke failure')
+            with patch('rs9.hosted_pipeline.validate_host'), patch('rs9.hosted_pipeline._inputs',
+                    return_value={('authenticate','generation'):inputs}), patch('rs9.hosted_pipeline.capture_generation',side_effect=capture), patch(
+                    'rs9.hosted_pipeline.canonical_release_auth_projection',return_value={}), patch(
+                    'rs9.hosted_pipeline.compute_auth_sha256',return_value='a'*64), patch(
+                    'rs9.hosted_pipeline.bind_commands',side_effect=bind), patch('rs9.hosted_pipeline.runner_facts',return_value={}), patch(
+                    'rs9.hosted_pipeline.importlib.import_module',return_value=SimpleNamespace(execute=fail_after_observation)):
+                self.assertEqual(run_lane(ROOT,scratch,root/'packet','nix','x86_64-linux',
+                    client=SimpleNamespace(receipts=[]),inputs=inputs),2)
+            manifest=verify_set(root/'packet')
+            diagnostic=root/'packet/objects/lane-work/diagnostics/nix-gui-discovery.json'
+            self.assertTrue(diagnostic.is_file())
+            receipt=json.loads((root/'packet/nix-x86_64-linux.json').read_bytes())
+            self.assertEqual(receipt['execution_error'],'APPLICATION_SMOKE')
+            self.assertNotIn('diagnostic_scan_failures',receipt)
+            self.assertTrue(json.loads(diagnostic.read_bytes())['diagnostic_only'])
+
+    def test_optional_discovery_fault_cannot_preempt_required_flow(self):
+        original = _mock_dbus_loader_facts
+        def facts_with_gui(*args, **kwargs):
+            result = original(*args, **kwargs)
+            kwargs["facts_out"]["gui_discovery"] = {}
+            return result
+        with patch(__name__ + "._mock_dbus_loader_facts", side_effect=facts_with_gui), patch(
+                "rs9.hosted_nix.record_fhs_gui_discovery", side_effect=OSError("controlled diagnostic custody fault")) as observe:
+            self.test_execute_linux_nix_fhs_success_unaltered()
+        observe.assert_called_once()
 
     def test_execute_linux_nix_fhs_success_unaltered(self):
         with tempfile.TemporaryDirectory() as td:

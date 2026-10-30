@@ -1,4 +1,5 @@
 """Wheel-only bounded smoke failure records; raw process output is never retained."""
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -41,6 +42,33 @@ DIAGNOSTIC_REPLAY_TIMEOUT_TARGETS = frozenset({
 })
 RELEASED_NATIVE_RC_SMOKE_SHA256 = "3d1eb991bd586dbb90e926049b516549e7518c0851c2e90ecbcc4e20838963f2"
 RELEASED_NATIVE_RC_SNAPSHOT_SHA256 = "a85cd9e81602ddc585baa4164f98707debe5158d260130e489431e9ae699bbde"
+CURRENT_REPLAY_PROGRESS_PROFILE = {'id': 'nebular070',
+ 'commit': 'cadb40c4972f68f314096ff60fbcfb4da950c161',
+ 'tree': '27c643b6375c2aafde314799c4f08e844c14992c',
+ 'modules': {'candidate-provenance.mjs': {'sha256': '20244b6765d6e7d0ee5fd86452096a4546f189103b0acb9f065c4a1479c23155',
+                                          'blob': '129b0da16329d07697daab619f8fdbc5690f72fa',
+                                          'size': 15484},
+             'fs-snapshot.mjs': {'sha256': '30ad6c3f0394126a7d3e5534507fe46c78c34946edd15bd5c91b36e2b36df351',
+                                 'blob': '841cfecd874517d0c619cf9a3866c2697e12ecd6',
+                                 'size': 13794},
+             'native-launcher.mjs': {'sha256': '3595cfaf0a2f1ac51a48862dc5f6aa842db6d3431a62159bcb93cb0abc812f2d',
+                                     'blob': '9c84fff880957edcb98925bbaea941fc0f7e66fe',
+                                     'size': 7193},
+             'native-rc-package.mjs': {'sha256': '0ef948c2f9f45a9343586288681ae5ed6f6527b85912a52bd8c37aa50e3682c6',
+                                       'blob': '570d4d2b6cee8551bb0d77417e54ee4a0d308ca8',
+                                       'size': 33102},
+             'native-rc-smoke.mjs': {'sha256': '874355e36496884e55a6e4dae6986ecde817d20863bb3fe26d1b1b5a1d283e69',
+                                     'blob': 'cbf6a2148c11ed1516ba5d7fc2d4dd32dee3ee9f',
+                                     'size': 30732},
+             'native-runtime.mjs': {'sha256': 'a9d6c8e885b9db41877c5d2d79efe48f2e47daf791e0f1ad1ca06636d37d962e',
+                                    'blob': '333192471147289f232bd915c6813ae23b39f1bb',
+                                    'size': 118749},
+             'platform-targets.mjs': {'sha256': '35321c7e888038210589612873136c96bf697789f6f4e90918442faa41e13aec',
+                                      'blob': 'ebe518bbf27856c496541bca46bf13066805a606',
+                                      'size': 7292}},
+ 'support': {'sha256': '15d3f118dfdc0014129fc37d63533a6a02cf355fdb89961a215eca77e95b7cd2',
+             'blob': '161ee788b7a8660916e2b6fbbebbac0de4a87f42',
+             'size': 1833}}
 REPLAY_PROGRESS_SCHEMA = "rs9.application-smoke-replay-progress.v1"
 REPLAY_PROGRESS_MAX_BYTES = 16 * 1024
 REPLAY_PROGRESS_MAX_EVENTS = 32
@@ -48,7 +76,7 @@ REPLAY_PROGRESS_EVENTS = {
     ("harness", "import-start"), ("harness", "imported"),
     ("harness", "import-failed"), ("harness", "export-missing"),
     ("candidate", "launch-failed"), ("candidate", "launched"),
-    ("candidate", "exited"), ("run-smoke", "enter"),
+    ("candidate", "exited"), ("application", "release-smoke-active"), ("run-smoke", "enter"),
     ("run-smoke", "returned"), ("run-smoke", "error"),
     ("receipt", "write-start"), ("receipt", "finalized"),
     ("receipt", "write-failed"), ("run-record", "write-start"),
@@ -227,6 +255,31 @@ def _read_regular(path, limit):
     return raw, {"present": True, "bytes": len(raw), "sha256": digest(raw)}, None
 
 
+def _current_replay_progress_profile(prepared):
+    """A closed current source observation profile, never a release capability."""
+    if prepared.get("source_generation") != "theme-forge-current-202610":
+        return None
+    from rs9.hosted_smoke import verify_execution_source_readback
+    try:
+        verify_execution_source_readback(prepared)
+        source = Path(prepared["source"])
+        if Path(prepared["tools"]).resolve() != (source / "tools").resolve():
+            return None
+        profile = CURRENT_REPLAY_PROGRESS_PROFILE
+        pins = {"tools/" + name: pin for name, pin in profile["modules"].items()}
+        pins["package.json"] = profile["support"]
+        for name, pin in pins.items():
+            raw, meta, error = _read_regular(source / name, 4 * 1024 * 1024)
+            blob = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+            if error or meta.get("sha256") != pin["sha256"] or len(raw) != pin["size"] or blob != pin["blob"]:
+                return None
+        if json.loads(raw).get("version") != "0.7.0":
+            return None
+        return profile
+    except (ContractError, OSError, ValueError, TypeError, KeyError):
+        return None
+
+
 def _replay_progress_wrapper(prepared):
     """Return the owned observer only for the authenticated harness pair."""
     tools = prepared.get("tools")
@@ -242,6 +295,8 @@ def _replay_progress_wrapper(prepared):
         _raw, _meta, error = _read_regular(candidate, 4 * 1024 * 1024)
         if error:
             return None
+        if prepared.get("source_generation") == "theme-forge-current-202610":
+            return candidate if _current_replay_progress_profile(prepared) is not None else None
         raw, _meta, error = _read_regular(harness, 4 * 1024 * 1024)
         if error or digest(raw) != RELEASED_NATIVE_RC_SMOKE_SHA256:
             return None
@@ -604,6 +659,16 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
         "--checkout", str(prepared.get("checkout", prepared["source"])),
         "--evidence", str(evidence), "--label", platform + "-" + scenario]
     if replay_progress:
+        if replay_progress.get("profile") is not None:
+            profile = replay_progress["profile"]
+            if profile != CURRENT_REPLAY_PROGRESS_PROFILE:
+                raise ContractError("APPLICATION_SMOKE", "Unknown replay source profile")
+            command[2:2] = [
+                "--rs9-replay-progress-profile", profile["id"],
+                "--rs9-replay-progress-source-commit", profile["commit"],
+                "--rs9-replay-progress-source-tree", profile["tree"],
+                "--rs9-replay-progress-support-member", "package.json=" + profile["support"]["sha256"],
+            ]
         command[2:2] = [
             "--rs9-replay-progress-harness", str(replay_progress["harness"]),
             "--rs9-replay-progress-file", str(replay_progress["progress"]),
@@ -712,7 +777,7 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
 
 
 def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
-               scratch, timeout=240, session_bus_argv=None, replay_progress_wrapper=None, system=None):
+               scratch, timeout=240, session_bus_argv=None, replay_progress_wrapper=None, system=None, replay_progress_profile=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
@@ -737,6 +802,12 @@ def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
                 "fs-snapshot.mjs": RELEASED_NATIVE_RC_SNAPSHOT_SHA256,
             },
         }
+    if replay_progress is not None and replay_progress_profile is not None:
+        if replay_progress_profile != CURRENT_REPLAY_PROGRESS_PROFILE:
+            raise ContractError("APPLICATION_SMOKE", "Unknown replay source profile")
+        replay_progress.update(profile=replay_progress_profile,
+            expected_sha256=replay_progress_profile["modules"]["native-rc-smoke.mjs"]["sha256"],
+            closure={name: pin["sha256"] for name, pin in replay_progress_profile["modules"].items()})
     fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, True, timeout,
                       session_bus_argv=session_bus_argv, system=system,
                       harness_timeout_ms=harness_timeout_ms, replay_progress=replay_progress)
@@ -776,7 +847,9 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
         _, replay = run_replay(scenario=scenario, platform=platform, launch_root=launch_root,
             checkout=prepared.get("checkout", prepared["source"]), tools=prepared["tools"], prefix=prefix,
             env=env, scratch=prepared["scratch"], session_bus_argv=session_bus_argv,
-            replay_progress_wrapper=replay_progress_wrapper, system=system)
+            replay_progress_wrapper=replay_progress_wrapper, system=system,
+            replay_progress_profile=(_current_replay_progress_profile(prepared)
+                                     if replay_progress_wrapper is not None else None))
     else:
         replay = {"status": "not-run", "reason": "boundary-probe-only"}
     if boundary_probes:

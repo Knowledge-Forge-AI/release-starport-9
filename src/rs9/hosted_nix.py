@@ -23,6 +23,7 @@ from rs9.scratch import canonical
 from rs9.security import scan_for_credentials
 from rs9.release_core import digest
 from rs9.wheel_native import get_embedded_rs9_helpers
+from rs9.nix_gui_discovery import record_fhs_gui_discovery
 
 SYSTEMS = {"aarch64-darwin", "x86_64-linux", "aarch64-linux"}
 PRODUCTS = ("theme-forge-stellar-burst", "theme-forge-stellar-loom",
@@ -326,6 +327,7 @@ def execute(context):
     prepared = None
     runtime_prefix = []
     runtime_facts = {}
+    gui_discovery_path = None
     def after_nebular_probe():
         nonlocal baseline
         if baseline is None:
@@ -396,6 +398,14 @@ def execute(context):
                         }
                     raise
                 runtime_prefix = [str(Path(runtime) / "bin/rs9-nebular-fhs")]
+                if "gui_discovery" in runtime_facts:
+                    gui_discovery_path = diagnostic_root / "nix-gui-discovery.json"
+                    try:
+                        record_fhs_gui_discovery(
+                            runtime_facts, prefix, runtime_prefix, env, gui_discovery_path)
+                    except Exception:
+                        # Optional observation or custody faults cannot preempt a required gate.
+                        gui_discovery_path = None
             # Native outPath has symlink payload passthru: read back compressed archive from store
             store_payload_dir = Path(output) / "payload"
             if not store_payload_dir.exists():
@@ -451,6 +461,8 @@ def execute(context):
     artifacts = [evidence]
     if (scratch / "nix-loader-evaluation.json").is_file():
         artifacts.append(scratch / "nix-loader-evaluation.json")
+    if gui_discovery_path is not None and gui_discovery_path.is_file():
+        artifacts.append(gui_discovery_path)
     if installer_lane_copy.is_file():
         artifacts.append(installer_lane_copy)
     if installer_failure_copy.is_file():
