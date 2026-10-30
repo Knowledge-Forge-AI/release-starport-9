@@ -17,8 +17,11 @@ from rs9.hosted_smoke import (
     _control_verifier, _import_preflight_script, _verifier_script,
     bound_diagnostic, expected_runtime_members, verify_nebular_runtime,
     verify_source_readback,
+    export_current_source_readback,
 )
-from rs9.release_core import digest
+from rs9.release_core import digest, read_evidence
+from rs9.smoke_source_envelope import (GENERATION, checked_envelope, mint_guest_readback,
+    verify_guest_prepared, verify_checkout)
 from rs9.scratch import canonical
 from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
 
@@ -27,6 +30,69 @@ RUNTIME = "/usr/lib/theme-forge-nebular-fusion"
 SCHEMA = "rs9.container-nebular-smoke.v1"
 MAX_OUTPUT = 1024 * 1024
 MAX_INPUT = 32 * 1024 * 1024
+_CURRENT_REQUEST_KEYS = {"schema", "family", "system", "tools_relative", "records", "expected_members",
+                         "manifest_sha256", "probe_sha256", "source_readback"}
+
+
+def _checked_current_request(request, raw, expected_sha256):
+    if (not isinstance(request, dict) or not isinstance(raw, bytes) or len(raw) > MAX_INPUT
+            or not isinstance(expected_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_sha256)
+            or digest(raw) != expected_sha256 or raw != canonical(request)
+            or set(request) != _CURRENT_REQUEST_KEYS or request.get("schema") != SCHEMA
+            or request.get("family") not in {"apt", "dnf", "pacman"}
+            or request.get("system") not in {"x86_64-linux", "aarch64-linux"}
+            or request.get("tools_relative") != "tools"):
+        raise ContractError("SMOKE_INPUT", "Exact canonical current client request required")
+    envelope = checked_envelope(request["source_readback"])
+    members, probes = request.get("expected_members"), request.get("probe_sha256")
+    if (request.get("records") != envelope["records"] or not isinstance(members, list)
+            or not 1 <= len(members) <= 20000 or request.get("manifest_sha256") != digest(canonical(members))
+            or not isinstance(probes, dict) or set(probes) != {"verify-runtime.mjs", "verify-import-preflight.mjs"}
+            or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in probes.values())):
+        raise ContractError("SMOKE_INPUT", "Current source, manifest or wrapper request binding differs")
+    return envelope
+
+
+def _current_binding(binding):
+    request = binding.get("request", {})
+    prepared = binding.get("prepared")
+    return ("request_bytes" in binding or "source_readback_sha256" in binding
+            or isinstance(request, dict) and "source_readback" in request
+            or isinstance(prepared, dict) and prepared.get("source_generation") == GENERATION)
+
+
+def _recheck_current_binding(binding):
+    """Parent acceptance always re-authenticates the original live objects."""
+    try:
+        return _recheck_current_binding_data(binding)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        raise ContractError("SMOKE_INPUT", "Malformed current parent request binding") from None
+
+
+def _check_current_probes(probe, request, source, tools):
+    expected = {"verify-runtime.mjs": _verifier_script(tools / "sidecar-common.mjs"),
+                "verify-import-preflight.mjs": _import_preflight_script(source, tools)}
+    if set(path.name for path in probe.iterdir()) != set(expected):
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Exact current wrapper file set required")
+    for name, text in expected.items():
+        if (request["probe_sha256"][name] != digest(text.encode())
+                or read_evidence(probe, name, 64 * 1024) != text.encode()):
+            raise ContractError("SIDECAR_HARNESS_IMPORT", "Current source-owned wrapper differs")
+
+
+def _recheck_current_binding_data(binding):
+    prepared, request = binding["prepared"], binding["request"]
+    exported = export_current_source_readback(prepared)
+    raw = binding["request_bytes"]
+    envelope = _checked_current_request(request, raw, binding["request_sha256"])
+    if (envelope != exported or digest(canonical(envelope)) != binding["source_readback_sha256"]
+            or request["family"] != binding["family"] or request["system"] != binding["system"]
+            or request["expected_members"] != expected_runtime_members(prepared, binding["system"])
+            or read_evidence(binding["request_path"].parent, "request.json", MAX_INPUT) != raw):
+        raise ContractError("SMOKE_INPUT", "Parent live source or exact request/envelope differs")
+    source, tools = GUEST / "source", GUEST / "source/tools"
+    _check_current_probes(binding["request_path"].parent / "probe", request, source, tools)
+    return binding["source_readback_sha256"]
 
 
 def read_output(path, limit=MAX_OUTPUT):
@@ -58,7 +124,12 @@ def prepare_container_smoke(prepared, system, family):
     if system not in {"x86_64-linux", "aarch64-linux"} or family not in {"apt", "dnf", "pacman"}:
         raise ContractError("SMOKE_INPUT", "Reviewed client family/system required")
     source = Path(prepared["source"])
-    tools_relative = Path(prepared["tools"]).relative_to(source).as_posix()
+    current = prepared.get("source_generation") == GENERATION
+    if current:
+        source = source.resolve()
+        tools_relative = Path(prepared["tools"]).resolve().relative_to(source).as_posix()
+    else:
+        tools_relative = Path(prepared["tools"]).relative_to(source).as_posix()
     validate_safe_relative_posix_path(tools_relative)
     expected = expected_runtime_members(prepared, system)
     if not expected:
@@ -77,6 +148,8 @@ def prepare_container_smoke(prepared, system, family):
                "tools_relative": tools_relative, "records": prepared["records"],
                "expected_members": expected, "manifest_sha256": digest(canonical(expected)),
                "probe_sha256": {p.name: digest(p.read_bytes()) for p in probe.iterdir()}}
+    if current:
+        request["source_readback"] = export_current_source_readback(prepared)
     raw = canonical(request)
     if len(raw) > MAX_INPUT:
         raise ContractError("SMOKE_INPUT", "Client manifest closure exceeded bound")
@@ -92,11 +165,15 @@ def prepare_container_smoke(prepared, system, family):
             raise ContractError("SMOKE_INPUT", "Regular source/probe inputs required")
         if path.is_file():
             path.chmod(0o644)
-    return {"prepared": prepared, "request": request, "request_sha256": digest(raw),
+    binding = {"prepared": prepared, "request": request, "request_sha256": digest(raw),
             "output": output, "family": family, "system": system,
             "mounts": [(str(source), str(GUEST / "source"), False),
                        (str(inputs), str(GUEST / "input"), False),
                        (str(output), str(GUEST / "out"), True)]}
+    if current:
+        binding.update(request_bytes=raw, request_path=inputs / "request.json",
+                       source_readback_sha256=digest(canonical(request["source_readback"])))
+    return binding
 
 
 def configure_container_output(client, *, user):
@@ -110,9 +187,14 @@ def configure_container_output(client, *, user):
 
 
 def verify_container_nebular(client, binding, *, user):
+    current = _current_binding(binding)
+    if current:
+        _recheck_current_binding(binding)
+    guest_call = ("guest_main(expected_request_sha256=" + repr(binding["request_sha256"]) + ")"
+                  if current else "guest_main()")
     command = ["python3", "-B", "-c",
                "import sys;sys.path.insert(0,'/rs9-source');"
-               "from rs9.hosted_container_smoke import guest_main;sys.exit(guest_main())"]
+               "from rs9.hosted_container_smoke import guest_main;sys.exit(" + guest_call + ")"]
     receipt = client.exec(command, user=user)
     try:
         return _accept_container_output(binding, receipt)
@@ -131,7 +213,12 @@ def verify_container_nebular(client, binding, *, user):
 
 
 def _accept_container_output(binding, receipt):
+    current_digest = _recheck_current_binding(binding) if _current_binding(binding) else None
     doc = read_output(binding["output"] / "result.json")
+    if current_digest is not None:
+        if (doc.get("status") == "pass" and doc.get("source_readback_sha256") != current_digest
+                or "source_readback_sha256" in doc and doc["source_readback_sha256"] != current_digest):
+            raise ContractError("SMOKE_OUTPUT", "Client source-readback envelope digest differs")
     if (doc.get("schema") != SCHEMA or doc.get("request_sha256") != binding["request_sha256"]
             or doc.get("family") != binding["family"] or doc.get("system") != binding["system"]
             or doc.get("uid") != 65534 or doc.get("status") not in {"pass", "fail"}):
@@ -194,7 +281,10 @@ def _accept_container_output(binding, receipt):
                    or not re.fullmatch(r"[0-9a-f]{64}", r[k])
                    for k in ("receipt_sha256", "executable_sha256")) for r in result["scenarios"])):
         raise ContractError("SMOKE_OUTPUT", "Complete bound scenario receipts required")
-    return {**result, "source_bindings": binding["request"]["records"], "filesystem": "installed-client"}
+    accepted = {**result, "source_bindings": binding["request"]["records"], "filesystem": "installed-client"}
+    if current_digest is not None:
+        accepted["source_readback_sha256"] = current_digest
+    return accepted
 
 
 def _logical_io(error):
@@ -215,7 +305,20 @@ def _logical_io(error):
             "exception_type": type(error).__name__, "substage": "client-filesystem"}
 
 
-def guest_main():
+def _guest_source_readback(prepared):
+    if "_source_readback_proof" in prepared:
+        return verify_guest_prepared(prepared)
+    return verify_source_readback(prepared)
+
+
+def _guest_checkout_readback(prepared, checkout):
+    if "_source_readback_proof" in prepared:
+        return verify_checkout(prepared["source_readback"], checkout)
+    return verify_source_readback({**prepared, "source": checkout,
+                                   "tools": checkout / Path(prepared["tools"]).relative_to(prepared["source"])})
+
+
+def guest_main(*, expected_request_sha256=None):
     """Only called in the actual client. All Path/read/hash/subprocess work is local."""
     os.umask(0o022)
     result = {"schema": SCHEMA, "request_sha256": None,
@@ -238,29 +341,38 @@ def guest_main():
         result.update(family=request["family"], system=request["system"])
         if os.getuid() != 65534 or request.get("schema") != SCHEMA:
             raise ContractError("UNPRIVILEGED_CLIENT_REQUIRED", "Installed client identity required")
+        current = expected_request_sha256 is not None or "source_readback" in request
+        envelope = _checked_current_request(request, request_raw, expected_request_sha256) if current else None
+        if current:
+            result["source_readback_sha256"] = digest(canonical(envelope))
         source = GUEST / "source"
         scratch.mkdir()
         prepared = {"source": source, "tools": source / request["tools_relative"],
                     "scratch": scratch, "probe": GUEST / "input/probe", "container_client": True,
                     "records": request["records"], "expected_members": request["expected_members"],
                     "manifest_sha256": request["manifest_sha256"], "label": request["family"]}
+        if current:
+            prepared.update(source_generation=GENERATION, source_readback=envelope,
+                            _source_readback_proof=mint_guest_readback(envelope, source, prepared["tools"]))
         for name, sha in request["probe_sha256"].items():
             if name not in {"verify-runtime.mjs", "verify-import-preflight.mjs"} or digest((prepared["probe"] / name).read_bytes()) != sha:
                 raise ContractError("SIDECAR_HARNESS_IMPORT", "Verifier wrapper identity differs")
-        verify_source_readback(prepared)
-        # Some released harnesses use checkout for temporary fixture work.
-        # Execute modules from immutable source, give checkout a checked copy.
+        if current:
+            _check_current_probes(prepared["probe"], request, source, prepared["tools"])
+        _guest_source_readback(prepared)
+        # Execute modules from immutable source and give the harness a checked
+        # fixture-input copy. Current prepareFixtures writes to smokeDir, not checkout.
         checkout = GUEST / "out/checkout"
         shutil.copytree(source, checkout)
-        verify_source_readback({**prepared, "source": checkout})
+        _guest_checkout_readback(prepared, checkout)
         prepared["checkout"] = checkout
         if not Path(RUNTIME).is_dir():
             raise FileNotFoundError(2, "Installed runtime absent", RUNTIME)
         evidence = verify_nebular_runtime(RUNTIME, prepared, request["system"], env={
             "PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": "/tmp",
             "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "/tmp"})
-        verify_source_readback(prepared)
-        verify_source_readback({**prepared, "source": checkout})
+        _guest_source_readback(prepared)
+        _guest_checkout_readback(prepared, checkout)
         evidence.pop("source_bindings", None)
         result.update(status="pass", result={**evidence,
                       "source_bindings_sha256": digest(canonical(request["records"]))})

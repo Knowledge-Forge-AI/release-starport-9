@@ -246,42 +246,24 @@ def _verify_current_source_binding(prepared):
         raise ContractError("SIDECAR_HARNESS_IMPORT", "Current verifier generation marker differs")
     _current_smoke_capture(prepared.get("capture"))
     _current_fixture_identity(prepared.get("fixture_capture"))
-    pins = {**CURRENT070_VERIFIER_FILES, **CURRENT070_FIXTURE_FILES}
-    modules = set(CURRENT070_VERIFIER_FILES) - {"package.json"}
-    if (set(CURRENT070_VERIFIER_IMPORTS) != modules
-            or any(set(edges) - modules for edges in CURRENT070_VERIFIER_IMPORTS.values())):
-        raise ContractError("SIDECAR_HARNESS_IMPORT", "Current import graph metadata is inconsistent")
-    rows = prepared.get("records", [])
-    if (not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows)
-            or len(rows) != len(pins) or {row.get("path") for row in rows} != set(pins)):
-        raise ContractError("SIDECAR_HARNESS_IMPORT", "Exact current verifier and fixture member set required",
-                            details={"substage": "verifier-source-readback", "reason": "source-member-set"})
-    for row in rows:
-        name = row["path"]
-        fixture = name in CURRENT070_FIXTURE_FILES
-        expected_role = ("fixture" if fixture else "verifier-support" if name == "package.json"
-                         else "application-smoke" if name == "tools/native-rc-smoke.mjs" else "verifier-module")
-        if (any(row.get(key) != pins[name][key] for key in ("blob", "sha256", "size"))
-                or row.get("tag_commit") != (CURRENT070_FIXTURE_COMMIT if fixture else CURRENT070_COMMIT)
-                or row.get("role") != expected_role):
-            raise ContractError("SIDECAR_HARNESS_IMPORT", "Current source member or producer differs",
-                                details={"substage": "verifier-source-readback", "missing_path": name})
-    source = Path(prepared["source"])
-    if Path(prepared["tools"]).resolve() != source.resolve() / "tools":
-        raise ContractError("SIDECAR_HARNESS_IMPORT", "Current importer path is outside its reviewed closure")
-    if source.is_symlink():
-        raise ContractError("SIDECAR_HARNESS_IMPORT", "Current source root cannot contain aliases")
-    observed = set()
-    for path in source.resolve().rglob("*"):
-        if path.is_symlink():
-            raise ContractError("SIDECAR_HARNESS_IMPORT", "Current source closure cannot contain aliases")
-        if path.is_file():
-            observed.add(path.relative_to(source.resolve()).as_posix())
-        elif not path.is_dir():
-            raise ContractError("SIDECAR_HARNESS_IMPORT", "Current source closure requires regular members")
-    if observed != set(pins):
-        raise ContractError("SIDECAR_HARNESS_IMPORT", "Extra or missing current source member",
-                            details={"substage": "verifier-source-readback", "reason": "source-member-set"})
+    from rs9.smoke_source_envelope import verify_members
+    verify_members(prepared["source"], prepared["tools"], prepared.get("records"))
+
+
+def export_current_source_readback(prepared):
+    """Parent-only export gate: plain envelope/guest dictionaries cannot pass."""
+    _verify_current_source_binding(prepared)
+    verify_source_readback(prepared)
+    from rs9.smoke_source_envelope import _make_envelope
+    return _make_envelope(prepared["records"])
+
+
+def verify_execution_source_readback(prepared):
+    """Guest source proof and parent authentication are distinct entry points."""
+    if "_source_readback_proof" in prepared:
+        from rs9.smoke_source_envelope import verify_guest_prepared
+        return verify_guest_prepared(prepared)
+    return verify_source_readback(prepared)
 
 
 def _safe_label(value):
@@ -767,7 +749,7 @@ def verifier_import_preflight(prepared, system, prefix=(), env=None):
         raise ContractError("SIDECAR_HARNESS_IMPORT", "Verifier source root cannot be an alias")
     source = source.resolve()
     tools = Path(prepared["tools"]).resolve()
-    verify_source_readback({**prepared, "source": source, "tools": tools})
+    verify_execution_source_readback({**prepared, "source": source, "tools": tools})
     script = Path(prepared.get("probe", prepared["scratch"])) / "verify-import-preflight.mjs"
     _probe_script(prepared, "verify-import-preflight.mjs", _import_preflight_script(source, tools))
     evidence, result = _run_verifier(script, "", "", prefix, runtime_environment(env), cwd=source)
