@@ -10,6 +10,7 @@ import uuid
 from rs9.build_native import SubprocessRunner, REQUIRED_COMMANDS
 from rs9.build_pacman import build_pacman_candidate
 from rs9.build_rpm import build_rpm_candidate
+from rs9.current_generation import HISTORICAL_GENERATION, generation_paths
 from rs9.errors import ContractError, safe_details
 from rs9.hosted_native import provision, container_tool_facts
 from rs9.npm_deps import resolve_offline_npm_archives as _resolve_offline_npm_archives, resolve_offline_npm_archives
@@ -451,6 +452,8 @@ def _verify_unsigned_products(products, metadata, bundle):
 
 
 def execute(context):
+    generation = context.get("generation", HISTORICAL_GENERATION)
+    generation_paths(generation)
     # Import lazily: the APT/Pages module shares these native client primitives.
     from rs9.hosted_deb import (ContainerRunner, RecordingRunner, provision_image, client_cycle,
                                 tamper_cycle, dnf_spec, pacman_spec, _fold, _burst_release_record, burst_client_gates)
@@ -899,7 +902,7 @@ def execute(context):
                                 [*environment["preprovisioned_packages"], *client_tools])
                 client_image = client_tag
             spec = spec_for(dirs)
-            rows, evidence = client_cycle(host, spec, image=client_image, platform=platform,
+            rows, evidence = client_cycle(host, spec, image=client_image, platform=platform, generation=generation,
                        products=list(products), repository=repository, prefix=family + "-client", smoke=prepared, system=system,
                        burst_record=_burst_release_record(context["captures"], system),
                        burst_scratch=scratch / "burst-native-probe")

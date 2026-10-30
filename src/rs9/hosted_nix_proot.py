@@ -6,6 +6,7 @@ from pathlib import Path
 import time
 from typing import Any
 
+from rs9.current_generation import HISTORICAL_GENERATION, generation_paths
 from rs9.errors import ContractError, safe_details
 from rs9.hosted_commands import linux_runtime_prefix, run_probes, runtime_environment
 from rs9.hosted_nix import command, prepare_input, retain_installer_document
@@ -131,6 +132,8 @@ def _release_inventory(root):
 
 def execute(context: dict[str, Any]) -> dict[str, Any]:
     """Execute the hosted PRoot experiment on a candidate Linux platform."""
+    generation = context.get("generation", HISTORICAL_GENERATION)
+    generation_paths(generation)
     experiment_start = time.monotonic()
     system, repository, scratch = context["system"], context["repository"], context["scratch"]
     if system not in SYSTEMS:
@@ -219,7 +222,7 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
                     raise ContractError("NIX_RUNTIME", "First PRoot launcher materialization missing")
                 state["baseline"] = snapshot_nebular_runtime(found[0], state["prepared"], system)
 
-        rows = run_probes("tfnf", wrapper, repository=repository, prefix=prefix, env=env, system=system,
+        rows = run_probes("tfnf", wrapper, repository=repository, prefix=prefix, env=env, system=system, generation=generation,
                           substage="nix-proot-command-probe", after_probe=after_first_probe)
         if any(row["status"] != "pass" for row in rows):
             raise ContractError("NIX_COMMAND", "Installed PRoot command contract failed")

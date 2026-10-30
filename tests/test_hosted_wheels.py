@@ -68,6 +68,15 @@ class HostedWheelIsolationTests(unittest.TestCase):
         self.repo = self.root / "repo"
         self.repo.mkdir()
 
+    def test_current_capture_cannot_build_with_historical_wheel_version(self):
+        context = {"repository": self.repo, "scratch": self.scratch, "system": "aarch64-darwin",
+                   "generation": "theme-forge-current-202610",
+                   "captures": [(MagicMock(), {"project": {"id": "theme-forge-stellar-burst"}, "version": "0.7.0"}, {})]}
+        with patch("rs9.hosted_wheels.verify_double_build") as build, self.assertRaises(ContractError) as caught:
+            execute(context)
+        self.assertEqual(caught.exception.code, "WHEEL_GENERATION_VERSION")
+        build.assert_not_called()
+
     def _create_mock_wheel(self, filename: str, tag: str = "py3-none-any"):
         wheel = MagicMock()
         wheel.filename = filename

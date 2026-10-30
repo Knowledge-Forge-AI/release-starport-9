@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from rs9.build_native import SubprocessRunner
+from rs9.current_generation import HISTORICAL_GENERATION, generation_paths
 from rs9.errors import ContractError
 
 EXCLUDED_INVENTORY_PATTERNS = [
@@ -50,16 +51,16 @@ def compare_inventories(
 
 
 
-def get_command_probes(command, repository=None):
+def get_command_probes(command, repository=None, *, generation=HISTORICAL_GENERATION):
     from rs9.hosted_commands import probes_for
-    return probes_for(command, repository=repository)
+    return probes_for(command, repository=repository, generation=generation)
 
 
-def execute_probes(command, path, repository=None, prefix=None, env=None, runner=None):
+def execute_probes(command, path, repository=None, prefix=None, env=None, runner=None, *, generation=HISTORICAL_GENERATION):
     from rs9.hosted_commands import run_probes
     # The protocol requires an interactive subprocess, including docker exec -i.
     # Never downgrade it to an empty-stdin tool-exit check.
-    return run_probes(command, path, repository=repository, prefix=prefix, env=env)
+    return run_probes(command, path, repository=repository, prefix=prefix, env=env, generation=generation)
 
 
 def get_signing_authority(context, scratch):
@@ -116,5 +117,6 @@ def provision(family, system, pins=None, *, repository=None, runner=None):
 
 
 def execute(context):
+    generation_paths(context.get("generation", HISTORICAL_GENERATION))
     from rs9.hosted_packaging import execute
     return execute(context)

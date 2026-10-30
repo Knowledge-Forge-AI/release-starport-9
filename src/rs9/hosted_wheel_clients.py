@@ -7,6 +7,7 @@ import re
 import stat
 import uuid
 
+from rs9.current_generation import HISTORICAL_GENERATION, generation_paths
 from rs9.apt_diagnostics import safe_sample
 from rs9.build_native import SubprocessRunner
 from rs9.errors import ContractError
@@ -241,6 +242,8 @@ def build_client_prepared_config(prepared, system):
 
 
 def qualify(context, wheels, prepared):
+    generation = context.get("generation", HISTORICAL_GENERATION)
+    generation_paths(generation)
     system = context["system"]
     arch = "aarch64" if system == "aarch64-linux" else "x86_64"
     platform = "linux/arm64" if arch == "aarch64" else "linux/amd64"
@@ -269,6 +272,7 @@ def qualify(context, wheels, prepared):
                 "wheels": {k: str(v) for k, v in wheels.items()},
                 "prepared": client_prepared,
                 "bindings": _BOUND,
+                "generation": generation,
                 "repository": str(context["repository"]),
                 "output": str(output),
             }
@@ -304,6 +308,8 @@ def qualify(context, wheels, prepared):
 
 
 def child(config):
+    generation = config.get("generation", HISTORICAL_GENERATION)
+    generation_paths(generation)
     import socket
     probe = socket.socket()
     try:
@@ -336,7 +342,7 @@ def child(config):
         try:
             def verify(executable, prefix, env, name):
                 gates = run_probes(name, executable, repository=Path(config["repository"]), env=env,
-                                  system=config["system"], substage="wheel-client-command-probe")
+                                  system=config["system"], substage="wheel-client-command-probe", generation=generation)
                 if any(g["status"] != "pass" for g in gates):
                     raise ContractError("COMMAND_CONTRACT", "Retained client command failed")
                 if name == "tfnf":

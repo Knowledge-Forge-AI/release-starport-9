@@ -278,7 +278,7 @@ def host_runner(docker, cls=MockCommandRunner):
                handlers={"docker": docker} if docker else {})
 
 
-def stub_probes(command, path, repository=None, prefix=None, env=None, runner=None):
+def stub_probes(command, path, repository=None, prefix=None, env=None, runner=None, *, generation="theme-forge-live1"):
     return [{"name": f"command.{command}.supported-behavior", "status": "not-run",
              "reason": "released-command-contract-unbound"}]
 

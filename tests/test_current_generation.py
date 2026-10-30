@@ -27,7 +27,7 @@ from tests.shadow_fixtures import tar_bytes
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def current_fixture(root, product="stellar-loom", *, receipt_change=None, packaged_notice=None):
+def current_fixture(root, product="stellar-loom", *, receipt_change=None, packaged_notice=None, engine=None):
     """Synthetic bytes use the real release, bootstrap and profile mechanisms."""
     evidence = root / "capture"
     evidence.mkdir()
@@ -37,6 +37,8 @@ def current_fixture(root, product="stellar-loom", *, receipt_change=None, packag
     repository = "Knowledge-Forge-AI/" + project
     package = {"name": "@knowledge-forge-ai/" + project, "version": version,
                "license": "MIT", "bin": {"second": "bin/run.js"}}
+    if engine is not None:
+        package["engines"] = {"node": engine}
     source = {"package.json": canonical(package), "LICENSE": b"Synthetic MIT license\n",
               "NOTICE": b"Synthetic notice\n", "COMMERCIAL-LICENSE.md": b"Synthetic terms\n"}
     if product == "stellar-burst":

@@ -592,6 +592,7 @@ class HostedPackagingTests(unittest.TestCase):
 
         context = {
             "family": "pacman",
+            "generation": "theme-forge-current-202610",
             "system": "x86_64-linux",
             "repository": self.root,
             "scratch": lane_scratch,
@@ -662,11 +663,12 @@ class HostedPackagingTests(unittest.TestCase):
              patch("rs9.hosted_packaging._resolve_offline_npm_archives", return_value=None), \
              patch("rs9.hosted_packaging.build_pacman_candidate", autospec=True, side_effect=mock_build), \
              patch("rs9.pages_candidate.write_custody_bundle"), \
-             patch("rs9.hosted_deb.client_cycle", return_value=([], {})), \
+             patch("rs9.hosted_deb.client_cycle", return_value=([], {})) as cycle, \
              patch("rs9.hosted_deb.tamper_cycle", return_value=[]), \
              patch("rs9.hosted_smoke.prepare_smoke", return_value={}), \
              patch("rs9.hosted_packaging.SigningFixture", MockSigningFixture):
             execute(context)
+        self.assertEqual(cycle.call_args.kwargs["generation"], "theme-forge-current-202610")
 
         self.assertTrue(observed_mounts)
         for source, target, writable in observed_mounts:
@@ -1507,3 +1509,12 @@ class HostedPackagingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GenerationSelectionTests(unittest.TestCase):
+    def test_unknown_generation_refuses_before_native_actions(self):
+        from rs9.hosted_packaging import execute
+        with patch("rs9.hosted_packaging.provision") as provision, self.assertRaises(ContractError) as caught:
+            execute({"generation": "latest"})
+        self.assertEqual(caught.exception.code, "GENERATION_SELECTION")
+        provision.assert_not_called()

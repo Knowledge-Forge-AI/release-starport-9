@@ -39,6 +39,7 @@ import shutil
 from typing import Any, Mapping, Sequence
 import uuid
 
+from rs9.current_generation import HISTORICAL_GENERATION, generation_paths
 from rs9.apt_diagnostics import (
     trust_identity,
     build_positive_control,
@@ -769,8 +770,10 @@ def client_cycle(
     system: str | None = None,
     burst_record: Mapping[str, Any] | None = None,
     burst_scratch: Path | None = None,
+    generation=HISTORICAL_GENERATION,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Fresh container per product: configure, inventory, install, probe, remove, inventory."""
+    generation_paths(generation)
     gates: list[dict[str, Any]] = []
     evidence: dict[str, Any] = {}
     family = spec["family"]
@@ -918,7 +921,7 @@ def client_cycle(
                         try:
                             probe_rows = execute_probes(
                                 command, f"/usr/bin/{command}", repository=repository,
-                                prefix=client.unprivileged_prefix, runner=host,
+                                prefix=client.unprivileged_prefix, runner=host, generation=generation,
                             )
                         except Exception as err:  # probe execution is untrusted lane input
                             probe_rows = [{"name": f"probe.{command}", "status": "fail", "reason": _family_error(err)}]
@@ -1543,6 +1546,7 @@ def _build_products(
 
 
 def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
+    generation_paths(context.get("generation", HISTORICAL_GENERATION))
     repository = physical_directory(context["repository"])
     scratch = validate_scratch_root(context["scratch"])
     system = context.get("system")
@@ -1714,7 +1718,7 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
                 prepared = prepare_smoke(neb, context["captures"], context["client"], scratch / "application-smoke") if neb else None
                 spec = apt_spec(apt_dir, keyring, system, public_fingerprint=fixture.primary_fingerprint)
                 cycle_rows, evidence = client_cycle(
-                    host, spec, image=client_tag, platform=platform,
+                    host, spec, generation=context.get("generation", HISTORICAL_GENERATION), image=client_tag, platform=platform,
                     products=required, repository=repository, prefix="deb-client", smoke=prepared,
                     system="aarch64-linux" if system=="arm64" else "x86_64-linux",
                     burst_record=(_burst_release_record(context["captures"], "aarch64-linux" if system=="arm64" else "x86_64-linux")
@@ -1881,6 +1885,7 @@ PAGES_GATES = ("pages-repository-objects", "pages-inventory-integrity", "pages-p
 
 
 def execute_pages(context: dict[str, Any]) -> dict[str, Any]:
+    generation_paths(context.get("generation", HISTORICAL_GENERATION))
     repository = physical_directory(context["repository"])
     scratch = validate_scratch_root(context["scratch"])
     pins = context.get("pins") or {}
@@ -2206,7 +2211,7 @@ def _pages_client_tests(
         neb = next(c for c,i,_ in context["captures"] if i["project"]["id"] == NATIVE_PRODUCT)
         prepared = prepare_smoke(neb, context["captures"], context["client"], work / ("smoke-"+family))
         spec = spec_for(dirs)
-        rows, evidence = client_cycle(host, spec, image=tag, platform="linux/amd64", products=products,
+        rows, evidence = client_cycle(host, spec, generation=context.get("generation", HISTORICAL_GENERATION), image=tag, platform="linux/amd64", products=products,
                                       repository=repository, prefix=prefix, smoke=prepared, system="x86_64-linux",
                                       burst_record=_burst_release_record(context["captures"], "x86_64-linux"),
                                       burst_scratch=work / ("burst-probe-" + family))
@@ -2223,6 +2228,7 @@ def _pages_client_tests(
 
 def execute(context: dict[str, Any]) -> dict[str, Any]:
     """Shared hosted lane interface: family ``deb`` (amd64/arm64) or ``pages`` (generation)."""
+    generation_paths(context.get("generation", HISTORICAL_GENERATION))
     family = context.get("family")
     if family == "deb":
         return execute_deb(context)

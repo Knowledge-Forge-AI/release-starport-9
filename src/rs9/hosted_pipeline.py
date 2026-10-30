@@ -138,7 +138,7 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
             "requests": [{k: r[k] for k in ("url", "status", "size", "sha256", "collected_at")}
                          for r in client.receipts]}))
         files.append(transport)
-        files.append(bind_commands(captures, repository, scratch))
+        files.append(bind_commands(captures, repository, scratch, generation=generation))
         lane_scratch.mkdir()
         physical_directory(lane_scratch)
         context = {"repository": repository, "scratch": lane_scratch, "captures": captures, "client": client,

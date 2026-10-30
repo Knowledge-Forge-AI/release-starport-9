@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from rs9.build_native import stage_payload, stage_offline_npm_closure
+from rs9.current_generation import HISTORICAL_GENERATION, generation_paths, catalog_path, bind_catalog_product
 from rs9.errors import ContractError, safe_details
 from rs9.hosted_commands import command_diagnostic, linux_runtime_prefix, run_probes, runtime_environment
 from rs9.hosted_platforms import select_payload
@@ -30,12 +31,13 @@ _LOADER_FACT_KEYS = ("loader", "glibc_lib", "library_path", "python", "node", "r
 _DBUS_FACT_KEYS = ("dbus_run_session", "dbus_daemon", "dbus_session_config")
 
 
-def fhs_runtime_smoke(runtime, system, prefix, env):
+def fhs_runtime_smoke(runtime, system, prefix, env, *, generation=HISTORICAL_GENERATION):
     """Exercise the same disconnected FHS invocation before Nebular probes."""
+    generation_paths(generation)
     result = subprocess.run([*prefix, str(Path(runtime) / "bin/rs9-nebular-fhs"), "true"],
                             env=env, capture_output=True, timeout=30)
     details = command_diagnostic("tfnf", 0, {"kind": "fhs-runtime", "expect_exit": 0}, result,
-                                 system=system, substage="nix-fhs-runtime-smoke")
+                                 system=system, substage="nix-fhs-runtime-smoke", generation=generation)
     policy = Path("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")
     try:
         value = policy.read_text().strip()
@@ -114,6 +116,18 @@ def install(repository, scratch, *, client=None, runner=subprocess.run):
 
 
 def prepare_input(context):
+    generation = context.get("generation", HISTORICAL_GENERATION)
+    document = json.loads((context["repository"] / catalog_path(generation)).read_bytes())
+    if generation != HISTORICAL_GENERATION and document.get("generation") != generation:
+        raise ContractError("NIX_CATALOG_BINDING", "Selected catalog generation differs")
+    metadata = document["products"]
+    if generation != HISTORICAL_GENERATION and (
+            len(context["captures"]) != len(PRODUCTS)
+            or {i["project"]["id"] for _, i, _ in context["captures"]} != set(PRODUCTS)):
+        raise ContractError("NIX_CAPTURE", "All four current products required")
+    # Bind the complete generation before creating or staging any Nix input.
+    for capture, intent, _ in context["captures"]:
+        bind_catalog_product(metadata[intent["project"]["id"]], capture, intent, generation=generation)
     scratch = context["scratch"]
     source = scratch / "nix-source"
     source.mkdir(parents=True, exist_ok=True)
@@ -122,7 +136,6 @@ def prepare_input(context):
     capture_input = scratch / "nix-capture"
     capture_input.mkdir(parents=True, exist_ok=True)
     products = {}
-    metadata = json.loads((context["repository"] / "nix/candidate-products.json").read_bytes())["products"]
     for capture, intent, profile in context["captures"]:
         pid = intent["project"]["id"]
         row = dict(metadata[pid])
@@ -241,6 +254,8 @@ def record_direct_loader_evaluation(source, system, overrides, scratch, capture,
 
 
 def execute(context):
+    generation = context.get("generation", HISTORICAL_GENERATION)
+    generation_paths(generation)
     system, repository, scratch = context["system"], context["repository"], context["scratch"]
     if system not in SYSTEMS:
         raise ContractError("NIX_SYSTEM", "Unsupported Nix system")
@@ -351,7 +366,7 @@ def execute(context):
                 runtime = json.loads(command(["nix", "build", "--json", "--no-link", *overrides,
                     str(source) + "#candidates." + system + "." + pid + ".runtime"]))[0]["outputs"]["out"]
                 try:
-                    gates.append(fhs_runtime_smoke(runtime, system, prefix, env))
+                    gates.append(fhs_runtime_smoke(runtime, system, prefix, env, generation=generation))
                 except ContractError as err:
                     if err.code == "NIX_FHS_USERNS":
                         failed_gate = "nix-fhs-runtime-smoke"
@@ -401,7 +416,7 @@ def execute(context):
 
         for name in products[pid]["commands"]:
             rows = run_probes(name, Path(output) / "bin" / name, repository=repository, prefix=prefix, env=env,
-                              system=system, substage="nix-command-probe",
+                              system=system, substage="nix-command-probe", generation=generation,
                               **({"after_probe": after_nebular_probe} if pid == PRODUCTS[-1] else {}))
             if any(g["status"] != "pass" for g in rows):
                 raise ContractError("NIX_COMMAND", "Installed Nix command contract failed")

@@ -318,7 +318,7 @@ class PipelineReceiptTests(unittest.TestCase):
             auth.mkdir()
             (auth / "artifact-manifest.json").write_bytes(canonical({"release_ingestion_sha256": ingestion}))
 
-            def bind(captures, repository, output):
+            def bind(captures, repository, output, *, generation):
                 path = Path(output) / "command-bindings.json"
                 path.write_bytes(b"{}")
                 return path

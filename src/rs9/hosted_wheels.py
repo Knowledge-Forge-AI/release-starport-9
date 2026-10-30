@@ -26,6 +26,7 @@ import subprocess
 import sys
 from typing import Any, Mapping
 
+from rs9.current_generation import HISTORICAL_GENERATION, generation_paths
 from rs9.candidate import capture_generation
 from rs9.errors import ContractError, safe_details
 from rs9.hosted_commands import linux_runtime_prefix, runtime_environment
@@ -75,6 +76,8 @@ def _resolve_offline_npm_archives(
 
 def execute(context: dict[str, Any]) -> dict[str, Any]:
     """Execute real hosted candidate wheel builds, determinism, and lifecycle qualification."""
+    generation = context.get("generation", HISTORICAL_GENERATION)
+    generation_paths(generation)
     validate_execution_context(context)
     repository = physical_directory(context["repository"])
     scratch = physical_directory(context["scratch"])
@@ -98,6 +101,7 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
             capture_root,
             client=client,
             checkout_binding=checkout_binding,
+            generation=generation,
         )
 
     gates: list[dict[str, Any]] = []
@@ -121,6 +125,8 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
     for capture, intent, profile in captures:
         product_id = intent["project"]["id"]
         version = THEME_FORGE_PRODUCTS[product_id]["version"]
+        if generation != HISTORICAL_GENERATION and version != intent["version"]:
+            raise ContractError("WHEEL_GENERATION_VERSION", "Selected capture version differs from wheel builder metadata")
         is_native = package_class(product_id) == "native-desktop"
 
         proj_build_a = build_root / product_id / "build_a"
@@ -328,7 +334,7 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
                         raise ContractError("SIDECAR_REPRESENTATION", "Installed wheel did not materialize one payload")
                     baseline = snapshot_nebular_runtime(roots[0], prepared, system)
             rows = run_probes(command, path, repository=repository, prefix=prefix, env=env,
-                              system=system, substage="wheel-lifecycle-command-probe",
+                              system=system, substage="wheel-lifecycle-command-probe", generation=generation,
                               **({"after_probe": after_probe} if current_pid == "theme-forge-nebular-fusion" else {}))
             if any(r["status"] != "pass" for r in rows):
                 raise ContractError("COMMAND_CONTRACT", f"Released command contract is incomplete for {current_pid}")
