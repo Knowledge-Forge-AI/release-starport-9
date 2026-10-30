@@ -40,17 +40,19 @@ class SystemWebKitWorkflowTests(unittest.TestCase):
         self.assertIn("system profile unexpectedly has Stage-A receipt", text)
         self.assertEqual(text.count("\n  native_consumer_070_"), 5)
 
-    def test_generated_workflow_contains_route_without_changing_legacy_release(self) -> None:
+    def test_current_workflow_selects_universal_system_route_and_keeps_legacy_release(self) -> None:
         generated = workflow_text("0.7.0")
         legacy = workflow_text("0.6.1")
 
-        self.assertIn("Validate explicit 0.7.0 runtime profile", generated)
+        self.assertIn("Build and verify one universal launcher wheel", generated)
+        self.assertNotIn("Validate explicit 0.7.0 runtime profile\n", generated)
         self.assertIn("system-webkitgtk-4.1", generated)
-        # The combined workflow always carries the registered 0.7 jobs; the
+        # The combined workflow now carries the registered universal 0.7 jobs; the
         # legacy release selector remains independent of this route.
-        self.assertIn("build_verify_070:", legacy)
-        self.assertIn("build_verify_070:", generated)
-        self.assertIn("qualification_gate_070:", generated)
+        self.assertIn("universal_build_verify_070:", legacy)
+        self.assertIn("universal_build_verify_070:", generated)
+        self.assertIn("universal_qualification_gate_070:", generated)
+        self.assertNotIn("publication_resume_070:", generated)
 
 
 if __name__ == "__main__":

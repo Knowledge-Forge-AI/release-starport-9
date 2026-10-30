@@ -28,6 +28,7 @@ _ARTIFACT_SCHEMA = "rs9.nebular070-installed-smoke-json-artifact.v1"
 SYSTEM_WEBKIT_PROFILE = "system-webkitgtk-4.1"
 SYSTEM_WEBKIT_PROFILE_ID = "nebular-fusion-0.7.0-system-webkitgtk-4.1-v1"
 SYSTEM_WEBKIT_PREFLIGHT_SCHEMA = "rs9.nebular070-system-webkit-preflight.v1"
+UNIVERSAL_WEBKIT_PREFLIGHT_SCHEMA = "rs9.nebular070-system-webkit-preflight.v2"
 SYSTEM_WEBKIT_NATIVE_INPUT_SCHEMA = "rs9.tf-pypi-nebular070-system-native-consumer-input.v1"
 SYSTEM_WEBKIT_SONAME = "libwebkit2gtk-4.1.so.0"
 _SYSTEM_WEBKIT_HOST_CLASSES = {
@@ -209,6 +210,7 @@ def validate_system_webkit_preflight(
     source: Mapping[str, str] | None = None,
     run_id: str | None = None, run_attempt: str | None = None,
     host_observation_identity: str | None = None,
+    distribution: str = "platform-wheel",
 ) -> dict[str, Any]:
     """Validate the small, profile-specific host WebKit evidence envelope.
 
@@ -223,9 +225,17 @@ def validate_system_webkit_preflight(
         "schema", "profile", "status", "target", "host", "wheel", "payload",
         "source", "run", "soname", "provider", "provider_observation_identity", "loader", "identity",
     }
+    if distribution not in {"platform-wheel", "universal-launcher"}:
+        fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
+    universal = distribution == "universal-launcher"
+    if universal:
+        required.add("distribution")
     if not isinstance(value, Mapping) or set(value) != required:
         fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
-    if (value.get("schema") != SYSTEM_WEBKIT_PREFLIGHT_SCHEMA
+    if universal and value.get("distribution") != distribution:
+        fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
+    schema = UNIVERSAL_WEBKIT_PREFLIGHT_SCHEMA if universal else SYSTEM_WEBKIT_PREFLIGHT_SCHEMA
+    if (value.get("schema") != schema
             or value.get("profile") != SYSTEM_WEBKIT_PROFILE_ID
             or value.get("status") != "passed"
             or value.get("target") != target
@@ -241,7 +251,8 @@ def validate_system_webkit_preflight(
     if (not isinstance(wheel, Mapping) or set(wheel) != {"sha256", "tag"}
             or not _HEX64.fullmatch(str(wheel.get("sha256")))
             or not isinstance(wheel.get("tag"), str)
-            or wheel["tag"] not in {"py3-none-linux_aarch64", "py3-none-linux_x86_64"}):
+            or wheel["tag"] not in ({"py3-none-any"} if universal else
+                                    {"py3-none-linux_aarch64", "py3-none-linux_x86_64"})):
         fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
     payload = value.get("payload")
     if (not isinstance(payload, Mapping) or set(payload) != {"archive_sha256", "manifest_sha256"}
@@ -350,6 +361,7 @@ def produce_system_webkit_preflight(
     payload_archive_sha256: str, payload_manifest_sha256: str,
     source: Mapping[str, str], run_id: str, run_attempt: str,
     host: Mapping[str, Any], provider: Mapping[str, Any],
+    distribution: str = "platform-wheel",
 ) -> dict[str, Any]:
     """Produce fresh system-WebKit evidence from the current installed run.
 
@@ -398,7 +410,8 @@ def produce_system_webkit_preflight(
         classifications=frozenset({"system-webkitgtk-4.1"}),
     )
     unsigned = {
-        "schema": SYSTEM_WEBKIT_PREFLIGHT_SCHEMA,
+        "schema": (UNIVERSAL_WEBKIT_PREFLIGHT_SCHEMA if distribution == "universal-launcher"
+                   else SYSTEM_WEBKIT_PREFLIGHT_SCHEMA),
         "profile": SYSTEM_WEBKIT_PROFILE_ID,
         "status": "passed", "target": target,
         "host": dict(host),
@@ -409,6 +422,8 @@ def produce_system_webkit_preflight(
         "soname": SYSTEM_WEBKIT_SONAME, "provider": dict(provider),
         "provider_observation_identity": provider_identity, "loader": loader,
     }
+    if distribution == "universal-launcher":
+        unsigned["distribution"] = distribution
     unsigned["identity"] = sha256(canonical(unsigned))
     validate_system_webkit_preflight(
         unsigned, target=target, wheel_sha256=wheel_sha256, wheel_tag=wheel_tag,
@@ -416,6 +431,7 @@ def produce_system_webkit_preflight(
         payload_manifest_sha256=payload_manifest_sha256, source=source,
         run_id=run_id, run_attempt=run_attempt,
         host_observation_identity=host.get("identity") if isinstance(host, Mapping) else None,
+        distribution=distribution,
     )
     return unsigned
 
@@ -724,9 +740,15 @@ def _summary_native_probe(value: Any, expected: Mapping[str, Any]) -> dict[str, 
     return dict(value)
 
 
-def _summary_system_webkit(value: Any, *, target: str) -> dict[str, Any]:
-    if isinstance(value, Mapping) and value.get("schema") == SYSTEM_WEBKIT_PREFLIGHT_SCHEMA:
-        return validate_system_webkit_preflight(value, target=target)
+def _summary_system_webkit(
+    value: Any, *, target: str, distribution: str = "platform-wheel",
+) -> dict[str, Any]:
+    if isinstance(value, Mapping) and value.get("schema") in {
+        SYSTEM_WEBKIT_PREFLIGHT_SCHEMA, UNIVERSAL_WEBKIT_PREFLIGHT_SCHEMA,
+    }:
+        return validate_system_webkit_preflight(value, target=target, distribution=distribution)
+    if distribution != "platform-wheel":
+        fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
     if (not isinstance(value, Mapping)
             or value.get("schema") != "rs9.nebular070-system-webkit-runtime-probe.v1"
             or value.get("status") != "passed"
@@ -839,9 +861,12 @@ def _summary_entry(
 
 def validate_installed_smoke_summary(
     value: Mapping[str, Any], *, target: str, authenticated_gui: Mapping[str, Any],
+    distribution: str = "platform-wheel",
 ) -> dict[str, Any]:
     """Validate the complete multi-scenario summary at the matrix boundary."""
     expected = _SCENARIOS.get(target)
+    if distribution not in {"platform-wheel", "universal-launcher"}:
+        fail("NEBULAR_INSTALLED_SMOKE")
     if (
         not isinstance(authenticated_gui, Mapping)
         or authenticated_gui.get("status") != "verified"
@@ -876,13 +901,17 @@ def validate_installed_smoke_summary(
     elif native_probe.get("darwin_process_harness") is not None:
         fail("NEBULAR_DARWIN_HARNESS")
     system_probe = value.get("system_webkit_preflight")
+    if target.startswith("linux") and distribution == "universal-launcher" and system_probe is None:
+        fail("NEBULAR_SYSTEM_WEBKIT_PREFLIGHT")
     if system_probe is not None:
-        _summary_system_webkit(system_probe, target=target)
+        _summary_system_webkit(system_probe, target=target, distribution=distribution)
         nested_probe = native_probe.get("system_webkit_preflight")
         if (not isinstance(nested_probe, Mapping)
                 or canonical(nested_probe) != canonical(system_probe)):
             fail("NEBULAR_INSTALLED_SMOKE")
-    if isinstance(system_probe, Mapping) and system_probe.get("schema") == SYSTEM_WEBKIT_PREFLIGHT_SCHEMA:
+    if isinstance(system_probe, Mapping) and system_probe.get("schema") in {
+        SYSTEM_WEBKIT_PREFLIGHT_SCHEMA, UNIVERSAL_WEBKIT_PREFLIGHT_SCHEMA,
+    }:
         adapter = value.get("installed_launcher_harness")
         if (not isinstance(adapter, Mapping)
                 or set(adapter) != {"schema", "source_sha256", "derived_sha256",

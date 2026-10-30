@@ -2381,6 +2381,7 @@ def check_prior_publish_runs(
     *,
     api_get: Callable[[str], Any] | None = None,
     environ: Mapping[str, str] | None = None,
+    additional_run_validator: Callable[[Mapping[str, Any], Callable[[str], Any]], bool] | None = None,
 ) -> None:
     """Enforce durable cross-run repeat-upload guard via GitHub Actions workflow-run history."""
     env = environ if environ is not None else os.environ
@@ -2471,6 +2472,12 @@ def check_prior_publish_runs(
                         or repo_obj.get("full_name") != repo_slug
                     ):
                         fail("PRIOR_ATTEMPT_UNCONFIRMED")
+
+            # A separately owned distribution may add its closed history domain.
+            # Common run, pagination and repeat-attempt guards above still apply;
+            # unrecognized runs continue through the unchanged historical reader.
+            if additional_run_validator is not None and additional_run_validator(run, client_json):
+                continue
 
             title_release, title_mode, is_historical_061 = (
                 _parse_prior_run_title_and_inputs(run)

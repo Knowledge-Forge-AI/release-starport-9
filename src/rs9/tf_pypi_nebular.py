@@ -2897,10 +2897,10 @@ def workflow_text(release: str = "0.6.1", *, mode: str | None = None) -> str:
     """Generate the exact registered GitHub Actions workflow rs9-tfnf-pypi-publish.yml."""
     if release not in ("0.6.1", "0.7.0"):
         fail("WORKFLOW_RELEASE")
-    from rs9.tf_pypi_nebular070_publish import (
-        publication_resume_job_text,
+    from rs9.nebular070_universal_workflow import (
+        publication_job_text as publication_resume_job_text,
         validate_workflow_dispatch,
-        workflow_070_qualify_jobs_text,
+        qualify_jobs_text as workflow_070_qualify_jobs_text,
     )
 
     if mode is not None:
@@ -2929,7 +2929,8 @@ on:
         options:
           - qualify
           - publish
-          - resume
+          - universal-qualify
+          - universal-publish
         default: qualify
       dispatch_id:
         description: 'Unique attended intent correlation; not publication authority'
@@ -2945,7 +2946,7 @@ concurrency:
 
 jobs:
   build_verify:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/{QUALIFY_BRANCH}') && inputs.release != '0.7.0' && inputs.mode != 'resume'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/{QUALIFY_BRANCH}') && ((github.event_name == 'push') || (inputs.release == '0.6.1' && (inputs.mode == 'qualify' || inputs.mode == 'publish')))
     name: Build and Verify Native Darwin Wheel
     runs-on: macos-15
     timeout-minutes: 30
@@ -2980,7 +2981,7 @@ jobs:
           if-no-files-found: error
 
   native_consumer:
-    if: inputs.release != '0.7.0' && inputs.mode != 'resume'
+    if: github.event_name == 'push' || (inputs.release == '0.6.1' && (inputs.mode == 'qualify' || inputs.mode == 'publish'))
     name: Native macOS ARM64 installed consumer and Scenario A
     needs: [build_verify]
     runs-on: macos-15
@@ -3056,7 +3057,7 @@ jobs:
           if-no-files-found: error
 """ + workflow_070_qualify_jobs_text() + f"""
   publish:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release != '0.7.0' && inputs.mode == 'publish'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.6.1' && inputs.mode == 'publish'
     name: Trusted Publishing to PyPI
     needs: [build_verify, native_consumer]
     runs-on: ubuntu-24.04
