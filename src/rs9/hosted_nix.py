@@ -8,7 +8,8 @@ import subprocess
 import sys
 
 from rs9.build_native import stage_payload, stage_offline_npm_closure
-from rs9.current_generation import HISTORICAL_GENERATION, generation_paths, catalog_path, bind_catalog_product
+from rs9.current_generation import (HISTORICAL_GENERATION, CURRENT_GENERATION, generation_paths,
+                                     catalog_path, bind_catalog_product)
 from rs9.errors import ContractError, safe_details
 from rs9.hosted_commands import command_diagnostic, linux_runtime_prefix, run_probes, runtime_environment
 from rs9.hosted_platforms import select_payload
@@ -30,6 +31,28 @@ PRODUCTS = ("theme-forge-stellar-burst", "theme-forge-stellar-loom",
             "theme-forge-solar-sail", "theme-forge-nebular-fusion")
 _LOADER_FACT_KEYS = ("loader", "glibc_lib", "library_path", "python", "node", "readelf")
 _DBUS_FACT_KEYS = ("dbus_run_session", "dbus_daemon", "dbus_session_config")
+
+
+def _current_linux_initial_observation_enabled(generation, system, prepared):
+    """Opt in only after prepare_smoke has authenticated the current Nebular source."""
+    return (generation == CURRENT_GENERATION
+            and system in {"x86_64-linux", "aarch64-linux"}
+            and isinstance(prepared, dict)
+            and prepared.get("source_generation") == CURRENT_GENERATION
+            and prepared.get("capture") is not None
+            and prepared.get("fixture_capture") is not None)
+
+
+def _verify_final_nebular_runtime(runtime_root, prepared, system, prefix, runtime_prefix, env,
+                                  baseline, runtime_facts, generation):
+    session_bus_argv = _pinned_session_bus_argv(runtime_facts) if system.endswith("-linux") else None
+    return verify_nebular_runtime(
+        runtime_root, prepared, system, [*prefix, *runtime_prefix], env, baseline=baseline,
+        diagnostic_boundary_probes=system.endswith("-linux"),
+        diagnostic_replay=system.endswith("-linux"),
+        diagnostic_initial_observation=_current_linux_initial_observation_enabled(
+            generation, system, prepared),
+        session_bus_argv=session_bus_argv)
 
 
 def fhs_runtime_smoke(runtime, system, prefix, env, *, generation=HISTORICAL_GENERATION):
@@ -448,11 +471,8 @@ def execute(context):
                 result = subprocess.run([*prefix, *runtime_prefix, "ldd", str(file)], env=env, capture_output=True, timeout=30)
                 if b"not found" in result.stdout or (result.returncode and b"not a dynamic" not in result.stderr + result.stdout and b"statically linked" not in result.stderr + result.stdout):
                     raise ContractError("NIX_CLOSURE", "ELF dependency missing from actual FHS closure")
-    session_bus_argv = _pinned_session_bus_argv(runtime_facts) if system.endswith("-linux") else None
-    smoke = verify_nebular_runtime(roots[0], prepared, system, [*prefix, *runtime_prefix], env, baseline=baseline,
-                                   diagnostic_boundary_probes=system.endswith("-linux"),
-                                   diagnostic_replay=system.endswith("-linux"),
-                                   session_bus_argv=session_bus_argv)
+    smoke = _verify_final_nebular_runtime(
+        roots[0], prepared, system, prefix, runtime_prefix, env, baseline, runtime_facts, generation)
     gates.extend([{"name": "nix-native-closure", "status": "pass"}, {"name": "nix-build-check-run", "status": "pass"}])
     evidence = scratch / "nix-output-receipt.json"
     evidence.write_bytes(canonical({"schema": "rs9.hosted-nix-output.v1alpha1", "system": system,

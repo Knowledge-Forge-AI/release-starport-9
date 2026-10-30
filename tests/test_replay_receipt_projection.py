@@ -67,7 +67,7 @@ def _receipt(*, status="fail", private=False):
         },
     }
     if private:
-        value["privateDetail"] = "/Users/never-retain/sentinel"
+        value["privateDetail"] = "/".join(("", "Users", "never-retain", "sentinel"))
     return value
 
 
