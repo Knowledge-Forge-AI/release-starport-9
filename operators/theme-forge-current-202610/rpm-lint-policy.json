@@ -1,0 +1,186 @@
+{
+  "schema": "rs9.rpm-lint-policy.v1",
+  "generation": "theme-forge-current-202610",
+  "status": "blocked",
+  "blocking": true,
+  "scope": "Current exact release RPM construction and raw lint diagnostics only; separate native evidence and disposition required.",
+  "production_enabled": false,
+  "publication_authority": false,
+  "permitted_preservation_exception_classes": [
+    "env-script-interpreter",
+    "non-executable-script",
+    "files-duplicated-waste"
+  ],
+  "unwaivable_error_classes": [
+    "no-changelogname-tag",
+    "explicit-lib-dependency"
+  ],
+  "tool_constraints": {
+    "tool": "rpmlint",
+    "version": "2.8.0",
+    "package_version": "2.8.0-2.fc43",
+    "allowed_exit_codes": [
+      0,
+      64
+    ],
+    "filtered_count": 8
+  },
+  "projects": {
+    "theme-forge-stellar-burst": {
+      "package_name": "theme-forge-stellar-burst",
+      "version": "0.7.0",
+      "status": "blocked",
+      "blocking": true,
+      "allowed_architectures": [
+        "x86_64",
+        "aarch64"
+      ],
+      "allowed_systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ],
+      "exceptions": {},
+      "authenticated_inputs": {
+        "asset_name": "knowledge-forge-ai-theme-forge-stellar-burst-0.7.0.tgz",
+        "asset_sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+        "closure_sha256": null,
+        "closure_status": "held_pending_observed_npm_closure"
+      },
+      "engine_constraints": {
+        "engine": "node",
+        "requires_spec_dependency": "nodejs >= 22",
+        "interpreter": "/usr/bin/env node"
+      },
+      "launchers": {
+        "tfsb": {
+          "path": "/usr/bin/tfsb",
+          "target": "/usr/lib/theme-forge-stellar-burst/dist/cli.js",
+          "mode": "0755",
+          "type": "node_wrapper"
+        },
+        "tfsb-studio-service": {
+          "path": "/usr/bin/tfsb-studio-service",
+          "target": "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.js",
+          "mode": "0755",
+          "type": "node_wrapper"
+        }
+      }
+    },
+    "theme-forge-stellar-loom": {
+      "package_name": "theme-forge-stellar-loom",
+      "version": "0.5.0",
+      "status": "blocked",
+      "blocking": true,
+      "allowed_architectures": [
+        "noarch"
+      ],
+      "allowed_systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ],
+      "exceptions": {},
+      "authenticated_inputs": {
+        "asset_name": "knowledge-forge-ai-theme-forge-stellar-loom-0.5.0.tgz",
+        "asset_sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f",
+        "closure_sha256": null,
+        "closure_status": "held_pending_observed_npm_closure"
+      },
+      "engine_constraints": {
+        "engine": "node",
+        "requires_spec_dependency": "nodejs >= 22",
+        "interpreter": "/usr/bin/env node"
+      },
+      "launchers": {
+        "tfsl": {
+          "path": "/usr/bin/tfsl",
+          "target": "/usr/lib/theme-forge-stellar-loom/bin/tfsl.js",
+          "mode": "0755",
+          "type": "node_wrapper"
+        },
+        "tfsl-batch": {
+          "path": "/usr/bin/tfsl-batch",
+          "target": "/usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js",
+          "mode": "0755",
+          "type": "node_wrapper"
+        }
+      }
+    },
+    "theme-forge-solar-sail": {
+      "package_name": "theme-forge-solar-sail",
+      "version": "0.3.0",
+      "status": "blocked",
+      "blocking": true,
+      "allowed_architectures": [
+        "noarch"
+      ],
+      "allowed_systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ],
+      "exceptions": {},
+      "authenticated_inputs": {
+        "asset_name": "knowledge-forge-ai-theme-forge-solar-sail-0.3.0.tgz",
+        "asset_sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415",
+        "closure_sha256": null,
+        "closure_status": "held_pending_observed_npm_closure"
+      },
+      "engine_constraints": {
+        "engine": "node",
+        "requires_spec_dependency": "nodejs >= 22",
+        "interpreter": "/usr/bin/env node"
+      },
+      "launchers": {
+        "tfss": {
+          "path": "/usr/bin/tfss",
+          "target": "/usr/lib/theme-forge-solar-sail/bin/tfss.js",
+          "mode": "0755",
+          "type": "node_wrapper"
+        }
+      }
+    },
+    "theme-forge-nebular-fusion": {
+      "package_name": "theme-forge-nebular-fusion",
+      "version": "0.7.0",
+      "status": "blocked",
+      "blocking": true,
+      "allowed_architectures": [
+        "x86_64",
+        "aarch64"
+      ],
+      "allowed_systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ],
+      "exceptions": {},
+      "authenticated_inputs": {
+        "assets": [
+          {
+            "name": "theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27"
+          },
+          {
+            "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c"
+          }
+        ]
+      },
+      "archive_contract_members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/package.json"
+      ],
+      "runtime_requires_contract": {
+        "member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/package.json",
+        "sha256": "168b43aba5a8966b0caee78d441f4bb63787889bb2895120e44f505194b3236c",
+        "pointer": "/engines/node"
+      },
+      "launchers": {},
+      "public_symlinks": {
+        "tfnf": {
+          "path": "/usr/bin/tfnf",
+          "target": "/usr/lib/theme-forge-nebular-fusion/bin/tfnf",
+          "type": "symlink"
+        }
+      }
+    }
+  }
+}

@@ -10,7 +10,7 @@ import uuid
 from rs9.build_native import SubprocessRunner, REQUIRED_COMMANDS
 from rs9.build_pacman import build_pacman_candidate
 from rs9.build_rpm import build_rpm_candidate
-from rs9.current_generation import HISTORICAL_GENERATION, generation_paths
+from rs9.current_generation import HISTORICAL_GENERATION, generation_paths, rpm_policy_path
 from rs9.errors import ContractError, safe_details
 from rs9.hosted_native import provision, container_tool_facts
 from rs9.npm_deps import resolve_offline_npm_archives as _resolve_offline_npm_archives, resolve_offline_npm_archives
@@ -502,7 +502,9 @@ def execute(context):
             artifacts.append(runtime_path)
             from rs9.rpm_lint_policy import load_policy
             try:
-                preservation_policy = load_policy(repository / "operators/live1/rpm-lint-policy.json")
+                preservation_policy = (load_policy(repository / "operators/live1/rpm-lint-policy.json")
+                    if generation == HISTORICAL_GENERATION else
+                    load_policy(repository / rpm_policy_path(generation), generation=generation))
             except (ContractError, OSError):
                 preservation_policy = {}  # Explicit invalid input cannot confer acceptance.
             nebular = next((capture for capture, intent, _ in context["captures"]
@@ -539,7 +541,8 @@ def execute(context):
                 result = build(capture, intent, target, work,
                                offline_npm_archives=npm, runner=builder,
                                **({"builder_system": system, "policy": preservation_policy,
-                                   "client_runtime": client_runtime, "caller_evidence": caller_evidence}
+                                    "client_runtime": client_runtime, "caller_evidence": caller_evidence,
+                                    **({"generation": generation} if generation != HISTORICAL_GENERATION else {})}
                                   if family == "rpm" else {}))
                 path = result["package_path"] if family == "pacman" else result["rpm_path"]
                 dest = unsigned / path.name

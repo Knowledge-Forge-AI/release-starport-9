@@ -13,6 +13,7 @@ import subprocess
 import time
 import zipfile
 
+from rs9.current_generation import HISTORICAL_GENERATION, CURRENT_GENERATION, GENERATIONS, distribution_paths
 from rs9.errors import ContractError
 from rs9.scratch import canonical, physical_directory
 from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
@@ -246,9 +247,12 @@ def api_rows(root, endpoint, key, runner=None):
     raise ContractError("HOSTED_API_LIMIT", "Evidence pagination exceeds bound")
 
 
-def _run_identity(doc, commit, started_at=None):
+def _run_identity(doc, commit, started_at=None, *, generation=HISTORICAL_GENERATION):
+    workflow, _, _ = distribution_paths(generation)
+    if generation == HISTORICAL_GENERATION:
+        workflow = ".github/workflows/" + WORKFLOW
     if (doc.get("head_sha") != commit or doc.get("event") != "push" or doc.get("head_branch") != "main"
-            or doc.get("path") != ".github/workflows/" + WORKFLOW or doc.get("run_attempt") != 1
+            or doc.get("path") != workflow or doc.get("run_attempt") != 1
             or doc.get("repository", {}).get("full_name") != REPOSITORY):
         raise ContractError("HOSTED_BINDING", "Run differs from the new adopted push or is a rerun")
     if not isinstance(started_at, datetime) or started_at.tzinfo is None:
@@ -263,16 +267,32 @@ def _run_identity(doc, commit, started_at=None):
             raise ContractError("HOSTED_BINDING", "Run predates the attended push")
 
 
-def diagnostic_scope(repository, output, packet, contract, reported=None):
+def admit_original_run(repository, *, commit, run_id, started_at, generation, runner=None):
+    """Mint a non-JSON context only after fresh ORIGINAL API run admission."""
+    distribution_paths(generation)
+    if generation != CURRENT_GENERATION or type(run_id) is not int or run_id <= 0 or not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ContractError("HOSTED_RUN_CONTEXT", "Exact original current run selection required")
+    document = json.loads(gh_read(repository, ["api", "--method", "GET", f"repos/{REPOSITORY}/actions/runs/{run_id}"], runner))
+    _run_identity(document, commit, started_at, generation=generation)
+    if (type(document.get("id")) is not int or document["id"] != run_id
+            or type(document.get("run_attempt")) is not int or document["run_attempt"] != 1):
+        raise ContractError("HOSTED_BINDING", "Original API run ID or attempt differs from selection")
+    from rs9.hosted_custody import _mint_original_run_context
+    return document, _mint_original_run_context(document, generation=generation)
+
+
+def diagnostic_scope(repository, output, packet, contract, reported=None, *, generation=HISTORICAL_GENERATION, original_run=None):
     """Persist individually authenticated diagnostics before qualification raises."""
-    from rs9.hosted_custody import provenance, verify_set
+    distribution_paths(generation)
+    from rs9.hosted_custody import provenance, consumer_provenance, verify_set
     from rs9.hosted_summary import gate_blockers, validate_summary_binding
     from rs9.candidate_readiness import readiness_record
     scope = {"source_adoption_scope": "partial-diagnostic",
-             "known_unqualified_lanes": readiness_record()["known_unqualified_lanes"],
              "full_live1_qualification": False, "published_linux_nix_ready": False,
              "summary_binding": "missing", "required_lanes": [], "experiments": [],
              "partial_diagnostic_lanes_all_pass": False}
+    if generation == HISTORICAL_GENERATION:
+        scope["known_unqualified_lanes"] = readiness_record()["known_unqualified_lanes"]
     jobs = {j.get("name"): j for j in packet.get("jobs", [])}
     def job_passed(job):
         return bool(job and job.get("status") == "completed" and job.get("conclusion") == "success"
@@ -281,12 +301,17 @@ def diagnostic_scope(repository, output, packet, contract, reported=None):
     bound = None
     if reported is not None:
         try:
-            bound = validate_summary_binding(reported, repository, packet["source_commit"])
+            bound = validate_summary_binding(reported, repository, packet["source_commit"], generation=generation, run_id=packet["run_id"], original_run=original_run)
             scope["summary_binding"] = "verified"
         except (ContractError, KeyError, TypeError, ValueError, OSError):
             scope["summary_binding"] = "failed"
-    expected = provenance(repository, bound.get("release_ingestion_sha256") if bound else None)
-    expected.update(source_commit=packet["source_commit"], event="push", ref="refs/heads/main", attempt=1)
+    def expected_provenance(ingestion):
+        if generation == CURRENT_GENERATION:
+            return consumer_provenance(repository, ingestion, original_run, source_commit=packet["source_commit"], run_id=packet["run_id"], generation=generation)
+        return provenance(repository, ingestion, generation=generation, source_commit=packet["source_commit"], run_id=packet.get("run_id"))
+    expected = expected_provenance(bound.get("release_ingestion_sha256") if bound else None)
+    if generation == HISTORICAL_GENERATION:
+        expected.update(source_commit=packet["source_commit"], event="push", ref="refs/heads/main", attempt=1)
     if bound is None:
         expected.pop("release_ingestion_sha256")
     evidence = {r.get("name"): r for r in packet["artifacts"]}
@@ -312,7 +337,7 @@ def diagnostic_scope(repository, output, packet, contract, reported=None):
                             raise ContractError("HOSTED_BINDING", "Receipt lane differs from declaration")
                         if (receipt.get("production_enabled") is not False
                                 or receipt.get("publication_authority") is not False
-                                or receipt.get("provenance") != {k: manifest[k] for k in provenance(repository, manifest.get("release_ingestion_sha256"))}):
+                                or receipt.get("provenance") != {k: manifest[k] for k in expected_provenance(manifest.get("release_ingestion_sha256"))}):
                             raise ContractError("HOSTED_BINDING", "Receipt differs from isolated source provenance")
                         if experimental and (receipt.get("schema") != "rs9.hosted-experiment-diagnostic.v1alpha1"
                                 or receipt.get("qualification_authority") is not False):
@@ -325,7 +350,7 @@ def diagnostic_scope(repository, output, packet, contract, reported=None):
                             if matches != [receipt]:
                                 raise ContractError("HOSTED_BINDING", "Summary and individual receipt differ")
                         gates = dict(lane, required_gates=lane.get("experiment_gates", []) if experimental else lane["required_gates"])
-                        blockers = gate_blockers(gates, receipt)
+                        blockers = gate_blockers(gates, receipt, generation=generation)
                         if lane["lane"] == "rpm":
                             from rs9.hosted_summary import promotion_blockers, rpm_lint_results, validate_rpm_policy_custody
                             promotion_blockers(lane, receipt)
@@ -359,10 +384,14 @@ def diagnostic_scope(repository, output, packet, contract, reported=None):
 
 def packet_classification(packet):
     if packet["validation"]["status"] == "pass":
-        return "fully-qualified-candidate"
+        return "qualified-current-distribution-candidate" if packet.get("generation") == CURRENT_GENERATION else "fully-qualified-candidate"
     if "HOSTED_TIMEOUT" in packet["validation"]["reasons"]:
         return "timeout"
     scope = packet["diagnostic_scope"]
+    if packet.get("generation") == CURRENT_GENERATION:
+        failed = (packet.get("artifact_collection_reasons") or scope.get("summary_binding") != "verified"
+                  or any(row.get("integrity") == "fail" for row in scope["required_lanes"] + scope["experiments"]))
+        return "current-distribution-collection-failure" if failed else "current-distribution-not-qualified"
     if (packet.get("artifact_collection_reasons") or scope.get("summary_binding") != "verified"
             or any(r.get("integrity") == "fail" for r in scope["required_lanes"] + scope["experiments"])):
         return "collection-failure"
@@ -394,7 +423,11 @@ def read_reported_summary(summary_root, packet):
     return json.loads((summary_root / "hosted-summary.json").read_bytes())
 
 
-def collect(repository, output, *, commit, started_at, run_id=None, timeout=7200, runner=None):
+def collect(repository, output, *, commit, started_at, run_id=None, timeout=7200, runner=None, generation=HISTORICAL_GENERATION, zip_transport="actions"):
+    from rs9.public_release_transport import select_zip_transport
+    transport = select_zip_transport(zip_transport, generation=generation)
+    workflow_path, _, qualification_scope = distribution_paths(generation)
+    workflow_name = WORKFLOW if generation == HISTORICAL_GENERATION else Path(workflow_path).name
     if not re.fullmatch(r"[0-9a-f]{40}", commit) or type(timeout) is not int or not 30 <= timeout <= 21600:
         raise ContractError("HOSTED_ARGUMENT", "Commit and bounded wait required")
     if run_id is not None and (type(run_id) is not int or run_id <= 0):
@@ -418,19 +451,23 @@ def collect(repository, output, *, commit, started_at, run_id=None, timeout=7200
               "status": "pending", "validation": {"status": "not-run", "reasons": []},
               "jobs": [], "artifacts": [], "clock_skew_tolerance_seconds": 60,
               "not_before": started_at.isoformat()}
+    if generation == CURRENT_GENERATION:
+        packet.update(generation=generation, qualification_scope=qualification_scope)
     packet["diagnostic_scope"] = {"source_adoption_scope": "partial-diagnostic",
         "full_live1_qualification": False, "published_linux_nix_ready": False,
         "summary_binding": "missing", "required_lanes": [], "experiments": [],
         "partial_diagnostic_lanes_all_pass": False}
     from rs9.candidate_readiness import readiness_record
-    packet["diagnostic_scope"]["known_unqualified_lanes"] = readiness_record()["known_unqualified_lanes"]
+    if generation == HISTORICAL_GENERATION:
+        packet["diagnostic_scope"]["known_unqualified_lanes"] = readiness_record()["known_unqualified_lanes"]
     packet["classification"] = "pending"
     write_packet(output, packet)
     deadline = time.monotonic() + timeout
+    original_run = None
     try:
         while time.monotonic() < deadline:
             if run_id is None:
-                rows = json.loads(gh_read(root, ["run", "list", "--repo", REPOSITORY, "--workflow", WORKFLOW,
+                rows = json.loads(gh_read(root, ["run", "list", "--repo", REPOSITORY, "--workflow", workflow_name,
                     "--event", "push", "--branch", "main", "--commit", commit, "--limit", "100",
                     "--json", "databaseId,headSha,event,status,conclusion,createdAt"], runner))
                 matches = [r for r in rows if r.get("headSha") == commit and r.get("event") == "push"
@@ -441,9 +478,12 @@ def collect(repository, output, *, commit, started_at, run_id=None, timeout=7200
                     run_id = matches[0]["databaseId"]
                     packet["run_id"] = run_id
             if run_id is not None:
-                doc = json.loads(gh_read(root, ["api", "--method", "GET",
-                    f"repos/{REPOSITORY}/actions/runs/{run_id}"], runner))
-                _run_identity(doc, commit, started_at)
+                if generation == CURRENT_GENERATION:
+                    doc, original_run = admit_original_run(root, commit=commit, run_id=run_id, started_at=started_at, generation=generation, runner=runner)
+                else:
+                    doc = json.loads(gh_read(root, ["api", "--method", "GET",
+                        f"repos/{REPOSITORY}/actions/runs/{run_id}"], runner))
+                    _run_identity(doc, commit, started_at, generation=generation)
                 if doc.get("id") != run_id:
                     raise ContractError("HOSTED_BINDING", "API run identity differs from selected run")
                 packet["run"] = {k: doc.get(k) for k in ("id", "head_sha", "event", "head_branch", "path",
@@ -467,6 +507,7 @@ def collect(repository, output, *, commit, started_at, run_id=None, timeout=7200
         collection_errors = []
         if any(not isinstance(n, str) for n in names) or len(names) != len(set(names)) or names.count("hosted-summary") != 1:
             collection_errors.append("HOSTED_ARTIFACTS")
+        relay = transport.prepare(artifacts, commit=commit, run_id=run_id, generation=generation) if transport is not None else None
         total_download_tracker, total_extracted_tracker = [0], [0]
         for artifact, evidence in zip(artifacts, packet["artifacts"]):
             zip_path = None
@@ -478,14 +519,17 @@ def collect(repository, output, *, commit, started_at, run_id=None, timeout=7200
                     raise ContractError("HOSTED_ARTIFACTS", "Invalid or expired artifact identity")
                 target_dir = output / (name if names.count(name) == 1 else f"artifact-{identity}")
                 zip_path = output / f".artifact-{identity}.zip"
-                size = gh_stream_artifact(root, identity, zip_path, artifact.get("digest"), runner=runner,
-                                          total_tracker=total_download_tracker)
+                if relay is None:
+                    size = gh_stream_artifact(root, identity, zip_path, artifact.get("digest"), runner=runner,
+                                              total_tracker=total_download_tracker)
+                else:
+                    size = relay.download(artifact, zip_path, total_tracker=total_download_tracker)
                 evidence.update(zip_digest_verified=True, downloaded_bytes=size)
                 extract_safe_zip(zip_path, target_dir, total_extracted_tracker=total_extracted_tracker)
                 manifest_path = target_dir / "artifact-manifest.json"
                 if manifest_path.is_file():
                     from rs9.hosted_custody import verify_set
-                    verify_set(target_dir, expected_provenance={"source_commit": commit})
+                    verify_set(target_dir, expected_provenance=({"source_commit": commit, "generation": generation, "qualification_scope": qualification_scope, "run_id": run_id} if generation == CURRENT_GENERATION else {"source_commit": commit}))
                     evidence["manifest_sha256"] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
                 elif name != "hosted-summary":
                     raise ContractError("HOSTED_ARTIFACTS", "Candidate artifact lacks custody manifest")
@@ -504,7 +548,7 @@ def collect(repository, output, *, commit, started_at, run_id=None, timeout=7200
 
         summary_root = output / "hosted-summary"
         from rs9.hosted_contract import validate_hosted_summary, load_hosted_lanes
-        contract = load_hosted_lanes(root)
+        contract = load_hosted_lanes(root, generation=generation)
         reported = None
         if any(a.get("name") == "hosted-summary" and a.get("collection") == "verified" for a in packet["artifacts"]):
             try:
@@ -521,13 +565,15 @@ def collect(repository, output, *, commit, started_at, run_id=None, timeout=7200
                 "blocking_reasons": reported.get("blocking_reasons", []),
                 "production_promotion_blockers": reported.get("production_promotion_blockers", []),
                 "production_promotion_blocked": reported.get("production_promotion_blocked", False)}
-        packet["diagnostic_scope"] = diagnostic_scope(root, output, packet, contract, reported)
+        packet["diagnostic_scope"] = diagnostic_scope(root, output, packet, contract, reported, generation=generation, original_run=original_run)
         write_packet(output, packet)
         if collection_errors:
             raise ContractError(collection_errors[0], "One or more artifacts could not be authenticated")
         if any(r["integrity"] == "fail" for r in packet["diagnostic_scope"]["experiments"]):
             raise ContractError("HOSTED_CUSTODY", "Declared experiment receipt or provenance invalid")
-        summary = validate_hosted_summary(summary_root, root, commit)
+        if generation == CURRENT_GENERATION and any(row["integrity"] != "verified" for row in packet["diagnostic_scope"]["required_lanes"]):
+            raise ContractError("HOSTED_CUSTODY", "Required original receipt or custody integrity invalid")
+        summary = validate_hosted_summary(summary_root, root, commit, generation=generation, run_id=run_id, original_run=original_run)
         expected = {r.get("artifact", r.get("artifact_name")) for r in contract.get("lanes", [])}
         expected.discard(None)
         expected_jobs = {r["lane"]+"-"+r["system"] if r["lane"] in {"wheels","nix","pacman","rpm","deb"} else r["lane"]
@@ -552,7 +598,9 @@ def collect(repository, output, *, commit, started_at, run_id=None, timeout=7200
         if summary.get("qualification_verdict", summary.get("verdict")) != "qualified":
             raise ContractError("HOSTED_NOT_QUALIFIED", "Hosted candidate is not qualified")
         packet["validation"] = {"status": "pass", "reasons": []}
-        packet["diagnostic_scope"]["full_live1_qualification"] = True
+        packet["diagnostic_scope"]["full_live1_qualification"] = generation == HISTORICAL_GENERATION
+        if generation == CURRENT_GENERATION:
+            packet["diagnostic_scope"]["current_distribution_qualification"] = True
     except (ContractError, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
         packet["validation"] = {"status": "fail", "reasons": [error.code if isinstance(error, ContractError) else "HOSTED_COLLECTION_FAILED"]}
         packet["status"] = "pending" if packet["validation"]["reasons"] == ["HOSTED_TIMEOUT"] else "not-qualified"
@@ -564,6 +612,8 @@ def collect(repository, output, *, commit, started_at, run_id=None, timeout=7200
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Read-only bounded hosted candidate collection")
     parser.add_argument("--repository", default=".")
+    parser.add_argument("--generation", choices=GENERATIONS, default=HISTORICAL_GENERATION)
+    parser.add_argument("--zip-transport", choices=["actions", "public-release-relay"], default="actions")
     parser.add_argument("--output", required=True)
     parser.add_argument("--commit", required=True)
     parser.add_argument("--run-id", type=int, default=None)
@@ -578,7 +628,7 @@ def main(argv=None):
         except ValueError as exc:
             raise ContractError("HOSTED_ARGUMENT", "Malformed --not-before timestamp") from exc
         result = collect(args.repository, args.output, commit=args.commit, run_id=args.run_id,
-                         started_at=started_at, timeout=args.timeout)
+                         started_at=started_at, timeout=args.timeout, generation=args.generation, zip_transport=args.zip_transport)
         print(canonical({"status": result["status"], "run_id": result["run_id"],
                          "validation": result["validation"], "production_enabled": False}).decode(), end="")
         return 0 if result["validation"]["status"] == "pass" else 2

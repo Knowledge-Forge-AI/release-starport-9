@@ -5,8 +5,9 @@ import os
 import re
 from pathlib import Path
 
+from rs9.current_generation import (HISTORICAL_GENERATION, CURRENT_GENERATION, distribution_paths, rpm_policy_path)
 from rs9.errors import ContractError
-from rs9.hosted_custody import provenance, verify_set
+from rs9.hosted_custody import provenance, consumer_provenance, diagnostic_provenance, verify_set, validate_current_provenance
 from rs9.product_classes import get_product_class, supported_architectures, extract_package_arch
 from rs9.rpm_evidence import (
     CURRENT_RPM_EVIDENCE_CONTRACT,
@@ -145,10 +146,20 @@ def validate_rpm_custody(directory, manifest, receipt):
     return verify_rpm_custody(directory, manifest, receipt)
 
 
-def validate_rpm_policy_source(repository, receipt):
+def validate_rpm_policy_source(repository, receipt, *, generation=HISTORICAL_GENERATION):
     """Bind retained policy evaluations to the source file in builder provenance."""
+    distribution_paths(generation)
     if receipt.get('lane') != 'rpm':
         return
+    policy_path = repository / rpm_policy_path(generation)
+    if generation == CURRENT_GENERATION and (not policy_path.is_file() or policy_path.is_symlink()):
+        raise ContractError("CURRENT_RPM_POLICY_HELD", "Selected current RPM policy is not ready")
+    from rs9.rpm_lint_policy import load_policy
+    selected = None
+    if generation == CURRENT_GENERATION:
+        selected = load_policy(policy_path, generation=generation)
+        if selected.get("blocking") is True or selected.get("status") == "blocked":
+            raise ContractError("CURRENT_RPM_POLICY_HELD", "Selected current RPM policy blocks qualification")
     details = receipt.get('details', {})
     if not isinstance(details, dict):
         raise ContractError('HOSTED_POLICY', 'Malformed RPM policy details')
@@ -157,22 +168,31 @@ def validate_rpm_policy_source(repository, receipt):
         raise ContractError('HOSTED_POLICY', 'Malformed RPM policy evaluations')
     if not policies:
         return  # Historical/absent results remain subject to required-gate checks.
-    from rs9.rpm_lint_policy import load_policy
-    expected = hashlib.sha256(canonical(load_policy(repository / 'operators/live1/rpm-lint-policy.json'))).hexdigest()
+    if generation == HISTORICAL_GENERATION:
+        selected = load_policy(policy_path)
+    expected = hashlib.sha256(canonical(selected)).hexdigest()
     if any(not isinstance(p, dict) or p.get('policy_sha256') != expected for p in policies.values()):
         raise ContractError('HOSTED_POLICY', 'RPM policy evaluation differs from reviewed source')
 
 
-def contract(repository):
-    return json.loads((repository / "operators/live1/hosted-lanes.json").read_bytes())
+def contract(repository, *, generation=HISTORICAL_GENERATION):
+    from rs9.hosted_contract import load_hosted_lanes
+    return load_hosted_lanes(repository, generation=generation)
 
 
-def required(repository):
-    return [r for r in contract(repository)["lanes"] if r.get("module")]
+def required(repository, *, generation=HISTORICAL_GENERATION):
+    return [r for r in contract(repository, generation=generation)["lanes"] if r.get("module")]
 
 
-def gate_blockers(lane, receipt):
+def gate_blockers(lane, receipt, *, generation=HISTORICAL_GENERATION):
+    distribution_paths(generation)
     blockers = []
+    if generation == CURRENT_GENERATION and lane["lane"] == "nix":
+        from rs9.hosted_nix import PRODUCTS
+        details = receipt.get("details", {})
+        outputs = details.get("outputs", {}) if isinstance(details, dict) else {}
+        if not isinstance(outputs, dict) or set(outputs) != set(PRODUCTS):
+            blockers.append("missing-current-nix-products")
     gates = receipt.get("gates", [])
     names = [g["name"] for g in gates]
     for name in lane["required_gates"]:
@@ -190,11 +210,11 @@ def gate_blockers(lane, receipt):
     return blockers
 
 
-def summarize(repository, inputs, output):
-    lanes = required(repository)
+def summarize(repository, inputs, output, *, generation=HISTORICAL_GENERATION):
+    lanes = required(repository, generation=generation)
     reasons, receipts, manifests, promotion = [], [], [], []
     jobs = json.loads(os.environ.get("RS9_JOB_CONCLUSIONS", "{}"))
-    expected_jobs = set(contract(repository)["required_jobs"]) - {"summary"}
+    expected_jobs = set(contract(repository, generation=generation)["required_jobs"]) - {"summary"}
     if set(jobs) != expected_jobs or any(row.get("result") != "success" for row in jobs.values()):
         reasons.append("missing-or-failed-required-workflow-job")
     auth_values = set()
@@ -214,9 +234,12 @@ def summarize(repository, inputs, output):
             reasons.append(lane_name + ":" + (error.code if isinstance(error, ContractError) else "missing-or-invalid-artifact"))
             continue
 
+        if generation == CURRENT_GENERATION and (receipt.get("production_enabled") is not False or receipt.get("publication_authority") is not False):
+            reasons.append(lane_name + ":publication-authority-forbidden")
+
         # Guarded step: Gate blockers
         try:
-            reasons.extend(lane_name + ":" + r for r in gate_blockers(lane, receipt))
+            reasons.extend(lane_name + ":" + r for r in gate_blockers(lane, receipt, generation=generation))
         except (ContractError, OSError, ValueError, KeyError) as error:
             reasons.append(lane_name + ":" + (error.code if isinstance(error, ContractError) else "gate-blockers-error"))
 
@@ -265,7 +288,7 @@ def summarize(repository, inputs, output):
 
         # Guarded step: RPM policy source
         try:
-            validate_rpm_policy_source(repository, receipt)
+            validate_rpm_policy_source(repository, receipt, generation=generation)
         except ContractError as error:
             reasons.append(lane_name + ":" + error.code)
         except Exception:
@@ -281,7 +304,15 @@ def summarize(repository, inputs, output):
     if len(auth_values) != 1 or None in auth_values:
         reasons.append("release-projection-missing-or-mixed")
     ingestion = next(iter(auth_values)) if len(auth_values) == 1 else None
-    expected = provenance(repository, ingestion)
+    source_authenticated = True
+    try:
+        expected = provenance(repository, ingestion, generation=generation)
+    except ContractError as error:
+        if generation != CURRENT_GENERATION or error.code not in {"HOSTED_SOURCE_TREE", "HOSTED_PROVENANCE"}:
+            raise
+        source_authenticated = False
+        reasons.extend(["source-tree-unauthenticated", error.code])
+        expected = diagnostic_provenance(repository, ingestion, error.code, generation=generation)
     for manifest in manifests:
         if any(manifest.get(k) != v for k, v in expected.items()):
             reasons.append("mixed-source-or-run-provenance")
@@ -289,6 +320,8 @@ def summarize(repository, inputs, output):
     expected_sets = {r["artifact_name"] for r in lanes}
     if actual != expected_sets:
         reasons.append("missing-or-surplus-artifact-sets")
+    if generation == CURRENT_GENERATION and (expected["event"] != "push" or expected["ref"] != "refs/heads/main" or expected["attempt"] != 1):
+        reasons.append("current-distribution-push-main-attempt-one-required")
     qualified = not reasons
     observe_receipt = next((r for r in receipts if r.get("lane") == "observe"), None)
     observe_details = observe_receipt.get("details", {}) if isinstance(observe_receipt, dict) else {}
@@ -298,7 +331,7 @@ def summarize(repository, inputs, output):
     exact_observations = observe_details.get("exact_observations", [])
     record = {"schema": "rs9.hosted-candidate-summary.v1alpha2", **expected,
               "production_enabled": False, "publication_authority": False, "attended_gates_satisfied": False,
-              "adoptable": expected["event"] == "push" and expected["ref"] == "refs/heads/main" and expected["attempt"] == 1,
+              "adoptable": source_authenticated and expected["event"] == "push" and expected["ref"] == "refs/heads/main" and expected["attempt"] == 1,
               "qualification_verdict": "qualified" if qualified else "not-qualified",
               "lanes_executed_ok": len(receipts) == len(lanes) and all(not r.get("execution_error") for r in receipts),
               "blocking_reasons": sorted(set(reasons)), "receipts": receipts, "artifact_manifests": manifests,
@@ -318,14 +351,26 @@ def summarize(repository, inputs, output):
     return 0 if qualified else 2
 
 
-def validate_summary_binding(summary, repository, commit):
+def _validation_provenance(repository, ingestion, commit, run_id, generation, original_run):
+    if generation == CURRENT_GENERATION or original_run is not None:
+        return consumer_provenance(repository, ingestion, original_run, source_commit=commit, run_id=run_id, generation=generation)
+    return provenance(repository, ingestion, generation=generation, source_commit=commit, run_id=run_id)
+
+
+def validate_summary_binding(summary, repository, commit, *, generation=HISTORICAL_GENERATION, run_id=None, original_run=None):
     """Authenticate source/provenance without treating failed gates as passes."""
+    distribution_paths(generation)
     record = json.loads((Path(summary) / "hosted-summary.json").read_bytes()) if not isinstance(summary, dict) else summary
     if record.get("schema") != "rs9.hosted-candidate-summary.v1alpha2":
         raise ContractError("HOSTED_SUMMARY", "Current hosted summary required")
-    expected = provenance(repository, record.get("release_ingestion_sha256"))
+    if generation == CURRENT_GENERATION:
+        validate_current_provenance(record)
+    expected = _validation_provenance(repository, record.get("release_ingestion_sha256"), commit, run_id, generation, original_run)
     expected["source_commit"] = commit
-    for key in ("source_commit", "workflow_sha256", "contract_sha256", "builder_source_sha256"):
+    fields = ("source_commit", "workflow_sha256", "contract_sha256", "builder_source_sha256")
+    if generation == CURRENT_GENERATION:
+        fields += ("generation", "qualification_scope", "configuration_sha256", "source_tree", "repository", "run_id", "workflow_path")
+    for key in fields:
         if record.get(key) != expected[key]:
             raise ContractError("HOSTED_BINDING", "Summary differs from adopted source")
     if (record.get("production_enabled") is not False or record.get("publication_authority") is not False
@@ -335,11 +380,11 @@ def validate_summary_binding(summary, repository, commit):
     return record
 
 
-def validate_summary(summary, repository, commit):
-    record = validate_summary_binding(summary, repository, commit)
-    expected = provenance(repository, record.get("release_ingestion_sha256"))
+def validate_summary(summary, repository, commit, *, generation=HISTORICAL_GENERATION, run_id=None, original_run=None):
+    record = validate_summary_binding(summary, repository, commit, generation=generation, run_id=run_id, original_run=original_run)
+    expected = _validation_provenance(repository, record.get("release_ingestion_sha256"), commit, run_id, generation, original_run)
     expected["source_commit"] = commit
-    lanes = required(repository)
+    lanes = required(repository, generation=generation)
     keys = {(l["lane"], l["system"]) for l in lanes}
     receipts = record.get("receipts", [])
     if len(receipts) != len(keys) or {(r["lane"], r["system"]) for r in receipts} != keys:
@@ -361,9 +406,10 @@ def validate_summary(summary, repository, commit):
     from rs9.package_roles import is_installable_binary, validate_role_declarations
     for row in receipts:
         lane = next(l for l in lanes if (l["lane"], l["system"]) == (row["lane"], row["system"]))
-        if row.get("provenance") != {k: record[k] for k in expected} or gate_blockers(lane, row):
+        if row.get("provenance") != {k: record[k] for k in expected} or gate_blockers(lane, row, generation=generation):
             raise ContractError("HOSTED_GATES", "Missing gate or mixed receipt provenance")
-        if row.get("execution_error") or row.get("policy_blockers") or row.get("production_enabled") is not False:
+        if (row.get("execution_error") or row.get("policy_blockers") or row.get("production_enabled") is not False
+                or (generation == CURRENT_GENERATION and row.get("publication_authority") is not False)):
             raise ContractError("HOSTED_GATES", "Receipt has unresolved failures or publication authority")
         if row.get("lane") == "rpm":
             details = row.get("details", {})
@@ -371,7 +417,7 @@ def validate_summary(summary, repository, commit):
                 raise ContractError("HOSTED_POLICY", "Malformed RPM policy details")
             if details.get("rpm_evidence_contract") != CURRENT_RPM_EVIDENCE_CONTRACT:
                 raise ContractError("HOSTED_NOT_QUALIFIED", "Historical marker-free RPM evidence cannot acquire new qualification")
-        validate_rpm_policy_source(repository, row)
+        validate_rpm_policy_source(repository, row, generation=generation)
         tokens, errors = promotion_restrictions(lane, row)
         if errors:
             raise ContractError(errors[0], "Receipt has invalid promotion restrictions")
@@ -390,7 +436,7 @@ def validate_summary(summary, repository, commit):
                 or manifest.get("production_enabled") is not False or manifest.get("publication_authority") is not False
                 or not manifest.get("files")):
             raise ContractError("HOSTED_CUSTODY", "Manifest and receipt binding differ")
-    if record.get("job_conclusions") != {key:"success" for key in set(contract(repository)["required_jobs"]) - {"summary"}}:
+    if record.get("job_conclusions") != {key:"success" for key in set(contract(repository, generation=generation)["required_jobs"]) - {"summary"}}:
         raise ContractError("HOSTED_JOBS", "Source-required workflow job conclusions missing")
     if (record.get("production_enabled") is not False or record.get("publication_authority") is not False
             or record.get("adoptable") is not True or record.get("event") != "push"

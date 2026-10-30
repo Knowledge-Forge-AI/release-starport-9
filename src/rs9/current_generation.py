@@ -96,3 +96,53 @@ def bind_catalog_product(row, capture, intent, *, generation=HISTORICAL_GENERATI
         if (icon["path"] != path or icon["sha256"] != digest(data) or icon["size"] != len(data)
                 or icon["url"] != "https://raw.githubusercontent.com/" + repository + "/" + row["commit"] + "/" + path):
             raise ContractError("NIX_CATALOG_BINDING", "Catalog icon differs from authenticated tagged source")
+
+
+DISTRIBUTION_SCOPE = "current-distribution-only"
+DISTRIBUTION_JOBS = ("config", "unit", "authenticate", "pins", "nix", "native", "pages", "summary")
+DISTRIBUTION_LANES = ("unit", "pins", "authenticate", "nix", "pacman", "rpm", "deb", "pages", "summary")
+
+
+def distribution_paths(generation=HISTORICAL_GENERATION):
+    """Closed qualification policy selection; paths never come from callers."""
+    generation_paths(generation)
+    if generation == HISTORICAL_GENERATION:
+        return (".github/workflows/rs9-candidate-tests.yml", "operators/live1/hosted-lanes.json", "full-live1")
+    return (".github/workflows/rs9-current-distribution-tests.yml",
+            "operators/theme-forge-current-202610/hosted-lanes.json", DISTRIBUTION_SCOPE)
+
+
+def rpm_policy_path(generation=HISTORICAL_GENERATION):
+    generation_paths(generation)
+    return ("operators/live1/rpm-lint-policy.json" if generation == HISTORICAL_GENERATION
+            else "operators/theme-forge-current-202610/rpm-lint-policy.json")
+
+
+def configuration_paths(repository, *, generation=HISTORICAL_GENERATION):
+    """Enumerate only the selected source-owned configuration, including held inputs."""
+    from pathlib import Path
+    bootstrap, expectations = generation_paths(generation)
+    _, contract, _ = distribution_paths(generation)
+    root = Path(repository)
+    paths = {bootstrap, expectations, contract, catalog_path(generation), command_contract_path(generation),
+             rpm_policy_path(generation), "operators/live1/targets.json"}
+    prefix = "operators/live1" if generation == HISTORICAL_GENERATION else "operators/theme-forge-current-202610"
+    paths.add(prefix + "/nebular-callers.json")
+    paths.update(p.relative_to(root).as_posix() for p in (root / bootstrap).parent.rglob("*.json"))
+    return sorted(paths)
+
+
+def configuration_identity(repository, *, generation=HISTORICAL_GENERATION):
+    import hashlib
+    from pathlib import Path
+    from rs9.scratch import canonical
+    root = Path(repository)
+    rows = []
+    for relative in configuration_paths(root, generation=generation):
+        path = root / relative
+        if not path.is_file() or path.is_symlink():
+            rows.append({"path": relative, "status": "held-missing-physical-input"})
+        else:
+            data = path.read_bytes()
+            rows.append({"path": relative, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+    return hashlib.sha256(canonical(rows)).hexdigest()

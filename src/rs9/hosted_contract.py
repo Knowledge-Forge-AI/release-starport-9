@@ -6,6 +6,8 @@ from pathlib import Path
 import re
 from typing import Any
 
+from rs9.current_generation import (HISTORICAL_GENERATION, CURRENT_GENERATION, distribution_paths,
+                                    DISTRIBUTION_JOBS, DISTRIBUTION_LANES, DISTRIBUTION_SCOPE)
 from rs9.errors import ContractError
 from rs9.scratch import canonical, physical_directory
 from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
@@ -87,9 +89,10 @@ def compute_auth_sha256(projection: dict) -> str:
     return hashlib.sha256(canonical(projection)).hexdigest()
 
 
-def load_hosted_lanes(repository: Path) -> dict:
-    """Load and validate operators/live1/hosted-lanes.json."""
-    lanes_path = physical_directory(repository) / "operators/live1/hosted-lanes.json"
+def load_hosted_lanes(repository: Path, *, generation=HISTORICAL_GENERATION) -> dict:
+    """Load and validate the closed source-owned qualification contract."""
+    _, relative, _ = distribution_paths(generation)
+    lanes_path = physical_directory(repository) / relative
     if not lanes_path.is_file():
         raise ContractError("LANES_MISSING", "operators/live1/hosted-lanes.json missing")
     raw = lanes_path.read_bytes()
@@ -112,6 +115,14 @@ def load_hosted_lanes(repository: Path) -> dict:
                 raise ContractError("LANES_POLICY", "experiment qualification_authority must be false")
     if "experiment_jobs" in doc and not isinstance(doc["experiment_jobs"], list):
         raise ContractError("LANES_SCHEMA", "Hosted experiment_jobs must be a list")
+    if generation == CURRENT_GENERATION:
+        historical = json.loads((Path(repository) / "operators/live1/hosted-lanes.json").read_bytes())
+        selected = [row for row in historical["lanes"] if row["lane"] in DISTRIBUTION_LANES]
+        if (doc.get("generation") != generation or doc.get("qualification_scope") != DISTRIBUTION_SCOPE
+                or doc.get("publication_authority") is not False
+                or doc.get("required_jobs") != list(DISTRIBUTION_JOBS) or doc["lanes"] != selected
+                or doc.get("experiments") != [] or doc.get("experiment_jobs") != []):
+            raise ContractError("LANES_POLICY", "Exact current distribution contract required")
     return doc
 
 
@@ -189,14 +200,17 @@ def validate_execution_result(result: dict) -> dict:
     return result
 
 
-def validate_hosted_summary(summary: Any, repository: Path, commit: str) -> dict:
+def validate_hosted_summary(summary: Any, repository: Path, commit: str, *, generation=HISTORICAL_GENERATION, run_id=None, original_run=None) -> dict:
+    distribution_paths(generation)
     from rs9.hosted_summary import validate_summary
     if isinstance(summary, dict) and summary.get("schema") == "rs9.hosted-candidate-summary.v1alpha2":
-        return validate_summary(summary, repository, commit)
+        return validate_summary(summary, repository, commit, generation=generation, run_id=run_id, original_run=original_run)
     if isinstance(summary, (str, Path)) and (Path(summary) / "hosted-summary.json").is_file():
-        return validate_summary(summary, repository, commit)
+        return validate_summary(summary, repository, commit, generation=generation, run_id=run_id, original_run=original_run)
     """Validate fail-closed hosted summary completeness and provenance.
     Usable by parent operator validate_hosted_summary(summary, repository, commit)."""
+    if generation == CURRENT_GENERATION:
+        raise ContractError("HOSTED_SUMMARY", "Current distribution requires the bound v1alpha2 summary")
     repository = physical_directory(repository)
     if isinstance(summary, (str, Path)):
         summary_path = physical_directory(Path(summary))

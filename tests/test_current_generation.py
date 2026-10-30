@@ -273,13 +273,23 @@ class CurrentGenerationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             work = Path(temporary) / "work"
             work.mkdir()
-            with patch("rs9.hosted_pipeline.capture_generation", side_effect=ContractError("FETCH_FAILED", "Offline")) as capture, \
+            receipts = Path(temporary) / "receipts"
+            with patch.dict("os.environ", {"GITHUB_SHA": "1" * 40, "GITHUB_RUN_ID": "7", "GITHUB_RUN_ATTEMPT": "1",
+                    "GITHUB_REPOSITORY": "Knowledge-Forge-AI/release-starport-9", "GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/main"}), \
+                 patch("rs9.hosted_pipeline.capture_generation", side_effect=ContractError("FETCH_FAILED", "Offline")) as capture, \
                  patch("rs9.hosted_pipeline.report_generation", return_value={}) as report, \
                  patch("rs9.hosted_pipeline.runner_facts", return_value={}):
-                self.assertEqual(run_lane(ROOT, work, Path(temporary) / "receipts", "authenticate", "generation",
+                self.assertEqual(run_lane(ROOT, work, receipts, "authenticate", "generation",
                     client=object(), generation=CURRENT_GENERATION), 2)
-            self.assertEqual(capture.call_args.kwargs["generation"], CURRENT_GENERATION)
-            self.assertEqual(report.call_args.kwargs["generation"], CURRENT_GENERATION)
+            capture.assert_not_called()
+            report.assert_not_called()
+            receipt = json.loads((receipts / "authenticate-generation.json").read_bytes())
+            manifest = json.loads((receipts / "artifact-manifest.json").read_bytes())
+            self.assertEqual(receipt["execution_error"], "HOSTED_SOURCE_TREE")
+            self.assertIsNone(receipt["provenance"]["source_tree"])
+            self.assertIsNone(manifest["source_tree"])
+            self.assertEqual(manifest["execution_error"], "HOSTED_SOURCE_TREE")
+            self.assertEqual(manifest["generation"], CURRENT_GENERATION)
 
     def test_attended_authentication_selects_current_manifest(self):
         with tempfile.TemporaryDirectory() as temporary:

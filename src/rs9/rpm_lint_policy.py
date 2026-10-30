@@ -11,19 +11,65 @@ import posixpath
 from rs9.release_core import digest
 from rs9.scratch import canonical
 from rs9.rpm_preservation import duplicate_groups, duplicate_waste_totals, INVENTORY_SCHEMA
+from rs9.current_generation import HISTORICAL_GENERATION, CURRENT_GENERATION, generation_paths, rpm_policy_path
 
 DEFAULT_POLICY_PATH = Path(__file__).resolve().parents[2]/'operators/live1/rpm-lint-policy.json'
 RPM_LINT_POLICY_SCHEMA = 'rs9.rpm-lint-policy.v1'
 RPM_POLICY_EVALUATION_SCHEMA = 'rs9.rpm-lint-policy-evaluation.v1'
 PERMITTED_EXCEPTION_CLASSES = frozenset({'env-script-interpreter','non-executable-script','files-duplicated-waste'})
 CURRENT_VERSIONS = {'theme-forge-stellar-burst':'0.6.1','theme-forge-stellar-loom':'0.4.0','theme-forge-solar-sail':'0.2.1','theme-forge-nebular-fusion':'0.6.1'}
+CURRENT_GENERATION_VERSIONS = {'theme-forge-stellar-burst':'0.7.0','theme-forge-stellar-loom':'0.5.0','theme-forge-solar-sail':'0.3.0','theme-forge-nebular-fusion':'0.7.0'}
 UNWAIVABLE_ERROR_CLASSES = frozenset({'no-changelogname-tag','explicit-lib-dependency'})
 MISSING_EVIDENCE_PREDICATES = frozenset({'caller-contract-unproven', 'caller-member-missing',
     'caller-reference-unresolved', 'engine-floor-unproven', 'engine-floor-unmet',
     'node-runtime-floor-unobserved', 'caller-content-or-identity-unproven'})
 
 
-def _validate_policy(policy):
+def _validate_current_policy(policy):
+    """Current preparation cannot import a historical exception disposition."""
+    if (policy.get('generation') != CURRENT_GENERATION or policy.get('status') != 'blocked'
+            or policy.get('blocking') is not True
+            or set(policy.get('projects', {})) != set(CURRENT_GENERATION_VERSIONS)
+            or policy.get('unwaivable_error_classes') != ['no-changelogname-tag', 'explicit-lib-dependency']
+            or policy.get('tool_constraints') != {'tool':'rpmlint', 'version':'2.8.0',
+                'package_version':'2.8.0-2.fc43', 'allowed_exit_codes':[0,64], 'filtered_count':8}):
+        raise ContractError('INVALID_POLICY', 'Current diagnostic-only policy and strict tool constraints required')
+    root = Path(__file__).resolve().parents[2]
+    catalog = json.loads((root/'nix/theme-forge-current-202610-products.json').read_bytes())['products']
+    callers = json.loads((root/'operators/theme-forge-current-202610/nebular-callers.json').read_bytes())
+    for name, entry in policy['projects'].items():
+        native = name in {'theme-forge-stellar-burst', 'theme-forge-nebular-fusion'}
+        if (entry.get('status') != 'blocked' or entry.get('blocking') is not True or entry.get('exceptions') != {}
+                or entry.get('allowed_architectures') != (['x86_64','aarch64'] if native else ['noarch'])
+                or entry.get('allowed_systems') != ['x86_64-linux','aarch64-linux']):
+            raise ContractError('INVALID_POLICY', 'Current blocked exact architecture scope required')
+        if name == 'theme-forge-nebular-fusion':
+            expected_auth = {'assets': [dict(name=callers['platforms'][system]['asset']['name'],
+                sha256=callers['platforms'][system]['asset']['sha256'])
+                for system in ['x86_64-linux','aarch64-linux']]}
+            expected_floor = {key:callers['floor'][source] for key,source in
+                              [('member','installed_member'),('sha256','sha256'),('pointer','pointer')]}
+            if (entry.get('runtime_requires_contract') != expected_floor
+                    or entry.get('archive_contract_members') != [
+                        '/usr/lib/'+name+'/lib/'+name+'/sidecar-payload/manifest.json', callers['floor']['installed_member']]):
+                raise ContractError('INVALID_POLICY', 'Current caller archive and runtime floor contract required')
+            if entry.get('public_symlinks') != {'tfnf': {'path':'/usr/bin/tfnf',
+                    'target':'/usr/lib/'+name+'/bin/tfnf', 'type':'symlink'}}:
+                raise ContractError('INVALID_POLICY', 'Current native public launcher contract required')
+            wrappers = {}
+        else:
+            asset = catalog[name]['asset']
+            expected_auth = {'asset_name':asset['name'], 'asset_sha256':asset['sha256'],
+                             'closure_sha256':None, 'closure_status':'held_pending_observed_npm_closure'}
+            wrappers = {command:dict(path='/usr/bin/'+command, target='/usr/lib/'+name+'/'+target,
+                                    mode='0755', type='node_wrapper')
+                        for command,target in catalog[name]['command_paths'].items()}
+        if entry.get('authenticated_inputs') != expected_auth or entry.get('launchers', {}) != wrappers:
+            raise ContractError('INVALID_POLICY', 'Current exact asset and maintained wrapper contract required')
+
+
+def _validate_policy(policy, *, generation=HISTORICAL_GENERATION):
+    generation_paths(generation)
     json.dumps(policy, allow_nan=False)
     if not isinstance(policy, dict) or policy.get('schema') != RPM_LINT_POLICY_SCHEMA:
         raise ContractError('INVALID_POLICY', 'Invalid candidate lint policy schema')
@@ -36,8 +82,9 @@ def _validate_policy(policy):
         raise ContractError('INVALID_POLICY', 'Explicit existing tool filter count required')
     if not isinstance(codes, list) or set(codes) != PERMITTED_EXCEPTION_CLASSES or not isinstance(projects, dict) or not projects:
         raise ContractError('INVALID_POLICY', 'Malformed candidate lint policy')
+    versions = CURRENT_VERSIONS if generation == HISTORICAL_GENERATION else CURRENT_GENERATION_VERSIONS
     for name, entry in projects.items():
-        if not isinstance(entry, dict) or entry.get('package_name') != name or entry.get('version') != CURRENT_VERSIONS.get(name):
+        if not isinstance(entry, dict) or entry.get('package_name') != name or entry.get('version') != versions.get(name):
             raise ContractError('INVALID_POLICY', 'Malformed exact project identity')
         architectures = entry.get('allowed_architectures')
         systems = entry.get('allowed_systems')
@@ -125,12 +172,17 @@ def _validate_policy(policy):
                             raise ContractError('INVALID_POLICY', 'Unauthorized script intent')
                     elif discriminator is not None or 'systems' in rule:
                         raise ContractError('INVALID_POLICY', 'Unknown or ambiguous discriminator')
+    if generation == CURRENT_GENERATION:
+        _validate_current_policy(policy)
     return policy
 
 
-def load_policy(path=None):
+def load_policy(path=None, *, generation=HISTORICAL_GENERATION):
+    generation_paths(generation)
+    selected = (DEFAULT_POLICY_PATH if generation == HISTORICAL_GENERATION else
+                Path(__file__).resolve().parents[2]/rpm_policy_path(generation))
     try:
-        return _validate_policy(json.loads((Path(path) if path is not None else DEFAULT_POLICY_PATH).read_bytes()))
+        return _validate_policy(json.loads((Path(path) if path is not None else selected).read_bytes()), generation=generation)
     except (OSError, ValueError, TypeError) as exc:
         raise ContractError('INVALID_POLICY', 'Candidate lint policy unavailable or malformed') from exc
 
@@ -428,7 +480,7 @@ def _blocked_evaluation(reason, raw, inputs):
             'raw_exit_code': receipt.get('exit_code') if isinstance(receipt, dict) else None}
 
 
-def _evaluate_policy(raw_evidence, inventory, inputs, policy=None):
+def _evaluate_policy(raw_evidence, inventory, inputs, policy=None, *, generation=HISTORICAL_GENERATION):
     """Only complete raw results and exact member proofs can accept exceptions."""
     if not isinstance(raw_evidence, dict):
         return _blocked_evaluation('malformed-raw-evidence', raw_evidence, inputs)
@@ -437,9 +489,12 @@ def _evaluate_policy(raw_evidence, inventory, inputs, policy=None):
     accepted, proofs, duplicates, rule_blockers = [], [], [], []
     payload_compromised = False
     try:
-        policy = _validate_policy(policy) if policy is not None else load_policy()
+        policy = (_validate_policy(policy, generation=generation) if policy is not None
+                  else load_policy(generation=generation))
         entry = policy['projects'].get(inputs.get('project_id'))
         blockers = _raw_blockers(raw_evidence, policy)
+        if generation == CURRENT_GENERATION:
+            blockers.append('current-generation-diagnostic-only')
         if not isinstance(entry, dict):
             blockers.append('unauthorized-project')
             payload_compromised = True
@@ -539,9 +594,13 @@ def _evaluate_policy(raw_evidence, inventory, inputs, policy=None):
     return result
 
 
-def evaluate_policy(raw_evidence, inventory, inputs, policy=None):
+def evaluate_policy(raw_evidence, inventory, inputs, policy=None, *, generation=HISTORICAL_GENERATION):
     """Malformed observations and serialization must also produce a blocked result."""
     try:
-        return _evaluate_policy(raw_evidence, inventory, inputs, policy)
+        return _evaluate_policy(raw_evidence, inventory, inputs, policy, generation=generation)
+    except OSError:
+        if generation == HISTORICAL_GENERATION:
+            raise
+        return _blocked_evaluation('malformed-or-unavailable-policy-evidence', raw_evidence, inputs)
     except (ContractError, ValueError, TypeError, KeyError, AttributeError, OverflowError, RecursionError):
         return _blocked_evaluation('malformed-or-unavailable-policy-evidence', raw_evidence, inputs)

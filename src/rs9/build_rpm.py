@@ -21,6 +21,7 @@ import posixpath
 import re
 import shutil
 from typing import Any, Mapping, Sequence
+from rs9.current_generation import HISTORICAL_GENERATION, CURRENT_GENERATION, generation_paths
 
 from rs9.build_native import (
     CommandReceipt,
@@ -462,8 +463,10 @@ def build_rpm_candidate(
     policy: Mapping[str, Any] | None = None,
     client_runtime: Mapping[str, Any] | None = None,
     caller_evidence: Mapping[str, Any] | None = None,
+    generation: str = HISTORICAL_GENERATION,
 ) -> dict[str, Any]:
     """Build Fedora 43 RPM candidate package using real rpmbuild, rpmlint, and createrepo."""
+    generation_paths(generation)
     scratch = validate_scratch_root(scratch_dir)
 
     ctx = validate_build_inputs(
@@ -615,8 +618,11 @@ def build_rpm_candidate(
             # Keep executable Loom shebang Requires, bound to authenticated metadata.
             from rs9.nebular_callers import release_runtime_floor
             from rs9.rpm_lint_policy import load_policy
-            current_policy = policy if policy is not None else load_policy()
-            floor = release_runtime_floor(ctx["asset_file"], current_policy["projects"][project_id])
+            current_policy = policy if policy is not None else (
+                load_policy() if generation == HISTORICAL_GENERATION else load_policy(generation=generation))
+            floor = (release_runtime_floor(ctx["asset_file"], current_policy["projects"][project_id])
+                     if generation == HISTORICAL_GENERATION else
+                     release_runtime_floor(ctx["asset_file"], current_policy["projects"][project_id], capture=capture))
             fedora_packages_for_spec.remove("nodejs")
             fedora_packages_for_spec.add("nodejs " + floor)
 
@@ -947,9 +953,10 @@ def build_rpm_candidate(
     if resolved_policy is None:
         try:
             from rs9.rpm_lint_policy import load_policy
-            resolved_policy = load_policy()
+            resolved_policy = load_policy() if generation == HISTORICAL_GENERATION else load_policy(generation=generation)
         except Exception:
-            resolved_policy = None
+            # Current selection failure remains explicit; None would reload a default.
+            resolved_policy = None if generation == HISTORICAL_GENERATION else {}
 
     # Collect preservation inventory
     staged_nm_for_inventory = None if is_native_desktop else (rpm_topdir / "staged_node_modules")
@@ -1018,6 +1025,7 @@ def build_rpm_candidate(
         inventory=inventory,
         inputs=policy_inputs,
         policy=resolved_policy,
+        **({"generation": generation} if generation != HISTORICAL_GENERATION else {}),
     )
 
     # Check policy acceptance

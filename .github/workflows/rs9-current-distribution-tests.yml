@@ -1,0 +1,257 @@
+name: RS9 current distribution qualification proposal
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: rs9-current-distribution-${{ github.sha }}-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  config:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix_nix: ${{ steps.lanes.outputs.matrix_nix }}
+      matrix_native: ${{ steps.lanes.outputs.matrix_native }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - id: lanes
+        env:
+          PYTHONPATH: src
+        run: python3 -m rs9.hosted_pipeline config --repository . --generation theme-forge-current-202610
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Source contracts
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest discover -s tests -q
+  authenticate:
+    needs: [config]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Execute non-production authenticate lane
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline 'authenticate' --system 'generation' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs" --generation theme-forge-current-202610
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: candidate-authenticate-generation
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  pins:
+    needs: [config, authenticate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Execute non-production pins lane
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline 'pins' --system 'generation' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs" --generation theme-forge-current-202610
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: candidate-pins-generation
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  nix:
+    name: ${{ matrix.job_name }}
+    needs: [config, authenticate, pins]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.config.outputs.matrix_nix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Install version-bound Nix for hosted builds
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: python3 -m rs9.hosted_nix install --repository . --scratch "$RUNNER_TEMP/rs9-nix-install"
+      - name: Enable installed Nix
+        if: ${{ !cancelled() }}
+        run: |
+          echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH"
+          echo "NIX_CONFIG=experimental-features = nix-command flakes" >> "$GITHUB_ENV"
+      - name: Execute non-production nix lane
+        if: ${{ !cancelled() }}
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          if [[ "${RUNNER_OS-}" == 'Linux' ]]; then
+            ./.github/scripts/rs9-linux-userns-apparmor-guard.sh -- \
+              python3 -m rs9.hosted_pipeline 'nix' --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs" --generation theme-forge-current-202610
+          elif [[ "${RUNNER_OS-}" == 'macOS' ]]; then
+          python3 -m rs9.hosted_pipeline 'nix' --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs" --generation theme-forge-current-202610
+          else
+            printf '%s\n' 'Unsupported runner OS for the maintained nix matrix' >&2
+            exit 78
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  native:
+    name: ${{ matrix.job_name }}
+    needs: [config, authenticate, pins]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.config.outputs.matrix_native) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Provision hosted repository tools
+        run: sudo apt-get update && sudo apt-get install -y gnupg rpm createrepo-c libarchive-tools zstd xz-utils
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Execute non-production native lane
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline '${{ matrix.lane }}' --system '${{ matrix.system }}' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs" --generation theme-forge-current-202610
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  pages:
+    needs: [config, authenticate, pins, native]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Provision hosted repository tools
+        run: sudo apt-get update && sudo apt-get install -y gnupg rpm createrepo-c libarchive-tools zstd xz-utils
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Execute non-production pages lane
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline 'pages' --system 'generation' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs" --generation theme-forge-current-202610
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: candidate-pages-generation
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  summary:
+    if: ${{ always() }}
+    needs: [config, unit, authenticate, pins, nix, native, pages]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Verify every source-required receipt and custody manifest
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_JOB_CONCLUSIONS: ${{ toJSON(needs) }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-inputs" "$RUNNER_TEMP/rs9-summary"
+          python3 -m rs9.hosted_pipeline summary --inputs "$RUNNER_TEMP/rs9-inputs" --receipts "$RUNNER_TEMP/rs9-summary" --generation theme-forge-current-202610
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ always() }}
+        with:
+          name: hosted-summary
+          path: ${{ runner.temp }}/rs9-summary/
+          retention-days: 90
+          if-no-files-found: error

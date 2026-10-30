@@ -13,11 +13,11 @@ import traceback
 from rs9.candidate import capture_generation
 from rs9.command_report import report_generation
 from rs9.errors import ContractError, safe_details
-from rs9.current_generation import HISTORICAL_GENERATION, GENERATIONS, generation_paths
+from rs9.current_generation import HISTORICAL_GENERATION, CURRENT_GENERATION, GENERATIONS, generation_paths, rpm_policy_path
 from rs9.github import PublicClient
 from rs9.hosted_commands import bind_commands
 from rs9.hosted_contract import canonical_release_auth_projection, compute_auth_sha256, generate_matrix_outputs
-from rs9.hosted_custody import provenance, retain, runner_facts, verify_set
+from rs9.hosted_custody import provenance, diagnostic_provenance, retain, runner_facts, verify_set
 from rs9.hosted_summary import contract, required, gate_blockers, summarize
 from rs9.scratch import canonical, physical_directory
 
@@ -41,12 +41,13 @@ def internal_error_details(error, lane, module):
     return safe_details(details)
 
 
-def _inputs(inputs, repository, commit):
+def _inputs(inputs, repository, commit, *, generation=HISTORICAL_GENERATION):
+    generation_paths(generation)
     records = {}
     if inputs:
         for path in Path(inputs).rglob("artifact-manifest.json"):
             manifest = verify_set(path.parent)
-            local = provenance(repository, manifest["release_ingestion_sha256"])
+            local = provenance(repository, manifest["release_ingestion_sha256"], generation=generation)
             if any(manifest.get(k) != local[k] for k in local):
                 raise ContractError("CUSTODY_SOURCE", "Mixed source, workflow, builder, contract or run provenance")
             key = (manifest["lane"], manifest["system"])
@@ -72,7 +73,7 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
     repository, scratch = physical_directory(repository), physical_directory(scratch)
     if any(scratch.iterdir()):
         raise ContractError("OUTPUT_NOT_EMPTY", "Fresh hosted scratch required")
-    c = contract(repository)
+    c = contract(repository, generation=generation)
     all_lanes = c.get("lanes", []) + c.get("experiments", [])
     rows = [r for r in all_lanes if r["lane"] == lane and r["system"] == system]
     if len(rows) != 1:
@@ -102,9 +103,15 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
     files, ingestion = [], None
     lane_scratch = scratch / "lane-work"
     bytes_authenticated = False
+    initial_source = None
     try:
+        if generation == CURRENT_GENERATION:
+            initial_source = provenance(repository, None, generation=generation)
         validate_host(system)
-        upstream = _inputs(inputs, repository, commit)
+        policy_path = repository / rpm_policy_path(generation)
+        if generation == CURRENT_GENERATION and lane == "rpm" and (not policy_path.is_file() or policy_path.is_symlink()):
+            raise ContractError("CURRENT_RPM_POLICY_HELD", "Selected current RPM policy is not ready")
+        upstream = _inputs(inputs, repository, commit, generation=generation)
         capture_root = scratch / "capture"
         capture_root.mkdir()
         client = client or PublicClient(api_token=os.environ.get("RS9_GITHUB_READ_TOKEN"))
@@ -161,7 +168,7 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
                 record["policy_blockers"].append("nix-installer-run-resolved-not-source-reproducible")
             if lane == "pins" and not result["details"]["pins"]["all_source_pinned"]:
                 record["policy_blockers"].append("container-pins-run-resolved-not-source-reproducible")
-        if gate_blockers(row, record):
+        if gate_blockers(row, record, generation=generation):
             record["execution_error"] = "required-gates-unsatisfied"
     except Exception as error:
         # Retain diagnostic custody even for an unexpected builder exception.
@@ -193,7 +200,20 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
             files.append(command_report)
         except Exception:
             record["command_report_error"] = "report-unavailable"
-    record["provenance"] = provenance(repository, ingestion)
+    if generation == HISTORICAL_GENERATION:
+        record["provenance"] = provenance(repository, ingestion, generation=generation)
+    elif initial_source is None:
+        record["provenance"] = diagnostic_provenance(repository, ingestion, record["execution_error"], generation=generation)
+    else:
+        try:
+            final_source = provenance(repository, ingestion, generation=generation)
+            if {key: value for key, value in final_source.items() if key != "release_ingestion_sha256"} != {
+                    key: value for key, value in initial_source.items() if key != "release_ingestion_sha256"}:
+                raise ContractError("HOSTED_SOURCE_TREE", "Current source identity changed during execution")
+            record["provenance"] = final_source
+        except ContractError as error:
+            record["execution_error"] = error.code
+            record["provenance"] = diagnostic_provenance(repository, ingestion, error.code, generation=generation)
     if is_experiment:
         # Offline is proven only by the explicit in-guest denial result the gate itself carries;
         # a synthesized or absent gate (for example after an earlier execution error) proves nothing.
@@ -247,7 +267,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     repository = physical_directory(args.repository)
     if args.command == "config":
-        outputs = generate_matrix_outputs(contract(repository))
+        outputs = generate_matrix_outputs(contract(repository, generation=args.generation))
         if os.environ.get("GITHUB_OUTPUT"):
             with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
                 for key, value in outputs.items():
@@ -256,7 +276,7 @@ def main(argv=None):
             print(canonical(outputs).decode(), end="")
         return 0
     if args.command == "summary":
-        return summarize(repository, physical_directory(args.inputs), Path(args.receipts))
+        return summarize(repository, physical_directory(args.inputs), Path(args.receipts), generation=args.generation)
     return run_lane(repository, physical_directory(args.scratch), Path(args.receipts), args.command, args.system,
                     inputs=Path(args.inputs) if args.inputs else None, generation=args.generation)
 
