@@ -2272,6 +2272,7 @@ class Nebular070PublisherSeamTests(unittest.TestCase):
             pin=self.base_pin,
             get=lambda _u: canonical({"info": {"name": PROJECT}, "releases": {"0.6.1": []}}),
             attempt_marker=marker_all,
+            environ={},
         )
         self.assertTrue(res_all["upload"])
         self.assertEqual(res_all["state"], "version-absent")
@@ -2290,6 +2291,7 @@ class Nebular070PublisherSeamTests(unittest.TestCase):
                 pin=self.base_pin,
                 get=lambda _u: canonical({"info": {"name": PROJECT}, "releases": {"0.6.1": []}}),
                 attempt_marker=marker_all,
+                environ={},
             )
         self.assertEqual(ctx_mkr.exception.code, "TF_PYPI_PRIOR_ATTEMPT_UNCONFIRMED")
 
@@ -2315,6 +2317,7 @@ class Nebular070PublisherSeamTests(unittest.TestCase):
             approval=self.base_approval,
             pin=self.base_pin,
             get=_get_inc,
+            environ={},
         )
         self.assertTrue(res_part["upload"])
         self.assertEqual(res_part["state"], "incomplete")
@@ -2340,6 +2343,7 @@ class Nebular070PublisherSeamTests(unittest.TestCase):
             approval=self.base_approval,
             pin=self.base_pin,
             get=_get_exact,
+            environ={},
         )
         self.assertFalse(res_none["upload"])
         self.assertEqual(res_none["state"], "published-exact")

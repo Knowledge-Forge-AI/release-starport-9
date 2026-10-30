@@ -105,7 +105,8 @@ class RpmOrchestrationTests(unittest.TestCase):
                         (output / "summary").mkdir()
                         (output / "summary/authentication.json").write_bytes(b"{}")
                         return context["captures"]
-                    def command_bindings(captures, repository, output):
+                    def command_bindings(captures, repository, output, *, generation):
+                        self.assertEqual(generation, "theme-forge-live1")
                         path = output / "command-bindings.json"
                         path.write_bytes(b"{}")
                         return path

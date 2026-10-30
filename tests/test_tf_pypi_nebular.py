@@ -1881,7 +1881,16 @@ class NebularPyPIContractTests(unittest.TestCase):
         from rs9.tf_pypi_nebular import _nebular_import_closure_paths
 
         closure_paths = _nebular_import_closure_paths(ROOT)
-        self.assertEqual(len(closure_paths), 108)
+        self.assertEqual(len(closure_paths), 115)
+        self.assertTrue({
+            "src/rs9/current_generation.py",
+            "src/rs9/current_npm_profile.py",
+            "src/rs9/hosted_contract.py",
+            "src/rs9/hosted_nix.py",
+            "src/rs9/nix_installer.py",
+            "src/rs9/nix_loader.py",
+            "src/rs9/smoke_source_envelope.py",
+        } <= set(closure_paths))
         self.assertIn("src/rs9/nebular070_universal_workflow.py", closure_paths)
         self.assertIn("src/rs9/nebular_lineage.py", closure_paths)
         self.assertIn("src/rs9/tf_pypi_nebular070_publish.py", closure_paths)

@@ -43,7 +43,8 @@ class HostedExecutionTests(unittest.TestCase):
                         (root / "archive.tgz").write_bytes(b"authenticated-payload")
                         snapshots["capture"] = snapshot(root)
                         return []
-                    def bind(captures, repository, root):
+                    def bind(captures, repository, root, *, generation):
+                        self.assertEqual(generation, "theme-forge-live1")
                         path = root / "command-bindings.json"
                         path.write_bytes(b"bindings")
                         return path
@@ -164,7 +165,8 @@ class HostedExecutionTests(unittest.TestCase):
                 (root / "summary/authentication.json").write_text("{}")
                 (root / "immutable-capture.json").write_bytes(b"capture-input")
                 return []
-            def bind(captures, repository, root):
+            def bind(captures, repository, root, *, generation):
+                self.assertEqual(generation, "theme-forge-live1")
                 path = root / "command-bindings.json"
                 path.write_bytes(b"bindings")
                 return path

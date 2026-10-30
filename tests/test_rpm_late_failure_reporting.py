@@ -486,7 +486,8 @@ class RpmLateFailureReportingTests(unittest.TestCase):
                 (root / "summary" / "authentication.json").write_bytes(b"{}")
                 return []
 
-            def fake_bind(c, r, s):
+            def fake_bind(c, r, s, *, generation):
+                self.assertEqual(generation, "theme-forge-live1")
                 p = s / "bind.json"
                 p.write_bytes(b"{}")
                 return p
