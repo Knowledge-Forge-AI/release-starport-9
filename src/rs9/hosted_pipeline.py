@@ -13,6 +13,7 @@ import traceback
 from rs9.candidate import capture_generation
 from rs9.command_report import report_generation
 from rs9.errors import ContractError, safe_details
+from rs9.current_generation import HISTORICAL_GENERATION, GENERATIONS, generation_paths
 from rs9.github import PublicClient
 from rs9.hosted_commands import bind_commands
 from rs9.hosted_contract import canonical_release_auth_projection, compute_auth_sha256, generate_matrix_outputs
@@ -65,7 +66,9 @@ def validate_host(system):
         raise ContractError("HOSTED_ARCHITECTURE", "Runner OS/architecture differs from the source-required lane")
 
 
-def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs=None, phase="candidate"):
+def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs=None, phase="candidate",
+             generation=HISTORICAL_GENERATION):
+    generation_paths(generation)
     repository, scratch = physical_directory(repository), physical_directory(scratch)
     if any(scratch.iterdir()):
         raise ContractError("OUTPUT_NOT_EMPTY", "Fresh hosted scratch required")
@@ -108,7 +111,7 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
         supplemental_receipts = []
         record["npm_corroboration"] = supplemental_receipts
         captures = capture_generation(repository, capture_root, client=client, checkout_binding="hosted:" + commit,
-                                      supplemental_receipts=supplemental_receipts)
+                                      supplemental_receipts=supplemental_receipts, generation=generation)
         bytes_authenticated = True
         projection = canonical_release_auth_projection(json.loads((capture_root / "summary/authentication.json").read_bytes()))
         ingestion = compute_auth_sha256(projection)
@@ -140,7 +143,7 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
         physical_directory(lane_scratch)
         context = {"repository": repository, "scratch": lane_scratch, "captures": captures, "client": client,
                    "binding": {"source_commit": commit, "checkout_binding": "hosted:" + commit}, "system": system,
-                   "inputs": inputs, "pins": pins, "authentication_sha256": ingestion, "family": lane, "phase": phase}
+                   "generation": generation, "inputs": inputs, "pins": pins, "authentication_sha256": ingestion, "family": lane, "phase": phase}
         if lane == "authenticate":
             record["gates"] = [{"name": n, "status": "pass"} for n in row["required_gates"]]
         else:
@@ -186,7 +189,7 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
         try:
             command_report = scratch / "command-report.json"
             command_report.write_bytes(canonical(report_generation(repository, scratch / "capture",
-                                                                    bytes_authenticated=bytes_authenticated)))
+                                                                    bytes_authenticated=bytes_authenticated, generation=generation)))
             files.append(command_report)
         except Exception:
             record["command_report_error"] = "report-unavailable"
@@ -240,6 +243,7 @@ def main(argv=None):
     parser.add_argument("--scratch")
     parser.add_argument("--receipts", required=False)
     parser.add_argument("--inputs")
+    parser.add_argument("--generation", choices=GENERATIONS, default=HISTORICAL_GENERATION)
     args = parser.parse_args(argv)
     repository = physical_directory(args.repository)
     if args.command == "config":
@@ -254,7 +258,7 @@ def main(argv=None):
     if args.command == "summary":
         return summarize(repository, physical_directory(args.inputs), Path(args.receipts))
     return run_lane(repository, physical_directory(args.scratch), Path(args.receipts), args.command, args.system,
-                    inputs=Path(args.inputs) if args.inputs else None)
+                    inputs=Path(args.inputs) if args.inputs else None, generation=args.generation)
 
 
 if __name__ == "__main__":

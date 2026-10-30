@@ -10,6 +10,7 @@ from rs9.errors import ContractError
 from rs9.github import PublicClient
 from rs9.nebular_lineage import select_forward_lineage_proof
 from rs9.operator import BOOTSTRAP, EXPECTATIONS, assert_release_expectations
+from rs9.current_generation import HISTORICAL_GENERATION, GENERATIONS, generation_paths
 from rs9.profiles import (TAURI_PROFILE, TAURI_AUTHORITY_PROFILE, capture_supplemental,
                           evaluate_profile, record_corroboration_failure, selection_for_intent)
 from rs9.records import record_sha256
@@ -17,26 +18,27 @@ from rs9.release_core import authenticate_release, capture_release, digest
 from rs9.scratch import ConfinedWriter, canonical, physical_directory
 
 
-def configuration_rows(repository):
+def configuration_rows(repository, *, generation=HISTORICAL_GENERATION):
     root = physical_directory(repository)
-    manifest = root / BOOTSTRAP
+    manifest = root / generation_paths(generation)[0]
     # Candidate source selects its checked bootstrap; this is not an operator
     # approval and cannot authorize publication. load_bootstrap grants only the
-    # configuration capability needed to inspect this exact old generation.
+    # configuration capability needed to inspect this exact selected generation.
     return checked_bootstrap_configurations(manifest, approved_manifests=[digest(manifest.read_bytes())])
 
 
 def capture_generation(repository, output, *, project=None, client=None, checkout_binding="provider-uncommitted",
-                       supplemental_receipts=None):
+                       supplemental_receipts=None, generation=HISTORICAL_GENERATION):
+    bootstrap, expectations_path = generation_paths(generation)
     root, output = physical_directory(repository), physical_directory(output)
     if any(output.iterdir()):
         raise ContractError("OUTPUT_NOT_EMPTY", "Fresh candidate scratch must be empty")
-    rows = configuration_rows(root)
+    rows = configuration_rows(root, generation=generation)
     if project is not None:
         rows = [(row, intent) for row, intent in rows if intent["project"]["id"] == project]
         if len(rows) != 1:
             raise ContractError("CANDIDATE_PROJECT", "One current-generation project required")
-    expectations = json.loads((root / EXPECTATIONS).read_bytes())["projects"]
+    expectations = json.loads((root / expectations_path).read_bytes())["projects"]
     client = client or PublicClient()
     results, summaries = [], []
     for row, intent in rows:
@@ -55,7 +57,7 @@ def capture_generation(repository, output, *, project=None, client=None, checkou
                 raise ContractError("LIVE1_RELEASE_MISMATCH", "Exactly one release expectation required")
             assert_release_expectations(capture, expected[0])
             stage = "bootstrap"
-            manifest = root / BOOTSTRAP
+            manifest = root / bootstrap
             intent = load_bootstrap(manifest, capture, approved_manifests=[digest(manifest.read_bytes())])
             require_configuration_authority(capture, intent)
             stage = "lineage"
@@ -100,12 +102,13 @@ def main(argv=None):
     parser.add_argument("--repository", default=".")
     parser.add_argument("--scratch", required=True)
     parser.add_argument("--project")
+    parser.add_argument("--generation", choices=GENERATIONS, default=HISTORICAL_GENERATION)
     args = parser.parse_args(argv)
     scratch = physical_directory(args.scratch)
     try:
         binding = "hosted:" + os.environ["GITHUB_SHA"] if os.environ.get("GITHUB_ACTIONS") == "true" else "provider-uncommitted"
         identity = os.environ.get("RS9_GITHUB_READ_TOKEN") if os.environ.get("GITHUB_ACTIONS") == "true" else None
-        capture_generation(args.repository, scratch, project=args.project, client=PublicClient(api_token=identity), checkout_binding=binding)
+        capture_generation(args.repository, scratch, project=args.project, client=PublicClient(api_token=identity), checkout_binding=binding, generation=args.generation)
         print("Fresh release authentication complete; production disabled.")
         return 0
     except (ContractError, OSError, ValueError, KeyError):

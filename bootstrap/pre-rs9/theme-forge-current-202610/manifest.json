@@ -1,0 +1,92 @@
+{
+  "bootstrap-pre-rs9": true,
+  "future-releases": "forbidden",
+  "projects": [
+    {
+      "config_sha256": "df30b48dfd18ba9a3dadb0246b08014bb08a9e0a27ced7b98d07bfb8afe43b76",
+      "configuration": "theme-forge-stellar-burst",
+      "license_authority": {
+        "basis": "manager-direction-and-authenticated-tagged-repository",
+        "expression": "AGPL-3.0-or-later",
+        "files": [
+          "LICENSE",
+          "NOTICE",
+          "COMMERCIAL-LICENSE.md",
+          "package.json"
+        ]
+      },
+      "release_id": 424873797,
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+      "repository_id": 1342490027,
+      "tag": "v0.7.0",
+      "tag_commit": "3edb9d2c40dd19a2b7d97d9309bc210e7fed711c",
+      "tag_tree": "4be1551c49b15dff788d07ed1fb00ddcd8839a76",
+      "version": "0.7.0"
+    },
+    {
+      "config_sha256": "c0d042f817b9730caef38a8699e74a68b54c0ae0610b36a359b7574e0c9d948d",
+      "configuration": "theme-forge-stellar-loom",
+      "license_authority": {
+        "basis": "manager-direction-and-authenticated-tagged-repository",
+        "expression": "AGPL-3.0-or-later",
+        "files": [
+          "LICENSE",
+          "NOTICE",
+          "COMMERCIAL-LICENSE.md",
+          "package.json"
+        ]
+      },
+      "release_id": 423916361,
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-loom",
+      "repository_id": 1361513719,
+      "tag": "v0.5.0",
+      "tag_commit": "9063fe5d283881f464ab566d8b74296a6ce1b688",
+      "tag_tree": "9ac1906d36baff63fd3e28f49d50ce2e0e07ee04",
+      "version": "0.5.0"
+    },
+    {
+      "config_sha256": "6b2167d7c95d87313cc918ac860e5a0ff50fdd72e31b45fdcdc732e12237decb",
+      "configuration": "theme-forge-solar-sail",
+      "license_authority": {
+        "basis": "manager-direction-and-authenticated-tagged-repository",
+        "expression": "AGPL-3.0-or-later",
+        "files": [
+          "LICENSE",
+          "NOTICE",
+          "COMMERCIAL-LICENSE.md",
+          "package.json"
+        ]
+      },
+      "release_id": 423916603,
+      "repository": "Knowledge-Forge-AI/theme-forge-solar-sail",
+      "repository_id": 1374611333,
+      "tag": "v0.3.0",
+      "tag_commit": "eafd594af8bce04ef3752c489ae770946b4e0e3b",
+      "tag_tree": "a87aa8428f7b5d773683c8fb4ab0135b1ff73fd0",
+      "version": "0.3.0"
+    },
+    {
+      "config_sha256": "0a499374c6c2834337b4bf1b9f44c7cd80b33ee3c36e5a76442c08e7585e5189",
+      "configuration": "theme-forge-nebular-fusion",
+      "license_authority": {
+        "basis": "manager-direction-and-authenticated-tagged-repository",
+        "expression": "AGPL-3.0-or-later",
+        "files": [
+          "LICENSE",
+          "NOTICE",
+          "COMMERCIAL-LICENSE.md"
+        ]
+      },
+      "release_id": 426333162,
+      "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+      "repository_id": 1358643872,
+      "tag": "v0.7.0",
+      "tag_commit": "cadb40c4972f68f314096ff60fbcfb4da950c161",
+      "tag_tree": "27c643b6375c2aafde314799c4f08e844c14992c",
+      "version": "0.7.0"
+    }
+  ],
+  "release-contains-rs9": false,
+  "schema": "rs9.bootstrap-tenant-manifest.v1alpha1",
+  "scope": "exact-generation"
+}

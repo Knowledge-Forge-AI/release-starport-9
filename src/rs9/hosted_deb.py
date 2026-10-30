@@ -1477,7 +1477,8 @@ def _ensure_captures(context: dict[str, Any], repository: Path, scratch: Path) -
         root.mkdir()
         binding = context.get("binding", {}) or {}
         captures.extend(capture_generation(repository, root, client=context["client"],
-                                           checkout_binding=binding.get("checkout_binding", "hosted:unknown")))
+                                           checkout_binding=binding.get("checkout_binding", "hosted:unknown"),
+                                           generation=context.get("generation", "theme-forge-live1")))
     return captures
 
 

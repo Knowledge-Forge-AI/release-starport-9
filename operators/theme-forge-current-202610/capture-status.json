@@ -1,0 +1,14 @@
+{
+  "generation": "theme-forge-current-202610",
+  "held_follow_up": [
+    "Nix product catalog",
+    "command contracts",
+    "Nebular caller bindings",
+    "public hosted native qualification"
+  ],
+  "native_qualification": false,
+  "production_enabled": false,
+  "receipt_evidence": "unsigned-publisher-consistency-only",
+  "schema": "rs9.current-generation-capture-status.v1alpha1",
+  "status": "requires-fresh-capture"
+}

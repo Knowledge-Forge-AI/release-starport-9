@@ -1,0 +1,171 @@
+{
+  "projects": [
+    {
+      "assets": [
+        {
+          "id": 679807239,
+          "name": "SHA256SUMS",
+          "sha256": "0dcf7dd74e3b28d67b8f70225202338da275ac6e7637c5a8e2f166329f4cad3c",
+          "size": 952
+        },
+        {
+          "id": 679807099,
+          "name": "knowledge-forge-ai-theme-forge-stellar-burst-0.7.0.tgz",
+          "sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+          "size": 646798
+        },
+        {
+          "id": 679807209,
+          "name": "root-package.receipt.json",
+          "sha256": "a385504dc67ca5aaeb0c33e7fe7dcde27a7f6a49dfa1e59de6037c2b28b607a8",
+          "size": 5126
+        }
+      ],
+      "commit": "3edb9d2c40dd19a2b7d97d9309bc210e7fed711c",
+      "contains_rs9": false,
+      "immutable": false,
+      "project": "theme-forge-stellar-burst",
+      "published_at": "2026-10-26T23:24:27Z",
+      "release_id": 424873797,
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-burst",
+      "repository_id": 1342490027,
+      "tag": "v0.7.0",
+      "tree": "4be1551c49b15dff788d07ed1fb00ddcd8839a76",
+      "truncated": false,
+      "version": "0.7.0"
+    },
+    {
+      "assets": [
+        {
+          "id": 677230854,
+          "name": "SHA256SUMS",
+          "sha256": "f35af80516929ab9fc49d8c2fa9d6e9ef8961c628ade955c757bd7511a110c49",
+          "size": 950
+        },
+        {
+          "id": 677230963,
+          "name": "knowledge-forge-ai-theme-forge-stellar-loom-0.5.0.tgz",
+          "sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f",
+          "size": 272836
+        },
+        {
+          "id": 677231164,
+          "name": "root-package.receipt.json",
+          "sha256": "1f0bffd39f5db15928052df56542ffa2f0ae56709e8266c34a3fcf976f603dbf",
+          "size": 26915
+        }
+      ],
+      "commit": "9063fe5d283881f464ab566d8b74296a6ce1b688",
+      "contains_rs9": false,
+      "immutable": false,
+      "project": "theme-forge-stellar-loom",
+      "published_at": "2026-10-26T06:24:54Z",
+      "release_id": 423916361,
+      "repository": "Knowledge-Forge-AI/theme-forge-stellar-loom",
+      "repository_id": 1361513719,
+      "tag": "v0.5.0",
+      "tree": "9ac1906d36baff63fd3e28f49d50ce2e0e07ee04",
+      "truncated": false,
+      "version": "0.5.0"
+    },
+    {
+      "assets": [
+        {
+          "id": 677231611,
+          "name": "SHA256SUMS",
+          "sha256": "590ff4c96cbcbe61d0bd0fbd69ee7f1494738026aeb6da870a4b7a29351b6692",
+          "size": 946
+        },
+        {
+          "id": 677231744,
+          "name": "knowledge-forge-ai-theme-forge-solar-sail-0.3.0.tgz",
+          "sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415",
+          "size": 110836
+        },
+        {
+          "id": 677231905,
+          "name": "root-package.receipt.json",
+          "sha256": "393bbc57580fb4c1a7687e526becc39010ea506ab0b1eba81467b43da5b0ef24",
+          "size": 26899
+        }
+      ],
+      "commit": "eafd594af8bce04ef3752c489ae770946b4e0e3b",
+      "contains_rs9": false,
+      "immutable": false,
+      "project": "theme-forge-solar-sail",
+      "published_at": "2026-10-26T06:25:22Z",
+      "release_id": 423916603,
+      "repository": "Knowledge-Forge-AI/theme-forge-solar-sail",
+      "repository_id": 1374611333,
+      "tag": "v0.3.0",
+      "tree": "a87aa8428f7b5d773683c8fb4ab0135b1ff73fd0",
+      "truncated": false,
+      "version": "0.3.0"
+    },
+    {
+      "assets": [
+        {
+          "id": 688740169,
+          "name": "SHA256SUMS",
+          "sha256": "7ba8445ca16289bf6e5ab459101aaae2ec7c76db4457bf2855c77e53f5582cf2",
+          "size": 2764
+        },
+        {
+          "id": 687086750,
+          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz",
+          "sha256": "d4bef1172a773c27eced3067e148aaa353152c577001f1203a0dc95ab4cb9f00",
+          "size": 22564
+        },
+        {
+          "id": 687087117,
+          "name": "nebular-v0.7.0-native-ci-provenance.json",
+          "sha256": "535951387716f3100eaab33c8ee28b3d0794cd3a755c2b23f0071c3f5f88e92d",
+          "size": 4290
+        },
+        {
+          "id": 687215208,
+          "name": "nebular-v0.7.0-sbom.spdx.json",
+          "sha256": "e95e984096d6767959711bf98f8790e7d100328719fdfb59ac13ff34fd4c9225",
+          "size": 63796
+        },
+        {
+          "id": 687215206,
+          "name": "nebular-v0.7.0-third-party-notices.tar.gz",
+          "sha256": "c8ab80d6601947a505eb68e482985672dd4c4a697ff57ecb1bacb9ca9935dbde",
+          "size": 30212
+        },
+        {
+          "id": 687086526,
+          "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz",
+          "sha256": "52f626bfcbfb4235298675669841ca9fbea8113118e9d25f0310e0a26489a470",
+          "size": 47355011
+        },
+        {
+          "id": 687086522,
+          "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz",
+          "sha256": "eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c",
+          "size": 54553557
+        },
+        {
+          "id": 687086740,
+          "name": "theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz",
+          "sha256": "4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27",
+          "size": 54425294
+        }
+      ],
+      "commit": "cadb40c4972f68f314096ff60fbcfb4da950c161",
+      "contains_rs9": false,
+      "immutable": false,
+      "project": "theme-forge-nebular-fusion",
+      "published_at": "2026-10-29T02:09:29Z",
+      "release_id": 426333162,
+      "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+      "repository_id": 1358643872,
+      "tag": "v0.7.0",
+      "tree": "27c643b6375c2aafde314799c4f08e844c14992c",
+      "truncated": false,
+      "version": "0.7.0"
+    }
+  ],
+  "schema": "rs9.current-generation-release-expectations.v1alpha1"
+}

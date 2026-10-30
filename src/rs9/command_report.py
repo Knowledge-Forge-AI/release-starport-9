@@ -6,6 +6,7 @@ from pathlib import Path
 
 from rs9.archives import inspect_archive
 from rs9.errors import ContractError
+from rs9.current_generation import HISTORICAL_GENERATION, GENERATIONS
 from rs9.scratch import canonical
 from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
 
@@ -75,16 +76,17 @@ def report_asset(project, asset, path, *, npm=False, bytes_authenticated=False):
     return rows
 
 
-def report_generation(repository, capture_root, *, bytes_authenticated=False):
+def report_generation(repository, capture_root, *, bytes_authenticated=False,
+                      generation=HISTORICAL_GENERATION):
     """Inspection hashes confer no authentication; the caller supplies completed custody."""
     from rs9.candidate import configuration_rows
     rows, unavailable = [], []
-    for _, intent in configuration_rows(repository):
+    for _, intent in configuration_rows(repository, generation=generation):
         project = intent["project"]["id"]
         for asset in intent["assets"]:
             try:
                 rows.extend(report_asset(project, asset, Path(capture_root) / project / "assets" / asset["name"],
-                                         npm=intent["release"]["evidence"]["profile"] == "npm-package-archive.v1alpha1",
+                                         npm=intent["release"]["evidence"]["profile"] in {"npm-package-archive.v1alpha1", "npm-root-receipt-archive.v1alpha1"},
                                          bytes_authenticated=bytes_authenticated))
             except ContractError as error:
                 unavailable.append({"project": project, "asset": asset["id"], "error": error.code})
@@ -100,8 +102,9 @@ def main(argv=None):
     parser.add_argument("--repository", default=".")
     parser.add_argument("--capture", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--generation", choices=GENERATIONS, default=HISTORICAL_GENERATION)
     args = parser.parse_args(argv)
-    Path(args.output).write_bytes(canonical(report_generation(args.repository, args.capture)))
+    Path(args.output).write_bytes(canonical(report_generation(args.repository, args.capture, generation=args.generation)))
 
 
 if __name__ == "__main__":

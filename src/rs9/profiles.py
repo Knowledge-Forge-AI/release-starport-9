@@ -6,6 +6,7 @@ import re
 import struct
 
 from rs9.archives import inspect_archive
+from rs9.current_npm_profile import CURRENT_PACKAGE_PROFILE, LEGAL_SOURCES, evaluate_current_package
 from rs9.errors import ContractError
 from rs9.release_core import ReleaseCapture, digest, read_evidence, json_evidence, authenticated_record_hash
 from rs9.scratch import ConfinedWriter, canonical, physical_directory
@@ -22,6 +23,7 @@ TAURI_SOURCES = ("LICENSE", "NOTICE", "COMMERCIAL-LICENSE.md", "package.json",
 PROFILE_ROLES = {TAURI_PROFILE: {"provenance", "sbom-spdx", "third-party-notices", "npm-wrapper"},
                  PACKAGE_PROFILE: {"provenance", "notice"}}
 PROFILE_ROLES[TAURI_AUTHORITY_PROFILE] = PROFILE_ROLES[TAURI_PROFILE]
+PROFILE_ROLES[CURRENT_PACKAGE_PROFILE] = {"root-package-receipt"}
 
 
 def png_size(data):
@@ -50,6 +52,8 @@ def selection_for_intent(normalized, *, include_configuration=False):
     profile, evidence, roles = evidence_policy(normalized)
     sources = set(TAURI_SOURCES if profile in {TAURI_PROFILE, TAURI_AUTHORITY_PROFILE} else ("package.json",))
     sources.update(normalized.get("license", {}).get("files", []))
+    if profile == CURRENT_PACKAGE_PROFILE:
+        sources.update(LEGAL_SOURCES)
     from rs9.constants import ALLOWED_PROJECT_FILES
     for row in normalized.get("evidence", {}).get("inputs", []) if include_configuration else ():
         if row.get("filename") in ALLOWED_PROJECT_FILES:
@@ -62,7 +66,7 @@ def selection_for_intent(normalized, *, include_configuration=False):
         sources.add(normalized["desktop"]["icon"]["path"])
     return {"schema": "rs9.release-selection.v1alpha1", "repository": normalized["project"]["repository"],
             "tag": normalized["tag"], "prerelease": normalized["release"]["prerelease"],
-            "payload_assets": [{**asset, "command_policy": "npm-package-bin" if profile == PACKAGE_PROFILE else "native-executable"}
+            "payload_assets": [{**asset, "command_policy": "npm-package-bin" if profile in {PACKAGE_PROFILE, CURRENT_PACKAGE_PROFILE} else "native-executable"}
                                for asset in normalized["assets"]], "evidence_assets": evidence["assets"],
             "checksums": evidence["checksums"], "source_paths": sorted(sources)}
 
@@ -171,9 +175,9 @@ def evaluate_profile(capture, profile, intent, *, roles=None, corroboration=None
     release_hash = authenticated_record_hash(capture)
     if profile not in PROFILE_ROLES:
         raise ContractError("EVIDENCE_PROFILE", "Unknown RS9-owned evidence profile")
-    if lineage_correction is not None and profile == PACKAGE_PROFILE:
+    if lineage_correction is not None and profile in {PACKAGE_PROFILE, CURRENT_PACKAGE_PROFILE}:
         raise ContractError("LINEAGE_PROFILE", "Forward Nebular lineage correction requires a desktop profile")
-    expected_policy = "npm-package-bin" if profile == PACKAGE_PROFILE else "native-executable"
+    expected_policy = "npm-package-bin" if profile in {PACKAGE_PROFILE, CURRENT_PACKAGE_PROFILE} else "native-executable"
     if any(p.get("command_policy", "native-executable") != expected_policy for p in capture.record["payloads"]):
         raise ContractError("EVIDENCE_PROFILE", "Profile and captured command execution policy disagree")
     if roles is None:
@@ -186,9 +190,12 @@ def evaluate_profile(capture, profile, intent, *, roles=None, corroboration=None
         if not any(row["role"] == role and row["name"] == name for row in capture.record["assets"]):
             raise ContractError("EVIDENCE_ROLES", "Profile roles must bind selected authenticated assets")
     try:
-        sections = (_evaluate_tauri(capture, intent, roles, repository_authority=profile == TAURI_AUTHORITY_PROFILE,
-                                   corroboration=corroboration, lineage_correction=lineage_correction)
-                    if profile in {TAURI_PROFILE, TAURI_AUTHORITY_PROFILE} else _evaluate_package(capture, intent, roles))
+        if profile == CURRENT_PACKAGE_PROFILE:
+            sections = evaluate_current_package(capture, intent, roles)
+        else:
+            sections = (_evaluate_tauri(capture, intent, roles, repository_authority=profile == TAURI_AUTHORITY_PROFILE,
+                                       corroboration=corroboration, lineage_correction=lineage_correction)
+                        if profile in {TAURI_PROFILE, TAURI_AUTHORITY_PROFILE} else _evaluate_package(capture, intent, roles))
     except ContractError as error:
         record_corroboration_failure(corroboration, error)
         raise

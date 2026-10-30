@@ -203,17 +203,20 @@ def assert_release_expectations(capture, expected):
             raise ContractError("LIVE1_RELEASE_MISMATCH", "Release asset identity differs from reviewed expectation")
 
 
-def authenticate_generation(repository, output, *, approved_bootstrap_sha256, client=None):
+def authenticate_generation(repository, output, *, approved_bootstrap_sha256, client=None,
+                            generation="theme-forge-live1"):
     """Fresh download; no offline JSON capability and no historical-verdict reuse."""
     from rs9.github import PublicClient
     from rs9.profiles import capture_supplemental
+    from rs9.current_generation import generation_paths
+    bootstrap, expectations_path = generation_paths(generation)
     client = client or PublicClient()
     repository, output = physical_directory(repository), physical_directory(output)
     if any(output.iterdir()):
         raise ContractError("OUTPUT_NOT_EMPTY", "Authentication evidence root must be empty")
-    manifest_path = repository / BOOTSTRAP
+    manifest_path = repository / bootstrap
     configurations = checked_bootstrap_configurations(manifest_path, approved_manifests=[approved_bootstrap_sha256])
-    expectations = json.loads(read_evidence(repository, EXPECTATIONS, 512 * 1024))["projects"]
+    expectations = json.loads(read_evidence(repository, expectations_path, 512 * 1024))["projects"]
     results = []
     for row, intent in configurations:
         evidence = output / intent["project"]["id"]
