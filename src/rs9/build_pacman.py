@@ -33,6 +33,7 @@ from rs9.build_native import (
     validate_build_inputs,
     validate_scratch_root,
 )
+from rs9.current_generation import HISTORICAL_GENERATION, generation_paths
 from rs9.errors import ContractError
 from rs9.profiles import png_size
 from rs9.release_core import ReleaseCapture, digest
@@ -125,12 +126,14 @@ def build_pacman_candidate(
     revision: int = 1,
     offline_npm_archives: Mapping[str, str | Path] | None = None,
     runner: CommandRunner | None = None,
+    generation: str = HISTORICAL_GENERATION,
 ) -> dict[str, Any]:
     """Build pacman candidate package using normal host makepkg and repo-add."""
+    generation_paths(generation)
     scratch = validate_scratch_root(scratch_dir)
 
     ctx = validate_build_inputs(
-        capture, intent, arch, adapter="pacman", distro=distro
+        capture, intent, arch, adapter="pacman", distro=distro, generation=generation
     )
     project_id = ctx["project_id"]
     version = ctx["version"]

@@ -102,10 +102,11 @@ class CurrentRpmDiagnosticPolicyTests(unittest.TestCase):
 
     def test_current_builder_raw_lint_precedes_policy_and_retains_failure_objects(self):
         from rs9 import rpm_lint_policy
+        from tests.test_current_native_version_propagation import current_cli
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp);capture,intent,npm=create_cli_fixture(root/'capture')
+            root=Path(tmp);capture,intent=current_cli(root/'capture');npm={}
             work=root/'work';work.mkdir()
-            runner=build_fixtures.BuildRpmTests()._setup_runner()
+            runner=build_fixtures.BuildRpmTests()._setup_runner(version=intent['version'])
             raw_handler=runner.handlers['rpmlint'];order=[]
             def lint(argv,**kwargs):
                 if '--version' not in argv:order.append('raw-lint')
@@ -132,12 +133,13 @@ class CurrentRpmDiagnosticPolicyTests(unittest.TestCase):
 
     def test_current_policy_load_failure_does_not_reload_historical_default(self):
         from rs9 import rpm_lint_policy
+        from tests.test_current_native_version_propagation import current_cli
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp);capture,intent,npm=create_cli_fixture(root/'capture');work=root/'work';work.mkdir()
+            root=Path(tmp);capture,intent=current_cli(root/'capture');npm={};work=root/'work';work.mkdir()
             with patch.object(rpm_lint_policy,'load_policy',side_effect=ContractError('INVALID_POLICY','missing current')) as loader:
                 with self.assertRaises(ContractError) as caught:
                     build_rpm_candidate(capture,intent,'noarch',work,offline_npm_archives=npm,
-                        runner=build_fixtures.BuildRpmTests()._setup_runner(),generation=CURRENT_GENERATION)
+                        runner=build_fixtures.BuildRpmTests()._setup_runner(version=intent['version']),generation=CURRENT_GENERATION)
             self.assertEqual(loader.call_count,1)
             loader.assert_called_once_with(generation=CURRENT_GENERATION)
             self.assertEqual(caught.exception.code,'RPMLINT_FAILED')

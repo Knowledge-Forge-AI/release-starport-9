@@ -1502,8 +1502,9 @@ def _write_manifest(scratch: Path, name: str, manifest: dict[str, Any], artifact
 
 def _build_products(
     captures: Sequence[Any], system: str, scratch: Path, builder: CommandRunner, maintainer: str,
-    inputs: Path | None, client: Any, required: Sequence[str],
+    inputs: Path | None, client: Any, required: Sequence[str], *, generation=HISTORICAL_GENERATION,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
+    generation_paths(generation)
     products: dict[str, dict[str, Any]] = {}
     errors: dict[str, str] = {}
     for capture, intent, _profile in captures:
@@ -1520,6 +1521,7 @@ def _build_products(
                 maintainer=maintainer,
                 offline_npm_archives=resolve_offline_npm_archives(capture, product, scratch, inputs=inputs, client=client),
                 runner=builder,
+                **({"generation": generation} if generation != HISTORICAL_GENERATION else {}),
             )
         except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
             errors[product] = "PACKAGE_FILESYSTEM" if isinstance(err, OSError) else _family_error(err)
@@ -1611,7 +1613,8 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
             mark = host.mark()
             captures = _ensure_captures(context, repository, scratch)
             products, errors = _build_products(captures, system, scratch, builder, maintainer, inputs,
-                                               context.get("client"), required)
+                                               context.get("client"), required,
+                                               generation=context.get("generation", HISTORICAL_GENERATION))
             details["products"] = {k: {kk: vv for kk, vv in v.items() if kk != "path"} for k, v in products.items()}
             if errors:
                 details["build_errors"] = errors

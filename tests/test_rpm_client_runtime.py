@@ -63,6 +63,61 @@ class ClientRuntimeTests(unittest.TestCase):
                 self.assertEqual(bound['engine_constraints'][0]['source_sha256'], FLOOR_SHA256)
                 self.assertEqual(bound['engine_constraints'][0]['purpose'], 'preserved-executable-rpm-requires')
 
+    def test_current_nebular_floor_propagates_exact_generation_capture_and_source(self):
+        """Strict orchestration seams are synthetic; no capture authority is minted."""
+        from unittest.mock import patch
+        from rs9.candidate import configuration_rows
+        from rs9.current_generation import CURRENT_GENERATION
+        from rs9.nebular_callers import _load_current_contract, FLOOR_SHA256
+        from rs9.rpm_lint_policy import load_policy
+        repository = Path(__file__).resolve().parents[1]
+        _, intent = next((row, intent) for row, intent in configuration_rows(repository, generation=CURRENT_GENERATION)
+                         if intent["project"]["id"] == "theme-forge-nebular-fusion")
+        product = intent["project"]["id"]
+        capture = object()
+        archive = Path("synthetic-current-nebular-archive.tar.gz")
+        contract = _load_current_contract()
+        current_policy = load_policy(generation=CURRENT_GENERATION)
+        self.assertNotEqual(contract["floor"]["sha256"], FLOOR_SHA256)
+        _, evidence = self.prepare()
+        def selected_generation(selected_capture, selected_intent, *, generation):
+            self.assertIs(selected_capture, capture)
+            self.assertIs(selected_intent, intent)
+            self.assertEqual(generation, CURRENT_GENERATION)
+            return intent["version"]
+        def native_inputs(selected_capture, selected_intent, arch, *, adapter, generation):
+            self.assertIs(selected_capture, capture)
+            self.assertIs(selected_intent, intent)
+            self.assertEqual((arch, adapter, generation), ("x86_64", "rpm", CURRENT_GENERATION))
+            return {"asset_file": archive}
+        def policy(*, generation):
+            self.assertEqual(generation, CURRENT_GENERATION)
+            return current_policy
+        def selected_contract(selected_capture):
+            self.assertIs(selected_capture, capture)
+            return contract
+        def floor(selected_archive, entry, *, capture):
+            self.assertEqual(selected_archive, archive)
+            self.assertIs(entry, current_policy["projects"][product])
+            self.assertIs(capture, original_capture)
+            return ">= 22"
+        original_capture = capture
+        with patch("rs9.rpm_client_runtime.bind_native_build_generation", side_effect=selected_generation) as binding, \
+             patch("rs9.build_native.validate_build_inputs", side_effect=native_inputs) as inputs, \
+             patch("rs9.rpm_lint_policy.load_policy", side_effect=policy) as loader, \
+             patch("rs9.nebular_callers.current_contract_for_capture", side_effect=selected_contract) as selected, \
+             patch("rs9.nebular_callers.release_runtime_floor", side_effect=floor) as runtime_floor:
+            bound = bind_engine_floors(evidence, [(capture, intent, {})], generation=CURRENT_GENERATION)
+        self.assertEqual(bound["status"], "pass", bound)
+        loader.assert_called_once_with(generation=CURRENT_GENERATION)
+        runtime_floor.assert_called_once_with(archive, current_policy["projects"][product], capture=capture)
+        selected.assert_called_once_with(capture)
+        binding.assert_called_once_with(capture, intent, generation=CURRENT_GENERATION)
+        inputs.assert_called_once_with(capture, intent, "x86_64", adapter="rpm", generation=CURRENT_GENERATION)
+        self.assertEqual(bound["engine_constraints"], [{"product": product,
+            "source_sha256": contract["floor"]["sha256"], "floor": ">= 22",
+            "purpose": "preserved-executable-rpm-requires"}])
+
     def prepare(self, host=None):
         host = host or ClientHost()
         return host, prepare_client(host, ENVIRONMENT, arch="x86_64", system="x86_64-linux", tag="test-client")

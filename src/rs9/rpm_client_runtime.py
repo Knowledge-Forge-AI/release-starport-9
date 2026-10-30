@@ -5,6 +5,7 @@ import re
 import uuid
 
 from rs9.errors import ContractError
+from rs9.current_generation import HISTORICAL_GENERATION, generation_paths, bind_native_build_generation
 from rs9.release_core import digest
 from rs9.scratch import canonical
 
@@ -154,8 +155,9 @@ def validate_runtime_evidence(evidence, *, system, arch, floor):
     return True
 
 
-def bind_engine_floors(evidence, captures):
+def bind_engine_floors(evidence, captures, *, generation=HISTORICAL_GENERATION):
     """Bind system-Node requirements, including preserved executable Loom capabilities."""
+    generation_paths(generation)
     from rs9.release_core import authenticated_record_hash
     from rs9.product_classes import is_native_desktop
     if evidence.get("status") != "pass":
@@ -164,15 +166,26 @@ def bind_engine_floors(evidence, captures):
     try:
         for capture, intent, _ in captures:
             product = intent["project"]["id"]
+            if generation != HISTORICAL_GENERATION:
+                bind_native_build_generation(capture, intent, generation=generation)
             if is_native_desktop(product):
                 # Embedded caller roles stay independent of system Node. The
                 # preserved executable Loom capability already has RPM Requires.
                 from rs9.build_native import validate_build_inputs
                 from rs9.nebular_callers import FLOOR_SHA256, release_runtime_floor
                 from rs9.rpm_lint_policy import load_policy
-                inputs = validate_build_inputs(capture, intent, evidence["arch"], adapter="rpm")
-                floor = release_runtime_floor(inputs["asset_file"], load_policy()["projects"][product])
-                binding = {"product": product, "source_sha256": FLOOR_SHA256, "floor": floor,
+                inputs = validate_build_inputs(capture, intent, evidence["arch"], adapter="rpm",
+                    **({"generation": generation} if generation != HISTORICAL_GENERATION else {}))
+                if generation == HISTORICAL_GENERATION:
+                    floor = release_runtime_floor(inputs["asset_file"], load_policy()["projects"][product])
+                    floor_sha256 = FLOOR_SHA256
+                else:
+                    from rs9.nebular_callers import current_contract_for_capture
+                    selected = current_contract_for_capture(capture)
+                    policy = load_policy(generation=generation)
+                    floor = release_runtime_floor(inputs["asset_file"], policy["projects"][product], capture=capture)
+                    floor_sha256 = selected["floor"]["sha256"]
+                binding = {"product": product, "source_sha256": floor_sha256, "floor": floor,
                            "purpose": "preserved-executable-rpm-requires"}
             else:
                 authenticated_record_hash(capture)

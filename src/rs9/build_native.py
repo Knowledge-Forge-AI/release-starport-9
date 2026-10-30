@@ -32,6 +32,7 @@ from typing import Any, Mapping
 
 from rs9.archives import inspect_archive
 from rs9.bootstrap import require_configuration_authority
+from rs9.current_generation import HISTORICAL_GENERATION, generation_paths, bind_native_build_generation
 from rs9.errors import ContractError
 from rs9.npm_deps import authenticate_dependencies, closure_for_capture
 from rs9.records import closed, record_sha256, snapshot, validate_sanitized_string, validate_sha256
@@ -378,8 +379,10 @@ def validate_build_inputs(
     *,
     adapter: str,
     distro: str | None = None,
+    generation: str = HISTORICAL_GENERATION,
 ) -> dict[str, Any]:
     """Validate release capture, bootstrap authority, architecture, and licensing."""
+    generation_paths(generation)
     authenticated_record_hash(capture)
     require_configuration_authority(capture, intent)
 
@@ -399,7 +402,9 @@ def validate_build_inputs(
 
     version = intent.get("version", "")
     validate_version_string(version)
-    if version != SUPPORTED_PROJECTS[project_id]:
+    expected_version = (SUPPORTED_PROJECTS[project_id] if generation == HISTORICAL_GENERATION else
+                        bind_native_build_generation(capture, intent, generation=generation))
+    if version != expected_version:
         raise ContractError("UNSUPPORTED_VERSION", "Invalid candidate project version")
 
     repo = (

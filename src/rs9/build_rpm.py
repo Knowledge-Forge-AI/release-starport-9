@@ -470,7 +470,7 @@ def build_rpm_candidate(
     scratch = validate_scratch_root(scratch_dir)
 
     ctx = validate_build_inputs(
-        capture, intent, arch, adapter="rpm", distro=distro
+        capture, intent, arch, adapter="rpm", distro=distro, generation=generation
     )
     project_id = ctx["project_id"]
     version = ctx["version"]

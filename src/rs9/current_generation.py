@@ -146,3 +146,27 @@ def configuration_identity(repository, *, generation=HISTORICAL_GENERATION):
             data = path.read_bytes()
             rows.append({"path": relative, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
     return hashlib.sha256(canonical(rows)).hexdigest()
+
+
+def bind_native_build_generation(capture, intent, *, generation=HISTORICAL_GENERATION):
+    """Current native inputs require the exact source-owned bootstrap generation."""
+    generation_paths(generation)
+    if generation == HISTORICAL_GENERATION:
+        return None
+    from pathlib import Path
+    from rs9.bootstrap import checked_bootstrap_configurations, require_configuration_authority
+    from rs9.release_core import authenticated_record_hash, digest
+    authenticated_record_hash(capture)
+    require_configuration_authority(capture, intent)
+    manifest = Path(__file__).resolve().parents[2] / generation_paths(generation)[0]
+    configurations = checked_bootstrap_configurations(manifest, approved_manifests=[digest(manifest.read_bytes())])
+    record = capture.record
+    identity = {"repository": record["repository"]["full_name"], "repository_id": record["repository"]["id"],
+                "release_id": record["release"]["id"], "tag": record["release"]["tag"],
+                "tag_commit": record["tag"]["commit"], "tag_tree": record["tag"]["tree"]}
+    selected = [(row, expected) for row, expected in configurations
+                if expected["project"]["id"] == intent["project"]["id"]]
+    if (len(selected) != 1 or selected[0][1] != intent
+            or any(selected[0][0].get(key) != value for key, value in identity.items())):
+        raise ContractError("NATIVE_GENERATION_BINDING", "Native inputs differ from the exact selected current generation")
+    return selected[0][0]["version"]

@@ -37,6 +37,7 @@ from rs9.build_native import (
     validate_scratch_root,
 )
 from rs9.elf import parse_elf
+from rs9.current_generation import HISTORICAL_GENERATION, generation_paths
 from rs9.errors import ContractError
 from rs9.profiles import png_size
 from rs9.release_core import ReleaseCapture, digest
@@ -281,8 +282,10 @@ def build_deb_candidate(
     revision: int = 1,
     offline_npm_archives: Mapping[str, str | Path] | None = None,
     runner: CommandRunner | None = None,
+    generation: str = HISTORICAL_GENERATION,
 ) -> dict[str, Any]:
     """Build Debian candidate package for Ubuntu 26.04 and publish into candidate APT repository."""
+    generation_paths(generation)
     scratch = validate_scratch_root(scratch_dir)
 
     # Maintainer email must be explicitly supplied; never invent maintainer email
@@ -302,7 +305,7 @@ def build_deb_candidate(
         )
 
     ctx = validate_build_inputs(
-        capture, intent, arch, adapter="debian", distro=distro
+        capture, intent, arch, adapter="debian", distro=distro, generation=generation
     )
     project_id = ctx["project_id"]
     version = ctx["version"]

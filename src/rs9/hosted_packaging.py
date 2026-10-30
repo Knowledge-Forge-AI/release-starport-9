@@ -494,7 +494,8 @@ def execute(context):
             # It does not install, sign or qualify any candidate product.
             client_runtime = prepare_client(host, environment, arch=arch, system=system, tag=client_tag)
             from rs9.rpm_client_runtime import bind_engine_floors
-            client_runtime = bind_engine_floors(client_runtime, context["captures"])
+            client_runtime = bind_engine_floors(client_runtime, context["captures"],
+                **({"generation": generation} if generation != HISTORICAL_GENERATION else {}))
             diagnostics = scratch / "diagnostics"
             diagnostics.mkdir(exist_ok=True)
             runtime_path = diagnostics / ("rpm-client-runtime-" + system + ".json")
@@ -541,9 +542,9 @@ def execute(context):
                 result = build(capture, intent, target, work,
                                offline_npm_archives=npm, runner=builder,
                                **({"builder_system": system, "policy": preservation_policy,
-                                    "client_runtime": client_runtime, "caller_evidence": caller_evidence,
-                                    **({"generation": generation} if generation != HISTORICAL_GENERATION else {})}
-                                  if family == "rpm" else {}))
+                                    "client_runtime": client_runtime, "caller_evidence": caller_evidence}
+                                  if family == "rpm" else {}),
+                               **({"generation": generation} if generation != HISTORICAL_GENERATION else {}))
                 path = result["package_path"] if family == "pacman" else result["rpm_path"]
                 dest = unsigned / path.name
                 shutil.copyfile(path, dest)
