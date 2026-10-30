@@ -132,6 +132,8 @@ class ReplayProblemProjectionTests(unittest.TestCase):
     def test_optional_projection_is_dropped_before_existing_diagnostic_bound(self):
         doc = self.execute("x86_64-linux")
         doc["replay"].pop("harness_problem_categories")
+        # Size the original record without either optional projection.
+        doc["replay"].pop("replay_receipt_projection", None)
         legacy_size = len(canonical(doc))
         shutil.rmtree(self.scratch / "evidence-replay-C")
         with patch.object(smoke, "MAX_DIAGNOSTIC", legacy_size):
