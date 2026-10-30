@@ -20,10 +20,11 @@ from rs9.build_native import CommandReceipt, validate_build_inputs
 from tests.test_rpm_lint_policy import raw_from_records
 from tests import test_build_rpm as build_fixtures
 from tests.test_build_native import create_cli_fixture
+from tests.test_current_rpm_preservation_policy import blocked_policy
 
 
 def current_case():
-    policy = load_policy(generation=CURRENT_GENERATION)
+    policy = blocked_policy()
     name = 'theme-forge-stellar-loom'
     entry = policy['projects'][name]
     inputs = dict(project_id=name, version='0.5.0', arch='noarch', system='x86_64-linux',
@@ -63,8 +64,8 @@ class CurrentRpmDiagnosticPolicyTests(unittest.TestCase):
             path.write_text(json.dumps(current))
             with self.assertRaises(ContractError):load_policy(path,generation=CURRENT_GENERATION)
 
-    def test_current_policy_cannot_authorize_or_change_exact_contract(self):
-        original=load_policy(generation=CURRENT_GENERATION)
+    def test_blocked_current_snapshot_cannot_be_flag_authorized_or_change_exact_contract(self):
+        original=blocked_policy()
         mutations = [lambda p:p.update(status='authorized'), lambda p:p.update(blocking=False),
             lambda p:p.update(production_enabled=True), lambda p:p.update(publication_authority=True),
             lambda p:p['tool_constraints'].update(filtered_count=0),
@@ -118,7 +119,7 @@ class CurrentRpmDiagnosticPolicyTests(unittest.TestCase):
             with patch('rs9.build_rpm.evaluate_policy',side_effect=evaluation):
                 with self.assertRaises(ContractError) as caught:
                     build_rpm_candidate(capture,intent,'noarch',work,offline_npm_archives=npm,
-                        runner=runner,policy=load_policy(generation=CURRENT_GENERATION),generation=CURRENT_GENERATION)
+                        runner=runner,policy=blocked_policy(),generation=CURRENT_GENERATION)
             error=caught.exception
             self.assertEqual(order,['raw-lint','policy'])
             self.assertEqual(error.code,'RPMLINT_FAILED')
@@ -176,7 +177,7 @@ class CurrentRpmDiagnosticPolicyTests(unittest.TestCase):
         from rs9 import hosted_packaging as hosted
         from rs9.build_native import MockCommandRunner
         from tests.rpm_summary_fixtures import witnessed_build_double
-        policy=load_policy(generation=CURRENT_GENERATION)
+        policy=blocked_policy()
         for missing_policy in (False,True):
             with self.subTest(missing_policy=missing_policy),tempfile.TemporaryDirectory() as tmp:
                 root=Path(tmp);scratch=root/'work';scratch.mkdir()

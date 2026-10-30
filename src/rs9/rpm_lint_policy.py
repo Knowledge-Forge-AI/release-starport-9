@@ -25,24 +25,101 @@ MISSING_EVIDENCE_PREDICATES = frozenset({'caller-contract-unproven', 'caller-mem
     'node-runtime-floor-unobserved', 'caller-content-or-identity-unproven'})
 
 
+_CURRENT_POLICY_FIELDS = {
+    'blocking',
+    'generation',
+    'permitted_preservation_exception_classes',
+    'policy_authority',
+    'production_enabled',
+    'projects',
+    'publication_authority',
+    'schema',
+    'scope',
+    'status',
+    'tool_constraints',
+    'unwaivable_error_classes',
+}
+_CURRENT_DIAGNOSTIC_FIELDS = {
+    'blocking',
+    'generation',
+    'permitted_preservation_exception_classes',
+    'production_enabled',
+    'projects',
+    'publication_authority',
+    'schema',
+    'scope',
+    'status',
+    'tool_constraints',
+    'unwaivable_error_classes',
+}
+_CURRENT_PROJECT_FIELDS = {
+    'allowed_architectures',
+    'allowed_systems',
+    'archive_contract_members',
+    'authenticated_inputs',
+    'blocking',
+    'engine_constraints',
+    'exceptions',
+    'inventory_bindings',
+    'launchers',
+    'package_name',
+    'public_symlinks',
+    'runtime_requires_contract',
+    'status',
+    'version',
+}
+_CURRENT_PROJECT_REQUIRED = {
+    'allowed_architectures',
+    'allowed_systems',
+    'authenticated_inputs',
+    'blocking',
+    'exceptions',
+    'launchers',
+    'package_name',
+    'status',
+    'version',
+}
+
+CURRENT_SOURCE_INVENTORY_FIELDS = ('asset_sha256', 'payload_manifest_sha256', 'closure_sha256',
+    'expected', 'permitted_directories', 'license_projections', 'wrappers', 'contract_members', 'engine_node')
+
+
+def _current_source_inventory_sha256(inventory):
+    """Bind stable complete source projections; runtime inode/owner checks remain separate."""
+    return digest(canonical({key: inventory.get(key) for key in CURRENT_SOURCE_INVENTORY_FIELDS}))
+
+
 def _validate_current_policy(policy):
-    """Current preparation cannot import a historical exception disposition."""
-    if (policy.get('generation') != CURRENT_GENERATION or policy.get('status') != 'blocked'
-            or policy.get('blocking') is not True
+    """Only the complete source-owned current disposition may authorize preservation."""
+    status = policy.get('status')
+    authorized = status == 'authorized'
+    if (not isinstance(status, str) or status not in {'blocked', 'authorized'}
+            or policy.get('generation') != CURRENT_GENERATION
+            or policy.get('blocking') is not (not authorized)
             or set(policy.get('projects', {})) != set(CURRENT_GENERATION_VERSIONS)
             or policy.get('unwaivable_error_classes') != ['no-changelogname-tag', 'explicit-lib-dependency']
             or policy.get('tool_constraints') != {'tool':'rpmlint', 'version':'2.8.0',
                 'package_version':'2.8.0-2.fc43', 'allowed_exit_codes':[0,64], 'filtered_count':8}):
-        raise ContractError('INVALID_POLICY', 'Current diagnostic-only policy and strict tool constraints required')
+        raise ContractError('INVALID_POLICY', 'Complete current disposition and strict tool constraints required')
+    closed(policy, _CURRENT_POLICY_FIELDS, required=_CURRENT_DIAGNOSTIC_FIELDS)
     root = Path(__file__).resolve().parents[2]
+    if authorized:
+        selected = root / rpm_policy_path(CURRENT_GENERATION)
+        if selected.is_symlink() or not selected.is_file() or selected.stat().st_size > 512 * 1024:
+            raise ContractError('INVALID_POLICY', 'Physical source-owned current disposition required')
+        source_policy = json.loads(selected.read_bytes())
+        if canonical(policy) != canonical(source_policy):
+            raise ContractError('INVALID_POLICY', 'Current authorization differs from selected source-owned policy')
     catalog = json.loads((root/'nix/theme-forge-current-202610-products.json').read_bytes())['products']
     callers = json.loads((root/'operators/theme-forge-current-202610/nebular-callers.json').read_bytes())
     for name, entry in policy['projects'].items():
+        closed(entry, _CURRENT_PROJECT_FIELDS, required=_CURRENT_PROJECT_REQUIRED)
         native = name in {'theme-forge-stellar-burst', 'theme-forge-nebular-fusion'}
-        if (entry.get('status') != 'blocked' or entry.get('blocking') is not True or entry.get('exceptions') != {}
+        if (entry.get('status') != status or entry.get('blocking') is not (not authorized)
+                or (not entry.get('exceptions') if authorized else entry.get('exceptions') != {})
                 or entry.get('allowed_architectures') != (['x86_64','aarch64'] if native else ['noarch'])
                 or entry.get('allowed_systems') != ['x86_64-linux','aarch64-linux']):
-            raise ContractError('INVALID_POLICY', 'Current blocked exact architecture scope required')
+            raise ContractError('INVALID_POLICY', 'Exact complete current product/platform disposition required')
         if name == 'theme-forge-nebular-fusion':
             expected_auth = {'assets': [dict(name=callers['platforms'][system]['asset']['name'],
                 sha256=callers['platforms'][system]['asset']['sha256'])
@@ -59,13 +136,52 @@ def _validate_current_policy(policy):
             wrappers = {}
         else:
             asset = catalog[name]['asset']
-            expected_auth = {'asset_name':asset['name'], 'asset_sha256':asset['sha256'],
-                             'closure_sha256':None, 'closure_status':'held_pending_observed_npm_closure'}
+            if authorized:
+                auth = entry.get('authenticated_inputs', {})
+                closure = auth.get('closure_sha256')
+                if not isinstance(closure, str) or not re.fullmatch('[0-9a-f]{64}', closure):
+                    raise ContractError('INVALID_POLICY', 'Exact current dependency closure required')
+                expected_auth = {'asset_name':asset['name'], 'asset_sha256':asset['sha256'],
+                                 'closure_name':'npm-closure.tar.gz', 'closure_sha256':closure}
+            else:
+                expected_auth = {'asset_name':asset['name'], 'asset_sha256':asset['sha256'],
+                                 'closure_sha256':None, 'closure_status':'held_pending_observed_npm_closure'}
             wrappers = {command:dict(path='/usr/bin/'+command, target='/usr/lib/'+name+'/'+target,
                                     mode='0755', type='node_wrapper')
                         for command,target in catalog[name]['command_paths'].items()}
         if entry.get('authenticated_inputs') != expected_auth or entry.get('launchers', {}) != wrappers:
             raise ContractError('INVALID_POLICY', 'Current exact asset and maintained wrapper contract required')
+        if authorized:
+            bindings = entry.get('inventory_bindings')
+            if not isinstance(bindings, dict) or set(bindings) != set(entry['allowed_systems']):
+                raise ContractError('INVALID_POLICY', 'Complete independent current inventory bindings required')
+            for binding in bindings.values():
+                closed(binding, {'payload_manifest_sha256', 'source_inventory_sha256'})
+                if set(binding) != {'payload_manifest_sha256', 'source_inventory_sha256'} or any(
+                        not isinstance(value, str) or not re.fullmatch('[0-9a-f]{64}', value) for value in binding.values()):
+                    raise ContractError('INVALID_POLICY', 'Exact current inventory identities required')
+            for code, rules in entry['exceptions'].items():
+                if code == 'files-duplicated-waste':
+                    if rules.get('discriminator') != 'exact-duplicate-set':
+                        raise ContractError('INVALID_POLICY', 'Current duplicate authority requires complete group sets')
+                    continue
+                for path, rule in rules.items():
+                    if rule.get('discriminator') == 'per-system-script':
+                        continue
+                    source = rule.get('source')
+                    if (not isinstance(source, dict) or set(source) != {'asset_sha256','input_member','sha256'}
+                            or source.get('asset_sha256') != expected_auth.get('asset_sha256')
+                            or not isinstance(source.get('sha256'), str) or not re.fullmatch('[0-9a-f]{64}',source['sha256'])
+                            or rule.get('mode') not in {'0644','0755'}
+                            or rule.get('intent') != 'private-implementation-node-wrapper'
+                            or rule.get('interpreter') != 'node' or rule.get('shebang') != '/usr/bin/env node'
+                            or rule.get('public_launcher') is not False
+                            or not any(rule.get('launcher') == wrapper['path'] and path == wrapper['target']
+                                       for wrapper in wrappers.values())):
+                        raise ContractError('INVALID_POLICY', 'Exact current script source binding required')
+                    validate_safe_relative_posix_path(source['input_member'])
+        elif 'inventory_bindings' in entry:
+            raise ContractError('INVALID_POLICY', 'Blocked diagnostic policy cannot carry authorization inventory')
 
 
 def _validate_policy(policy, *, generation=HISTORICAL_GENERATION):
@@ -219,7 +335,7 @@ def _raw_blockers(raw, policy):
     return []
 
 
-def _input_blockers(entry, inputs, inventory, raw):
+def _input_blockers(entry, inputs, inventory, raw, *, generation=HISTORICAL_GENERATION):
     if not isinstance(inventory, dict) or inventory.get('schema') != INVENTORY_SCHEMA or inventory.get('complete') is not True:
         return ['incomplete-preservation-inventory']
     for key in ('asset_sha256', 'payload_manifest_sha256', 'closure_sha256'):
@@ -238,6 +354,25 @@ def _input_blockers(entry, inputs, inventory, raw):
         return ['closure-identity-mismatch']
     if not re.fullmatch('[0-9a-f]{64}', inputs.get('payload_manifest_sha256', '')):
         return ['payload-manifest-unbound']
+    if generation == CURRENT_GENERATION and entry.get('status') == 'authorized':
+        binding = entry['inventory_bindings'].get(inputs.get('system'), {})
+        if inputs.get('payload_manifest_sha256') != binding.get('payload_manifest_sha256'):
+            return ['current-payload-manifest-mismatch']
+        if _current_source_inventory_sha256(inventory) != binding.get('source_inventory_sha256'):
+            return ['current-source-inventory-mismatch']
+        inode_keys = []
+        for row in inventory['files'].values():
+            if row.get('type') == 'file':
+                if any(type(row.get(key)) is not int or row[key] < 0 for key in ('device','inode')):
+                    return ['current-runtime-inode-unproven']
+                inode_keys.append((row['device'],row['inode']))
+        if len(inode_keys) != len(set(inode_keys)):
+            return ['current-runtime-inode-alias']
+        groups, waste = duplicate_groups(inventory['files'])
+        if (not {'duplicate_groups', 'calculated_duplicate_waste', 'possible_duplicate_waste_bytes'} <= set(inventory)
+                or inventory['duplicate_groups'] != groups or inventory['calculated_duplicate_waste'] != waste
+                or inventory['possible_duplicate_waste_bytes'] != duplicate_waste_totals(groups)):
+            return ['current-duplicate-inventory-mismatch']
     return []
 
 
@@ -278,6 +413,15 @@ def _script_proof(record, rule, inventory, inputs=None):
     shebang = expected.get('shebang')
     if shebang != '#!/usr/bin/env node' or record.get('interpreter') != '/usr/bin/env node':
         return None, 'script-interpreter-mismatch'
+
+    if 'source' in rule:
+        source = rule['source']
+        if (not isinstance(source, dict) or expected.get('origin') != 'release'
+                or source.get('asset_sha256') != expected.get('input_archive_sha256')
+                or source.get('asset_sha256') != (inputs.get('asset_sha256') if inputs else None)
+                or source.get('input_member') != expected.get('input_member')
+                or source.get('sha256') != actual.get('sha256')):
+            return None, 'script-source-binding-unproven'
 
     discriminator = rule.get('discriminator')
     if discriminator == 'per-system-script':
@@ -493,7 +637,7 @@ def _evaluate_policy(raw_evidence, inventory, inputs, policy=None, *, generation
                   else load_policy(generation=generation))
         entry = policy['projects'].get(inputs.get('project_id'))
         blockers = _raw_blockers(raw_evidence, policy)
-        if generation == CURRENT_GENERATION:
+        if generation == CURRENT_GENERATION and policy['status'] == 'blocked':
             blockers.append('current-generation-diagnostic-only')
         if not isinstance(entry, dict):
             blockers.append('unauthorized-project')
@@ -504,7 +648,7 @@ def _evaluate_policy(raw_evidence, inventory, inputs, policy=None, *, generation
             blockers.append('project-version-platform-mismatch')
             payload_compromised = True
         else:
-            inp_bl = _input_blockers(entry, inputs, inventory, raw_evidence)
+            inp_bl = _input_blockers(entry, inputs, inventory, raw_evidence, generation=generation)
             if inp_bl:
                 blockers += inp_bl
                 payload_compromised = True
@@ -525,7 +669,8 @@ def _evaluate_policy(raw_evidence, inventory, inputs, policy=None, *, generation
                     payload_compromised = True
 
                 # Evaluate errors without blanket short circuit for incomplete-project-policy
-                if raw_evidence.get('findings_summary', {}).get('errors'):
+                if (raw_evidence.get('findings_summary', {}).get('errors')
+                        or generation == CURRENT_GENERATION and policy['status'] == 'authorized'):
                     extra, r_blockers, acc, prfs, dups = _evaluate_errors(raw_evidence, entry, inventory, inputs)
                     blockers += extra
                     rule_blockers += r_blockers

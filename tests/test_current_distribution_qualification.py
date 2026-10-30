@@ -15,6 +15,7 @@ from unittest.mock import patch
 from rs9.current_generation import (CURRENT_GENERATION, HISTORICAL_GENERATION, DISTRIBUTION_JOBS,
     DISTRIBUTION_SCOPE, distribution_paths, configuration_paths, configuration_identity, rpm_policy_path)
 from rs9.errors import ContractError
+from tests.test_current_rpm_preservation_policy import blocked_policy
 from rs9.hosted_contract import load_hosted_lanes, generate_matrix_outputs, REQUIRED_RECEIPTS
 from rs9.hosted_custody import builder_identity, provenance, source_tree_identity, verify_set
 from rs9.hosted_pipeline import _inputs, main, run_lane
@@ -193,7 +194,8 @@ class CurrentDistributionQualificationTests(unittest.TestCase):
                 _run_identity({**doc, field: value}, COMMIT, started, generation=CURRENT_GENERATION)
         self.assertEqual(packet_classification({"generation": CURRENT_GENERATION, "validation": {"status": "pass"}}), "qualified-current-distribution-candidate")
 
-    def test_complete_synthetic_distribution_evidence_stays_held_for_missing_policy(self):
+    @patch("rs9.rpm_lint_policy.load_policy", side_effect=lambda *args, **kwargs: blocked_policy())
+    def test_complete_synthetic_distribution_evidence_stays_held_for_explicit_blocked_policy(self, selected_policy):
         from tests.test_hosted_summary import HostedSummaryTests
         from rs9.scratch import canonical
         from rs9.hosted_nix import PRODUCTS

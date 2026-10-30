@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from rs9.current_generation import CURRENT_GENERATION, DISTRIBUTION_SCOPE, DISTRIBUTION_JOBS
 from rs9.errors import ContractError
+from tests.test_current_rpm_preservation_policy import blocked_policy
 from rs9.hosted_custody import provenance, retain
 from rs9.hosted_summary import required, summarize
 from rs9.qualified_distribution_inputs import SourceBoundConfiguration, qualified_distribution_inputs, _binary_inputs
@@ -101,7 +102,8 @@ class QualifiedDistributionInputTests(unittest.TestCase):
         for field in ("production_enabled", "publication_authority", "attended_gates_satisfied", "signing_authority", "full_live1_qualification", "published_linux_nix_ready"):
             self.assertIs(result[field], False)
 
-    def test_forged_green_packet_cannot_override_real_current_rpm_policy_hold(self):
+    @patch("rs9.rpm_lint_policy.load_policy", side_effect=lambda *args, **kwargs: blocked_policy())
+    def test_forged_green_packet_cannot_override_explicit_current_rpm_policy_hold(self, selected_policy):
         from tests.test_hosted_summary import HostedSummaryTests
         from rs9.hosted_nix import PRODUCTS
         fixture = HostedSummaryTests(); fixture.setUp(); self.addCleanup(fixture.doCleanups)

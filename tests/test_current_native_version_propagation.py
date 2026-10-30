@@ -101,12 +101,13 @@ class CurrentNativeVersionPropagationTests(unittest.TestCase):
 
     def test_current_rpm_reaches_raw_lint_without_policy_acceptance(self):
         from tests.test_build_rpm import BuildRpmTests
+        from tests.test_current_rpm_preservation_policy import blocked_policy
         capture, intent = current_cli(self.root / "capture")
         fixture = BuildRpmTests(); fixture.root = self.root
         runner = fixture._setup_runner(version=intent["version"])
         scratch = self.root / "rpm"; scratch.mkdir()
         try:
-            result = build_rpm_candidate(capture, intent, "noarch", scratch, runner=runner, generation=CURRENT_GENERATION)
+            result = build_rpm_candidate(capture, intent, "noarch", scratch, runner=runner, policy=blocked_policy(), generation=CURRENT_GENERATION)
         except ContractError as error:
             self.assertTrue(any("rpmlint" in str(call["argv"][0]) for call in runner.calls), error)
             self.assertIsNotNone(getattr(error, "rpmlint_evidence", None), error)
