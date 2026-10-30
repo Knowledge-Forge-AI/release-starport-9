@@ -101,6 +101,64 @@ def _fixture_model(facts, *, cycle=False, escape=False, unstable=False, missing=
     return model
 
 
+def _sampling_fixture_model(facts):
+    """Place useful category paths behind deterministic share-tree noise."""
+    roots = facts["gui_discovery"]["roots"]
+    dependency = facts["gui_discovery"]["closure_roots"][-1]
+    model = {}
+    serial = 1
+
+    def add(path, value):
+        nonlocal serial
+        value = dict(value)
+        value.setdefault("ino", serial)
+        serial += 1
+        model[path] = value
+
+    for role, root in roots.items():
+        add(root, _entry("dir", mode=0o755))
+        add(root + "/share", _entry("dir", mode=0o755))
+        add(root + "/share/locale", _entry("dir", mode=0o755))
+        for index in range(120):
+            add(root + "/share/locale/noise-" + str(index).zfill(3),
+                _entry("dir", mode=0o755))
+    add(dependency, _entry("dir", mode=0o755))
+    add(dependency + "/libexec", _entry("dir", mode=0o755))
+    add(dependency + "/libexec/target", _entry("file", data="target", mode=0o755))
+
+    glib = roots["glib"]
+    add(glib + "/libexec", _entry("dir", mode=0o755))
+    add(glib + "/libexec/helper", _entry("file", data="helper", mode=0o755))
+    add(glib + "/lib", _entry("dir", mode=0o755))
+    add(glib + "/lib/gio", _entry("dir", mode=0o755))
+    add(glib + "/lib/gio/modules", _entry("dir", mode=0o755))
+    add(glib + "/lib/gio/modules/module.so", _entry("file", data="gio", mode=0o644))
+    add(glib + "/share/glib-2.0", _entry("dir", mode=0o755))
+    add(glib + "/share/glib-2.0/schemas", _entry("dir", mode=0o755))
+    add(glib + "/share/glib-2.0/schemas/org.example.gschema.xml",
+        _entry("file", data="schema", mode=0o644))
+    add(glib + "/share/fonts", _entry("dir", mode=0o755))
+    add(glib + "/share/fonts/example.ttf", _entry("file", data="font", mode=0o644))
+
+    gtk = roots["gtk"]
+    add(gtk + "/share/gsettings-schemas", _entry("dir", mode=0o755))
+    add(gtk + "/share/gsettings-schemas/gtk.example", _entry("dir", mode=0o755))
+    add(gtk + "/share/gsettings-schemas/gtk.example/example.xml",
+        _entry("file", data="gtk-schema", mode=0o644))
+
+    webkit = roots["webkit"]
+    add(webkit + "/libexec", _entry("dir", mode=0o755))
+    add(webkit + "/libexec/alias", _entry("link", target=dependency + "/libexec/target"))
+
+    pixbuf = roots["pixbuf"]
+    add(pixbuf + "/lib", _entry("dir", mode=0o755))
+    add(pixbuf + "/lib/gdk-pixbuf-2.0", _entry("dir", mode=0o755))
+    add(pixbuf + "/lib/gdk-pixbuf-2.0/loaders", _entry("dir", mode=0o755))
+    add(pixbuf + "/lib/gdk-pixbuf-2.0/loaders/libpixbufloader-example.so",
+        _entry("file", data="pixbuf", mode=0o755))
+    return model
+
+
 def _run_script(request, model, *, stat_times=None):
     node = shutil.which("node")
     if node is None:
@@ -168,12 +226,86 @@ process.stdout.write(output);
 
 
 class NixGuiDiscoveryNodeTests(unittest.TestCase):
+    def test_category_samples_survive_noise_and_roots_are_fair(self):
+        from subprocess import CompletedProcess
+        from unittest.mock import patch
+        from rs9.nix_gui_discovery import record_fhs_gui_discovery
+        import tempfile
+
+        facts = _facts()
+        result = _run_script(_discovery_request(facts), _sampling_fixture_model(facts))
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["truncated"]["reason"], "category-pruned")
+        summary = result["category_summary"]
+        self.assertIs(result["category_summary_complete"], False)
+        for category in CATEGORIES:
+            self.assertGreater(
+                sum(summary[role][category]["observed"] for role in ROLES), 0,
+                category,
+            )
+        sample_paths = {sample["path"] for sample in result["samples"]}
+        self.assertIn("libexec/helper", sample_paths)
+        self.assertIn("lib/gio/modules/module.so", sample_paths)
+        self.assertTrue(any(sample["type"] == "symlink" for sample in result["samples"]))
+        self.assertTrue(all(any(sample["role"] == role for sample in result["samples"])
+                            for role in ("glib", "gtk", "webkit", "pixbuf")))
+        _validate_observation(result)
+
+        with tempfile.TemporaryDirectory() as tmp, patch(
+                "rs9.nix_gui_discovery.subprocess.run",
+                return_value=CompletedProcess([], 0, json.dumps(result).encode(), b"")):
+            destination = Path(tmp) / "diagnostic.json"
+            retained = record_fhs_gui_discovery(facts, [], [], {}, destination)
+            self.assertLessEqual(destination.stat().st_size, 64 * 1024)
+            self.assertIn("samples", retained["result"])
+            self.assertTrue(retained["result"]["samples"])
+            self.assertFalse(retained["result"]["category_summary_complete"])
+
+    def test_legacy_partial_metadata_fixture_is_bounded_and_nonadmitting(self):
+        # Replays only selected facts from the retained 36-KiB member; the
+        # original member body is deliberately not copied into the fixture.
+        replay = {
+            "schema": SCHEMA,
+            "status": "partial",
+            "roots": {
+                role: {"path": "/nix/store/" + "a" * 32 + "-" + role,
+                       "full9": {"dev": 1, "ino": index + 1, "size": 4096,
+                                 "mode": 16749, "mtimeNs": "1", "ctimeNs": "1",
+                                 "uid": 65534, "gid": 65534, "nlink": 1},
+                       "records": 0}
+                for index, role in enumerate(ROLES)
+            },
+            "totals": {"entries": 1169, "read_bytes": 986602,
+                       "skipped_uncategorized": 524, "skipped_oversize": 0},
+            "categories": CATEGORIES,
+            "records": [{
+                "role": "gtk", "path": "share/gsettings-schemas",
+                "categories": ["data", "gsettings-schema"], "type": "directory",
+                "full9": {"dev": 1, "ino": 2, "size": 4096, "mode": 16749,
+                          "mtimeNs": "1", "ctimeNs": "1", "uid": 65534,
+                          "gid": 65534, "nlink": 1},
+            }],
+            "truncated": {"reason": "output-bound", "records_dropped": True},
+        }
+        replay_metadata = {
+            "member_bytes": 36485,
+            "member_sha256": "f379c5e766467887786d9e1d4cd1af79fb269b8ea2f7a3f3faf0c00d60a5a7af",
+            "stdout_bytes": 153886,
+            "stdout_sha256": "4e3840ae57b1f8188bc9180eac47601aa1261184a3070e5121c13a7dee319b1e",
+        }
+        self.assertLess(replay_metadata["member_bytes"], 64 * 1024)
+        self.assertEqual(len(replay_metadata["member_sha256"]), 64)
+        self.assertEqual(replay["records"][0]["categories"], ["data", "gsettings-schema"])
+        self.assertTrue(replay["truncated"]["records_dropped"])
+        _validate_observation(replay)
+
     def test_selected_members_and_large_uncategorized_files(self):
         facts = _facts()
         request = _discovery_request(facts)
         result = _run_script(request, _fixture_model(facts))
         self.assertEqual(result["schema"], SCHEMA)
-        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["truncated"]["reason"], "category-pruned")
         paths = [record["path"] for record in result["records"]]
         self.assertIn("libexec/helper", paths)
         self.assertIn("lib/gio/modules/module.so", paths)
@@ -216,7 +348,8 @@ class NixGuiDiscoveryNodeTests(unittest.TestCase):
         model = _fixture_model(facts)
         for value in model.values(): value["tick"] = "1700000000000123456"
         result = _run_script(request, model)
-        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["truncated"]["reason"], "category-pruned")
         self.assertEqual(result["roots"]["glib"]["full9"]["ctimeNs"], "1700000000000123456")
         _validate_observation(result)
         model[facts["gui_discovery"]["roots"]["glib"] + "/libexec/helper"]["unstable"] = True
@@ -226,7 +359,8 @@ class NixGuiDiscoveryNodeTests(unittest.TestCase):
     def test_timestamp_fallback_and_malformed_out_of_range_refuse(self):
         facts = _facts(); request = _discovery_request(facts); model = _fixture_model(facts)
         result = _run_script(request, model, stat_times="{mtimeMs:1700000000000.125,ctimeMs:1700000000000.125}")
-        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["truncated"]["reason"], "category-pruned")
         self.assertEqual(result["roots"]["glib"]["full9"]["mtimeNs"], "1700000000000125000")
         for expression in ("{mtimeNs:NaN,ctimeNs:1n}", "{mtimeNs:-1n,ctimeNs:1n}",
                 "{mtimeNs:9223372036854775808n,ctimeNs:1n}", "{mtimeNs:'1',ctimeNs:1n}",
@@ -286,6 +420,59 @@ class NixGuiDiscoveryNodeTests(unittest.TestCase):
             self.assertLessEqual(destination.stat().st_size,64*1024)
             from rs9.hosted_custody import diagnostic_bytes
             self.assertEqual(diagnostic_bytes(destination),destination.read_bytes())
+
+    def test_huge_symlink_samples_trim_after_records_are_empty(self):
+        from subprocess import CompletedProcess
+        from unittest.mock import patch
+        from rs9.nix_gui_discovery import record_fhs_gui_discovery
+        import copy
+        import tempfile
+
+        facts = _facts()
+        good = _run_script(_discovery_request(facts), _sampling_fixture_model(facts))
+        symlink = copy.deepcopy(next(sample for sample in good["samples"]
+                                     if sample["type"] == "symlink"))
+        samples = [copy.deepcopy(symlink), copy.deepcopy(symlink)]
+        samples[1]["path"] = samples[1]["path"] + "-duplicate"
+        for sample in samples:
+            sample["chain"] = [
+                {**link, "target": "/nix/store/" + "a" * 32 + "-target-" + "x" * 3500}
+                for link in sample["chain"] * 16
+            ]
+        good["records"] = []
+        good["samples"] = samples[:2]
+        for root in good["roots"].values():
+            root["records"] = 0
+        raw = json.dumps(good, separators=(",", ":")).encode()
+        self.assertGreater(len(raw), 64 * 1024)
+        self.assertLess(len(raw), 4 * 1024 * 1024)
+        _validate_observation(good)
+        with tempfile.TemporaryDirectory() as tmp, patch(
+                "rs9.nix_gui_discovery.subprocess.run",
+                return_value=CompletedProcess([], 0, raw, b"")):
+            destination = Path(tmp) / "diagnostic.json"
+            retained = record_fhs_gui_discovery(facts, [], [], {}, destination)
+            self.assertTrue(destination.is_file())
+            self.assertEqual(retained["status"], "partial")
+            self.assertEqual(retained["result"]["records"], [])
+            self.assertEqual(retained["result"]["samples"], [])
+            self.assertTrue(retained["result"]["truncated"]["samples_dropped"])
+            self.assertLessEqual(destination.stat().st_size, 64 * 1024)
+
+    def test_entry_bound_round_robin_preserves_later_root_samples(self):
+        facts = _facts()
+        model = _sampling_fixture_model(facts)
+        glib = facts["gui_discovery"]["roots"]["glib"]
+        for index in range(4097):
+            model[f"{glib}/noise-{index:04d}"] = _entry("file", data="noise", mode=0o644)
+        result = _run_script(_discovery_request(facts), model)
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["truncated"]["reason"], "entry-bound")
+        self.assertGreater(result["totals"]["entries"], facts["gui_discovery"]["max_entries"])
+        sampled_roles = {sample["role"] for sample in result["samples"]}
+        self.assertTrue({"gtk", "webkit", "pixbuf"} <= sampled_roles)
+        self.assertTrue(any(sample["role"] == "pixbuf" for sample in result["samples"]))
+        _validate_observation(result)
 
     def test_existing_custody_privacy_rejection_becomes_safe_optional_record(self):
         from subprocess import CompletedProcess

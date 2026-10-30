@@ -35,6 +35,7 @@ _STORE_PATH = re.compile(
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _MAX_OUTPUT_BYTES = 4 * 1024 * 1024
 _MAX_CUSTODY_BYTES = 64 * 1024
+_MAX_SAMPLE_RECORDS = len(_ROLES) * len(_CATEGORIES)
 _CREDENTIAL_WORDS = (
     "token", "password", "secret", "cookie", "authorization", "credential",
     "private_key", "privatekey",
@@ -57,9 +58,27 @@ const STORE_ROOT = /^\/nix\/store\/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]+$/;
 const STORE_PATH = /^\/nix\/store\/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]+(?:\/.*)?$/;
 const CATEGORIES = new Set(['helper', 'libexec', 'gio-module', 'gsettings-schema', 'pixbuf-loader', 'font', 'data']);
 const ROLES = ['glib', 'gtk', 'webkit', 'pixbuf'];
+const SAMPLE_LIMIT_PER_CATEGORY = 1;
+const MAX_SAMPLE_RECORDS = ROLES.length * CATEGORIES.size;
+const DESCENT_ANCHORS = new Set([
+  'libexec', 'gio', 'gsettings-schemas', 'glib-2.0', 'gdk-pixbuf-2.0', 'fonts',
+]);
+function newCategorySummary() {
+  const summary = {};
+  for (const role of ROLES) {
+    summary[role] = {};
+    for (const categoryName of CATEGORIES)
+      summary[role][categoryName] = {observed: 0, sampled: 0};
+  }
+  return summary;
+}
 const state = {
   roots: {},
   records: [],
+  samples: [],
+  sampleKeys: new Set(),
+  prunedDirectories: 0,
+  category_summary: newCategorySummary(),
   totals: {entries: 0, read_bytes: 0, skipped_uncategorized: 0, skipped_oversize: 0},
   truncated: null,
 };
@@ -147,6 +166,20 @@ function category(relative, stat, directory = false) {
   if (directory && parts.includes('share')) categories.add('data');
   return [...categories].filter((item) => CATEGORIES.has(item)).sort();
 }
+function noteRecord(record) {
+  const summary = state.category_summary[record.role];
+  for (const categoryName of record.categories) summary[categoryName].observed += 1;
+  if (record.type !== 'regular' && record.type !== 'symlink') return;
+  if (state.samples.length >= MAX_SAMPLE_RECORDS) return;
+  const key = `${record.role}\u0000${record.path}`;
+  if (state.sampleKeys.has(key)) return;
+  if (!record.categories.some((categoryName) =>
+      summary[categoryName].sampled < SAMPLE_LIMIT_PER_CATEGORY)) return;
+  state.samples.push(record);
+  state.sampleKeys.add(key);
+  for (const categoryName of record.categories)
+    summary[categoryName].sampled += 1;
+}
 function resolveChain(start, closureRoots) {
   let current = storePath(path.resolve(start));
   if (!insideClosure(closureRoots, current)) stop('symlink-closure-escape', true);
@@ -194,58 +227,103 @@ function readRegular(absolute, expected, remaining) {
 function addRecord(record) {
   if (state.records.length >= input.limits.max_entries) stop('entry-bound');
   state.records.push(record);
+  noteRecord(record);
 }
-function walk(rootRole, root, closureRoots) {
-  const queue = [{absolute: root, relative: ''}];
-  while (queue.length) {
-    const current = queue.shift();
+function descentPriority(relative) {
+  if (relative === 'share') return 0;
+  const parts = relative.split('/').filter(Boolean);
+  if (parts.some((part) => DESCENT_ANCHORS.has(part))) return 0;
+  if (parts.includes('lib')) return 1;
+  return 2;
+}
+function shouldDescend(relative) {
+  if (relative === 'share') return true;
+  const parts = relative.split('/').filter(Boolean);
+  if (!parts.includes('share')) return true;
+  return parts.some((part) => DESCENT_ANCHORS.has(part));
+}
+function enqueueDirectory(queue, item) {
+  queue.push(item);
+  queue.sort((left, right) => descentPriority(left.relative) - descentPriority(right.relative)
+    || (left.relative < right.relative ? -1 : left.relative > right.relative ? 1 : 0));
+}
+function loadCurrentDirectory(rootState) {
+  while (!rootState.current || rootState.current.index >= rootState.current.children.length) {
+    rootState.current = null;
+    if (!rootState.queue.length) return false;
+    const current = rootState.queue.shift();
     let children;
     try {
       children = [...fs.readdirSync(current.absolute, {withFileTypes: true})].sort((left, right) =>
         left.name < right.name ? -1 : left.name > right.name ? 1 : 0);
     } catch (_) { stop('directory-read-failed', true); }
-    for (const child of children) {
-      state.totals.entries += 1;
-      if (state.totals.entries > input.limits.max_entries) stop('entry-bound');
-      if (typeof child.name !== 'string' || !child.name || child.name === '.' || child.name === '..'
-          || child.name.includes('\0') || child.name.length > 512) stop('invalid-entry-name', true);
-      const relative = current.relative ? `${current.relative}/${child.name}` : child.name;
-      if (relative.length > 4096) stop('entry-path-bound', true);
-      const absolute = path.join(current.absolute, child.name);
-      let stat;
-      try { stat = lstat(absolute); } catch (_) { stop('entry-disappeared', true); }
-      if (stat.isSymbolicLink()) {
-        const categories = category(relative, stat);
-        if (!categories.length) { state.totals.skipped_uncategorized += 1; continue; }
-        const resolved = resolveChain(absolute, closureRoots);
-        let terminal;
-        try { terminal = lstat(resolved.terminal); } catch (_) { stop('symlink-target-missing', true); }
-        addRecord({role: rootRole, path: relative, categories, type: 'symlink', full9: frame(stat),
-          chain: resolved.chain, terminal: {path: resolved.terminal, full9: frame(terminal), regular: terminal.isFile()}});
-        continue;
-      }
-      if (stat.isDirectory()) {
-        const categories = category(relative, stat, true);
-        if (categories.length) addRecord({role: rootRole, path: relative, categories,
-          type: 'directory', full9: frame(stat)});
-        queue.push({absolute, relative});
-        continue;
-      }
-      if (!stat.isFile()) { state.totals.skipped_uncategorized += 1; continue; }
-      const categories = category(relative, stat);
-      if (!categories.length) { state.totals.skipped_uncategorized += 1; continue; }
-      const expected = safeInteger(stat.size, 'invalid-stat');
-      const read = readRegular(absolute, expected, input.limits.max_bytes - state.totals.read_bytes);
-      if (read.skipped) {
-        state.totals.skipped_oversize += 1;
-        addRecord({role: rootRole, path: relative, categories, type: 'regular', full9: frame(stat),
-          read: false, reason: read.skipped});
-        if (read.skipped === 'read-byte-bound') stop('read-byte-bound');
-        continue;
-      }
-      state.totals.read_bytes += read.bytes.length;
-      addRecord({role: rootRole, path: relative, categories, type: 'regular', full9: read.full9,
-        read: true, sha256: sha256(read.bytes)});
+    rootState.current = {absolute: current.absolute, relative: current.relative, children, index: 0};
+  }
+  return true;
+}
+function scanEntry(rootState, closureRoots) {
+  if (!loadCurrentDirectory(rootState)) return false;
+  const current = rootState.current;
+  const child = current.children[current.index];
+  current.index += 1;
+  if (current.index >= current.children.length) rootState.current = null;
+  state.totals.entries += 1;
+  if (state.totals.entries > input.limits.max_entries) stop('entry-bound');
+  if (typeof child.name !== 'string' || !child.name || child.name === '.' || child.name === '..'
+      || child.name.includes('\0') || child.name.length > 512)
+    stop('invalid-entry-name', true);
+  const relative = current.relative ? `${current.relative}/${child.name}` : child.name;
+  if (relative.length > 4096) stop('entry-path-bound', true);
+  const absolute = path.join(current.absolute, child.name);
+  let stat;
+  try { stat = lstat(absolute); } catch (_) { stop('entry-disappeared', true); }
+  if (stat.isSymbolicLink()) {
+    const categories = category(relative, stat);
+    if (!categories.length) { state.totals.skipped_uncategorized += 1; return true; }
+    const resolved = resolveChain(absolute, closureRoots);
+    let terminal;
+    try { terminal = lstat(resolved.terminal); } catch (_) { stop('symlink-target-missing', true); }
+    addRecord({role: rootState.role, path: relative, categories, type: 'symlink', full9: frame(stat),
+      chain: resolved.chain, terminal: {path: resolved.terminal, full9: frame(terminal), regular: terminal.isFile()}});
+    return true;
+  }
+  if (stat.isDirectory()) {
+    const categories = category(relative, stat, true);
+    if (categories.length) {
+      const record = {role: rootState.role, path: relative, categories, type: 'directory', full9: frame(stat)};
+      // Keep the share root and category-bearing directories, but count
+      // broad data-only children without retaining locale/theme noise.
+      if (relative === 'share' || categories.some((item) => item !== 'data')) addRecord(record);
+      else noteRecord(record);
+    }
+    if (shouldDescend(relative)) enqueueDirectory(rootState.queue, {absolute, relative});
+    else state.prunedDirectories += 1;
+    return true;
+  }
+  if (!stat.isFile()) { state.totals.skipped_uncategorized += 1; return true; }
+  const categories = category(relative, stat);
+  if (!categories.length) { state.totals.skipped_uncategorized += 1; return true; }
+  const expected = safeInteger(stat.size, 'invalid-stat');
+  const read = readRegular(absolute, expected, input.limits.max_bytes - state.totals.read_bytes);
+  if (read.skipped) {
+    state.totals.skipped_oversize += 1;
+    addRecord({role: rootState.role, path: relative, categories, type: 'regular', full9: frame(stat),
+      read: false, reason: read.skipped});
+    if (read.skipped === 'read-byte-bound') stop('read-byte-bound');
+    return true;
+  }
+  state.totals.read_bytes += read.bytes.length;
+  addRecord({role: rootState.role, path: relative, categories, type: 'regular', full9: read.full9,
+    read: true, sha256: sha256(read.bytes)});
+  return true;
+}
+function observeRoots(roots, closureRoots) {
+  const states = ROLES.map((role) => ({role, queue: [{absolute: roots[role].path, relative: ''}]}));
+  let active = true;
+  while (active) {
+    active = false;
+    for (const rootState of states) {
+      if (scanEntry(rootState, closureRoots)) active = true;
     }
   }
 }
@@ -255,7 +333,9 @@ function emit(status, reason = null) {
       state.roots[role].records = state.records.filter((item) => item.role === role).length;
   }
   const result = {schema: 'rs9.nix-fhs-gui-observation.v1', status,
-    roots: state.roots, totals: state.totals, categories: input.categories, records: state.records};
+    roots: state.roots, totals: state.totals, categories: input.categories,
+    category_summary: state.category_summary, category_summary_complete: false,
+    samples: state.samples, records: state.records};
   if (state.truncated || reason) result.truncated = state.truncated || {reason};
   let encoded = JSON.stringify(result);
   if (Buffer.byteLength(encoded, 'utf8') > 4 * 1024 * 1024) {
@@ -295,11 +375,11 @@ try {
   }
   state.roots = roots;
   phase = 'observe';
-  for (const role of ROLES) {
-    walk(role, roots[role].path, closureRoots);
+  observeRoots(roots, closureRoots);
+  for (const role of ROLES)
     roots[role].records = state.records.filter((item) => item.role === role).length;
-  }
-  emit('pass');
+  if (state.prunedDirectories > 0) emit('partial', 'category-pruned');
+  else emit('pass');
 } catch (error) {
   if (error instanceof ObservationStop) {
     // Bounds retain typed partial facts; custody/identity failures remain fatal.
@@ -423,7 +503,7 @@ def _validate_observation(result: Any) -> None:
     if status not in {"pass", "partial"}:
         raise ValueError("observation status mismatch")
     required = {"schema", "status", "roots", "totals", "categories", "records"}
-    allowed = required | {"truncated"}
+    allowed = required | {"truncated", "category_summary", "category_summary_complete", "samples"}
     if set(result) - allowed or not required <= set(result):
         raise ValueError("closed observation required")
     if status == "partial" and not isinstance(result.get("truncated"), Mapping):
@@ -453,12 +533,61 @@ def _validate_observation(result: Any) -> None:
         raise ValueError("observation records bound")
     for record in result["records"]:
         _validate_record(record, full9_keys)
+    projection_fields = {"category_summary", "category_summary_complete", "samples"}
+    if projection_fields & set(result):
+        if projection_fields - set(result):
+            raise ValueError("observation projection fields incomplete")
+        _validate_category_summary(result["category_summary"])
+        if result["category_summary_complete"] is not False:
+            raise ValueError("observation category summary must remain partial")
+        samples = result["samples"]
+        if not isinstance(samples, list) or len(samples) > _MAX_SAMPLE_RECORDS:
+            raise ValueError("observation sample bound")
+        for sample in samples:
+            if not isinstance(sample, Mapping) or sample.get("type") not in {"regular", "symlink"}:
+                raise ValueError("observation sample kind mismatch")
+            _validate_record(sample, full9_keys)
     if "truncated" in result:
         truncated = result["truncated"]
-        if (not isinstance(truncated, Mapping) or set(truncated) - {"reason", "records_dropped"}
-                or not isinstance(truncated.get("reason"), str)):
+        if (not isinstance(truncated, Mapping)
+                or set(truncated) - {"reason", "records_dropped", "samples_dropped"}
+                or not isinstance(truncated.get("reason"), str)
+                or ("records_dropped" in truncated and type(truncated["records_dropped"]) is not bool)
+                or ("samples_dropped" in truncated and type(truncated["samples_dropped"]) is not bool)):
             raise ValueError("observation truncation mismatch")
     _check_metadata(result)
+
+
+def _validate_category_summary(value: Any) -> None:
+    if not isinstance(value, Mapping) or set(value) != set(_ROLES):
+        raise ValueError("observation category summary roles mismatch")
+    for role in _ROLES:
+        row = value[role]
+        if not isinstance(row, Mapping) or set(row) != set(_CATEGORIES):
+            raise ValueError("observation category summary categories mismatch")
+        for category in _CATEGORIES:
+            counts = row[category]
+            if (not isinstance(counts, Mapping) or set(counts) != {"observed", "sampled"}
+                    or type(counts["observed"]) is not int or counts["observed"] < 0
+                    or type(counts["sampled"]) is not int or counts["sampled"] < 0
+                    or counts["sampled"] > counts["observed"]):
+                raise ValueError("observation category summary counts mismatch")
+
+
+def _sampled_category_summary(value: Mapping[str, Any], samples: list[Any]) -> dict[str, Any]:
+    return {
+        role: {
+            category: {
+                **value[role][category],
+                "sampled": sum(
+                    1 for sample in samples
+                    if sample.get("role") == role and category in sample.get("categories", [])
+                ),
+            }
+            for category in _CATEGORIES
+        }
+        for role in _ROLES
+    }
 
 
 def _validate_record(record: Any, full9_keys: set[str]) -> None:
@@ -520,16 +649,35 @@ def _write_record(destination: Path, record: Mapping[str, Any]) -> dict[str, Any
             # Keep a deterministic prefix that fits the existing diagnostic
             # custody budget, including canonical whitespace and outer fields.
             retained = list(observed["records"])
+            retained_samples = list(observed.get("samples", []))
+            records_dropped = False
+            samples_dropped = False
             while True:
-                retained = retained[:len(retained) // 2]
+                if retained:
+                    retained = retained[:len(retained) // 2]
+                    records_dropped = True
+                elif retained_samples:
+                    retained_samples = retained_samples[:len(retained_samples) // 2]
+                    samples_dropped = True
+                else:
+                    break
+                truncation = {"reason": "output-bound", "records_dropped": records_dropped}
+                if "samples" in observed:
+                    truncation["samples_dropped"] = samples_dropped
                 reduced = {**observed, "status": "partial", "records": retained,
                     "roots": {role: {**root, "records": sum(row["role"] == role for row in retained)}
                               for role, root in observed["roots"].items()},
-                    "truncated": {"reason": "output-bound", "records_dropped": True}}
+                    "truncated": truncation}
+                if "samples" in observed:
+                    reduced["samples"] = retained_samples
+                    if "category_summary" in observed:
+                        reduced["category_summary"] = _sampled_category_summary(
+                            observed["category_summary"], retained_samples
+                        )
                 record = {**record, "result": reduced,
                           "status": "partial" if record.get("status") in {"pass", "partial"} else "fail"}
                 encoded = canonical(record)
-                if len(encoded) <= _MAX_CUSTODY_BYTES or not retained:
+                if len(encoded) <= _MAX_CUSTODY_BYTES or (not retained and not retained_samples):
                     break
         if len(encoded) > _MAX_CUSTODY_BYTES or destination.is_symlink():
             raise OSError("diagnostic output unavailable")

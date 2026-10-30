@@ -59,6 +59,7 @@ from rs9.build_native import (
     validate_scratch_root,
 )
 from rs9.errors import ContractError, safe_details
+from rs9.provision_observation import classify_provision_failure
 from rs9.hosted_native import compare_inventories, execute_probes, is_excluded_inventory_path
 from rs9.hosted_native import provision as provision_native
 from rs9.npm_deps import resolve_offline_npm_archives
@@ -535,9 +536,15 @@ def provision_image(
         except ContractError as err:
             raise err.with_details(substage=prov_substage) from None
         if run.exit_code != 0:
+            try:
+                observation = classify_provision_failure(run.stdout_bytes, run.stderr_bytes, packages)
+            except Exception:
+                # An optional observation must not replace failure or cleanup.
+                observation = "observation-unavailable"
             raise ContractError("PROVISION_FAILED", f"{family} provisioning failed with exit code {run.exit_code}",
                                 details={"substage": prov_substage, "tool": family, "exit_code": run.exit_code,
-                                         "stdout_sha256": run.stdout_sha256, "stderr_sha256": run.stderr_sha256})
+                                         "stdout_sha256": run.stdout_sha256, "stderr_sha256": run.stderr_sha256,
+                                         "reason_token": observation})
         try:
             commit = _prep_step(host, recorder, commit_substage, ["docker", "commit", name, tag])
         except NativePrerequisiteUnavailable:

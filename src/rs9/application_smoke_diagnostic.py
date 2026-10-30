@@ -82,6 +82,10 @@ REPLAY_PROGRESS_EVENTS = {
     ("receipt", "write-failed"), ("run-record", "write-start"),
     ("run-record", "finalized"), ("run-record", "write-failed"),
 }
+REPLAY_RECEIPT_PROJECTION_SCHEMA = "rs9.application-smoke-replay-receipt-stage.v1"
+REPLAY_RECEIPT_MAX_STEPS = 64
+REPLAY_LINUX_SCENARIOS = {"linux-arm64": "B", "linux-x64": "C"}
+REPLAY_LINUX_TARGETS = {"linux-arm64": "aarch64-unknown-linux-gnu", "linux-x64": "x86_64-unknown-linux-gnu"}
 
 
 def extract_log_categories(stdout, stderr, exit_code=None):
@@ -253,6 +257,215 @@ def _read_regular(path, limit):
     if len(raw) > limit:
         return b"", meta, "oversize"
     return raw, {"present": True, "bytes": len(raw), "sha256": digest(raw)}, None
+
+
+def _read_stable_json(path, limit):
+    """Read one fixed evidence file through one no-follow FD and reject mutation."""
+    meta = {"present": False}
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    try:
+        fd = os.open(path, flags)
+    except FileNotFoundError:
+        return None, meta, "missing"
+    except OSError:
+        return None, {"present": True}, "invalid"
+    try:
+        before = os.fstat(fd)
+        meta = {"present": True, "bytes": before.st_size}
+        if not stat.S_ISREG(before.st_mode):
+            return None, meta, "invalid"
+        if before.st_size > limit:
+            return None, meta, "oversize"
+        chunks = []
+        total = 0
+        while total <= limit:
+            chunk = os.read(fd, min(65536, limit + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        raw = b"".join(chunks)
+        after = os.fstat(fd)
+    except OSError:
+        return None, meta, "invalid"
+    finally:
+        os.close(fd)
+    stable = (
+        before.st_dev == after.st_dev and before.st_ino == after.st_ino
+        and before.st_mode == after.st_mode and before.st_size == after.st_size
+        and before.st_mtime_ns == after.st_mtime_ns and before.st_ctime_ns == after.st_ctime_ns
+        and len(raw) == before.st_size
+    )
+    if len(raw) > limit:
+        return None, {"present": True, "bytes": len(raw)}, "oversize"
+    meta = {"present": True, "bytes": len(raw), "sha256": digest(raw)}
+    if not stable:
+        return None, meta, "unstable"
+    try:
+        value = json.loads(raw)
+    except (ValueError, UnicodeError, RecursionError):
+        return None, meta, "malformed"
+    if not isinstance(value, dict):
+        return None, meta, "malformed"
+    return value, meta, None
+
+
+def _replay_expected_steps(scenario):
+    """Read the maintained consumer step contract; no caller-supplied steps are accepted."""
+    try:
+        from rs9.tf_pypi_consumer import _NEBULAR_NATIVE_RC_STEPS
+        steps = _NEBULAR_NATIVE_RC_STEPS.get(scenario)
+    except (ImportError, AttributeError, TypeError):
+        steps = None
+    if not isinstance(steps, tuple) or not steps or any(not isinstance(step, str) for step in steps):
+        return None
+    return steps
+
+
+def _closed_replay_value(value, allowed, fallback="unknown"):
+    """Return only a scalar enum value; malformed JSON shapes stay observational."""
+    return value if type(value) is str and value in allowed else fallback
+
+
+def _project_replay_steps(raw_steps, expected):
+    """Project only fixed expected step IDs and boolean pass/fail states."""
+    if not isinstance(raw_steps, list):
+        return {
+            "steps": [{"id": step, "state": "unknown"} for step in expected],
+            "entries_observed": 0, "entries_unlisted": 0, "entries_omitted": 0,
+        }
+    window = raw_steps[:REPLAY_RECEIPT_MAX_STEPS]
+    seen = {}
+    unlisted = 0
+    expected_set = set(expected)
+    for item in window:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str) or item["id"] not in expected_set:
+            unlisted += 1
+            continue
+        step_id = item["id"]
+        if step_id in seen:
+            seen[step_id] = "duplicate"
+        else:
+            ok = item.get("ok")
+            seen[step_id] = "pass" if ok is True else "fail" if ok is False else "unknown"
+    omitted = max(0, len(raw_steps) - REPLAY_RECEIPT_MAX_STEPS)
+    default = "unknown" if omitted else "missing"
+    return {
+        "steps": [{"id": step, "state": seen.get(step, default)} for step in expected],
+        "entries_observed": len(window), "entries_unlisted": unlisted, "entries_omitted": omitted,
+    }
+
+
+def _project_replay_receipt(record, identity, error, scenario, target, expected):
+    status = _closed_replay_value(
+        record.get("status") if isinstance(record, dict) else None, {"pass", "fail"})
+    driver = record.get("driver") if isinstance(record, dict) else None
+    driver_status = _closed_replay_value(
+        driver.get("status") if isinstance(driver, dict) else None, {"pass", "fail"})
+    executable = record.get("executable") if isinstance(record, dict) else None
+    executable_sha = executable.get("sha256") if isinstance(executable, dict) else None
+    valid = (
+        isinstance(record, dict)
+        and record.get("schema") == "nebular.release-smoke-receipt-v1"
+        and record.get("scenario") == scenario
+        and record.get("target") == target
+        and status in {"pass", "fail"}
+        and isinstance(driver, dict) and driver.get("scenario") == scenario
+        and driver_status in {"pass", "fail"}
+        and isinstance(executable_sha, str) and re.fullmatch(r"[0-9a-f]{64}", executable_sha)
+    )
+    steps = _project_replay_steps(driver.get("steps") if isinstance(driver, dict) else None, expected)
+    return {
+        "present": bool(identity.get("present")),
+        "bytes": identity.get("bytes") if type(identity.get("bytes")) is int else None,
+        "sha256": identity.get("sha256") if isinstance(identity.get("sha256"), str) else None,
+        "valid": bool(valid), "read_error": error,
+        "status": status, "driver_status": driver_status,
+        "problem_codes": validate_problem_codes(record.get("problems") if isinstance(record, dict) else None),
+        **steps,
+    }
+
+
+def _project_replay_run(record, identity, error, platform, scenario, expected):
+    status = _closed_replay_value(
+        record.get("status") if isinstance(record, dict) else None, {"pass", "fail"})
+    run_receipt = record.get("receipt") if isinstance(record, dict) else None
+    run_receipt_status = _closed_replay_value(
+        run_receipt.get("status") if isinstance(run_receipt, dict) else None, {"pass", "fail"})
+    finalization = record.get("finalization") if isinstance(record, dict) else None
+    final_status = _closed_replay_value(
+        finalization.get("status") if isinstance(finalization, dict) else None,
+        {"complete", "fail", "failed", "partial"})
+    final_phase = _closed_replay_value(
+        finalization.get("phase") if isinstance(finalization, dict) else None,
+        {"complete", "fail", "failed", "partial"})
+    finalization_status = "complete" if final_status == "complete" and final_phase == "complete" else (
+        "failed" if final_status in {"fail", "failed", "partial"} or final_phase in {"fail", "failed", "partial"}
+        else "unknown")
+    observation = finalization.get("applicationReceiptObservation") if isinstance(finalization, dict) else None
+    observation = _closed_replay_value(observation, {"present-at-read", "missing-at-read"})
+    copy_status = finalization.get("applicationReceiptCopy") if isinstance(finalization, dict) else None
+    copy_status = _closed_replay_value(copy_status, {"written", "not-written"})
+    try:
+        from rs9.smoke_stream_tokens import _classify_problems
+        problems = _classify_problems(record.get("problems") if isinstance(record, dict) else None)
+    except (ImportError, AttributeError, TypeError):
+        problems = {"categories": [], "total": None, "scanned": 0, "unrecognized": 0,
+                    "non_string": 0, "unavailable": 1}
+    derived_count = next((item["count"] for item in problems.get("categories", [])
+                          if item.get("category") == "derived-asset-not-written"), 0)
+    derived_status = "missing" if derived_count else "unobserved"
+    return {
+        "present": bool(identity.get("present")),
+        "bytes": identity.get("bytes") if type(identity.get("bytes")) is int else None,
+        "sha256": identity.get("sha256") if isinstance(identity.get("sha256"), str) else None,
+        "valid": isinstance(record, dict) and record.get("schema") == "nebular.native-rc-smoke-run-v1"
+            and record.get("scenario") == scenario and record.get("platform") == platform,
+        "read_error": error, "status": status, "receipt_status": run_receipt_status,
+        "finalization": {"status": finalization_status, "receipt_observation": observation, "receipt_copy": copy_status},
+        "receipt": _project_replay_steps(run_receipt.get("steps") if isinstance(run_receipt, dict) else None, expected),
+        "problem_categories": problems.get("categories", []),
+        # The current run/receipt contract has no typed derived-output member;
+        # preserve only the closed missing category and never infer a path/type/digest.
+        "derived_output": {"status": derived_status, "type": None, "sha256": None},
+    }
+
+
+def _replay_projection_fallback(reason):
+    """Typed non-authoritative fallback for faults in this optional observation."""
+    return {
+        "schema": REPLAY_RECEIPT_PROJECTION_SCHEMA,
+        "status": "unavailable",
+        "reason": reason,
+        "qualification_authority": False,
+        "application_qualified": False,
+    }
+
+
+def project_replay_receipt_stage(evidence, platform, scenario):
+    """Read only the two released replay JSONs and emit a non-qualifying projection."""
+    expected = _replay_expected_steps(scenario)
+    expected_scenario = REPLAY_LINUX_SCENARIOS.get(platform)
+    if (expected is None or expected_scenario is None or scenario not in {expected_scenario, "C-signal"}
+            or scenario == "C-signal" and platform != "linux-x64"):
+        return {"schema": REPLAY_RECEIPT_PROJECTION_SCHEMA, "status": "unavailable",
+                "scenario": scenario if scenario in {"B", "C", "C-signal"} else "unknown",
+                "reason": "unknown-scenario", "qualification_authority": False, "application_qualified": False}
+    run, run_identity, run_error = _read_stable_json(
+        Path(evidence) / f"{platform}-{scenario}.run.json", MAX_RECEIPT)
+    receipt, receipt_identity, receipt_error = _read_stable_json(
+        Path(evidence) / f"{platform}-{scenario}.receipt.json", MAX_RECEIPT)
+    present = [bool(run_identity.get("present")), bool(receipt_identity.get("present"))]
+    status = "observed" if all(present) else "partial" if any(present) else "unavailable"
+    return {
+        "schema": REPLAY_RECEIPT_PROJECTION_SCHEMA, "status": status, "platform": platform,
+        "scenario": scenario,
+        "run_record": _project_replay_run(run, run_identity, run_error, platform, scenario, expected),
+        "receipt": _project_replay_receipt(
+            receipt, receipt_identity, receipt_error, scenario, REPLAY_LINUX_TARGETS[platform], expected,
+        ),
+        "qualification_authority": False, "application_qualified": False,
+    }
 
 
 def _current_replay_progress_profile(prepared):
@@ -773,6 +986,12 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
             "categories": extract_log_categories(b"", raw) if not log_error else []}
         if replay_progress:
             fields["progress"] = _read_replay_progress(replay_progress["progress"])
+        try:
+            fields["replay_receipt_projection"] = project_replay_receipt_stage(evidence, platform, scenario)
+        except Exception:
+            # This is optional diagnostic data. Never change the original failure,
+            # custody result, or retention path if the projection itself is malformed.
+            fields["replay_receipt_projection"] = _replay_projection_fallback("projection-failed")
     return fields
 
 
@@ -880,6 +1099,18 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
     if boundary_probes:
         record["boundary_probes"] = probes
     raw = canonical(record)
+    if len(raw) > MAX_DIAGNOSTIC and isinstance(replay, dict) and "replay_receipt_projection" in replay:
+        # Keep a small typed omission marker instead of allowing the new optional
+        # projection to exceed the established diagnostic cap.
+        replay = dict(replay)
+        replay["replay_receipt_projection"] = _replay_projection_fallback("diagnostic-size-cap")
+        record["replay"] = replay
+        raw = canonical(record)
+        if len(raw) > MAX_DIAGNOSTIC:
+            # Even the omission marker is optional. Preserve a legacy record
+            # that fits with less space than that marker requires.
+            replay.pop("replay_receipt_projection")
+            raw = canonical(record)
     if len(raw) > MAX_DIAGNOSTIC and "harness_problem_categories" in replay:
         # Optional replay projection cannot displace the original failure record.
         replay = dict(replay)
