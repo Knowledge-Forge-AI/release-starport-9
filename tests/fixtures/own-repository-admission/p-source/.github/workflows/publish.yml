@@ -1,0 +1,17 @@
+name: Current Production Publication Held
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  publication-held:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Refuse current production publication
+        shell: bash
+        run: |
+          printf '%s\n' 'Current production publication is held pending qualified RS9 inputs, P native-three qualification, and signing preflight. This interim workflow grants no publication authority.'
+          exit 1

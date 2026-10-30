@@ -4,7 +4,7 @@ from pathlib import Path
 from rs9.build_native import CommandReceipt
 from rs9.release_core import digest
 from rs9.rpm_lint import build_rpmlint_evidence
-from rs9.rpm_lint_policy import load_policy
+from rs9 import rpm_lint_policy
 from rs9.rpm_evidence import durable_lint_projection, write_policy_evidence
 from rs9.scratch import canonical
 
@@ -41,7 +41,7 @@ def witnessed_build_double(builder):
 def add_rpm_annex(scratch, receipt, files):
     raw_results, policies = {}, {}
     for package in list(files):
-        product = next(p for p in load_policy()['projects'] if package.name.startswith(p+'-'))
+        product = next(p for p in rpm_lint_policy.load_policy()['projects'] if package.name.startswith(p+'-'))
         arch = 'noarch' if '.noarch.rpm' in package.name else receipt['system'].removesuffix('-linux')
         spec = scratch / (product+'.spec'); spec.write_bytes(b'fixture-spec')
         stdout=b'1 packages and 1 specfiles checked; 0 errors, 0 warnings, 8 filtered.\n'
@@ -50,7 +50,7 @@ def add_rpm_annex(scratch, receipt, files):
         raw_path=scratch/'diagnostics'/('rpmlint-'+product+'.json');raw_path.parent.mkdir(exist_ok=True);raw_path.write_bytes(canonical(raw))
         evaluation=dict(schema='rs9.rpm-lint-policy-evaluation.v1',accepted=True,status='accepted-no-exceptions',blockers=[],
             inputs=dict(project_id=product,version='0.6.1',arch=arch,system=receipt['system']),raw_lint_status=raw['status'],raw_exit_code=0,
-            policy_sha256=digest(canonical(load_policy())),accepted_findings=[])
+            policy_sha256=digest(canonical(rpm_lint_policy.load_policy())),accepted_findings=[])
         summary, chunks=write_policy_evidence(scratch,evaluation)
         derivation=dict(project=product,adapter='rpm',artifact=dict(sha256=raw['package_sha256']),evidence=dict(rpmlint=durable_lint_projection(raw)))
         manifest=dict(schema='rs9.rpm-candidate.v1alpha2',project=product,architecture=arch,package_file='unsigned/'+package.name,

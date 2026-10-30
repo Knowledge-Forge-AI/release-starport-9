@@ -74,7 +74,7 @@ def _authority_boundaries(record):
         raise ContractError("DISTRIBUTION_AUTHORITY", "Original non-production authority boundaries must remain false")
 
 
-def _binary_inputs(repository, output, summary, expected):
+def _binary_inputs(repository, output, summary, expected, *, _admission=None):
     """Join physical custody to the validated summary, then verify real byte roles."""
     from rs9.hosted_deb import _custody_unique, _rpm_custody_unique
     versions = {intent["project"]["id"]: intent["version"] for _, intent in configuration_rows(repository, generation=CURRENT_GENERATION)}
@@ -92,8 +92,12 @@ def _binary_inputs(repository, output, summary, expected):
             raise ContractError("DISTRIBUTION_CUSTODY", "Physical receipt/manifest differs from validated summary")
         _authority_boundaries(receipt)
         tokens, errors = promotion_restrictions(lane, receipt)
-        if tokens or errors or receipt.get("production_promotion_blockers") != []:
-            raise ContractError("DISTRIBUTION_PROMOTION_HELD", "Lane promotion restrictions prohibit import")
+        if _admission is None:
+            if tokens or errors or receipt.get("production_promotion_blockers") != []:
+                raise ContractError("DISTRIBUTION_PROMOTION_HELD", "Lane promotion restrictions prohibit import")
+        else:
+            from rs9.own_repository_admission import check_lane
+            check_lane(_admission, lane, receipt, manifest)
         validate_rpm_policy_source(repository, receipt, generation=CURRENT_GENERATION)
         verify_package_roles(directory, manifest)
         validate_product_architectures(lane, manifest["files"])
@@ -139,7 +143,7 @@ def _binary_inputs(repository, output, summary, expected):
     return [unique[key] for key in sorted(unique)], nix
 
 
-def qualified_distribution_inputs(config, output, *, zip_transport="actions", timeout=7200):
+def _verified_context(config, output, *, zip_transport="actions", timeout=7200, _execution_source=False):
     """Collect fresh live metadata and recompute validators; saved packet flags are never inputs."""
     if zip_transport not in MODES:
         raise ContractError("PUBLIC_RELAY_MODE", "Unknown ZIP transport mode")
@@ -151,8 +155,13 @@ def qualified_distribution_inputs(config, output, *, zip_transport="actions", ti
     source_fields = set(expected) - {"event", "ref", "attempt", "run_id", "release_ingestion_sha256"}
     if any(actual.get(field) != expected[field] for field in source_fields):
         raise ContractError("DISTRIBUTION_SOURCE", "Caller configuration differs from authenticated current source")
-    packet = collect(repository, output, commit=config.source_commit, started_at=config.not_before, run_id=config.run_id,
-                     timeout=timeout, generation=CURRENT_GENERATION, zip_transport=zip_transport)
+    try:
+        packet = collect(repository, output, commit=config.source_commit, started_at=config.not_before, run_id=config.run_id,
+                         timeout=timeout, generation=CURRENT_GENERATION, zip_transport=zip_transport)
+    finally:
+        if _execution_source:
+            from rs9.own_repository_admission import verify_execution_source
+            verify_execution_source(repository)
     scope = packet.get("diagnostic_scope", {})
     if (packet.get("validation") != {"status": "pass", "reasons": []}
             or packet.get("classification") != "qualified-current-distribution-candidate"
@@ -178,9 +187,50 @@ def qualified_distribution_inputs(config, output, *, zip_transport="actions", ti
             or summary.get("blocking_reasons") != [] or any(summary.get(field) != value for field, value in expected.items())):
         raise ContractError("DISTRIBUTION_NOT_QUALIFIED", "Revalidated summary differs from exact source-bound qualification")
     _authority_boundaries(summary)
-    if summary.get("production_promotion_blockers") != [] or summary.get("production_promotion_blocked") is not False:
-        raise ContractError("DISTRIBUTION_PROMOTION_HELD", "Actual production promotion restrictions prohibit import")
-    binaries, nix = _binary_inputs(repository, output, summary, expected)
+    return repository, output, summary, expected
+
+
+def _inventory(expected, binaries, nix):
     return {"schema": "rs9.verified-distribution-inputs.v1alpha1", **expected, "binaries": binaries, "nix_outputs": nix,
             "production_enabled": False, "publication_authority": False, "attended_gates_satisfied": False,
             "signing_authority": False, "full_live1_qualification": False, "published_linux_nix_ready": False}
+
+
+def qualified_distribution_inputs(config, output, *, zip_transport="actions", timeout=7200):
+    """Generic/default facade remains strict for every promotion restriction."""
+    repository, output, summary, expected = _verified_context(config, output, zip_transport=zip_transport, timeout=timeout)
+    if summary.get("production_promotion_blockers") != [] or summary.get("production_promotion_blocked") is not False:
+        raise ContractError("DISTRIBUTION_PROMOTION_HELD", "Actual production promotion restrictions prohibit import")
+    binaries, nix = _binary_inputs(repository, output, summary, expected)
+    return _inventory(expected, binaries, nix)
+
+
+def qualified_theme_forge_packages_inputs(config, output, *, consumer_repository, consumer_commit, consumer_tree,
+                                          zip_transport="actions", timeout=7200):
+    """Fixed source-bound P unsigned inputs only; never generic token permission."""
+    if type(config) is not SourceBoundConfiguration:
+        raise ContractError("DISTRIBUTION_CONFIG", "Closed source-bound configuration required")
+    from rs9.own_repository_admission import consumer_source, admit, release, release_consumer, verify_execution_source
+    verify_execution_source(config.repository)
+    consumer = consumer_source(config, consumer_repository, consumer_commit, consumer_tree)
+    proof = None
+    observations = [consumer]
+    try:
+        repository, output, summary, expected = _verified_context(config, output, zip_transport=zip_transport, timeout=timeout, _execution_source=True)
+        verify_execution_source(config.repository)
+        observations.append(consumer_source(config, consumer_repository, consumer_commit, consumer_tree))
+        if observations[-1].record != consumer.record:
+            raise ContractError("OWN_REPOSITORY_SOURCE", "Consumer changed during original-run admission")
+        proof = admit(repository, output, summary, expected, consumer)
+        binaries, nix = _binary_inputs(repository, output, summary, expected, _admission=proof)
+        verify_execution_source(config.repository)
+        observations.append(consumer_source(config, consumer_repository, consumer_commit, consumer_tree))
+        if observations[-1].record != consumer.record:
+            raise ContractError("OWN_REPOSITORY_SOURCE", "Consumer changed during input readback")
+        verify_execution_source(config.repository)
+        return {**_inventory(expected, binaries, nix), "own_repository_admission": proof.record}
+    finally:
+        if proof is not None:
+            release(proof)
+        for binding in observations:
+            release_consumer(binding)
