@@ -1,0 +1,4742 @@
+{
+  "floor": {
+    "archive_member": "theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/package.json",
+    "installed_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/package.json",
+    "pointer": "/engines/node",
+    "sha256": "168b43aba5a8966b0caee78d441f4bb63787889bb2895120e44f505194b3236c",
+    "size": 1822,
+    "value": ">=22"
+  },
+  "identity": {
+    "commit": "cadb40c4972f68f314096ff60fbcfb4da950c161",
+    "lineage_mode": "direct-current-tag-no-historical-forward-proof",
+    "release_id": 426333162,
+    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+    "repository_id": 1358643872,
+    "tag": "v0.7.0",
+    "tree": "27c643b6375c2aafde314799c4f08e844c14992c"
+  },
+  "member_definitions": {
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs": {
+      "literals": {
+        "src-tauri/src/platform.rs": [
+          "parent.join(\"tfsb-studio-service\")",
+          "if packaged || !cfg!(debug_assertions) {",
+          "packaged_runtime(executable)"
+        ],
+        "src-tauri/src/theme_lab/runner.rs": [
+          "crate::platform::select_runtime(",
+          "resource_dir.join(\"loom-adapter\").join(\"theme-adapter.mjs\")",
+          "Command::new(&self.node_binary)",
+          ".arg(script_path)"
+        ]
+      },
+      "proof": {
+        "kind": "embedded-runtime-invocation",
+        "manifest_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json",
+        "runtime_member": "/usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service"
+      },
+      "requires_runtime": false,
+      "role": "embedded-runtime-invocation"
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js": {
+      "literals": {
+        "src-tauri/src/platform.rs": [
+          "parent.join(\"tfsb-studio-service\")",
+          "if packaged || !cfg!(debug_assertions) {",
+          "packaged_runtime(executable)"
+        ],
+        "src-tauri/src/theme_lab/runner.rs": [
+          "crate::platform::select_runtime(",
+          "self.execute_process(request, &self.batch_adapter)",
+          "Command::new(&self.node_binary)",
+          ".arg(script_path)"
+        ]
+      },
+      "proof": {
+        "kind": "embedded-runtime-invocation",
+        "manifest_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json",
+        "runtime_member": "/usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service"
+      },
+      "requires_runtime": false,
+      "role": "embedded-runtime-invocation"
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js": {
+      "literals": {
+        "protocol/theme-lab-v2/payload-binding.json": [
+          "\"path\": \"bin/tfsl.js\""
+        ]
+      },
+      "proof": {
+        "kind": "retained-loom-source",
+        "manifest_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json",
+        "runtime_member": "/usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service"
+      },
+      "requires_runtime": false,
+      "role": "retained-loom-source"
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts": {
+      "literals": {},
+      "proof": {
+        "kind": "typescript-declaration-data"
+      },
+      "requires_runtime": false,
+      "role": "typescript-declaration-data"
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js": {
+      "literals": {
+        "tools/sidecar-common.mjs": [
+          "manifest.json"
+        ]
+      },
+      "proof": {
+        "kind": "retained-sidecar-source",
+        "manifest_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json",
+        "runtime_member": "/usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service"
+      },
+      "requires_runtime": false,
+      "role": "retained-sidecar-source"
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts": {
+      "literals": {},
+      "proof": {
+        "kind": "typescript-declaration-data"
+      },
+      "requires_runtime": false,
+      "role": "typescript-declaration-data"
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js": {
+      "literals": {
+        "src-tauri/src/sidecar/process.rs": [
+          "verified.revalidate_for_spawn()?;",
+          "verified.payload.join(\"dist/service-protocol/server-cli.js\")",
+          "Command::new(&verified.binary)",
+          ".arg(&entrypoint)"
+        ]
+      },
+      "proof": {
+        "kind": "embedded-runtime-invocation",
+        "manifest_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json",
+        "runtime_member": "/usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service"
+      },
+      "requires_runtime": false,
+      "role": "embedded-runtime-invocation"
+    },
+    "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs": {
+      "literals": {
+        "src-tauri/src/app_theme/runner.rs": [
+          "crate::platform::select_runtime(",
+          "resource.join(\"solar-sail-adapter/solar-sail-adapter.mjs\")",
+          "Command::new(&self.node_binary)",
+          ".arg(&self.adapter_path)"
+        ],
+        "src-tauri/src/platform.rs": [
+          "parent.join(\"tfsb-studio-service\")",
+          "if packaged || !cfg!(debug_assertions) {",
+          "packaged_runtime(executable)"
+        ]
+      },
+      "proof": {
+        "kind": "embedded-runtime-invocation",
+        "manifest_member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json",
+        "runtime_member": "/usr/lib/theme-forge-nebular-fusion/bin/tfsb-studio-service"
+      },
+      "requires_runtime": false,
+      "role": "embedded-runtime-invocation"
+    }
+  },
+  "platforms": {
+    "aarch64-linux": {
+      "application": {
+        "mode": 493,
+        "path": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+        "sha256": "9dcd5953dc3696f0159323fd02ef009178a4eb2fed6427dde52eb9a26283e06e",
+        "size": 21932792
+      },
+      "asset": {
+        "github_asset_id": 687086522,
+        "id": "linux-arm64",
+        "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c",
+        "size": 54553557
+      },
+      "manifest": {
+        "content": {
+          "core": {
+            "name": "@knowledge-forge-ai/theme-forge-stellar-burst",
+            "tarball": {
+              "sha1": "d76c2440163642b3cb003641642aa8140b14f765",
+              "sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+              "size": 646798,
+              "sri": "sha512-2l/YU5kpJQdJ29Mv5DFawbf8seqBfrLZO7XkovlPKcJTE7ZMdH+75aDvmMUZaeg9qwa1hieHAbxhVEEFUbSDyQ=="
+            },
+            "version": "0.7.0"
+          },
+          "entrypoint": "dist/service-protocol/server-cli.js",
+          "files": [
+            {
+              "mode": 420,
+              "path": "dist/analyze-contract.d.ts",
+              "sha256": "5d4bc59e9faa34b141fa983e9eb9b7fad2560ab41f1370db167b21cefc91fc9b",
+              "size": 13626
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-contract.js",
+              "sha256": "df2be13dfbbc38de21c7d74cd602b22c7d94aacca39cac116557fb84c7072031",
+              "size": 9369
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-details.d.ts",
+              "sha256": "e8e29e0c704a6b6700cb2dc924d3b95dbeaa455648649af36742c0bd3475896c",
+              "size": 2001
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-details.js",
+              "sha256": "04863bfb4072fc1a46a33d48ee75af567f6670df5f6443739d893ef35f2d0f4d",
+              "size": 9306
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-scanner.d.ts",
+              "sha256": "7d9078b6023357ad5092a942be5916b1c935c477f09589fb6e1e544a4f682a81",
+              "size": 255
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-scanner.js",
+              "sha256": "ee5099fee099c046562b4316b5cc88ee24a1cb8b7120be0a953d243f9691892b",
+              "size": 38588
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-source.d.ts",
+              "sha256": "9db178b2ab9bb50047aa9ccd2a9a71717d35b3f38cd3d47b68ddad62642c5232",
+              "size": 1609
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-source.js",
+              "sha256": "93f3c939a4795526b229490079a0c88ff2ac7d3b032b1c292bf257d88b2fbc31",
+              "size": 12615
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze.d.ts",
+              "sha256": "8809e498d3461bdc97a2bf580291135969dd7f06318a157a432580e30b3fccc2",
+              "size": 839
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze.js",
+              "sha256": "0a2bf90832e7819f01df2ccfb2a17a30164c5734e426b14fd08fa1f634923973",
+              "size": 7619
+            },
+            {
+              "mode": 420,
+              "path": "dist/archive-limits.d.ts",
+              "sha256": "da7eb5d1fd89c0b8a7d6704fc358016ec56dfc48dd53b83867dc96fdbe52002e",
+              "size": 478
+            },
+            {
+              "mode": 420,
+              "path": "dist/archive-limits.js",
+              "sha256": "df654b0e1096abac5d233ebf631f8057f0a03c3d8162d6809a454eb6982257a2",
+              "size": 517
+            },
+            {
+              "mode": 420,
+              "path": "dist/archive.d.ts",
+              "sha256": "4a16e4187e20902d8cf1e0afcebca0b0db98a23410ff1ca5f76d1538092522a7",
+              "size": 4124
+            },
+            {
+              "mode": 420,
+              "path": "dist/archive.js",
+              "sha256": "12bbb2e4890520e56ff547272919120a96a41a752e10e1c34e2bc20844e4ede5",
+              "size": 37498
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-availability.d.ts",
+              "sha256": "5a6e7509f0272c5f1494df33381104c50ddf2abaea9e6cb4f9beabc296f5cfe5",
+              "size": 1487
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-availability.js",
+              "sha256": "9aab33486cb9cb7260870fb0eb2b2a4b506eadedcf904dee620ed6418b4367a1",
+              "size": 11374
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-bundle-manifest.d.ts",
+              "sha256": "2fc50f8bbe0bfb32ca6752f6e1a104c25b8bbe0ffbfcea59914d71bd39bbe17e",
+              "size": 3356
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-bundle-manifest.js",
+              "sha256": "51885abaf00d5a8816dc894e3dfa408f68df0b35ea650a20212ec55567f3295b",
+              "size": 30883
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-bundle.d.ts",
+              "sha256": "58f40ce1b94594e8bb52e876e7640cd4f01c143ea98f307da8d06456abd278d6",
+              "size": 4046
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-bundle.js",
+              "sha256": "05a416e781be652a6069368c4a8758ad20dd13d03a064851b81e6b22ab460b1b",
+              "size": 57169
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-core.d.ts",
+              "sha256": "1b7680a1427de2ec218efec3f8acfeb055c63fad64d5ee635b6bff65a7cf5752",
+              "size": 2705
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-core.js",
+              "sha256": "9bbcd4eed5eba9d820a545834a65f310cdee4653c6f1ca93e35b3d1192d019f5",
+              "size": 16608
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-diff.d.ts",
+              "sha256": "0b777d4b233d67b4b81e90e258c971e7792c84778d702603a05d53827346dfdb",
+              "size": 3963
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-diff.js",
+              "sha256": "303990cf00f31dedf979a7cf31dd5be80a1d4026b38eb5840f2beb3de76bdb05",
+              "size": 17095
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-digests.d.ts",
+              "sha256": "fd6c91f14eb187f725453e9f272de6610061eb77d101e43347f1a030509534e9",
+              "size": 746
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-digests.js",
+              "sha256": "24b801376b0be9a7852514754f99c53abf4c0d538d644aa899028ad0cf7a2a3d",
+              "size": 2603
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-files.d.ts",
+              "sha256": "08340c4b723de9e9f368c4596f302e75afbd887764f738b12d82962983995565",
+              "size": 2564
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-files.js",
+              "sha256": "62f8dc9d305aa724d2d42aead4e8a7fab4d8625e041a3cbba2ab369a0e71a899",
+              "size": 4098
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-import.d.ts",
+              "sha256": "926b1e87041a1518b31c9fa2cf3c8684d139f56f5eebd195d283c5ba376b8c17",
+              "size": 3627
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-import.js",
+              "sha256": "c42a934789dda5b2b306e4ce457b3f1685171cc63056f162a4a82146942cff56",
+              "size": 86155
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-package.d.ts",
+              "sha256": "a68f3fd37071635b8b35dc2a31b1d15a11643d2a5e2cfafc27c6a86c27a3be14",
+              "size": 3004
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-package.js",
+              "sha256": "afce1f3b5dd92fbe6ccbf218db09c0b11547ad6c93736fde75460854ec3afcb1",
+              "size": 28293
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-schema.d.ts",
+              "sha256": "e5c9c3d50da75e888374f181e6b8aea25470aee19c9e2f323a215e3903d52923",
+              "size": 3248
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-schema.js",
+              "sha256": "faef98c8b69ab473eef74b1defd393e0bfe481e6fc31d1bb53a761d8e0029bfc",
+              "size": 27683
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-install.d.ts",
+              "sha256": "88b239860ad49d1efe777d494eb844f11735f3768edbf8c016c36e560d850102",
+              "size": 1466
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-install.js",
+              "sha256": "138b93c444b2a3d12b4860363a4691eeb322daf10bb4ed623f45e0015c0f48f2",
+              "size": 23446
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-lock.d.ts",
+              "sha256": "e2e4d2889b9200ac657005aabea566e5978a1f96d9ff15a3bc08422514eb45ba",
+              "size": 4259
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-lock.js",
+              "sha256": "bdab242641b4e8c609ec3dcebc28aaf831c26356b44d05867eb01c7b9a1250b8",
+              "size": 21194
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-plan.d.ts",
+              "sha256": "9a0f884502c4408a70495cbf00cfcb2f09147fae1ae419943982e04e810b8e87",
+              "size": 5405
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-plan.js",
+              "sha256": "6dcc16b11e554543827292e79b90164a44d42a334bb9122b089bc36e73ca7458",
+              "size": 39443
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-profile.d.ts",
+              "sha256": "4f01de184c4c178bc099fda8dfaacdd0b12537a3499da25192060d43147875ac",
+              "size": 2925
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-profile.js",
+              "sha256": "251861b6f9ebf643608fa9c01cc8ae4b81c82bb7238e9e867f67378927b4cc69",
+              "size": 21093
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-source.d.ts",
+              "sha256": "8a6670c7a7d4f7da5c59c129b75d02b7cebae1aa244be07d6dd44cbccf9688f6",
+              "size": 3595
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-source.js",
+              "sha256": "31b285789ea668f6c074f5cbada742a783c4271fe8a445ae710b9bcde5dbdbaf",
+              "size": 21376
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/derive.d.ts",
+              "sha256": "e8719df0cde8fbc40cba808d1a15fd18874ed819ccc46a8e1bd6c88016af742d",
+              "size": 3679
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/derive.js",
+              "sha256": "c5a1f2148eb283ea84e6fa8ce0b5ecec354bff662e28f863bb0f286c2a92e37a",
+              "size": 56426
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/derived-receipt.d.ts",
+              "sha256": "14c48042f7f6587183badf8b8e8bb320f016a0a9d85bc3cb11815a3622b266b5",
+              "size": 2848
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/derived-receipt.js",
+              "sha256": "ca6d15b2037e02d6c1f087fd94bb0efd48d169e2a94ccd014eaa54f2dea312bd",
+              "size": 24124
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/export-plan.d.ts",
+              "sha256": "782f2420fa7a9119aba64e6e5fadc268558e752f3d2eb7a40a6086eef5b44bb4",
+              "size": 4609
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/export-plan.js",
+              "sha256": "653f0f6c5b9d86c65640d89edf4138b28d4e0b6cdb048a4f59b73ecc925c60ee",
+              "size": 35282
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/export-profile.d.ts",
+              "sha256": "8dada719bb812439c80257e8f0d9b6924951fcb7cc2c8daddcac624a798f1a04",
+              "size": 3519
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/export-profile.js",
+              "sha256": "149c73cb7f3a4f75340c198324d539e0ddba239460eafd789b4f442805294849",
+              "size": 17502
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-baseline.d.ts",
+              "sha256": "e761fedb34bdc06c24014f94e7c8d3c89f4eeade51b79db1561d12bbbdf81a8a",
+              "size": 3259
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-baseline.js",
+              "sha256": "0ed174846df6c4edccc28e20c79111322485f48d021188d572bb19a0dd7d4bcc",
+              "size": 18661
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-capability.d.ts",
+              "sha256": "3acdb0865e9de9b25275e8f77dbdc42293f285415c66f68931b305736a2ba3b6",
+              "size": 3877
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-capability.js",
+              "sha256": "8a71d676f57e169b75e4c92539023406623903724caa548f4c5f222c031ad001",
+              "size": 9776
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-report.d.ts",
+              "sha256": "6b937a4c42eaaf408c587b7d18bbc443051b33d73f4d025f3c1b99c5893d7370",
+              "size": 3295
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-report.js",
+              "sha256": "bbfb33bd7cf78d16bf8c08f6b16e8e10cef34938b70fdcc1cb679e7632bc9424",
+              "size": 9893
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-schema.d.ts",
+              "sha256": "d385cdfec7c797d74a468c66069a68fddd1cc91fa949b46a8cc5e7f9d06e1ada",
+              "size": 6389
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-schema.js",
+              "sha256": "1764429489b58b38cd6096f902f279cd5e679afc52d42d5911cd33b2fc85649f",
+              "size": 26374
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-semantic.d.ts",
+              "sha256": "07e8587e0d23046717dc3b967623aebc79b7f4a2cd684493a78052f91a51dbf3",
+              "size": 1884
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-semantic.js",
+              "sha256": "971dac0ab0a4a8291ed07fb2b31ce96f7fb921adf2d5c0f51908ffe44f30c5bd",
+              "size": 34059
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/raster-capability.d.ts",
+              "sha256": "1ade3b75e96601f0f2d8873dca6419129cde38281c6598fcae69d70e461b641a",
+              "size": 2342
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/raster-capability.js",
+              "sha256": "e6380ce4cff7dac6edeb55c9728cc428c58e1ebd032f1e764f9e4f384b29d1fe",
+              "size": 14634
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/raster-receipt.d.ts",
+              "sha256": "a7f9706387bd3bc7b4a30dd9d397122d427fef9548fd7dc1deb995a7f26ef5aa",
+              "size": 3266
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/raster-receipt.js",
+              "sha256": "b1794bd22a7f6d456ff50b921dd6462bd77c6e3c390e191b7aaa92ae092d5fa1",
+              "size": 15053
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/recipes.d.ts",
+              "sha256": "61b7f0a51e2710dc47ded354e4bf41963706cfc9ef8d72a00a3a2c915f67d0a7",
+              "size": 4573
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/recipes.js",
+              "sha256": "f27f7e417f89319cde4450cbf8465fb32f32d9165b6ac8ca535a54c66b467bb4",
+              "size": 32536
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/tokens.d.ts",
+              "sha256": "8962f4077aacebb9d884e181b65ae253cdeafff546b15455571853a59e65ecb9",
+              "size": 3827
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/tokens.js",
+              "sha256": "cb6b31fbf6602492f822b1eba0b441bf71cc8e27d84f5f851e888cb4184003f0",
+              "size": 22105
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/visual-diff.d.ts",
+              "sha256": "48a0920322cdb9d4b54610edb385ca922e7c1b05411547d4b77e45af4850fe21",
+              "size": 2711
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/visual-diff.js",
+              "sha256": "b4fb12a72ca723d13192a5b1b8b83a81a1d5de0fc106cdfa51d146d25fe31e07",
+              "size": 3544
+            },
+            {
+              "mode": 420,
+              "path": "dist/build.d.ts",
+              "sha256": "6b50ccaf49cef0d714c904ba11d952f19a3625fb9fe03f794fcf4689ea7569c7",
+              "size": 2287
+            },
+            {
+              "mode": 420,
+              "path": "dist/build.js",
+              "sha256": "5cde7bb0ce268bc126476aa0d7364033180382e03cbf98363849d93a80348794",
+              "size": 10404
+            },
+            {
+              "mode": 420,
+              "path": "dist/bundle.d.ts",
+              "sha256": "82020570c391fc666d80bec258b343297b02d34917cfe369f7c364b41e31cb19",
+              "size": 2569
+            },
+            {
+              "mode": 420,
+              "path": "dist/bundle.js",
+              "sha256": "8ad86650c9d0ed3cdc38662e8c99d636389f6ce0c0d99a37b7d6379f89a05e56",
+              "size": 19314
+            },
+            {
+              "mode": 420,
+              "path": "dist/check.d.ts",
+              "sha256": "1ac4a97517ca557843d7c85bacfaad77c99a3f47fa5b77c532224dc58dd0c86a",
+              "size": 2381
+            },
+            {
+              "mode": 420,
+              "path": "dist/check.js",
+              "sha256": "0608fe20381f738079ffc1767b51b33329b2538fbf11183a6ec52b517c3b43af",
+              "size": 11851
+            },
+            {
+              "mode": 420,
+              "path": "dist/classifier.d.ts",
+              "sha256": "02795dcec05056975550dba367dd577066aceecb1a6044897d6908929cada6a8",
+              "size": 1154
+            },
+            {
+              "mode": 420,
+              "path": "dist/classifier.js",
+              "sha256": "cbdccace12e2a331bd9c08b340983013d2342babeb80955b031a4d533f43c686",
+              "size": 1703
+            },
+            {
+              "mode": 420,
+              "path": "dist/cli.d.ts",
+              "sha256": "5c32ef46b90997fc6de2a43c40a92643d025b64f1ed7c360e1cd40997528797b",
+              "size": 292
+            },
+            {
+              "mode": 420,
+              "path": "dist/cli.js",
+              "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+              "size": 74258
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/index.d.ts",
+              "sha256": "1e5b09b1d29215e6cb4680df385126347f7676abb1ee387c686e77cb631cc279",
+              "size": 133
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/index.js",
+              "sha256": "1e5b09b1d29215e6cb4680df385126347f7676abb1ee387c686e77cb631cc279",
+              "size": 133
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-canonical.d.ts",
+              "sha256": "a238850a77d01157769fa7da05554925998e744f58fac3ecf771134da8bf2e7f",
+              "size": 699
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-canonical.js",
+              "sha256": "16ff83f58b3e2754115ec7889db863d797627ba69633fa0d1c7ff1df8e6a719f",
+              "size": 1363
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-summary.d.ts",
+              "sha256": "43060edc46ff8e74f3465b6ebbaa2cd03c591764c7bf98d47981a6f25840fbc2",
+              "size": 198
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-summary.js",
+              "sha256": "eb1ed1af8306945e54b348a1813a94a2936cb8391cdcf2b28fb5d71f316fe1ec",
+              "size": 1546
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-types.d.ts",
+              "sha256": "054da21c2fd90029c507897f56e4fd6a02b7ea2ceb35757eec209592887c6c35",
+              "size": 8007
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-types.js",
+              "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+              "size": 11
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-validate.d.ts",
+              "sha256": "68e747a2739929a6334976f82a2a2e41e695a2adecb8f75ee637fc9508624051",
+              "size": 1384
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-validate.js",
+              "sha256": "7268cec9bc919da3633f2a14f4329da917f94078de591f9c4472bd0949563fae",
+              "size": 25351
+            },
+            {
+              "mode": 420,
+              "path": "dist/diagnostics.d.ts",
+              "sha256": "4cb8fbe15dc912e5c1dafc23cbec26e33c568aaafff4a712c28da305fbc3f32c",
+              "size": 954
+            },
+            {
+              "mode": 420,
+              "path": "dist/diagnostics.js",
+              "sha256": "0807d8d20810f4dc97e12d2f0adfe3022a6e6869fbfb35fd052bfef3d38078ca",
+              "size": 1146
+            },
+            {
+              "mode": 420,
+              "path": "dist/diff.d.ts",
+              "sha256": "8c2fb370130acd4e831c0dfe0dd57a52f530150eef7ee9e6e62ae09eaac274d7",
+              "size": 5013
+            },
+            {
+              "mode": 420,
+              "path": "dist/diff.js",
+              "sha256": "611f8be0d4da43523b182ebf057b707fa1326cc1a96acbcde4fbcab8ab706e04",
+              "size": 35964
+            },
+            {
+              "mode": 420,
+              "path": "dist/digests.d.ts",
+              "sha256": "5967163019698b89fad860e3170e448d5b0686fb703875ef8fc66c2218d50502",
+              "size": 1178
+            },
+            {
+              "mode": 420,
+              "path": "dist/digests.js",
+              "sha256": "66f632dd1a092c7b9d424adda85a909069860a52dd79130ac5c800e20baff528",
+              "size": 1375
+            },
+            {
+              "mode": 420,
+              "path": "dist/directory-snapshot-native.d.ts",
+              "sha256": "addbdce1ac6604707b9ae685784d0d6d332a1ec93081e464d473ff06c961ccd0",
+              "size": 2452
+            },
+            {
+              "mode": 420,
+              "path": "dist/directory-snapshot-native.js",
+              "sha256": "23a3bf942fa1f92fbf686b4cedc0ec2a9f6653ded6fd2df7ef9d3c58d6591e69",
+              "size": 3639
+            },
+            {
+              "mode": 420,
+              "path": "dist/directory-snapshot.d.ts",
+              "sha256": "8ab4fb2d6ba35297db973d40ee3c88b36144eea4971f0f5de22ecb2e0a594a65",
+              "size": 6500
+            },
+            {
+              "mode": 420,
+              "path": "dist/directory-snapshot.js",
+              "sha256": "1e2ec764d3965f2cb4c8088003cb852b550d18e1b9119174b9866a9f8590a8b6",
+              "size": 54847
+            },
+            {
+              "mode": 420,
+              "path": "dist/edit.d.ts",
+              "sha256": "6a0ef8840dae1fcdadf4d0bfbe1b34c238ca3ef42fab389544245b6c889a361e",
+              "size": 2081
+            },
+            {
+              "mode": 420,
+              "path": "dist/edit.js",
+              "sha256": "0d5b31e359c8efbbd725cc20e1b7ee95c9375a5ec11080ecc032054d31e9fa59",
+              "size": 9315
+            },
+            {
+              "mode": 420,
+              "path": "dist/filesystem.d.ts",
+              "sha256": "3db79efaa159357bc1271ebb7c025d1c36a15b106c7b1c50855d3e6a73f38317",
+              "size": 2422
+            },
+            {
+              "mode": 420,
+              "path": "dist/filesystem.js",
+              "sha256": "fb30719af51b5730b79862f5560218e626dcd1f8db815871f04ccbbd501f29c9",
+              "size": 6175
+            },
+            {
+              "mode": 420,
+              "path": "dist/fmt.d.ts",
+              "sha256": "190deb624a4eb9c24a6072361d49050756a9506cc94843574e9af143bd4c349f",
+              "size": 1415
+            },
+            {
+              "mode": 420,
+              "path": "dist/fmt.js",
+              "sha256": "68bd47db9c9b6aff66fe88c5b988273d3951d650c772c8bba7b4a8fab5643a99",
+              "size": 4937
+            },
+            {
+              "mode": 420,
+              "path": "dist/importer.d.ts",
+              "sha256": "e361287ff23f8eb9f078df7f04d241d13fbcfbca4beb190ac934eaca72f1c2a9",
+              "size": 3781
+            },
+            {
+              "mode": 420,
+              "path": "dist/importer.js",
+              "sha256": "c3d8ed421d1e87cfb2cd69c543c831a01e7c18b5e52d319184106678f9c3797a",
+              "size": 57032
+            },
+            {
+              "mode": 420,
+              "path": "dist/index.d.ts",
+              "sha256": "b15fdec2ebd45dfe283910d3d09cf0b4c8c6b90c59c90c8e7d3342f48c21855c",
+              "size": 25514
+            },
+            {
+              "mode": 420,
+              "path": "dist/index.js",
+              "sha256": "afc7198d4c4a1b389565c5ccc55ab43e5122b1cb1f528eba11d697757a83409d",
+              "size": 14699
+            },
+            {
+              "mode": 420,
+              "path": "dist/install.d.ts",
+              "sha256": "324bd5d2d02493d25507a196261077723acac65e2d50362b25857c00a455bf23",
+              "size": 1360
+            },
+            {
+              "mode": 420,
+              "path": "dist/install.js",
+              "sha256": "bf846c1fddb815694092196dbbe98ba23a11c035551f92c0f486e2bdeccff92e",
+              "size": 12128
+            },
+            {
+              "mode": 420,
+              "path": "dist/json.d.ts",
+              "sha256": "dc7f58bb07cbdede38d8fc2cb124593d70ff1822fb052903dc5ea4d35128064b",
+              "size": 8803
+            },
+            {
+              "mode": 420,
+              "path": "dist/json.js",
+              "sha256": "152a33674f3348294cc6de6854153614ab333b6ba0fddf2ba7a1d8a3cb07a869",
+              "size": 4798
+            },
+            {
+              "mode": 420,
+              "path": "dist/list.d.ts",
+              "sha256": "4da530ec13f333d5ba93e97c641fbaa50d8bc8bcef0c16d53144b07cadde98a7",
+              "size": 2714
+            },
+            {
+              "mode": 420,
+              "path": "dist/list.js",
+              "sha256": "1912b3d31f933aa1c3e4719f90c057d0d624b94565ed2936b78d56d672a5f340",
+              "size": 5493
+            },
+            {
+              "mode": 420,
+              "path": "dist/manifest.d.ts",
+              "sha256": "c2fe252bb0ed14dcc136c3f3a0c68dc33a2d3708550d7504bcee88e8ce5dd206",
+              "size": 3077
+            },
+            {
+              "mode": 420,
+              "path": "dist/manifest.js",
+              "sha256": "b3c679c7b8b9e7845c0d96edc118c8e7dcc4db44964a7496629e57801c02108a",
+              "size": 20646
+            },
+            {
+              "mode": 420,
+              "path": "dist/migration.d.ts",
+              "sha256": "c998ecfcb1f8d3d11d10925e41ae6643c450755df6a5d7a316d206f4ceae75d2",
+              "size": 2348
+            },
+            {
+              "mode": 420,
+              "path": "dist/migration.js",
+              "sha256": "04ab7b1cee2e944d346a74027d55a56ed84e47648de51c4f1761c8a9275ba0f4",
+              "size": 14252
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalization-ledger.d.ts",
+              "sha256": "b4702ffdf68a78d513e053a3b1973758904f4cc1f27eed18603cd5bd2ec6b0f8",
+              "size": 1402
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalization-ledger.js",
+              "sha256": "94c734aba384104439758208b92d9e8db2a054908b8be5c953e91ba21330cfaf",
+              "size": 54
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalization-map.d.ts",
+              "sha256": "243429ebecfff2aac810238c634f6a6e51323889212a9b9b6571ab19a5e319b0",
+              "size": 1003
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalization-map.js",
+              "sha256": "c60a9c4652c9e48cca749fe20a20e863bc9b2ebf20f32f87f3c60118a85aee83",
+              "size": 5752
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalization-policy.d.ts",
+              "sha256": "7991b370d04dfaa5a8711fb1cff1ed66cf7cb512a42608d65522211cfb88e060",
+              "size": 1479
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalization-policy.js",
+              "sha256": "f9203c6a809b46fcdee01eb310909b83de77ccb5ab02b73ee45399c92ab97d9b",
+              "size": 2121
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalizer.d.ts",
+              "sha256": "5b96c4238265031554213850cf987c8d723ec9b2a4a05584e4df222047894912",
+              "size": 859
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalizer.js",
+              "sha256": "bdb26f8ee0be113f6468914621d25083b5bd344b7939a11ae953393f33637c10",
+              "size": 9594
+            },
+            {
+              "mode": 420,
+              "path": "dist/plan-retention.d.ts",
+              "sha256": "1a7c6fcf620169dcac406b5bc43522402894ed91f4ab3b87810d24786a008410",
+              "size": 1240
+            },
+            {
+              "mode": 420,
+              "path": "dist/plan-retention.js",
+              "sha256": "0514799c3b5c879521d941894aca6adf0fbcbae35f88ae4be41267a00acdfc96",
+              "size": 2872
+            },
+            {
+              "mode": 420,
+              "path": "dist/preview.d.ts",
+              "sha256": "271c2b573724c87bb55ffc0b8f6d38d0292d14a4955bee79eb6593a08f28bfcc",
+              "size": 4888
+            },
+            {
+              "mode": 420,
+              "path": "dist/preview.js",
+              "sha256": "f0ac6d4e951197bc7c4fea3fa80cf2981c30b1556803046c837fe19b700d9efc",
+              "size": 29286
+            },
+            {
+              "mode": 420,
+              "path": "dist/primitives.d.ts",
+              "sha256": "a27cf42bd140599a8bbe819b7e5ff252524a5253fb8f1ca655d2bd312416d5f7",
+              "size": 1903
+            },
+            {
+              "mode": 420,
+              "path": "dist/primitives.js",
+              "sha256": "8ea0aba048383082c285f449040a3d1d87d0f016c098b9141da23cebfedbe89b",
+              "size": 14262
+            },
+            {
+              "mode": 420,
+              "path": "dist/project.d.ts",
+              "sha256": "b7834b2527c9430675e80d8b13814ebc65790eeaa33276fb8b469df110df0a55",
+              "size": 1740
+            },
+            {
+              "mode": 420,
+              "path": "dist/project.js",
+              "sha256": "821c98656a66d7d04ceda2759411e2dfccb60541ad0f367efd2f68d8540cfba2",
+              "size": 9380
+            },
+            {
+              "mode": 420,
+              "path": "dist/provenance.d.ts",
+              "sha256": "17626e5823504466ca65b43b0d73916a918e899981f5572b5b9135af7a3d974b",
+              "size": 1803
+            },
+            {
+              "mode": 420,
+              "path": "dist/provenance.js",
+              "sha256": "ff10614c17c2262cbd040ecb5f047b2dba01845ca5f86161d3e0eabb2c6b899c",
+              "size": 12216
+            },
+            {
+              "mode": 420,
+              "path": "dist/provenance2.d.ts",
+              "sha256": "63e2e449f765e053278868818f0969a759b0420e747ace829d8f0070a46f2d8c",
+              "size": 3141
+            },
+            {
+              "mode": 420,
+              "path": "dist/provenance2.js",
+              "sha256": "cce8b52753288722fac0bc111d552dfbb69355acb572b42c2dd37c48916a28d7",
+              "size": 12876
+            },
+            {
+              "mode": 420,
+              "path": "dist/provenance3.d.ts",
+              "sha256": "f0ce1507577e02b8d9f1cbb6b738d1f9c2242d420b81d87cfdc320701b53195e",
+              "size": 3171
+            },
+            {
+              "mode": 420,
+              "path": "dist/provenance3.js",
+              "sha256": "e9e925589284f203264292ea46c3b02943f3efefd0e8a5db9e91d75cfc82a0d8",
+              "size": 14071
+            },
+            {
+              "mode": 420,
+              "path": "dist/receipt.d.ts",
+              "sha256": "e42f3771900c1a9ffa0e464af8cb04de7055eafe58d32f86a8db9fa178329c84",
+              "size": 2213
+            },
+            {
+              "mode": 420,
+              "path": "dist/receipt.js",
+              "sha256": "ca5d67f0e5bbd83fbbe447016013f9a2795ef026472da2917fd6444aac4cc2fc",
+              "size": 7755
+            },
+            {
+              "mode": 420,
+              "path": "dist/reconcile-directory.d.ts",
+              "sha256": "faf70d199f49045455a4e0c9ab8c36eba4be0ed12e5d1cdf5e9ccc9ee8c153e5",
+              "size": 5324
+            },
+            {
+              "mode": 420,
+              "path": "dist/reconcile-directory.js",
+              "sha256": "42832165eaa111ccc67f70ff2a24c3ed6cfe84558897e997596b129d9c08ead1",
+              "size": 65760
+            },
+            {
+              "mode": 420,
+              "path": "dist/reconcile.d.ts",
+              "sha256": "838bda9fa690f5b1ff8f75d2218d16fdf74aaf69db81081c1eee1d6e69fe8065",
+              "size": 3581
+            },
+            {
+              "mode": 420,
+              "path": "dist/reconcile.js",
+              "sha256": "a8ca2953a46b861e20929c2a4078b294689614dd5a87519e35fdece81aaf1a97",
+              "size": 40941
+            },
+            {
+              "mode": 420,
+              "path": "dist/reconcile2.d.ts",
+              "sha256": "a17a15f22512ebc23cf410584a599829aad18ba91efa6234e5852a3c200e98fb",
+              "size": 996
+            },
+            {
+              "mode": 420,
+              "path": "dist/reconcile2.js",
+              "sha256": "65a4e40a91984dfe32e324ead45ade089f0d94ef371929f0021c352fbc8787f2",
+              "size": 17416
+            },
+            {
+              "mode": 420,
+              "path": "dist/root.d.ts",
+              "sha256": "18b43bb049d3a9d09bff3d43f681fa0cb4fe49dcf63f9859af366ac65e38d3da",
+              "size": 944
+            },
+            {
+              "mode": 420,
+              "path": "dist/root.js",
+              "sha256": "92d3011ccd82e1378134a89e9ef5a259682d58d71e41efd7b7f3af774e15746c",
+              "size": 7461
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene-cli.d.ts",
+              "sha256": "25ac3c79ca90681495ce8af897640912956c6bb3fb1b1b501f69e245e780babd",
+              "size": 745
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene-cli.js",
+              "sha256": "5750919a9d74e35a15d1cad1dbe1507d3cea9be57c6115b218b6483a855c9691",
+              "size": 16984
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene-files.d.ts",
+              "sha256": "8a793a4e83cd93a230f6543e90a7d7661394f5fe5bf362d53df0c51a8a58181d",
+              "size": 3028
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene-files.js",
+              "sha256": "27fd4ce7354ae9373add4261002ce368208b4f051365257d8fe1c7f968f9514f",
+              "size": 14415
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/canonical.d.ts",
+              "sha256": "0730ecd87aef992d93102da4bb212f664398b2616a7aad38a4bd2a8c9d847c63",
+              "size": 711
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/canonical.js",
+              "sha256": "dfee79ef254cbcc99cc84e6e4dc1d90c01ed5d5b43b087ef51809ffae30af9b1",
+              "size": 2802
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/compile.d.ts",
+              "sha256": "b68a51d7ff8656fcc2619aea2c79203dd4320fbf12fc3bec460fc259cc886a4e",
+              "size": 867
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/compile.js",
+              "sha256": "135c71215a19f2f77b24646f47fb49927144f80118b61849ec902fa5f309db96",
+              "size": 13719
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/constants.d.ts",
+              "sha256": "6e2b402ce91cfa89e2c9fc400bd608aa96b711293ef65c73d5ef48c256cb3f74",
+              "size": 2266
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/constants.js",
+              "sha256": "2c3bfd8a6cc25e8be9dd75b4291221db7390dbe022076b41e440665e7dee73d3",
+              "size": 3169
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/emit.d.ts",
+              "sha256": "fab69c898c60f40f677d35bfa21253fb84bbbc408b55061c65599d9e5ee6e729",
+              "size": 271
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/emit.js",
+              "sha256": "e320009e7aafb970c59014eb795bb25dfee705ef6788e12afd9f98433f9443fa",
+              "size": 13404
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/geometry.d.ts",
+              "sha256": "b2f25be92d719de4e6b86d04686bea606a7f7f733a994cab4919e7326e05a8bb",
+              "size": 2347
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/geometry.js",
+              "sha256": "ccc86fd18106c6639bf3abc34d5681c35260bb64983d3187467561876ce8a218",
+              "size": 14497
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/glyphs/catalog.d.ts",
+              "sha256": "a2a52683c3484e33fc6bbc5a5752befb8c773e76d7cf0137d8880b2d8ac34749",
+              "size": 1642
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/glyphs/catalog.js",
+              "sha256": "cbb47ee1629e73139fcb9dc5b5af5c4947c763a0bf52320d352feb8b28b9d2b7",
+              "size": 6466
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/glyphs/labels.d.ts",
+              "sha256": "60c76fd1c5d0c8c862504ab0f0487451bacf34f37c6563235afa706e1251d561",
+              "size": 1107
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/glyphs/labels.js",
+              "sha256": "7ed3f88a1616e23c45d2e5293b91857e9f2c32aa4dfd3aa7714bba15bf690c0f",
+              "size": 6053
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/guard.d.ts",
+              "sha256": "6ab32786301afeff89d60ff16cb8e762b41887e159dbfedc64dd0fe360d2f33f",
+              "size": 232
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/guard.js",
+              "sha256": "592c290897fb4a31fbad6083609cd4bc2b888f2988ec62fd7230b64278955bbd",
+              "size": 3600
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/import-svg-guard.d.ts",
+              "sha256": "a16dd7b74e797b2f9c62462bcd90257f871e743baa540d22204e25db824a16ff",
+              "size": 983
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/import-svg-guard.js",
+              "sha256": "67eecd5b5959e960d434a4569b7db0577bf7650a61cd40baaac390d6fc6928a0",
+              "size": 14870
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/import-svg-types.d.ts",
+              "sha256": "801c40bbbc7974a388d6d1ac219b4ae0f4168ef061e10dd5f7855389b702e2a6",
+              "size": 1042
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/import-svg-types.js",
+              "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+              "size": 11
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/import-svg.d.ts",
+              "sha256": "a3c54a9115bbf06444b93100b93a0c28e770c222791eff6e66a02ce31f906d42",
+              "size": 228
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/import-svg.js",
+              "sha256": "d600ad614745f907261d7ea5ff24539fbb4f2b7c0339504ac98ce1dad8f95999",
+              "size": 70221
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/index.d.ts",
+              "sha256": "c1c4fb188f30433f1d3b603d160f2da645a1e228eb88ca9049005ba78f31979e",
+              "size": 1389
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/index.js",
+              "sha256": "20b8e8b8329e08ee6fcbcdf6fadf62505ddb0acc1ca0c1fc7a6018a7f2b9162a",
+              "size": 572
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/layout.d.ts",
+              "sha256": "f45e7e6689223fffd41f2cfbeb00d88e372247ff2aa16b9f9748ea4816e64d85",
+              "size": 452
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/layout.js",
+              "sha256": "395fdbe3ce06f341bdb5aade341725e6abdf8857e91d5c62baeb475daa207bf0",
+              "size": 18684
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/path-canonical.d.ts",
+              "sha256": "4d57cb85748c4e61a6d342ff8b2b52436dec7c04b48fe1b51de5df0e8feaab55",
+              "size": 70
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/path-canonical.js",
+              "sha256": "a58f8a4d97b2cc3263a387a4443f5fbce9a802329606849c1858831f2d8e270e",
+              "size": 1841
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/transforms.d.ts",
+              "sha256": "1fe27188cdfb2bfb991116eeaee5313e2b100dc0101a99b185d53f1fca31a131",
+              "size": 2043
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/transforms.js",
+              "sha256": "78085867466af0aba892a7c2d0af6496cb61352d15e796d23677407b1f7722fd",
+              "size": 11231
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/types.d.ts",
+              "sha256": "1191ac024d77c812d3f82f75b404c99c7a28c78cd8a58223fd5e6fa9d51ed8c5",
+              "size": 10201
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/types.js",
+              "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+              "size": 11
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/validate.d.ts",
+              "sha256": "bb2d430ea92adadb21d6610839909fc97cbc66421ec7334986ca00ad136a273f",
+              "size": 2890
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/validate.js",
+              "sha256": "4c12ff28885c7c04d4c4ee75b20bd3cf267775f7ac84ca0a587d26e8c1c43868",
+              "size": 87607
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema-dispatch.d.ts",
+              "sha256": "b53a1f95d160910e73ebf0a53f5b289be588e7740f77c6c9a558d6b7b5db3bcb",
+              "size": 946
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema-dispatch.js",
+              "sha256": "dd218495d053552fdb5b082293679c4a21086782292f05995891b604945340ad",
+              "size": 2641
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-svg.d.ts",
+              "sha256": "b24b608b33d20f7be1f91b27dbde0441477ae28232358d291f3fb22f20449b8f",
+              "size": 554
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-svg.js",
+              "sha256": "61485c9b53b019877978b06a5703039d63aa3083f1e7d144c684d3622bbafd81",
+              "size": 33904
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-toml.d.ts",
+              "sha256": "dce559c5254cfdb00f2a0b8d47facdb9aac8e7a16c43b5b9ef51479ac55cd635",
+              "size": 494
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-toml.js",
+              "sha256": "08e735b3fa6c7034ed843fd2bb2f381acbcd2c9a7792ca107cb6cd8437e666c6",
+              "size": 34384
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-types.d.ts",
+              "sha256": "68ee964a9907e93a926d6815f3156765e114e83664d1da821dd455b3e8172b78",
+              "size": 5608
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-types.js",
+              "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+              "size": 11
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-validation.d.ts",
+              "sha256": "e8be6cd6d32b788bf96ebe7e749a9db07ac1a917137da42b5bbf0ca1a608da1c",
+              "size": 437
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-validation.js",
+              "sha256": "d258ec8aeb6a47d70ac037201511f07ca05b6bcac3f0a8945a5619d3e2542243",
+              "size": 4978
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/authority-ledger.d.ts",
+              "sha256": "85c34794c58d12325b17c213450052d44b763d96ca57c5cb9114aaadd6d669dc",
+              "size": 4171
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/authority-ledger.js",
+              "sha256": "1c1c1b522eaa1681bdf662bb0a93242a433acb68c2869ddf1442fbf33c2b4af9",
+              "size": 7307
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/brand-methods.d.ts",
+              "sha256": "4710d632958122f4b4ab0928ef9b144d1ea997f1660270f1575dafd370ac30cb",
+              "size": 702
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/brand-methods.js",
+              "sha256": "8dba508c86f7c98f4d43dcb3c6f28a25a5bac6361fb2c6fe708cc4776d5eedbb",
+              "size": 34845
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/brand-visual-methods.d.ts",
+              "sha256": "9409ff923289752cc34a1fc929a9b2e76d97885e4e751476f8ded2d11fd76d50",
+              "size": 843
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/brand-visual-methods.js",
+              "sha256": "17c05b287c325ae30ba9c3d96d757e5f4166388bc08252dafe0f5c3ba8056116",
+              "size": 12745
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/canonical-json.d.ts",
+              "sha256": "b5930235198ac8d49056f8ad96e39d01ecd170e94575078381f62546703b98c1",
+              "size": 1446
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/canonical-json.js",
+              "sha256": "8f12641b32734a36036f5dd27538659a93f53122797200ce2ff928b447eee881",
+              "size": 4899
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/cursor.d.ts",
+              "sha256": "8cd2607f664cbb35b076e535f77889eaa83b8715f9634fa862bf6800188d4531",
+              "size": 1390
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/cursor.js",
+              "sha256": "486eec94eda11dcbdac9cb29d3ead470dcf6930d7175de5b67521b8a04be7c4f",
+              "size": 3515
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/errors.d.ts",
+              "sha256": "4ddd6da4f1fd02cc388f04cc828f08e623acb710dd856996817680a4f0c726ef",
+              "size": 490
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/errors.js",
+              "sha256": "4f99e3039f01bd436f5a2ccefec79005f115fd420bdfecf1386a268b89f548a8",
+              "size": 1571
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/framing.d.ts",
+              "sha256": "aec1e3fbad4a19cb92b24beef5a44a15a28847f176e66b76fc6c6133e1b10395",
+              "size": 413
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/framing.js",
+              "sha256": "b5e3abea0400aa292a6bfee060fc93f13d7039e3433b72936c753542ac587274",
+              "size": 2798
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/handles.d.ts",
+              "sha256": "b44546bf02206af0fa6cc60c15be03a25641272869881fdbdb2c976e86956c60",
+              "size": 5771
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/handles.js",
+              "sha256": "d0f5512ff94244ff987240e24b3426aad400ecc29d406b268fbd1dad944a012d",
+              "size": 23567
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/mutation-methods.d.ts",
+              "sha256": "7339cc292259aaecceefa254dd765b0aaadff4f00eb6bb74c5f45d079dcc1c7c",
+              "size": 3447
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/mutation-methods.js",
+              "sha256": "adce29d870d80b54c547511e8e4d9505d57950045185e89e6aa82f4e55df2c34",
+              "size": 41143
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/plan-registry.d.ts",
+              "sha256": "c19f377a32c719e80fae6fb1495818dd528651813488e4bb3db72643302d49f6",
+              "size": 6788
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/plan-registry.js",
+              "sha256": "33d1060f026f0340118d458173e5f1c0cc580bcaa06fc3403e3c6c827cec2e73",
+              "size": 22362
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/read-methods.d.ts",
+              "sha256": "d1a1f504a427142f84b3e772790d758adf8a584848dd90ed8ba7c481ce202716",
+              "size": 812
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/read-methods.js",
+              "sha256": "8da9d6f961ce93fbd63025c3965faaf12d727a71959d93059a0f55b074e8a38e",
+              "size": 20048
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/server-cli.d.ts",
+              "sha256": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012",
+              "size": 31
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/server-cli.js",
+              "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+              "size": 298
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/server.d.ts",
+              "sha256": "f1952b67dc1b425c1017316e9fc9e5ad16ccdfc18df1d4a38671da90fd072bcc",
+              "size": 340
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/server.js",
+              "sha256": "aaf1fc147725fd27cfaa0d222b19ae7e1965fd46003c2996b32a2f7644259778",
+              "size": 14593
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/session.d.ts",
+              "sha256": "57f25155e9cefa8178c633a896997b60c3ab7fe6934fbf571afcfa6e935dbfc0",
+              "size": 1612
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/session.js",
+              "sha256": "26082e4989c3808500c3590388629bb59d158ba4bd109696464ab5dd7bb5e26e",
+              "size": 5797
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/v1-registry.d.ts",
+              "sha256": "9d9c284f65b491bc0ca4b85ad12ac0032aa61c1df924c5db9b36509a76742db7",
+              "size": 14675
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/v1-registry.js",
+              "sha256": "2db1a9400e157c63efecdfaed7bc18b1e960aaf52cbba03340bc399952df6504",
+              "size": 9310
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/v1-types.d.ts",
+              "sha256": "4fd15a246e1c05368348bbbf74183e7a69e8c3d3e9bec418ef401362704951c1",
+              "size": 50487
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/v1-types.js",
+              "sha256": "083e59a27e9a0f0f41acdf8b6aa54227517636c648238c0db5ef1bbb07902aa3",
+              "size": 2154
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/v1-validate.d.ts",
+              "sha256": "1fbdf553eb092deab50931682898d0ad70abe72975041fe9ef9bec19a2e19e57",
+              "size": 945
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/v1-validate.js",
+              "sha256": "8224764e36a6446daf8de449c53e1e4340f74104a7cec6e6676caa597868f56f",
+              "size": 104981
+            },
+            {
+              "mode": 420,
+              "path": "dist/shard.d.ts",
+              "sha256": "a0da1807d950580ae03778889ebc25e2da04dec3d5482e8671f62f3a3613a5b3",
+              "size": 3868
+            },
+            {
+              "mode": 420,
+              "path": "dist/shard.js",
+              "sha256": "c3ec26f387352f0f7c5dcc0156da8feadba119bcc7ab21e5b27169fd7a08f274",
+              "size": 33884
+            },
+            {
+              "mode": 420,
+              "path": "dist/source-identity.d.ts",
+              "sha256": "c0c449868f5b00c195f1f44be3273c9d873ef74931d56c03eb4989d4d37e11dc",
+              "size": 1929
+            },
+            {
+              "mode": 420,
+              "path": "dist/source-identity.js",
+              "sha256": "ab0b45c98bb810466dc4717b48ca8f9f1ae1702f484a0684c4c4ada7b67db22d",
+              "size": 9202
+            },
+            {
+              "mode": 420,
+              "path": "dist/source-map.d.ts",
+              "sha256": "2b82af31974de2af7d7e42d7b9b8231b60eb6e71c1c1401c0c6e71dfdcfb92cb",
+              "size": 1734
+            },
+            {
+              "mode": 420,
+              "path": "dist/source-map.js",
+              "sha256": "9fb8d319fc430df544a8e3fd42163b7d706adf56bee23eba862f0d80e3eafe80",
+              "size": 11180
+            },
+            {
+              "mode": 420,
+              "path": "dist/svg.d.ts",
+              "sha256": "550f00def90906b38c824f33a094eb0aa6bf0bb6ef7d5fca6a5a9a6fca1fdfb7",
+              "size": 230
+            },
+            {
+              "mode": 420,
+              "path": "dist/svg.js",
+              "sha256": "99e5a89cd09c4517bace40a418f8f1e1613a07a3e96df1dd1344830f97048bf2",
+              "size": 29910
+            },
+            {
+              "mode": 420,
+              "path": "dist/toml-writer.d.ts",
+              "sha256": "9c7539e030a1cfbb905198002950c1f565b56f05751c91d0f4d324d73830b79d",
+              "size": 228
+            },
+            {
+              "mode": 420,
+              "path": "dist/toml-writer.js",
+              "sha256": "32773468d5655c38467f3f81fab81602c3f0be2200a56967f62942584072c7fa",
+              "size": 8597
+            },
+            {
+              "mode": 420,
+              "path": "dist/toml.d.ts",
+              "sha256": "04897708bf0725144139214f40a3a1654c95250697b3a165f7f7072069948947",
+              "size": 274
+            },
+            {
+              "mode": 420,
+              "path": "dist/toml.js",
+              "sha256": "74f80fe0fea0e0b9c247f7378d88be062ffa47eefb78aba7e2b39e0933da2593",
+              "size": 23014
+            },
+            {
+              "mode": 420,
+              "path": "dist/transaction.d.ts",
+              "sha256": "f5b80633c10a558f35cab7d8abe41c8ca0caff27ef97ef41a02cedaaf1f59ca7",
+              "size": 3322
+            },
+            {
+              "mode": 420,
+              "path": "dist/transaction.js",
+              "sha256": "f4124f7f45009123c383200529c49dd28877c89260f1a1a5098f64420cc5b617",
+              "size": 32622
+            },
+            {
+              "mode": 420,
+              "path": "dist/types.d.ts",
+              "sha256": "52e90a0442b291e0171ad4a5f30240e11feebd2026d2a01471f63fd8f964cfdf",
+              "size": 5179
+            },
+            {
+              "mode": 420,
+              "path": "dist/types.js",
+              "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+              "size": 11
+            },
+            {
+              "mode": 420,
+              "path": "dist/validation.d.ts",
+              "sha256": "38a293d255688d2cddcc2b06195fe3600144d7a7ce8b966ae1d8a168f50b6576",
+              "size": 203
+            },
+            {
+              "mode": 420,
+              "path": "dist/validation.js",
+              "sha256": "69f7260e314ea997f01186f8de4f6a53b0ee20b35267b23c52ea510fd17e0b5a",
+              "size": 3580
+            },
+            {
+              "mode": 420,
+              "path": "dist/version.d.ts",
+              "sha256": "1e51df981fb3b25faf6c3cf5ba0da90d8908b2d963d60a89a00d9e045207370e",
+              "size": 43
+            },
+            {
+              "mode": 420,
+              "path": "dist/version.js",
+              "sha256": "1b45f7d34136d40ee61f33998121923f6de901764fe348f5bd57437ad8648d79",
+              "size": 391
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-check.d.ts",
+              "sha256": "ffe48f7e44079421ec388f58cb8f7c5f4b4c4c0b2bcef247a958916fac9904bf",
+              "size": 1843
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-check.js",
+              "sha256": "3415ffa465af3311a29cb2c0a4c44f95cf5b10e5b314a4e7f813c9c9a0181599",
+              "size": 4929
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-collisions.d.ts",
+              "sha256": "7247aab629f566397d9777f4d657c331e821cf834516605056f0785d7bc0922e",
+              "size": 465
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-collisions.js",
+              "sha256": "b15fe447c83bac347f5c3f491cc34515cd7c57efdc5612e22f213a9ed471e139",
+              "size": 2891
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-list.d.ts",
+              "sha256": "92ddcd956c0499a83244368d514d0d6d97d26547a5c668effa7e57a3aa87ec72",
+              "size": 2652
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-list.js",
+              "sha256": "7a5a6888c2c6d73efa492f9abcbeebd1362e58393e691bc97217c4354801c0cb",
+              "size": 10616
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-preview.d.ts",
+              "sha256": "986a3e11b5c1a72951a2fcd524c9cec21911d50a053eb3242b43e97005353559",
+              "size": 3300
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-preview.js",
+              "sha256": "5cbad71960a33c332ab9aae79cc5d0240f919c850e68cde68f71e6404bb16cae",
+              "size": 23230
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace.d.ts",
+              "sha256": "1d4702fbdf356827de1191e0bca7b701ae3d192316623ad03556ee0c9815e036",
+              "size": 3035
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace.js",
+              "sha256": "7342ea2d952e64d5fbff442ab5afdfed600b6ab7ec3abeec1684d3fa3f6d05f4",
+              "size": 13590
+            },
+            {
+              "mode": 420,
+              "path": "legal/COMMERCIAL-LICENSE.md",
+              "sha256": "63ddf934056e5e21f70b5fca6824679bff8c759e14c59b9b1704412d5ccc1747",
+              "size": 942
+            },
+            {
+              "mode": 420,
+              "path": "legal/LICENSE",
+              "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+              "size": 34460
+            },
+            {
+              "mode": 420,
+              "path": "legal/NOTICE",
+              "sha256": "4a65d0820387e60ff6cd04282d335104a3deb2f32f7c56f3e34fc6576a3089ba",
+              "size": 611
+            },
+            {
+              "mode": 420,
+              "path": "legal/node-LICENSE.txt",
+              "sha256": "c738ae413cf561f174e34f6961f8ca458aae2369a73640dda6234c629b98bcc4",
+              "size": 145485
+            },
+            {
+              "mode": 420,
+              "path": "native/directory-snapshot/prebuilds/linux-arm64-gnu/manifest.json",
+              "sha256": "845b0672a73b16da97a6320b427eefaabf85e4d39a51ca8e8876bd997b9debea",
+              "size": 1305
+            },
+            {
+              "mode": 420,
+              "path": "native/directory-snapshot/prebuilds/linux-arm64-gnu/native-addon-posix-openat-v1.node",
+              "sha256": "67fb6b85f339a7c2f43ababa20434b26a3ea9bb65b17e70257a03c07810beb79",
+              "size": 73336
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/COMMERCIAL-LICENSE.md",
+              "sha256": "a81bcda7ec57a5c09f1cc6d05de420db7a0053b9496f1762065e083a60e5ede2",
+              "size": 932
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/LICENSE",
+              "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+              "size": 34460
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/MPL-2.0.txt",
+              "sha256": "4b89d4518bd135ab4ee154a7bce722246b57a98c3d7efc1a09409898160c2bd1",
+              "size": 16724
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/NOTICE",
+              "sha256": "d31e49346c1d4b9ea98ed49b817d48e68c4b9000e1763522da5ffe7f791e3657",
+              "size": 601
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/THIRD_PARTY_NOTICES.md",
+              "sha256": "27270f218c669a2dc276685c23304e81be6740c3eb48a1b4d7080e8c6587d779",
+              "size": 883
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/index.d.ts",
+              "sha256": "18907fdd6b3f6050eb1284afcc8c9e9d044648e93592bc3bd0c4de720687486c",
+              "size": 1150
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/index.js",
+              "sha256": "cdd58ed5a66c5bf7fbb99653482db0004dba960b990e3e98433c36045bbeace4",
+              "size": 6150
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/package.json",
+              "sha256": "14b741e56d9823f82318e8a9d062a02884258eccfae6266138be2a6aaf9acd12",
+              "size": 731
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/README.md",
+              "sha256": "d10de0be25ba578e49979d5a02eb91c60e950a9e00df5669421dc1ad48265878",
+              "size": 936
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/index.d.ts",
+              "sha256": "bc8ed21a5bde7f8ab289969c11fbd6dd4d708f4ff36dd9c374aee3cc1b6b63c8",
+              "size": 2496
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/index.js",
+              "sha256": "0c1cd17c478a10ad891b147808c4f27b1023216f7726c49528c22c310c83ee6c",
+              "size": 18024
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/index.min.js",
+              "sha256": "590115ae25dead0d688da192f2d31586cdf1f8c70fe294919419c168e03e5c42",
+              "size": 8587
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/index.mjs",
+              "sha256": "10170d02d816f02ec76f9bc095b01d9becf536e7b1e12e5aa616652c84b237a1",
+              "size": 17048
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/index_bg.wasm",
+              "sha256": "22bf6e9f9a100d972da0411a69c5ba504367fc1fa87b3b64e3f35e53926d2d70",
+              "size": 2478606
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/package.json",
+              "sha256": "4a9efcb54b2670726ccf9b91086413676c3de0fae607cce3b8a5a0d25abaff48",
+              "size": 903
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/CHANGELOG.md",
+              "sha256": "5138fc1f8c15712ed7ede448a53f06fad0c15f1f94b57b4cb74ccfe694329c5a",
+              "size": 69194
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/LICENSE",
+              "sha256": "4da724fc305d81606b245b324d4d2586916b9d248b23d82183df753ace0fdf71",
+              "size": 1298
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/SECURITY.md",
+              "sha256": "a17b482b11a4f3ff0aa20bad116c49472c5ba9417223adf915eb739d194aceea",
+              "size": 3980
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/index.d.ts",
+              "sha256": "342163401aa45f329d6b07a70d878ec9d1dfbf1630ee389ac242309178833baf",
+              "size": 73605
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/.eslintrc.yml",
+              "sha256": "8962d52a0bb86f17e764dfaf160d265eaa969ed3d67da747b59c1df6eb4833c2",
+              "size": 63
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/conventions.js",
+              "sha256": "da57fbe2b07f5a4aaee9217b49778936c11a1108da1761b2f24f356a900ff124",
+              "size": 13399
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/dom-parser.js",
+              "sha256": "4188e24b953e2c70b66150306c66547495ad968d040e31dd65f22a7b3485da28",
+              "size": 20276
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/dom.js",
+              "sha256": "bea9ba89adfec227e9e572ee934a48223a170c5cf96b7087d7e3d3023ac47be3",
+              "size": 133234
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/entities.js",
+              "sha256": "ef333b680379392e8ee120e1cc77e0a8ff99a135e3b365b048f69c0df5f571f9",
+              "size": 44533
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/errors.js",
+              "sha256": "3e97f9c4f0a189346e2621b29c7c5a3899cd7375d1d15cbfbddd044fb781cb9f",
+              "size": 6817
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/grammar.js",
+              "sha256": "144f27b46adfb4a139adeb7483820def568b3940a6893194c03f5a71a94babc0",
+              "size": 23776
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/index.js",
+              "sha256": "418c42598a45290498f4350b6b6f531ceeb25e8d4d9a107db2448a1c0b5b784e",
+              "size": 1595
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/sax.js",
+              "sha256": "324e8a0c7b475c645efcd1736b634733e133150849bff741fa0e2215e7017d02",
+              "size": 32465
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/package.json",
+              "sha256": "b61c2dd342e0e1abb800302ec62c0b06ae7a07cd9b907c88428ff80100f64c6a",
+              "size": 2253
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/readme.md",
+              "sha256": "5ee9af83f442f300bf14d6ba8a79a6708f4f721a68ce79ce6fb701bc9ccd2de7",
+              "size": 13763
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/CHANGELOG.md",
+              "sha256": "adea1c1555f1496882896a5de3edbd53eb9a2e952555fd392e4a5dd2215ba7df",
+              "size": 4560
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/LICENSE",
+              "sha256": "0a1df3a083d0c010560aa342e87959c8c1070e6fd54545741f083f22d0c8b551",
+              "size": 1069
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/README.md",
+              "sha256": "021950f8aa043d57876d65917abb546c29de4007e8f873cac142c5394d4e17bc",
+              "size": 27362
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/esm/browser.d.ts",
+              "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+              "size": 53488
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/esm/browser.js",
+              "sha256": "b7ca4450b19559a1d50eb381adcee94b82449674be4cd17789d9beba7e6122a1",
+              "size": 90922
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/esm/index.d.mts",
+              "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+              "size": 53488
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/esm/index.mjs",
+              "sha256": "8d75534a30a0580608e1271c13d70943ed4cd3589fddff7b1197748036a5116e",
+              "size": 91765
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/browser.cjs",
+              "sha256": "cbe7f75f83e0ca95ec7f3854fcdc8f854f488485d0ecf03c3a0a7ff29765c690",
+              "size": 91611
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/browser.d.cts",
+              "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+              "size": 53488
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/index.cjs",
+              "sha256": "36967d6a4576f414f5a3611cfc866fa4245c05582048332ac139a174c63d56e0",
+              "size": 91005
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/index.d.ts",
+              "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+              "size": 53488
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/node-worker.cjs",
+              "sha256": "69fe824fc1ecdcbd3f4ea0c8718b57bd91c84e202944034a2f0a5cb71be850f7",
+              "size": 1405
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/node.cjs",
+              "sha256": "befa44cd80a1da830179db9e57930050a2e460ca3df13f0b05f83f52b1491818",
+              "size": 92380
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/node.d.cts",
+              "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+              "size": 53488
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/worker.cjs",
+              "sha256": "7e04279c47bfcfb60cee1d86b250f6cffce89e922a0bdf959258713a30e0e46a",
+              "size": 636
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/package.json",
+              "sha256": "5922d8150b307bc0e4e441491c779c45379e9913d348848fca8d5cf02db4d134",
+              "size": 3543
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/umd/index.js",
+              "sha256": "462ef8041fc970e3615a20a9dd2b2e3047a073b2da729ef4f02b634bba8b7b83",
+              "size": 33044
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/LICENSE",
+              "sha256": "fa5659948374d4f555594f47f6da073b40dc503e921aeeece30df4362b3051a5",
+              "size": 1499
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/README.md",
+              "sha256": "bcaaa3befbd5bc5373cc6d80f4502afbe83179f96dcf9a336c43deb7ffa24c65",
+              "size": 37677
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/date.d.ts",
+              "sha256": "c7ad3531c131f2b5b246b2d208b75c5403475ad155b7661fa2d673104b806791",
+              "size": 2098
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/date.js",
+              "sha256": "ef924a2a42c7f16761e7098c3ed8e04195ecbcb02d5c369db0aee76f251a409c",
+              "size": 6256
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/error.d.ts",
+              "sha256": "02e33cdc5ca75f517f44b31070640be0fe6d0169dd91c266d02a1e2a71e064ac",
+              "size": 1874
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/error.js",
+              "sha256": "76f8e47f5fc57273748242d59570656d7c921a80bceb2291ca5a4d7a723e9f29",
+              "size": 2910
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/extract.js",
+              "sha256": "3e6f1e5764a091acf2df6a3f257d0467c37a2b9dbfecab1573f17a6489349c90",
+              "size": 13083
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/index.cjs",
+              "sha256": "f9029370259e9a43a2f3e64fa1d39e72f3598188380ace83a0abb8261fa33555",
+              "size": 28642
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/index.d.ts",
+              "sha256": "b4556819c2ed0cd4016d05a6bfd7d4773c0b5ffb39c8ed547796ce4a1093d9b8",
+              "size": 2282
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/index.js",
+              "sha256": "dc8e0afc74477e514f5cb8492b587560c1d7d68cec03a994cc8bc4af99c8da2a",
+              "size": 1949
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/parse.d.ts",
+              "sha256": "2b230dc984b6e51b545bfe222f9965cc2ff434164ed9428bec415c5e508a9854",
+              "size": 3194
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/parse.js",
+              "sha256": "195e33ea068bf6f3acb5b3342792ac4aa954bba7e751519ba869c00da395ecdb",
+              "size": 6484
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/primitive.js",
+              "sha256": "be47fe90bf9a410af0b9204b6b34617f4b38e57f08198b10cb024a0272eb5936",
+              "size": 7694
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/stringify.d.ts",
+              "sha256": "628a6a55714fcf4a4eb0e59866ab1e5cc67c1b9e0cfc8524ccc8d6b5ee24ad7c",
+              "size": 1805
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/stringify.js",
+              "sha256": "c717d95456426dc8a0b07c9d03a4e434d5dea8254fca24e5fd93a22de3bcd44c",
+              "size": 9662
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/struct.js",
+              "sha256": "736742cfa645bbd08bc5396c5f7ddbea5c3b7ac5d61fe86031846f5769131deb",
+              "size": 6273
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/util.d.ts",
+              "sha256": "e6b1d3eecb240dc71d0dc28d1beee69cefd6ee014507c822909be0a7117517e0",
+              "size": 2473
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/util.js",
+              "sha256": "6327e40efd957128da15867c3a32293950a925570b457b1b78c735452cebc08e",
+              "size": 2636
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/package.json",
+              "sha256": "d7ad6488e35b31d46bac6412d2d35225db4d693f02a415d872714ceb7e3d7138",
+              "size": 1548
+            },
+            {
+              "mode": 420,
+              "path": "package.json",
+              "sha256": "f1e9d6668a2dbb9e4ad51ab02215b850c1f356e1936730d3c423dc24f4d3fe8b",
+              "size": 108
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/README.md",
+              "sha256": "819a0fd67b57aaf6817c62858e83dafc38c5b27e0aa52996dde9392659af51e4",
+              "size": 3325
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/envelope.schema.json",
+              "sha256": "3f974c3b66bd300c6e144476fb918b56ca4cfed7daa1f1fcbe8f6f122167b3e5",
+              "size": 2170
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/inventory-1.1.json",
+              "sha256": "9d58e954e62169e87648814372a381653e9e69df5a0ce722251e6e46951dfe8a",
+              "size": 1842
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/inventory-1.2.json",
+              "sha256": "b620544ad644a7293313212a9585cd9e07af93608f2beac4e36b4bc99d812638",
+              "size": 1904
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/inventory.json",
+              "sha256": "96fdbcf0c56c1890d44363c34c80d8dacfccb37196de8050ab2d1afc7a3e0f70",
+              "size": 1400
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/requests-1.1.schema.json",
+              "sha256": "b5a10078862c8e03e951a67a8e7cd125c5d4d23619c3d32a9fb41a762629d54f",
+              "size": 8959
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/requests-1.2.schema.json",
+              "sha256": "e63252413eaebc2f5a73ad0973d48a51908f8d0604b09440774948bd935daf89",
+              "size": 11225
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/requests.schema.json",
+              "sha256": "5fa687ed6434b4f0ec6288bf4285f4109ab63afe55e2235d52f04f8ed77a8827",
+              "size": 16257
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/results-1.1.schema.json",
+              "sha256": "dee9513c61ed767e260d6dd16a13420c26f745850c7a6055cf6213e52571be60",
+              "size": 24523
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/results-1.2.schema.json",
+              "sha256": "d6259a45a4da2185761098ebf6f8d0f5ff80f08f41d3e34a4a3d69f792760fd1",
+              "size": 29673
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/results.schema.json",
+              "sha256": "5b8f0f057d0dbcabf1b5d83765e476baececd5e7cdb5696bfcb1ac1826f84ff1",
+              "size": 27062
+            }
+          ],
+          "manifestDigest": "60a794af4476b6ad227d58c27d94a06ca4d0513588ecfa319ec8038ffae14a54",
+          "native": {
+            "abi": 1,
+            "backend": "native-addon-posix-openat-v1",
+            "sha256": "67fb6b85f339a7c2f43ababa20434b26a3ea9bb65b17e70257a03c07810beb79",
+            "size": 73336,
+            "target": "aarch64-unknown-linux-gnu"
+          },
+          "protocol": {
+            "1.0": {
+              "inventorySha256": "96fdbcf0c56c1890d44363c34c80d8dacfccb37196de8050ab2d1afc7a3e0f70",
+              "requestsSha256": "5fa687ed6434b4f0ec6288bf4285f4109ab63afe55e2235d52f04f8ed77a8827",
+              "resultsSha256": "5b8f0f057d0dbcabf1b5d83765e476baececd5e7cdb5696bfcb1ac1826f84ff1"
+            },
+            "1.1": {
+              "inventorySha256": "9d58e954e62169e87648814372a381653e9e69df5a0ce722251e6e46951dfe8a",
+              "requestsSha256": "b5a10078862c8e03e951a67a8e7cd125c5d4d23619c3d32a9fb41a762629d54f",
+              "resultsSha256": "dee9513c61ed767e260d6dd16a13420c26f745850c7a6055cf6213e52571be60"
+            },
+            "1.2": {
+              "inventorySha256": "b620544ad644a7293313212a9585cd9e07af93608f2beac4e36b4bc99d812638",
+              "requestsSha256": "e63252413eaebc2f5a73ad0973d48a51908f8d0604b09440774948bd935daf89",
+              "resultsSha256": "d6259a45a4da2185761098ebf6f8d0f5ff80f08f41d3e34a4a3d69f792760fd1"
+            }
+          },
+          "raster": {
+            "name": "@knowledge-forge-ai/tfsb-raster-resvg",
+            "packageJsonSha256": "14b741e56d9823f82318e8a9d062a02884258eccfae6266138be2a6aaf9acd12",
+            "version": "0.0.0-tfsb47f"
+          },
+          "resvg": {
+            "name": "@resvg/resvg-wasm",
+            "version": "2.6.2",
+            "wasmSha256": "22bf6e9f9a100d972da0411a69c5ba504367fc1fa87b3b64e3f35e53926d2d70",
+            "wasmSize": 2478606
+          },
+          "runtime": {
+            "mode": 493,
+            "sha256": "d09e299258c24f7cdf6f5d5ec185e3a56512b27a697113735dac909f1cac7b8d",
+            "size": 122179336,
+            "target": "aarch64-unknown-linux-gnu",
+            "v8": "12.4.254.21-node.57",
+            "version": "22.23.3"
+          },
+          "runtimeKind": "node-runtime-payload-v1",
+          "schema": "tfsb.studio-sidecar-distribution",
+          "schemaVersion": 1,
+          "source": {
+            "actualInputDigest": "a02e753d959b32a2e0c0282a1ec78c6252076410d3e7134748f07b6f25b018b5",
+            "baseCommit": "55ab0e5f1c575388af53ee3e1fafeab7116e7baf",
+            "model": "closed-input-digest-v1"
+          },
+          "target": "aarch64-unknown-linux-gnu",
+          "totals": {
+            "bytes": 7140726,
+            "fileCount": 350,
+            "inventoryDigest": "e8093de3dd210992afcc396626e6f5720b2b0c53b74a4eda4716869b2af25014"
+          }
+        },
+        "sha256": "33256d0b33530d299cca80dab1790851a4fba7320cfba546d4a3014a6b845182",
+        "size": 51251
+      },
+      "members": {
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs": {
+          "mode": 420,
+          "sha256": "35b7a9c9b0ca863a11819759168150bd0f7d3900bb1cade7666d0414afc6ae2d",
+          "size": 6453
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js": {
+          "mode": 493,
+          "sha256": "b58052712f9426a7669fe7f719aa20c30e19fa4c4d8be6e6a9de41e5b2a081d4",
+          "size": 125
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js": {
+          "mode": 493,
+          "sha256": "6f4196e9a8eb744308a38328d396329901ca7619d8155fb15acfba26257ab316",
+          "size": 131
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts": {
+          "mode": 420,
+          "sha256": "5c32ef46b90997fc6de2a43c40a92643d025b64f1ed7c360e1cd40997528797b",
+          "size": 292
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js": {
+          "mode": 420,
+          "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+          "size": 74258
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts": {
+          "mode": 420,
+          "sha256": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012",
+          "size": 31
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js": {
+          "mode": 420,
+          "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+          "size": 298
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs": {
+          "mode": 420,
+          "sha256": "d128b824f444d60da1404622f3698d33f09a17a58aed9b3289fd24d805901276",
+          "size": 28998
+        }
+      },
+      "runtime": {
+        "mode": 493,
+        "sha256": "d09e299258c24f7cdf6f5d5ec185e3a56512b27a697113735dac909f1cac7b8d",
+        "size": 122179336,
+        "target": "aarch64-unknown-linux-gnu",
+        "v8": "12.4.254.21-node.57",
+        "version": "22.23.3"
+      }
+    },
+    "x86_64-linux": {
+      "application": {
+        "mode": 493,
+        "path": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+        "sha256": "6213ca853a49af3a74ee271216743e47c24edfccb4c2ac92025b049e96cad99d",
+        "size": 23183096
+      },
+      "asset": {
+        "github_asset_id": 687086740,
+        "id": "linux-x64",
+        "name": "theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz",
+        "sha256": "4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27",
+        "size": 54425294
+      },
+      "manifest": {
+        "content": {
+          "core": {
+            "name": "@knowledge-forge-ai/theme-forge-stellar-burst",
+            "tarball": {
+              "sha1": "d76c2440163642b3cb003641642aa8140b14f765",
+              "sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+              "size": 646798,
+              "sri": "sha512-2l/YU5kpJQdJ29Mv5DFawbf8seqBfrLZO7XkovlPKcJTE7ZMdH+75aDvmMUZaeg9qwa1hieHAbxhVEEFUbSDyQ=="
+            },
+            "version": "0.7.0"
+          },
+          "entrypoint": "dist/service-protocol/server-cli.js",
+          "files": [
+            {
+              "mode": 420,
+              "path": "dist/analyze-contract.d.ts",
+              "sha256": "5d4bc59e9faa34b141fa983e9eb9b7fad2560ab41f1370db167b21cefc91fc9b",
+              "size": 13626
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-contract.js",
+              "sha256": "df2be13dfbbc38de21c7d74cd602b22c7d94aacca39cac116557fb84c7072031",
+              "size": 9369
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-details.d.ts",
+              "sha256": "e8e29e0c704a6b6700cb2dc924d3b95dbeaa455648649af36742c0bd3475896c",
+              "size": 2001
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-details.js",
+              "sha256": "04863bfb4072fc1a46a33d48ee75af567f6670df5f6443739d893ef35f2d0f4d",
+              "size": 9306
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-scanner.d.ts",
+              "sha256": "7d9078b6023357ad5092a942be5916b1c935c477f09589fb6e1e544a4f682a81",
+              "size": 255
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-scanner.js",
+              "sha256": "ee5099fee099c046562b4316b5cc88ee24a1cb8b7120be0a953d243f9691892b",
+              "size": 38588
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-source.d.ts",
+              "sha256": "9db178b2ab9bb50047aa9ccd2a9a71717d35b3f38cd3d47b68ddad62642c5232",
+              "size": 1609
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze-source.js",
+              "sha256": "93f3c939a4795526b229490079a0c88ff2ac7d3b032b1c292bf257d88b2fbc31",
+              "size": 12615
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze.d.ts",
+              "sha256": "8809e498d3461bdc97a2bf580291135969dd7f06318a157a432580e30b3fccc2",
+              "size": 839
+            },
+            {
+              "mode": 420,
+              "path": "dist/analyze.js",
+              "sha256": "0a2bf90832e7819f01df2ccfb2a17a30164c5734e426b14fd08fa1f634923973",
+              "size": 7619
+            },
+            {
+              "mode": 420,
+              "path": "dist/archive-limits.d.ts",
+              "sha256": "da7eb5d1fd89c0b8a7d6704fc358016ec56dfc48dd53b83867dc96fdbe52002e",
+              "size": 478
+            },
+            {
+              "mode": 420,
+              "path": "dist/archive-limits.js",
+              "sha256": "df654b0e1096abac5d233ebf631f8057f0a03c3d8162d6809a454eb6982257a2",
+              "size": 517
+            },
+            {
+              "mode": 420,
+              "path": "dist/archive.d.ts",
+              "sha256": "4a16e4187e20902d8cf1e0afcebca0b0db98a23410ff1ca5f76d1538092522a7",
+              "size": 4124
+            },
+            {
+              "mode": 420,
+              "path": "dist/archive.js",
+              "sha256": "12bbb2e4890520e56ff547272919120a96a41a752e10e1c34e2bc20844e4ede5",
+              "size": 37498
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-availability.d.ts",
+              "sha256": "5a6e7509f0272c5f1494df33381104c50ddf2abaea9e6cb4f9beabc296f5cfe5",
+              "size": 1487
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-availability.js",
+              "sha256": "9aab33486cb9cb7260870fb0eb2b2a4b506eadedcf904dee620ed6418b4367a1",
+              "size": 11374
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-bundle-manifest.d.ts",
+              "sha256": "2fc50f8bbe0bfb32ca6752f6e1a104c25b8bbe0ffbfcea59914d71bd39bbe17e",
+              "size": 3356
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-bundle-manifest.js",
+              "sha256": "51885abaf00d5a8816dc894e3dfa408f68df0b35ea650a20212ec55567f3295b",
+              "size": 30883
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-bundle.d.ts",
+              "sha256": "58f40ce1b94594e8bb52e876e7640cd4f01c143ea98f307da8d06456abd278d6",
+              "size": 4046
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-bundle.js",
+              "sha256": "05a416e781be652a6069368c4a8758ad20dd13d03a064851b81e6b22ab460b1b",
+              "size": 57169
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-core.d.ts",
+              "sha256": "1b7680a1427de2ec218efec3f8acfeb055c63fad64d5ee635b6bff65a7cf5752",
+              "size": 2705
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-core.js",
+              "sha256": "9bbcd4eed5eba9d820a545834a65f310cdee4653c6f1ca93e35b3d1192d019f5",
+              "size": 16608
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-diff.d.ts",
+              "sha256": "0b777d4b233d67b4b81e90e258c971e7792c84778d702603a05d53827346dfdb",
+              "size": 3963
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-diff.js",
+              "sha256": "303990cf00f31dedf979a7cf31dd5be80a1d4026b38eb5840f2beb3de76bdb05",
+              "size": 17095
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-digests.d.ts",
+              "sha256": "fd6c91f14eb187f725453e9f272de6610061eb77d101e43347f1a030509534e9",
+              "size": 746
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-digests.js",
+              "sha256": "24b801376b0be9a7852514754f99c53abf4c0d538d644aa899028ad0cf7a2a3d",
+              "size": 2603
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-files.d.ts",
+              "sha256": "08340c4b723de9e9f368c4596f302e75afbd887764f738b12d82962983995565",
+              "size": 2564
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-files.js",
+              "sha256": "62f8dc9d305aa724d2d42aead4e8a7fab4d8625e041a3cbba2ab369a0e71a899",
+              "size": 4098
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-import.d.ts",
+              "sha256": "926b1e87041a1518b31c9fa2cf3c8684d139f56f5eebd195d283c5ba376b8c17",
+              "size": 3627
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-import.js",
+              "sha256": "c42a934789dda5b2b306e4ce457b3f1685171cc63056f162a4a82146942cff56",
+              "size": 86155
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-package.d.ts",
+              "sha256": "a68f3fd37071635b8b35dc2a31b1d15a11643d2a5e2cfafc27c6a86c27a3be14",
+              "size": 3004
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-package.js",
+              "sha256": "afce1f3b5dd92fbe6ccbf218db09c0b11547ad6c93736fde75460854ec3afcb1",
+              "size": 28293
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-schema.d.ts",
+              "sha256": "e5c9c3d50da75e888374f181e6b8aea25470aee19c9e2f323a215e3903d52923",
+              "size": 3248
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/brand-schema.js",
+              "sha256": "faef98c8b69ab473eef74b1defd393e0bfe481e6fc31d1bb53a761d8e0029bfc",
+              "size": 27683
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-install.d.ts",
+              "sha256": "88b239860ad49d1efe777d494eb844f11735f3768edbf8c016c36e560d850102",
+              "size": 1466
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-install.js",
+              "sha256": "138b93c444b2a3d12b4860363a4691eeb322daf10bb4ed623f45e0015c0f48f2",
+              "size": 23446
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-lock.d.ts",
+              "sha256": "e2e4d2889b9200ac657005aabea566e5978a1f96d9ff15a3bc08422514eb45ba",
+              "size": 4259
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-lock.js",
+              "sha256": "bdab242641b4e8c609ec3dcebc28aaf831c26356b44d05867eb01c7b9a1250b8",
+              "size": 21194
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-plan.d.ts",
+              "sha256": "9a0f884502c4408a70495cbf00cfcb2f09147fae1ae419943982e04e810b8e87",
+              "size": 5405
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-plan.js",
+              "sha256": "6dcc16b11e554543827292e79b90164a44d42a334bb9122b089bc36e73ca7458",
+              "size": 39443
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-profile.d.ts",
+              "sha256": "4f01de184c4c178bc099fda8dfaacdd0b12537a3499da25192060d43147875ac",
+              "size": 2925
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-profile.js",
+              "sha256": "251861b6f9ebf643608fa9c01cc8ae4b81c82bb7238e9e867f67378927b4cc69",
+              "size": 21093
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-source.d.ts",
+              "sha256": "8a6670c7a7d4f7da5c59c129b75d02b7cebae1aa244be07d6dd44cbccf9688f6",
+              "size": 3595
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/consumer-source.js",
+              "sha256": "31b285789ea668f6c074f5cbada742a783c4271fe8a445ae710b9bcde5dbdbaf",
+              "size": 21376
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/derive.d.ts",
+              "sha256": "e8719df0cde8fbc40cba808d1a15fd18874ed819ccc46a8e1bd6c88016af742d",
+              "size": 3679
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/derive.js",
+              "sha256": "c5a1f2148eb283ea84e6fa8ce0b5ecec354bff662e28f863bb0f286c2a92e37a",
+              "size": 56426
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/derived-receipt.d.ts",
+              "sha256": "14c48042f7f6587183badf8b8e8bb320f016a0a9d85bc3cb11815a3622b266b5",
+              "size": 2848
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/derived-receipt.js",
+              "sha256": "ca6d15b2037e02d6c1f087fd94bb0efd48d169e2a94ccd014eaa54f2dea312bd",
+              "size": 24124
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/export-plan.d.ts",
+              "sha256": "782f2420fa7a9119aba64e6e5fadc268558e752f3d2eb7a40a6086eef5b44bb4",
+              "size": 4609
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/export-plan.js",
+              "sha256": "653f0f6c5b9d86c65640d89edf4138b28d4e0b6cdb048a4f59b73ecc925c60ee",
+              "size": 35282
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/export-profile.d.ts",
+              "sha256": "8dada719bb812439c80257e8f0d9b6924951fcb7cc2c8daddcac624a798f1a04",
+              "size": 3519
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/export-profile.js",
+              "sha256": "149c73cb7f3a4f75340c198324d539e0ddba239460eafd789b4f442805294849",
+              "size": 17502
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-baseline.d.ts",
+              "sha256": "e761fedb34bdc06c24014f94e7c8d3c89f4eeade51b79db1561d12bbbdf81a8a",
+              "size": 3259
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-baseline.js",
+              "sha256": "0ed174846df6c4edccc28e20c79111322485f48d021188d572bb19a0dd7d4bcc",
+              "size": 18661
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-capability.d.ts",
+              "sha256": "3acdb0865e9de9b25275e8f77dbdc42293f285415c66f68931b305736a2ba3b6",
+              "size": 3877
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-capability.js",
+              "sha256": "8a71d676f57e169b75e4c92539023406623903724caa548f4c5f222c031ad001",
+              "size": 9776
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-report.d.ts",
+              "sha256": "6b937a4c42eaaf408c587b7d18bbc443051b33d73f4d025f3c1b99c5893d7370",
+              "size": 3295
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-report.js",
+              "sha256": "bbfb33bd7cf78d16bf8c08f6b16e8e10cef34938b70fdcc1cb679e7632bc9424",
+              "size": 9893
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-schema.d.ts",
+              "sha256": "d385cdfec7c797d74a468c66069a68fddd1cc91fa949b46a8cc5e7f9d06e1ada",
+              "size": 6389
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-schema.js",
+              "sha256": "1764429489b58b38cd6096f902f279cd5e679afc52d42d5911cd33b2fc85649f",
+              "size": 26374
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-semantic.d.ts",
+              "sha256": "07e8587e0d23046717dc3b967623aebc79b7f4a2cd684493a78052f91a51dbf3",
+              "size": 1884
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/qa-semantic.js",
+              "sha256": "971dac0ab0a4a8291ed07fb2b31ce96f7fb921adf2d5c0f51908ffe44f30c5bd",
+              "size": 34059
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/raster-capability.d.ts",
+              "sha256": "1ade3b75e96601f0f2d8873dca6419129cde38281c6598fcae69d70e461b641a",
+              "size": 2342
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/raster-capability.js",
+              "sha256": "e6380ce4cff7dac6edeb55c9728cc428c58e1ebd032f1e764f9e4f384b29d1fe",
+              "size": 14634
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/raster-receipt.d.ts",
+              "sha256": "a7f9706387bd3bc7b4a30dd9d397122d427fef9548fd7dc1deb995a7f26ef5aa",
+              "size": 3266
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/raster-receipt.js",
+              "sha256": "b1794bd22a7f6d456ff50b921dd6462bd77c6e3c390e191b7aaa92ae092d5fa1",
+              "size": 15053
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/recipes.d.ts",
+              "sha256": "61b7f0a51e2710dc47ded354e4bf41963706cfc9ef8d72a00a3a2c915f67d0a7",
+              "size": 4573
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/recipes.js",
+              "sha256": "f27f7e417f89319cde4450cbf8465fb32f32d9165b6ac8ca535a54c66b467bb4",
+              "size": 32536
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/tokens.d.ts",
+              "sha256": "8962f4077aacebb9d884e181b65ae253cdeafff546b15455571853a59e65ecb9",
+              "size": 3827
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/tokens.js",
+              "sha256": "cb6b31fbf6602492f822b1eba0b441bf71cc8e27d84f5f851e888cb4184003f0",
+              "size": 22105
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/visual-diff.d.ts",
+              "sha256": "48a0920322cdb9d4b54610edb385ca922e7c1b05411547d4b77e45af4850fe21",
+              "size": 2711
+            },
+            {
+              "mode": 420,
+              "path": "dist/brand/visual-diff.js",
+              "sha256": "b4fb12a72ca723d13192a5b1b8b83a81a1d5de0fc106cdfa51d146d25fe31e07",
+              "size": 3544
+            },
+            {
+              "mode": 420,
+              "path": "dist/build.d.ts",
+              "sha256": "6b50ccaf49cef0d714c904ba11d952f19a3625fb9fe03f794fcf4689ea7569c7",
+              "size": 2287
+            },
+            {
+              "mode": 420,
+              "path": "dist/build.js",
+              "sha256": "5cde7bb0ce268bc126476aa0d7364033180382e03cbf98363849d93a80348794",
+              "size": 10404
+            },
+            {
+              "mode": 420,
+              "path": "dist/bundle.d.ts",
+              "sha256": "82020570c391fc666d80bec258b343297b02d34917cfe369f7c364b41e31cb19",
+              "size": 2569
+            },
+            {
+              "mode": 420,
+              "path": "dist/bundle.js",
+              "sha256": "8ad86650c9d0ed3cdc38662e8c99d636389f6ce0c0d99a37b7d6379f89a05e56",
+              "size": 19314
+            },
+            {
+              "mode": 420,
+              "path": "dist/check.d.ts",
+              "sha256": "1ac4a97517ca557843d7c85bacfaad77c99a3f47fa5b77c532224dc58dd0c86a",
+              "size": 2381
+            },
+            {
+              "mode": 420,
+              "path": "dist/check.js",
+              "sha256": "0608fe20381f738079ffc1767b51b33329b2538fbf11183a6ec52b517c3b43af",
+              "size": 11851
+            },
+            {
+              "mode": 420,
+              "path": "dist/classifier.d.ts",
+              "sha256": "02795dcec05056975550dba367dd577066aceecb1a6044897d6908929cada6a8",
+              "size": 1154
+            },
+            {
+              "mode": 420,
+              "path": "dist/classifier.js",
+              "sha256": "cbdccace12e2a331bd9c08b340983013d2342babeb80955b031a4d533f43c686",
+              "size": 1703
+            },
+            {
+              "mode": 420,
+              "path": "dist/cli.d.ts",
+              "sha256": "5c32ef46b90997fc6de2a43c40a92643d025b64f1ed7c360e1cd40997528797b",
+              "size": 292
+            },
+            {
+              "mode": 420,
+              "path": "dist/cli.js",
+              "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+              "size": 74258
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/index.d.ts",
+              "sha256": "1e5b09b1d29215e6cb4680df385126347f7676abb1ee387c686e77cb631cc279",
+              "size": 133
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/index.js",
+              "sha256": "1e5b09b1d29215e6cb4680df385126347f7676abb1ee387c686e77cb631cc279",
+              "size": 133
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-canonical.d.ts",
+              "sha256": "a238850a77d01157769fa7da05554925998e744f58fac3ecf771134da8bf2e7f",
+              "size": 699
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-canonical.js",
+              "sha256": "16ff83f58b3e2754115ec7889db863d797627ba69633fa0d1c7ff1df8e6a719f",
+              "size": 1363
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-summary.d.ts",
+              "sha256": "43060edc46ff8e74f3465b6ebbaa2cd03c591764c7bf98d47981a6f25840fbc2",
+              "size": 198
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-summary.js",
+              "sha256": "eb1ed1af8306945e54b348a1813a94a2936cb8391cdcf2b28fb5d71f316fe1ec",
+              "size": 1546
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-types.d.ts",
+              "sha256": "054da21c2fd90029c507897f56e4fd6a02b7ea2ceb35757eec209592887c6c35",
+              "size": 8007
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-types.js",
+              "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+              "size": 11
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-validate.d.ts",
+              "sha256": "68e747a2739929a6334976f82a2a2e41e695a2adecb8f75ee637fc9508624051",
+              "size": 1384
+            },
+            {
+              "mode": 420,
+              "path": "dist/design-evidence/v1-validate.js",
+              "sha256": "7268cec9bc919da3633f2a14f4329da917f94078de591f9c4472bd0949563fae",
+              "size": 25351
+            },
+            {
+              "mode": 420,
+              "path": "dist/diagnostics.d.ts",
+              "sha256": "4cb8fbe15dc912e5c1dafc23cbec26e33c568aaafff4a712c28da305fbc3f32c",
+              "size": 954
+            },
+            {
+              "mode": 420,
+              "path": "dist/diagnostics.js",
+              "sha256": "0807d8d20810f4dc97e12d2f0adfe3022a6e6869fbfb35fd052bfef3d38078ca",
+              "size": 1146
+            },
+            {
+              "mode": 420,
+              "path": "dist/diff.d.ts",
+              "sha256": "8c2fb370130acd4e831c0dfe0dd57a52f530150eef7ee9e6e62ae09eaac274d7",
+              "size": 5013
+            },
+            {
+              "mode": 420,
+              "path": "dist/diff.js",
+              "sha256": "611f8be0d4da43523b182ebf057b707fa1326cc1a96acbcde4fbcab8ab706e04",
+              "size": 35964
+            },
+            {
+              "mode": 420,
+              "path": "dist/digests.d.ts",
+              "sha256": "5967163019698b89fad860e3170e448d5b0686fb703875ef8fc66c2218d50502",
+              "size": 1178
+            },
+            {
+              "mode": 420,
+              "path": "dist/digests.js",
+              "sha256": "66f632dd1a092c7b9d424adda85a909069860a52dd79130ac5c800e20baff528",
+              "size": 1375
+            },
+            {
+              "mode": 420,
+              "path": "dist/directory-snapshot-native.d.ts",
+              "sha256": "addbdce1ac6604707b9ae685784d0d6d332a1ec93081e464d473ff06c961ccd0",
+              "size": 2452
+            },
+            {
+              "mode": 420,
+              "path": "dist/directory-snapshot-native.js",
+              "sha256": "23a3bf942fa1f92fbf686b4cedc0ec2a9f6653ded6fd2df7ef9d3c58d6591e69",
+              "size": 3639
+            },
+            {
+              "mode": 420,
+              "path": "dist/directory-snapshot.d.ts",
+              "sha256": "8ab4fb2d6ba35297db973d40ee3c88b36144eea4971f0f5de22ecb2e0a594a65",
+              "size": 6500
+            },
+            {
+              "mode": 420,
+              "path": "dist/directory-snapshot.js",
+              "sha256": "1e2ec764d3965f2cb4c8088003cb852b550d18e1b9119174b9866a9f8590a8b6",
+              "size": 54847
+            },
+            {
+              "mode": 420,
+              "path": "dist/edit.d.ts",
+              "sha256": "6a0ef8840dae1fcdadf4d0bfbe1b34c238ca3ef42fab389544245b6c889a361e",
+              "size": 2081
+            },
+            {
+              "mode": 420,
+              "path": "dist/edit.js",
+              "sha256": "0d5b31e359c8efbbd725cc20e1b7ee95c9375a5ec11080ecc032054d31e9fa59",
+              "size": 9315
+            },
+            {
+              "mode": 420,
+              "path": "dist/filesystem.d.ts",
+              "sha256": "3db79efaa159357bc1271ebb7c025d1c36a15b106c7b1c50855d3e6a73f38317",
+              "size": 2422
+            },
+            {
+              "mode": 420,
+              "path": "dist/filesystem.js",
+              "sha256": "fb30719af51b5730b79862f5560218e626dcd1f8db815871f04ccbbd501f29c9",
+              "size": 6175
+            },
+            {
+              "mode": 420,
+              "path": "dist/fmt.d.ts",
+              "sha256": "190deb624a4eb9c24a6072361d49050756a9506cc94843574e9af143bd4c349f",
+              "size": 1415
+            },
+            {
+              "mode": 420,
+              "path": "dist/fmt.js",
+              "sha256": "68bd47db9c9b6aff66fe88c5b988273d3951d650c772c8bba7b4a8fab5643a99",
+              "size": 4937
+            },
+            {
+              "mode": 420,
+              "path": "dist/importer.d.ts",
+              "sha256": "e361287ff23f8eb9f078df7f04d241d13fbcfbca4beb190ac934eaca72f1c2a9",
+              "size": 3781
+            },
+            {
+              "mode": 420,
+              "path": "dist/importer.js",
+              "sha256": "c3d8ed421d1e87cfb2cd69c543c831a01e7c18b5e52d319184106678f9c3797a",
+              "size": 57032
+            },
+            {
+              "mode": 420,
+              "path": "dist/index.d.ts",
+              "sha256": "b15fdec2ebd45dfe283910d3d09cf0b4c8c6b90c59c90c8e7d3342f48c21855c",
+              "size": 25514
+            },
+            {
+              "mode": 420,
+              "path": "dist/index.js",
+              "sha256": "afc7198d4c4a1b389565c5ccc55ab43e5122b1cb1f528eba11d697757a83409d",
+              "size": 14699
+            },
+            {
+              "mode": 420,
+              "path": "dist/install.d.ts",
+              "sha256": "324bd5d2d02493d25507a196261077723acac65e2d50362b25857c00a455bf23",
+              "size": 1360
+            },
+            {
+              "mode": 420,
+              "path": "dist/install.js",
+              "sha256": "bf846c1fddb815694092196dbbe98ba23a11c035551f92c0f486e2bdeccff92e",
+              "size": 12128
+            },
+            {
+              "mode": 420,
+              "path": "dist/json.d.ts",
+              "sha256": "dc7f58bb07cbdede38d8fc2cb124593d70ff1822fb052903dc5ea4d35128064b",
+              "size": 8803
+            },
+            {
+              "mode": 420,
+              "path": "dist/json.js",
+              "sha256": "152a33674f3348294cc6de6854153614ab333b6ba0fddf2ba7a1d8a3cb07a869",
+              "size": 4798
+            },
+            {
+              "mode": 420,
+              "path": "dist/list.d.ts",
+              "sha256": "4da530ec13f333d5ba93e97c641fbaa50d8bc8bcef0c16d53144b07cadde98a7",
+              "size": 2714
+            },
+            {
+              "mode": 420,
+              "path": "dist/list.js",
+              "sha256": "1912b3d31f933aa1c3e4719f90c057d0d624b94565ed2936b78d56d672a5f340",
+              "size": 5493
+            },
+            {
+              "mode": 420,
+              "path": "dist/manifest.d.ts",
+              "sha256": "c2fe252bb0ed14dcc136c3f3a0c68dc33a2d3708550d7504bcee88e8ce5dd206",
+              "size": 3077
+            },
+            {
+              "mode": 420,
+              "path": "dist/manifest.js",
+              "sha256": "b3c679c7b8b9e7845c0d96edc118c8e7dcc4db44964a7496629e57801c02108a",
+              "size": 20646
+            },
+            {
+              "mode": 420,
+              "path": "dist/migration.d.ts",
+              "sha256": "c998ecfcb1f8d3d11d10925e41ae6643c450755df6a5d7a316d206f4ceae75d2",
+              "size": 2348
+            },
+            {
+              "mode": 420,
+              "path": "dist/migration.js",
+              "sha256": "04ab7b1cee2e944d346a74027d55a56ed84e47648de51c4f1761c8a9275ba0f4",
+              "size": 14252
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalization-ledger.d.ts",
+              "sha256": "b4702ffdf68a78d513e053a3b1973758904f4cc1f27eed18603cd5bd2ec6b0f8",
+              "size": 1402
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalization-ledger.js",
+              "sha256": "94c734aba384104439758208b92d9e8db2a054908b8be5c953e91ba21330cfaf",
+              "size": 54
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalization-map.d.ts",
+              "sha256": "243429ebecfff2aac810238c634f6a6e51323889212a9b9b6571ab19a5e319b0",
+              "size": 1003
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalization-map.js",
+              "sha256": "c60a9c4652c9e48cca749fe20a20e863bc9b2ebf20f32f87f3c60118a85aee83",
+              "size": 5752
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalization-policy.d.ts",
+              "sha256": "7991b370d04dfaa5a8711fb1cff1ed66cf7cb512a42608d65522211cfb88e060",
+              "size": 1479
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalization-policy.js",
+              "sha256": "f9203c6a809b46fcdee01eb310909b83de77ccb5ab02b73ee45399c92ab97d9b",
+              "size": 2121
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalizer.d.ts",
+              "sha256": "5b96c4238265031554213850cf987c8d723ec9b2a4a05584e4df222047894912",
+              "size": 859
+            },
+            {
+              "mode": 420,
+              "path": "dist/normalizer.js",
+              "sha256": "bdb26f8ee0be113f6468914621d25083b5bd344b7939a11ae953393f33637c10",
+              "size": 9594
+            },
+            {
+              "mode": 420,
+              "path": "dist/plan-retention.d.ts",
+              "sha256": "1a7c6fcf620169dcac406b5bc43522402894ed91f4ab3b87810d24786a008410",
+              "size": 1240
+            },
+            {
+              "mode": 420,
+              "path": "dist/plan-retention.js",
+              "sha256": "0514799c3b5c879521d941894aca6adf0fbcbae35f88ae4be41267a00acdfc96",
+              "size": 2872
+            },
+            {
+              "mode": 420,
+              "path": "dist/preview.d.ts",
+              "sha256": "271c2b573724c87bb55ffc0b8f6d38d0292d14a4955bee79eb6593a08f28bfcc",
+              "size": 4888
+            },
+            {
+              "mode": 420,
+              "path": "dist/preview.js",
+              "sha256": "f0ac6d4e951197bc7c4fea3fa80cf2981c30b1556803046c837fe19b700d9efc",
+              "size": 29286
+            },
+            {
+              "mode": 420,
+              "path": "dist/primitives.d.ts",
+              "sha256": "a27cf42bd140599a8bbe819b7e5ff252524a5253fb8f1ca655d2bd312416d5f7",
+              "size": 1903
+            },
+            {
+              "mode": 420,
+              "path": "dist/primitives.js",
+              "sha256": "8ea0aba048383082c285f449040a3d1d87d0f016c098b9141da23cebfedbe89b",
+              "size": 14262
+            },
+            {
+              "mode": 420,
+              "path": "dist/project.d.ts",
+              "sha256": "b7834b2527c9430675e80d8b13814ebc65790eeaa33276fb8b469df110df0a55",
+              "size": 1740
+            },
+            {
+              "mode": 420,
+              "path": "dist/project.js",
+              "sha256": "821c98656a66d7d04ceda2759411e2dfccb60541ad0f367efd2f68d8540cfba2",
+              "size": 9380
+            },
+            {
+              "mode": 420,
+              "path": "dist/provenance.d.ts",
+              "sha256": "17626e5823504466ca65b43b0d73916a918e899981f5572b5b9135af7a3d974b",
+              "size": 1803
+            },
+            {
+              "mode": 420,
+              "path": "dist/provenance.js",
+              "sha256": "ff10614c17c2262cbd040ecb5f047b2dba01845ca5f86161d3e0eabb2c6b899c",
+              "size": 12216
+            },
+            {
+              "mode": 420,
+              "path": "dist/provenance2.d.ts",
+              "sha256": "63e2e449f765e053278868818f0969a759b0420e747ace829d8f0070a46f2d8c",
+              "size": 3141
+            },
+            {
+              "mode": 420,
+              "path": "dist/provenance2.js",
+              "sha256": "cce8b52753288722fac0bc111d552dfbb69355acb572b42c2dd37c48916a28d7",
+              "size": 12876
+            },
+            {
+              "mode": 420,
+              "path": "dist/provenance3.d.ts",
+              "sha256": "f0ce1507577e02b8d9f1cbb6b738d1f9c2242d420b81d87cfdc320701b53195e",
+              "size": 3171
+            },
+            {
+              "mode": 420,
+              "path": "dist/provenance3.js",
+              "sha256": "e9e925589284f203264292ea46c3b02943f3efefd0e8a5db9e91d75cfc82a0d8",
+              "size": 14071
+            },
+            {
+              "mode": 420,
+              "path": "dist/receipt.d.ts",
+              "sha256": "e42f3771900c1a9ffa0e464af8cb04de7055eafe58d32f86a8db9fa178329c84",
+              "size": 2213
+            },
+            {
+              "mode": 420,
+              "path": "dist/receipt.js",
+              "sha256": "ca5d67f0e5bbd83fbbe447016013f9a2795ef026472da2917fd6444aac4cc2fc",
+              "size": 7755
+            },
+            {
+              "mode": 420,
+              "path": "dist/reconcile-directory.d.ts",
+              "sha256": "faf70d199f49045455a4e0c9ab8c36eba4be0ed12e5d1cdf5e9ccc9ee8c153e5",
+              "size": 5324
+            },
+            {
+              "mode": 420,
+              "path": "dist/reconcile-directory.js",
+              "sha256": "42832165eaa111ccc67f70ff2a24c3ed6cfe84558897e997596b129d9c08ead1",
+              "size": 65760
+            },
+            {
+              "mode": 420,
+              "path": "dist/reconcile.d.ts",
+              "sha256": "838bda9fa690f5b1ff8f75d2218d16fdf74aaf69db81081c1eee1d6e69fe8065",
+              "size": 3581
+            },
+            {
+              "mode": 420,
+              "path": "dist/reconcile.js",
+              "sha256": "a8ca2953a46b861e20929c2a4078b294689614dd5a87519e35fdece81aaf1a97",
+              "size": 40941
+            },
+            {
+              "mode": 420,
+              "path": "dist/reconcile2.d.ts",
+              "sha256": "a17a15f22512ebc23cf410584a599829aad18ba91efa6234e5852a3c200e98fb",
+              "size": 996
+            },
+            {
+              "mode": 420,
+              "path": "dist/reconcile2.js",
+              "sha256": "65a4e40a91984dfe32e324ead45ade089f0d94ef371929f0021c352fbc8787f2",
+              "size": 17416
+            },
+            {
+              "mode": 420,
+              "path": "dist/root.d.ts",
+              "sha256": "18b43bb049d3a9d09bff3d43f681fa0cb4fe49dcf63f9859af366ac65e38d3da",
+              "size": 944
+            },
+            {
+              "mode": 420,
+              "path": "dist/root.js",
+              "sha256": "92d3011ccd82e1378134a89e9ef5a259682d58d71e41efd7b7f3af774e15746c",
+              "size": 7461
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene-cli.d.ts",
+              "sha256": "25ac3c79ca90681495ce8af897640912956c6bb3fb1b1b501f69e245e780babd",
+              "size": 745
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene-cli.js",
+              "sha256": "5750919a9d74e35a15d1cad1dbe1507d3cea9be57c6115b218b6483a855c9691",
+              "size": 16984
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene-files.d.ts",
+              "sha256": "8a793a4e83cd93a230f6543e90a7d7661394f5fe5bf362d53df0c51a8a58181d",
+              "size": 3028
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene-files.js",
+              "sha256": "27fd4ce7354ae9373add4261002ce368208b4f051365257d8fe1c7f968f9514f",
+              "size": 14415
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/canonical.d.ts",
+              "sha256": "0730ecd87aef992d93102da4bb212f664398b2616a7aad38a4bd2a8c9d847c63",
+              "size": 711
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/canonical.js",
+              "sha256": "dfee79ef254cbcc99cc84e6e4dc1d90c01ed5d5b43b087ef51809ffae30af9b1",
+              "size": 2802
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/compile.d.ts",
+              "sha256": "b68a51d7ff8656fcc2619aea2c79203dd4320fbf12fc3bec460fc259cc886a4e",
+              "size": 867
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/compile.js",
+              "sha256": "135c71215a19f2f77b24646f47fb49927144f80118b61849ec902fa5f309db96",
+              "size": 13719
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/constants.d.ts",
+              "sha256": "6e2b402ce91cfa89e2c9fc400bd608aa96b711293ef65c73d5ef48c256cb3f74",
+              "size": 2266
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/constants.js",
+              "sha256": "2c3bfd8a6cc25e8be9dd75b4291221db7390dbe022076b41e440665e7dee73d3",
+              "size": 3169
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/emit.d.ts",
+              "sha256": "fab69c898c60f40f677d35bfa21253fb84bbbc408b55061c65599d9e5ee6e729",
+              "size": 271
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/emit.js",
+              "sha256": "e320009e7aafb970c59014eb795bb25dfee705ef6788e12afd9f98433f9443fa",
+              "size": 13404
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/geometry.d.ts",
+              "sha256": "b2f25be92d719de4e6b86d04686bea606a7f7f733a994cab4919e7326e05a8bb",
+              "size": 2347
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/geometry.js",
+              "sha256": "ccc86fd18106c6639bf3abc34d5681c35260bb64983d3187467561876ce8a218",
+              "size": 14497
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/glyphs/catalog.d.ts",
+              "sha256": "a2a52683c3484e33fc6bbc5a5752befb8c773e76d7cf0137d8880b2d8ac34749",
+              "size": 1642
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/glyphs/catalog.js",
+              "sha256": "cbb47ee1629e73139fcb9dc5b5af5c4947c763a0bf52320d352feb8b28b9d2b7",
+              "size": 6466
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/glyphs/labels.d.ts",
+              "sha256": "60c76fd1c5d0c8c862504ab0f0487451bacf34f37c6563235afa706e1251d561",
+              "size": 1107
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/glyphs/labels.js",
+              "sha256": "7ed3f88a1616e23c45d2e5293b91857e9f2c32aa4dfd3aa7714bba15bf690c0f",
+              "size": 6053
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/guard.d.ts",
+              "sha256": "6ab32786301afeff89d60ff16cb8e762b41887e159dbfedc64dd0fe360d2f33f",
+              "size": 232
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/guard.js",
+              "sha256": "592c290897fb4a31fbad6083609cd4bc2b888f2988ec62fd7230b64278955bbd",
+              "size": 3600
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/import-svg-guard.d.ts",
+              "sha256": "a16dd7b74e797b2f9c62462bcd90257f871e743baa540d22204e25db824a16ff",
+              "size": 983
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/import-svg-guard.js",
+              "sha256": "67eecd5b5959e960d434a4569b7db0577bf7650a61cd40baaac390d6fc6928a0",
+              "size": 14870
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/import-svg-types.d.ts",
+              "sha256": "801c40bbbc7974a388d6d1ac219b4ae0f4168ef061e10dd5f7855389b702e2a6",
+              "size": 1042
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/import-svg-types.js",
+              "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+              "size": 11
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/import-svg.d.ts",
+              "sha256": "a3c54a9115bbf06444b93100b93a0c28e770c222791eff6e66a02ce31f906d42",
+              "size": 228
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/import-svg.js",
+              "sha256": "d600ad614745f907261d7ea5ff24539fbb4f2b7c0339504ac98ce1dad8f95999",
+              "size": 70221
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/index.d.ts",
+              "sha256": "c1c4fb188f30433f1d3b603d160f2da645a1e228eb88ca9049005ba78f31979e",
+              "size": 1389
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/index.js",
+              "sha256": "20b8e8b8329e08ee6fcbcdf6fadf62505ddb0acc1ca0c1fc7a6018a7f2b9162a",
+              "size": 572
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/layout.d.ts",
+              "sha256": "f45e7e6689223fffd41f2cfbeb00d88e372247ff2aa16b9f9748ea4816e64d85",
+              "size": 452
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/layout.js",
+              "sha256": "395fdbe3ce06f341bdb5aade341725e6abdf8857e91d5c62baeb475daa207bf0",
+              "size": 18684
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/path-canonical.d.ts",
+              "sha256": "4d57cb85748c4e61a6d342ff8b2b52436dec7c04b48fe1b51de5df0e8feaab55",
+              "size": 70
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/path-canonical.js",
+              "sha256": "a58f8a4d97b2cc3263a387a4443f5fbce9a802329606849c1858831f2d8e270e",
+              "size": 1841
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/transforms.d.ts",
+              "sha256": "1fe27188cdfb2bfb991116eeaee5313e2b100dc0101a99b185d53f1fca31a131",
+              "size": 2043
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/transforms.js",
+              "sha256": "78085867466af0aba892a7c2d0af6496cb61352d15e796d23677407b1f7722fd",
+              "size": 11231
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/types.d.ts",
+              "sha256": "1191ac024d77c812d3f82f75b404c99c7a28c78cd8a58223fd5e6fa9d51ed8c5",
+              "size": 10201
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/types.js",
+              "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+              "size": 11
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/validate.d.ts",
+              "sha256": "bb2d430ea92adadb21d6610839909fc97cbc66421ec7334986ca00ad136a273f",
+              "size": 2890
+            },
+            {
+              "mode": 420,
+              "path": "dist/scene/validate.js",
+              "sha256": "4c12ff28885c7c04d4c4ee75b20bd3cf267775f7ac84ca0a587d26e8c1c43868",
+              "size": 87607
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema-dispatch.d.ts",
+              "sha256": "b53a1f95d160910e73ebf0a53f5b289be588e7740f77c6c9a558d6b7b5db3bcb",
+              "size": 946
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema-dispatch.js",
+              "sha256": "dd218495d053552fdb5b082293679c4a21086782292f05995891b604945340ad",
+              "size": 2641
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-svg.d.ts",
+              "sha256": "b24b608b33d20f7be1f91b27dbde0441477ae28232358d291f3fb22f20449b8f",
+              "size": 554
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-svg.js",
+              "sha256": "61485c9b53b019877978b06a5703039d63aa3083f1e7d144c684d3622bbafd81",
+              "size": 33904
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-toml.d.ts",
+              "sha256": "dce559c5254cfdb00f2a0b8d47facdb9aac8e7a16c43b5b9ef51479ac55cd635",
+              "size": 494
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-toml.js",
+              "sha256": "08e735b3fa6c7034ed843fd2bb2f381acbcd2c9a7792ca107cb6cd8437e666c6",
+              "size": 34384
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-types.d.ts",
+              "sha256": "68ee964a9907e93a926d6815f3156765e114e83664d1da821dd455b3e8172b78",
+              "size": 5608
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-types.js",
+              "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+              "size": 11
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-validation.d.ts",
+              "sha256": "e8be6cd6d32b788bf96ebe7e749a9db07ac1a917137da42b5bbf0ca1a608da1c",
+              "size": 437
+            },
+            {
+              "mode": 420,
+              "path": "dist/schema2-validation.js",
+              "sha256": "d258ec8aeb6a47d70ac037201511f07ca05b6bcac3f0a8945a5619d3e2542243",
+              "size": 4978
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/authority-ledger.d.ts",
+              "sha256": "85c34794c58d12325b17c213450052d44b763d96ca57c5cb9114aaadd6d669dc",
+              "size": 4171
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/authority-ledger.js",
+              "sha256": "1c1c1b522eaa1681bdf662bb0a93242a433acb68c2869ddf1442fbf33c2b4af9",
+              "size": 7307
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/brand-methods.d.ts",
+              "sha256": "4710d632958122f4b4ab0928ef9b144d1ea997f1660270f1575dafd370ac30cb",
+              "size": 702
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/brand-methods.js",
+              "sha256": "8dba508c86f7c98f4d43dcb3c6f28a25a5bac6361fb2c6fe708cc4776d5eedbb",
+              "size": 34845
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/brand-visual-methods.d.ts",
+              "sha256": "9409ff923289752cc34a1fc929a9b2e76d97885e4e751476f8ded2d11fd76d50",
+              "size": 843
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/brand-visual-methods.js",
+              "sha256": "17c05b287c325ae30ba9c3d96d757e5f4166388bc08252dafe0f5c3ba8056116",
+              "size": 12745
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/canonical-json.d.ts",
+              "sha256": "b5930235198ac8d49056f8ad96e39d01ecd170e94575078381f62546703b98c1",
+              "size": 1446
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/canonical-json.js",
+              "sha256": "8f12641b32734a36036f5dd27538659a93f53122797200ce2ff928b447eee881",
+              "size": 4899
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/cursor.d.ts",
+              "sha256": "8cd2607f664cbb35b076e535f77889eaa83b8715f9634fa862bf6800188d4531",
+              "size": 1390
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/cursor.js",
+              "sha256": "486eec94eda11dcbdac9cb29d3ead470dcf6930d7175de5b67521b8a04be7c4f",
+              "size": 3515
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/errors.d.ts",
+              "sha256": "4ddd6da4f1fd02cc388f04cc828f08e623acb710dd856996817680a4f0c726ef",
+              "size": 490
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/errors.js",
+              "sha256": "4f99e3039f01bd436f5a2ccefec79005f115fd420bdfecf1386a268b89f548a8",
+              "size": 1571
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/framing.d.ts",
+              "sha256": "aec1e3fbad4a19cb92b24beef5a44a15a28847f176e66b76fc6c6133e1b10395",
+              "size": 413
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/framing.js",
+              "sha256": "b5e3abea0400aa292a6bfee060fc93f13d7039e3433b72936c753542ac587274",
+              "size": 2798
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/handles.d.ts",
+              "sha256": "b44546bf02206af0fa6cc60c15be03a25641272869881fdbdb2c976e86956c60",
+              "size": 5771
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/handles.js",
+              "sha256": "d0f5512ff94244ff987240e24b3426aad400ecc29d406b268fbd1dad944a012d",
+              "size": 23567
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/mutation-methods.d.ts",
+              "sha256": "7339cc292259aaecceefa254dd765b0aaadff4f00eb6bb74c5f45d079dcc1c7c",
+              "size": 3447
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/mutation-methods.js",
+              "sha256": "adce29d870d80b54c547511e8e4d9505d57950045185e89e6aa82f4e55df2c34",
+              "size": 41143
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/plan-registry.d.ts",
+              "sha256": "c19f377a32c719e80fae6fb1495818dd528651813488e4bb3db72643302d49f6",
+              "size": 6788
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/plan-registry.js",
+              "sha256": "33d1060f026f0340118d458173e5f1c0cc580bcaa06fc3403e3c6c827cec2e73",
+              "size": 22362
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/read-methods.d.ts",
+              "sha256": "d1a1f504a427142f84b3e772790d758adf8a584848dd90ed8ba7c481ce202716",
+              "size": 812
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/read-methods.js",
+              "sha256": "8da9d6f961ce93fbd63025c3965faaf12d727a71959d93059a0f55b074e8a38e",
+              "size": 20048
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/server-cli.d.ts",
+              "sha256": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012",
+              "size": 31
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/server-cli.js",
+              "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+              "size": 298
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/server.d.ts",
+              "sha256": "f1952b67dc1b425c1017316e9fc9e5ad16ccdfc18df1d4a38671da90fd072bcc",
+              "size": 340
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/server.js",
+              "sha256": "aaf1fc147725fd27cfaa0d222b19ae7e1965fd46003c2996b32a2f7644259778",
+              "size": 14593
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/session.d.ts",
+              "sha256": "57f25155e9cefa8178c633a896997b60c3ab7fe6934fbf571afcfa6e935dbfc0",
+              "size": 1612
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/session.js",
+              "sha256": "26082e4989c3808500c3590388629bb59d158ba4bd109696464ab5dd7bb5e26e",
+              "size": 5797
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/v1-registry.d.ts",
+              "sha256": "9d9c284f65b491bc0ca4b85ad12ac0032aa61c1df924c5db9b36509a76742db7",
+              "size": 14675
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/v1-registry.js",
+              "sha256": "2db1a9400e157c63efecdfaed7bc18b1e960aaf52cbba03340bc399952df6504",
+              "size": 9310
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/v1-types.d.ts",
+              "sha256": "4fd15a246e1c05368348bbbf74183e7a69e8c3d3e9bec418ef401362704951c1",
+              "size": 50487
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/v1-types.js",
+              "sha256": "083e59a27e9a0f0f41acdf8b6aa54227517636c648238c0db5ef1bbb07902aa3",
+              "size": 2154
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/v1-validate.d.ts",
+              "sha256": "1fbdf553eb092deab50931682898d0ad70abe72975041fe9ef9bec19a2e19e57",
+              "size": 945
+            },
+            {
+              "mode": 420,
+              "path": "dist/service-protocol/v1-validate.js",
+              "sha256": "8224764e36a6446daf8de449c53e1e4340f74104a7cec6e6676caa597868f56f",
+              "size": 104981
+            },
+            {
+              "mode": 420,
+              "path": "dist/shard.d.ts",
+              "sha256": "a0da1807d950580ae03778889ebc25e2da04dec3d5482e8671f62f3a3613a5b3",
+              "size": 3868
+            },
+            {
+              "mode": 420,
+              "path": "dist/shard.js",
+              "sha256": "c3ec26f387352f0f7c5dcc0156da8feadba119bcc7ab21e5b27169fd7a08f274",
+              "size": 33884
+            },
+            {
+              "mode": 420,
+              "path": "dist/source-identity.d.ts",
+              "sha256": "c0c449868f5b00c195f1f44be3273c9d873ef74931d56c03eb4989d4d37e11dc",
+              "size": 1929
+            },
+            {
+              "mode": 420,
+              "path": "dist/source-identity.js",
+              "sha256": "ab0b45c98bb810466dc4717b48ca8f9f1ae1702f484a0684c4c4ada7b67db22d",
+              "size": 9202
+            },
+            {
+              "mode": 420,
+              "path": "dist/source-map.d.ts",
+              "sha256": "2b82af31974de2af7d7e42d7b9b8231b60eb6e71c1c1401c0c6e71dfdcfb92cb",
+              "size": 1734
+            },
+            {
+              "mode": 420,
+              "path": "dist/source-map.js",
+              "sha256": "9fb8d319fc430df544a8e3fd42163b7d706adf56bee23eba862f0d80e3eafe80",
+              "size": 11180
+            },
+            {
+              "mode": 420,
+              "path": "dist/svg.d.ts",
+              "sha256": "550f00def90906b38c824f33a094eb0aa6bf0bb6ef7d5fca6a5a9a6fca1fdfb7",
+              "size": 230
+            },
+            {
+              "mode": 420,
+              "path": "dist/svg.js",
+              "sha256": "99e5a89cd09c4517bace40a418f8f1e1613a07a3e96df1dd1344830f97048bf2",
+              "size": 29910
+            },
+            {
+              "mode": 420,
+              "path": "dist/toml-writer.d.ts",
+              "sha256": "9c7539e030a1cfbb905198002950c1f565b56f05751c91d0f4d324d73830b79d",
+              "size": 228
+            },
+            {
+              "mode": 420,
+              "path": "dist/toml-writer.js",
+              "sha256": "32773468d5655c38467f3f81fab81602c3f0be2200a56967f62942584072c7fa",
+              "size": 8597
+            },
+            {
+              "mode": 420,
+              "path": "dist/toml.d.ts",
+              "sha256": "04897708bf0725144139214f40a3a1654c95250697b3a165f7f7072069948947",
+              "size": 274
+            },
+            {
+              "mode": 420,
+              "path": "dist/toml.js",
+              "sha256": "74f80fe0fea0e0b9c247f7378d88be062ffa47eefb78aba7e2b39e0933da2593",
+              "size": 23014
+            },
+            {
+              "mode": 420,
+              "path": "dist/transaction.d.ts",
+              "sha256": "f5b80633c10a558f35cab7d8abe41c8ca0caff27ef97ef41a02cedaaf1f59ca7",
+              "size": 3322
+            },
+            {
+              "mode": 420,
+              "path": "dist/transaction.js",
+              "sha256": "f4124f7f45009123c383200529c49dd28877c89260f1a1a5098f64420cc5b617",
+              "size": 32622
+            },
+            {
+              "mode": 420,
+              "path": "dist/types.d.ts",
+              "sha256": "52e90a0442b291e0171ad4a5f30240e11feebd2026d2a01471f63fd8f964cfdf",
+              "size": 5179
+            },
+            {
+              "mode": 420,
+              "path": "dist/types.js",
+              "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+              "size": 11
+            },
+            {
+              "mode": 420,
+              "path": "dist/validation.d.ts",
+              "sha256": "38a293d255688d2cddcc2b06195fe3600144d7a7ce8b966ae1d8a168f50b6576",
+              "size": 203
+            },
+            {
+              "mode": 420,
+              "path": "dist/validation.js",
+              "sha256": "69f7260e314ea997f01186f8de4f6a53b0ee20b35267b23c52ea510fd17e0b5a",
+              "size": 3580
+            },
+            {
+              "mode": 420,
+              "path": "dist/version.d.ts",
+              "sha256": "1e51df981fb3b25faf6c3cf5ba0da90d8908b2d963d60a89a00d9e045207370e",
+              "size": 43
+            },
+            {
+              "mode": 420,
+              "path": "dist/version.js",
+              "sha256": "1b45f7d34136d40ee61f33998121923f6de901764fe348f5bd57437ad8648d79",
+              "size": 391
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-check.d.ts",
+              "sha256": "ffe48f7e44079421ec388f58cb8f7c5f4b4c4c0b2bcef247a958916fac9904bf",
+              "size": 1843
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-check.js",
+              "sha256": "3415ffa465af3311a29cb2c0a4c44f95cf5b10e5b314a4e7f813c9c9a0181599",
+              "size": 4929
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-collisions.d.ts",
+              "sha256": "7247aab629f566397d9777f4d657c331e821cf834516605056f0785d7bc0922e",
+              "size": 465
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-collisions.js",
+              "sha256": "b15fe447c83bac347f5c3f491cc34515cd7c57efdc5612e22f213a9ed471e139",
+              "size": 2891
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-list.d.ts",
+              "sha256": "92ddcd956c0499a83244368d514d0d6d97d26547a5c668effa7e57a3aa87ec72",
+              "size": 2652
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-list.js",
+              "sha256": "7a5a6888c2c6d73efa492f9abcbeebd1362e58393e691bc97217c4354801c0cb",
+              "size": 10616
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-preview.d.ts",
+              "sha256": "986a3e11b5c1a72951a2fcd524c9cec21911d50a053eb3242b43e97005353559",
+              "size": 3300
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace-preview.js",
+              "sha256": "5cbad71960a33c332ab9aae79cc5d0240f919c850e68cde68f71e6404bb16cae",
+              "size": 23230
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace.d.ts",
+              "sha256": "1d4702fbdf356827de1191e0bca7b701ae3d192316623ad03556ee0c9815e036",
+              "size": 3035
+            },
+            {
+              "mode": 420,
+              "path": "dist/workspace.js",
+              "sha256": "7342ea2d952e64d5fbff442ab5afdfed600b6ab7ec3abeec1684d3fa3f6d05f4",
+              "size": 13590
+            },
+            {
+              "mode": 420,
+              "path": "legal/COMMERCIAL-LICENSE.md",
+              "sha256": "63ddf934056e5e21f70b5fca6824679bff8c759e14c59b9b1704412d5ccc1747",
+              "size": 942
+            },
+            {
+              "mode": 420,
+              "path": "legal/LICENSE",
+              "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+              "size": 34460
+            },
+            {
+              "mode": 420,
+              "path": "legal/NOTICE",
+              "sha256": "4a65d0820387e60ff6cd04282d335104a3deb2f32f7c56f3e34fc6576a3089ba",
+              "size": 611
+            },
+            {
+              "mode": 420,
+              "path": "legal/node-LICENSE.txt",
+              "sha256": "c738ae413cf561f174e34f6961f8ca458aae2369a73640dda6234c629b98bcc4",
+              "size": 145485
+            },
+            {
+              "mode": 420,
+              "path": "native/directory-snapshot/prebuilds/linux-x64-gnu/manifest.json",
+              "sha256": "aa60f4655cfe03abba8b85b3ab74bf9c20f1131c7bbc7dfcddc96941f5315b84",
+              "size": 1341
+            },
+            {
+              "mode": 420,
+              "path": "native/directory-snapshot/prebuilds/linux-x64-gnu/native-addon-posix-openat-v1.node",
+              "sha256": "a2999fc9ac1b1f0a31600595f7069e10aadb032f01059b4d7e64ed80cd8a38a8",
+              "size": 27240
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/COMMERCIAL-LICENSE.md",
+              "sha256": "a81bcda7ec57a5c09f1cc6d05de420db7a0053b9496f1762065e083a60e5ede2",
+              "size": 932
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/LICENSE",
+              "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+              "size": 34460
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/MPL-2.0.txt",
+              "sha256": "4b89d4518bd135ab4ee154a7bce722246b57a98c3d7efc1a09409898160c2bd1",
+              "size": 16724
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/NOTICE",
+              "sha256": "d31e49346c1d4b9ea98ed49b817d48e68c4b9000e1763522da5ffe7f791e3657",
+              "size": 601
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/THIRD_PARTY_NOTICES.md",
+              "sha256": "27270f218c669a2dc276685c23304e81be6740c3eb48a1b4d7080e8c6587d779",
+              "size": 883
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/index.d.ts",
+              "sha256": "18907fdd6b3f6050eb1284afcc8c9e9d044648e93592bc3bd0c4de720687486c",
+              "size": 1150
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/index.js",
+              "sha256": "cdd58ed5a66c5bf7fbb99653482db0004dba960b990e3e98433c36045bbeace4",
+              "size": 6150
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@knowledge-forge-ai/tfsb-raster-resvg/package.json",
+              "sha256": "14b741e56d9823f82318e8a9d062a02884258eccfae6266138be2a6aaf9acd12",
+              "size": 731
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/README.md",
+              "sha256": "d10de0be25ba578e49979d5a02eb91c60e950a9e00df5669421dc1ad48265878",
+              "size": 936
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/index.d.ts",
+              "sha256": "bc8ed21a5bde7f8ab289969c11fbd6dd4d708f4ff36dd9c374aee3cc1b6b63c8",
+              "size": 2496
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/index.js",
+              "sha256": "0c1cd17c478a10ad891b147808c4f27b1023216f7726c49528c22c310c83ee6c",
+              "size": 18024
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/index.min.js",
+              "sha256": "590115ae25dead0d688da192f2d31586cdf1f8c70fe294919419c168e03e5c42",
+              "size": 8587
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/index.mjs",
+              "sha256": "10170d02d816f02ec76f9bc095b01d9becf536e7b1e12e5aa616652c84b237a1",
+              "size": 17048
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/index_bg.wasm",
+              "sha256": "22bf6e9f9a100d972da0411a69c5ba504367fc1fa87b3b64e3f35e53926d2d70",
+              "size": 2478606
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@resvg/resvg-wasm/package.json",
+              "sha256": "4a9efcb54b2670726ccf9b91086413676c3de0fae607cce3b8a5a0d25abaff48",
+              "size": 903
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/CHANGELOG.md",
+              "sha256": "5138fc1f8c15712ed7ede448a53f06fad0c15f1f94b57b4cb74ccfe694329c5a",
+              "size": 69194
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/LICENSE",
+              "sha256": "4da724fc305d81606b245b324d4d2586916b9d248b23d82183df753ace0fdf71",
+              "size": 1298
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/SECURITY.md",
+              "sha256": "a17b482b11a4f3ff0aa20bad116c49472c5ba9417223adf915eb739d194aceea",
+              "size": 3980
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/index.d.ts",
+              "sha256": "342163401aa45f329d6b07a70d878ec9d1dfbf1630ee389ac242309178833baf",
+              "size": 73605
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/.eslintrc.yml",
+              "sha256": "8962d52a0bb86f17e764dfaf160d265eaa969ed3d67da747b59c1df6eb4833c2",
+              "size": 63
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/conventions.js",
+              "sha256": "da57fbe2b07f5a4aaee9217b49778936c11a1108da1761b2f24f356a900ff124",
+              "size": 13399
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/dom-parser.js",
+              "sha256": "4188e24b953e2c70b66150306c66547495ad968d040e31dd65f22a7b3485da28",
+              "size": 20276
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/dom.js",
+              "sha256": "bea9ba89adfec227e9e572ee934a48223a170c5cf96b7087d7e3d3023ac47be3",
+              "size": 133234
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/entities.js",
+              "sha256": "ef333b680379392e8ee120e1cc77e0a8ff99a135e3b365b048f69c0df5f571f9",
+              "size": 44533
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/errors.js",
+              "sha256": "3e97f9c4f0a189346e2621b29c7c5a3899cd7375d1d15cbfbddd044fb781cb9f",
+              "size": 6817
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/grammar.js",
+              "sha256": "144f27b46adfb4a139adeb7483820def568b3940a6893194c03f5a71a94babc0",
+              "size": 23776
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/index.js",
+              "sha256": "418c42598a45290498f4350b6b6f531ceeb25e8d4d9a107db2448a1c0b5b784e",
+              "size": 1595
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/lib/sax.js",
+              "sha256": "324e8a0c7b475c645efcd1736b634733e133150849bff741fa0e2215e7017d02",
+              "size": 32465
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/package.json",
+              "sha256": "b61c2dd342e0e1abb800302ec62c0b06ae7a07cd9b907c88428ff80100f64c6a",
+              "size": 2253
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/@xmldom/xmldom/readme.md",
+              "sha256": "5ee9af83f442f300bf14d6ba8a79a6708f4f721a68ce79ce6fb701bc9ccd2de7",
+              "size": 13763
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/CHANGELOG.md",
+              "sha256": "adea1c1555f1496882896a5de3edbd53eb9a2e952555fd392e4a5dd2215ba7df",
+              "size": 4560
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/LICENSE",
+              "sha256": "0a1df3a083d0c010560aa342e87959c8c1070e6fd54545741f083f22d0c8b551",
+              "size": 1069
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/README.md",
+              "sha256": "021950f8aa043d57876d65917abb546c29de4007e8f873cac142c5394d4e17bc",
+              "size": 27362
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/esm/browser.d.ts",
+              "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+              "size": 53488
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/esm/browser.js",
+              "sha256": "b7ca4450b19559a1d50eb381adcee94b82449674be4cd17789d9beba7e6122a1",
+              "size": 90922
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/esm/index.d.mts",
+              "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+              "size": 53488
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/esm/index.mjs",
+              "sha256": "8d75534a30a0580608e1271c13d70943ed4cd3589fddff7b1197748036a5116e",
+              "size": 91765
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/browser.cjs",
+              "sha256": "cbe7f75f83e0ca95ec7f3854fcdc8f854f488485d0ecf03c3a0a7ff29765c690",
+              "size": 91611
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/browser.d.cts",
+              "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+              "size": 53488
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/index.cjs",
+              "sha256": "36967d6a4576f414f5a3611cfc866fa4245c05582048332ac139a174c63d56e0",
+              "size": 91005
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/index.d.ts",
+              "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+              "size": 53488
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/node-worker.cjs",
+              "sha256": "69fe824fc1ecdcbd3f4ea0c8718b57bd91c84e202944034a2f0a5cb71be850f7",
+              "size": 1405
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/node.cjs",
+              "sha256": "befa44cd80a1da830179db9e57930050a2e460ca3df13f0b05f83f52b1491818",
+              "size": 92380
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/node.d.cts",
+              "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+              "size": 53488
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/lib/worker.cjs",
+              "sha256": "7e04279c47bfcfb60cee1d86b250f6cffce89e922a0bdf959258713a30e0e46a",
+              "size": 636
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/package.json",
+              "sha256": "5922d8150b307bc0e4e441491c779c45379e9913d348848fca8d5cf02db4d134",
+              "size": 3543
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/fflate/umd/index.js",
+              "sha256": "462ef8041fc970e3615a20a9dd2b2e3047a073b2da729ef4f02b634bba8b7b83",
+              "size": 33044
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/LICENSE",
+              "sha256": "fa5659948374d4f555594f47f6da073b40dc503e921aeeece30df4362b3051a5",
+              "size": 1499
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/README.md",
+              "sha256": "bcaaa3befbd5bc5373cc6d80f4502afbe83179f96dcf9a336c43deb7ffa24c65",
+              "size": 37677
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/date.d.ts",
+              "sha256": "c7ad3531c131f2b5b246b2d208b75c5403475ad155b7661fa2d673104b806791",
+              "size": 2098
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/date.js",
+              "sha256": "ef924a2a42c7f16761e7098c3ed8e04195ecbcb02d5c369db0aee76f251a409c",
+              "size": 6256
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/error.d.ts",
+              "sha256": "02e33cdc5ca75f517f44b31070640be0fe6d0169dd91c266d02a1e2a71e064ac",
+              "size": 1874
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/error.js",
+              "sha256": "76f8e47f5fc57273748242d59570656d7c921a80bceb2291ca5a4d7a723e9f29",
+              "size": 2910
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/extract.js",
+              "sha256": "3e6f1e5764a091acf2df6a3f257d0467c37a2b9dbfecab1573f17a6489349c90",
+              "size": 13083
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/index.cjs",
+              "sha256": "f9029370259e9a43a2f3e64fa1d39e72f3598188380ace83a0abb8261fa33555",
+              "size": 28642
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/index.d.ts",
+              "sha256": "b4556819c2ed0cd4016d05a6bfd7d4773c0b5ffb39c8ed547796ce4a1093d9b8",
+              "size": 2282
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/index.js",
+              "sha256": "dc8e0afc74477e514f5cb8492b587560c1d7d68cec03a994cc8bc4af99c8da2a",
+              "size": 1949
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/parse.d.ts",
+              "sha256": "2b230dc984b6e51b545bfe222f9965cc2ff434164ed9428bec415c5e508a9854",
+              "size": 3194
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/parse.js",
+              "sha256": "195e33ea068bf6f3acb5b3342792ac4aa954bba7e751519ba869c00da395ecdb",
+              "size": 6484
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/primitive.js",
+              "sha256": "be47fe90bf9a410af0b9204b6b34617f4b38e57f08198b10cb024a0272eb5936",
+              "size": 7694
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/stringify.d.ts",
+              "sha256": "628a6a55714fcf4a4eb0e59866ab1e5cc67c1b9e0cfc8524ccc8d6b5ee24ad7c",
+              "size": 1805
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/stringify.js",
+              "sha256": "c717d95456426dc8a0b07c9d03a4e434d5dea8254fca24e5fd93a22de3bcd44c",
+              "size": 9662
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/struct.js",
+              "sha256": "736742cfa645bbd08bc5396c5f7ddbea5c3b7ac5d61fe86031846f5769131deb",
+              "size": 6273
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/util.d.ts",
+              "sha256": "e6b1d3eecb240dc71d0dc28d1beee69cefd6ee014507c822909be0a7117517e0",
+              "size": 2473
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/dist/util.js",
+              "sha256": "6327e40efd957128da15867c3a32293950a925570b457b1b78c735452cebc08e",
+              "size": 2636
+            },
+            {
+              "mode": 420,
+              "path": "node_modules/smol-toml/package.json",
+              "sha256": "d7ad6488e35b31d46bac6412d2d35225db4d693f02a415d872714ceb7e3d7138",
+              "size": 1548
+            },
+            {
+              "mode": 420,
+              "path": "package.json",
+              "sha256": "f1e9d6668a2dbb9e4ad51ab02215b850c1f356e1936730d3c423dc24f4d3fe8b",
+              "size": 108
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/README.md",
+              "sha256": "819a0fd67b57aaf6817c62858e83dafc38c5b27e0aa52996dde9392659af51e4",
+              "size": 3325
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/envelope.schema.json",
+              "sha256": "3f974c3b66bd300c6e144476fb918b56ca4cfed7daa1f1fcbe8f6f122167b3e5",
+              "size": 2170
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/inventory-1.1.json",
+              "sha256": "9d58e954e62169e87648814372a381653e9e69df5a0ce722251e6e46951dfe8a",
+              "size": 1842
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/inventory-1.2.json",
+              "sha256": "b620544ad644a7293313212a9585cd9e07af93608f2beac4e36b4bc99d812638",
+              "size": 1904
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/inventory.json",
+              "sha256": "96fdbcf0c56c1890d44363c34c80d8dacfccb37196de8050ab2d1afc7a3e0f70",
+              "size": 1400
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/requests-1.1.schema.json",
+              "sha256": "b5a10078862c8e03e951a67a8e7cd125c5d4d23619c3d32a9fb41a762629d54f",
+              "size": 8959
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/requests-1.2.schema.json",
+              "sha256": "e63252413eaebc2f5a73ad0973d48a51908f8d0604b09440774948bd935daf89",
+              "size": 11225
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/requests.schema.json",
+              "sha256": "5fa687ed6434b4f0ec6288bf4285f4109ab63afe55e2235d52f04f8ed77a8827",
+              "size": 16257
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/results-1.1.schema.json",
+              "sha256": "dee9513c61ed767e260d6dd16a13420c26f745850c7a6055cf6213e52571be60",
+              "size": 24523
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/results-1.2.schema.json",
+              "sha256": "d6259a45a4da2185761098ebf6f8d0f5ff80f08f41d3e34a4a3d69f792760fd1",
+              "size": 29673
+            },
+            {
+              "mode": 420,
+              "path": "protocol/tfsb-studio-v1/results.schema.json",
+              "sha256": "5b8f0f057d0dbcabf1b5d83765e476baececd5e7cdb5696bfcb1ac1826f84ff1",
+              "size": 27062
+            }
+          ],
+          "manifestDigest": "368fb92497c2f4c9be88d63ee0f4216a404024d700875e44ae016cb4c9947f88",
+          "native": {
+            "abi": 1,
+            "backend": "native-addon-posix-openat-v1",
+            "sha256": "a2999fc9ac1b1f0a31600595f7069e10aadb032f01059b4d7e64ed80cd8a38a8",
+            "size": 27240,
+            "target": "x86_64-unknown-linux-gnu"
+          },
+          "protocol": {
+            "1.0": {
+              "inventorySha256": "96fdbcf0c56c1890d44363c34c80d8dacfccb37196de8050ab2d1afc7a3e0f70",
+              "requestsSha256": "5fa687ed6434b4f0ec6288bf4285f4109ab63afe55e2235d52f04f8ed77a8827",
+              "resultsSha256": "5b8f0f057d0dbcabf1b5d83765e476baececd5e7cdb5696bfcb1ac1826f84ff1"
+            },
+            "1.1": {
+              "inventorySha256": "9d58e954e62169e87648814372a381653e9e69df5a0ce722251e6e46951dfe8a",
+              "requestsSha256": "b5a10078862c8e03e951a67a8e7cd125c5d4d23619c3d32a9fb41a762629d54f",
+              "resultsSha256": "dee9513c61ed767e260d6dd16a13420c26f745850c7a6055cf6213e52571be60"
+            },
+            "1.2": {
+              "inventorySha256": "b620544ad644a7293313212a9585cd9e07af93608f2beac4e36b4bc99d812638",
+              "requestsSha256": "e63252413eaebc2f5a73ad0973d48a51908f8d0604b09440774948bd935daf89",
+              "resultsSha256": "d6259a45a4da2185761098ebf6f8d0f5ff80f08f41d3e34a4a3d69f792760fd1"
+            }
+          },
+          "raster": {
+            "name": "@knowledge-forge-ai/tfsb-raster-resvg",
+            "packageJsonSha256": "14b741e56d9823f82318e8a9d062a02884258eccfae6266138be2a6aaf9acd12",
+            "version": "0.0.0-tfsb47f"
+          },
+          "resvg": {
+            "name": "@resvg/resvg-wasm",
+            "version": "2.6.2",
+            "wasmSha256": "22bf6e9f9a100d972da0411a69c5ba504367fc1fa87b3b64e3f35e53926d2d70",
+            "wasmSize": 2478606
+          },
+          "runtime": {
+            "mode": 493,
+            "sha256": "fde6a4bf8d0562f7751d1a2d6cb9b417c4cfe107bbcb0aa3e9a24e125e348f48",
+            "size": 124827920,
+            "target": "x86_64-unknown-linux-gnu",
+            "v8": "12.4.254.21-node.57",
+            "version": "22.23.3"
+          },
+          "runtimeKind": "node-runtime-payload-v1",
+          "schema": "tfsb.studio-sidecar-distribution",
+          "schemaVersion": 1,
+          "source": {
+            "actualInputDigest": "1b899ca47968ff74b7bebaa9c0ad1546df72420cf2c5577d326211bc04bef93d",
+            "baseCommit": "55ab0e5f1c575388af53ee3e1fafeab7116e7baf",
+            "model": "closed-input-digest-v1"
+          },
+          "target": "x86_64-unknown-linux-gnu",
+          "totals": {
+            "bytes": 7094666,
+            "fileCount": 350,
+            "inventoryDigest": "2e76cd1a694ae4b2e7e8a9b106fdb5be2cd5fef45204ace49aaaaa0007e66b70"
+          }
+        },
+        "sha256": "dc6e6406dafcd46cafc974edec4db2b070bf66594692509ac6df94faa0d139da",
+        "size": 51244
+      },
+      "members": {
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs": {
+          "mode": 420,
+          "sha256": "35b7a9c9b0ca863a11819759168150bd0f7d3900bb1cade7666d0414afc6ae2d",
+          "size": 6453
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl-batch.js": {
+          "mode": 493,
+          "sha256": "b58052712f9426a7669fe7f719aa20c30e19fa4c4d8be6e6a9de41e5b2a081d4",
+          "size": 125
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/bin/tfsl.js": {
+          "mode": 493,
+          "sha256": "6f4196e9a8eb744308a38328d396329901ca7619d8155fb15acfba26257ab316",
+          "size": 131
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.d.ts": {
+          "mode": 420,
+          "sha256": "5c32ef46b90997fc6de2a43c40a92643d025b64f1ed7c360e1cd40997528797b",
+          "size": 292
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/cli.js": {
+          "mode": 420,
+          "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+          "size": 74258
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.d.ts": {
+          "mode": 420,
+          "sha256": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012",
+          "size": 31
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/dist/service-protocol/server-cli.js": {
+          "mode": 420,
+          "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+          "size": 298
+        },
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/solar-sail-adapter/solar-sail-adapter.mjs": {
+          "mode": 420,
+          "sha256": "d128b824f444d60da1404622f3698d33f09a17a58aed9b3289fd24d805901276",
+          "size": 28998
+        }
+      },
+      "runtime": {
+        "mode": 493,
+        "sha256": "fde6a4bf8d0562f7751d1a2d6cb9b417c4cfe107bbcb0aa3e9a24e125e348f48",
+        "size": 124827920,
+        "target": "x86_64-unknown-linux-gnu",
+        "v8": "12.4.254.21-node.57",
+        "version": "22.23.3"
+      }
+    }
+  },
+  "schema": "rs9.nebular-current-caller-contract.v1",
+  "source_files": {
+    "authenticated-inputs/loom-binding.json": {
+      "blob": "181a0eb5df85e4ecf7b9622cb37a7f786523a421",
+      "sha256": "0c3ce971f5e4ac149c630ad01629c776fde350b3f20c02df19f4dffb8337ac2e",
+      "size": 2496
+    },
+    "authenticated-inputs/manifest.json": {
+      "blob": "524100eb3ff75bdd207fb8c4caec0a8775f75fa0",
+      "sha256": "288c6b417fd313833c58774030c636bd6c1921ccda6ab6a75879db02fbbc5714",
+      "size": 2992
+    },
+    "authenticated-inputs/stellar-binding.json": {
+      "blob": "aba230340b146aa9ed5424889b589ae270414735",
+      "sha256": "76b320b9f339ba635cef771baac35bafab231623a35399936043bc5664938b0e",
+      "size": 8397
+    },
+    "protocol/theme-lab-v2/payload-binding.json": {
+      "blob": "32c8658a6d1ab4b941c4b8d42b8f2ad07bc743b6",
+      "sha256": "95b274cab41f4512e2a5002476a650feea9a5b6a3f182dd0cb577ade286af729",
+      "size": 55841
+    },
+    "src-tauri/Cargo.toml": {
+      "blob": "227de4166f6b74dd4d865ef69b6311c7df3b5edf",
+      "sha256": "98f0cd315ca2dfb40a6cc575ec3eb302c2f866a89aa58e180541f93c29cc31ee",
+      "size": 1235
+    },
+    "src-tauri/build.rs": {
+      "blob": "9c9c32befeac5d6a77d1f5064610fabf9669247e",
+      "sha256": "c6ebe38561deb409ecac7f1a53a756584d8141da22896b873dc56d8b22e6d887",
+      "size": 16870
+    },
+    "src-tauri/loom-adapter/theme-adapter.mjs": {
+      "blob": "7fcc9eeeab6d962788659f9c751eb0ab854fa9c9",
+      "sha256": "35b7a9c9b0ca863a11819759168150bd0f7d3900bb1cade7666d0414afc6ae2d",
+      "size": 6453
+    },
+    "src-tauri/solar-sail-adapter/solar-sail-adapter.mjs": {
+      "blob": "863f31ce148c901118f1fd52f2d1186f286f5510",
+      "sha256": "d128b824f444d60da1404622f3698d33f09a17a58aed9b3289fd24d805901276",
+      "size": 28998
+    },
+    "src-tauri/src/app_theme/payload_authentication.rs": {
+      "blob": "0568a5cc1f197c0da117d12677d24a50d46c79be",
+      "sha256": "630dc7be67f9b4be0c92281fbc24a533aaf8eec79af8c482e46b45f2cd071d5e",
+      "size": 20951
+    },
+    "src-tauri/src/app_theme/runner.rs": {
+      "blob": "60843ff7bd3a3bcc0ffe47b0236c364174032549",
+      "sha256": "bcde9fee5dc35d6fc9577942760d2a420e7b3b05502546c01830fee19b1fe7a8",
+      "size": 31354
+    },
+    "src-tauri/src/lib.rs": {
+      "blob": "c95262e90d206778f5f58dea3a358732ee03e3fa",
+      "sha256": "b8f7a51ff11606a65162545a20b5d12bbbf76f9a94c2c849ed2fea9992e13b57",
+      "size": 20378
+    },
+    "src-tauri/src/platform.rs": {
+      "blob": "7e22505a105335837eb8e4c57f46355815e2396f",
+      "sha256": "9ae8772be82a57f3d15c1df40581ebb5bd9c0c52bfc1300d59c03b548b621809",
+      "size": 10419
+    },
+    "src-tauri/src/platform/resource_root.rs": {
+      "blob": "d0f4cd27e4a52a09ebc0a50b464e3940c9e8dd1e",
+      "sha256": "955ddb784401026f113229ef505ab2679fd2d82fee1038b6b70f1a696dd3f64c",
+      "size": 1954
+    },
+    "src-tauri/src/sidecar/artifact.rs": {
+      "blob": "9b54daaa16c827b45e914e647139492a8c49d825",
+      "sha256": "a84a358d40a440c1f7c977ce061e363d8502fe5ea29604aa6b39cbbf664694c2",
+      "size": 57325
+    },
+    "src-tauri/src/sidecar/process.rs": {
+      "blob": "594916c451722524be7b2c5c296e1283ea22bd3a",
+      "sha256": "71cfc25d009fa21851510c771dc97f6fa6bb271cc18fdb076420f29e19d52277",
+      "size": 13132
+    },
+    "src-tauri/src/sidecar/scene_artifact.rs": {
+      "blob": "9d8c33948f9155ab764b81bf3a2a872f1b44344c",
+      "sha256": "1d59f320ec3dfcaa50865af3d2df83efe8990c53834f0b8bb5a31c9e65306089",
+      "size": 8107
+    },
+    "src-tauri/src/theme_lab/runner.rs": {
+      "blob": "3e9823af755804c906b98e253eff16e58354096a",
+      "sha256": "64359533f946ccea6d56530dc1eec25ff7bc3088afea3b66cdcffb94fbee9864",
+      "size": 32460
+    },
+    "src-tauri/tauri.conf.json": {
+      "blob": "c8f0ba81ae12ec2d5f9e245e44b0507fd09ad852",
+      "sha256": "d078aa55c8c41f1d58c6a70d6c9ae325f020101bde9fa696a61fa309ffc374e9",
+      "size": 1530
+    },
+    "tools/node-runtime-authority.mjs": {
+      "blob": "f55c2231f07d35af6593634b49d13c30d429ba1f",
+      "sha256": "962014ba74a1b0285388b85026016d7d664adea6353ebca5c61a407a6c7ee653",
+      "size": 37930
+    },
+    "tools/sidecar-common.mjs": {
+      "blob": "a79812c8b47bb9a0a34c341261c49f7c1060d12e",
+      "sha256": "e0ca4d4a4bba4abd756f1399e31a768a20873eefb6c50ac26a75adddccc1978c",
+      "size": 81902
+    },
+    "tools/sidecar-verify.mjs": {
+      "blob": "a456da327097d26bec9a41fdfaf288af57f38657",
+      "sha256": "fba7f292b3c01ed062f4727e0c22912bc269b6ca76fca8328fb5329c098aac77",
+      "size": 1906
+    }
+  }
+}

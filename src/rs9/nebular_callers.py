@@ -10,7 +10,8 @@ from rs9.nebular_lineage import (
     HISTORICAL_COMMIT,
     HISTORICAL_TREE,
 )
-from rs9.release_core import digest
+from rs9.release_core import (digest, authenticated_record_hash, authenticated_tree,
+                              authenticated_release_metadata)
 
 TAG_COMMIT = HISTORICAL_COMMIT
 TAG_TREE = HISTORICAL_TREE
@@ -182,8 +183,100 @@ RUNTIME_PINS = {
 }
 
 
-def _source_valid(path, record):
-    pin = REVIEWED_TAGGED_FILES[path]
+CURRENT070_CONTRACT_PATH = Path(__file__).resolve().parents[2] / "operators/theme-forge-current-202610/nebular-callers.json"
+CURRENT070_CONTRACT_SHA256 = "db10b939421dc56d4011dcb3a52a659f0c0e8f73e33439cd88173e3b85fe90a8"
+CURRENT070_COMMIT = "cadb40c4972f68f314096ff60fbcfb4da950c161"
+CURRENT070_TREE = "27c643b6375c2aafde314799c4f08e844c14992c"
+CURRENT070_ASSET_SHA256S = frozenset({
+    "eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c",
+    "4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27",
+})
+_CURRENT_CALLER_PROOF = object()
+
+
+def _load_current_contract():
+    path = CURRENT070_CONTRACT_PATH
+    if path.is_symlink() or path.stat().st_size > 512 * 1024:
+        raise ContractError("CALLER_SOURCE_IDENTITY", "Bounded current caller contract required")
+    raw = path.read_bytes()
+    if digest(raw) != CURRENT070_CONTRACT_SHA256:
+        raise ContractError("CALLER_SOURCE_IDENTITY", "Current caller contract bytes differ")
+    contract = json.loads(raw)
+    if (set(contract) != {"schema", "identity", "source_files", "member_definitions", "floor", "platforms"}
+            or contract["schema"] != "rs9.nebular-current-caller-contract.v1"):
+        raise ContractError("CALLER_SOURCE_IDENTITY", "Closed current caller contract required")
+    return contract
+
+
+def current_contract_for_capture(capture):
+    """Select the current contract only from a real, exact authenticated release.
+
+    Returned JSON describes expectations. It is not a caller-proof capability.
+    """
+    authenticated_record_hash(capture)
+    authenticated_tree(capture)
+    release = authenticated_release_metadata(capture)
+    record = capture.record
+    identity = (record["repository"]["full_name"], record["repository"]["id"],
+                record["release"]["id"], record["release"]["tag"],
+                record["tag"]["commit"], record["tag"]["tree"])
+    if (identity != ("Knowledge-Forge-AI/theme-forge-nebular-fusion", 1358643872,
+                     426333162, "v0.7.0", CURRENT070_COMMIT, CURRENT070_TREE)
+            or release.get("id") != 426333162 or release.get("tag_name") != "v0.7.0"):
+        raise ContractError("CALLER_SOURCE_IDENTITY", "Exact current authenticated Nebular release required")
+    contract = _load_current_contract()
+    for platform in contract["platforms"].values():
+        asset = platform["asset"]
+        selected = [row for row in record["assets"] if row["name"] == asset["name"]]
+        if (len(selected) != 1 or any(selected[0][key] != asset[key] for key in ("sha256", "size"))
+                or selected[0]["github_asset_id"] != asset["github_asset_id"]):
+            raise ContractError("CALLER_SOURCE_IDENTITY", "Current caller release asset differs")
+    return contract
+
+
+class _CurrentCallerEvidence(dict):
+    """JSON-compatible audit data with an unpersistable current-capture binding."""
+    def __init__(self, capture, value, *, _proof=None):
+        if _proof is not _CURRENT_CALLER_PROOF:
+            raise ContractError("CALLER_SOURCE_IDENTITY", "Fresh current source collection required")
+        super().__init__(value)
+        self._capture = capture
+        self._capture_hash = authenticated_record_hash(capture)
+        self._seal = digest(_canonical_evidence(self))
+        self._proof = _proof
+
+    def __deepcopy__(self, memo):
+        import copy
+        # Copying is not authentication; preserve both original binding seals.
+        result = type(self).__new__(type(self))
+        memo[id(self)] = result
+        dict.update(result, copy.deepcopy(dict(self), memo))
+        result._capture = self._capture
+        result._capture_hash = self._capture_hash
+        result._seal = self._seal
+        result._proof = self._proof
+        return result
+
+
+def _canonical_evidence(value):
+    from rs9.scratch import canonical
+    return canonical(dict(value))
+
+
+def _current_evidence_contract(evidence):
+    if (not isinstance(evidence, _CurrentCallerEvidence) or evidence._proof is not _CURRENT_CALLER_PROOF
+            or digest(_canonical_evidence(evidence)) != evidence._seal
+            or authenticated_record_hash(evidence._capture) != evidence._capture_hash):
+        raise ContractError("CALLER_SOURCE_IDENTITY", "Current caller evidence lost its live capture binding")
+    contract = current_contract_for_capture(evidence._capture)
+    if (evidence.get("tag_commit") != CURRENT070_COMMIT or evidence.get("tag_tree") != CURRENT070_TREE
+            or evidence.get("tag_name") != "v0.7.0"):
+        raise ContractError("CALLER_SOURCE_IDENTITY", "Current caller evidence identity differs")
+    return contract
+
+
+def _source_valid(path, record, *, pins=None):
+    pin = (REVIEWED_TAGGED_FILES if pins is None else pins)[path]
     if not isinstance(record, dict) or not isinstance(record.get("content"), str):
         return False
     data = record["content"].encode()
@@ -208,32 +301,48 @@ def collect_caller_sources(capture, client, scratch, entry=None):
     output = Path(scratch)
     output.mkdir(parents=True, exist_ok=True)
     missing = list(REVIEWED_CALLER_FILES)
+    current = False
+    pins = REVIEWED_TAGGED_FILES
     try:
         if client is None:
             raise ContractError("CALLER_CLIENT_UNAVAILABLE", "Authenticated source client unavailable")
         tag = capture.record.get("tag") if isinstance(capture.record, dict) else None
-        identity = _reviewed_tag_identity(tag)
+        release = capture.record.get("release", {})
+        current = ((isinstance(tag, dict) and (tag.get("commit") == CURRENT070_COMMIT
+                    or tag.get("tree") == CURRENT070_TREE))
+                   or isinstance(release, dict) and release.get("tag") == "v0.7.0")
+        if current:
+            contract = current_contract_for_capture(capture)
+            pins = contract["source_files"]
+            missing = list(pins)
+            identity = (CURRENT070_COMMIT, CURRENT070_TREE)
+        else:
+            identity = _reviewed_tag_identity(tag)
         if identity is None:
             raise ContractError("CALLER_SOURCE_IDENTITY", "Caller tag/tree differs from reviewed release")
         tag_commit, tag_tree = identity
         from rs9.hosted_smoke import tagged_files
-        records = tagged_files(capture, client, output, (), paths=REVIEWED_CALLER_FILES, role="caller-source")
+        records = tagged_files(capture, client, output, (), paths=tuple(pins), role="caller-source")
         files = {}
         for record in records:
             path = record["path"]
-            if path not in REVIEWED_TAGGED_FILES:
+            if path not in pins:
                 raise ContractError("CALLER_SOURCE_IDENTITY", "Unselected source returned")
             if record.get("tag_commit") != tag_commit:
                 raise ContractError("CALLER_SOURCE_IDENTITY", "Caller source record is bound to another tag")
             record = dict(record, content=(output / path).read_text(encoding="utf-8"))
-            if not _source_valid(path, record):
+            if not _source_valid(path, record, pins=pins):
                 raise ContractError("CALLER_SOURCE_IDENTITY", "Caller bytes differ from authenticated tag")
             files[path] = record
             missing.remove(path)
         if missing:
             raise ContractError("CALLER_SOURCE_MISSING", "Selected source absent")
-        return dict(schema="rs9.nebular-caller-sources.v1", status="available", tag_commit=tag_commit,
-                    tag_tree=tag_tree, files=files, records=records)
+        result = dict(schema="rs9.nebular-caller-sources.v1", status="available", tag_commit=tag_commit,
+                      tag_tree=tag_tree, files=files, records=records)
+        if current:
+            result["tag_name"] = "v0.7.0"
+            return _CurrentCallerEvidence(capture, result, _proof=_CURRENT_CALLER_PROOF)
+        return result
     except (ContractError, OSError, ValueError, KeyError, TypeError, AttributeError) as error:
         return dict(schema="rs9.nebular-caller-sources.v1", status="unavailable", reason=getattr(error, "code", "CALLER_SOURCE_UNAVAILABLE"),
                     missing_items=missing, collection_path="execute -> collect_caller_sources -> tagged_files", files={}, records=[])
@@ -263,22 +372,42 @@ def validate_rule(path, rule):
         raise ContractError("INVALID_POLICY", "Mixed or unauthenticated Nebular caller discriminator")
 
 
-def release_runtime_floor(archive, entry):
+def release_runtime_floor(archive, entry, *, capture=None):
     """Read only the product-declared, hash-bound engine member."""
     import re
     import tarfile
+    import io
+    floor_sha256 = FLOOR_SHA256
+    archive_bytes = None
+    if capture is not None:
+        try:
+            selected = current_contract_for_capture(capture)
+            floor_sha256 = selected["floor"]["sha256"]
+            archive_path = Path(archive)
+            assets = [row["asset"] for row in selected["platforms"].values()]
+            if (archive_path.is_symlink() or not archive_path.is_file()
+                    or archive_path.stat().st_size > 256 * 1024 * 1024):
+                raise ValueError("archive binding")
+            archive_bytes = archive_path.read_bytes()
+            archive_sha256 = digest(archive_bytes)
+            if not any(archive_sha256 == asset["sha256"] for asset in assets):
+                raise ValueError("archive binding")
+        except (ContractError, OSError, ValueError, KeyError, TypeError, AttributeError):
+            raise ContractError("DEPENDENCY_DERIVATION", "Current runtime floor needs an exact authenticated archive") from None
     contract = entry.get("runtime_requires_contract", {})
-    if (contract.get("member") != FLOOR_MEMBER or contract.get("sha256") != FLOOR_SHA256
+    if (contract.get("member") != FLOOR_MEMBER or contract.get("sha256") != floor_sha256
             or contract.get("pointer") != "/engines/node"):
         raise ContractError("DEPENDENCY_DERIVATION", "Exact runtime Requires source contract missing")
     name = FLOOR_MEMBER.removeprefix("/usr/lib/")
-    with tarfile.open(archive, "r:*") as archive_file:
+    archive_input = ({"fileobj": io.BytesIO(archive_bytes), "mode": "r:*"} if archive_bytes is not None
+                     else {"name": archive, "mode": "r:*"})
+    with tarfile.open(**archive_input) as archive_file:
         members = [m for m in archive_file.getmembers() if m.name == name]
         if len(members) != 1 or not members[0].isfile() or members[0].size > 256 * 1024:
             raise ContractError("DEPENDENCY_DERIVATION", "Bounded runtime engine member missing")
         with archive_file.extractfile(members[0]) as stream:
             data = stream.read(256 * 1024 + 1)
-    if digest(data) != FLOOR_SHA256:
+    if digest(data) != floor_sha256:
         raise ContractError("DEPENDENCY_DERIVATION", "Runtime engine source changed")
     floor = json.loads(data).get("engines", {}).get("node")
     if not isinstance(floor, str) or not re.fullmatch(r">=\s*([0-9]{1,6}(?:\.[0-9]{1,6}){0,2})", floor):
@@ -288,6 +417,16 @@ def release_runtime_floor(archive, entry):
 
 def verify_nebular_caller(path, rule, pin, inventory, inputs, *, caller_evidence=None, client_runtime=None):
     """Verify a source relationship and byte preservation; no system Node inference."""
+    evidence = caller_evidence if caller_evidence is not None else inventory.get("caller_evidence")
+    if (isinstance(evidence, _CurrentCallerEvidence)
+            or isinstance(evidence, dict) and (evidence.get("tag_commit") == CURRENT070_COMMIT
+                                               or evidence.get("tag_tree") == CURRENT070_TREE
+                                               or evidence.get("tag_name") == "v0.7.0")):
+        return _verify_current_caller(path, rule, pin, inventory, inputs, evidence)
+    if (inputs.get("version") == "0.7.0"
+            or any(isinstance(value, str) and value in CURRENT070_ASSET_SHA256S
+                   for value in (inputs.get("asset_sha256"), inventory.get("asset_sha256"), pin.get("asset_sha256")))):
+        return None, "caller-content-or-identity-unproven"
     try:
         validate_rule(path, rule)
     except ContractError:
@@ -363,3 +502,97 @@ def verify_nebular_caller(path, rule, pin, inventory, inputs, *, caller_evidence
                 proof_model="authenticated-source-relation-and-release-preservation", tag_commit=evidence_commit, tag_tree=evidence_tree,
                 runtime_member=RUNTIME, runtime_sha256=runtime["sha256"], manifest_sha256=digest(manifest_text.encode()),
                 native_execution_claimed=False, system_node_required=False), None
+
+
+def _verify_current_caller(path, rule, pin, inventory, inputs, evidence):
+    """Current static caller proof requires the live authenticated source result."""
+    failure = "caller-content-or-identity-unproven"
+    try:
+        contract = _current_evidence_contract(evidence)
+        definition = contract["member_definitions"].get(path)
+        if (not definition or rule.get("role") != definition["role"]
+                or rule.get("intent") != ROLE_INTENTS[definition["role"]]
+                or rule.get("caller_structure") != definition["proof"]
+                or any(key in rule for key in ("reference_contract", "caller_member", "floor_source"))):
+            return None, failure
+        if rule.get("status") == "blocked":
+            return None, rule.get("missing_predicate", failure)
+        sources = evidence["files"]
+        if (set(sources) != set(contract["source_files"])
+                or not all(_source_valid(name, sources[name], pins=contract["source_files"])
+                           for name in contract["source_files"])):
+            return None, failure
+        for source, literals in definition["literals"].items():
+            if any(literal not in sources[source]["content"] for literal in literals):
+                return None, failure
+        system = inputs.get("system")
+        platform = contract["platforms"].get(system)
+        if (platform is None or inputs.get("arch") != system.removesuffix("-linux")
+                or inputs.get("project_id") != NEBULAR_PROJECT_ID
+                or inputs.get("version") != "0.7.0"):
+            return None, failure
+        asset = platform["asset"]
+        if (inputs.get("asset_sha256") != asset["sha256"]
+                or inventory.get("asset_sha256") != asset["sha256"]
+                or pin.get("asset_sha256") != asset["sha256"]
+                or pin.get("input_member") != path.removeprefix("/usr/lib/")):
+            return None, failure
+        member_pin = platform["members"][path]
+        adapter_source = {
+            PAYLOAD + "/loom-adapter/theme-adapter.mjs": "src-tauri/loom-adapter/theme-adapter.mjs",
+            PAYLOAD + "/solar-sail-adapter/solar-sail-adapter.mjs": "src-tauri/solar-sail-adapter/solar-sail-adapter.mjs",
+        }.get(path)
+        if adapter_source and member_pin["sha256"] != contract["source_files"][adapter_source]["sha256"]:
+            return None, failure
+        if (not _preserved(path, inventory) or pin.get("sha256") != member_pin["sha256"]
+                or any(inventory["files"][path].get(key) != member_pin[key] for key in ("sha256", "size", "mode"))):
+            return None, "script-preservation-unproven"
+        runtime = platform["runtime"]
+        application_path = ROOT + "/bin/" + NEBULAR_PROJECT_ID
+        for member, expected in ((RUNTIME, runtime), (application_path, platform["application"])):
+            if not _preserved(member, inventory):
+                return None, "caller-member-missing"
+            if any(inventory["files"][member].get(key) != expected[key] for key in ("sha256", "size", "mode")):
+                return None, failure
+        text = _text(MANIFEST, inventory)
+        manifest_pin = platform["manifest"]
+        if text is None or len(text.encode()) != manifest_pin["size"] or digest(text.encode()) != manifest_pin["sha256"]:
+            return None, failure
+        manifest = json.loads(text)
+        if manifest != manifest_pin["content"] or manifest["runtime"] != runtime:
+            return None, failure
+        members = manifest["files"]
+        names = [row["path"] for row in members]
+        released_names = {name.removeprefix(PAYLOAD + "/sidecar-payload/")
+                          for name, row in inventory["expected"].items()
+                          if name.startswith(PAYLOAD + "/sidecar-payload/")
+                          and name != MANIFEST and row.get("type") == "file"}
+        if len(names) != len(set(names)) or set(names) != released_names:
+            return None, failure
+        for row in members:
+            member = PAYLOAD + "/sidecar-payload/" + row["path"]
+            if (not _preserved(member, inventory)
+                    or any(inventory["files"][member].get(key) != row[key] for key in ("sha256", "size", "mode"))):
+                return None, failure
+        floor = contract["floor"]
+        floor_text = _text(FLOOR_MEMBER, inventory)
+        if (floor_text is None or digest(floor_text.encode()) != floor["sha256"]
+                or len(floor_text.encode()) != floor["size"]
+                or json.loads(floor_text).get("engines", {}).get("node") != floor["value"]):
+            return None, "engine-floor-unproven"
+        if "/loom-payload/" in path:
+            if "nodejs >= 22" not in inventory.get("requires", []):
+                return None, "engine-floor-unmet"
+            binding = json.loads(sources["protocol/theme-lab-v2/payload-binding.json"]["content"])
+            selected = [row for row in binding["files"] if row["path"] == path.removeprefix(PAYLOAD + "/loom-payload/")]
+            if (len(selected) != 1 or selected[0]["sha256"] != member_pin["sha256"]
+                    or selected[0]["bytes"] != member_pin["size"]):
+                return None, failure
+        return dict(path=path, role=definition["role"], intent=rule["intent"], sha256=member_pin["sha256"],
+                    mode=member_pin["mode"], input_member=pin["input_member"], input_archive_sha256=asset["sha256"],
+                    proof_model="authenticated-source-relation-and-release-preservation",
+                    tag_commit=CURRENT070_COMMIT, tag_tree=CURRENT070_TREE,
+                    runtime_member=RUNTIME, runtime_sha256=runtime["sha256"], manifest_sha256=manifest_pin["sha256"],
+                    native_execution_claimed=False, system_node_required=False), None
+    except (ContractError, OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None, failure

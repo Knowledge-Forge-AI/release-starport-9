@@ -9,13 +9,15 @@ from pathlib import Path
 
 from rs9.errors import ContractError, safe_details
 from rs9.hosted_commands import runtime_environment
+from rs9.nebular_callers import CURRENT070_COMMIT, CURRENT070_TREE, current_contract_for_capture
 from rs9.nebular_lineage import (
     CURRENT_COMMIT,
     CURRENT_TREE,
     HISTORICAL_COMMIT,
     HISTORICAL_TREE,
 )
-from rs9.release_core import authenticated_record_hash, authenticated_tree, digest
+from rs9.release_core import (authenticated_record_hash, authenticated_tree,
+                              authenticated_release_metadata, digest)
 from rs9.scratch import canonical
 from rs9.security import validate_safe_relative_posix_path
 
@@ -59,11 +61,131 @@ def tagged_files(capture, client, output, prefixes, *, paths=(), role="verifier-
 VERIFIER_SUPPORT = {
     HISTORICAL_COMMIT: ("package.json",),
     CURRENT_COMMIT: ("package.json",),
+    CURRENT070_COMMIT: ("package.json",),
 }
 VERIFIER_SUPPORT_TREES = {
     HISTORICAL_COMMIT: HISTORICAL_TREE,
     CURRENT_COMMIT: CURRENT_TREE,
+    CURRENT070_COMMIT: CURRENT070_TREE,
 }
+
+
+# Exact import-time closure and fixture members measured from current tagged bytes.
+CURRENT070_VERIFIER_FILES = {'package.json': {'blob': '161ee788b7a8660916e2b6fbbebbac0de4a87f42',
+                  'sha256': '15d3f118dfdc0014129fc37d63533a6a02cf355fdb89961a215eca77e95b7cd2',
+                  'size': 1833},
+ 'tools/build-inputs.mjs': {'blob': 'd9e0019d04d4ca8862f789fd2a5319fd828a0855',
+                            'sha256': '92cc77082ffc399a9c39ad4fce41811e9ac8aba7e2d852ac223cdf0e193381bc',
+                            'size': 16400},
+ 'tools/build-settings.mjs': {'blob': '87b69b40534ef60f1895bdd866ce7e74fa581dae',
+                              'sha256': 'f7578fccf935e14aee190a2de4378a986a182b038e41b261f3f9355e33449cd0',
+                              'size': 24182},
+ 'tools/candidate-provenance.mjs': {'blob': '129b0da16329d07697daab619f8fdbc5690f72fa',
+                                    'sha256': '20244b6765d6e7d0ee5fd86452096a4546f189103b0acb9f065c4a1479c23155',
+                                    'size': 15484},
+ 'tools/darwin-linkage-validator.mjs': {'blob': '3ca8ede088162f10d922b9cbec1d091daa052c33',
+                                        'sha256': '67073d25aa00bc6c8086e8d10a2bd7302cc46c6416894bcba553880edf83f0f9',
+                                        'size': 7678},
+ 'tools/fs-snapshot.mjs': {'blob': '841cfecd874517d0c619cf9a3866c2697e12ecd6',
+                           'sha256': '30ad6c3f0394126a7d3e5534507fe46c78c34946edd15bd5c91b36e2b36df351',
+                           'size': 13794},
+ 'tools/native-launcher.mjs': {'blob': '9c84fff880957edcb98925bbaea941fc0f7e66fe',
+                               'sha256': '3595cfaf0a2f1ac51a48862dc5f6aa842db6d3431a62159bcb93cb0abc812f2d',
+                               'size': 7193},
+ 'tools/native-rc-package.mjs': {'blob': '570d4d2b6cee8551bb0d77417e54ee4a0d308ca8',
+                                 'sha256': '0ef948c2f9f45a9343586288681ae5ed6f6527b85912a52bd8c37aa50e3682c6',
+                                 'size': 33102},
+ 'tools/native-rc-smoke.mjs': {'blob': 'cbf6a2148c11ed1516ba5d7fc2d4dd32dee3ee9f',
+                               'sha256': '874355e36496884e55a6e4dae6986ecde817d20863bb3fe26d1b1b5a1d283e69',
+                               'size': 30732},
+ 'tools/native-runtime.mjs': {'blob': '333192471147289f232bd915c6813ae23b39f1bb',
+                              'sha256': 'a9d6c8e885b9db41877c5d2d79efe48f2e47daf791e0f1ad1ca06636d37d962e',
+                              'size': 118749},
+ 'tools/node-runtime-authority.mjs': {'blob': 'f55c2231f07d35af6593634b49d13c30d429ba1f',
+                                      'sha256': '962014ba74a1b0285388b85026016d7d664adea6353ebca5c61a407a6c7ee653',
+                                      'size': 37930},
+ 'tools/platform-targets.mjs': {'blob': 'ebe518bbf27856c496541bca46bf13066805a606',
+                                'sha256': '35321c7e888038210589612873136c96bf697789f6f4e90918442faa41e13aec',
+                                'size': 7292},
+ 'tools/sidecar-common.mjs': {'blob': 'a79812c8b47bb9a0a34c341261c49f7c1060d12e',
+                              'sha256': 'e0ca4d4a4bba4abd756f1399e31a768a20873eefb6c50ac26a75adddccc1978c',
+                              'size': 81902},
+ 'tools/sidecar-verify.mjs': {'blob': 'a456da327097d26bec9a41fdfaf288af57f38657',
+                              'sha256': 'fba7f292b3c01ed062f4727e0c22912bc269b6ca76fca8328fb5329c098aac77',
+                              'size': 1906}}
+# Reviewed graph documentation, not a JavaScript parser or a separate authority.
+# Exact member pins/readback and import preflight enforce the actual closure.
+CURRENT070_VERIFIER_IMPORTS = {'tools/build-inputs.mjs': ['tools/build-settings.mjs',
+                            'tools/candidate-provenance.mjs',
+                            'tools/platform-targets.mjs'],
+ 'tools/build-settings.mjs': ['tools/candidate-provenance.mjs', 'tools/fs-snapshot.mjs'],
+ 'tools/candidate-provenance.mjs': ['tools/platform-targets.mjs'],
+ 'tools/darwin-linkage-validator.mjs': [],
+ 'tools/fs-snapshot.mjs': [],
+ 'tools/native-launcher.mjs': ['tools/platform-targets.mjs'],
+ 'tools/native-rc-package.mjs': ['tools/fs-snapshot.mjs',
+                                 'tools/native-launcher.mjs',
+                                 'tools/native-runtime.mjs',
+                                 'tools/platform-targets.mjs'],
+ 'tools/native-rc-smoke.mjs': ['tools/fs-snapshot.mjs',
+                               'tools/native-launcher.mjs',
+                               'tools/native-rc-package.mjs',
+                               'tools/native-runtime.mjs'],
+ 'tools/native-runtime.mjs': ['tools/candidate-provenance.mjs'],
+ 'tools/node-runtime-authority.mjs': ['tools/darwin-linkage-validator.mjs'],
+ 'tools/platform-targets.mjs': [],
+ 'tools/sidecar-common.mjs': ['tools/build-inputs.mjs',
+                              'tools/candidate-provenance.mjs',
+                              'tools/darwin-linkage-validator.mjs',
+                              'tools/node-runtime-authority.mjs',
+                              'tools/platform-targets.mjs'],
+ 'tools/sidecar-verify.mjs': ['tools/build-inputs.mjs',
+                              'tools/platform-targets.mjs',
+                              'tools/sidecar-common.mjs']}
+CURRENT070_FIXTURE_COMMIT = '3edb9d2c40dd19a2b7d97d9309bc210e7fed711c'
+CURRENT070_FIXTURE_TREE = '4be1551c49b15dff788d07ed1fb00ddcd8839a76'
+CURRENT070_FIXTURE_FILES = {'docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-dark.toml': {'blob': '36e238da1aec1b8a5ef4ab35569175101b202204',
+                                                                                         'sha256': '6a95e550c0c3e92793a873251eed3bc888e5e4c4a3355124d5230eaebe479387',
+                                                                                         'size': 371},
+ 'docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-light.toml': {'blob': 'b4d6b7644c40bb94ff58ad6449537f17e1e2f2b3',
+                                                                                          'sha256': '8e53627c743ba21b079b281638804f3a9214895686514dbf5fec0c279db71667',
+                                                                                          'size': 375},
+ 'docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand-package.toml': {'blob': '78a6a5b2cd6b36da681450e94bd2841a86469454',
+                                                                           'sha256': 'd205c6db34f0af25d6657a8133593d1d67b50dda8e4cfc34973450dd141c7bd4',
+                                                                           'size': 1194},
+ 'docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand.toml': {'blob': 'c024cf83958ff1debf9ec614cfce06ca08ec5702',
+                                                                   'sha256': '1017ebaca28269b4d4397e84bf29696ddea3f615ef1a8e5a6d67606a369c8b41',
+                                                                   'size': 1012},
+ 'docs/examples/v0.4/brand-system/core-minimal/.tfsb/companions/GUIDANCE.md': {'blob': '3166248645c5459c066cece832c9a7d0c82c10aa',
+                                                                               'sha256': '10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3',
+                                                                               'size': 90},
+ 'docs/examples/v0.4/brand-system/core-minimal/.tfsb/project.toml': {'blob': '513887cacede8047e8451ef241222c1e4661a4d2',
+                                                                     'sha256': '932378720ed558961f520df7c6d74da2a3b11c6a5f31263cbe565a22d5e801c3',
+                                                                     'size': 69},
+ 'docs/examples/v0.4/brand-system/core-minimal/GUIDANCE.md': {'blob': '3166248645c5459c066cece832c9a7d0c82c10aa',
+                                                              'sha256': '10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3',
+                                                              'size': 90},
+ 'docs/examples/v0.4/brand-system/core-minimal/bundle/assets/fixture-mark-on-dark.svg': {'blob': '8ec42a928976bcce8e5972c7191fe928dbb159e9',
+                                                                                         'sha256': '1068a15abd03564d4a48257825914baa14ae26990aad96c0c8f46e2d5a27a15b',
+                                                                                         'size': 345},
+ 'docs/examples/v0.4/brand-system/core-minimal/bundle/assets/fixture-mark-on-light.svg': {'blob': 'e1f2c48c977fcca5f220af6b8760b008195a4f87',
+                                                                                          'sha256': 'a1bf2b63584d6c5e7832d2e7c29f9137f6f15c4a0d004b9e71c1ee599d75d75f',
+                                                                                          'size': 348},
+ 'docs/examples/v0.4/brand-system/core-minimal/bundle/brand/brand-package.toml': {'blob': '78a6a5b2cd6b36da681450e94bd2841a86469454',
+                                                                                  'sha256': 'd205c6db34f0af25d6657a8133593d1d67b50dda8e4cfc34973450dd141c7bd4',
+                                                                                  'size': 1194},
+ 'docs/examples/v0.4/brand-system/core-minimal/bundle/brand/brand.toml': {'blob': 'c024cf83958ff1debf9ec614cfce06ca08ec5702',
+                                                                          'sha256': '1017ebaca28269b4d4397e84bf29696ddea3f615ef1a8e5a6d67606a369c8b41',
+                                                                          'size': 1012},
+ 'docs/examples/v0.4/brand-system/core-minimal/bundle/companions/GUIDANCE.md': {'blob': '3166248645c5459c066cece832c9a7d0c82c10aa',
+                                                                                'sha256': '10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3',
+                                                                                'size': 90},
+ 'docs/examples/v0.4/brand-system/core-minimal/bundle/tfsb-brand-manifest.json': {'blob': '38feefb3c5f7575af7bcd3dcb0a818e83a27732c',
+                                                                                  'sha256': 'c9c652e36d881775d14ed467bad4a1e5494d3ef55b2aade0252f74c6299a28e4',
+                                                                                  'size': 1874},
+ 'docs/examples/v0.4/brand-system/core-minimal/bundle/tfsb-manifest.json': {'blob': 'f867a70f3e48d29f20c958ac93dd95425cca4410',
+                                                                            'sha256': '53ece77670595a24f49bbdfb0af0498e093e5a08366ecaff090814a02c9f70e8',
+                                                                            'size': 1110}}
 
 
 def _reviewed_verifier_support(capture):
@@ -83,7 +205,83 @@ def _reviewed_verifier_support(capture):
     if tag.get("tree") != VERIFIER_SUPPORT_TREES[commit]:
         raise ContractError("SIDECAR_HARNESS_IMPORT", "Tagged verifier tree is not the reviewed closure",
                             details={"substage": "verifier-closure", "reason": "tag-tree-mismatch"})
+    if commit == CURRENT070_COMMIT:
+        _current_smoke_capture(capture)
+    elif (isinstance(capture.record.get("release"), dict)
+          and capture.record["release"].get("tag") == "v0.7.0"):
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Mixed verifier generation is forbidden",
+                            details={"substage": "verifier-closure", "reason": "mixed-generation"})
     return support
+
+
+def _current_smoke_capture(capture):
+    try:
+        current_contract_for_capture(capture)
+    except (ContractError, OSError, ValueError, KeyError, TypeError, AttributeError):
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Exact authenticated current verifier capture required",
+                            details={"substage": "verifier-closure", "reason": "current-capture-binding"}) from None
+
+
+def _current_fixture_identity(capture):
+    try:
+        authenticated_record_hash(capture)
+        authenticated_tree(capture)
+        metadata = authenticated_release_metadata(capture)
+        record = capture.record
+        identity = (record["repository"]["full_name"], record["repository"]["id"],
+                    record["release"]["id"], record["release"]["tag"],
+                    record["tag"]["commit"], record["tag"]["tree"])
+        if (identity != ("Knowledge-Forge-AI/theme-forge-stellar-burst", 1342490027, 424873797,
+                         "v0.7.0", CURRENT070_FIXTURE_COMMIT, CURRENT070_FIXTURE_TREE)
+                or metadata.get("id") != 424873797 or metadata.get("tag_name") != "v0.7.0"):
+            raise ValueError("fixture identity")
+    except (ContractError, KeyError, TypeError, AttributeError, ValueError):
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Exact authenticated current Burst fixture required",
+                            details={"substage": "verifier-closure", "reason": "current-fixture-binding"}) from None
+
+
+def _verify_current_source_binding(prepared):
+    """Close the current source set and both producer identities before import."""
+    if prepared.get("source_generation") != "theme-forge-current-202610":
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Current verifier generation marker differs")
+    _current_smoke_capture(prepared.get("capture"))
+    _current_fixture_identity(prepared.get("fixture_capture"))
+    pins = {**CURRENT070_VERIFIER_FILES, **CURRENT070_FIXTURE_FILES}
+    modules = set(CURRENT070_VERIFIER_FILES) - {"package.json"}
+    if (set(CURRENT070_VERIFIER_IMPORTS) != modules
+            or any(set(edges) - modules for edges in CURRENT070_VERIFIER_IMPORTS.values())):
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Current import graph metadata is inconsistent")
+    rows = prepared.get("records", [])
+    if (not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows)
+            or len(rows) != len(pins) or {row.get("path") for row in rows} != set(pins)):
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Exact current verifier and fixture member set required",
+                            details={"substage": "verifier-source-readback", "reason": "source-member-set"})
+    for row in rows:
+        name = row["path"]
+        fixture = name in CURRENT070_FIXTURE_FILES
+        expected_role = ("fixture" if fixture else "verifier-support" if name == "package.json"
+                         else "application-smoke" if name == "tools/native-rc-smoke.mjs" else "verifier-module")
+        if (any(row.get(key) != pins[name][key] for key in ("blob", "sha256", "size"))
+                or row.get("tag_commit") != (CURRENT070_FIXTURE_COMMIT if fixture else CURRENT070_COMMIT)
+                or row.get("role") != expected_role):
+            raise ContractError("SIDECAR_HARNESS_IMPORT", "Current source member or producer differs",
+                                details={"substage": "verifier-source-readback", "missing_path": name})
+    source = Path(prepared["source"])
+    if Path(prepared["tools"]).resolve() != source.resolve() / "tools":
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Current importer path is outside its reviewed closure")
+    if source.is_symlink():
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Current source root cannot contain aliases")
+    observed = set()
+    for path in source.resolve().rglob("*"):
+        if path.is_symlink():
+            raise ContractError("SIDECAR_HARNESS_IMPORT", "Current source closure cannot contain aliases")
+        if path.is_file():
+            observed.add(path.relative_to(source.resolve()).as_posix())
+        elif not path.is_dir():
+            raise ContractError("SIDECAR_HARNESS_IMPORT", "Current source closure requires regular members")
+    if observed != set(pins):
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Extra or missing current source member",
+                            details={"substage": "verifier-source-readback", "reason": "source-member-set"})
 
 
 def _safe_label(value):
@@ -100,7 +298,12 @@ def prepare_smoke(capture, captures, client, scratch, label=None):
     source = scratch / "source"
     source.mkdir()
     support = _reviewed_verifier_support(capture)
-    records = tagged_files(capture, client, source, ("tools/", "apps/studio/tools/"))
+    current = capture.record["tag"]["commit"] == CURRENT070_COMMIT
+    if current:
+        records = tagged_files(capture, client, source, (),
+                               paths=tuple(path for path in CURRENT070_VERIFIER_FILES if path != "package.json"))
+    else:
+        records = tagged_files(capture, client, source, ("tools/", "apps/studio/tools/"))
     records += tagged_files(capture, client, source, (), paths=support, role="verifier-support")
     for row in records:
         if row["path"].endswith("/native-rc-smoke.mjs"):
@@ -112,16 +315,24 @@ def prepare_smoke(capture, captures, client, scratch, label=None):
         raise ContractError("SIDECAR_HARNESS_IMPORT", "Released application-aware harness is unavailable",
                             details={"substage": "verifier-closure"})
     fixture = next(c for c, intent, _ in captures if intent["project"]["id"] == "theme-forge-stellar-burst")
-    records += tagged_files(fixture, client, source, ("docs/examples/v0.4/brand-system/core-minimal/",), role="fixture")
+    if current:
+        _current_fixture_identity(fixture)
+        records += tagged_files(fixture, client, source, (), paths=tuple(CURRENT070_FIXTURE_FILES), role="fixture")
+    else:
+        records += tagged_files(fixture, client, source, ("docs/examples/v0.4/brand-system/core-minimal/",), role="fixture")
     if len(records) > 1000 or sum(r["size"] for r in records) > 32 * 1024 ** 2:
         raise ContractError("SMOKE_SOURCE", "Complete source closure exceeds bounds")
     if not (source / "docs/examples/v0.4/brand-system/core-minimal").is_dir():
         raise ContractError("SMOKE_FIXTURE", "Authenticated released fixture required")
-    (scratch / "source-bindings.json").write_bytes(canonical(records))
     if label is None and scratch.name.startswith("smoke-"):
         label = scratch.name[len("smoke-"):]
     safe = _safe_label(label)
     result = {"source": source, "tools": tools, "records": records, "scratch": scratch, "capture": capture}
+    if current:
+        result["source_generation"] = "theme-forge-current-202610"
+        result["fixture_capture"] = fixture
+        verify_source_readback(result)
+    (scratch / "source-bindings.json").write_bytes(canonical(records))
     if safe:
         result["label"] = safe
         result["family"] = safe
@@ -517,8 +728,24 @@ def _import_preflight_script(source, tools):
 
 def verify_source_readback(prepared):
     source = Path(prepared["source"])
+    capture = prepared.get("capture")
+    record = getattr(capture, "record", None)
+    tag = record.get("tag") if isinstance(record, dict) else None
+    tag = tag if isinstance(tag, dict) else {}
+    rows = prepared.get("records", [])
+    if (not isinstance(rows, list) or any(not isinstance(row, dict)
+            or not isinstance(row.get("path"), str) or type(row.get("size")) is not int
+            or not isinstance(row.get("sha256"), str) or not isinstance(row.get("blob"), str) for row in rows)):
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Malformed verifier source records")
+    if (prepared.get("source_generation") == "theme-forge-current-202610"
+            or tag.get("commit") == CURRENT070_COMMIT
+            or any(row.get("tag_commit") == CURRENT070_COMMIT for row in rows)):
+        _verify_current_source_binding(prepared)
+    if source.is_symlink():
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Verifier source root cannot be an alias")
+    source = source.resolve()
     # Recheck transported blobs before executing them in a wheel/native client.
-    for row in prepared.get("records", []):
+    for row in rows:
         validate_safe_relative_posix_path(row["path"])
         path = source / row["path"]
         if any(p.is_symlink() for p in (path, *path.parents)) or not path.is_file():
@@ -535,9 +762,12 @@ def verify_source_readback(prepared):
 
 def verifier_import_preflight(prepared, system, prefix=(), env=None):
     """Import the authentic released sibling closure before inspecting any runtime."""
-    source = Path(prepared.get("source", prepared["tools"])).resolve()
+    source = Path(prepared.get("source", prepared["tools"]))
+    if source.is_symlink():
+        raise ContractError("SIDECAR_HARNESS_IMPORT", "Verifier source root cannot be an alias")
+    source = source.resolve()
     tools = Path(prepared["tools"]).resolve()
-    verify_source_readback({**prepared, "source": source})
+    verify_source_readback({**prepared, "source": source, "tools": tools})
     script = Path(prepared.get("probe", prepared["scratch"])) / "verify-import-preflight.mjs"
     _probe_script(prepared, "verify-import-preflight.mjs", _import_preflight_script(source, tools))
     evidence, result = _run_verifier(script, "", "", prefix, runtime_environment(env), cwd=source)

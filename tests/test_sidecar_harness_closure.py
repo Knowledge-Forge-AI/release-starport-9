@@ -1,5 +1,6 @@
 """Authentic module closure and import gate, independent of payload verification."""
 import hashlib
+import copy
 import json
 import os
 import shutil
@@ -12,6 +13,7 @@ from unittest.mock import patch
 from rs9.errors import ContractError
 from rs9.hosted_smoke import (
     VERIFIER_SUPPORT,
+    CURRENT070_COMMIT,
     VERIFIER_SUPPORT_TREES,
     expected_runtime_members,
     prepare_smoke,
@@ -21,6 +23,7 @@ from rs9.hosted_smoke import (
 )
 from rs9.release_core import digest
 from rs9.scratch import canonical
+from rs9 import hosted_smoke as smoke
 
 
 def entry(path, data, mode="100644"):
@@ -82,6 +85,8 @@ class ClosureTests(unittest.TestCase):
         client = SimpleNamespace(get=lambda url, **kw: data[url.split("/", 6)[-1]])
         tree_rows = {"tree": [entry(path, value) for path, value in data.items()]}
         for commit, expected_tree in VERIFIER_SUPPORT_TREES.items():
+            if commit == CURRENT070_COMMIT:
+                continue  # Current 0.7 uses the separately authenticated closure tests below.
             with self.subTest(commit=commit):
                 capture = SimpleNamespace(record={"repository": {"full_name": "fixture/nebular"},
                                                   "tag": {"commit": commit, "tree": expected_tree}})
@@ -96,6 +101,8 @@ class ClosureTests(unittest.TestCase):
 
     def test_known_commit_with_wrong_tree_and_tampered_support_fail_closed(self):
         for commit, expected_tree in VERIFIER_SUPPORT_TREES.items():
+            if commit == CURRENT070_COMMIT:
+                continue  # Current 0.7 uses the separately authenticated closure tests below.
             with self.subTest(commit=commit), tempfile.TemporaryDirectory() as tmp:
                 capture = SimpleNamespace(record={"repository": {"full_name": "fixture/nebular"},
                                                   "tag": {"commit": commit, "tree": "0" * 40}})
@@ -182,6 +189,21 @@ class ImportTests(unittest.TestCase):
             run.assert_not_called()
             self.assertEqual(caught.exception.details["substage"], "verifier-source-readback")
 
+    def test_historical_preflight_accepts_unresolved_symlinked_ancestor(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            prepared = self.setup_source(root / "physical")
+            (prepared["source"] / "package.json").write_text('{"version":"0.6.1"}')
+            prepared["records"] = [{"path": path.relative_to(prepared["source"]).as_posix(),
+                "blob": entry(path.name, path.read_bytes())["sha"], "sha256": digest(path.read_bytes()),
+                "size": path.stat().st_size} for path in prepared["source"].rglob("*") if path.is_file()]
+            alias = root / "ancestor"
+            alias.symlink_to(root / "physical", target_is_directory=True)
+            prepared.update(source=alias / "source", tools=alias / "source/tools", scratch=alias / "smoke")
+            self.assertFalse(prepared["source"].is_symlink())
+            self.assertTrue(alias.is_symlink())
+            self.assertEqual(verifier_import_preflight(prepared, "aarch64-darwin")["status"], "pass")
+
     def test_import_time_spawn_failure_stops_without_fabricating_git_context(self):
         with tempfile.TemporaryDirectory() as tmp:
             work = Path(tmp).resolve()
@@ -193,3 +215,233 @@ class ImportTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, "SIDECAR_HARNESS_IMPORT")
             self.assertEqual(caught.exception.details["diagnostic_token"], "spawn-unavailable")
             self.assertFalse((prepared["source"] / ".git").exists())
+
+
+def current_import_fixture(root):
+    """Controlled real core captures; synthetic source bytes never qualify apps."""
+    from rs9.release_core import authenticate_release
+    from rs9.profiles import selection_for_intent
+    from tests.release_fixtures import package_evidence
+    from rs9.nebular_callers import CURRENT070_CONTRACT_PATH
+    source = {}
+    for name, edges in smoke.CURRENT070_VERIFIER_IMPORTS.items():
+        text = "".join("import './" + path.rsplit("/", 1)[-1] + "';\n" for path in edges)
+        if name == "tools/sidecar-common.mjs":
+            text += "export function verifyDistribution(){}\n"
+        elif name == "tools/sidecar-verify.mjs":
+            text += "export function verifySidecar(){}\n"
+        elif name == "tools/platform-targets.mjs":
+            text += "import {readFileSync} from 'node:fs'; export const version=JSON.parse(readFileSync(new URL('../package.json',import.meta.url))).version;\n"
+        else:
+            text += "export const fixtureModule=true;\n"
+        source[name] = text.encode()
+    source["package.json"] = b'{"version":"0.7.0","type":"module"}\n'
+    fixtures = {path: ("controlled fixture " + path + "\n").encode() for path in smoke.CURRENT070_FIXTURE_FILES}
+
+    def pins(data):
+        return {path: {"blob": entry(path, body)["sha"], "sha256": digest(body), "size": len(body)}
+                for path, body in data.items()}
+
+    def capture(name, repository, repository_id, release_id, commit, tree_sha, data):
+        directory = root / name
+        directory.mkdir()
+        intent = package_evidence(directory)
+        intent["project"]["repository"] = repository
+        intent["tag"] = "v0.7.0"
+        package = data.get("package.json", (directory / "source/package.json").read_bytes())
+        (directory / "source/package.json").write_bytes(package)
+        api = directory / "api"
+        (api / "repository.json").write_bytes(canonical({"id": repository_id, "full_name": repository}))
+        (api / "ref.json").write_bytes(canonical({"ref": "refs/tags/v0.7.0", "object": {"type": "commit", "sha": commit}}))
+        (api / "commit.json").write_bytes(canonical({"sha": commit, "tree": {"sha": tree_sha}}))
+        (api / "tree.json").write_bytes(canonical({"sha": tree_sha, "truncated": False,
+            "tree": [entry(path, body) for path, body in {"package.json": package, **data}.items()]}))
+        release = json.loads((api / "release.json").read_bytes())
+        release.update(id=release_id, tag_name="v0.7.0", target_commitish=commit)
+        (api / "release.json").write_bytes(canonical(release))
+        return authenticate_release(selection_for_intent(intent), directory), intent
+
+    nebular, intent = capture("nebular", "Knowledge-Forge-AI/theme-forge-nebular-fusion", 1358643872,
+        426333162, smoke.CURRENT070_COMMIT, smoke.CURRENT070_TREE, source)
+    burst, burst_intent = capture("burst", "Knowledge-Forge-AI/theme-forge-stellar-burst", 1342490027,
+        424873797, smoke.CURRENT070_FIXTURE_COMMIT, smoke.CURRENT070_FIXTURE_TREE, fixtures)
+    contract = json.loads(CURRENT070_CONTRACT_PATH.read_bytes())
+    asset = next(row for row in nebular.record["assets"] if row["role"] == "payload")
+    for platform in contract["platforms"].values():
+        platform["asset"] = {**platform["asset"], **asset}
+
+    class Client:
+        def get(self, url, **kwargs):
+            for selected, data in ((nebular, source), (burst, fixtures)):
+                prefix = "https://raw.githubusercontent.com/" + selected.record["repository"]["full_name"] + "/" + selected.record["tag"]["commit"] + "/"
+                if url.startswith(prefix):
+                    return data[url.removeprefix(prefix)]
+            raise AssertionError("Unexpected source identity")
+    captures = [(nebular, intent, {}), (burst, {**burst_intent, "project": {"id": "theme-forge-stellar-burst"}}, {})]
+    return nebular, captures, Client(), contract, pins(source), pins(fixtures)
+
+
+class CurrentClosureTests(unittest.TestCase):
+    def fixture(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        capture, captures, client, contract, source_pins, fixture_pins = current_import_fixture(root)
+        for target, value in (("rs9.nebular_callers._load_current_contract", contract),
+                              ("rs9.hosted_smoke.CURRENT070_VERIFIER_FILES", source_pins),
+                              ("rs9.hosted_smoke.CURRENT070_FIXTURE_FILES", fixture_pins)):
+            patcher = (patch(target, return_value=value) if target.endswith("_load_current_contract")
+                       else patch(target, value))
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        prepared = prepare_smoke(capture, captures, client, root / "prepared")
+        return prepared
+
+    def reject_before_import(self, prepared):
+        with patch("rs9.hosted_smoke._run_verifier") as run, self.assertRaises(ContractError):
+            verifier_import_preflight(prepared, "x86_64-linux")
+        run.assert_not_called()
+
+    def test_current_support_table_is_exact_and_old_entries_remain(self):
+        self.assertEqual(len(VERIFIER_SUPPORT), 3)
+        self.assertEqual(VERIFIER_SUPPORT[smoke.HISTORICAL_COMMIT], ("package.json",))
+        self.assertEqual(VERIFIER_SUPPORT[smoke.CURRENT_COMMIT], ("package.json",))
+        self.assertEqual(VERIFIER_SUPPORT[smoke.CURRENT070_COMMIT], ("package.json",))
+        self.assertEqual(VERIFIER_SUPPORT_TREES[smoke.CURRENT070_COMMIT], "27c643b6375c2aafde314799c4f08e844c14992c")
+        self.assertEqual(set(smoke.CURRENT070_VERIFIER_IMPORTS), set(smoke.CURRENT070_VERIFIER_FILES) - {"package.json"})
+        self.assertEqual(len(smoke.CURRENT070_VERIFIER_FILES), 14)
+        self.assertEqual(len(smoke.CURRENT070_FIXTURE_FILES), 14)
+        self.assertTrue(all(set(paths) <= set(smoke.CURRENT070_VERIFIER_IMPORTS)
+                            for paths in smoke.CURRENT070_VERIFIER_IMPORTS.values()))
+
+    def test_real_caller_smoke_pins_and_adapter_relationships_remain_consistent(self):
+        from rs9 import nebular_callers as callers
+        contract = callers._load_current_contract()
+        shared = set(smoke.CURRENT070_VERIFIER_FILES) & set(contract["source_files"])
+        self.assertEqual(shared, {"tools/sidecar-common.mjs", "tools/sidecar-verify.mjs", "tools/node-runtime-authority.mjs"})
+        for name in shared:
+            self.assertEqual(smoke.CURRENT070_VERIFIER_FILES[name], contract["source_files"][name])
+        self.assertEqual(callers.CURRENT070_ASSET_SHA256S,
+                         {platform["asset"]["sha256"] for platform in contract["platforms"].values()})
+        for platform in contract["platforms"].values():
+            for member, source in ((callers.PAYLOAD + "/loom-adapter/theme-adapter.mjs", "src-tauri/loom-adapter/theme-adapter.mjs"),
+                                   (callers.PAYLOAD + "/solar-sail-adapter/solar-sail-adapter.mjs", "src-tauri/solar-sail-adapter/solar-sail-adapter.mjs")):
+                self.assertEqual(platform["members"][member]["sha256"], contract["source_files"][source]["sha256"])
+
+    def test_current_contract_io_and_parse_errors_are_classified(self):
+        for error in (FileNotFoundError("missing"), OSError("unreadable"), ValueError("malformed")):
+            with patch("rs9.hosted_smoke.current_contract_for_capture", side_effect=error), self.assertRaises(ContractError) as caught:
+                smoke._current_smoke_capture(None)
+            self.assertEqual(caught.exception.code, "SIDECAR_HARNESS_IMPORT")
+            self.assertEqual(caught.exception.details["reason"], "current-capture-binding")
+
+    def test_malformed_record_tag_and_rows_fail_without_raw_attribute_errors(self):
+        prepared = self.fixture()
+        for record in (None, [], {"tag": None}):
+            self.reject_before_import({**prepared, "capture": SimpleNamespace(record=record)})
+        for rows in (None, ["not-a-record"], [{"path": []}], [{"path": "package.json"}]):
+            self.reject_before_import({**prepared, "records": rows})
+
+    def test_mixed_generation_has_distinct_diagnostic(self):
+        capture = SimpleNamespace(record={"tag": {"commit": smoke.CURRENT_COMMIT, "tree": smoke.CURRENT_TREE},
+                                          "release": {"tag": "v0.7.0"}})
+        with self.assertRaises(ContractError) as caught:
+            smoke._reviewed_verifier_support(capture)
+        self.assertEqual(caught.exception.details["reason"], "mixed-generation")
+
+    def test_current_collection_has_closed_member_set_and_live_captures(self):
+        prepared = self.fixture()
+        smoke.verify_source_readback(prepared)
+        self.assertEqual(len(prepared["records"]), 28)
+        self.assertEqual(prepared["source_generation"], "theme-forge-current-202610")
+        self.assertEqual({row["tag_commit"] for row in prepared["records"]},
+                         {smoke.CURRENT070_COMMIT, smoke.CURRENT070_FIXTURE_COMMIT})
+
+    @unittest.skipUnless(shutil.which("node"), "System Node required for non-native ESM import gate")
+    def test_maintained_current_import_only_preflight(self):
+        prepared = self.fixture()
+        with patch("rs9.hosted_smoke.runtime_evidence") as runtime:
+            self.assertEqual(verifier_import_preflight(prepared, "x86_64-linux")["status"], "pass")
+        runtime.assert_not_called()
+
+    @unittest.skipUnless(shutil.which("node"), "System Node required for non-native ESM import gate")
+    def test_current_preflight_allows_ancestor_alias_but_not_source_alias(self):
+        prepared = self.fixture()
+        alias = prepared["scratch"].parent / "ancestor-alias"
+        alias.symlink_to(prepared["scratch"].parent, target_is_directory=True)
+        aliased = {**prepared, "source": alias / "prepared/source", "tools": alias / "prepared/source/tools"}
+        smoke.verify_source_readback(aliased)
+        self.assertEqual(verifier_import_preflight(aliased, "x86_64-linux")["status"], "pass")
+        root_alias = prepared["scratch"].parent / "source-alias"
+        root_alias.symlink_to(prepared["source"], target_is_directory=True)
+        self.reject_before_import({**prepared, "source": root_alias, "tools": root_alias / "tools"})
+
+    def test_current_source_bindings_are_written_only_after_successful_readback(self):
+        prepared = self.fixture()
+        output = prepared["scratch"].parent / "blocked-preparation"
+        with patch("rs9.hosted_smoke.verify_source_readback", side_effect=ContractError("SIDECAR_HARNESS_IMPORT", "changed")):
+            with self.assertRaises(ContractError):
+                prepare_smoke(prepared["capture"], [(prepared["fixture_capture"],
+                    {"project": {"id": "theme-forge-stellar-burst"}}, {})],
+                    SimpleNamespace(get=lambda url, **kwargs: (prepared["source"] / url.split("/", 5)[-1].split("/", 1)[-1]).read_bytes()), output)
+        self.assertFalse((output / "source-bindings.json").exists())
+
+    def test_missing_and_extra_records_refused_before_import(self):
+        prepared = self.fixture()
+        original = prepared["records"]
+        for rows in (original[:-1], original + [dict(original[0])]):
+            self.reject_before_import({**prepared, "records": rows})
+
+    def test_missing_extra_and_changed_source_files_refused_before_import(self):
+        prepared = self.fixture()
+        path = prepared["source"] / "package.json"
+        original = path.read_bytes()
+        path.unlink()
+        self.reject_before_import(prepared)
+        path.write_bytes(original)
+        extra = prepared["source"] / "tools/extra.mjs"
+        extra.write_text("export const unexpected=true;")
+        self.reject_before_import(prepared)
+        extra.unlink()
+        path.write_bytes(b'{"version":"0.6.1"}')
+        self.reject_before_import(prepared)
+        # Recomputed row digests cannot change the independently reviewed pins.
+        changed = dict(prepared, records=copy.deepcopy(prepared["records"]))
+        row = next(row for row in changed["records"] if row["path"] == "package.json")
+        row.update(blob=entry("package.json", path.read_bytes())["sha"], sha256=digest(path.read_bytes()), size=path.stat().st_size)
+        self.reject_before_import(changed)
+
+    def test_cross_generation_producers_and_roles_refused(self):
+        prepared = self.fixture()
+        for key, value in (("tag_commit", smoke.CURRENT_COMMIT), ("role", "fixture")):
+            changed = dict(prepared, records=copy.deepcopy(prepared["records"]))
+            changed["records"][0][key] = value
+            self.reject_before_import(changed)
+        self.reject_before_import({**prepared, "fixture_capture": prepared["capture"]})
+        self.reject_before_import({**prepared, "capture": prepared["fixture_capture"]})
+        self.reject_before_import({**prepared, "capture": None})
+        self.reject_before_import({**prepared, "source_generation": "theme-forge-live1"})
+        self.reject_before_import({**prepared, "tools": prepared["scratch"] / "unreviewed-tools"})
+
+    def test_current_wrong_tree_and_unknown_identity_refused(self):
+        prepared = self.fixture()
+        capture = prepared["capture"]
+        capture.record["tag"]["tree"] = "0" * 40
+        with self.assertRaises(ContractError):
+            smoke._reviewed_verifier_support(capture)
+        capture.record["tag"]["commit"] = "a" * 40
+        with self.assertRaises(ContractError):
+            smoke._reviewed_verifier_support(capture)
+
+    def test_nonregular_current_source_and_lost_record_marker_refused(self):
+        prepared = self.fixture()
+        path = prepared["source"] / "package.json"
+        target = prepared["scratch"] / "outside.json"
+        target.write_bytes(path.read_bytes())
+        path.unlink()
+        path.symlink_to(target)
+        self.reject_before_import(prepared)
+        # A missing explicit generation marker still cannot downgrade a current capture.
+        changed = dict(prepared)
+        changed.pop("source_generation")
+        self.reject_before_import(changed)
