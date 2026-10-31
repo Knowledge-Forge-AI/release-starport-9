@@ -63,6 +63,7 @@ PROBLEM_CATEGORIES = {
     "read-only fixture ": "read-only-fixture-modified",
     "persistent user state changed: ": "persistent-user-state-changed",
     "the candidate executable changed during the smoke run": "candidate-executable-changed",
+    "harness cleanup of the owned scratch directory failed": "harness-cleanup-failed",
     "harness error: ": "harness-error",
 }
 _EXACT_PROBLEM_FORMS = frozenset({
@@ -76,6 +77,7 @@ _EXACT_PROBLEM_FORMS = frozenset({
     "the derived asset was not written to the case-exact project",
     "the case-distinct sibling project was modified",
     "the candidate executable changed during the smoke run",
+    "harness cleanup of the owned scratch directory failed",
 })
 _PROBLEM_SUFFIXES = {
     "application ended by ": " instead of SIGTERM",
@@ -98,6 +100,22 @@ _CATEGORY_SCENARIOS = {"x86_64-linux": frozenset({"C", "C-signal"}), "aarch64-li
 _CATEGORY_KEYS = frozenset({"schema", "stage", "system", "scenario", "receipt", "problems"})
 _CATEGORY_PROBLEM_KEYS = frozenset({"total", "scanned", "categories", "unrecognized", "non_string",
                                     "omitted", "unavailable"})
+FINALIZATION_SCHEMA = "nebular.native-rc-finalization-v1"
+FINALIZATION_STATUSES = frozenset({"complete", "failed"})
+FINALIZATION_PHASES = frozenset({
+    "complete", "pre-spawn", "post-exit", "receipt-copy", "cleanup", "report-write",
+})
+FINALIZATION_EXCEPTION_FAMILIES = frozenset({
+    "state", "parse", "timeout", "process", "filesystem", "unknown",
+})
+FINALIZATION_RECEIPT_OBSERVATIONS = frozenset({
+    "not-attempted", "read-failed", "present-at-read", "absent-at-read",
+})
+FINALIZATION_RECEIPT_COPIES = frozenset({"not-attempted", "copy-failed", "written"})
+_FINALIZATION_KEYS = frozenset({
+    "status", "phase", "exceptionFamily", "spawned", "exitObserved",
+    "applicationReceiptObservation", "applicationReceiptCopy",
+})
 _RECEIPT_SUMMARY_KEYS = frozenset({"present", "bytes", "sha256", "status", "problem_codes",
                                    "problem_count", "executable_sha256"})
 _CATEGORY_RECEIPT_ERRORS = frozenset({"receipt-missing", "receipt-invalid", "receipt-oversize", "receipt-corrupt"})
@@ -352,7 +370,7 @@ def project_run_record(record, identity=None, *, receipt_error=None):
     }
 
 
-def _classify_problems(raw_problems):
+def _classify_problems(raw_problems, *, current071=False):
     """Closed category counts over the bounded prefix; no problem text leaves."""
     if not isinstance(raw_problems, list):
         return {"total": None, "scanned": 0, "categories": [], "unrecognized": 0,
@@ -366,6 +384,8 @@ def _classify_problems(raw_problems):
             non_string += 1
             continue
         for prefix, category in _ORDERED_PROBLEM_PREFIXES:
+            if category == "harness-cleanup-failed" and current071 is not True:
+                continue
             if prefix in _EXACT_PROBLEM_FORMS:
                 matched = item == prefix
             elif prefix in _PROBLEM_SUFFIXES:
@@ -517,7 +537,46 @@ def _withheld_categories(reason):
     return {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "withheld_reason": reason}
 
 
-def project_problem_categories(record, identity, *, system, platform, scenario):
+def _closed_finalization(raw, *, allow_schema=False):
+    """Exact closed projection of run.json.finalization; no error message, path, or PID."""
+    if not isinstance(raw, dict):
+        return None
+    keys = set(raw)
+    if allow_schema:
+        if keys != _FINALIZATION_KEYS | {"schema"} or raw.get("schema") != FINALIZATION_SCHEMA:
+            return None
+    elif keys != _FINALIZATION_KEYS:
+        return None
+    status = raw.get("status")
+    phase = raw.get("phase")
+    family = raw.get("exceptionFamily")
+    spawned = raw.get("spawned")
+    exited = raw.get("exitObserved")
+    obs = raw.get("applicationReceiptObservation")
+    copy = raw.get("applicationReceiptCopy")
+    if (not isinstance(status, str) or status not in FINALIZATION_STATUSES or
+            not isinstance(phase, str) or phase not in FINALIZATION_PHASES or
+            not (family is None or isinstance(family, str) and family in FINALIZATION_EXCEPTION_FAMILIES) or
+            type(spawned) is not bool or type(exited) is not bool or
+            not isinstance(obs, str) or obs not in FINALIZATION_RECEIPT_OBSERVATIONS or
+            not isinstance(copy, str) or copy not in FINALIZATION_RECEIPT_COPIES):
+        return None
+    if status == "complete" and (phase != "complete" or family is not None):
+        return None
+    if status == "failed" and (phase == "complete" or family is None):
+        return None
+    return {
+        "status": status,
+        "phase": phase,
+        "exceptionFamily": family,
+        "spawned": spawned,
+        "exitObserved": exited,
+        "applicationReceiptObservation": obs,
+        "applicationReceiptCopy": copy,
+    }
+
+
+def project_problem_categories(record, identity, *, system, platform, scenario, current071=False):
     """Category-only Linux B/C projection of the already-read original .run.json; no reread."""
     if (not all(isinstance(v, str) for v in (system, platform, scenario)) or
             (system, platform, scenario) not in _CATEGORY_BINDINGS or not isinstance(record, dict)):
@@ -527,9 +586,11 @@ def project_problem_categories(record, identity, *, system, platform, scenario):
     receipt = _receipt_identity(identity)
     if receipt is None:
         return None
-    problems = _classify_problems(record.get("problems"))
+    problems = _classify_problems(record.get("problems"), current071=current071)
     total = problems["total"]
-    return {
+    finalization = (_closed_finalization(record.get("finalization"), allow_schema=True)
+                    if current071 is True else None)
+    result = {
         "schema": CATEGORY_SCHEMA,
         "stage": CATEGORY_STAGE,
         "system": system,
@@ -545,11 +606,14 @@ def project_problem_categories(record, identity, *, system, platform, scenario):
             "unavailable": problems["unavailable"],
         },
     }
+    if finalization is not None:
+        result["finalization"] = finalization
+    return result
 
 
 def _closed_categories(raw):
     """Exact positive envelope structure and count closure, or None; binding is separate."""
-    if not isinstance(raw, dict) or set(raw) != _CATEGORY_KEYS:
+    if not isinstance(raw, dict) or set(raw) not in (_CATEGORY_KEYS, _CATEGORY_KEYS | {"finalization"}):
         return None
     system, scenario, receipt, probs = raw["system"], raw["scenario"], raw["receipt"], raw["problems"]
     if (raw["schema"] != CATEGORY_SCHEMA or raw["stage"] != CATEGORY_STAGE or
@@ -559,6 +623,11 @@ def _closed_categories(raw):
             _receipt_identity(receipt) is None or
             not isinstance(probs, dict) or set(probs) != _CATEGORY_PROBLEM_KEYS):
         return None
+    finalization = None
+    if "finalization" in raw:
+        finalization = _closed_finalization(raw["finalization"])
+        if finalization is None:
+            return None
     total, scanned, cats = probs["total"], probs["scanned"], probs["categories"]
     unrec, nonstr, omitted, unavail = (probs[k] for k in ("unrecognized", "non_string", "omitted", "unavailable"))
     if any(type(v) is not int for v in (scanned, unrec, nonstr, omitted, unavail)) or not isinstance(cats, list):
@@ -581,7 +650,7 @@ def _closed_categories(raw):
     names = [c["category"] for c in cats]
     if names != sorted(set(names)) or sum(c["count"] for c in cats) + unrec + nonstr != scanned:
         return None
-    return {
+    result = {
         "schema": CATEGORY_SCHEMA,
         "stage": CATEGORY_STAGE,
         "system": system,
@@ -597,6 +666,9 @@ def _closed_categories(raw):
             "unavailable": unavail,
         },
     }
+    if finalization is not None:
+        result["finalization"] = finalization
+    return result
 
 
 def _observation_receipt(raw):
@@ -818,7 +890,7 @@ def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require
     }
 
 
-def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, record=None, *, system=None):
+def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, record=None, *, system=None, current071=False):
     """Each optional observation fails independently after the gate outcome is fixed."""
     result = {}
     try:
@@ -849,7 +921,8 @@ def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, re
             pass
     try:
         categories = project_problem_categories(
-            record, fields.get("receipt"), system=system, platform=platform, scenario=scenario
+            record, fields.get("receipt"), system=system, platform=platform, scenario=scenario,
+            **({"current071": True} if current071 is True else {}),
         )
         if categories is not None:
             result["harness_problem_categories"] = categories

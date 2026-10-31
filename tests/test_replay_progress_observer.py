@@ -558,5 +558,422 @@ export function runSmoke() { return { label: 'unused', status: 'pass', problems:
         self.assertNotIn(("run-smoke", "returned"), timeout_pairs)
 
 
+class Current071InitialEnvObservationTests(unittest.TestCase):
+    """Focused current071 initial-observation environment-presence and fault-isolation tests."""
+
+    def setUp(self) -> None:
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name).resolve()
+        self.source = self.root / "source"
+        self.tools = self.source / "tools"
+        self.tools.mkdir(parents=True)
+        self.evidence = self.root / "evidence"
+        self.evidence.mkdir()
+        self.node = shutil.which("node")
+        self.assertIsNotNone(self.node)
+        self.profile = json.loads(json.dumps(diagnostic_module.CURRENT071_REPLAY_PROGRESS_PROFILE))
+        for name in self.profile["modules"]:
+            (self.tools / name).write_text("export const fixture = true;\n", encoding="utf-8")
+        (self.source / "package.json").write_text('{"version":"0.7.1"}\n', encoding="utf-8")
+        self.wrapper = self.root / "wrapper071.mjs"
+
+    @staticmethod
+    def _pin(data: bytes) -> dict[str, object]:
+        return {
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "blob": hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest(),
+            "size": len(data),
+        }
+
+    def _seal_harness(self, body: str, *, profile_const: str = "CURRENT071_PROFILE") -> None:
+        names = list(self.profile["modules"])
+        imports = "".join(
+            f"import './{name}';\n" for name in names if name != "native-rc-smoke.mjs"
+        )
+        (self.tools / "native-rc-smoke.mjs").write_text(imports + body, encoding="utf-8")
+        self.profile["modules"] = {
+            name: self._pin((self.tools / name).read_bytes()) for name in names
+        }
+        self.profile["support"] = self._pin((self.source / "package.json").read_bytes())
+        original = Path(diagnostic_module.__file__).with_name("replay_progress_wrapper.mjs").read_text(encoding="utf-8")
+        marker = f"const {profile_const} = Object.freeze("
+        start = original.index(marker)
+        end = original.index(");\n", start) + 3
+        self.wrapper.write_text(
+            original[:start] + marker + json.dumps(self.profile) + ");\n" + original[end:],
+            encoding="utf-8",
+        )
+
+    def _initial_command(self, observation_path: Path, *, timeout_ms: int = 210000, preload: Path | None = None) -> list[str]:
+        p = self.profile
+        cmd = [self.node]
+        if preload is not None:
+            cmd += ["--import", str(preload)]
+        cmd += [
+            str(self.wrapper),
+            "--rs9-replay-progress-harness",
+            str(self.tools / "native-rc-smoke.mjs"),
+            "--rs9-replay-progress-file",
+            str(self.root / "unused-progress.jsonl"),
+            "--rs9-replay-progress-expected-sha256",
+            p["modules"]["native-rc-smoke.mjs"]["sha256"],
+            "--rs9-initial-observation-kind",
+            "initial-observation",
+            "--rs9-initial-observation-file",
+            str(observation_path),
+            "--rs9-replay-progress-profile",
+            p["id"],
+            "--rs9-replay-progress-source-commit",
+            p["commit"],
+            "--rs9-replay-progress-source-tree",
+            p["tree"],
+            "--rs9-replay-progress-support-member",
+            "package.json=" + p["support"]["sha256"],
+        ]
+        for name, row in p["modules"].items():
+            cmd += ["--rs9-replay-progress-closure-member", f"{name}={row['sha256']}"]
+        cmd += [
+            "--platform",
+            "linux-x64",
+            "--scenario",
+            "C",
+            "--launch-root",
+            str(self.root / "launch"),
+            "--checkout",
+            str(self.source),
+            "--evidence",
+            str(self.evidence),
+            "--label",
+            "linux-x64-C",
+            "--timeout-ms",
+            str(timeout_ms),
+        ]
+        return cmd
+
+    def test_current071_records_boolean_env_presence_at_entry_and_first_spawn_only(self) -> None:
+        secret = "PRIVATE_ENV_SECRET_VALUE_88319"
+        preload = self.root / "spy-preload.mjs"
+        preload.write_text(
+            """import childProcess from 'node:child_process';
+const realSpawn = childProcess.spawn;
+globalThis.__spawnRecords = [];
+childProcess.spawn = function(...args) {
+  globalThis.__spawnRecords.push({argCount: args.length, argsRef: args[1], optionsRef: args[2], envRef: args[2]?.env});
+  return realSpawn.apply(this, args);
+};
+""",
+            encoding="utf-8",
+        )
+        self._seal_harness(
+            """import {spawn} from 'node:child_process';
+import {writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+export async function runSmoke(options) {
+  const spawnArgs = ['-e', "process.stdout.write('CHILD_OUT');process.stderr.write('TFSB Studio release smoke scenario C active\\\\n');"];
+  const firstEnv = {
+    PATH: process.env.PATH,
+    DBUS_SESSION_BUS_ADDRESS: 'unix:path=/tmp/' + 'PRIVATE_ENV_SECRET_VALUE_88319',
+    DISPLAY: ':99',
+    LD_LIBRARY_PATH: '',
+  };
+  const spawnOpts = {env: firstEnv, stdio: ['ignore', 'pipe', 'pipe']};
+  const child = spawn(process.execPath, spawnArgs, spawnOpts);
+  let out = '', err = '';
+  child.stdout.on('data', d => out += d);
+  child.stderr.on('data', d => err += d);
+  await new Promise(r => child.once('exit', r));
+  const secondChild = spawn(process.execPath, ['-e', 'process.exit(0)'], {
+    env: {PATH: process.env.PATH, LD_LIBRARY_PATH: '/should/not/overwrite'},
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  await new Promise(r => secondChild.once('exit', r));
+  const firstRecord = globalThis.__spawnRecords[0];
+  writeFileSync(join(options.evidenceDir, 'parity.json'), JSON.stringify({
+    sameArgsRef: firstRecord.argsRef === spawnArgs,
+    sameOptionsRef: firstRecord.optionsRef === spawnOpts,
+    sameEnvRef: firstRecord.envRef === firstEnv,
+    out,
+    err,
+  }));
+  return {label: options.label, status: 'fail', problems: ['no receipt was written']};
+}
+"""
+        )
+        obs_path = self.root / "initial-observation.json"
+        env = dict(os.environ)
+        for key in diagnostic_module.INITIAL_ENV_KEYS:
+            env[key] = f"/private/{secret}/{key}"
+        env["GIO_EXTRA_MODULES"] = ""
+        env["FONTCONFIG_FILE"] = ""
+        result = subprocess.run(
+            self._initial_command(obs_path, preload=preload),
+            env=env,
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        parity = json.loads((self.evidence / "parity.json").read_bytes())
+        self.assertTrue(parity["sameArgsRef"])
+        self.assertTrue(parity["sameOptionsRef"])
+        self.assertTrue(parity["sameEnvRef"])
+        self.assertEqual(parity["out"], "CHILD_OUT")
+        self.assertEqual(parity["err"], "TFSB Studio release smoke scenario C active\n")
+
+        raw = obs_path.read_bytes()
+        self.assertNotIn(secret.encode("utf-8"), raw)
+        self.assertNotIn(b"/private/", raw)
+        observed = diagnostic_module._read_initial_observation(obs_path, expected_profile=self.profile)
+        self.assertEqual(observed["status"], "failed")
+        self.assertEqual(observed["error_counts"], {"observer-fault": 0, "stream-fault": 0, "write-failure": 0})
+        self.assertEqual(
+            observed["environment_presence"],
+            {
+                "wrapper_entry": {
+                    "LD_LIBRARY_PATH": True,
+                    "XDG_DATA_DIRS": True,
+                    "GIO_EXTRA_MODULES": False,
+                    "GDK_PIXBUF_MODULE_FILE": True,
+                    "GSETTINGS_SCHEMA_DIR": True,
+                    "FONTCONFIG_FILE": False,
+                    "PATH": True,
+                    "DBUS_SESSION_BUS_ADDRESS": True,
+                    "DISPLAY": True,
+                },
+                "first_spawn": {
+                    "LD_LIBRARY_PATH": False,
+                    "XDG_DATA_DIRS": False,
+                    "GIO_EXTRA_MODULES": False,
+                    "GDK_PIXBUF_MODULE_FILE": False,
+                    "GSETTINGS_SCHEMA_DIR": False,
+                    "FONTCONFIG_FILE": False,
+                    "PATH": True,
+                    "DBUS_SESSION_BUS_ADDRESS": True,
+                    "DISPLAY": True,
+                },
+            },
+        )
+
+    def test_current071_getter_proxy_and_malformed_cases_isolate_observer_faults(self) -> None:
+        secret = "PRIVATE_TRAP_SECRET_77412"
+        # 1. Proxy env that throws on observer read after originalSpawn consumes env
+        self._seal_harness(
+            """import {spawn} from 'node:child_process';
+export async function runSmoke(options) {
+  let reads = 0;
+  const baseEnv = {PATH: process.env.PATH, DISPLAY: ':99'};
+  const proxyEnv = new Proxy(baseEnv, {
+    get(target, prop, receiver) {
+      if (prop === 'LD_LIBRARY_PATH') {
+        reads += 1;
+        if (reads >= 1) throw new Error('PRIVATE_TRAP_SECRET_77412');
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+  const child = spawn(process.execPath, ['-e', 'process.exit(0)'], {
+    env: proxyEnv,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  if (reads !== 0) throw new Error('OBSERVER_PROXY_SIDE_EFFECT');
+  await new Promise(r => child.once('exit', r));
+  return {label: options.label, status: 'pass', problems: []};
+}
+"""
+        )
+        obs_proxy = self.root / "obs-proxy.json"
+        res_proxy = subprocess.run(
+            self._initial_command(obs_proxy),
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(res_proxy.returncode, 0, res_proxy.stderr)
+        self.assertNotIn(secret.encode("utf-8"), obs_proxy.read_bytes())
+        self.assertNotIn(secret.encode("utf-8"), res_proxy.stderr)
+        parsed_proxy = diagnostic_module._read_initial_observation(obs_proxy, expected_profile=self.profile)
+        self.assertEqual(parsed_proxy["status"], "completed")
+        self.assertEqual(parsed_proxy["error_counts"]["observer-fault"], 1)
+        self.assertIsNotNone(parsed_proxy["environment_presence"]["wrapper_entry"])
+        self.assertIsNone(parsed_proxy["environment_presence"]["first_spawn"])
+
+        # 2. Options getter that returns undefined for originalSpawn then throws for observer
+        self._seal_harness(
+            """import {spawn} from 'node:child_process';
+export async function runSmoke(options) {
+  let envLookups = 0;
+  const opts = {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    get env() {
+      envLookups += 1;
+      if (envLookups > 1) throw new Error('PRIVATE_TRAP_SECRET_77412');
+      return undefined;
+    },
+  };
+  const child = spawn(process.execPath, ['-e', 'process.exit(0)'], opts);
+  if (envLookups !== 1) throw new Error('OBSERVER_GETTER_SIDE_EFFECT');
+  await new Promise(r => child.once('exit', r));
+  return {label: options.label, status: 'pass', problems: []};
+}
+"""
+        )
+        obs_getter = self.root / "obs-getter.json"
+        res_getter = subprocess.run(
+            self._initial_command(obs_getter),
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(res_getter.returncode, 0, res_getter.stderr)
+        parsed_getter = diagnostic_module._read_initial_observation(obs_getter, expected_profile=self.profile)
+        self.assertEqual(parsed_getter["error_counts"]["observer-fault"], 1)
+        self.assertIsNone(parsed_getter["environment_presence"]["first_spawn"])
+        self.assertNotIn(secret.encode("utf-8"), obs_getter.read_bytes())
+
+        # 3. Preload Proxy on process.env that throws on first LD_LIBRARY_PATH lookup at wrapper entry
+        entry_preload = self.root / "entry-preload.mjs"
+        entry_preload.write_text(
+            """let count = 0;
+const originalEnv = process.env;
+Object.defineProperty(process, 'env', {
+  configurable: true,
+  enumerable: true,
+  value: new Proxy(originalEnv, {
+    get(target, prop, receiver) {
+      if (prop === 'LD_LIBRARY_PATH') {
+        count += 1;
+        if (count === 1) throw new Error('PRIVATE_TRAP_SECRET_77412');
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  }),
+});
+""",
+            encoding="utf-8",
+        )
+        self._seal_harness(
+            """import {spawn} from 'node:child_process';
+export async function runSmoke(options) {
+  const child = spawn(process.execPath, ['-e', 'process.exit(0)'], {
+    env: {PATH: process.env.PATH, DISPLAY: ':0'},
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  await new Promise(r => child.once('exit', r));
+  return {label: options.label, status: 'pass', problems: []};
+}
+"""
+        )
+        obs_entry = self.root / "obs-entry.json"
+        res_entry = subprocess.run(
+            self._initial_command(obs_entry, preload=entry_preload),
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(res_entry.returncode, 0, res_entry.stderr)
+        parsed_entry = diagnostic_module._read_initial_observation(obs_entry, expected_profile=self.profile)
+        self.assertEqual(parsed_entry["error_counts"]["observer-fault"], 1)
+        self.assertIsNone(parsed_entry["environment_presence"]["wrapper_entry"])
+        self.assertTrue(parsed_entry["environment_presence"]["first_spawn"]["DISPLAY"])
+        self.assertFalse(parsed_entry["environment_presence"]["first_spawn"]["LD_LIBRARY_PATH"])
+        self.assertNotIn(secret.encode("utf-8"), obs_entry.read_bytes())
+
+        # 4. Node normalizeSpawnArguments parity when args[1] is a non-array options object and args.length >= 3
+        self._seal_harness(
+            """import {spawn} from 'node:child_process';
+export async function runSmoke(options) {
+  const child = spawn(
+    process.execPath,
+    {
+      env: {PATH: process.env.PATH, DISPLAY: ':77', LD_LIBRARY_PATH: '/opt/lib'},
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+    {env: {PATH: process.env.PATH, DISPLAY: ''}},
+  );
+  await new Promise(r => child.once('exit', r));
+  return {label: options.label, status: 'pass', problems: []};
+}
+"""
+        )
+        obs_norm = self.root / "obs-norm.json"
+        res_norm = subprocess.run(
+            self._initial_command(obs_norm),
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(res_norm.returncode, 0, res_norm.stderr)
+        parsed_norm = diagnostic_module._read_initial_observation(obs_norm, expected_profile=self.profile)
+        self.assertEqual(parsed_norm["error_counts"]["observer-fault"], 0)
+        self.assertTrue(parsed_norm["environment_presence"]["first_spawn"]["DISPLAY"])
+        self.assertTrue(parsed_norm["environment_presence"]["first_spawn"]["LD_LIBRARY_PATH"])
+
+    def test_current071_observation_does_not_invoke_accessors_or_proxy_traps(self) -> None:
+        cases = {
+            "env-accessor": ("""
+  env = {PATH: process.env.PATH, get DISPLAY() { reads += 1; return ':91'; }};
+  options = {env, stdio: 'ignore'};
+""", 1, None),
+            "options-proxy": ("""
+  env = {PATH: process.env.PATH, DISPLAY: ':91'};
+  options = new Proxy({env, stdio: 'ignore'}, {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === 'env') reads += 1;
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+""", 1, None),
+            "inherited-options-accessor": ("""
+  options = Object.create({get env() { reads += 1; throw Error('OBSERVER_SIDE_EFFECT'); }});
+  options.stdio = 'ignore';
+""", 0, "default"),
+            "nonenumerable-options-accessor": ("""
+  options = {stdio: 'ignore'};
+  Object.defineProperty(options, 'env', {get() { reads += 1; throw Error('OBSERVER_SIDE_EFFECT'); }});
+""", 0, "default"),
+            "null-environment-default": ("options = {env: null, stdio: 'ignore'};", 0, "default"),
+            "false-environment-default": ("options = {env: false, stdio: 'ignore'};", 0, "default"),
+            "zero-environment-default": ("options = {env: 0, stdio: 'ignore'};", 0, "default"),
+            "empty-environment-default": ("options = {env: '', stdio: 'ignore'};", 0, "default"),
+            "inherited-environment-data": ("""
+  env = Object.create({DISPLAY: ':91'});
+  env.PATH = process.env.PATH;
+  options = {env, stdio: 'ignore'};
+""", 0, True),
+            "nonenumerable-environment-data": ("""
+  env = {PATH: process.env.PATH};
+  Object.defineProperty(env, 'DISPLAY', {value: ':91'});
+  options = {env, stdio: 'ignore'};
+""", 0, False),
+        }
+        for name, (setup, expected_reads, expected_display) in cases.items():
+            with self.subTest(name=name):
+                self._seal_harness("""import {spawn} from 'node:child_process';
+export async function runSmoke(optionsInput) {
+  let reads = 0, env, options;
+""" + setup + """
+  const child = spawn(process.execPath, ['-e', 'process.exit(0)'], options);
+  await new Promise(resolve => child.once('exit', resolve));
+  if (reads !== EXPECTED_READS) throw Error('OBSERVER_SIDE_EFFECT');
+  return {label: optionsInput.label, status: 'pass', problems: []};
+}
+""".replace("EXPECTED_READS", str(expected_reads)))
+                observed_path = self.root / (name + ".json")
+                result = subprocess.run(self._initial_command(observed_path), capture_output=True,
+                                        timeout=10, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                observed = diagnostic_module._read_initial_observation(observed_path, expected_profile=self.profile)
+                first = observed["environment_presence"]["first_spawn"]
+                if expected_display is None:
+                    self.assertIsNone(first)
+                    self.assertEqual(observed["error_counts"]["observer-fault"], 1)
+                else:
+                    self.assertIsInstance(first, dict)
+                    self.assertEqual(observed["error_counts"]["observer-fault"], 0)
+                    if expected_display != "default":
+                        self.assertIs(first["DISPLAY"], expected_display)
+
+
 if __name__ == "__main__":
     unittest.main()

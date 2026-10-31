@@ -8,6 +8,7 @@ import fs from "node:fs";
 import { registerHooks, syncBuiltinESMExports } from "node:module";
 import { basename, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { types as utilTypes } from "node:util";
 
 const CURRENT_PROFILE = Object.freeze({
   "id": "nebular070",
@@ -128,6 +129,10 @@ const INITIAL_ERROR_CATEGORIES = Object.freeze([
 ]);
 const INITIAL_HELPER_IDENTIFIERS = Object.freeze([
   "dbus-run-session", "dbus-daemon", "node", "native-rc-smoke.mjs",
+]);
+const INITIAL_ENV_KEYS = Object.freeze([
+  "LD_LIBRARY_PATH", "XDG_DATA_DIRS", "GIO_EXTRA_MODULES", "GDK_PIXBUF_MODULE_FILE",
+  "GSETTINGS_SCHEMA_DIR", "FONTCONFIG_FILE", "PATH", "DBUS_SESSION_BUS_ADDRESS", "DISPLAY",
 ]);
 const INITIAL_ERROR_PATTERNS = Object.freeze([
   ["dbus-session-conf-missing", /session\.conf.*(?:no such|failed|missing|not found)/i],
@@ -411,6 +416,7 @@ function installProgressObservers(progressPath, current = null, options = null, 
     }
     if (!launchObserved) {
       launchObserved = true;
+      if (initialObservation) initialObservation.recordFirstSpawnEnv(args);
       if (!current || typeof child?.pid === "number") emit("candidate", "launched");
       if (current && typeof child?.stderr?.emit === "function") {
         const stream = child.stderr;
@@ -594,6 +600,44 @@ function initialObservationProfile(profile) {
   };
 }
 
+function defaultEnvironmentSource() {
+  const descriptor = Object.getOwnPropertyDescriptor(process, "env");
+  if (!descriptor || !("value" in descriptor)) throw new TypeError("Unobservable default environment");
+  return descriptor.value;
+}
+
+function environmentDataValue(source, key) {
+  let current = source;
+  for (let depth = 0; current !== null && depth < 64; depth += 1) {
+    if (utilTypes.isProxy(current)) throw new TypeError("Unobservable environment proxy");
+    const descriptor = Object.getOwnPropertyDescriptor(current, key);
+    if (descriptor) {
+      // Node's environment enumeration ignores non-enumerable properties.
+      if (!descriptor.enumerable) return undefined;
+      if (!("value" in descriptor)) throw new TypeError("Unobservable environment accessor");
+      return descriptor.value;
+    }
+    current = Object.getPrototypeOf(current);
+  }
+  if (current !== null) throw new TypeError("Environment prototype bound exceeded");
+  return undefined;
+}
+
+function sampleEnvironmentPresence(envSource) {
+  if (!envSource || typeof envSource !== "object" || utilTypes.isProxy(envSource) || Array.isArray(envSource)) {
+    throw new TypeError("Initial observation environment source is not an object");
+  }
+  const presence = {};
+  for (const key of INITIAL_ENV_KEYS) {
+    const value = environmentDataValue(envSource, key);
+    if (value !== undefined && typeof value !== "string") {
+      throw new TypeError("Initial observation environment value is not a string");
+    }
+    presence[key] = typeof value === "string" && value.length > 0;
+  }
+  return presence;
+}
+
 function makeInitialObservation(path, profile) {
   const state = {
     schema: INITIAL_OBSERVATION_SCHEMA,
@@ -624,6 +668,15 @@ function makeInitialObservation(path, profile) {
     else state.error_counts["observer-fault"] += 1;
     state.status = "partial";
   };
+
+  if (profile.id === "nebular071") {
+    state.environment_presence = {wrapper_entry: null, first_spawn: null};
+    try {
+      state.environment_presence.wrapper_entry = sampleEnvironmentPresence(defaultEnvironmentSource());
+    } catch {
+      noteError("observer-fault");
+    }
+  }
 
   const count = (table, name) => {
     if (table[name] < MAX_INITIAL_CATEGORY_COUNT) table[name] += 1;
@@ -661,7 +714,18 @@ function makeInitialObservation(path, profile) {
       try { digest = hashes[name].copy().digest("hex"); } catch { noteError("stream-fault"); }
       streams[name] = {...row, sha256: digest};
     }
-    return {...state, streams, phase_events: [...state.phase_events]};
+    const copy = {...state, streams, phase_events: [...state.phase_events]};
+    if (state.environment_presence) {
+      copy.environment_presence = {
+        wrapper_entry: state.environment_presence.wrapper_entry
+          ? {...state.environment_presence.wrapper_entry}
+          : null,
+        first_spawn: state.environment_presence.first_spawn
+          ? {...state.environment_presence.first_spawn}
+          : null,
+      };
+    }
+    return copy;
   };
 
   const writeSnapshot = (final = false) => {
@@ -754,11 +818,48 @@ function makeInitialObservation(path, profile) {
     }
   };
 
+  const recordFirstSpawnEnv = args => {
+    if (disabled || finished || !state.environment_presence) return;
+    try {
+      let spawnOptions;
+      if (utilTypes.isProxy(args[1]) || utilTypes.isProxy(args[2])) {
+        throw new TypeError("Unobservable spawn options proxy");
+      }
+      if (Array.isArray(args[1]) || args[1] === undefined || args[1] === null) {
+        if (args[2] !== undefined && args[2] !== null) {
+          if (typeof args[2] !== "object" || Array.isArray(args[2])) {
+            throw new TypeError("Malformed spawn options");
+          }
+          spawnOptions = args[2];
+        }
+      } else if (typeof args[1] === "object") {
+        spawnOptions = args[1];
+      } else {
+        throw new TypeError("Malformed spawn options");
+      }
+      // Node copies own enumerable options before reading env. Avoid invoking
+      // accessors or proxy traps a second time solely for this observation.
+      const descriptor = spawnOptions === undefined ? undefined
+        : Object.getOwnPropertyDescriptor(spawnOptions, "env");
+      if (descriptor?.enumerable && !("value" in descriptor)) {
+        throw new TypeError("Unobservable spawn environment accessor");
+      }
+      const rawEnv = descriptor?.enumerable ? descriptor.value : undefined;
+      const envSource = rawEnv || defaultEnvironmentSource();
+      state.environment_presence.first_spawn = sampleEnvironmentPresence(envSource);
+    } catch {
+      state.environment_presence.first_spawn = null;
+      noteError("observer-fault");
+    }
+    requestSnapshot();
+  };
+
   writeSnapshot();
   return {
     addPhase,
     capture,
     noteError,
+    recordFirstSpawnEnv,
     finish: status => {
       if (finished) return;
       finished = true;

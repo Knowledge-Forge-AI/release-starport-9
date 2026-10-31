@@ -453,6 +453,183 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
                 self.assertEqual(binding["phase"], phase)
                 self.assertNotIn("secret-node", json.dumps(binding))
 
+    def test_resolution_matches_separate_stderr_stdout_closed_templates_and_basenames(self):
+        from rs9.application_smoke_diagnostic import (
+            INITIAL_ENV_KEYS,
+            KNOWN_RESOLUTION_TARGET_BASENAMES,
+            MARKER_ONLY_RESOLUTION_TEMPLATES,
+            RESOLUTION_MATCH_MAX_ENTRIES,
+            RESOLUTION_MATCH_STREAMS,
+            RESOLUTION_MATCH_TEMPLATES,
+            RESOLUTION_TARGET_BASENAMES,
+            _attempt,
+            extract_resolution_matches,
+            validate_resolution_matches,
+        )
+        secret_path = b"/private/operator-secret/bin/custom-helper"
+        stderr = (
+            b"dbus-run-session: failed to exec '/nix/store/x/bin/dbus-daemon': No such file or directory\n"
+            b"/usr/bin/env: 'node': No such file or directory\n"
+            b"sh: 1: /nix/store/x/bin/dbus-run-session: not found\n"
+            b"bash: /private/dir/native-rc-smoke.mjs: command not found\n"
+            b"dbus-daemon[12]: Failed to start message bus: Failed to open \"/etc/dbus\": No such file or directory\n"
+        )
+        stdout = (
+            b"loader: " + secret_path + b": cannot execute binary file\n"
+            b"kernel: " + secret_path + b": Exec format error\n"
+            b"lookup: " + secret_path + b" was not found in table\n"
+        )
+        matches = extract_resolution_matches(stdout, stderr)
+        expected = [
+            {"stream": "stderr", "template": "failed-to-exec", "target_basename": "dbus-daemon"},
+            {"stream": "stderr", "template": "env-target", "target_basename": "node"},
+            {"stream": "stderr", "template": "colon-not-found", "target_basename": "dbus-run-session"},
+            {"stream": "stderr", "template": "command-not-found", "target_basename": "native-rc-smoke.mjs"},
+            {"stream": "stderr", "template": "no-such-file-marker", "target_basename": "unknown"},
+            {"stream": "stdout", "template": "cannot-execute-marker", "target_basename": "unknown"},
+            {"stream": "stdout", "template": "exec-format-error-marker", "target_basename": "unknown"},
+            {"stream": "stdout", "template": "not-found-marker", "target_basename": "unknown"},
+        ]
+        self.assertEqual(matches, expected)
+        self.assertEqual({m["template"] for m in matches}, set(RESOLUTION_MATCH_TEMPLATES))
+        self.assertEqual({m["stream"] for m in matches}, set(RESOLUTION_MATCH_STREAMS))
+        self.assertEqual(
+            {m["target_basename"] for m in matches},
+            set(RESOLUTION_TARGET_BASENAMES),
+        )
+        self.assertEqual(
+            set(KNOWN_RESOLUTION_TARGET_BASENAMES),
+            {"dbus-run-session", "dbus-daemon", "node", "native-rc-smoke.mjs"},
+        )
+        self.assertEqual(len(INITIAL_ENV_KEYS), 9)
+        self.assertNotIn("operator-secret", json.dumps(matches))
+        self.assertNotIn("custom-helper", json.dumps(matches))
+        self.assertEqual(validate_resolution_matches(matches, complete=True, mismatch=False), matches)
+        self.assertEqual(validate_resolution_matches(matches, complete=False, mismatch=False), [])
+        self.assertEqual(validate_resolution_matches(matches, complete=True, mismatch=True), [])
+
+        # Confirm classify_failure_binding and classify_smoke_cause order/behavior are unchanged
+        nix_stderr = (
+            b"dbus-daemon[99]: Failed to start message bus: Could not get UID and GID for username \"messagebus\": No such file or directory\n"
+        )
+        cats = extract_log_categories(b"", nix_stderr, exit_code=None)
+        self.assertEqual(cats, ["dbus-daemon-error"])
+        self.assertEqual(
+            classify_failure_binding(b"", nix_stderr, None, cats),
+            {"role": "unknown", "phase": "resolution", "evidence": "command-not-found"},
+        )
+        self.assertEqual(
+            extract_resolution_matches(b"", nix_stderr),
+            [{"stream": "stderr", "template": "no-such-file-marker", "target_basename": "unknown"}],
+        )
+        self.assertEqual(
+            classify_smoke_cause(timed_out=True, log_categories=cats),
+            "process-timeout",
+        )
+
+        # Invalid/hostile shapes are withheld by validate_resolution_matches
+        all_valid_combinations = [
+            {"stream": s, "template": t, "target_basename": b}
+            for s in RESOLUTION_MATCH_STREAMS
+            for t in RESOLUTION_MATCH_TEMPLATES
+            for b in (
+                ("unknown",) if t in MARKER_ONLY_RESOLUTION_TEMPLATES else RESOLUTION_TARGET_BASENAMES
+            )
+        ]
+        self.assertEqual(len(all_valid_combinations), RESOLUTION_MATCH_MAX_ENTRIES)
+        self.assertEqual(
+            validate_resolution_matches(all_valid_combinations, complete=True, mismatch=False),
+            all_valid_combinations,
+        )
+        for bad in (
+            None,
+            [],
+            "command-not-found",
+            [{"stream": "stderr", "template": "command-not-found"}],
+            [{"stream": "stderr", "template": "command-not-found", "target_basename": "node", "extra": 1}],
+            [{"stream": "stdin", "template": "command-not-found", "target_basename": "node"}],
+            [{"stream": "stderr", "template": "arbitrary-template", "target_basename": "node"}],
+            [{"stream": "stderr", "template": "command-not-found", "target_basename": "/private/node"}],
+            [{"stream": "stderr", "template": "no-such-file-marker", "target_basename": "node"}],
+            [expected[0], expected[0]],
+            all_valid_combinations + [expected[0]],
+        ):
+            self.assertEqual(validate_resolution_matches(bad, complete=True, mismatch=False), [])
+
+        # Only authenticated current071 initial attempts gain the optional field.
+        evidence_dir = self.scratch / "evidence-res-scope"
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        current_observation = {
+            "profile": CURRENT071_REPLAY_PROGRESS_PROFILE,
+            "path": evidence_dir / "unwritten-current-observation.json",
+        }
+        previous_observation = {
+            "profile": diagnostic_module.CURRENT_REPLAY_PROGRESS_PROFILE,
+            "path": evidence_dir / "unwritten-previous-observation.json",
+        }
+        with patch(
+            "subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                ["node"], 127, b"", b"sh: 1: /nix/store/x/bin/dbus-run-session: not found\n"
+            ),
+        ), patch("rs9.application_smoke_diagnostic._command", return_value=["node"]):
+            linux_failed = _attempt(
+                self.prepared, "linux-x64", "C", self.launch_root, evidence_dir, (), None, False,
+                initial_observation=current_observation,
+            )
+            darwin_failed = _attempt(
+                self.prepared, "darwin-arm64", "A", self.launch_root, evidence_dir, (), None, False
+            )
+            historical_failed = _attempt(
+                self.prepared, "linux-x64", "C", self.launch_root, evidence_dir, (), None, False
+            )
+            previous_failed = _attempt(
+                self.prepared, "linux-x64", "C", self.launch_root, evidence_dir, (), None, False,
+                initial_observation=previous_observation,
+            )
+        self.assertEqual(
+            linux_failed.get("resolution_matches"),
+            [{"stream": "stderr", "template": "colon-not-found", "target_basename": "dbus-run-session"}],
+        )
+        self.assertNotIn("resolution_matches", darwin_failed)
+        self.assertNotIn("resolution_matches", historical_failed)
+        self.assertNotIn("resolution_matches", previous_failed)
+        with patch(
+            "subprocess.run",
+            side_effect=subprocess.TimeoutExpired(
+                ["node"], 240, stderr=b"sh: 1: /nix/store/x/bin/dbus-run-session: not found\n"
+            ),
+        ), patch("rs9.application_smoke_diagnostic._command", return_value=["node"]):
+            linux_timeout = _attempt(
+                self.prepared, "linux-x64", "C", self.launch_root, evidence_dir, (), None, False,
+                initial_observation=current_observation,
+            )
+        self.assertNotIn("resolution_matches", linux_timeout)
+
+    def test_new_diagnostic_fields_are_shed_before_established_observations(self):
+        import copy
+        base = {"cause": "unknown", "problem_codes": [],
+                "initial_observation": {"status": "completed", "phase_events": [{"event": "kept"}]},
+                "harness_problem_categories": {"problems": {"unrecognized": 1}}}
+        args = (self.prepared, "x86_64-linux", "linux-x64", "C", self.launch_root, (), None)
+        diagnostic_module._retain_failure(*args, copy.deepcopy(base), [], include_replay=False)
+        path = self.prepared["scratch"].parent / "diagnostics/application-smoke-diagnostic.json"
+        limit = len(path.read_bytes())
+        variants = []
+        row = copy.deepcopy(base)
+        row["resolution_matches"] = [{"stream": "stderr", "template": "colon-not-found", "target_basename": "node"}]
+        variants.append(row)
+        row = copy.deepcopy(base)
+        row["initial_observation"]["environment_presence"] = {"wrapper_entry": {}, "first_spawn": {}}
+        variants.append(row)
+        row = copy.deepcopy(base)
+        row["harness_problem_categories"]["finalization"] = {"phase": "cleanup"}
+        variants.append(row)
+        for fields in variants:
+            with self.subTest(new_field=list(fields)), patch("rs9.application_smoke_diagnostic.MAX_DIAGNOSTIC", limit):
+                diagnostic_module._retain_failure(*args, fields, [], include_replay=False)
+                self.assertEqual(json.loads(path.read_bytes())["initial_run"], base)
+
     def test_adverse_corrupt_streams_handled_safely(self):
         """Corrupt non-UTF-8 binary stream bytes compute lengths and digests cleanly."""
         corrupt_bytes = b"\x80\xff\xfe\x00\xaa\xbb\xcc\xdd"
@@ -1773,6 +1950,112 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
                 self.scratch / "evidence-replay-C", extras=True,
                 harness_timeout_ms=179999,
             )
+
+    def test_current071_initial_observation_environment_presence_reader_and_gate_invariance(self):
+        """current071 accepts optional boolean environment_presence and rejects it on 070 or when malformed."""
+        import copy
+        from rs9.application_smoke_diagnostic import (
+            CURRENT_REPLAY_PROGRESS_PROFILE,
+            INITIAL_ENV_KEYS,
+            _read_initial_observation,
+        )
+        path = self.scratch / "evidence" / "linux-x64-C.initial-observation.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        valid_env_map = {key: (idx % 2 == 0) for idx, key in enumerate(INITIAL_ENV_KEYS)}
+        valid_presence = {
+            "wrapper_entry": dict(valid_env_map),
+            "first_spawn": {key: False for key in INITIAL_ENV_KEYS},
+        }
+
+        # 1. Valid current071 summary with environment_presence
+        self._write_initial_observation(
+            ["--rs9-initial-observation-file", str(path)],
+            status="failed",
+            events=[("candidate", "launched")],
+        )
+        doc071 = json.loads(path.read_text(encoding="utf-8"))
+        doc071["environment_presence"] = valid_presence
+        path.write_text(json.dumps(doc071) + "\n", encoding="utf-8")
+        observed = _read_initial_observation(path, expected_profile=CURRENT071_REPLAY_PROGRESS_PROFILE)
+        self.assertEqual(observed["status"], "failed")
+        self.assertEqual(observed["environment_presence"], valid_presence)
+
+        # 2. Nullable stage maps (when spawn not reached or observer-fault occurred)
+        for stage_presence in (
+            {"wrapper_entry": dict(valid_env_map), "first_spawn": None},
+            {"wrapper_entry": None, "first_spawn": None},
+        ):
+            doc_null = {**doc071, "environment_presence": stage_presence}
+            path.write_text(json.dumps(doc_null) + "\n", encoding="utf-8")
+            obs_null = _read_initial_observation(path, expected_profile=CURRENT071_REPLAY_PROGRESS_PROFILE)
+            self.assertEqual(obs_null["environment_presence"], stage_presence)
+
+        # 3. Old current071 summary without environment_presence remains accepted
+        doc071_legacy = {k: v for k, v in doc071.items() if k != "environment_presence"}
+        path.write_text(json.dumps(doc071_legacy) + "\n", encoding="utf-8")
+        obs_legacy = _read_initial_observation(path, expected_profile=CURRENT071_REPLAY_PROGRESS_PROFILE)
+        self.assertEqual(obs_legacy["status"], "failed")
+        self.assertNotIn("environment_presence", obs_legacy)
+
+        # 4. 070 profile rejects environment_presence
+        doc070 = copy.deepcopy(doc071)
+        doc070["source_profile"] = {
+            "id": CURRENT_REPLAY_PROGRESS_PROFILE["id"],
+            "source_commit": CURRENT_REPLAY_PROGRESS_PROFILE["commit"],
+            "source_tree": CURRENT_REPLAY_PROGRESS_PROFILE["tree"],
+            "harness_sha256": CURRENT_REPLAY_PROGRESS_PROFILE["modules"]["native-rc-smoke.mjs"]["sha256"],
+            "closure_sha256s": {
+                k: v["sha256"] for k, v in CURRENT_REPLAY_PROGRESS_PROFILE["modules"].items()
+            },
+        }
+        path.write_text(json.dumps(doc070) + "\n", encoding="utf-8")
+        obs070_with_env = _read_initial_observation(path, expected_profile=CURRENT_REPLAY_PROGRESS_PROFILE)
+        self.assertEqual(obs070_with_env, {
+            "schema": INITIAL_OBSERVATION_SCHEMA,
+            "status": "unobserved",
+            "attempt_kind": INITIAL_OBSERVATION_KIND,
+            "reason": "invalid",
+            "non_admitting": True,
+        })
+
+        # 5. Malformed environment_presence shapes withhold field-locally on 071 without discarding valid phase_events/streams or changing the required gate
+        malformed_presences = (
+            None,
+            [],
+            "true",
+            {"wrapper_entry": dict(valid_env_map)},
+            {**valid_presence, "extra": None},
+            {"wrapper_entry": {k: valid_env_map[k] for k in INITIAL_ENV_KEYS[:-1]}, "first_spawn": None},
+            {"wrapper_entry": {**valid_env_map, "HOME": True}, "first_spawn": None},
+            {"wrapper_entry": {**valid_env_map, "PATH": 1}, "first_spawn": None},
+            {"wrapper_entry": {**valid_env_map, "PATH": "/nix/store/secret"}, "first_spawn": None},
+        )
+        for bad_presence in malformed_presences:
+            with self.subTest(bad_presence=repr(bad_presence)):
+                bad_doc = {**doc071, "environment_presence": bad_presence}
+                path.write_text(json.dumps(bad_doc) + "\n", encoding="utf-8")
+                withheld = _read_initial_observation(path, expected_profile=CURRENT071_REPLAY_PROGRESS_PROFILE)
+                self.assertEqual(withheld["status"], "failed")
+                self.assertEqual(withheld["phase_events"], doc071["phase_events"])
+                self.assertNotIn("environment_presence", withheld)
+                self.assertNotIn("/nix/store/secret", json.dumps(withheld))
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(["node"], 240, stderr=b"timeout\n")), \
+             patch("rs9.application_smoke_diagnostic._replay_progress_wrapper", return_value=self.work / "wrapper.mjs"), \
+             patch("rs9.application_smoke_diagnostic._current_replay_progress_profile",
+                   return_value=CURRENT071_REPLAY_PROGRESS_PROFILE):
+            with self.assertRaises(ContractError) as caught:
+                execute_application_smoke(
+                    prepared=self.prepared,
+                    system="x86_64-linux",
+                    launch_root=self.launch_root,
+                    diagnostic_initial_observation=True,
+                )
+        self.assertEqual(caught.exception.code, "APPLICATION_SMOKE")
+        diag = json.loads((self.work / "diagnostics/application-smoke-diagnostic.json").read_text(encoding="utf-8"))
+        self.assertEqual(diag["gate_status"], "fail")
+        self.assertEqual(diag["initial_run"]["cause"], "process-timeout")
+        self.assertEqual(diag["initial_run"]["initial_observation"]["status"], "failed")
+        self.assertNotIn("environment_presence", diag["initial_run"]["initial_observation"])
 
 
 if __name__ == "__main__":
