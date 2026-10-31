@@ -132,7 +132,7 @@ class OriginalRunContextTests(unittest.TestCase):
             manifest["qualification_receipt_hashes"] = {name: hashlib.sha256(canonical(receipt)).hexdigest()}; path.write_bytes(canonical(manifest))
         jobs = {job: {"result": "success"} for job in DISTRIBUTION_JOBS if job != "summary"}
         # Isolate the environment join from the separately held policy-admission layer.
-        with patch.dict(os.environ, {"RS9_JOB_CONCLUSIONS": json.dumps(jobs)}), patch("rs9.hosted_summary.validate_rpm_policy_source"):
+        with patch.dict(os.environ, {"RS9_JOB_CONCLUSIONS": json.dumps(jobs)}), patch("rs9.hosted_summary._validate_hosted_rpm_policy_source"):
             self.assertEqual(summarize(ROOT, fixture.inputs, fixture.output, generation=CURRENT_GENERATION), 0)
         if mixed:
             target = fixture.inputs / "candidate-authenticate-generation/authenticate-generation.json"
@@ -173,7 +173,7 @@ class OriginalRunContextTests(unittest.TestCase):
         for label, environment, clear in (("packages", PACKAGES, False), ("absent", absent, True)):
             output = self.root / ("packet-" + label); output.mkdir()
             with self.subTest(environment=label), patch.dict(os.environ, environment, clear=clear), \
-                 patch("rs9.collect_candidate.output_directory", return_value=output), patch("rs9.hosted_summary.validate_rpm_policy_source"):
+                 patch("rs9.collect_candidate.output_directory", return_value=output), patch("rs9.hosted_summary.validate_rpm_policy_source"), patch("rs9.hosted_summary._validate_hosted_rpm_policy_source"):
                 before = dict(os.environ)
                 packet = collect(ROOT, output, commit=COMMIT, run_id=7, started_at=STARTED, timeout=30, runner=self.api, generation=CURRENT_GENERATION)
                 self.assertEqual(dict(os.environ), before)
@@ -195,7 +195,7 @@ class OriginalRunContextTests(unittest.TestCase):
             with self.subTest(environment=label), patch.dict(os.environ, environment, clear=clear), \
                  patch("rs9.collect_candidate.output_directory", return_value=output), \
                  patch("rs9.collect_candidate.gh_read", side_effect=lambda root, argv, runner=None: self.api(root, ["gh", *argv])), \
-                 patch("rs9.qualified_distribution_inputs.collect", side_effect=fresh_collect), patch("rs9.hosted_summary.validate_rpm_policy_source"), \
+                 patch("rs9.qualified_distribution_inputs.collect", side_effect=fresh_collect), patch("rs9.hosted_summary.validate_rpm_policy_source"), patch("rs9.hosted_summary._validate_hosted_rpm_policy_source"), \
                  patch("rs9.qualified_distribution_inputs._binary_inputs", return_value=([], {})):
                 before = dict(os.environ)
                 result = qualified_distribution_inputs(config, output, timeout=30)
@@ -214,7 +214,7 @@ class OriginalRunContextTests(unittest.TestCase):
         for kind in ("run", "gate"):
             self.prepare_artifacts(mixed=kind)
             output = self.root / ("mixed-" + kind); output.mkdir()
-            with self.subTest(kind=kind), patch.dict(os.environ, PACKAGES), patch("rs9.collect_candidate.output_directory", return_value=output), patch("rs9.hosted_summary.validate_rpm_policy_source"):
+            with self.subTest(kind=kind), patch.dict(os.environ, PACKAGES), patch("rs9.collect_candidate.output_directory", return_value=output), patch("rs9.hosted_summary.validate_rpm_policy_source"), patch("rs9.hosted_summary._validate_hosted_rpm_policy_source"):
                 packet = collect(ROOT, output, commit=COMMIT, run_id=7, started_at=STARTED, timeout=30, runner=self.api, generation=CURRENT_GENERATION)
             self.assertEqual(packet["validation"]["status"], "fail")
             self.assertNotEqual(packet["classification"], "qualified-current-distribution-candidate")
@@ -229,7 +229,7 @@ class OriginalRunContextTests(unittest.TestCase):
             def fresh_collect(*args, **kwargs):
                 return collect(*args, runner=self.api, **kwargs)
             with self.subTest(kind=kind), patch.dict(os.environ, PACKAGES), patch("rs9.collect_candidate.output_directory", return_value=output), \
-                 patch("rs9.qualified_distribution_inputs.collect", side_effect=fresh_collect), patch("rs9.hosted_summary.validate_rpm_policy_source"), \
+                 patch("rs9.qualified_distribution_inputs.collect", side_effect=fresh_collect), patch("rs9.hosted_summary.validate_rpm_policy_source"), patch("rs9.hosted_summary._validate_hosted_rpm_policy_source"), \
                  patch("rs9.qualified_distribution_inputs.admit_original_run") as final_admission, \
                  patch("rs9.qualified_distribution_inputs._binary_inputs") as binaries, self.assertRaises(ContractError) as error:
                 qualified_distribution_inputs(config, output, timeout=30)

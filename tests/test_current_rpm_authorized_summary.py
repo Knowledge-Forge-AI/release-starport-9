@@ -132,7 +132,7 @@ def probe(case):
                     raise AssertionError(summary['blocking_reasons'])
             elif not (code == 2 and any(('HOSTED_POLICY' in x for x in summary['blocking_reasons']))):
                 raise AssertionError(summary['blocking_reasons'])
-            reason_codes = {'intact': [], 'omitted': ['RPM_POLICY_CUSTODY'], 'empty': ['RPM_POLICY_CUSTODY'], 'empty-policy-and-raw': ['RPM_POLICY_CUSTODY'], 'all-findings-stripped': ['RPM_POLICY_CUSTODY'], 'stripped-findings': ['HOSTED_POLICY', 'RPM_POLICY_CUSTODY'], 'stripped-token': ['HOSTED_POLICY'], 'empty-maps-missing-required-gate': ['missing-or-duplicate-gate:rpm-lint-policy-accepted']}[case]
+            reason_codes = {'intact': [], 'omitted': ['HOSTED_POLICY', 'RPM_POLICY_CUSTODY'], 'empty': ['HOSTED_POLICY', 'RPM_POLICY_CUSTODY'], 'empty-policy-and-raw': ['HOSTED_POLICY', 'RPM_POLICY_CUSTODY'], 'all-findings-stripped': ['RPM_POLICY_CUSTODY'], 'stripped-findings': ['HOSTED_POLICY', 'RPM_POLICY_CUSTODY'], 'stripped-token': ['HOSTED_POLICY'], 'empty-maps-missing-required-gate': ['HOSTED_POLICY', 'missing-or-duplicate-gate:rpm-lint-policy-accepted']}[case]
             expected_reasons = sorted(('candidate-rpm-' + system + ':' + reason for system in ('aarch64-linux', 'x86_64-linux') for reason in reason_codes))
             if not sorted(summary['blocking_reasons']) == expected_reasons:
                 raise AssertionError(summary['blocking_reasons'])
