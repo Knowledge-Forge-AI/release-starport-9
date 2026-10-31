@@ -15,8 +15,17 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, patch
 
+import rs9.application_smoke_diagnostic as diagnostic_module
 from rs9.application_smoke_diagnostic import (
     CAUSE_CATEGORIES,
+    CURRENT071_SIGNAL_HARNESS_TIMEOUT_MS,
+    CURRENT071_REQUIRED_HARNESS_TIMEOUT_MS,
+    INITIAL_ERROR_CATEGORIES,
+    INITIAL_HELPER_IDENTIFIERS,
+    INITIAL_OBSERVATION_KIND,
+    INITIAL_OBSERVATION_SCHEMA,
+    REPLAY_SKIP_REASON_ORIGINAL_CLEANUP_UNPROVEN,
+    REPLAY_SKIP_REASON_ORIGINAL_HARNESS_NOT_PASSED,
     SAFE_FAILURE_ROLES,
     SAFE_LOG_CATEGORIES,
     classify_failure_binding,
@@ -30,9 +39,11 @@ from rs9.application_smoke_diagnostic import (
     validate_problem_codes,
     _bounded_run,
     _command,
+    _original_replay_skip_reason,
 )
 from rs9.errors import ContractError, safe_details
 from rs9.release_core import digest
+from rs9.current_os071 import CURRENT071_REPLAY_PROGRESS_PROFILE
 
 
 class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
@@ -63,6 +74,42 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
 
     def tearDown(self):
         self.synthetic_tmp.cleanup()
+
+    def _write_initial_observation(self, command, *, status, events):
+        path = Path(command[command.index("--rs9-initial-observation-file") + 1])
+        profile = diagnostic_module._initial_observation_profile(CURRENT071_REPLAY_PROGRESS_PROFILE)
+        phase_events = [
+            {"seq": index, "stage": stage, "event": event}
+            for index, (stage, event) in enumerate(events, 1)
+        ]
+        empty_stream = {"bytes_seen": 0, "bytes_hashed": 0, "sha256": digest(b""), "truncated": False}
+        path.write_text(json.dumps({
+            "schema": INITIAL_OBSERVATION_SCHEMA,
+            "attempt_kind": INITIAL_OBSERVATION_KIND,
+            "non_admitting": True,
+            "status": status,
+            "source_profile": profile,
+            "phase_events": phase_events,
+            "error_counts": {"observer-fault": 0, "stream-fault": 0, "write-failure": 0},
+            "error_category_counts": {name: 0 for name in INITIAL_ERROR_CATEGORIES},
+            "helper_identifier_counts": {name: 0 for name in INITIAL_HELPER_IDENTIFIERS},
+            "streams": {"stdout": empty_stream, "stderr": empty_stream},
+            "truncated": False,
+        }))
+
+    def _write_run_receipt(self, command, *, status, malformed=False):
+        evidence = Path(command[command.index("--evidence") + 1])
+        scenario = command[command.index("--scenario") + 1]
+        evidence.mkdir(parents=True, exist_ok=True)
+        path = evidence / ("linux-" + ("arm64" if scenario == "B" else "x64") + "-" + scenario + ".run.json")
+        if malformed:
+            path.write_bytes(b"not-json")
+        else:
+            path.write_text(json.dumps({
+                "status": status,
+                "problems": [] if status == "pass" else ["synthetic-failure"],
+                "executable": {"sha256": "a" * 64},
+            }))
 
     def test_adverse_nonzero_exit_triggers_single_replay_and_diagnostic(self):
         """Synthetic nonzero exit failure triggers exactly one replay, classifies cause,
@@ -148,6 +195,170 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
         self.assertEqual(diag["cause"], "process-timeout")
         self.assertEqual(diag["replay"]["status"], "replay-reproduced")
 
+    def test_current071_timeout_skips_replay_without_native_cleanup_evidence(self):
+        """An incomplete required attempt cannot launch another native subject."""
+        calls = []
+
+        def original_timeout(cmd, **kwargs):
+            calls.append((list(cmd), kwargs))
+            raise subprocess.TimeoutExpired(cmd=cmd, timeout=240, output=b"partial", stderr=b"partial")
+
+        with patch("subprocess.run", side_effect=original_timeout), \
+             patch("rs9.application_smoke_diagnostic._bounded_run") as replay, \
+             patch("rs9.application_smoke_diagnostic._replay_progress_wrapper", return_value=self.work / "wrapper.mjs"), \
+             patch("rs9.application_smoke_diagnostic._current_replay_progress_profile",
+                   return_value=CURRENT071_REPLAY_PROGRESS_PROFILE):
+            with self.assertRaises(ContractError):
+                execute_application_smoke(
+                    prepared=self.prepared,
+                    system="aarch64-linux",
+                    launch_root=self.launch_root,
+                    diagnostic_replay=True,
+                    diagnostic_initial_observation=True,
+                )
+
+        self.assertEqual(replay.call_count, 0)
+        self.assertEqual(calls[0][1]["timeout"], 240)
+        self.assertIn("--timeout-ms", calls[0][0])
+        self.assertEqual(calls[0][0][calls[0][0].index("--timeout-ms") + 1], "210000")
+        diagnostic = json.loads((self.work / "diagnostics/application-smoke-diagnostic.json").read_bytes())
+        self.assertEqual(diagnostic["replay"], {
+            "status": "not-run", "reason": "original-cleanup-unproven",
+        })
+        self.assertEqual(diagnostic["initial_run"]["cause"], "process-timeout")
+        self.assertFalse(diagnostic["initial_run"]["stream_capture_complete"])
+        self.assertEqual(diagnostic["gate_status"], "fail")
+
+    def test_current071_initial_invocation_uses_signal_budget_only_for_c_signal(self):
+        calls = []
+
+        def clean_run(cmd, **kwargs):
+            calls.append((list(cmd), kwargs))
+            self._write_run_receipt(cmd, status="pass")
+            return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+
+        with patch("subprocess.run", side_effect=clean_run), \
+             patch("rs9.application_smoke_diagnostic._replay_progress_wrapper",
+                   return_value=self.work / "wrapper.mjs"), \
+             patch("rs9.application_smoke_diagnostic._current_replay_progress_profile",
+                   return_value=CURRENT071_REPLAY_PROGRESS_PROFILE):
+            execute_application_smoke(
+                prepared=self.prepared,
+                system="x86_64-linux",
+                launch_root=self.launch_root,
+                diagnostic_initial_observation=True,
+            )
+
+        self.assertEqual(len(calls), 2)
+        by_scenario = {
+            command[command.index("--scenario") + 1]: command
+            for command, _kwargs in calls
+        }
+        self.assertEqual(
+            by_scenario["C"][by_scenario["C"].index("--timeout-ms") + 1],
+            str(CURRENT071_REQUIRED_HARNESS_TIMEOUT_MS),
+        )
+        self.assertEqual(
+            by_scenario["C-signal"][by_scenario["C-signal"].index("--timeout-ms") + 1],
+            str(CURRENT071_SIGNAL_HARNESS_TIMEOUT_MS),
+        )
+
+    def test_current071_clean_failed_harness_uses_truthful_skip_reason(self):
+        calls = []
+        final_events = [
+            ("candidate", "exited"),
+            ("receipt", "finalized"),
+            ("run-record", "finalized"),
+            ("run-smoke", "returned"),
+        ]
+
+        def failed_harness(cmd, **kwargs):
+            calls.append(list(cmd))
+            self._write_run_receipt(cmd, status="fail")
+            self._write_initial_observation(cmd, status="failed", events=final_events)
+            return SimpleNamespace(returncode=1, stdout=b"", stderr=b"")
+
+        with patch("subprocess.run", side_effect=failed_harness), \
+             patch("rs9.application_smoke_diagnostic._bounded_run") as replay, \
+             patch("rs9.application_smoke_diagnostic._replay_progress_wrapper",
+                   return_value=self.work / "wrapper.mjs"), \
+             patch("rs9.application_smoke_diagnostic._current_replay_progress_profile",
+                   return_value=CURRENT071_REPLAY_PROGRESS_PROFILE):
+            with self.assertRaises(ContractError):
+                execute_application_smoke(
+                    prepared=self.prepared,
+                    system="aarch64-linux",
+                    launch_root=self.launch_root,
+                    diagnostic_replay=True,
+                    diagnostic_initial_observation=True,
+                )
+
+        self.assertEqual(len(calls), 1)
+        replay.assert_not_called()
+        diagnostic = json.loads((self.work / "diagnostics/application-smoke-diagnostic.json").read_bytes())
+        self.assertEqual(diagnostic["replay"], {
+            "status": "not-run", "reason": REPLAY_SKIP_REASON_ORIGINAL_HARNESS_NOT_PASSED,
+        })
+        self.assertEqual(diagnostic["initial_run"]["initial_observation"]["status"], "failed")
+        self.assertEqual(diagnostic["gate_status"], "fail")
+
+    def test_current071_passed_harness_with_python_receipt_failure_can_replay(self):
+        calls = []
+        final_events = [
+            ("candidate", "exited"),
+            ("receipt", "finalized"),
+            ("run-record", "finalized"),
+            ("run-smoke", "returned"),
+        ]
+
+        def original_pass(cmd, **kwargs):
+            calls.append(("original", list(cmd)))
+            self._write_run_receipt(cmd, status="pass", malformed=True)
+            self._write_initial_observation(cmd, status="completed", events=final_events)
+            return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+
+        def replay_fail(cmd, **kwargs):
+            calls.append(("replay", list(cmd)))
+            self._write_run_receipt(cmd, status="fail")
+            return SimpleNamespace(returncode=1, stdout=b"", stderr=b"")
+
+        with patch("subprocess.run", side_effect=original_pass), \
+             patch("rs9.application_smoke_diagnostic._bounded_run", side_effect=replay_fail), \
+             patch("rs9.application_smoke_diagnostic._replay_progress_wrapper",
+                   return_value=self.work / "wrapper.mjs"), \
+             patch("rs9.application_smoke_diagnostic._current_replay_progress_profile",
+                   return_value=CURRENT071_REPLAY_PROGRESS_PROFILE):
+            with self.assertRaises(ContractError):
+                execute_application_smoke(
+                    prepared=self.prepared,
+                    system="aarch64-linux",
+                    launch_root=self.launch_root,
+                    diagnostic_replay=True,
+                    diagnostic_initial_observation=True,
+                )
+
+        self.assertEqual([kind for kind, _command in calls], ["original", "replay"])
+        diagnostic = json.loads((self.work / "diagnostics/application-smoke-diagnostic.json").read_bytes())
+        self.assertEqual(diagnostic["initial_run"]["initial_observation"]["status"], "completed")
+        self.assertEqual(diagnostic["initial_run"]["receipt_error"], "receipt-corrupt")
+        self.assertEqual(diagnostic["replay"]["status"], "replay-reproduced")
+        self.assertNotIn("reason", diagnostic["replay"])
+
+    def test_current071_partial_observation_keeps_cleanup_unproven_reason(self):
+        fields = {
+            "error": None,
+            "stream_capture_complete": True,
+            "raw_returncode": 1,
+            "cleanup_error": None,
+            "initial_observation": {
+                "status": "partial",
+                "phase_events": [
+                    {"stage": "candidate", "event": "exited"},
+                ],
+            },
+        }
+        self.assertEqual(_original_replay_skip_reason(fields), REPLAY_SKIP_REASON_ORIGINAL_CLEANUP_UNPROVEN)
+
     def test_adverse_missing_display_and_socket(self):
         """Synthetic missing Xvfb display and dbus socket are categorized without raw text."""
         stderr_xvfb = b"Xvfb failed to start, cannot open display :99\n"
@@ -172,6 +383,26 @@ class ApplicationSmokeDiagnosticAdverseTests(unittest.TestCase):
             log_categories=log_cats_dbus,
         )
         self.assertEqual(cause_dbus, "dbus-session-failure")
+
+    def test_dbus_category_does_not_cross_log_records(self):
+        """A D-Bus token on one record cannot relabel an unrelated Node failure."""
+        categories = extract_log_categories(
+            b"Error: Cannot find module '/private/smoke.mjs'\n",
+            b"dbus-run-session: starting session\n",
+            exit_code=1,
+        )
+        self.assertIn("module-not-found", categories)
+        self.assertNotIn("dbus-daemon-error", categories)
+        self.assertEqual(
+            classify_smoke_cause(
+                exit_code=1,
+                timed_out=False,
+                receipt_error=None,
+                log_categories=categories,
+            ),
+            "harness-error",
+        )
+
 
     def test_failure_binding_uses_failed_callee_not_wrapper_prefix(self):
         cases = [

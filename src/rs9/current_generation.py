@@ -113,8 +113,13 @@ def distribution_paths(generation=HISTORICAL_GENERATION):
             "operators/theme-forge-current-202610/hosted-lanes.json", DISTRIBUTION_SCOPE)
 
 
-def rpm_policy_path(generation=HISTORICAL_GENERATION):
+def rpm_policy_path(generation=HISTORICAL_GENERATION, *, policy_variant=None):
     generation_paths(generation)
+    if policy_variant is not None:
+        if generation != CURRENT_GENERATION or policy_variant not in ('current070', 'current071'):
+            raise ContractError('INVALID_SELECTION', 'Unknown RPM policy context')
+        if policy_variant == 'current071':
+            return 'operators/theme-forge-current-202610/rpm-lint-policy-nebular071.json'
     return ("operators/live1/rpm-lint-policy.json" if generation == HISTORICAL_GENERATION
             else "operators/theme-forge-current-202610/rpm-lint-policy.json")
 
@@ -129,6 +134,9 @@ def configuration_paths(repository, *, generation=HISTORICAL_GENERATION):
              rpm_policy_path(generation), "operators/live1/targets.json"}
     prefix = "operators/live1" if generation == HISTORICAL_GENERATION else "operators/theme-forge-current-202610"
     paths.add(prefix + "/nebular-callers.json")
+    if generation == CURRENT_GENERATION:
+        paths.update({rpm_policy_path(generation, policy_variant='current071'),
+                      prefix + '/nebular-callers-070.json'})
     paths.update(p.relative_to(root).as_posix() for p in (root / bootstrap).parent.rglob("*.json"))
     return sorted(paths)
 

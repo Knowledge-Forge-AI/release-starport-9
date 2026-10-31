@@ -120,6 +120,11 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
         captures = capture_generation(repository, capture_root, client=client, checkout_binding="hosted:" + commit,
                                       supplemental_receipts=supplemental_receipts, generation=generation)
         bytes_authenticated = True
+        if generation == CURRENT_GENERATION and lane == 'rpm':
+            from rs9.rpm_lint_policy import select_current_rpm_variant, load_policy
+            variant = select_current_rpm_variant(captures)
+            selected_path = repository / rpm_policy_path(generation, policy_variant=variant)
+            load_policy(selected_path, generation=generation, policy_variant=variant)
         projection = canonical_release_auth_projection(json.loads((capture_root / "summary/authentication.json").read_bytes()))
         ingestion = compute_auth_sha256(projection)
         expected_auth = upstream.get(("authenticate", "generation"))

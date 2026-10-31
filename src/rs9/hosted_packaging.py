@@ -473,6 +473,7 @@ def execute(context):
     client_tag = "rs9-" + family + "-client:" + uuid.uuid4().hex[:12]
     artifacts, identities = [], []
     client_runtime, caller_evidence, preservation_policy = None, None, None
+    policy_variant = None
     return_result = None
     current_substage = "builder-provision"
     failed_product = None
@@ -494,8 +495,11 @@ def execute(context):
             # It does not install, sign or qualify any candidate product.
             client_runtime = prepare_client(host, environment, arch=arch, system=system, tag=client_tag)
             from rs9.rpm_client_runtime import bind_engine_floors
+            if generation != HISTORICAL_GENERATION:
+                from rs9.rpm_lint_policy import select_current_rpm_variant
+                policy_variant = select_current_rpm_variant(context['captures'])
             client_runtime = bind_engine_floors(client_runtime, context["captures"],
-                **({"generation": generation} if generation != HISTORICAL_GENERATION else {}))
+                **({"generation": generation, "policy_variant":policy_variant} if generation != HISTORICAL_GENERATION else {}))
             diagnostics = scratch / "diagnostics"
             diagnostics.mkdir(exist_ok=True)
             runtime_path = diagnostics / ("rpm-client-runtime-" + system + ".json")
@@ -505,7 +509,7 @@ def execute(context):
             try:
                 preservation_policy = (load_policy(repository / "operators/live1/rpm-lint-policy.json")
                     if generation == HISTORICAL_GENERATION else
-                    load_policy(repository / rpm_policy_path(generation), generation=generation))
+                    load_policy(repository / rpm_policy_path(generation, policy_variant=policy_variant), generation=generation, policy_variant=policy_variant))
             except (ContractError, OSError):
                 preservation_policy = {}  # Explicit invalid input cannot confer acceptance.
             nebular = next((capture for capture, intent, _ in context["captures"]
@@ -542,7 +546,8 @@ def execute(context):
                 result = build(capture, intent, target, work,
                                offline_npm_archives=npm, runner=builder,
                                **({"builder_system": system, "policy": preservation_policy,
-                                    "client_runtime": client_runtime, "caller_evidence": caller_evidence}
+                                    "client_runtime": client_runtime, "caller_evidence": caller_evidence,
+                                    **({"policy_variant":policy_variant} if policy_variant is not None else {})}
                                   if family == "rpm" else {}),
                                **({"generation": generation} if generation != HISTORICAL_GENERATION else {}))
                 path = result["package_path"] if family == "pacman" else result["rpm_path"]

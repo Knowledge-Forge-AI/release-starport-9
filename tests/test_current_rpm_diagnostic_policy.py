@@ -178,59 +178,63 @@ class CurrentRpmDiagnosticPolicyTests(unittest.TestCase):
         from rs9.build_native import MockCommandRunner
         from tests.rpm_summary_fixtures import witnessed_build_double
         policy=blocked_policy()
-        for missing_policy in (False,True):
-            with self.subTest(missing_policy=missing_policy),tempfile.TemporaryDirectory() as tmp:
-                root=Path(tmp);scratch=root/'work';scratch.mkdir()
-                context=dict(family='rpm',system='x86_64-linux',repository=Path('.').resolve(),
-                    scratch=scratch,pins={},client=None,generation=CURRENT_GENERATION,
-                    captures=[(SimpleNamespace(),{'project':{'id':pid}}, {}) for pid in policy['projects']],
-                    binding={'source_commit':'0'*40},authentication_sha256='1'*64,
-                    runner=MockCommandRunner(available_tools={'docker':'fixture-docker'}))
-                environment=dict(platform='linux/amd64',image_ref='fixture@sha256:'+'a'*64,preprovisioned_packages=[],tools={})
-                seen=[]
-                def build(capture,intent,arch,work,**kwargs):
-                    pid=intent['project']['id'];seen.append(pid)
-                    self.assertEqual(kwargs['generation'],CURRENT_GENERATION)
-                    self.assertEqual(kwargs['policy'],{} if missing_policy else policy)
-                    rpm=work/(pid+'.rpm');spec=work/(pid+'.spec')
-                    rpm.write_bytes(b'fixture-unsigned-rpm');spec.write_bytes(b'Name: fixture\n')
-                    raw=raw_from_records([]);raw.update(package_sha256=digest(rpm.read_bytes()),spec_sha256=digest(spec.read_bytes()))
-                    raw['tool_receipt'].update(stdout_sha256=digest(b'clean'),stderr_sha256=digest(b''))
-                    evaluation=evaluate_policy(raw,{},dict(project_id=pid,version=policy['projects'][pid]['version'],arch=arch,
-                        system='x86_64-linux'),kwargs['policy'],generation=kwargs['generation'])
-                    error=ContractError('RPMLINT_FAILED','blocked current diagnostic policy',details={'substage':'rpmlint'})
-                    error.rpmlint_evidence=raw;error.rpmlint_policy=evaluation
-                    error.package_path=str(rpm);error.spec_path=str(spec)
-                    error.package_sha256=raw['package_sha256'];error.spec_sha256=raw['spec_sha256']
-                    raise error
-                with ExitStack() as stack:
-                    for target,value in [('rs9.hosted_packaging.provision',environment),
-                        ('rs9.hosted_packaging.container_tool_facts',{}),
-                        ('rs9.hosted_packaging._resolve_offline_npm_archives',None),
-                        ('rs9.hosted_packaging.prepare_client',{'status':'unavailable'}),
-                        ('rs9.rpm_client_runtime.bind_engine_floors',{'status':'unavailable'})]:
-                        stack.enter_context(patch(target,return_value=value))
-                    for target in ['rs9.hosted_deb.provision_image','rs9.hosted_packaging.checked']:
-                        stack.enter_context(patch(target))
-                    stack.enter_context(patch('rs9.nebular_callers.collect_caller_sources',side_effect=ContractError('CALLER_SOURCE_UNAVAILABLE','fixture')))
-                    stack.enter_context(patch.object(hosted,'build_rpm_candidate',side_effect=witnessed_build_double(build)))
-                    for target in ['rs9.hosted_packaging.SigningFixture','rs9.rpm_repository.metadata_command','rs9.hosted_deb.client_cycle']:
-                        stack.enter_context(patch(target,side_effect=AssertionError('rejection must stop downstream action')))
-                    loader=stack.enter_context(patch('rs9.rpm_lint_policy.load_policy',
-                        side_effect=ContractError('INVALID_POLICY','missing selected current') if missing_policy else None,
-                        return_value=policy))
-                    result=hosted.execute(context)
-                loader.assert_called_once_with(context['repository']/'operators/theme-forge-current-202610/rpm-lint-policy.json',generation=CURRENT_GENERATION)
-                self.assertEqual(set(seen),set(policy['projects']))
-                gates={row['name']:row for row in result['gates']}
-                self.assertEqual(gates['rpm-lint-policy-accepted']['status'],'fail')
-                self.assertEqual(gates['rpm-repository-indexing']['status'],'not-run')
-                self.assertEqual(gates['rpm-client-qualification']['status'],'not-run')
-                self.assertFalse((scratch/'unsigned-custody').exists())
-                for pid in seen:
-                    failure=result['details']['product_failures'][pid]
-                    self.assertEqual(failure['code'],'RPMLINT_FAILED')
-                    self.assertIn(scratch/'quarantine'/(pid+'.rpm'),result['artifacts'])
-                    self.assertTrue((scratch/'diagnostics'/('rpmlint-'+pid+'.json')).is_file())
-                    self.assertTrue(any('spec' in path.name for path in result['artifacts']))
-                    self.assertIn(pid,result['details']['construction_witnesses'])
+        for variant in ('current070','current071'):
+            for missing_policy in (False,True):
+                with self.subTest(missing_policy=missing_policy),tempfile.TemporaryDirectory() as tmp:
+                    root=Path(tmp);scratch=root/'work';scratch.mkdir()
+                    context=dict(family='rpm',system='x86_64-linux',repository=Path('.').resolve(),
+                        scratch=scratch,pins={},client=None,generation=CURRENT_GENERATION,
+                        captures=[(SimpleNamespace(),{'project':{'id':pid}}, {}) for pid in policy['projects']],
+                        binding={'source_commit':'0'*40},authentication_sha256='1'*64,
+                        runner=MockCommandRunner(available_tools={'docker':'fixture-docker'}))
+                    environment=dict(platform='linux/amd64',image_ref='fixture@sha256:'+'a'*64,preprovisioned_packages=[],tools={})
+                    seen=[]
+                    def build(capture,intent,arch,work,**kwargs):
+                        pid=intent['project']['id'];seen.append(pid)
+                        self.assertEqual(kwargs['policy_variant'],variant)
+                        self.assertEqual(kwargs['generation'],CURRENT_GENERATION)
+                        self.assertEqual(kwargs['policy'],{} if missing_policy else policy)
+                        rpm=work/(pid+'.rpm');spec=work/(pid+'.spec')
+                        rpm.write_bytes(b'fixture-unsigned-rpm');spec.write_bytes(b'Name: fixture\n')
+                        raw=raw_from_records([]);raw.update(package_sha256=digest(rpm.read_bytes()),spec_sha256=digest(spec.read_bytes()))
+                        raw['tool_receipt'].update(stdout_sha256=digest(b'clean'),stderr_sha256=digest(b''))
+                        evaluation=evaluate_policy(raw,{},dict(project_id=pid,version=policy['projects'][pid]['version'],arch=arch,
+                            system='x86_64-linux'),kwargs['policy'],generation=kwargs['generation'])
+                        error=ContractError('RPMLINT_FAILED','blocked current diagnostic policy',details={'substage':'rpmlint'})
+                        error.rpmlint_evidence=raw;error.rpmlint_policy=evaluation
+                        error.package_path=str(rpm);error.spec_path=str(spec)
+                        error.package_sha256=raw['package_sha256'];error.spec_sha256=raw['spec_sha256']
+                        raise error
+                    with ExitStack() as stack:
+                        for target,value in [('rs9.hosted_packaging.provision',environment),
+                            ('rs9.hosted_packaging.container_tool_facts',{}),
+                            ('rs9.hosted_packaging._resolve_offline_npm_archives',None),
+                            ('rs9.hosted_packaging.prepare_client',{'status':'unavailable'}),
+                            ('rs9.rpm_client_runtime.bind_engine_floors',{'status':'unavailable'})]:
+                            stack.enter_context(patch(target,return_value=value))
+                        for target in ['rs9.hosted_deb.provision_image','rs9.hosted_packaging.checked']:
+                            stack.enter_context(patch(target))
+                        stack.enter_context(patch('rs9.nebular_callers.collect_caller_sources',side_effect=ContractError('CALLER_SOURCE_UNAVAILABLE','fixture')))
+                        stack.enter_context(patch.object(hosted,'build_rpm_candidate',side_effect=witnessed_build_double(build)))
+                        for target in ['rs9.hosted_packaging.SigningFixture','rs9.rpm_repository.metadata_command','rs9.hosted_deb.client_cycle']:
+                            stack.enter_context(patch(target,side_effect=AssertionError('rejection must stop downstream action')))
+                        # Synthetic orchestration seam; these are not live captures.
+                        stack.enter_context(patch('rs9.rpm_lint_policy.select_current_rpm_variant',return_value=variant))
+                        loader=stack.enter_context(patch('rs9.rpm_lint_policy.load_policy',
+                            side_effect=ContractError('INVALID_POLICY','missing selected current') if missing_policy else None,
+                            return_value=policy))
+                        result=hosted.execute(context)
+                    loader.assert_called_once_with(context['repository']/('operators/theme-forge-current-202610/rpm-lint-policy-nebular071.json' if variant=='current071' else 'operators/theme-forge-current-202610/rpm-lint-policy.json'),generation=CURRENT_GENERATION,policy_variant=variant)
+                    self.assertEqual(set(seen),set(policy['projects']))
+                    gates={row['name']:row for row in result['gates']}
+                    self.assertEqual(gates['rpm-lint-policy-accepted']['status'],'fail')
+                    self.assertEqual(gates['rpm-repository-indexing']['status'],'not-run')
+                    self.assertEqual(gates['rpm-client-qualification']['status'],'not-run')
+                    self.assertFalse((scratch/'unsigned-custody').exists())
+                    for pid in seen:
+                        failure=result['details']['product_failures'][pid]
+                        self.assertEqual(failure['code'],'RPMLINT_FAILED')
+                        self.assertIn(scratch/'quarantine'/(pid+'.rpm'),result['artifacts'])
+                        self.assertTrue((scratch/'diagnostics'/('rpmlint-'+pid+'.json')).is_file())
+                        self.assertTrue(any('spec' in path.name for path in result['artifacts']))
+                        self.assertIn(pid,result['details']['construction_witnesses'])

@@ -155,7 +155,7 @@ def validate_runtime_evidence(evidence, *, system, arch, floor):
     return True
 
 
-def bind_engine_floors(evidence, captures, *, generation=HISTORICAL_GENERATION):
+def bind_engine_floors(evidence, captures, *, generation=HISTORICAL_GENERATION, policy_variant=None):
     """Bind system-Node requirements, including preserved executable Loom capabilities."""
     generation_paths(generation)
     from rs9.release_core import authenticated_record_hash
@@ -182,7 +182,11 @@ def bind_engine_floors(evidence, captures, *, generation=HISTORICAL_GENERATION):
                 else:
                     from rs9.nebular_callers import current_contract_for_capture
                     selected = current_contract_for_capture(capture)
-                    policy = load_policy(generation=generation)
+                    if policy_variant is not None:
+                        from rs9.rpm_lint_policy import assert_policy_capture
+                        assert_policy_capture(capture, intent, policy_variant)
+                    policy = load_policy(generation=generation,
+                        **({} if policy_variant is None else {'policy_variant':policy_variant}))
                     floor = release_runtime_floor(inputs["asset_file"], policy["projects"][product], capture=capture)
                     floor_sha256 = selected["floor"]["sha256"]
                 binding = {"product": product, "source_sha256": floor_sha256, "floor": floor,
