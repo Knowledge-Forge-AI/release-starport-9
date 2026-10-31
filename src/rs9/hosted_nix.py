@@ -33,6 +33,16 @@ _LOADER_FACT_KEYS = ("loader", "glibc_lib", "library_path", "python", "node", "r
 _DBUS_FACT_KEYS = ("dbus_run_session", "dbus_daemon", "dbus_session_config")
 
 
+def _nix_application_environment(source, generation, system):
+    env = runtime_environment(source)
+    flags = ("WEBKIT_DISABLE_COMPOSITING_MODE", "WEBKIT_DISABLE_DMABUF_RENDERER")
+    for name in flags:
+        env.pop(name, None)
+    if generation == CURRENT_GENERATION and system in {"x86_64-linux", "aarch64-linux"}:
+        env.update({name: "1" for name in flags})
+    return env
+
+
 def _current_linux_initial_observation_enabled(generation, system, prepared):
     """Opt in only after prepare_smoke has authenticated the current Nebular source."""
     return (generation == CURRENT_GENERATION
@@ -344,7 +354,8 @@ def execute(context):
         raise ContractError("NIX_PIN", "Actual fetched nixpkgs identity differs from source")
     command(["nix", "flake", "check", "--no-build", *overrides, str(source)], timeout=600)
     paths, gates = {}, [{"name": "nix-lock-pin", "status": "pass"}]
-    env = runtime_environment(dict(os.environ, THEME_FORGE_CACHE_DIR=str(scratch / "nix-runtime-cache")))
+    env = _nix_application_environment(
+        dict(os.environ, THEME_FORGE_CACHE_DIR=str(scratch / "nix-runtime-cache")), generation, system)
     neb = next(c for c, i, _ in context["captures"] if i["project"]["id"] == PRODUCTS[-1])
     baseline = None
     prepared = None

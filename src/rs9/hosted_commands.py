@@ -186,6 +186,7 @@ def service_protocol(argv, env=None):
 def runtime_environment(env=None):
     allowed = {"PATH","HOME","TMPDIR","LANG","LC_ALL","TZ","THEME_FORGE_CACHE_DIR",
         "PYTHONDONTWRITEBYTECODE","DISPLAY","XAUTHORITY","DBUS_SESSION_BUS_ADDRESS",
+        "WEBKIT_DISABLE_COMPOSITING_MODE","WEBKIT_DISABLE_DMABUF_RENDERER",
         "WAYLAND_DISPLAY","LD_LIBRARY_PATH","DYLD_LIBRARY_PATH","XDG_RUNTIME_DIR",
         "XDG_CONFIG_HOME","XDG_DATA_HOME","XDG_STATE_HOME","XDG_CACHE_HOME"}
     source = os.environ if env is None else env
