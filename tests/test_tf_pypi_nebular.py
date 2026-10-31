@@ -3304,7 +3304,8 @@ class NebularPyPIContractTests(unittest.TestCase):
             sorted(TOKENS, key=len, reverse=True)[:8]
         )
         all_cats = sorted(PROBLEM_CATEGORIES.values())
-        self.assertEqual(len(all_cats), 22)
+        self.assertEqual(len(all_cats), 23)
+        self.assertIn("harness-cleanup-failed", all_cats)
         max_raw_obs = {
             "scenario": "A",
             "cause": "process-cleanup-failure",
@@ -3375,7 +3376,7 @@ class NebularPyPIContractTests(unittest.TestCase):
                     "total": 1048576,
                     "scanned": 64,
                     "categories": [{"category": c, "count": 2} for c in all_cats],
-                    "unrecognized": 10,
+                    "unrecognized": 8,
                     "non_string": 10,
                     "unavailable": 0,
                 },
