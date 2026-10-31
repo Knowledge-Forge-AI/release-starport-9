@@ -8,13 +8,13 @@
     "value": ">=22"
   },
   "identity": {
-    "commit": "cadb40c4972f68f314096ff60fbcfb4da950c161",
+    "commit": "f2c527ee6f3cbd53fd44e095d5355ca7f5c7519a",
     "lineage_mode": "direct-current-tag-no-historical-forward-proof",
-    "release_id": 426333162,
+    "release_id": 429782340,
     "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
     "repository_id": 1358643872,
-    "tag": "v0.7.0",
-    "tree": "27c643b6375c2aafde314799c4f08e844c14992c"
+    "tag": "v0.7.1",
+    "tree": "6e3561855f6ee0093fb709488ad976b69bf501d2"
   },
   "member_definitions": {
     "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-adapter/theme-adapter.mjs": {
@@ -150,15 +150,15 @@
       "application": {
         "mode": 493,
         "path": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
-        "sha256": "9dcd5953dc3696f0159323fd02ef009178a4eb2fed6427dde52eb9a26283e06e",
-        "size": 21932792
+        "sha256": "558defb360fee8cf687ef725ca25528909d358c748bd56e215f041d8e2565ab6",
+        "size": 21932728
       },
       "asset": {
-        "github_asset_id": 687086522,
+        "github_asset_id": 694680442,
         "id": "linux-arm64",
-        "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz",
-        "sha256": "eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c",
-        "size": 54553557
+        "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "8341d0069dd729d4d7e535b42d411edb8fee02c402fbcf0c861514a64f09c608",
+        "size": 54621132
       },
       "manifest": {
         "content": {
@@ -2275,7 +2275,7 @@
               "size": 27062
             }
           ],
-          "manifestDigest": "60a794af4476b6ad227d58c27d94a06ca4d0513588ecfa319ec8038ffae14a54",
+          "manifestDigest": "bc74b499a6ce914d2e913b2f6bda4de8dd1401f6e1fb9763f2c00606a70e9cef",
           "native": {
             "abi": 1,
             "backend": "native-addon-posix-openat-v1",
@@ -2313,11 +2313,11 @@
           },
           "runtime": {
             "mode": 493,
-            "sha256": "d09e299258c24f7cdf6f5d5ec185e3a56512b27a697113735dac909f1cac7b8d",
-            "size": 122179336,
+            "sha256": "7e48183361053f039294fbbc3ba586722fe756bf296d6cb8195356d10819cd16",
+            "size": 122293360,
             "target": "aarch64-unknown-linux-gnu",
             "v8": "12.4.254.21-node.57",
-            "version": "22.23.3"
+            "version": "22.23.4"
           },
           "runtimeKind": "node-runtime-payload-v1",
           "schema": "tfsb.studio-sidecar-distribution",
@@ -2334,7 +2334,7 @@
             "inventoryDigest": "e8093de3dd210992afcc396626e6f5720b2b0c53b74a4eda4716869b2af25014"
           }
         },
-        "sha256": "33256d0b33530d299cca80dab1790851a4fba7320cfba546d4a3014a6b845182",
+        "sha256": "8b275de7becbcd47886ebdfb1e156a64b3a5991cf181b34b8ce126af44df0eb4",
         "size": 51251
       },
       "members": {
@@ -2381,26 +2381,26 @@
       },
       "runtime": {
         "mode": 493,
-        "sha256": "d09e299258c24f7cdf6f5d5ec185e3a56512b27a697113735dac909f1cac7b8d",
-        "size": 122179336,
+        "sha256": "7e48183361053f039294fbbc3ba586722fe756bf296d6cb8195356d10819cd16",
+        "size": 122293360,
         "target": "aarch64-unknown-linux-gnu",
         "v8": "12.4.254.21-node.57",
-        "version": "22.23.3"
+        "version": "22.23.4"
       }
     },
     "x86_64-linux": {
       "application": {
         "mode": 493,
         "path": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
-        "sha256": "6213ca853a49af3a74ee271216743e47c24edfccb4c2ac92025b049e96cad99d",
-        "size": 23183096
+        "sha256": "61f7410256e1d657fa1e119f4e57e1b68bd2ad1123fc4915a7f80091b6e3ba6a",
+        "size": 23180376
       },
       "asset": {
-        "github_asset_id": 687086740,
+        "github_asset_id": 694680564,
         "id": "linux-x64",
-        "name": "theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz",
-        "sha256": "4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27",
-        "size": 54425294
+        "name": "theme-forge-nebular-fusion-v0.7.1-x86_64-unknown-linux-gnu.tar.gz",
+        "sha256": "3a0f9fc991c94588ec06bbe9e0dc4a40250e11f8d238bd8a11cad9ce6fc98c5c",
+        "size": 54473927
       },
       "manifest": {
         "content": {
@@ -4517,7 +4517,7 @@
               "size": 27062
             }
           ],
-          "manifestDigest": "368fb92497c2f4c9be88d63ee0f4216a404024d700875e44ae016cb4c9947f88",
+          "manifestDigest": "5d30cb2dce605892eca2e234d8fe564b655c2bc8f6c56055985f56ebba541b27",
           "native": {
             "abi": 1,
             "backend": "native-addon-posix-openat-v1",
@@ -4555,11 +4555,11 @@
           },
           "runtime": {
             "mode": 493,
-            "sha256": "fde6a4bf8d0562f7751d1a2d6cb9b417c4cfe107bbcb0aa3e9a24e125e348f48",
-            "size": 124827920,
+            "sha256": "94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90",
+            "size": 124902584,
             "target": "x86_64-unknown-linux-gnu",
             "v8": "12.4.254.21-node.57",
-            "version": "22.23.3"
+            "version": "22.23.4"
           },
           "runtimeKind": "node-runtime-payload-v1",
           "schema": "tfsb.studio-sidecar-distribution",
@@ -4576,7 +4576,7 @@
             "inventoryDigest": "2e76cd1a694ae4b2e7e8a9b106fdb5be2cd5fef45204ace49aaaaa0007e66b70"
           }
         },
-        "sha256": "dc6e6406dafcd46cafc974edec4db2b070bf66594692509ac6df94faa0d139da",
+        "sha256": "5caf3591b05181a5c605e6d9929ed6660e2ca073359eeae8d42fc7a1c6253160",
         "size": 51244
       },
       "members": {
@@ -4623,11 +4623,11 @@
       },
       "runtime": {
         "mode": 493,
-        "sha256": "fde6a4bf8d0562f7751d1a2d6cb9b417c4cfe107bbcb0aa3e9a24e125e348f48",
-        "size": 124827920,
+        "sha256": "94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90",
+        "size": 124902584,
         "target": "x86_64-unknown-linux-gnu",
         "v8": "12.4.254.21-node.57",
-        "version": "22.23.3"
+        "version": "22.23.4"
       }
     }
   },
@@ -4649,13 +4649,13 @@
       "size": 8397
     },
     "protocol/theme-lab-v2/payload-binding.json": {
-      "blob": "32c8658a6d1ab4b941c4b8d42b8f2ad07bc743b6",
-      "sha256": "95b274cab41f4512e2a5002476a650feea9a5b6a3f182dd0cb577ade286af729",
+      "blob": "9f45136ab593a964d080756b7ab41dd4494f20b0",
+      "sha256": "59a155682d0a622e3699b1e673859406096d167f1a5c21147afd123a7144f08c",
       "size": 55841
     },
     "src-tauri/Cargo.toml": {
-      "blob": "227de4166f6b74dd4d865ef69b6311c7df3b5edf",
-      "sha256": "98f0cd315ca2dfb40a6cc575ec3eb302c2f866a89aa58e180541f93c29cc31ee",
+      "blob": "d41f8d0252d227340467ca98c9cb02b55f55c47b",
+      "sha256": "c42d6fec67d50135527565f08757b5b5b72e7446691d5bf841c875d2e200bdd9",
       "size": 1235
     },
     "src-tauri/build.rs": {
@@ -4699,9 +4699,9 @@
       "size": 1954
     },
     "src-tauri/src/sidecar/artifact.rs": {
-      "blob": "9b54daaa16c827b45e914e647139492a8c49d825",
-      "sha256": "a84a358d40a440c1f7c977ce061e363d8502fe5ea29604aa6b39cbbf664694c2",
-      "size": 57325
+      "blob": "0f2319d660195f73536758966d2c9cd4d42434a7",
+      "sha256": "f9710aee02f5adc5a8d1e857a9e4413651980b0dca2fa16a2de2788fa61569f4",
+      "size": 67505
     },
     "src-tauri/src/sidecar/process.rs": {
       "blob": "594916c451722524be7b2c5c296e1283ea22bd3a",
@@ -4719,14 +4719,14 @@
       "size": 32460
     },
     "src-tauri/tauri.conf.json": {
-      "blob": "c8f0ba81ae12ec2d5f9e245e44b0507fd09ad852",
-      "sha256": "d078aa55c8c41f1d58c6a70d6c9ae325f020101bde9fa696a61fa309ffc374e9",
+      "blob": "5a0e7dd3590eb5a36906c211488ba1c2a1a280b7",
+      "sha256": "3427de9fca379e264d786291a756c3f6b5549f4d3675961dfd6c6b70212b825d",
       "size": 1530
     },
     "tools/node-runtime-authority.mjs": {
-      "blob": "f55c2231f07d35af6593634b49d13c30d429ba1f",
-      "sha256": "962014ba74a1b0285388b85026016d7d664adea6353ebca5c61a407a6c7ee653",
-      "size": 37930
+      "blob": "dfb5fb377c66463ec54ba81c87d1424857548436",
+      "sha256": "5495e291131a963c3e9bc9730aacb108d770954ce88f397e0f4a3c9ce768635e",
+      "size": 37973
     },
     "tools/sidecar-common.mjs": {
       "blob": "a79812c8b47bb9a0a34c341261c49f7c1060d12e",

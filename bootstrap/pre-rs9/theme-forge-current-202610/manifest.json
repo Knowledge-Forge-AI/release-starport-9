@@ -66,7 +66,7 @@
       "version": "0.3.0"
     },
     {
-      "config_sha256": "0a499374c6c2834337b4bf1b9f44c7cd80b33ee3c36e5a76442c08e7585e5189",
+      "config_sha256": "4c811af119ea39fcbc6859caf3d4babbab091d45c4649ddc33ecccf0c6343588",
       "configuration": "theme-forge-nebular-fusion",
       "license_authority": {
         "basis": "manager-direction-and-authenticated-tagged-repository",
@@ -77,13 +77,13 @@
           "COMMERCIAL-LICENSE.md"
         ]
       },
-      "release_id": 426333162,
+      "release_id": 429782340,
       "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
       "repository_id": 1358643872,
-      "tag": "v0.7.0",
-      "tag_commit": "cadb40c4972f68f314096ff60fbcfb4da950c161",
-      "tag_tree": "27c643b6375c2aafde314799c4f08e844c14992c",
-      "version": "0.7.0"
+      "tag": "v0.7.1",
+      "tag_commit": "f2c527ee6f3cbd53fd44e095d5355ca7f5c7519a",
+      "tag_tree": "6e3561855f6ee0093fb709488ad976b69bf501d2",
+      "version": "0.7.1"
     }
   ],
   "release-contains-rs9": false,

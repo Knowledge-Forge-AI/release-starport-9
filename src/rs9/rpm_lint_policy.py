@@ -18,7 +18,10 @@ RPM_LINT_POLICY_SCHEMA = 'rs9.rpm-lint-policy.v1'
 RPM_POLICY_EVALUATION_SCHEMA = 'rs9.rpm-lint-policy-evaluation.v1'
 PERMITTED_EXCEPTION_CLASSES = frozenset({'env-script-interpreter','non-executable-script','files-duplicated-waste'})
 CURRENT_VERSIONS = {'theme-forge-stellar-burst':'0.6.1','theme-forge-stellar-loom':'0.4.0','theme-forge-solar-sail':'0.2.1','theme-forge-nebular-fusion':'0.6.1'}
-CURRENT_GENERATION_VERSIONS = {'theme-forge-stellar-burst':'0.7.0','theme-forge-stellar-loom':'0.5.0','theme-forge-solar-sail':'0.3.0','theme-forge-nebular-fusion':'0.7.0'}
+CURRENT_GENERATION_VERSIONS = {'theme-forge-stellar-burst':'0.7.0','theme-forge-stellar-loom':'0.5.0','theme-forge-solar-sail':'0.3.0','theme-forge-nebular-fusion':'0.7.1'}
+# Policy bytes authorize the fixed070 inputs, independently of the advanced
+# active generation. Parsing them is not authority for a071 input tuple.
+CURRENT_POLICY_VERSIONS = {'theme-forge-stellar-burst':'0.7.0','theme-forge-stellar-loom':'0.5.0','theme-forge-solar-sail':'0.3.0','theme-forge-nebular-fusion':'0.7.0'}
 UNWAIVABLE_ERROR_CLASSES = frozenset({'no-changelogname-tag','explicit-lib-dependency'})
 MISSING_EVIDENCE_PREDICATES = frozenset({'caller-contract-unproven', 'caller-member-missing',
     'caller-reference-unresolved', 'engine-floor-unproven', 'engine-floor-unmet',
@@ -96,7 +99,7 @@ def _validate_current_policy(policy):
     if (not isinstance(status, str) or status not in {'blocked', 'authorized'}
             or policy.get('generation') != CURRENT_GENERATION
             or policy.get('blocking') is not (not authorized)
-            or set(policy.get('projects', {})) != set(CURRENT_GENERATION_VERSIONS)
+            or set(policy.get('projects', {})) != set(CURRENT_POLICY_VERSIONS)
             or policy.get('unwaivable_error_classes') != ['no-changelogname-tag', 'explicit-lib-dependency']
             or policy.get('tool_constraints') != {'tool':'rpmlint', 'version':'2.8.0',
                 'package_version':'2.8.0-2.fc43', 'allowed_exit_codes':[0,64], 'filtered_count':8}):
@@ -111,7 +114,10 @@ def _validate_current_policy(policy):
         if canonical(policy) != canonical(source_policy):
             raise ContractError('INVALID_POLICY', 'Current authorization differs from selected source-owned policy')
     catalog = json.loads((root/'nix/theme-forge-current-202610-products.json').read_bytes())['products']
-    callers = json.loads((root/'operators/theme-forge-current-202610/nebular-callers.json').read_bytes())
+    # Exact frozen caller bytes accompany this070 policy; active071 source
+    # metadata must neither invalidate that replay nor inherit its exceptions.
+    from rs9.nebular_callers import _load_current_contract
+    callers = _load_current_contract()
     for name, entry in policy['projects'].items():
         closed(entry, _CURRENT_PROJECT_FIELDS, required=_CURRENT_PROJECT_REQUIRED)
         native = name in {'theme-forge-stellar-burst', 'theme-forge-nebular-fusion'}
@@ -198,7 +204,7 @@ def _validate_policy(policy, *, generation=HISTORICAL_GENERATION):
         raise ContractError('INVALID_POLICY', 'Explicit existing tool filter count required')
     if not isinstance(codes, list) or set(codes) != PERMITTED_EXCEPTION_CLASSES or not isinstance(projects, dict) or not projects:
         raise ContractError('INVALID_POLICY', 'Malformed candidate lint policy')
-    versions = CURRENT_VERSIONS if generation == HISTORICAL_GENERATION else CURRENT_GENERATION_VERSIONS
+    versions = CURRENT_VERSIONS if generation == HISTORICAL_GENERATION else CURRENT_POLICY_VERSIONS
     for name, entry in projects.items():
         if not isinstance(entry, dict) or entry.get('package_name') != name or entry.get('version') != versions.get(name):
             raise ContractError('INVALID_POLICY', 'Malformed exact project identity')

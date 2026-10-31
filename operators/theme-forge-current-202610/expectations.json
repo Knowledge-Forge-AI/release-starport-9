@@ -105,66 +105,66 @@
     {
       "assets": [
         {
-          "id": 688740169,
+          "id": 694839709,
           "name": "SHA256SUMS",
-          "sha256": "7ba8445ca16289bf6e5ab459101aaae2ec7c76db4457bf2855c77e53f5582cf2",
-          "size": 2764
+          "sha256": "abaa657f58382cb369b566fbc7b799072d46851b842ed10057368288b1a6cea2",
+          "size": 1470
         },
         {
-          "id": 687086750,
-          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz",
-          "sha256": "d4bef1172a773c27eced3067e148aaa353152c577001f1203a0dc95ab4cb9f00",
-          "size": 22564
+          "id": 694680400,
+          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.7.1.tgz",
+          "sha256": "dd4420a827315267be16bb95f6982be396673e6b4cba17525bd25c49649c7200",
+          "size": 22541
         },
         {
-          "id": 687087117,
-          "name": "nebular-v0.7.0-native-ci-provenance.json",
-          "sha256": "535951387716f3100eaab33c8ee28b3d0794cd3a755c2b23f0071c3f5f88e92d",
-          "size": 4290
+          "id": 694839643,
+          "name": "nebular-v0.7.1-native-ci-provenance.json",
+          "sha256": "81b0431b358834d392e04f004e3e4922ff55e2e76248f2b257a1edbd11876ce0",
+          "size": 6933
         },
         {
-          "id": 687215208,
-          "name": "nebular-v0.7.0-sbom.spdx.json",
-          "sha256": "e95e984096d6767959711bf98f8790e7d100328719fdfb59ac13ff34fd4c9225",
+          "id": 694680408,
+          "name": "nebular-v0.7.1-sbom.spdx.json",
+          "sha256": "0d727179a4773f752c141e217a6ae53fd8470ad7cca706b4b850967d254fe08a",
           "size": 63796
         },
         {
-          "id": 687215206,
-          "name": "nebular-v0.7.0-third-party-notices.tar.gz",
-          "sha256": "c8ab80d6601947a505eb68e482985672dd4c4a697ff57ecb1bacb9ca9935dbde",
-          "size": 30212
+          "id": 694680412,
+          "name": "nebular-v0.7.1-third-party-notices.tar.gz",
+          "sha256": "4ca86276f2954935ef9e7f410171945f4808059856d4af7c152562f1f51a689f",
+          "size": 610282
         },
         {
-          "id": 687086526,
-          "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz",
-          "sha256": "52f626bfcbfb4235298675669841ca9fbea8113118e9d25f0310e0a26489a470",
-          "size": 47355011
+          "id": 694680425,
+          "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-apple-darwin.app.tar.gz",
+          "sha256": "903d7380dd54c9070e944be22c08137141d24a6e3c3f5a1f8fb53c61e9a2b342",
+          "size": 47380487
         },
         {
-          "id": 687086522,
-          "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz",
-          "sha256": "eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c",
-          "size": 54553557
+          "id": 694680442,
+          "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-unknown-linux-gnu.tar.gz",
+          "sha256": "8341d0069dd729d4d7e535b42d411edb8fee02c402fbcf0c861514a64f09c608",
+          "size": 54621132
         },
         {
-          "id": 687086740,
-          "name": "theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz",
-          "sha256": "4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27",
-          "size": 54425294
+          "id": 694680564,
+          "name": "theme-forge-nebular-fusion-v0.7.1-x86_64-unknown-linux-gnu.tar.gz",
+          "sha256": "3a0f9fc991c94588ec06bbe9e0dc4a40250e11f8d238bd8a11cad9ce6fc98c5c",
+          "size": 54473927
         }
       ],
-      "commit": "cadb40c4972f68f314096ff60fbcfb4da950c161",
+      "commit": "f2c527ee6f3cbd53fd44e095d5355ca7f5c7519a",
       "contains_rs9": false,
       "immutable": false,
       "project": "theme-forge-nebular-fusion",
-      "published_at": "2026-10-29T02:09:29Z",
-      "release_id": 426333162,
+      "published_at": "2026-10-31T08:30:56Z",
+      "release_id": 429782340,
       "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
       "repository_id": 1358643872,
-      "tag": "v0.7.0",
-      "tree": "27c643b6375c2aafde314799c4f08e844c14992c",
+      "tag": "v0.7.1",
+      "tree": "6e3561855f6ee0093fb709488ad976b69bf501d2",
       "truncated": false,
-      "version": "0.7.0"
+      "version": "0.7.1"
     }
   ],
   "schema": "rs9.current-generation-release-expectations.v1alpha1"

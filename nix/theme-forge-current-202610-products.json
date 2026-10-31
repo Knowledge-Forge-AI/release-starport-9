@@ -109,11 +109,11 @@
     "theme-forge-nebular-fusion": {
       "id": "theme-forge-nebular-fusion",
       "pname": "theme-forge-nebular-fusion",
-      "version": "0.7.0",
+      "version": "0.7.1",
       "summary": "Evidence-bound Theme Forge integration workbench",
       "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
-      "tag": "v0.7.0",
-      "commit": "cadb40c4972f68f314096ff60fbcfb4da950c161",
+      "tag": "v0.7.1",
+      "commit": "f2c527ee6f3cbd53fd44e095d5355ca7f5c7519a",
       "kind": "materialized-desktop",
       "packaging_class": "native-desktop",
       "license": "AGPL-3.0-or-later",
@@ -123,7 +123,7 @@
       ],
       "icon": {
         "path": "src-tauri/icons/icon.png",
-        "url": "https://raw.githubusercontent.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/cadb40c4972f68f314096ff60fbcfb4da950c161/src-tauri/icons/icon.png",
+        "url": "https://raw.githubusercontent.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/f2c527ee6f3cbd53fd44e095d5355ca7f5c7519a/src-tauri/icons/icon.png",
         "sha256": "2d65e8c69a675b6c939ac11757c6a47a123f63b3f83b6d58305aaf7231aca160",
         "size": 8814
       },
@@ -135,34 +135,34 @@
       },
       "assets": {
         "aarch64-darwin": {
-          "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz",
-          "sha256": "52f626bfcbfb4235298675669841ca9fbea8113118e9d25f0310e0a26489a470",
-          "size": 47355011,
-          "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz",
+          "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-apple-darwin.app.tar.gz",
+          "sha256": "903d7380dd54c9070e944be22c08137141d24a6e3c3f5a1f8fb53c61e9a2b342",
+          "size": 47380487,
+          "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.1/theme-forge-nebular-fusion-v0.7.1-aarch64-apple-darwin.app.tar.gz",
           "root": "Theme Forge Nebular Fusion.app",
           "launcher": "Contents/Resources/bin/tfnf",
           "executable_path": "Theme Forge Nebular Fusion.app/Contents/MacOS/theme-forge-nebular-fusion",
-          "executable_sha256": "8aee6af893f2a3ab01b1e4ad84dc1cad8eab2067f00200149cfb5301274232b5"
+          "executable_sha256": "02c563f82d23fa06120ae3e8145fc2b4e46f1c1653db92d185d98a04464bfe4a"
         },
         "aarch64-linux": {
-          "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz",
-          "sha256": "eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c",
-          "size": 54553557,
-          "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz",
+          "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-unknown-linux-gnu.tar.gz",
+          "sha256": "8341d0069dd729d4d7e535b42d411edb8fee02c402fbcf0c861514a64f09c608",
+          "size": 54621132,
+          "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.1/theme-forge-nebular-fusion-v0.7.1-aarch64-unknown-linux-gnu.tar.gz",
           "root": "theme-forge-nebular-fusion",
           "launcher": "bin/tfnf",
           "executable_path": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
-          "executable_sha256": "9dcd5953dc3696f0159323fd02ef009178a4eb2fed6427dde52eb9a26283e06e"
+          "executable_sha256": "558defb360fee8cf687ef725ca25528909d358c748bd56e215f041d8e2565ab6"
         },
         "x86_64-linux": {
-          "name": "theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz",
-          "sha256": "4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27",
-          "size": 54425294,
-          "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.0/theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz",
+          "name": "theme-forge-nebular-fusion-v0.7.1-x86_64-unknown-linux-gnu.tar.gz",
+          "sha256": "3a0f9fc991c94588ec06bbe9e0dc4a40250e11f8d238bd8a11cad9ce6fc98c5c",
+          "size": 54473927,
+          "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.1/theme-forge-nebular-fusion-v0.7.1-x86_64-unknown-linux-gnu.tar.gz",
           "root": "theme-forge-nebular-fusion",
           "launcher": "bin/tfnf",
           "executable_path": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
-          "executable_sha256": "6213ca853a49af3a74ee271216743e47c24edfccb4c2ac92025b049e96cad99d"
+          "executable_sha256": "61f7410256e1d657fa1e119f4e57e1b68bd2ad1123fc4915a7f80091b6e3ba6a"
         }
       }
     }

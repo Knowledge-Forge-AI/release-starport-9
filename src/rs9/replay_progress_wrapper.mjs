@@ -56,6 +56,53 @@ const CURRENT_PROFILE = Object.freeze({
     "size": 1833
   }
 });
+const CURRENT071_PROFILE = Object.freeze({
+  "commit": "f2c527ee6f3cbd53fd44e095d5355ca7f5c7519a",
+  "id": "nebular071",
+  "modules": {
+    "candidate-provenance.mjs": {
+      "blob": "129b0da16329d07697daab619f8fdbc5690f72fa",
+      "sha256": "20244b6765d6e7d0ee5fd86452096a4546f189103b0acb9f065c4a1479c23155",
+      "size": 15484
+    },
+    "fs-snapshot.mjs": {
+      "blob": "841cfecd874517d0c619cf9a3866c2697e12ecd6",
+      "sha256": "30ad6c3f0394126a7d3e5534507fe46c78c34946edd15bd5c91b36e2b36df351",
+      "size": 13794
+    },
+    "native-launcher.mjs": {
+      "blob": "9c84fff880957edcb98925bbaea941fc0f7e66fe",
+      "sha256": "3595cfaf0a2f1ac51a48862dc5f6aa842db6d3431a62159bcb93cb0abc812f2d",
+      "size": 7193
+    },
+    "native-rc-package.mjs": {
+      "blob": "570d4d2b6cee8551bb0d77417e54ee4a0d308ca8",
+      "sha256": "0ef948c2f9f45a9343586288681ae5ed6f6527b85912a52bd8c37aa50e3682c6",
+      "size": 33102
+    },
+    "native-rc-smoke.mjs": {
+      "blob": "cbf6a2148c11ed1516ba5d7fc2d4dd32dee3ee9f",
+      "sha256": "874355e36496884e55a6e4dae6986ecde817d20863bb3fe26d1b1b5a1d283e69",
+      "size": 30732
+    },
+    "native-runtime.mjs": {
+      "blob": "333192471147289f232bd915c6813ae23b39f1bb",
+      "sha256": "a9d6c8e885b9db41877c5d2d79efe48f2e47daf791e0f1ad1ca06636d37d962e",
+      "size": 118749
+    },
+    "platform-targets.mjs": {
+      "blob": "ebe518bbf27856c496541bca46bf13066805a606",
+      "sha256": "35321c7e888038210589612873136c96bf697789f6f4e90918442faa41e13aec",
+      "size": 7292
+    }
+  },
+  "support": {
+    "blob": "a0ea0f117edb7c980db653ad1073e005d603b71a",
+    "sha256": "0d68c1e18c5024f5fc8b52815d9f01ad25fd68f878f85bed59bdb4833a7f98c0",
+    "size": 1833
+  },
+  "tree": "6e3561855f6ee0093fb709488ad976b69bf501d2"
+});
 const PROGRESS_SCHEMA = "rs9.application-smoke-replay-progress.v1";
 const MAX_PROGRESS_BYTES = 16 * 1024;
 const MAX_PROGRESS_EVENTS = 32;
@@ -266,7 +313,7 @@ function buildAuthenticatedClosure(harnessPath, expectedSha256, rawMembers, curr
     if (visited.has(name)) return;
     const path = closurePath(root, name);
     const bytes = readHeldRegular(path, expected.get(name));
-    if (current) verifyCurrentBytes(bytes, CURRENT_PROFILE.modules[name]);
+    if (current) verifyCurrentBytes(bytes, current.profile.modules[name]);
     totalBytes += bytes.length;
     if (totalBytes > MAX_CLOSURE_BYTES) throw new Error("Authenticated replay source closure is too large");
     visited.add(name);
@@ -476,15 +523,18 @@ function verifyCurrentBytes(bytes, pin) {
 
 function currentProfile(args) {
   if (args.currentArgs.size === 0) return null;
+  const id = args.currentArgs.get(INTERNAL.profile);
+  const profile = id === "nebular070" ? CURRENT_PROFILE : id === "nebular071" ? CURRENT071_PROFILE : null;
+  if (!profile) throw new Error("Unknown current replay source profile");
   const expected = new Map([
-    [INTERNAL.profile, CURRENT_PROFILE.id], [INTERNAL.commit, CURRENT_PROFILE.commit],
-    [INTERNAL.tree, CURRENT_PROFILE.tree],
-    [INTERNAL.support, `package.json=${CURRENT_PROFILE.support.sha256}`],
+    [INTERNAL.profile, profile.id], [INTERNAL.commit, profile.commit],
+    [INTERNAL.tree, profile.tree],
+    [INTERNAL.support, `package.json=${profile.support.sha256}`],
   ]);
   if (args.currentArgs.size !== expected.size
       || [...expected].some(([key, value]) => args.currentArgs.get(key) !== value)
       || basename(args.harnessPath) !== "native-rc-smoke.mjs"
-      || args.expectedSha256 !== CURRENT_PROFILE.modules["native-rc-smoke.mjs"].sha256) {
+      || args.expectedSha256 !== profile.modules["native-rc-smoke.mjs"].sha256) {
     throw new Error("Current replay profile binding differs");
   }
   const members = new Map();
@@ -493,7 +543,7 @@ function currentProfile(args) {
     if (members.has(item.name)) throw new Error("Current replay closure duplicated");
     members.set(item.name, item.expectedSha256);
   }
-  const pins = CURRENT_PROFILE.modules;
+  const pins = profile.modules;
   if (members.size !== Object.keys(pins).length || [...members].some(([name, hash]) => pins[name]?.sha256 !== hash)) {
     throw new Error("Current replay closure differs");
   }
@@ -503,10 +553,10 @@ function currentProfile(args) {
     if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Current replay source root differs");
   }
   const supportPath = resolve(toolsRoot, "../package.json");
-  const supportBytes = readHeldRegular(supportPath, CURRENT_PROFILE.support.sha256);
-  verifyCurrentBytes(supportBytes, CURRENT_PROFILE.support);
-  if (JSON.parse(supportBytes.toString("utf8")).version !== "0.7.0") throw new Error("Current replay version differs");
-  return { supportPath, supportBytes };
+  const supportBytes = readHeldRegular(supportPath, profile.support.sha256);
+  verifyCurrentBytes(supportBytes, profile.support);
+  if (JSON.parse(supportBytes.toString("utf8")).version !== (profile.id === "nebular071" ? "0.7.1" : "0.7.0")) throw new Error("Current replay version differs");
+  return { supportPath, supportBytes, profile };
 }
 
 function installCurrentSupport(current) {
@@ -740,7 +790,7 @@ async function main() {
   if (initialObservationKind !== undefined && options.timeoutMs !== undefined)
     throw new Error("Initial observation must use the released smoke default timeout");
   const initialObservation = initialObservationKind === INITIAL_OBSERVATION_KIND
-    ? makeInitialObservation(initialObservationPath, CURRENT_PROFILE) : null;
+    ? makeInitialObservation(initialObservationPath, current.profile) : null;
   const restoreSupport = installCurrentSupport(current);
   const loader = installAuthenticatedLoader(closure);
   const observer = installProgressObservers(progressPath, current, options, initialObservation);

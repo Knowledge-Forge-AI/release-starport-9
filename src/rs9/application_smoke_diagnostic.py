@@ -69,6 +69,8 @@ CURRENT_REPLAY_PROGRESS_PROFILE = {'id': 'nebular070',
  'support': {'sha256': '15d3f118dfdc0014129fc37d63533a6a02cf355fdb89961a215eca77e95b7cd2',
              'blob': '161ee788b7a8660916e2b6fbbebbac0de4a87f42',
              'size': 1833}}
+from rs9.current_os071 import CURRENT071_REPLAY_PROGRESS_PROFILE
+
 REPLAY_PROGRESS_SCHEMA = "rs9.application-smoke-replay-progress.v1"
 REPLAY_PROGRESS_MAX_BYTES = 16 * 1024
 REPLAY_PROGRESS_MAX_EVENTS = 32
@@ -489,7 +491,14 @@ def _current_replay_progress_profile(prepared):
         source = Path(prepared["source"])
         if Path(prepared["tools"]).resolve() != (source / "tools").resolve():
             return None
-        profile = CURRENT_REPLAY_PROGRESS_PROFILE
+        package_raw, _, package_error = _read_regular(source / "package.json", 4 * 1024 * 1024)
+        if package_error:
+            return None
+        version = json.loads(package_raw).get("version")
+        profile = ({"0.7.0": CURRENT_REPLAY_PROGRESS_PROFILE,
+                    "0.7.1": CURRENT071_REPLAY_PROGRESS_PROFILE}).get(version)
+        if profile is None:
+            return None
         pins = {"tools/" + name: pin for name, pin in profile["modules"].items()}
         pins["package.json"] = profile["support"]
         for name, pin in pins.items():
@@ -497,7 +506,7 @@ def _current_replay_progress_profile(prepared):
             blob = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
             if error or meta.get("sha256") != pin["sha256"] or len(raw) != pin["size"] or blob != pin["blob"]:
                 return None
-        if json.loads(raw).get("version") != "0.7.0":
+        if json.loads(raw).get("version") != version:
             return None
         return profile
     except (ContractError, OSError, ValueError, TypeError, KeyError):
@@ -985,7 +994,7 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
     if replay_progress:
         if replay_progress.get("profile") is not None:
             profile = replay_progress["profile"]
-            if profile != CURRENT_REPLAY_PROGRESS_PROFILE:
+            if profile not in (CURRENT_REPLAY_PROGRESS_PROFILE, CURRENT071_REPLAY_PROGRESS_PROFILE):
                 raise ContractError("APPLICATION_SMOKE", "Unknown replay source profile")
             command[2:2] = [
                 "--rs9-replay-progress-profile", profile["id"],
@@ -1006,7 +1015,7 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
         if replay_progress is not None or harness_timeout_ms is not None:
             raise ContractError("APPLICATION_SMOKE", "Initial observation options cannot be combined with replay timeout")
         profile = initial_observation.get("profile")
-        if profile != CURRENT_REPLAY_PROGRESS_PROFILE:
+        if profile not in (CURRENT_REPLAY_PROGRESS_PROFILE, CURRENT071_REPLAY_PROGRESS_PROFILE):
             raise ContractError("APPLICATION_SMOKE", "Unknown initial observation source profile")
         command[2:2] = [
             "--rs9-replay-progress-harness", str(initial_observation["harness"]),
@@ -1156,7 +1165,7 @@ def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
             },
         }
     if replay_progress is not None and replay_progress_profile is not None:
-        if replay_progress_profile != CURRENT_REPLAY_PROGRESS_PROFILE:
+        if replay_progress_profile not in (CURRENT_REPLAY_PROGRESS_PROFILE, CURRENT071_REPLAY_PROGRESS_PROFILE):
             raise ContractError("APPLICATION_SMOKE", "Unknown replay source profile")
         replay_progress.update(profile=replay_progress_profile,
             expected_sha256=replay_progress_profile["modules"]["native-rc-smoke.mjs"]["sha256"],

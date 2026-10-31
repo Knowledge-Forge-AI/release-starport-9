@@ -10,6 +10,8 @@ from pathlib import Path
 from rs9.errors import ContractError, safe_details
 from rs9.hosted_commands import runtime_environment
 from rs9.nebular_callers import CURRENT070_COMMIT, CURRENT070_TREE, current_contract_for_capture
+from rs9.current_os071 import (CURRENT071_COMMIT, CURRENT071_TREE, CURRENT071_VERIFIER_FILES,
+                               CURRENT071_VERIFIER_IMPORTS)
 from rs9.nebular_lineage import (
     CURRENT_COMMIT,
     CURRENT_TREE,
@@ -62,11 +64,13 @@ VERIFIER_SUPPORT = {
     HISTORICAL_COMMIT: ("package.json",),
     CURRENT_COMMIT: ("package.json",),
     CURRENT070_COMMIT: ("package.json",),
+    CURRENT071_COMMIT: ("package.json",),
 }
 VERIFIER_SUPPORT_TREES = {
     HISTORICAL_COMMIT: HISTORICAL_TREE,
     CURRENT_COMMIT: CURRENT_TREE,
     CURRENT070_COMMIT: CURRENT070_TREE,
+    CURRENT071_COMMIT: CURRENT071_TREE,
 }
 
 
@@ -205,10 +209,10 @@ def _reviewed_verifier_support(capture):
     if tag.get("tree") != VERIFIER_SUPPORT_TREES[commit]:
         raise ContractError("SIDECAR_HARNESS_IMPORT", "Tagged verifier tree is not the reviewed closure",
                             details={"substage": "verifier-closure", "reason": "tag-tree-mismatch"})
-    if commit == CURRENT070_COMMIT:
+    if commit in (CURRENT070_COMMIT, CURRENT071_COMMIT):
         _current_smoke_capture(capture)
     elif (isinstance(capture.record.get("release"), dict)
-          and capture.record["release"].get("tag") == "v0.7.0"):
+          and capture.record["release"].get("tag") in ("v0.7.0", "v0.7.1")):
         raise ContractError("SIDECAR_HARNESS_IMPORT", "Mixed verifier generation is forbidden",
                             details={"substage": "verifier-closure", "reason": "mixed-generation"})
     return support
@@ -280,10 +284,11 @@ def prepare_smoke(capture, captures, client, scratch, label=None):
     source = scratch / "source"
     source.mkdir()
     support = _reviewed_verifier_support(capture)
-    current = capture.record["tag"]["commit"] == CURRENT070_COMMIT
+    current = capture.record["tag"]["commit"] in (CURRENT070_COMMIT, CURRENT071_COMMIT)
     if current:
         records = tagged_files(capture, client, source, (),
-                               paths=tuple(path for path in CURRENT070_VERIFIER_FILES if path != "package.json"))
+                               paths=tuple(path for path in (CURRENT071_VERIFIER_FILES if capture.record["tag"]["commit"] == CURRENT071_COMMIT
+                                                            else CURRENT070_VERIFIER_FILES) if path != "package.json"))
     else:
         records = tagged_files(capture, client, source, ("tools/", "apps/studio/tools/"))
     records += tagged_files(capture, client, source, (), paths=support, role="verifier-support")
@@ -720,8 +725,8 @@ def verify_source_readback(prepared):
             or not isinstance(row.get("sha256"), str) or not isinstance(row.get("blob"), str) for row in rows)):
         raise ContractError("SIDECAR_HARNESS_IMPORT", "Malformed verifier source records")
     if (prepared.get("source_generation") == "theme-forge-current-202610"
-            or tag.get("commit") == CURRENT070_COMMIT
-            or any(row.get("tag_commit") == CURRENT070_COMMIT for row in rows)):
+            or tag.get("commit") in (CURRENT070_COMMIT, CURRENT071_COMMIT)
+            or any(row.get("tag_commit") in (CURRENT070_COMMIT, CURRENT071_COMMIT) for row in rows)):
         _verify_current_source_binding(prepared)
     if source.is_symlink():
         raise ContractError("SIDECAR_HARNESS_IMPORT", "Verifier source root cannot be an alias")

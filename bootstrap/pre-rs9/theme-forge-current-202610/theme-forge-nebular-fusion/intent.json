@@ -9,7 +9,7 @@
       "launchers": {
         "tfnf": "Theme Forge Nebular Fusion.app/Contents/Resources/bin/tfnf"
       },
-      "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-apple-darwin.app.tar.gz",
+      "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-apple-darwin.app.tar.gz",
       "platforms": [
         "aarch64-darwin"
       ]
@@ -23,7 +23,7 @@
       "launchers": {
         "tfnf": "theme-forge-nebular-fusion/bin/tfnf"
       },
-      "name": "theme-forge-nebular-fusion-v0.7.0-aarch64-unknown-linux-gnu.tar.gz",
+      "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-unknown-linux-gnu.tar.gz",
       "platforms": [
         "aarch64-linux"
       ]
@@ -37,7 +37,7 @@
       "launchers": {
         "tfnf": "theme-forge-nebular-fusion/bin/tfnf"
       },
-      "name": "theme-forge-nebular-fusion-v0.7.0-x86_64-unknown-linux-gnu.tar.gz",
+      "name": "theme-forge-nebular-fusion-v0.7.1-x86_64-unknown-linux-gnu.tar.gz",
       "platforms": [
         "x86_64-linux"
       ]
@@ -76,19 +76,19 @@
     "evidence": {
       "assets": [
         {
-          "name": "nebular-v0.7.0-native-ci-provenance.json",
+          "name": "nebular-v0.7.1-native-ci-provenance.json",
           "role": "provenance"
         },
         {
-          "name": "nebular-v0.7.0-sbom.spdx.json",
+          "name": "nebular-v0.7.1-sbom.spdx.json",
           "role": "sbom-spdx"
         },
         {
-          "name": "nebular-v0.7.0-third-party-notices.tar.gz",
+          "name": "nebular-v0.7.1-third-party-notices.tar.gz",
           "role": "third-party-notices"
         },
         {
-          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.7.0.tgz",
+          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.7.1.tgz",
           "role": "npm-wrapper"
         }
       ],
@@ -100,6 +100,6 @@
   "runtime": {
     "kind": "native"
   },
-  "tag": "v0.7.0",
-  "version": "0.7.0"
+  "tag": "v0.7.1",
+  "version": "0.7.1"
 }

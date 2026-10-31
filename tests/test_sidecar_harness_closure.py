@@ -85,7 +85,7 @@ class ClosureTests(unittest.TestCase):
         client = SimpleNamespace(get=lambda url, **kw: data[url.split("/", 6)[-1]])
         tree_rows = {"tree": [entry(path, value) for path, value in data.items()]}
         for commit, expected_tree in VERIFIER_SUPPORT_TREES.items():
-            if commit == CURRENT070_COMMIT:
+            if commit in (CURRENT070_COMMIT, smoke.CURRENT071_COMMIT):
                 continue  # Current 0.7 uses the separately authenticated closure tests below.
             with self.subTest(commit=commit):
                 capture = SimpleNamespace(record={"repository": {"full_name": "fixture/nebular"},
@@ -101,7 +101,7 @@ class ClosureTests(unittest.TestCase):
 
     def test_known_commit_with_wrong_tree_and_tampered_support_fail_closed(self):
         for commit, expected_tree in VERIFIER_SUPPORT_TREES.items():
-            if commit == CURRENT070_COMMIT:
+            if commit in (CURRENT070_COMMIT, smoke.CURRENT071_COMMIT):
                 continue  # Current 0.7 uses the separately authenticated closure tests below.
             with self.subTest(commit=commit), tempfile.TemporaryDirectory() as tmp:
                 capture = SimpleNamespace(record={"repository": {"full_name": "fixture/nebular"},
@@ -217,14 +217,18 @@ class ImportTests(unittest.TestCase):
             self.assertFalse((prepared["source"] / ".git").exists())
 
 
-def current_import_fixture(root):
+def current_import_fixture(root, nebular_version="0.7.0"):
     """Controlled real core captures; synthetic source bytes never qualify apps."""
     from rs9.release_core import authenticate_release
     from rs9.profiles import selection_for_intent
     from tests.release_fixtures import package_evidence
     from rs9.nebular_callers import CURRENT070_CONTRACT_PATH
+    if nebular_version not in ("0.7.0", "0.7.1"):
+        raise ValueError("unknown fixture generation")
+    current071 = nebular_version == "0.7.1"
     source = {}
-    for name, edges in smoke.CURRENT070_VERIFIER_IMPORTS.items():
+    imports = smoke.CURRENT071_VERIFIER_IMPORTS if current071 else smoke.CURRENT070_VERIFIER_IMPORTS
+    for name, edges in imports.items():
         text = "".join("import './" + path.rsplit("/", 1)[-1] + "';\n" for path in edges)
         if name == "tools/sidecar-common.mjs":
             text += "export function verifyDistribution(){}\n"
@@ -235,7 +239,7 @@ def current_import_fixture(root):
         else:
             text += "export const fixtureModule=true;\n"
         source[name] = text.encode()
-    source["package.json"] = b'{"version":"0.7.0","type":"module"}\n'
+    source["package.json"] = canonical({"version": nebular_version, "type": "module"})
     fixtures = {path: ("controlled fixture " + path + "\n").encode() for path in smoke.CURRENT070_FIXTURE_FILES}
 
     def pins(data):
@@ -247,25 +251,31 @@ def current_import_fixture(root):
         directory.mkdir()
         intent = package_evidence(directory)
         intent["project"]["repository"] = repository
-        intent["tag"] = "v0.7.0"
+        selected_tag = "v" + nebular_version if name == "nebular" else "v0.7.0"
+        intent["tag"] = selected_tag
         package = data.get("package.json", (directory / "source/package.json").read_bytes())
         (directory / "source/package.json").write_bytes(package)
         api = directory / "api"
         (api / "repository.json").write_bytes(canonical({"id": repository_id, "full_name": repository}))
-        (api / "ref.json").write_bytes(canonical({"ref": "refs/tags/v0.7.0", "object": {"type": "commit", "sha": commit}}))
+        (api / "ref.json").write_bytes(canonical({"ref": "refs/tags/" + selected_tag, "object": {"type": "commit", "sha": commit}}))
         (api / "commit.json").write_bytes(canonical({"sha": commit, "tree": {"sha": tree_sha}}))
         (api / "tree.json").write_bytes(canonical({"sha": tree_sha, "truncated": False,
             "tree": [entry(path, body) for path, body in {"package.json": package, **data}.items()]}))
         release = json.loads((api / "release.json").read_bytes())
-        release.update(id=release_id, tag_name="v0.7.0", target_commitish=commit)
+        release.update(id=release_id, tag_name=selected_tag, target_commitish=commit)
         (api / "release.json").write_bytes(canonical(release))
         return authenticate_release(selection_for_intent(intent), directory), intent
 
     nebular, intent = capture("nebular", "Knowledge-Forge-AI/theme-forge-nebular-fusion", 1358643872,
-        426333162, smoke.CURRENT070_COMMIT, smoke.CURRENT070_TREE, source)
+        429782340 if current071 else 426333162,
+        smoke.CURRENT071_COMMIT if current071 else smoke.CURRENT070_COMMIT,
+        smoke.CURRENT071_TREE if current071 else smoke.CURRENT070_TREE, source)
     burst, burst_intent = capture("burst", "Knowledge-Forge-AI/theme-forge-stellar-burst", 1342490027,
         424873797, smoke.CURRENT070_FIXTURE_COMMIT, smoke.CURRENT070_FIXTURE_TREE, fixtures)
     contract = json.loads(CURRENT070_CONTRACT_PATH.read_bytes())
+    if current071:
+        contract["identity"].update(commit=smoke.CURRENT071_COMMIT, tree=smoke.CURRENT071_TREE,
+                                    tag="v0.7.1", release_id=429782340)
     asset = next(row for row in nebular.record["assets"] if row["role"] == "payload")
     for platform in contract["platforms"].values():
         platform["asset"] = {**platform["asset"], **asset}
@@ -303,10 +313,12 @@ class CurrentClosureTests(unittest.TestCase):
         run.assert_not_called()
 
     def test_current_support_table_is_exact_and_old_entries_remain(self):
-        self.assertEqual(len(VERIFIER_SUPPORT), 3)
+        self.assertEqual(len(VERIFIER_SUPPORT), 4)
         self.assertEqual(VERIFIER_SUPPORT[smoke.HISTORICAL_COMMIT], ("package.json",))
         self.assertEqual(VERIFIER_SUPPORT[smoke.CURRENT_COMMIT], ("package.json",))
         self.assertEqual(VERIFIER_SUPPORT[smoke.CURRENT070_COMMIT], ("package.json",))
+        self.assertEqual(VERIFIER_SUPPORT[smoke.CURRENT071_COMMIT], ("package.json",))
+        self.assertEqual(VERIFIER_SUPPORT_TREES[smoke.CURRENT071_COMMIT], smoke.CURRENT071_TREE)
         self.assertEqual(VERIFIER_SUPPORT_TREES[smoke.CURRENT070_COMMIT], "27c643b6375c2aafde314799c4f08e844c14992c")
         self.assertEqual(set(smoke.CURRENT070_VERIFIER_IMPORTS), set(smoke.CURRENT070_VERIFIER_FILES) - {"package.json"})
         self.assertEqual(len(smoke.CURRENT070_VERIFIER_FILES), 14)
