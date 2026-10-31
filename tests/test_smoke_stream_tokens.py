@@ -286,7 +286,7 @@ class RunRecordAndInnerStderrTests(unittest.TestCase):
             "signal-sidecar-not-running": 1,
             "signal-termination-mismatch": 1,
         }
-        self.assertEqual(set(PROBLEM_CATEGORIES.values()), set(expected_category_counts))
+        self.assertEqual(set(PROBLEM_CATEGORIES.values()) - {"harness-cleanup-failed"}, set(expected_category_counts))
         identity = {"present": True, "bytes": 1779, "sha256": "b" * 64}
         doc = project_run_record({"receipt": None, "problems": problems}, identity)
         self.assertEqual(doc["status"], "observed")
@@ -617,11 +617,11 @@ class LinuxProblemCategoryTests(unittest.TestCase):
             {"code": "object-problem"},
         ]
 
-    def project(self, record, identity=None, binding=("x86_64-linux", "linux-x64", "C")):
+    def project(self, record, identity=None, binding=("x86_64-linux", "linux-x64", "C"), *, current071=False):
         from rs9.smoke_stream_tokens import project_problem_categories
         system, platform, scenario = binding
         return project_problem_categories(record, self.identity() if identity is None else identity,
-                                          system=system, platform=platform, scenario=scenario)
+                                          system=system, platform=platform, scenario=scenario, current071=current071)
 
     def validate(self, raw, *, system="x86_64-linux", scenario="C", receipt=None, receipt_error="receipt-failed",
                  raw_inventory="default-observed", mismatch=False):
@@ -931,6 +931,155 @@ class LinuxProblemCategoryTests(unittest.TestCase):
         self.assertEqual(self.validate(aarch, system="aarch64-linux", scenario="B"), aarch)
         self.assertEqual(self.validate(aarch, system="x86_64-linux", scenario="B"), mismatch)
         self.assertEqual(self.validate(aarch, system="x86_64-linux", scenario="C"), mismatch)
+
+    def test_default_problem_projection_does_not_add_current071_finalization(self):
+        from rs9.smoke_stream_tokens import project_problem_categories, FINALIZATION_SCHEMA
+        record = {"problems": ["harness cleanup of the owned scratch directory failed"],
+                  "finalization": {"schema": FINALIZATION_SCHEMA, "status": "complete", "phase": "complete",
+                    "exceptionFamily": None, "spawned": True, "exitObserved": True,
+                    "applicationReceiptObservation": "present-at-read", "applicationReceiptCopy": "written"}}
+        legacy = project_problem_categories(record, self.identity(), system="x86_64-linux", platform="linux-x64", scenario="C")
+        self.assertNotIn("finalization", legacy)
+        self.assertEqual(legacy["problems"]["unrecognized"], 1)
+
+    def test_cleanup_literal_debian_arm64_b_stdout_and_finalization_projection(self):
+        from rs9.smoke_stream_tokens import (
+            CATEGORY_SCHEMA,
+            CATEGORY_STAGE,
+            FINALIZATION_EXCEPTION_FAMILIES,
+            FINALIZATION_PHASES,
+            FINALIZATION_RECEIPT_COPIES,
+            FINALIZATION_RECEIPT_OBSERVATIONS,
+            FINALIZATION_SCHEMA,
+        )
+        cleanup_problem = "harness cleanup of the owned scratch directory failed"
+        cli_stdout = (json.dumps({
+            "label": "linux-arm64-B",
+            "status": "fail",
+            "problems": [cleanup_problem],
+        }, separators=(",", ":")) + "\n").encode("utf-8")
+        self.assertEqual(len(cli_stdout), 111)
+        self.assertEqual(
+            digest(cli_stdout),
+            "4c01e0ee066068fba7bb6f3bee1ec7c6afc82cba982193c284d0f0b87efd7a9a",
+        )
+        for family in sorted(FINALIZATION_EXCEPTION_FAMILIES):
+            with self.subTest(exception_family=family):
+                fin_input = {
+                    "schema": FINALIZATION_SCHEMA,
+                    "status": "failed",
+                    "phase": "cleanup",
+                    "exceptionFamily": family,
+                    "spawned": True,
+                    "exitObserved": True,
+                    "applicationReceiptObservation": "present-at-read",
+                    "applicationReceiptCopy": "written",
+                }
+                expected_fin = {k: v for k, v in fin_input.items() if k != "schema"}
+                record = {
+                    "status": "fail",
+                    "problems": [cleanup_problem],
+                    "finalization": fin_input,
+                }
+                doc = self.project(record, binding=("aarch64-linux", "linux-arm64", "B"), current071=True)
+                self.assertEqual(doc["problems"]["categories"], [
+                    {"category": "harness-cleanup-failed", "count": 1},
+                ])
+                self.assertEqual(doc["problems"]["unrecognized"], 0)
+                self.assertEqual(doc["finalization"], expected_fin)
+                p1 = self.validate(doc, system="aarch64-linux", scenario="B")
+                p2 = self.validate(p1, system="aarch64-linux", scenario="B", receipt=dict(p1["receipt"]))
+                p3 = self.validate(p2, system="aarch64-linux", scenario="B", receipt=dict(p2["receipt"]))
+                self.assertEqual(p1, doc)
+                self.assertEqual(p2, p1)
+                self.assertEqual(p3, p2)
+
+        complete_fin = {
+            "status": "complete",
+            "phase": "complete",
+            "exceptionFamily": None,
+            "spawned": True,
+            "exitObserved": True,
+            "applicationReceiptObservation": "present-at-read",
+            "applicationReceiptCopy": "written",
+        }
+        complete_doc = self.project({
+            "status": "fail",
+            "problems": ["receipt status fail"],
+            "finalization": {**complete_fin, "schema": FINALIZATION_SCHEMA},
+        }, current071=True)
+        self.assertEqual(complete_doc["finalization"], complete_fin)
+        self.assertEqual(self.validate(complete_doc), complete_doc)
+
+        # Producer omits malformed or extra-keyed finalization without dropping valid problem counts.
+        malformed_producer_finalizations = (
+            None,
+            "failed",
+            [],
+            {},
+            complete_fin,
+            {**complete_fin, "schema": "wrong-schema"},
+            {**complete_fin, "extra": self.PRIV_PATH},
+            {**complete_fin, "status": "failed"},
+            {**complete_fin, "phase": "cleanup"},
+            {**complete_fin, "exceptionFamily": "filesystem"},
+            {**complete_fin, "status": "failed", "phase": "cleanup", "exceptionFamily": None},
+            {**complete_fin, "status": "failed", "phase": "complete", "exceptionFamily": "state"},
+            {**complete_fin, "spawned": 1},
+            {**complete_fin, "exitObserved": "true"},
+            {**complete_fin, "applicationReceiptObservation": self.PRIV_PATH},
+            {**complete_fin, "applicationReceiptCopy": "copied"},
+        )
+        for bad_fin in malformed_producer_finalizations:
+            with self.subTest(producer_finalization=repr(bad_fin)):
+                produced = self.project({"problems": [cleanup_problem], "finalization": bad_fin}, current071=True)
+                self.assertNotIn("finalization", produced)
+                self.assertEqual(produced["problems"]["categories"], [
+                    {"category": "harness-cleanup-failed", "count": 1},
+                ])
+                self.assertNotIn(self.PRIV_PATH, json.dumps(produced))
+                self.assertEqual(self.validate(produced), produced)
+
+        # Consumer rejects forged or malformed finalization on envelope as invalid-observation.
+        invalid_env = {
+            "schema": CATEGORY_SCHEMA,
+            "stage": CATEGORY_STAGE,
+            "withheld_reason": "invalid-observation",
+        }
+        mismatch_env = {
+            "schema": CATEGORY_SCHEMA,
+            "stage": CATEGORY_STAGE,
+            "withheld_reason": "binding-mismatch",
+        }
+        for bad_fin in (
+            None,
+            "failed",
+            [],
+            {},
+            {**complete_fin, "schema": FINALIZATION_SCHEMA},
+            {**complete_fin, "message": self.PRIV_PATH},
+            {**complete_fin, "pid": 4242},
+            {**complete_fin, "status": "unknown"},
+            {**complete_fin, "phase": "unknown"},
+            {**complete_fin, "status": "failed", "phase": "cleanup", "exceptionFamily": self.PRIV_PATH},
+            {**complete_fin, "status": "failed", "phase": "cleanup", "exceptionFamily": None},
+            {**complete_fin, "status": "complete", "phase": "cleanup", "exceptionFamily": None},
+            {**complete_fin, "status": "complete", "phase": "complete", "exceptionFamily": "state"},
+            {**complete_fin, "spawned": 1},
+            {**complete_fin, "exitObserved": 0},
+            {**complete_fin, "applicationReceiptObservation": "missing-at-read"},
+            {**complete_fin, "applicationReceiptCopy": "not-written"},
+        ):
+            with self.subTest(consumer_finalization=repr(bad_fin)):
+                hostile_doc = {**self.small(), "finalization": bad_fin}
+                projected = self.validate(hostile_doc)
+                self.assertEqual(projected, invalid_env)
+                self.assertEqual(self.validate(projected), invalid_env)
+                self.assertEqual(self.validate(hostile_doc, mismatch=True), mismatch_env)
+                self.assertNotIn(self.PRIV_PATH, json.dumps(projected))
+        self.assertTrue(FINALIZATION_PHASES)
+        self.assertTrue(FINALIZATION_RECEIPT_OBSERVATIONS)
+        self.assertTrue(FINALIZATION_RECEIPT_COPIES)
 
     def test_collect_failure_diagnostics_emits_categories_only_for_bound_linux(self):
         from rs9.smoke_stream_tokens import (

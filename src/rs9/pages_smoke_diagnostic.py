@@ -4,7 +4,9 @@ from pathlib import Path
 import re
 import uuid
 
-from rs9.application_smoke_diagnostic import CAUSE_CATEGORIES, SAFE_LOG_CATEGORIES
+from rs9.application_smoke_diagnostic import (
+    CAUSE_CATEGORIES, SAFE_LOG_CATEGORIES, validate_resolution_matches,
+)
 from rs9.errors import ContractError
 from rs9.release_core import digest
 from rs9.scratch import canonical
@@ -72,6 +74,10 @@ def validate_smoke_observation(raw, *, system=None):
             "reason_token": _closed(raw.get("reason_token"), CAUSE_CATEGORIES, "unknown")}
     if mismatch:
         result["binding_mismatch"] = True
+    resolution_matches = validate_resolution_matches(
+        raw.get("resolution_matches"), complete=complete, mismatch=mismatch)
+    if resolution_matches:
+        result["resolution_matches"] = resolution_matches
     from rs9.smoke_stream_tokens import (
         CATEGORY_SCHEMA, CATEGORY_STAGE, _unavailable_inner, validate_inner_stream_tokens,
         validate_inventory, validate_problem_categories, validate_run_record, validate_stream_tokens,

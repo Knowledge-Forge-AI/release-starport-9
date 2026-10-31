@@ -502,6 +502,115 @@ class PagesSmokeDiagnosticUnitTests(unittest.TestCase):
                         self.assertEqual(l1, l2)
                         self.assertEqual(l2, l3)
 
+    def test_validate_smoke_observation_resolution_matches_and_finalization_projection(self):
+        from rs9.smoke_stream_tokens import (
+            CATEGORY_SCHEMA,
+            CATEGORY_STAGE,
+            FINALIZATION_SCHEMA,
+            INVENTORY_STAGE,
+            project_problem_categories,
+        )
+        run_record = {
+            "status": "fail",
+            "problems": ["harness cleanup of the owned scratch directory failed"],
+            "finalization": {
+                "schema": FINALIZATION_SCHEMA,
+                "status": "failed",
+                "phase": "cleanup",
+                "exceptionFamily": "filesystem",
+                "spawned": True,
+                "exitObserved": True,
+                "applicationReceiptObservation": "present-at-read",
+                "applicationReceiptCopy": "written",
+            },
+        }
+        run_bytes = json.dumps(run_record).encode("utf-8")
+        receipt_id = {"present": True, "bytes": len(run_bytes), "sha256": digest(run_bytes)}
+        categories = project_problem_categories(
+            run_record, receipt_id, system="aarch64-linux", platform="linux-arm64", scenario="B", current071=True
+        )
+        inv = {
+            "stage": INVENTORY_STAGE,
+            "status": "observed",
+            "artifacts": [{"kind": "run.json", "bytes": len(run_bytes), "regular": True, "symlink": False}],
+            "entries_observed": 1,
+            "unlisted": 0,
+        }
+        matches = [
+            {"stream": "stderr", "template": "no-such-file-marker", "target_basename": "unknown"},
+            {"stream": "stdout", "template": "failed-to-exec", "target_basename": "dbus-daemon"},
+        ]
+        raw_obs = {
+            "scenario": "B",
+            "cause": "process-nonzero",
+            "raw_returncode": 1,
+            "stdout_bytes": 111,
+            "stderr_bytes": 0,
+            "stdout_sha256": "4c01e0ee066068fba7bb6f3bee1ec7c6afc82cba982193c284d0f0b87efd7a9a",
+            "stderr_sha256": digest(b""),
+            "stream_capture_complete": True,
+            "log_categories": ["unclassified"],
+            "receipt_error": "receipt-failed",
+            "problem_codes": ["withheld-token"],
+            "elapsed_ms": 120,
+            "reason_token": "process-nonzero",
+            "receipt": receipt_id,
+            "evidence_inventory": inv,
+            "harness_problem_categories": categories,
+            "resolution_matches": matches,
+        }
+        p1 = validate_smoke_observation(raw_obs, system="aarch64-linux")
+        p2 = validate_smoke_observation(p1, system="aarch64-linux")
+        p3 = validate_smoke_observation(p2, system="aarch64-linux")
+        self.assertEqual(p1, p2)
+        self.assertEqual(p2, p3)
+        self.assertEqual(p1["resolution_matches"], matches)
+        self.assertEqual(
+            p1["harness_problem_categories"]["problems"]["categories"],
+            [{"category": "harness-cleanup-failed", "count": 1}],
+        )
+        self.assertEqual(
+            p1["harness_problem_categories"]["finalization"]["exceptionFamily"],
+            "filesystem",
+        )
+
+        # Incomplete stream or binding mismatch withholds resolution_matches
+        incomplete = validate_smoke_observation(
+            {**raw_obs, "cause": "process-timeout"}, system="aarch64-linux"
+        )
+        self.assertNotIn("resolution_matches", incomplete)
+        swapped = validate_smoke_observation(raw_obs, system="x86_64-linux")
+        self.assertTrue(swapped["binding_mismatch"])
+        self.assertNotIn("resolution_matches", swapped)
+        self.assertEqual(
+            swapped["harness_problem_categories"],
+            {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "withheld_reason": "binding-mismatch"},
+        )
+
+        # Hostile resolution_matches or hostile finalization never leak private strings
+        hostile = validate_smoke_observation(
+            {
+                **raw_obs,
+                "resolution_matches": [
+                    {"stream": "stderr", "template": "failed-to-exec", "target_basename": "/private/secret/node"}
+                ],
+                "harness_problem_categories": {
+                    **categories,
+                    "finalization": {
+                        **categories["finalization"],
+                        "exceptionFamily": "/private/secret/filesystem",
+                    },
+                },
+            },
+            system="aarch64-linux",
+        )
+        self.assertNotIn("resolution_matches", hostile)
+        self.assertEqual(
+            hostile["harness_problem_categories"],
+            {"schema": CATEGORY_SCHEMA, "stage": CATEGORY_STAGE, "withheld_reason": "invalid-observation"},
+        )
+        self.assertNotIn("/private/secret", json.dumps(hostile))
+
 
 class PagesNebularControlTests(unittest.TestCase):
     """Failing Pages Nebular all-other-clients-pass and all-pass controls, incumbent gates, one attempt."""

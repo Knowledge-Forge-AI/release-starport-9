@@ -102,7 +102,33 @@ INITIAL_ERROR_CATEGORIES = frozenset({
     "assertion", "socket-unavailable",
 })
 INITIAL_HELPER_IDENTIFIERS = frozenset({"dbus-run-session", "dbus-daemon", "node", "native-rc-smoke.mjs"})
+INITIAL_ENV_KEYS = (
+    "LD_LIBRARY_PATH", "XDG_DATA_DIRS", "GIO_EXTRA_MODULES", "GDK_PIXBUF_MODULE_FILE",
+    "GSETTINGS_SCHEMA_DIR", "FONTCONFIG_FILE", "PATH", "DBUS_SESSION_BUS_ADDRESS", "DISPLAY",
+)
 INITIAL_CATEGORY_COUNT_MAX = 4096
+RESOLUTION_MATCH_STREAMS = ("stderr", "stdout")
+RESOLUTION_MATCH_TEMPLATES = (
+    "failed-to-exec",
+    "env-target",
+    "command-not-found",
+    "colon-not-found",
+    "no-such-file-marker",
+    "cannot-execute-marker",
+    "exec-format-error-marker",
+    "not-found-marker",
+)
+KNOWN_RESOLUTION_TARGET_BASENAMES = (
+    "dbus-run-session", "dbus-daemon", "node", "native-rc-smoke.mjs",
+)
+RESOLUTION_TARGET_BASENAMES = (*KNOWN_RESOLUTION_TARGET_BASENAMES, "unknown")
+MARKER_ONLY_RESOLUTION_TEMPLATES = frozenset({
+    "no-such-file-marker",
+    "cannot-execute-marker",
+    "exec-format-error-marker",
+    "not-found-marker",
+})
+RESOLUTION_MATCH_MAX_ENTRIES = 48
 REPLAY_RECEIPT_PROJECTION_SCHEMA = "rs9.application-smoke-replay-receipt-stage.v1"
 REPLAY_RECEIPT_MAX_STEPS = 64
 REPLAY_LINUX_SCENARIOS = {"linux-arm64": "B", "linux-x64": "C"}
@@ -244,6 +270,108 @@ def classify_failure_binding(stdout, stderr, exit_code=None, log_categories=()):
     if categories or exit_code not in (None, 0):
         return {"role": "unknown", "phase": "runtime", "evidence": "unclassified"}
     return None
+
+
+def _target_basename_for_target(target):
+    """Map only a recognized failed-callee basename or 'unknown'; never return the path."""
+    if not target:
+        return "unknown"
+    cleaned = target.strip().strip(b"'\"")
+    for quote in (b"\xe2\x80\x98", b"\xe2\x80\x99", b"\xe2\x80\x9c", b"\xe2\x80\x9d"):
+        cleaned = cleaned.removeprefix(quote).removesuffix(quote)
+    basename = cleaned.strip(b"'\"").rsplit(b"/", 1)[-1]
+    return {
+        b"dbus-run-session": "dbus-run-session",
+        b"dbus-daemon": "dbus-daemon",
+        b"node": "node",
+        b"native-rc-smoke.mjs": "native-rc-smoke.mjs",
+    }.get(basename, "unknown")
+
+
+def _line_resolution_match(line):
+    """Classify one lowercased line into a closed (template, target_basename) pair or None."""
+    markers = (b"not found", b"no such file", b"cannot execute", b"exec format error")
+    line = line.strip()
+    if b"failed to exec" in line:
+        target = line.split(b"failed to exec", 1)[1].split(b":", 1)[0]
+        return "failed-to-exec", _target_basename_for_target(target)
+    if not any(marker in line for marker in markers):
+        return None
+    if line.startswith((b"/usr/bin/env:", b"env:")):
+        target = line.split(b":", 1)[1].split(b":", 1)[0]
+        return "env-target", _target_basename_for_target(target)
+    if b"command not found" in line or b": not found" in line:
+        template = "command-not-found" if b"command not found" in line else "colon-not-found"
+        parts = line.split(b":")
+        for index, part in enumerate(parts):
+            if index > 0 and (b"command not found" in part or b"not found" in part):
+                return template, _target_basename_for_target(parts[index - 1])
+        return template, "unknown"
+    if b"no such file" in line:
+        return "no-such-file-marker", "unknown"
+    if b"cannot execute" in line:
+        return "cannot-execute-marker", "unknown"
+    if b"exec format error" in line:
+        return "exec-format-error-marker", "unknown"
+    return "not-found-marker", "unknown"
+
+
+def extract_resolution_matches(stdout, stderr):
+    """Extract closed resolution-match evidence separately over held outer stderr and stdout."""
+    matches = []
+    seen = set()
+    for stream_name, raw_stream in (("stderr", stderr or b""), ("stdout", stdout or b"")):
+        if not isinstance(raw_stream, (bytes, bytearray)):
+            continue
+        for raw_line in bytes(raw_stream).lower().splitlines():
+            matched = _line_resolution_match(raw_line)
+            if matched is None:
+                continue
+            template, target_basename = matched
+            key = (stream_name, template, target_basename)
+            if key in seen:
+                continue
+            seen.add(key)
+            matches.append({
+                "stream": stream_name,
+                "template": template,
+                "target_basename": target_basename,
+            })
+            if len(matches) >= RESOLUTION_MATCH_MAX_ENTRIES:
+                return matches
+    return matches
+
+
+def validate_resolution_matches(raw, *, complete=True, mismatch=False):
+    """Validate a closed list of resolution matches; withhold on incomplete, mismatch, or invalid shape."""
+    if raw is None or not complete or mismatch or not isinstance(raw, list):
+        return []
+    if len(raw) == 0 or len(raw) > RESOLUTION_MATCH_MAX_ENTRIES:
+        return []
+    validated = []
+    seen = set()
+    for item in raw:
+        if (not isinstance(item, dict)
+                or set(item) != {"stream", "template", "target_basename"}
+                or not isinstance(item.get("stream"), str)
+                or item["stream"] not in RESOLUTION_MATCH_STREAMS
+                or not isinstance(item.get("template"), str)
+                or item["template"] not in RESOLUTION_MATCH_TEMPLATES
+                or not isinstance(item.get("target_basename"), str)
+                or item["target_basename"] not in RESOLUTION_TARGET_BASENAMES
+                or (item["template"] in MARKER_ONLY_RESOLUTION_TEMPLATES
+                    and item["target_basename"] != "unknown")):
+            return []
+        key = (item["stream"], item["template"], item["target_basename"])
+        if key in seen:
+            return []
+        seen.add(key)
+        validated.append({
+            "stream": item["stream"],
+            "template": item["template"],
+            "target_basename": item["target_basename"],
+        })
+    return validated
 
 
 def validate_problem_codes(problems):
@@ -603,6 +731,24 @@ def _unobserved_initial_observation(reason):
             "non_admitting": True}
 
 
+def _validate_initial_environment_presence(env_presence):
+    """Validate optional current071 boolean environment presence; return None to withhold when malformed."""
+    if not isinstance(env_presence, dict) or set(env_presence) != {"wrapper_entry", "first_spawn"}:
+        return None
+    validated = {}
+    for stage_name in ("wrapper_entry", "first_spawn"):
+        stage_env = env_presence[stage_name]
+        if stage_env is None:
+            validated[stage_name] = None
+            continue
+        if (not isinstance(stage_env, dict)
+                or set(stage_env) != set(INITIAL_ENV_KEYS)
+                or any(type(flag) is not bool for flag in stage_env.values())):
+            return None
+        validated[stage_name] = {key: stage_env[key] for key in INITIAL_ENV_KEYS}
+    return validated
+
+
 def _read_initial_observation(path, expected_profile=None):
     """Read only the closed live-observation summary; never retain child bytes."""
     raw, _meta, error = _read_regular(path, INITIAL_OBSERVATION_MAX_BYTES)
@@ -615,7 +761,8 @@ def _read_initial_observation(path, expected_profile=None):
         required = {"schema", "attempt_kind", "non_admitting", "status", "source_profile",
                     "phase_events", "error_counts", "error_category_counts", "helper_identifier_counts",
                     "streams", "truncated"}
-        if not isinstance(value, dict) or set(value) != required:
+        optional = {"environment_presence"}
+        if not isinstance(value, dict) or not (required <= set(value) <= (required | optional)):
             raise ValueError("initial observation fields")
         if (value["schema"] != INITIAL_OBSERVATION_SCHEMA
                 or value["attempt_kind"] != INITIAL_OBSERVATION_KIND
@@ -672,6 +819,14 @@ def _read_initial_observation(path, expected_profile=None):
                     or not re.fullmatch(r"[0-9a-f]{64}", stream["sha256"])
                     or type(stream["truncated"]) is not bool):
                 raise ValueError("initial observation stream")
+        if "environment_presence" in value:
+            if profile["id"] != "nebular071":
+                raise ValueError("initial observation environment presence profile")
+            validated_env = _validate_initial_environment_presence(value["environment_presence"])
+            if validated_env is None:
+                value.pop("environment_presence", None)
+            else:
+                value["environment_presence"] = validated_env
         if expected_profile is not None and profile != _initial_observation_profile(expected_profile):
             return _unobserved_initial_observation("source-binding-mismatch")
         return value
@@ -1176,12 +1331,25 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
         fields["cause"] = "process-cleanup-failure"
     fields["reason_token"] = error or ("process-signal" if sig_val is not None else ("process-nonzero" if ec_val else receipt_error)) or cleanup_error or "pass"
     fields["failed"] = bool(error or rc != 0 or receipt_error or cleanup_error)
+    current071_observation = (
+        isinstance(initial_observation, dict)
+        and initial_observation.get("profile") == CURRENT071_REPLAY_PROGRESS_PROFILE
+    )
+    if (fields["failed"] and platform != "darwin-arm64" and fields["stream_capture_complete"]
+            and current071_observation):
+        try:
+            matches = extract_resolution_matches(out, err)
+            if matches:
+                fields["resolution_matches"] = matches
+        except Exception:
+            pass
     if fields["failed"] and not extras:
         # Optional observations happen after the original outcome is fixed.
         from rs9.smoke_stream_tokens import collect_failure_diagnostics
         try:
             diagnostic = collect_failure_diagnostics(err, dict(fields), evidence, platform, scenario, record=record,
-                                                     system=system)
+                                                     system=system,
+                                                     **({"current071": True} if current071_observation else {}))
             fields.update({k: diagnostic[k] for k in (
                 "stderr_diagnostic", "evidence_inventory", "harness_run_record", "inner_stderr_diagnostic",
                 "harness_problem_categories",
@@ -1322,6 +1490,30 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
     if boundary_probes:
         record["boundary_probes"] = probes
     raw = canonical(record)
+    # New optional fields must not displace established observation evidence.
+    if len(raw) > MAX_DIAGNOSTIC and "resolution_matches" in record["initial_run"]:
+        initial = dict(record["initial_run"])
+        initial.pop("resolution_matches")
+        record["initial_run"] = initial
+        raw = canonical(record)
+    if len(raw) > MAX_DIAGNOSTIC:
+        observation = record["initial_run"].get("initial_observation")
+        if isinstance(observation, dict) and "environment_presence" in observation:
+            initial = dict(record["initial_run"])
+            observation = dict(observation)
+            observation.pop("environment_presence")
+            initial["initial_observation"] = observation
+            record["initial_run"] = initial
+            raw = canonical(record)
+    if len(raw) > MAX_DIAGNOSTIC:
+        categories = record["initial_run"].get("harness_problem_categories")
+        if isinstance(categories, dict) and "finalization" in categories:
+            initial = dict(record["initial_run"])
+            categories = dict(categories)
+            categories.pop("finalization")
+            initial["harness_problem_categories"] = categories
+            record["initial_run"] = initial
+            raw = canonical(record)
     if len(raw) > MAX_DIAGNOSTIC and "initial_observation" in record["initial_run"]:
         # The live stream projection is optional; shed it before pruning any
         # established failure fields. If even its typed omission marker would
