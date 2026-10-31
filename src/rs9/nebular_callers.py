@@ -183,7 +183,7 @@ RUNTIME_PINS = {
 }
 
 
-CURRENT070_CONTRACT_PATH = Path(__file__).resolve().parents[2] / "operators/theme-forge-current-202610/nebular-callers.json"
+CURRENT070_CONTRACT_PATH = Path(__file__).resolve().parents[2] / "operators/theme-forge-current-202610/nebular-callers-070.json"
 CURRENT070_CONTRACT_SHA256 = "db10b939421dc56d4011dcb3a52a659f0c0e8f73e33439cd88173e3b85fe90a8"
 CURRENT070_COMMIT = "cadb40c4972f68f314096ff60fbcfb4da950c161"
 CURRENT070_TREE = "27c643b6375c2aafde314799c4f08e844c14992c"
@@ -191,21 +191,35 @@ CURRENT070_ASSET_SHA256S = frozenset({
     "eb15e92e2c6c893748612c3e1e3910acbc57e8e990a4d4d1c89f958e330ce17c",
     "4a4035797ac591854e362404d32e8acc38f79ccdccf7696b31f24060f0b55c27",
 })
+from rs9.current_os071 import CURRENT071_COMMIT, CURRENT071_TREE, CURRENT071_RELEASE_ID
+CURRENT071_CONTRACT_PATH = Path(__file__).resolve().parents[2] / "operators/theme-forge-current-202610/nebular-callers.json"
+CURRENT071_CONTRACT_SHA256 = "7f7e2bd78350e1c9287de0622265f4317b59c939f63ace6f0ce4d7f71b6b480e"
+CURRENT071_ASSET_SHA256S = frozenset({
+    "8341d0069dd729d4d7e535b42d411edb8fee02c402fbcf0c861514a64f09c608",
+    "3a0f9fc991c94588ec06bbe9e0dc4a40250e11f8d238bd8a11cad9ce6fc98c5c",
+})
 _CURRENT_CALLER_PROOF = object()
 
 
-def _load_current_contract():
-    path = CURRENT070_CONTRACT_PATH
+def _load_current_contract_bytes(path, expected_sha256):
     if path.is_symlink() or path.stat().st_size > 512 * 1024:
         raise ContractError("CALLER_SOURCE_IDENTITY", "Bounded current caller contract required")
     raw = path.read_bytes()
-    if digest(raw) != CURRENT070_CONTRACT_SHA256:
+    if digest(raw) != expected_sha256:
         raise ContractError("CALLER_SOURCE_IDENTITY", "Current caller contract bytes differ")
     contract = json.loads(raw)
     if (set(contract) != {"schema", "identity", "source_files", "member_definitions", "floor", "platforms"}
             or contract["schema"] != "rs9.nebular-current-caller-contract.v1"):
         raise ContractError("CALLER_SOURCE_IDENTITY", "Closed current caller contract required")
     return contract
+
+
+def _load_current_contract():
+    return _load_current_contract_bytes(CURRENT070_CONTRACT_PATH, CURRENT070_CONTRACT_SHA256)
+
+
+def _load_current071_contract():
+    return _load_current_contract_bytes(CURRENT071_CONTRACT_PATH, CURRENT071_CONTRACT_SHA256)
 
 
 def current_contract_for_capture(capture):
@@ -220,11 +234,16 @@ def current_contract_for_capture(capture):
     identity = (record["repository"]["full_name"], record["repository"]["id"],
                 record["release"]["id"], record["release"]["tag"],
                 record["tag"]["commit"], record["tag"]["tree"])
-    if (identity != ("Knowledge-Forge-AI/theme-forge-nebular-fusion", 1358643872,
-                     426333162, "v0.7.0", CURRENT070_COMMIT, CURRENT070_TREE)
-            or release.get("id") != 426333162 or release.get("tag_name") != "v0.7.0"):
+    loaders = {
+        ("Knowledge-Forge-AI/theme-forge-nebular-fusion", 1358643872, 426333162,
+         "v0.7.0", CURRENT070_COMMIT, CURRENT070_TREE): _load_current_contract,
+        ("Knowledge-Forge-AI/theme-forge-nebular-fusion", 1358643872, CURRENT071_RELEASE_ID,
+         "v0.7.1", CURRENT071_COMMIT, CURRENT071_TREE): _load_current071_contract,
+    }
+    loader = loaders.get(identity)
+    if loader is None or release.get("id") != identity[2] or release.get("tag_name") != identity[3]:
         raise ContractError("CALLER_SOURCE_IDENTITY", "Exact current authenticated Nebular release required")
-    contract = _load_current_contract()
+    contract = loader()
     for platform in contract["platforms"].values():
         asset = platform["asset"]
         selected = [row for row in record["assets"] if row["name"] == asset["name"]]
@@ -269,8 +288,9 @@ def _current_evidence_contract(evidence):
             or authenticated_record_hash(evidence._capture) != evidence._capture_hash):
         raise ContractError("CALLER_SOURCE_IDENTITY", "Current caller evidence lost its live capture binding")
     contract = current_contract_for_capture(evidence._capture)
-    if (evidence.get("tag_commit") != CURRENT070_COMMIT or evidence.get("tag_tree") != CURRENT070_TREE
-            or evidence.get("tag_name") != "v0.7.0"):
+    if (evidence.get("tag_commit") != contract["identity"]["commit"]
+            or evidence.get("tag_tree") != contract["identity"]["tree"]
+            or evidence.get("tag_name") != contract["identity"]["tag"]):
         raise ContractError("CALLER_SOURCE_IDENTITY", "Current caller evidence identity differs")
     return contract
 
@@ -308,14 +328,14 @@ def collect_caller_sources(capture, client, scratch, entry=None):
             raise ContractError("CALLER_CLIENT_UNAVAILABLE", "Authenticated source client unavailable")
         tag = capture.record.get("tag") if isinstance(capture.record, dict) else None
         release = capture.record.get("release", {})
-        current = ((isinstance(tag, dict) and (tag.get("commit") == CURRENT070_COMMIT
-                    or tag.get("tree") == CURRENT070_TREE))
-                   or isinstance(release, dict) and release.get("tag") == "v0.7.0")
+        current = ((isinstance(tag, dict) and (tag.get("commit") in (CURRENT070_COMMIT, CURRENT071_COMMIT)
+                    or tag.get("tree") in (CURRENT070_TREE, CURRENT071_TREE)))
+                   or isinstance(release, dict) and release.get("tag") in ("v0.7.0", "v0.7.1"))
         if current:
             contract = current_contract_for_capture(capture)
             pins = contract["source_files"]
             missing = list(pins)
-            identity = (CURRENT070_COMMIT, CURRENT070_TREE)
+            identity = (contract["identity"]["commit"], contract["identity"]["tree"])
         else:
             identity = _reviewed_tag_identity(tag)
         if identity is None:
@@ -340,7 +360,7 @@ def collect_caller_sources(capture, client, scratch, entry=None):
         result = dict(schema="rs9.nebular-caller-sources.v1", status="available", tag_commit=tag_commit,
                       tag_tree=tag_tree, files=files, records=records)
         if current:
-            result["tag_name"] = "v0.7.0"
+            result["tag_name"] = contract["identity"]["tag"]
             return _CurrentCallerEvidence(capture, result, _proof=_CURRENT_CALLER_PROOF)
         return result
     except (ContractError, OSError, ValueError, KeyError, TypeError, AttributeError) as error:
@@ -419,12 +439,12 @@ def verify_nebular_caller(path, rule, pin, inventory, inputs, *, caller_evidence
     """Verify a source relationship and byte preservation; no system Node inference."""
     evidence = caller_evidence if caller_evidence is not None else inventory.get("caller_evidence")
     if (isinstance(evidence, _CurrentCallerEvidence)
-            or isinstance(evidence, dict) and (evidence.get("tag_commit") == CURRENT070_COMMIT
-                                               or evidence.get("tag_tree") == CURRENT070_TREE
-                                               or evidence.get("tag_name") == "v0.7.0")):
+            or isinstance(evidence, dict) and (evidence.get("tag_commit") in (CURRENT070_COMMIT, CURRENT071_COMMIT)
+                                               or evidence.get("tag_tree") in (CURRENT070_TREE, CURRENT071_TREE)
+                                               or evidence.get("tag_name") in ("v0.7.0", "v0.7.1"))):
         return _verify_current_caller(path, rule, pin, inventory, inputs, evidence)
-    if (inputs.get("version") == "0.7.0"
-            or any(isinstance(value, str) and value in CURRENT070_ASSET_SHA256S
+    if (inputs.get("version") in ("0.7.0", "0.7.1")
+            or any(isinstance(value, str) and value in (CURRENT070_ASSET_SHA256S | CURRENT071_ASSET_SHA256S)
                    for value in (inputs.get("asset_sha256"), inventory.get("asset_sha256"), pin.get("asset_sha256")))):
         return None, "caller-content-or-identity-unproven"
     try:
@@ -529,7 +549,7 @@ def _verify_current_caller(path, rule, pin, inventory, inputs, evidence):
         platform = contract["platforms"].get(system)
         if (platform is None or inputs.get("arch") != system.removesuffix("-linux")
                 or inputs.get("project_id") != NEBULAR_PROJECT_ID
-                or inputs.get("version") != "0.7.0"):
+                or inputs.get("version") != contract["identity"]["tag"].removeprefix("v")):
             return None, failure
         asset = platform["asset"]
         if (inputs.get("asset_sha256") != asset["sha256"]
@@ -591,7 +611,7 @@ def _verify_current_caller(path, rule, pin, inventory, inputs, evidence):
         return dict(path=path, role=definition["role"], intent=rule["intent"], sha256=member_pin["sha256"],
                     mode=member_pin["mode"], input_member=pin["input_member"], input_archive_sha256=asset["sha256"],
                     proof_model="authenticated-source-relation-and-release-preservation",
-                    tag_commit=CURRENT070_COMMIT, tag_tree=CURRENT070_TREE,
+                    tag_commit=contract["identity"]["commit"], tag_tree=contract["identity"]["tree"],
                     runtime_member=RUNTIME, runtime_sha256=runtime["sha256"], manifest_sha256=manifest_pin["sha256"],
                     native_execution_claimed=False, system_node_required=False), None
     except (ContractError, OSError, ValueError, KeyError, TypeError, AttributeError):

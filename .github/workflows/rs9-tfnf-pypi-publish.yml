@@ -12,7 +12,7 @@ on:
         type: choice
         options:
           - 0.6.1
-          - 0.7.0
+          - 0.7.1
         default: 0.6.1
       mode:
         description: 'Execution mode'
@@ -71,7 +71,6 @@ jobs:
           path: dist/
           retention-days: 1
           if-no-files-found: error
-
   native_consumer:
     if: github.event_name == 'push' || (inputs.release == '0.6.1' && (inputs.mode == 'qualify' || inputs.mode == 'publish'))
     name: Native macOS ARM64 installed consumer and Scenario A
@@ -147,1000 +146,6 @@ jobs:
           path: '${{ runner.temp }}/tfnf-consumer-report/'
           retention-days: 14
           if-no-files-found: error
-
-  universal_prepare_public_inputs_070:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'universal-qualify'
-    name: Prepare Nebular 0.7.0 universal launcher inputs
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: '${{ github.sha }}'
-          persist-credentials: false
-
-      - name: Set up Python 3.13
-        id: setup_python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.13'
-
-      - name: Resolve current source tree
-        id: source_tree
-        run: |
-          set -euo pipefail
-          printf 'tree=%s\n' "$(git rev-parse --verify 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
-
-      - name: Prepare held 0.7.0 public inputs
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          set -euo pipefail
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_publish prepare-public-inputs-070 \
-            --manifest operators/tf-pypi/theme-forge-nebular-fusion-0.7.0-public-inputs.json \
-            --output "${{ runner.temp }}/tfnf-070-universal-public-inputs" \
-            --repository "$GITHUB_WORKSPACE" \
-            --stage-a-spec stage-a-files.json \
-            --rs9-commit "${{ github.sha }}" \
-            --rs9-tree "${{ steps.source_tree.outputs.tree }}" \
-            --tf-producer-commit 79c67bb70d800701b4b0cdbb9caa9be2bbc7c2ff \
-            --tf-producer-tree e663c9cf15144578a17d3cd501cf031ac83a7e0e
-
-      - name: Upload 0.7.0 public inputs
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-public-inputs
-          path: '${{ runner.temp }}/tfnf-070-universal-public-inputs/'
-          include-hidden-files: true
-          compression-level: 0
-          retention-days: 14
-          if-no-files-found: error
-
-  universal_build_verify_070:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'universal-qualify'
-    name: Build and Verify Nebular 0.7.0 Universal Launcher
-    needs: [universal_prepare_public_inputs_070]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: '${{ github.sha }}'
-          persist-credentials: false
-
-      - name: Set up Python 3.13
-        id: setup_python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.13'
-
-      - name: Download 0.7.0 public inputs
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-public-inputs
-          path: '${{ runner.temp }}/tfnf-070-universal-public-inputs'
-
-      - name: Build and verify one universal launcher wheel
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          set -euo pipefail
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_universal build-bundle \
-            --qualification-inputs "${{ runner.temp }}/tfnf-070-universal-public-inputs/qualification-inputs-prep.json" \
-            --inrun-root "${{ runner.temp }}/tfnf-070-universal-public-inputs" \
-            --output "${{ runner.temp }}/tfnf-070-universal-bundle" \
-            --expected-commit "${{ github.sha }}" \
-            --require-clean
-
-      - name: Upload 0.7.0 candidate bundle
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-candidate-bundle
-          path: '${{ runner.temp }}/tfnf-070-universal-bundle/'
-          retention-days: 14
-          if-no-files-found: error
-
-  universal_native_consumer_070_darwin_arm64:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'universal-qualify'
-    name: Universal installed consumer 0.7.0 (darwin-arm64)
-    needs: [universal_build_verify_070]
-    runs-on: macos-15
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout exact source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: '${{ github.sha }}'
-          persist-credentials: false
-
-      - name: Set up Python 3.13
-        id: setup_python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.13'
-
-      - name: Set up Node 22
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
-        with:
-          node-version: '22'
-          package-manager-cache: false
-
-      - name: Download 0.7.0 candidate bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-candidate-bundle
-          path: '${{ runner.temp }}/tfnf-070-universal-bundle'
-
-      - name: Download 0.7.0 public inputs
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-public-inputs
-          path: '${{ runner.temp }}/tfnf-070-universal-public-inputs'
-
-      - name: Qualify native consumer on darwin-arm64
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_universal qualify-native \
-            --target darwin-arm64 \
-            --qualification-inputs "${{ runner.temp }}/tfnf-070-universal-public-inputs/qualification-inputs-prep.json" \
-            --inrun-root "${{ runner.temp }}/tfnf-070-universal-public-inputs" \
-            --raw-release "${{ runner.temp }}/tfnf-070-universal-raw-release-darwin-arm64/raw_release.json" \
-            --bundle "${{ runner.temp }}/tfnf-070-universal-bundle" \
-            --work "${{ runner.temp }}/tfnf-070-universal-work-darwin-arm64" \
-            --output "${{ runner.temp }}/tfnf-070-universal-qual/darwin-arm64/result.json" \
-            --expected-commit "${{ github.sha }}" \
-            --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}"
-
-      - name: Upload darwin-arm64 qualification receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-qualification-darwin-arm64
-          path: '${{ runner.temp }}/tfnf-070-universal-qual/'
-          retention-days: 14
-          if-no-files-found: error
-
-      - name: Upload failed native harness report
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-qualification-darwin-arm64-failure-diagnostic
-          path: '${{ runner.temp }}/tfnf-070-universal-work-darwin-arm64/installed-native-smoke/**/*.run.json'
-          retention-days: 14
-          if-no-files-found: ignore
-
-  universal_native_consumer_070_linux_arm64_gnu:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'universal-qualify'
-    name: Universal installed consumer 0.7.0 (linux-arm64-gnu)
-    needs: [universal_build_verify_070]
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout exact source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: '${{ github.sha }}'
-          persist-credentials: false
-
-      - name: Set up Python 3.13
-        id: setup_python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.13'
-
-      - name: Set up Node 22
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
-        with:
-          node-version: '22'
-          package-manager-cache: false
-
-      - name: Install minimal Ubuntu display tools
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            xvfb xauth dbus-x11
-
-      - name: Verify Ubuntu display tool class
-        shell: bash
-        run: |
-          set -euo pipefail
-          for tool in xvfb-run xauth dbus-run-session; do
-            command -v "$tool" >/dev/null
-          done
-          for package in xvfb xauth dbus-x11; do
-            dpkg-query -W -f='${Version}' "$package" >/dev/null
-          done
-          {
-            printf 'platform=ubuntu-runner\n'
-            dpkg-query -W -f='${Package}\t${Version}\n' xvfb xauth dbus-x11
-            for tool in xvfb-run xauth dbus-run-session; do
-              printf 'tool=%s path=%s\n' "$tool" "$(command -v "$tool")"
-            done
-          } | tee "${{ runner.temp }}/tfnf-070-universal-display-tools.tsv"
-
-      - name: Download 0.7.0 candidate bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-candidate-bundle
-          path: '${{ runner.temp }}/tfnf-070-universal-bundle'
-
-      - name: Download 0.7.0 public inputs
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-public-inputs
-          path: '${{ runner.temp }}/tfnf-070-universal-public-inputs'
-
-      - name: Resolve explicit Linux runtime profile
-        id: linux_runtime_profile
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-          QUALIFICATION_INPUTS: '${{ runner.temp }}/tfnf-070-universal-public-inputs/qualification-inputs-prep.json'
-          INRUN_ROOT: '${{ runner.temp }}/tfnf-070-universal-public-inputs'
-        run: |
-          set -euo pipefail
-          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
-          import os
-          from pathlib import Path
-          from rs9.tf_pypi_nebular070_publish import (
-              SYSTEM_WEBKIT_RUNTIME_PROFILE,
-              load_qualification_inputs_descriptor,
-          )
-
-          descriptor = load_qualification_inputs_descriptor(
-              Path(os.environ["QUALIFICATION_INPUTS"]),
-              repository=Path(os.environ["GITHUB_WORKSPACE"]),
-              phase="qualification-prep",
-              inrun_root=Path(os.environ["INRUN_ROOT"]),
-          )
-          if "system_webkit" not in descriptor or "manylinux" in descriptor:
-              raise SystemExit("universal launcher requires system WebKit inputs")
-          if "system_webkit" in descriptor:
-              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
-          elif "manylinux" in descriptor:
-              print("manylinux")
-          else:
-              raise SystemExit("explicit runtime profile missing")
-          PY
-          )"
-          case "$PROFILE" in
-            manylinux|system-webkitgtk-4.1) ;;
-            *) echo "unsupported runtime profile" >&2; exit 1 ;;
-          esac
-          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
-
-      - name: Install Ubuntu system WebKit runtime packages
-        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libgtk-3-0t64 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
-
-      - name: Verify Ubuntu system WebKit runtime packages
-        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
-        shell: bash
-        run: |
-          set -euo pipefail
-          dpkg-query -W -f='${Package}\t${Version}\n' libgtk-3-0t64 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 \
-            | tee "${{ runner.temp }}/tfnf-070-universal-system-webkit-packages.tsv"
-          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
-          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
-
-      - name: Qualify native consumer on linux-arm64-gnu
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_universal qualify-native \
-            --target linux-arm64-gnu \
-            --qualification-inputs "${{ runner.temp }}/tfnf-070-universal-public-inputs/qualification-inputs-prep.json" \
-            --inrun-root "${{ runner.temp }}/tfnf-070-universal-public-inputs" \
-            --raw-release "${{ runner.temp }}/tfnf-070-universal-raw-release-linux-arm64-gnu/raw_release.json" \
-            --bundle "${{ runner.temp }}/tfnf-070-universal-bundle" \
-            --work "${{ runner.temp }}/tfnf-070-universal-work-linux-arm64-gnu" \
-            --output "${{ runner.temp }}/tfnf-070-universal-qual/linux-arm64-gnu/result.json" \
-            --expected-commit "${{ github.sha }}" \
-            --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}" \
-            --consumer-host-role newer
-
-      - name: Upload linux-arm64-gnu qualification receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-qualification-linux-arm64-gnu
-          path: '${{ runner.temp }}/tfnf-070-universal-qual/'
-          retention-days: 14
-          if-no-files-found: error
-
-      - name: Upload failed native harness report
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-qualification-linux-arm64-gnu-failure-diagnostic
-          path: '${{ runner.temp }}/tfnf-070-universal-work-linux-arm64-gnu/installed-native-smoke/**/*.run.json'
-          retention-days: 14
-          if-no-files-found: ignore
-
-  universal_native_consumer_070_linux_x64_gnu:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'universal-qualify'
-    name: Universal installed consumer 0.7.0 (linux-x64-gnu)
-    needs: [universal_build_verify_070]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout exact source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: '${{ github.sha }}'
-          persist-credentials: false
-
-      - name: Set up Python 3.13
-        id: setup_python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.13'
-
-      - name: Set up Node 22
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
-        with:
-          node-version: '22'
-          package-manager-cache: false
-
-      - name: Install minimal Ubuntu display tools
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            xvfb xauth dbus-x11
-
-      - name: Verify Ubuntu display tool class
-        shell: bash
-        run: |
-          set -euo pipefail
-          for tool in xvfb-run xauth dbus-run-session; do
-            command -v "$tool" >/dev/null
-          done
-          for package in xvfb xauth dbus-x11; do
-            dpkg-query -W -f='${Version}' "$package" >/dev/null
-          done
-          {
-            printf 'platform=ubuntu-runner\n'
-            dpkg-query -W -f='${Package}\t${Version}\n' xvfb xauth dbus-x11
-            for tool in xvfb-run xauth dbus-run-session; do
-              printf 'tool=%s path=%s\n' "$tool" "$(command -v "$tool")"
-            done
-          } | tee "${{ runner.temp }}/tfnf-070-universal-display-tools.tsv"
-
-      - name: Download 0.7.0 candidate bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-candidate-bundle
-          path: '${{ runner.temp }}/tfnf-070-universal-bundle'
-
-      - name: Download 0.7.0 public inputs
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-public-inputs
-          path: '${{ runner.temp }}/tfnf-070-universal-public-inputs'
-
-      - name: Resolve explicit Linux runtime profile
-        id: linux_runtime_profile
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-          QUALIFICATION_INPUTS: '${{ runner.temp }}/tfnf-070-universal-public-inputs/qualification-inputs-prep.json'
-          INRUN_ROOT: '${{ runner.temp }}/tfnf-070-universal-public-inputs'
-        run: |
-          set -euo pipefail
-          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
-          import os
-          from pathlib import Path
-          from rs9.tf_pypi_nebular070_publish import (
-              SYSTEM_WEBKIT_RUNTIME_PROFILE,
-              load_qualification_inputs_descriptor,
-          )
-
-          descriptor = load_qualification_inputs_descriptor(
-              Path(os.environ["QUALIFICATION_INPUTS"]),
-              repository=Path(os.environ["GITHUB_WORKSPACE"]),
-              phase="qualification-prep",
-              inrun_root=Path(os.environ["INRUN_ROOT"]),
-          )
-          if "system_webkit" not in descriptor or "manylinux" in descriptor:
-              raise SystemExit("universal launcher requires system WebKit inputs")
-          if "system_webkit" in descriptor:
-              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
-          elif "manylinux" in descriptor:
-              print("manylinux")
-          else:
-              raise SystemExit("explicit runtime profile missing")
-          PY
-          )"
-          case "$PROFILE" in
-            manylinux|system-webkitgtk-4.1) ;;
-            *) echo "unsupported runtime profile" >&2; exit 1 ;;
-          esac
-          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
-
-      - name: Install Ubuntu system WebKit runtime packages
-        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libgtk-3-0t64 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
-
-      - name: Verify Ubuntu system WebKit runtime packages
-        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
-        shell: bash
-        run: |
-          set -euo pipefail
-          dpkg-query -W -f='${Package}\t${Version}\n' libgtk-3-0t64 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 \
-            | tee "${{ runner.temp }}/tfnf-070-universal-system-webkit-packages.tsv"
-          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
-          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
-
-      - name: Qualify native consumer on linux-x64-gnu
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_universal qualify-native \
-            --target linux-x64-gnu \
-            --qualification-inputs "${{ runner.temp }}/tfnf-070-universal-public-inputs/qualification-inputs-prep.json" \
-            --inrun-root "${{ runner.temp }}/tfnf-070-universal-public-inputs" \
-            --raw-release "${{ runner.temp }}/tfnf-070-universal-raw-release-linux-x64-gnu/raw_release.json" \
-            --bundle "${{ runner.temp }}/tfnf-070-universal-bundle" \
-            --work "${{ runner.temp }}/tfnf-070-universal-work-linux-x64-gnu" \
-            --output "${{ runner.temp }}/tfnf-070-universal-qual/linux-x64-gnu/result.json" \
-            --expected-commit "${{ github.sha }}" \
-            --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}" \
-            --consumer-host-role newer
-
-      - name: Upload linux-x64-gnu qualification receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-qualification-linux-x64-gnu
-          path: '${{ runner.temp }}/tfnf-070-universal-qual/'
-          retention-days: 14
-          if-no-files-found: error
-
-      - name: Upload failed native harness report
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-qualification-linux-x64-gnu-failure-diagnostic
-          path: '${{ runner.temp }}/tfnf-070-universal-work-linux-x64-gnu/installed-native-smoke/**/*.run.json'
-          retention-days: 14
-          if-no-files-found: ignore
-
-  universal_native_consumer_070_linux_arm64_gnu_floor:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'universal-qualify'
-    name: Universal installed consumer 0.7.0 (linux-arm64-gnu floor)
-    needs: [universal_build_verify_070]
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 60
-    defaults:
-      run:
-        shell: bash
-        working-directory: qualification-source
-    env:
-      TFNF_CI_TEMP: /__w/_temp
-    permissions:
-      contents: read
-    # Release-scoped Bookworm/SYS_ADMIN floor policy; held pending its
-    # corresponding release-policy decision.
-    container:
-      image: debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
-      options: --init --cap-add=SYS_ADMIN
-    steps:
-      - name: Install pinned Bookworm floor tools
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-          mkdir -p "${{ env.TFNF_CI_TEMP }}"
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            ca-certificates git python3 python3-venv=3.11.2-1+b1 \
-            sudo=1.9.13p3-1+deb12u4 util-linux=2.38.1-5+deb12u3 \
-            binutils procps \
-            xvfb=2:21.1.7-3+deb12u13 \
-            xauth=1:1.1.2-1 \
-            dbus-x11=1.14.10-1~deb12u1
-
-      - name: Verify Bookworm display tool class
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-          for tool in xvfb-run xauth dbus-run-session; do
-            command -v "$tool" >/dev/null
-          done
-          test "$(dpkg-query -W -f='${Version}' xvfb)" = "2:21.1.7-3+deb12u13"
-          test "$(dpkg-query -W -f='${Version}' xauth)" = "1:1.1.2-1"
-          test "$(dpkg-query -W -f='${Version}' dbus-x11)" = "1.14.10-1~deb12u1"
-          {
-            printf 'platform=debian-bookworm-floor\n'
-            dpkg-query -W -f='${Package}\t${Version}\n' xvfb xauth dbus-x11
-            for tool in xvfb-run xauth dbus-run-session; do
-              printf 'tool=%s path=%s\n' "$tool" "$(command -v "$tool")"
-            done
-          } | tee "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-floor-display-tools.tsv"
-
-      - name: Checkout exact source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: '${{ github.sha }}'
-          fetch-depth: 1
-          persist-credentials: false
-          path: qualification-source
-
-      - name: Select pinned Bookworm Python 3.11
-        id: setup_python
-        run: |
-          set -euo pipefail
-          /usr/bin/python3 -I -B -c 'import sys; assert sys.version_info[:2] == (3, 11)'
-          dpkg-query -W python3 python3.11 python3.11-venv
-          echo 'python-path=/usr/bin/python3' >> "$GITHUB_OUTPUT"
-
-      - name: Set up Node 22
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
-        with:
-          node-version: '22.23.3'
-          package-manager-cache: false
-
-      - name: Download 0.7.0 candidate bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-candidate-bundle
-          path: '${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-bundle'
-
-      - name: Download 0.7.0 public inputs
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-public-inputs
-          path: '${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-public-inputs'
-
-      - name: Resolve explicit Linux runtime profile
-        id: linux_runtime_profile
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-          QUALIFICATION_INPUTS: '${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-public-inputs/qualification-inputs-prep.json'
-          INRUN_ROOT: '${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-public-inputs'
-        run: |
-          set -euo pipefail
-          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
-          import os
-          from pathlib import Path
-          from rs9.tf_pypi_nebular070_publish import (
-              SYSTEM_WEBKIT_RUNTIME_PROFILE,
-              load_qualification_inputs_descriptor,
-          )
-
-          descriptor = load_qualification_inputs_descriptor(
-              Path(os.environ["QUALIFICATION_INPUTS"]),
-              repository=Path(os.environ["GITHUB_WORKSPACE"]) / "qualification-source",
-              phase="qualification-prep",
-              inrun_root=Path(os.environ["INRUN_ROOT"]),
-          )
-          if "system_webkit" not in descriptor or "manylinux" in descriptor:
-              raise SystemExit("universal launcher requires system WebKit inputs")
-          if "system_webkit" in descriptor:
-              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
-          elif "manylinux" in descriptor:
-              print("manylinux")
-          else:
-              raise SystemExit("explicit runtime profile missing")
-          PY
-          )"
-          case "$PROFILE" in
-            manylinux|system-webkitgtk-4.1) ;;
-            *) echo "unsupported runtime profile" >&2; exit 1 ;;
-          esac
-          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
-
-      - name: Check Bookworm installed tfnf missing system WebKit before runtime install
-        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
-        shell: bash
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          set -euo pipefail
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_universal check-system-webkit-missing \
-            --target linux-arm64-gnu \
-            --bundle "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-bundle" \
-            --work "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-preflight-linux-arm64-gnu-floor" \
-            --output "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-floor/linux-arm64-gnu/missing-runtime.json" \
-            --expected-commit "${{ github.sha }}" \
-            --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}"
-
-      - name: Install Bookworm system WebKit runtime packages
-        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
-        shell: bash
-        run: |
-          set -euo pipefail
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            libgtk-3-0 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
-
-      - name: Verify Bookworm system WebKit runtime packages
-        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
-        shell: bash
-        run: |
-          set -euo pipefail
-          dpkg-query -W -f='${Package}\t${Version}\n' libgtk-3-0 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 \
-            | tee "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-floor-system-webkit-packages.tsv"
-          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
-          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
-
-      - name: Qualify native consumer on linux-arm64-gnu floor
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_universal qualify-native \
-            --target linux-arm64-gnu \
-            --consumer-host-role floor \
-            --qualification-inputs "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-public-inputs/qualification-inputs-prep.json" \
-            --inrun-root "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-public-inputs" \
-            --raw-release "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-raw-release-linux-arm64-gnu-floor/raw_release.json" \
-            --bundle "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-bundle" \
-            --work "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-work-linux-arm64-gnu-floor" \
-            --output "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-floor/linux-arm64-gnu/result.json" \
-            --expected-commit "${{ github.sha }}" \
-            --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}"
-
-      - name: Upload linux-arm64-gnu floor qualification receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-qualification-linux-arm64-gnu-floor
-          path: '${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-floor/'
-          compression-level: 0
-          retention-days: 14
-          if-no-files-found: error
-
-      - name: Upload failed native harness report
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-qualification-linux-arm64-gnu-floor-failure-diagnostic
-          path: '${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-work-linux-arm64-gnu-floor/installed-native-smoke/**/*.run.json'
-          retention-days: 14
-          if-no-files-found: ignore
-
-  universal_native_consumer_070_linux_x64_gnu_floor:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'universal-qualify'
-    name: Universal installed consumer 0.7.0 (linux-x64-gnu floor)
-    needs: [universal_build_verify_070]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    defaults:
-      run:
-        shell: bash
-        working-directory: qualification-source
-    env:
-      TFNF_CI_TEMP: /__w/_temp
-    permissions:
-      contents: read
-    # Release-scoped Bookworm/SYS_ADMIN floor policy; held pending its
-    # corresponding release-policy decision.
-    container:
-      image: debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
-      options: --init --cap-add=SYS_ADMIN
-    steps:
-      - name: Install pinned Bookworm floor tools
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-          mkdir -p "${{ env.TFNF_CI_TEMP }}"
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            ca-certificates git python3 python3-venv=3.11.2-1+b1 \
-            sudo=1.9.13p3-1+deb12u4 util-linux=2.38.1-5+deb12u3 \
-            binutils procps \
-            xvfb=2:21.1.7-3+deb12u13 \
-            xauth=1:1.1.2-1 \
-            dbus-x11=1.14.10-1~deb12u1
-
-      - name: Verify Bookworm display tool class
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-          for tool in xvfb-run xauth dbus-run-session; do
-            command -v "$tool" >/dev/null
-          done
-          test "$(dpkg-query -W -f='${Version}' xvfb)" = "2:21.1.7-3+deb12u13"
-          test "$(dpkg-query -W -f='${Version}' xauth)" = "1:1.1.2-1"
-          test "$(dpkg-query -W -f='${Version}' dbus-x11)" = "1.14.10-1~deb12u1"
-          {
-            printf 'platform=debian-bookworm-floor\n'
-            dpkg-query -W -f='${Package}\t${Version}\n' xvfb xauth dbus-x11
-            for tool in xvfb-run xauth dbus-run-session; do
-              printf 'tool=%s path=%s\n' "$tool" "$(command -v "$tool")"
-            done
-          } | tee "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-floor-display-tools.tsv"
-
-      - name: Checkout exact source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: '${{ github.sha }}'
-          fetch-depth: 1
-          persist-credentials: false
-          path: qualification-source
-
-      - name: Select pinned Bookworm Python 3.11
-        id: setup_python
-        run: |
-          set -euo pipefail
-          /usr/bin/python3 -I -B -c 'import sys; assert sys.version_info[:2] == (3, 11)'
-          dpkg-query -W python3 python3.11 python3.11-venv
-          echo 'python-path=/usr/bin/python3' >> "$GITHUB_OUTPUT"
-
-      - name: Set up Node 22
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
-        with:
-          node-version: '22.23.3'
-          package-manager-cache: false
-
-      - name: Download 0.7.0 candidate bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-candidate-bundle
-          path: '${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-bundle'
-
-      - name: Download 0.7.0 public inputs
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-public-inputs
-          path: '${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-public-inputs'
-
-      - name: Resolve explicit Linux runtime profile
-        id: linux_runtime_profile
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-          QUALIFICATION_INPUTS: '${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-public-inputs/qualification-inputs-prep.json'
-          INRUN_ROOT: '${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-public-inputs'
-        run: |
-          set -euo pipefail
-          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
-          import os
-          from pathlib import Path
-          from rs9.tf_pypi_nebular070_publish import (
-              SYSTEM_WEBKIT_RUNTIME_PROFILE,
-              load_qualification_inputs_descriptor,
-          )
-
-          descriptor = load_qualification_inputs_descriptor(
-              Path(os.environ["QUALIFICATION_INPUTS"]),
-              repository=Path(os.environ["GITHUB_WORKSPACE"]) / "qualification-source",
-              phase="qualification-prep",
-              inrun_root=Path(os.environ["INRUN_ROOT"]),
-          )
-          if "system_webkit" not in descriptor or "manylinux" in descriptor:
-              raise SystemExit("universal launcher requires system WebKit inputs")
-          if "system_webkit" in descriptor:
-              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
-          elif "manylinux" in descriptor:
-              print("manylinux")
-          else:
-              raise SystemExit("explicit runtime profile missing")
-          PY
-          )"
-          case "$PROFILE" in
-            manylinux|system-webkitgtk-4.1) ;;
-            *) echo "unsupported runtime profile" >&2; exit 1 ;;
-          esac
-          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
-
-      - name: Check Bookworm installed tfnf missing system WebKit before runtime install
-        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
-        shell: bash
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          set -euo pipefail
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_universal check-system-webkit-missing \
-            --target linux-x64-gnu \
-            --bundle "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-bundle" \
-            --work "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-preflight-linux-x64-gnu-floor" \
-            --output "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-floor/linux-x64-gnu/missing-runtime.json" \
-            --expected-commit "${{ github.sha }}" \
-            --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}"
-
-      - name: Install Bookworm system WebKit runtime packages
-        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
-        shell: bash
-        run: |
-          set -euo pipefail
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            libgtk-3-0 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
-
-      - name: Verify Bookworm system WebKit runtime packages
-        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
-        shell: bash
-        run: |
-          set -euo pipefail
-          dpkg-query -W -f='${Package}\t${Version}\n' libgtk-3-0 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 \
-            | tee "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-floor-system-webkit-packages.tsv"
-          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
-          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
-
-      - name: Qualify native consumer on linux-x64-gnu floor
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_universal qualify-native \
-            --target linux-x64-gnu \
-            --consumer-host-role floor \
-            --qualification-inputs "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-public-inputs/qualification-inputs-prep.json" \
-            --inrun-root "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-public-inputs" \
-            --raw-release "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-raw-release-linux-x64-gnu-floor/raw_release.json" \
-            --bundle "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-bundle" \
-            --work "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-work-linux-x64-gnu-floor" \
-            --output "${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-floor/linux-x64-gnu/result.json" \
-            --expected-commit "${{ github.sha }}" \
-            --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}"
-
-      - name: Upload linux-x64-gnu floor qualification receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-qualification-linux-x64-gnu-floor
-          path: '${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-floor/'
-          compression-level: 0
-          retention-days: 14
-          if-no-files-found: error
-
-      - name: Upload failed native harness report
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-qualification-linux-x64-gnu-floor-failure-diagnostic
-          path: '${{ env.TFNF_CI_TEMP }}/tfnf-070-universal-work-linux-x64-gnu-floor/installed-native-smoke/**/*.run.json'
-          retention-days: 14
-          if-no-files-found: ignore
-
-  universal_qualification_gate_070:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'universal-qualify'
-    name: Universal installed qualification matrix 0.7.0
-    needs:
-      - universal_build_verify_070
-      - universal_native_consumer_070_darwin_arm64
-      - universal_native_consumer_070_linux_arm64_gnu
-      - universal_native_consumer_070_linux_x64_gnu
-      - universal_native_consumer_070_linux_arm64_gnu_floor
-      - universal_native_consumer_070_linux_x64_gnu_floor
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout exact source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: '${{ github.sha }}'
-          persist-credentials: false
-
-      - name: Set up Python 3.13
-        id: setup_python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.13'
-
-      - name: Download 0.7.0 candidate bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-candidate-bundle
-          path: '${{ runner.temp }}/tfnf-070-universal-bundle'
-
-      - name: Download 0.7.0 public inputs
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-public-inputs
-          path: '${{ runner.temp }}/tfnf-070-universal-public-inputs'
-
-      - name: Download darwin-arm64 qualification receipt
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-qualification-darwin-arm64
-          path: '${{ runner.temp }}/tfnf-070-universal-receipts'
-
-      - name: Download linux-arm64-gnu qualification receipt
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-qualification-linux-arm64-gnu
-          path: '${{ runner.temp }}/tfnf-070-universal-receipts'
-
-      - name: Download linux-x64-gnu qualification receipt
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-qualification-linux-x64-gnu
-          path: '${{ runner.temp }}/tfnf-070-universal-receipts'
-
-      - name: Download linux-arm64-gnu floor qualification receipt
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-qualification-linux-arm64-gnu-floor
-          path: '${{ runner.temp }}/tfnf-070-universal-floor-receipts'
-
-      - name: Download linux-x64-gnu floor qualification receipt
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: tfnf-070-universal-qualification-linux-x64-gnu-floor
-          path: '${{ runner.temp }}/tfnf-070-universal-floor-receipts'
-
-      - name: Validate all five universal installed consumer lanes
-        env:
-          PYTHONPATH: src
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          set -euo pipefail
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular070_universal admit-matrix \
-            --bundle "${{ runner.temp }}/tfnf-070-universal-bundle" \
-            --qualification-inputs "${{ runner.temp }}/tfnf-070-universal-public-inputs/qualification-inputs-prep.json" \
-            --inrun-root "${{ runner.temp }}/tfnf-070-universal-public-inputs" \
-            --receipts-dir "${{ runner.temp }}/tfnf-070-universal-receipts" \
-            --floor-receipts "${{ runner.temp }}/tfnf-070-universal-floor-receipts" \
-            --work "${{ runner.temp }}/tfnf-070-universal-matrix-work" \
-            --output "${{ runner.temp }}/tfnf-070-universal-matrix/matrix_receipt.json" \
-            --expected-commit "${{ github.sha }}" \
-            --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}"
-
-      - name: Upload 0.7.0 matrix qualification receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: tfnf-070-universal-matrix-receipt
-          path: '${{ runner.temp }}/tfnf-070-universal-matrix/'
-          retention-days: 14
-          if-no-files-found: error
-
-  reject_unsupported_dispatch:
-    if: github.event_name == 'workflow_dispatch' && !((inputs.release == '0.6.1' && (inputs.mode == 'qualify' || inputs.mode == 'publish')) || (inputs.release == '0.7.0' && (inputs.mode == 'universal-qualify' || inputs.mode == 'universal-publish')))
-    name: Reject unsupported release and mode combination
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - name: Reject unsupported distribution route
-        run: exit 1
-
   publish:
     if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.6.1' && inputs.mode == 'publish'
     name: Trusted Publishing to PyPI
@@ -1215,10 +220,1013 @@ jobs:
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
           "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular readback --dist dist
+  universal_prepare_public_inputs_071:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.1' && inputs.mode == 'universal-qualify'
+    name: Prepare Nebular 0.7.1 universal launcher inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
 
-  universal_publication_070:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.0' && inputs.mode == 'universal-publish'
-    name: Attended Nebular 0.7.0 universal PyPI publication
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Resolve current source tree
+        id: source_tree
+        run: |
+          set -euo pipefail
+          printf 'tree=%s\n' "$(git rev-parse --verify 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare held Nebular 0.7.1 system-WebKit inputs
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular071_publish prepare-public-inputs-071 \
+            --manifest operators/tf-pypi/theme-forge-nebular-fusion-0.7.1-public-inputs.json \
+            --output "${{ runner.temp }}/tfnf-071-universal-public-inputs" \
+            --repository "$GITHUB_WORKSPACE" \
+            --stage-a-spec stage-a-files.json \
+            --rs9-commit "${{ github.sha }}" \
+            --rs9-tree "$(git rev-parse --verify 'HEAD^{tree}')"
+
+      - name: Upload 0.7.1 public inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-public-inputs
+          path: '${{ runner.temp }}/tfnf-071-universal-public-inputs/'
+          include-hidden-files: true
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+
+  universal_build_verify_071:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.1' && inputs.mode == 'universal-qualify'
+    name: Build and Verify Nebular 0.7.1 Universal Launcher
+    needs: [universal_prepare_public_inputs_071]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Download 0.7.1 public inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-public-inputs
+          path: '${{ runner.temp }}/tfnf-071-universal-public-inputs'
+
+      - name: Build and verify one universal launcher wheel
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular071_universal build-bundle \
+            --qualification-inputs "${{ runner.temp }}/tfnf-071-universal-public-inputs/qualification-inputs-prep.json" \
+            --inrun-root "${{ runner.temp }}/tfnf-071-universal-public-inputs" \
+            --output "${{ runner.temp }}/tfnf-071-universal-bundle" \
+            --expected-commit "${{ github.sha }}" \
+            --require-clean
+
+      - name: Upload 0.7.1 candidate bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-candidate-bundle
+          path: '${{ runner.temp }}/tfnf-071-universal-bundle/'
+          retention-days: 14
+          if-no-files-found: error
+
+  universal_native_consumer_071_darwin_arm64:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.1' && inputs.mode == 'universal-qualify'
+    name: Universal installed consumer 0.7.1 (darwin-arm64)
+    needs: [universal_build_verify_071]
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Download 0.7.1 candidate bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-candidate-bundle
+          path: '${{ runner.temp }}/tfnf-071-universal-bundle'
+
+      - name: Download 0.7.1 public inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-public-inputs
+          path: '${{ runner.temp }}/tfnf-071-universal-public-inputs'
+
+      - name: Qualify native consumer on darwin-arm64
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular071_universal qualify-native \
+            --target darwin-arm64 \
+            --qualification-inputs "${{ runner.temp }}/tfnf-071-universal-public-inputs/qualification-inputs-prep.json" \
+            --inrun-root "${{ runner.temp }}/tfnf-071-universal-public-inputs" \
+            --raw-release "${{ runner.temp }}/tfnf-071-universal-raw-release-darwin-arm64/raw_release.json" \
+            --bundle "${{ runner.temp }}/tfnf-071-universal-bundle" \
+            --work "${{ runner.temp }}/tfnf-071-universal-work-darwin-arm64" \
+            --output "${{ runner.temp }}/tfnf-071-universal-qual/darwin-arm64/result.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Upload darwin-arm64 qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-qualification-darwin-arm64
+          path: '${{ runner.temp }}/tfnf-071-universal-qual/'
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload failed native harness report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-qualification-darwin-arm64-failure-diagnostic
+          path: '${{ runner.temp }}/tfnf-071-universal-work-darwin-arm64/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
+
+  universal_native_consumer_071_linux_arm64_gnu:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.1' && inputs.mode == 'universal-qualify'
+    name: Universal installed consumer 0.7.1 (linux-arm64-gnu)
+    needs: [universal_build_verify_071]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install minimal Ubuntu display tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb xauth dbus-x11
+
+      - name: Verify Ubuntu display tool class
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in xvfb-run xauth dbus-run-session; do
+            command -v "$tool" >/dev/null
+          done
+          for package in xvfb xauth dbus-x11; do
+            dpkg-query -W -f='${Version}' "$package" >/dev/null
+          done
+          {
+            printf 'platform=ubuntu-runner\n'
+            dpkg-query -W -f='${Package}\t${Version}\n' xvfb xauth dbus-x11
+            for tool in xvfb-run xauth dbus-run-session; do
+              printf 'tool=%s path=%s\n' "$tool" "$(command -v "$tool")"
+            done
+          } | tee "${{ runner.temp }}/tfnf-071-universal-display-tools.tsv"
+
+      - name: Download 0.7.1 candidate bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-candidate-bundle
+          path: '${{ runner.temp }}/tfnf-071-universal-bundle'
+
+      - name: Download 0.7.1 public inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-public-inputs
+          path: '${{ runner.temp }}/tfnf-071-universal-public-inputs'
+
+      - name: Resolve explicit Linux runtime profile
+        id: linux_runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{ runner.temp }}/tfnf-071-universal-public-inputs/qualification-inputs-prep.json'
+          INRUN_ROOT: '${{ runner.temp }}/tfnf-071-universal-public-inputs'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular071_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+          from rs9.nebular071_product_capture import load_held_product_capture
+          product_capture = load_held_product_capture(Path(os.environ["INRUN_ROOT"]))
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+              product_capture=product_capture,
+          )
+          if "system_webkit" not in descriptor or "manylinux" in descriptor:
+              raise SystemExit("universal launcher requires system WebKit inputs")
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Install Ubuntu system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-0t64 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
+
+      - name: Verify Ubuntu system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-query -W -f='${Package}\t${Version}\n' libgtk-3-0t64 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 \
+            | tee "${{ runner.temp }}/tfnf-071-universal-system-webkit-packages.tsv"
+          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
+          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
+
+      - name: Qualify native consumer on linux-arm64-gnu
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular071_universal qualify-native \
+            --target linux-arm64-gnu \
+            --qualification-inputs "${{ runner.temp }}/tfnf-071-universal-public-inputs/qualification-inputs-prep.json" \
+            --inrun-root "${{ runner.temp }}/tfnf-071-universal-public-inputs" \
+            --raw-release "${{ runner.temp }}/tfnf-071-universal-raw-release-linux-arm64-gnu/raw_release.json" \
+            --bundle "${{ runner.temp }}/tfnf-071-universal-bundle" \
+            --work "${{ runner.temp }}/tfnf-071-universal-work-linux-arm64-gnu" \
+            --output "${{ runner.temp }}/tfnf-071-universal-qual/linux-arm64-gnu/result.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}" \
+            --consumer-host-role newer
+
+      - name: Upload linux-arm64-gnu qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-qualification-linux-arm64-gnu
+          path: '${{ runner.temp }}/tfnf-071-universal-qual/'
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload failed native harness report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-qualification-linux-arm64-gnu-failure-diagnostic
+          path: '${{ runner.temp }}/tfnf-071-universal-work-linux-arm64-gnu/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
+
+  universal_native_consumer_071_linux_x64_gnu:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.1' && inputs.mode == 'universal-qualify'
+    name: Universal installed consumer 0.7.1 (linux-x64-gnu)
+    needs: [universal_build_verify_071]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install minimal Ubuntu display tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb xauth dbus-x11
+
+      - name: Verify Ubuntu display tool class
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in xvfb-run xauth dbus-run-session; do
+            command -v "$tool" >/dev/null
+          done
+          for package in xvfb xauth dbus-x11; do
+            dpkg-query -W -f='${Version}' "$package" >/dev/null
+          done
+          {
+            printf 'platform=ubuntu-runner\n'
+            dpkg-query -W -f='${Package}\t${Version}\n' xvfb xauth dbus-x11
+            for tool in xvfb-run xauth dbus-run-session; do
+              printf 'tool=%s path=%s\n' "$tool" "$(command -v "$tool")"
+            done
+          } | tee "${{ runner.temp }}/tfnf-071-universal-display-tools.tsv"
+
+      - name: Download 0.7.1 candidate bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-candidate-bundle
+          path: '${{ runner.temp }}/tfnf-071-universal-bundle'
+
+      - name: Download 0.7.1 public inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-public-inputs
+          path: '${{ runner.temp }}/tfnf-071-universal-public-inputs'
+
+      - name: Resolve explicit Linux runtime profile
+        id: linux_runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{ runner.temp }}/tfnf-071-universal-public-inputs/qualification-inputs-prep.json'
+          INRUN_ROOT: '${{ runner.temp }}/tfnf-071-universal-public-inputs'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular071_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+          from rs9.nebular071_product_capture import load_held_product_capture
+          product_capture = load_held_product_capture(Path(os.environ["INRUN_ROOT"]))
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]),
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+              product_capture=product_capture,
+          )
+          if "system_webkit" not in descriptor or "manylinux" in descriptor:
+              raise SystemExit("universal launcher requires system WebKit inputs")
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Install Ubuntu system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-0t64 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
+
+      - name: Verify Ubuntu system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-query -W -f='${Package}\t${Version}\n' libgtk-3-0t64 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 \
+            | tee "${{ runner.temp }}/tfnf-071-universal-system-webkit-packages.tsv"
+          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
+          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
+
+      - name: Qualify native consumer on linux-x64-gnu
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular071_universal qualify-native \
+            --target linux-x64-gnu \
+            --qualification-inputs "${{ runner.temp }}/tfnf-071-universal-public-inputs/qualification-inputs-prep.json" \
+            --inrun-root "${{ runner.temp }}/tfnf-071-universal-public-inputs" \
+            --raw-release "${{ runner.temp }}/tfnf-071-universal-raw-release-linux-x64-gnu/raw_release.json" \
+            --bundle "${{ runner.temp }}/tfnf-071-universal-bundle" \
+            --work "${{ runner.temp }}/tfnf-071-universal-work-linux-x64-gnu" \
+            --output "${{ runner.temp }}/tfnf-071-universal-qual/linux-x64-gnu/result.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}" \
+            --consumer-host-role newer
+
+      - name: Upload linux-x64-gnu qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-qualification-linux-x64-gnu
+          path: '${{ runner.temp }}/tfnf-071-universal-qual/'
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload failed native harness report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-qualification-linux-x64-gnu-failure-diagnostic
+          path: '${{ runner.temp }}/tfnf-071-universal-work-linux-x64-gnu/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
+
+  universal_native_consumer_071_linux_arm64_gnu_floor:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.1' && inputs.mode == 'universal-qualify'
+    name: Universal installed consumer 0.7.1 (linux-arm64-gnu floor)
+    needs: [universal_build_verify_071]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: qualification-source
+    env:
+      TFNF_CI_TEMP: /__w/_temp
+    permissions:
+      contents: read
+    # Release-scoped Bookworm/SYS_ADMIN floor policy; held pending its
+    # corresponding release-policy decision.
+    container:
+      image: debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
+      options: --init --cap-add=SYS_ADMIN
+    steps:
+      - name: Install pinned Bookworm floor tools
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ env.TFNF_CI_TEMP }}"
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git python3 python3-venv=3.11.2-1+b1 \
+            sudo=1.9.13p3-1+deb12u4 util-linux=2.38.1-5+deb12u3 \
+            binutils procps \
+            xvfb=2:21.1.7-3+deb12u13 \
+            xauth=1:1.1.2-1 \
+            dbus-x11=1.14.10-1~deb12u1
+
+      - name: Verify Bookworm display tool class
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          for tool in xvfb-run xauth dbus-run-session; do
+            command -v "$tool" >/dev/null
+          done
+          test "$(dpkg-query -W -f='${Version}' xvfb)" = "2:21.1.7-3+deb12u13"
+          test "$(dpkg-query -W -f='${Version}' xauth)" = "1:1.1.2-1"
+          test "$(dpkg-query -W -f='${Version}' dbus-x11)" = "1.14.10-1~deb12u1"
+          {
+            printf 'platform=debian-bookworm-floor\n'
+            dpkg-query -W -f='${Package}\t${Version}\n' xvfb xauth dbus-x11
+            for tool in xvfb-run xauth dbus-run-session; do
+              printf 'tool=%s path=%s\n' "$tool" "$(command -v "$tool")"
+            done
+          } | tee "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-floor-display-tools.tsv"
+
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          fetch-depth: 1
+          persist-credentials: false
+          path: qualification-source
+
+      - name: Select pinned Bookworm Python 3.11
+        id: setup_python
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B -c 'import sys; assert sys.version_info[:2] == (3, 11)'
+          dpkg-query -W python3 python3.11 python3.11-venv
+          echo 'python-path=/usr/bin/python3' >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22.23.3'
+          package-manager-cache: false
+
+      - name: Download 0.7.1 candidate bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-candidate-bundle
+          path: '${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-bundle'
+
+      - name: Download 0.7.1 public inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-public-inputs
+          path: '${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-public-inputs'
+
+      - name: Resolve explicit Linux runtime profile
+        id: linux_runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-public-inputs/qualification-inputs-prep.json'
+          INRUN_ROOT: '${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-public-inputs'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular071_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+          from rs9.nebular071_product_capture import load_held_product_capture
+          product_capture = load_held_product_capture(Path(os.environ["INRUN_ROOT"]))
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]) / "qualification-source",
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+              product_capture=product_capture,
+          )
+          if "system_webkit" not in descriptor or "manylinux" in descriptor:
+              raise SystemExit("universal launcher requires system WebKit inputs")
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Check Bookworm installed tfnf missing system WebKit before runtime install
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular071_universal check-system-webkit-missing \
+            --target linux-arm64-gnu \
+            --bundle "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-bundle" \
+            --work "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-preflight-linux-arm64-gnu-floor" \
+            --output "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-floor/linux-arm64-gnu/missing-runtime.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Install Bookworm system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            libgtk-3-0 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
+
+      - name: Verify Bookworm system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-query -W -f='${Package}\t${Version}\n' libgtk-3-0 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 \
+            | tee "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-floor-system-webkit-packages.tsv"
+          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
+          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
+
+      - name: Qualify native consumer on linux-arm64-gnu floor
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular071_universal qualify-native \
+            --target linux-arm64-gnu \
+            --consumer-host-role floor \
+            --qualification-inputs "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-public-inputs/qualification-inputs-prep.json" \
+            --inrun-root "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-public-inputs" \
+            --raw-release "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-raw-release-linux-arm64-gnu-floor/raw_release.json" \
+            --bundle "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-bundle" \
+            --work "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-work-linux-arm64-gnu-floor" \
+            --output "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-floor/linux-arm64-gnu/result.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Upload linux-arm64-gnu floor qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-qualification-linux-arm64-gnu-floor
+          path: '${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-floor/'
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload failed native harness report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-qualification-linux-arm64-gnu-floor-failure-diagnostic
+          path: '${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-work-linux-arm64-gnu-floor/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
+
+  universal_native_consumer_071_linux_x64_gnu_floor:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.1' && inputs.mode == 'universal-qualify'
+    name: Universal installed consumer 0.7.1 (linux-x64-gnu floor)
+    needs: [universal_build_verify_071]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: qualification-source
+    env:
+      TFNF_CI_TEMP: /__w/_temp
+    permissions:
+      contents: read
+    # Release-scoped Bookworm/SYS_ADMIN floor policy; held pending its
+    # corresponding release-policy decision.
+    container:
+      image: debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
+      options: --init --cap-add=SYS_ADMIN
+    steps:
+      - name: Install pinned Bookworm floor tools
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ env.TFNF_CI_TEMP }}"
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git python3 python3-venv=3.11.2-1+b1 \
+            sudo=1.9.13p3-1+deb12u4 util-linux=2.38.1-5+deb12u3 \
+            binutils procps \
+            xvfb=2:21.1.7-3+deb12u13 \
+            xauth=1:1.1.2-1 \
+            dbus-x11=1.14.10-1~deb12u1
+
+      - name: Verify Bookworm display tool class
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          for tool in xvfb-run xauth dbus-run-session; do
+            command -v "$tool" >/dev/null
+          done
+          test "$(dpkg-query -W -f='${Version}' xvfb)" = "2:21.1.7-3+deb12u13"
+          test "$(dpkg-query -W -f='${Version}' xauth)" = "1:1.1.2-1"
+          test "$(dpkg-query -W -f='${Version}' dbus-x11)" = "1.14.10-1~deb12u1"
+          {
+            printf 'platform=debian-bookworm-floor\n'
+            dpkg-query -W -f='${Package}\t${Version}\n' xvfb xauth dbus-x11
+            for tool in xvfb-run xauth dbus-run-session; do
+              printf 'tool=%s path=%s\n' "$tool" "$(command -v "$tool")"
+            done
+          } | tee "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-floor-display-tools.tsv"
+
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          fetch-depth: 1
+          persist-credentials: false
+          path: qualification-source
+
+      - name: Select pinned Bookworm Python 3.11
+        id: setup_python
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B -c 'import sys; assert sys.version_info[:2] == (3, 11)'
+          dpkg-query -W python3 python3.11 python3.11-venv
+          echo 'python-path=/usr/bin/python3' >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22.23.3'
+          package-manager-cache: false
+
+      - name: Download 0.7.1 candidate bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-candidate-bundle
+          path: '${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-bundle'
+
+      - name: Download 0.7.1 public inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-public-inputs
+          path: '${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-public-inputs'
+
+      - name: Resolve explicit Linux runtime profile
+        id: linux_runtime_profile
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          QUALIFICATION_INPUTS: '${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-public-inputs/qualification-inputs-prep.json'
+          INRUN_ROOT: '${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-public-inputs'
+        run: |
+          set -euo pipefail
+          PROFILE="$("${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
+          import os
+          from pathlib import Path
+          from rs9.tf_pypi_nebular071_publish import (
+              SYSTEM_WEBKIT_RUNTIME_PROFILE,
+              load_qualification_inputs_descriptor,
+          )
+          from rs9.nebular071_product_capture import load_held_product_capture
+          product_capture = load_held_product_capture(Path(os.environ["INRUN_ROOT"]))
+
+          descriptor = load_qualification_inputs_descriptor(
+              Path(os.environ["QUALIFICATION_INPUTS"]),
+              repository=Path(os.environ["GITHUB_WORKSPACE"]) / "qualification-source",
+              phase="qualification-prep",
+              inrun_root=Path(os.environ["INRUN_ROOT"]),
+              product_capture=product_capture,
+          )
+          if "system_webkit" not in descriptor or "manylinux" in descriptor:
+              raise SystemExit("universal launcher requires system WebKit inputs")
+          if "system_webkit" in descriptor:
+              print(SYSTEM_WEBKIT_RUNTIME_PROFILE)
+          elif "manylinux" in descriptor:
+              print("manylinux")
+          else:
+              raise SystemExit("explicit runtime profile missing")
+          PY
+          )"
+          case "$PROFILE" in
+            manylinux|system-webkitgtk-4.1) ;;
+            *) echo "unsupported runtime profile" >&2; exit 1 ;;
+          esac
+          printf 'profile=%s\n' "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Check Bookworm installed tfnf missing system WebKit before runtime install
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular071_universal check-system-webkit-missing \
+            --target linux-x64-gnu \
+            --bundle "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-bundle" \
+            --work "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-preflight-linux-x64-gnu-floor" \
+            --output "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-floor/linux-x64-gnu/missing-runtime.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Install Bookworm system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            libgtk-3-0 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0
+
+      - name: Verify Bookworm system WebKit runtime packages
+        if: steps.linux_runtime_profile.outputs.profile == 'system-webkitgtk-4.1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-query -W -f='${Package}\t${Version}\n' libgtk-3-0 libcairo2 libpango-1.0-0 libgdk-pixbuf-2.0-0 libsoup-3.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 \
+            | tee "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-floor-system-webkit-packages.tsv"
+          ldconfig -p | grep -F 'libwebkit2gtk-4.1.so.0' >/dev/null
+          ldconfig -p | grep -F 'libjavascriptcoregtk-4.1.so.0' >/dev/null
+
+      - name: Qualify native consumer on linux-x64-gnu floor
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular071_universal qualify-native \
+            --target linux-x64-gnu \
+            --consumer-host-role floor \
+            --qualification-inputs "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-public-inputs/qualification-inputs-prep.json" \
+            --inrun-root "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-public-inputs" \
+            --raw-release "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-raw-release-linux-x64-gnu-floor/raw_release.json" \
+            --bundle "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-bundle" \
+            --work "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-work-linux-x64-gnu-floor" \
+            --output "${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-floor/linux-x64-gnu/result.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Upload linux-x64-gnu floor qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-qualification-linux-x64-gnu-floor
+          path: '${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-floor/'
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload failed native harness report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-qualification-linux-x64-gnu-floor-failure-diagnostic
+          path: '${{ env.TFNF_CI_TEMP }}/tfnf-071-universal-work-linux-x64-gnu-floor/installed-native-smoke/**/*.run.json'
+          retention-days: 14
+          if-no-files-found: ignore
+
+  universal_qualification_gate_071:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.1' && inputs.mode == 'universal-qualify'
+    name: Universal installed qualification matrix 0.7.1
+    needs:
+      - universal_build_verify_071
+      - universal_native_consumer_071_darwin_arm64
+      - universal_native_consumer_071_linux_arm64_gnu
+      - universal_native_consumer_071_linux_x64_gnu
+      - universal_native_consumer_071_linux_arm64_gnu_floor
+      - universal_native_consumer_071_linux_x64_gnu_floor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        id: setup_python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+
+      - name: Download 0.7.1 candidate bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-candidate-bundle
+          path: '${{ runner.temp }}/tfnf-071-universal-bundle'
+
+      - name: Download 0.7.1 public inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-public-inputs
+          path: '${{ runner.temp }}/tfnf-071-universal-public-inputs'
+
+      - name: Download darwin-arm64 qualification receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-qualification-darwin-arm64
+          path: '${{ runner.temp }}/tfnf-071-universal-receipts'
+
+      - name: Download linux-arm64-gnu qualification receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-qualification-linux-arm64-gnu
+          path: '${{ runner.temp }}/tfnf-071-universal-receipts'
+
+      - name: Download linux-x64-gnu qualification receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-qualification-linux-x64-gnu
+          path: '${{ runner.temp }}/tfnf-071-universal-receipts'
+
+      - name: Download linux-arm64-gnu floor qualification receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-qualification-linux-arm64-gnu-floor
+          path: '${{ runner.temp }}/tfnf-071-universal-floor-receipts'
+
+      - name: Download linux-x64-gnu floor qualification receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: tfnf-071-universal-qualification-linux-x64-gnu-floor
+          path: '${{ runner.temp }}/tfnf-071-universal-floor-receipts'
+
+      - name: Validate all five universal installed consumer lanes
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.tf_pypi_nebular071_universal admit-matrix \
+            --bundle "${{ runner.temp }}/tfnf-071-universal-bundle" \
+            --qualification-inputs "${{ runner.temp }}/tfnf-071-universal-public-inputs/qualification-inputs-prep.json" \
+            --inrun-root "${{ runner.temp }}/tfnf-071-universal-public-inputs" \
+            --receipts-dir "${{ runner.temp }}/tfnf-071-universal-receipts" \
+            --floor-receipts "${{ runner.temp }}/tfnf-071-universal-floor-receipts" \
+            --work "${{ runner.temp }}/tfnf-071-universal-matrix-work" \
+            --output "${{ runner.temp }}/tfnf-071-universal-matrix/matrix_receipt.json" \
+            --expected-commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Upload 0.7.1 matrix qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tfnf-071-universal-matrix-receipt
+          path: '${{ runner.temp }}/tfnf-071-universal-matrix/'
+          retention-days: 14
+          if-no-files-found: error
+
+  reject_unsupported_dispatch:
+    if: github.event_name == 'workflow_dispatch' && !((inputs.release == '0.6.1' && (inputs.mode == 'qualify' || inputs.mode == 'publish')) || (inputs.release == '0.7.1' && (inputs.mode == 'universal-qualify' || inputs.mode == 'universal-publish')))
+    name: Reject unsupported release and mode combination
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Reject unsupported distribution route
+        run: exit 1
+
+  universal_publication_071:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.release == '0.7.1' && inputs.mode == 'universal-publish'
+    name: Attended Nebular 0.7.1 universal PyPI publication
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     concurrency:
@@ -1262,7 +1270,7 @@ jobs:
           def frame(info):
               return (info.st_dev, info.st_ino, info.st_size, info.st_mode,
                       info.st_mtime_ns, info.st_ctime_ns, info.st_uid, info.st_gid, info.st_nlink)
-          path = Path("publisher-authority/operators/tf-pypi/nebular-fusion-0.7.0-universal-publication.json")
+          path = Path("publisher-authority/operators/tf-pypi/nebular-fusion-0.7.1-universal-publication.json")
           try:
               for parent in path.parents:
                   if not stat.S_ISDIR(parent.lstat().st_mode):
@@ -1278,7 +1286,7 @@ jobs:
                       raise ValueError
               value = json.loads(raw, object_pairs_hook=unique)
               source, run = value["source"], value["run"]
-              if (value["schema"] != "rs9.nebular070-universal-publication.v1"
+              if (value["schema"] != "rs9.nebular071-universal-publication.v1"
                       or value["repository"] != "Knowledge-Forge-AI/release-starport-9"
                       or value["workflow"] != "rs9-tfnf-pypi-publish.yml"
                       or not isinstance(source, dict) or set(source) != {"commit", "tree"}
@@ -1309,9 +1317,9 @@ jobs:
           "${{ steps.setup_python.outputs.python-path }}" -B - <<'PY'
           import os, subprocess
           from pathlib import Path
-          from rs9.nebular070_universal_publication import load_authority
+          from rs9.nebular071_universal_publication import load_authority
           authority = load_authority(Path("publisher-authority"))
-          root = Path(os.environ["RUNNER_TEMP"]) / "tfnf-070-universal-custody"
+          root = Path(os.environ["RUNNER_TEMP"]) / "tfnf-071-universal-custody"
           api, archives = root / "api", root / "archives"
           api.mkdir(parents=True, mode=0o700)
           archives.mkdir(mode=0o700)
@@ -1335,13 +1343,13 @@ jobs:
           RS9_GITHUB_READ_TOKEN: ${{ github.token }}
           RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED: ${{ vars.RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED }}
         run: |
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.nebular070_universal_publication select-missing \
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.nebular071_universal_publication select-missing \
             --publisher-dir publisher-authority --qualification-dir qualification-source \
-            --api-dir "${{ runner.temp }}/tfnf-070-universal-custody/api" \
-            --archives-dir "${{ runner.temp }}/tfnf-070-universal-custody/archives" \
-            --work "${{ runner.temp }}/tfnf-070-universal-publication" \
-            --upload-dir "${{ github.workspace }}/tfnf-070-universal-upload" \
-            --attempt-marker "${{ runner.temp }}/tfnf-070-universal-upload-attempt.json" \
+            --api-dir "${{ runner.temp }}/tfnf-071-universal-custody/api" \
+            --archives-dir "${{ runner.temp }}/tfnf-071-universal-custody/archives" \
+            --work "${{ runner.temp }}/tfnf-071-universal-publication" \
+            --upload-dir "${{ github.workspace }}/tfnf-071-universal-upload" \
+            --attempt-marker "${{ runner.temp }}/tfnf-071-universal-upload-attempt.json" \
             --publisher-revision "${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Reverify universal upload bytes and admission
@@ -1352,20 +1360,20 @@ jobs:
           RS9_GITHUB_READ_TOKEN: ${{ github.token }}
           RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED: ${{ vars.RS9_TFNF_PRIOR_UPLOAD_UNCONFIRMED }}
         run: |
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.nebular070_universal_publication verify-upload \
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.nebular071_universal_publication verify-upload \
             --publisher-dir publisher-authority --qualification-dir qualification-source \
-            --api-dir "${{ runner.temp }}/tfnf-070-universal-custody/api" \
-            --archives-dir "${{ runner.temp }}/tfnf-070-universal-custody/archives" \
-            --work "${{ runner.temp }}/tfnf-070-universal-publication" \
-            --upload-dir "${{ github.workspace }}/tfnf-070-universal-upload" \
-            --attempt-marker "${{ runner.temp }}/tfnf-070-universal-upload-attempt.json" \
+            --api-dir "${{ runner.temp }}/tfnf-071-universal-custody/api" \
+            --archives-dir "${{ runner.temp }}/tfnf-071-universal-custody/archives" \
+            --work "${{ runner.temp }}/tfnf-071-universal-publication" \
+            --upload-dir "${{ github.workspace }}/tfnf-071-universal-upload" \
+            --attempt-marker "${{ runner.temp }}/tfnf-071-universal-upload-attempt.json" \
             --publisher-revision "${{ github.sha }}"
 
       - name: Publish universal launcher distribution to PyPI
         if: steps.missing.outputs.upload == 'true'
         uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e
         with:
-          packages-dir: tfnf-070-universal-upload/
+          packages-dir: tfnf-071-universal-upload/
           verify-metadata: true
           print-hash: true
           skip-existing: false
@@ -1377,9 +1385,9 @@ jobs:
           PYTHONPATH: qualification-source/src
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
-          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.nebular070_universal_publication readback \
+          "${{ steps.setup_python.outputs.python-path }}" -B -m rs9.nebular071_universal_publication readback \
             --publisher-dir publisher-authority --qualification-dir qualification-source \
-            --api-dir "${{ runner.temp }}/tfnf-070-universal-custody/api" \
-            --archives-dir "${{ runner.temp }}/tfnf-070-universal-custody/archives" \
-            --work "${{ runner.temp }}/tfnf-070-universal-publication" \
+            --api-dir "${{ runner.temp }}/tfnf-071-universal-custody/api" \
+            --archives-dir "${{ runner.temp }}/tfnf-071-universal-custody/archives" \
+            --work "${{ runner.temp }}/tfnf-071-universal-publication" \
             --publisher-revision "${{ github.sha }}"

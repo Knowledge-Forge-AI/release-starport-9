@@ -3,6 +3,7 @@ from rs9.errors import ContractError
 
 HISTORICAL_GENERATION = "theme-forge-live1"
 CURRENT_GENERATION = "theme-forge-current-202610"
+CURRENT_NEBULAR_VERSION = "0.7.1"
 GENERATIONS = (HISTORICAL_GENERATION, CURRENT_GENERATION)
 
 

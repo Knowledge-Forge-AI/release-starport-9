@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "asset_id": 695134231,
+    "bytes": 13393487,
+    "name": "nebular-v0.7.1-public-inputs.tar.gz",
+    "sha256": "d5aeffa7e479f224e108d493138882c3f2b5217c0513c5347cecfd1a9c6636bb",
+    "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.1/nebular-v0.7.1-public-inputs.tar.gz"
+  },
+  "payloads": [
+    {
+      "asset_id": 694680425,
+      "bytes": 47380487,
+      "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-apple-darwin.app.tar.gz",
+      "path": "raw-release/assets/theme-forge-nebular-fusion-v0.7.1-aarch64-apple-darwin.app.tar.gz",
+      "sha256": "903d7380dd54c9070e944be22c08137141d24a6e3c3f5a1f8fb53c61e9a2b342",
+      "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.1/theme-forge-nebular-fusion-v0.7.1-aarch64-apple-darwin.app.tar.gz"
+    },
+    {
+      "asset_id": 694680442,
+      "bytes": 54621132,
+      "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-unknown-linux-gnu.tar.gz",
+      "path": "raw-release/assets/theme-forge-nebular-fusion-v0.7.1-aarch64-unknown-linux-gnu.tar.gz",
+      "sha256": "8341d0069dd729d4d7e535b42d411edb8fee02c402fbcf0c861514a64f09c608",
+      "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.1/theme-forge-nebular-fusion-v0.7.1-aarch64-unknown-linux-gnu.tar.gz"
+    },
+    {
+      "asset_id": 694680564,
+      "bytes": 54473927,
+      "name": "theme-forge-nebular-fusion-v0.7.1-x86_64-unknown-linux-gnu.tar.gz",
+      "path": "raw-release/assets/theme-forge-nebular-fusion-v0.7.1-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "3a0f9fc991c94588ec06bbe9e0dc4a40250e11f8d238bd8a11cad9ce6fc98c5c",
+      "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.1/theme-forge-nebular-fusion-v0.7.1-x86_64-unknown-linux-gnu.tar.gz"
+    },
+    {
+      "asset_id": 694680400,
+      "bytes": 22541,
+      "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.7.1.tgz",
+      "path": "evidence/public-release/npm/package.tgz",
+      "sha256": "dd4420a827315267be16bb95f6982be396673e6b4cba17525bd25c49649c7200",
+      "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.1/knowledge-forge-ai-theme-forge-nebular-fusion-0.7.1.tgz"
+    }
+  ],
+  "release_id": 429782340,
+  "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+  "schema": "rs9.nebular071-public-input-manifest.v1",
+  "version": "0.7.1"
+}

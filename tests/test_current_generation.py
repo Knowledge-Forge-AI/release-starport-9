@@ -124,12 +124,12 @@ class CurrentGenerationTests(unittest.TestCase):
         manifest, expectations = generation_paths(CURRENT_GENERATION)
         expected = {row["repository"]: row for row in json.loads((ROOT / expectations).read_bytes())["projects"]}
         rows = configuration_rows(ROOT, generation=CURRENT_GENERATION)
-        self.assertEqual([intent["version"] for _, intent in rows], ["0.7.0", "0.5.0", "0.3.0", "0.7.0"])
+        self.assertEqual([intent["version"] for _, intent in rows], ["0.7.0", "0.5.0", "0.3.0", "0.7.1"])
         self.assertEqual([(row["repository_id"], row["release_id"], row["tag_commit"], row["tag_tree"]) for row, _ in rows], [
             (1342490027, 424873797, "3edb9d2c40dd19a2b7d97d9309bc210e7fed711c", "4be1551c49b15dff788d07ed1fb00ddcd8839a76"),
             (1361513719, 423916361, "9063fe5d283881f464ab566d8b74296a6ce1b688", "9ac1906d36baff63fd3e28f49d50ce2e0e07ee04"),
             (1374611333, 423916603, "eafd594af8bce04ef3752c489ae770946b4e0e3b", "a87aa8428f7b5d773683c8fb4ab0135b1ff73fd0"),
-            (1358643872, 426333162, "cadb40c4972f68f314096ff60fbcfb4da950c161", "27c643b6375c2aafde314799c4f08e844c14992c")])
+            (1358643872, 429782340, "f2c527ee6f3cbd53fd44e095d5355ca7f5c7519a", "6e3561855f6ee0093fb709488ad976b69bf501d2")])
         data = json.loads((ROOT / manifest).read_bytes())
         self.assertEqual((data["scope"], data["future-releases"], data["release-contains-rs9"]),
                          ("exact-generation", "forbidden", False))

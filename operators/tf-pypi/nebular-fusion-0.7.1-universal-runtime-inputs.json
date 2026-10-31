@@ -1,0 +1,104 @@
+{
+  "product_native_reference": {
+    "catalog": {
+      "id": 13032699957,
+      "member": {
+        "path": "rc-index.json",
+        "sha256": "93eb9016ea2a4529803e51dca00e9999217edc1c0394b696b370929eb6428404",
+        "size": 9748
+      },
+      "name": "nebular-rc-index-41176311998-a1",
+      "sha256": "cf835009a430f93895ae5a0f97b2e62e38a7b8c6472ae0471b4a7224d6558ad0",
+      "size": 2589
+    },
+    "lanes": [
+      {
+        "artifact_id": 13032957569,
+        "artifact_sha256": "3942533bbd9d41d9b174a808681d4d335eefd395212181732a557991f2976093",
+        "evidence_sha256": "1e0f9e80a5cc2d8af4d6823bb69217318a9f79531fe917285c84e089cfcde9ca",
+        "lane": "macos-arm64"
+      },
+      {
+        "artifact_id": 13033139137,
+        "artifact_sha256": "299f0fe252f08e3b457b638535bd54e9ee016953fc77637a4671619ad465ccfe",
+        "evidence_sha256": "09832b90cbbb2bfc1f2a27f235b1ebae313ead331f392bce649abad5b752baf7",
+        "lane": "linux-arm64"
+      },
+      {
+        "artifact_id": 13033108750,
+        "artifact_sha256": "5c13a6b9de8fa69405739b4f883c9754092718c43f67db64c79af839b1f34f0f",
+        "evidence_sha256": "2e384ec263ec95ad12fb5ccf29a168d3ef12373c49b4744e1bd38eb872c4e9f9",
+        "lane": "linux-x64"
+      }
+    ],
+    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+    "run_attempt": 1,
+    "run_id": 41176311998,
+    "schema": "rs9.nebular071-product-native-reference.v1",
+    "tested_commit": "7aadefdbcf496a34c097c4880d1802a02d00acc7",
+    "tested_tree": "6e3561855f6ee0093fb709488ad976b69bf501d2",
+    "workflow": ".github/workflows/native-rc.yml"
+  },
+  "project": "theme-forge-nebular-fusion",
+  "schema": "rs9.nebular071-universal-runtime-inputs.v1",
+  "targets": {
+    "darwin-arm64": {
+      "arch": "aarch64",
+      "asset": {
+        "id": 694680425,
+        "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-apple-darwin.app.tar.gz",
+        "sha256": "903d7380dd54c9070e944be22c08137141d24a6e3c3f5a1f8fb53c61e9a2b342",
+        "size": 47380487,
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.1/theme-forge-nebular-fusion-v0.7.1-aarch64-apple-darwin.app.tar.gz"
+      },
+      "family": "darwin",
+      "gui_target": "Theme Forge Nebular Fusion.app/Contents/MacOS/theme-forge-nebular-fusion",
+      "manifest_sha256": "b18e93914234524b33b943c9fea962c01cbb63e819814293feba350954f8ecad",
+      "minimum_glibc": null,
+      "minimum_os": "13.0",
+      "root": "Theme Forge Nebular Fusion.app",
+      "shell_target": "Theme Forge Nebular Fusion.app/Contents/Resources/bin/tfnf"
+    },
+    "linux-arm64-gnu": {
+      "arch": "aarch64",
+      "asset": {
+        "id": 694680442,
+        "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "8341d0069dd729d4d7e535b42d411edb8fee02c402fbcf0c861514a64f09c608",
+        "size": 54621132,
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.1/theme-forge-nebular-fusion-v0.7.1-aarch64-unknown-linux-gnu.tar.gz"
+      },
+      "family": "linux",
+      "gui_target": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+      "manifest_sha256": "4df90cab682899072fbc4450b28ed5d56d80d072c8e7a4615259dd49119874ad",
+      "minimum_glibc": "2.36",
+      "minimum_os": null,
+      "root": "theme-forge-nebular-fusion",
+      "shell_target": "theme-forge-nebular-fusion/bin/tfnf"
+    },
+    "linux-x64-gnu": {
+      "arch": "x86_64",
+      "asset": {
+        "id": 694680564,
+        "name": "theme-forge-nebular-fusion-v0.7.1-x86_64-unknown-linux-gnu.tar.gz",
+        "sha256": "3a0f9fc991c94588ec06bbe9e0dc4a40250e11f8d238bd8a11cad9ce6fc98c5c",
+        "size": 54473927,
+        "url": "https://github.com/Knowledge-Forge-AI/theme-forge-nebular-fusion/releases/download/v0.7.1/theme-forge-nebular-fusion-v0.7.1-x86_64-unknown-linux-gnu.tar.gz"
+      },
+      "family": "linux",
+      "gui_target": "theme-forge-nebular-fusion/bin/theme-forge-nebular-fusion",
+      "manifest_sha256": "8223745292323b1f335e65c2013a3cfd25504a3a916f34c47b2084532bac1a54",
+      "minimum_glibc": "2.36",
+      "minimum_os": null,
+      "root": "theme-forge-nebular-fusion",
+      "shell_target": "theme-forge-nebular-fusion/bin/tfnf"
+    }
+  },
+  "upstream_release": {
+    "commit": "f2c527ee6f3cbd53fd44e095d5355ca7f5c7519a",
+    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+    "tag": "v0.7.1",
+    "tree": "6e3561855f6ee0093fb709488ad976b69bf501d2"
+  },
+  "version": "0.7.1"
+}

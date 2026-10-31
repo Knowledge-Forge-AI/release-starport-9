@@ -223,7 +223,8 @@ CURRENT_FLOOR_TEXT = '{\n  "name": "@knowledge-forge-ai/theme-forge-stellar-loom
 
 
 def current_caller_fixture(root, system="x86_64-linux", *, tag="v0.7.0",
-                           tag_commit=callers.CURRENT070_COMMIT, tag_tree=callers.CURRENT070_TREE):
+                           tag_commit=callers.CURRENT070_COMMIT, tag_tree=callers.CURRENT070_TREE,
+                           version="0.7.0", release_id=426333162):
     """Real core authentication with explicit synthetic release/source inputs.
 
     Production contract loading is tested separately. This fixture changes only
@@ -238,7 +239,7 @@ def current_caller_fixture(root, system="x86_64-linux", *, tag="v0.7.0",
     capture_root = root / "capture"
     capture_root.mkdir()
     intent = package_evidence(capture_root)
-    contract = copy.deepcopy(callers._load_current_contract())
+    contract = copy.deepcopy(callers._load_current071_contract() if version == "0.7.1" else callers._load_current_contract())
     sources = {}
     for path in contract["source_files"]:
         literals = []
@@ -271,7 +272,7 @@ def current_caller_fixture(root, system="x86_64-linux", *, tag="v0.7.0",
                          for path, row in contract["source_files"].items())
     (api / "tree.json").write_bytes(canonical(tree))
     release = json.loads((api / "release.json").read_bytes())
-    release.update(id=426333162, tag_name=tag, target_commitish=tag_commit)
+    release.update(id=release_id, tag_name=tag, target_commitish=tag_commit)
     (api / "release.json").write_bytes(canonical(release))
     capture = authenticate_release(selection_for_intent(intent), capture_root)
     asset = next(row for row in capture.record["assets"] if row["role"] == "payload")
@@ -301,7 +302,7 @@ def current_caller_fixture(root, system="x86_64-linux", *, tag="v0.7.0",
                                input_member=path.removeprefix("/usr/lib/")) for path, row in files.items()},
         "contract_members": {callers.MANIFEST: manifest_text, callers.FLOOR_MEMBER: CURRENT_FLOOR_TEXT},
         "requires": ["nodejs >= 22"]}
-    inputs = {"system": system, "arch": system.removesuffix("-linux"), "version": "0.7.0",
+    inputs = {"system": system, "arch": system.removesuffix("-linux"), "version": version,
               "project_id": callers.NEBULAR_PROJECT_ID, "asset_sha256": asset["sha256"]}
     return capture, contract, SourceClient(), inventory, inputs
 

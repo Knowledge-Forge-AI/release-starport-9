@@ -25,32 +25,55 @@ def _fail():
                         details={"substage": "verifier-source-readback", "reason": "source-envelope-binding"})
 
 
-def _expectations():
+def _expectations(commit=None):
     # Lazy import keeps the fixed expectations owned by hosted_smoke, and does
     # not load the checkout-only caller JSON or invoke authentication APIs.
     from rs9 import hosted_smoke as s
-    modules = set(s.CURRENT070_VERIFIER_FILES) - {"package.json"}
-    if (set(s.CURRENT070_VERIFIER_IMPORTS) != modules
-            or any(set(edges) - modules for edges in s.CURRENT070_VERIFIER_IMPORTS.values())):
+    if commit is None or commit == s.CURRENT070_COMMIT:
+        files, imports = s.CURRENT070_VERIFIER_FILES, s.CURRENT070_VERIFIER_IMPORTS
+        commit, tree, tag = s.CURRENT070_COMMIT, s.CURRENT070_TREE, "v0.7.0"
+    elif commit == s.CURRENT071_COMMIT:
+        files, imports = s.CURRENT071_VERIFIER_FILES, s.CURRENT071_VERIFIER_IMPORTS
+        commit, tree, tag = s.CURRENT071_COMMIT, s.CURRENT071_TREE, "v0.7.1"
+    else:
         _fail()
-    pins = {**s.CURRENT070_VERIFIER_FILES, **s.CURRENT070_FIXTURE_FILES}
+    modules = set(files) - {"package.json"}
+    if (set(imports) != modules
+            or any(set(edges) - modules for edges in imports.values())):
+        _fail()
+    pins = {**files, **s.CURRENT070_FIXTURE_FILES}
     records = {}
     for name, pin in pins.items():
         fixture = name in s.CURRENT070_FIXTURE_FILES
         role = ("fixture" if fixture else "verifier-support" if name == "package.json"
                 else "application-smoke" if name == "tools/native-rc-smoke.mjs" else "verifier-module")
         records[name] = {"path": name, **pin, "role": role,
-                         "tag_commit": s.CURRENT070_FIXTURE_COMMIT if fixture else s.CURRENT070_COMMIT}
+                         "tag_commit": s.CURRENT070_FIXTURE_COMMIT if fixture else commit}
     producers = {
-        "nebular": {"repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion", "tag": "v0.7.0",
-                    "commit": s.CURRENT070_COMMIT, "tree": s.CURRENT070_TREE},
+        "nebular": {"repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion", "tag": tag,
+                    "commit": commit, "tree": tree},
         "fixture": {"repository": "Knowledge-Forge-AI/theme-forge-stellar-burst", "tag": "v0.7.0",
                     "commit": s.CURRENT070_FIXTURE_COMMIT, "tree": s.CURRENT070_FIXTURE_TREE}}
     return records, producers
 
 
+def _record_expectations(records):
+    if not isinstance(records, list) or any(not isinstance(row, dict) for row in records):
+        _fail()
+    values = [row.get("tag_commit") for row in records if row.get("role") != "fixture"]
+    if any(not isinstance(value, str) for value in values):
+        _fail()
+    commits = set(values)
+    if len(commits) != 1:
+        _fail()
+    commit = next(iter(commits))
+    if not isinstance(commit, str):
+        _fail()
+    return _expectations(commit)
+
+
 def checked_records(records):
-    expected, _ = _expectations()
+    expected, _ = _record_expectations(records)
     if (not isinstance(records, list) or len(records) != len(expected)
             or any(not isinstance(row, dict) or not isinstance(row.get("path"), str) for row in records)):
         _fail()
@@ -98,7 +121,7 @@ def _make_envelope(records):
     """Data constructor only. Parent export separately requires live captures."""
     records = checked_records(records)
     return {"schema": SCHEMA, "generation": GENERATION, "authority": dict(AUTHORITY),
-            "producers": _expectations()[1], "importer": "tools", "records": records,
+            "producers": _record_expectations(records)[1], "importer": "tools", "records": records,
             "source_bindings_sha256": digest(canonical(records))}
 
 
