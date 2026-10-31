@@ -10,6 +10,7 @@ import re
 
 from rs9 import tf_pypi_nebular071_publish as legacy
 from rs9 import nebular071_universal_workflow as workflow
+from rs9 import nebular071_predecessor_history as predecessor
 from rs9.errors import ContractError
 
 
@@ -168,7 +169,7 @@ def check_prior_universal_run(run: Mapping, client_json) -> bool:
     """Handle only recognized new modes; preserve the legacy full-list fallback."""
     mode = _mode(run)
     if mode is None:
-        return False
+        return predecessor.check_predecessor_run(run, client_json)
     _run_context(run)
     if mode == workflow.PUBLISH_MODE and run.get("run_attempt") != 1:
         _fail()

@@ -309,7 +309,9 @@ class Universal071OwnerTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertNotIn("raise SystemExit(0)", text, path.name)
             self.assertNotIn("runtime fetch is supplied", text, path.name)
-            if path.name != "nebular071_universal_profile.py":
+            # The isolated historical reader must name the older release. It
+            # supplies no current payload/consumer/publication admission.
+            if path.name not in {"nebular071_universal_profile.py", "nebular071_predecessor_history.py"}:
                 self.assertNotIn("nebular070", text, path.name)
                 self.assertNotIn("0.7.0", text, path.name)
             tree = ast.parse(text, filename=str(path))
@@ -317,9 +319,15 @@ class Universal071OwnerTests(unittest.TestCase):
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("rs9."):
                     imports.add(node.module.rsplit(".", 1)[-1])
+                elif isinstance(node, ast.ImportFrom) and node.module == "rs9":
+                    imports.update(alias.name for alias in node.names)
                 elif isinstance(node, ast.Import):
                     imports.update(alias.name.rsplit(".", 1)[-1] for alias in node.names if alias.name.startswith("rs9."))
-            self.assertTrue(forbidden.isdisjoint(imports), (path.name, sorted(imports & forbidden)))
+            if path.name == "nebular071_predecessor_history.py":
+                historical = {"tf_pypi_nebular070_publish", "nebular070_universal_history"}
+                self.assertTrue((forbidden - historical).isdisjoint(imports), (path.name, sorted(imports & (forbidden - historical))))
+            else:
+                self.assertTrue(forbidden.isdisjoint(imports), (path.name, sorted(imports & forbidden)))
 
 
 if __name__ == "__main__":
