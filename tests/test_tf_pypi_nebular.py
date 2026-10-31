@@ -255,6 +255,7 @@ class NebularPyPIContractTests(unittest.TestCase):
 
     def test_static_contract_and_workflow_yaml_parity(self) -> None:
         from rs9.tf_pypi_nebular import _legacy_workflow_text
+        from rs9.nebular071_universal_workflow import complete_workflow_text
 
         for mod_name in ("tf_pypi_nebular.py", "nebular_host_state.py", "tf_pypi_nebular070_publish.py"):
             path = ROOT / "src/rs9" / mod_name
@@ -274,8 +275,11 @@ class NebularPyPIContractTests(unittest.TestCase):
 
         wf_path = ROOT / ".github/workflows" / WORKFLOW
         self.assertTrue(wf_path.is_file())
-        text = wf_path.read_text(encoding="utf-8")
-        self.assertEqual(text, workflow_text())
+        registered = wf_path.read_text(encoding="utf-8")
+        self.assertEqual(registered, complete_workflow_text())
+        # Preserve the frozen 061/070 factory contract and its security assertions.
+        text = workflow_text()
+        self.assertNotEqual(registered, text)
         self.assertEqual(text, workflow_text("0.6.1"))
         self.assertEqual(text, workflow_text("0.7.0"))
         self.assertIn("build_verify:", _legacy_workflow_text())
@@ -1881,11 +1885,12 @@ class NebularPyPIContractTests(unittest.TestCase):
         from rs9.tf_pypi_nebular import _nebular_import_closure_paths
 
         closure_paths = _nebular_import_closure_paths(ROOT)
-        self.assertEqual(len(closure_paths), 117)
+        self.assertEqual(len(closure_paths), 118)
         self.assertTrue({
             "src/rs9/nix_gui_discovery.py",
             "src/rs9/provision_observation.py",
             "src/rs9/current_generation.py",
+            "src/rs9/current_os071.py",
             "src/rs9/current_npm_profile.py",
             "src/rs9/hosted_contract.py",
             "src/rs9/hosted_nix.py",
@@ -1893,6 +1898,14 @@ class NebularPyPIContractTests(unittest.TestCase):
             "src/rs9/nix_loader.py",
             "src/rs9/smoke_source_envelope.py",
         } <= set(closure_paths))
+        # The new member supplies exact 071 verifier pins to this reached importer.
+        hosted_smoke = ast.parse((ROOT / "src/rs9/hosted_smoke.py").read_text())
+        self.assertEqual(
+            [{alias.name for alias in node.names} for node in ast.walk(hosted_smoke)
+             if isinstance(node, ast.ImportFrom) and node.module == "rs9.current_os071"],
+            [{"CURRENT071_COMMIT", "CURRENT071_TREE", "CURRENT071_VERIFIER_FILES",
+              "CURRENT071_VERIFIER_IMPORTS"}],
+        )
         self.assertIn("src/rs9/nebular070_universal_workflow.py", closure_paths)
         self.assertIn("src/rs9/nebular_lineage.py", closure_paths)
         self.assertIn("src/rs9/tf_pypi_nebular070_publish.py", closure_paths)

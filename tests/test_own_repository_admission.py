@@ -251,6 +251,38 @@ class QualifiedFixture(SourceFixtures):
         self.assertEqual(len(record['raw_policy_evidence']),8)
         self.assertFalse(inventory['production_enabled']);self.assertFalse(record['publication_authority']);self.assertFalse(record['signing_authority'])
         self.assertTrue(all(row['raw_clean'] is False for row in record['raw_policy_evidence']))
+        self.assertEqual({row['product']:row['version'] for row in inventory['binaries']},own.VERSIONS)
+        from rs9.candidate import configuration_rows
+        active={intent['project']['id']:intent['version'] for _,intent in configuration_rows(self.rs,generation=CURRENT_GENERATION)}
+        self.assertEqual(active['theme-forge-nebular-fusion'],'0.7.1')
+        self.assertEqual(own.VERSIONS['theme-forge-nebular-fusion'],'0.7.0')
+    def test_generic_binary_scope_keeps_active071_versions_without_paired_proof(self):
+        from rs9 import qualified_distribution_inputs as facade
+        lane=next(row for row in required(self.rs,generation=CURRENT_GENERATION)
+                  if row['lane']=='deb' and row['system']=='amd64')
+        # Component-only check with existing valid custody and no admission.
+        # Old070 filenames must not become valid generic current071 inputs.
+        with patch.object(facade,'required',return_value=[lane]),self.assertRaises(ContractError) as error:
+            facade._binary_inputs(self.rs,self.inputs,self.summary,self.expected)
+        self.assertEqual(error.exception.code,'DISTRIBUTION_BINARY_SCOPE')
+
+    def test071_binary_filename_cannot_pass_live070_paired_proof(self):
+        # Rebind only synthetic fixture custody for a hostile filename. Original
+        # receipt bytes and the fixed proof's version/preservation scope stay070.
+        directory=self.inputs/'candidate-deb-amd64'
+        manifest_path=directory/'artifact-manifest.json'
+        manifest=json.loads(manifest_path.read_text())
+        row=next(row for row in manifest['files'] if 'theme-forge-nebular-fusion_0.7.0-' in row['path'])
+        old=directory/row['path'];new_path=row['path'].replace('theme-forge-nebular-fusion_0.7.0-','theme-forge-nebular-fusion_0.7.1-',1)
+        old.rename(directory/new_path);row['path']=new_path
+        manifest_path.write_bytes(canonical(manifest))
+        receipt=directory/'deb-amd64.json';before=receipt.read_bytes()
+        self.mutate_receipt('deb','amd64',lambda value:None)
+        self.assertEqual(receipt.read_bytes(),before)
+        with self.assertRaises(ContractError) as error:self.run_facade(True)
+        self.assertEqual(error.exception.code,'DISTRIBUTION_BINARY_SCOPE')
+        self.assertEqual(len(own._ACTIVE),0)
+
     def test_generic_entry_still_refuses_same_complete_current_candidate(self):
         with self.assertRaises(ContractError) as error:self.run_facade(False)
         self.assertEqual(error.exception.code,'DISTRIBUTION_PROMOTION_HELD')
