@@ -96,8 +96,11 @@ def _binary_inputs(repository, output, summary, expected, *, _admission=None):
             if tokens or errors or receipt.get("production_promotion_blockers") != []:
                 raise ContractError("DISTRIBUTION_PROMOTION_HELD", "Lane promotion restrictions prohibit import")
         else:
-            from rs9.own_repository_admission import check_lane
+            from rs9.own_repository_admission import check_lane, VERSIONS
             check_lane(_admission, lane, receipt, manifest)
+            # The live paired proof covers its fixed070 transport contract,
+            # not the active071 generation. Never infer this scope from JSON.
+            versions = dict(VERSIONS)
         validate_rpm_policy_source(repository, receipt, generation=CURRENT_GENERATION)
         verify_package_roles(directory, manifest)
         validate_product_architectures(lane, manifest["files"])

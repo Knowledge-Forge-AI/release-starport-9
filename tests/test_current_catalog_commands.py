@@ -38,7 +38,7 @@ class CurrentCatalogCommandsTests(unittest.TestCase):
             self.assertEqual(error.exception.code, "GENERATION_SELECTION")
 
     def test_current_contract_semantics_and_versions(self):
-        for name, version in (("tfsb", "0.7.0"), ("tfsl", "0.5.0"), ("tfss", "0.3.0"), ("tfnf", "0.7.0")):
+        for name, version in (("tfsb", "0.7.0"), ("tfsl", "0.5.0"), ("tfss", "0.3.0"), ("tfnf", "0.7.1")):
             self.assertEqual(probes_for(name, generation=CURRENT_GENERATION)[0]["stdout_contains"], [version])
         for name in ("tfsl-batch", "tfsb-studio-service"):
             self.assertEqual(probes_for(name), probes_for(name, generation=CURRENT_GENERATION))
@@ -153,7 +153,7 @@ class CurrentCatalogCommandsTests(unittest.TestCase):
         catalog = json.loads((ROOT / catalog_path(CURRENT_GENERATION)).read_bytes())
         self.assertEqual(catalog["generation"], CURRENT_GENERATION)
         expected = {"theme-forge-stellar-burst": "0.7.0", "theme-forge-stellar-loom": "0.5.0",
-                    "theme-forge-solar-sail": "0.3.0", "theme-forge-nebular-fusion": "0.7.0"}
+                    "theme-forge-solar-sail": "0.3.0", "theme-forge-nebular-fusion": "0.7.1"}
         self.assertEqual({pid: row["version"] for pid, row in catalog["products"].items()}, expected)
         nebular = catalog["products"]["theme-forge-nebular-fusion"]
         self.assertIn(nebular["commit"], nebular["icon"]["url"])

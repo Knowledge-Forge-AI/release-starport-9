@@ -26,7 +26,7 @@ class Output:
 
 class WorkflowTests(unittest.TestCase):
     def test_no_unqualified_first_wave_or_nebular_publisher(self):
-        from rs9.tf_pypi_nebular import workflow_text as nebular_workflow_text
+        from rs9.nebular071_universal_workflow import complete_workflow_text as nebular_workflow_text
         workflows = ROOT / ".github/workflows"
         for product in PRODUCTS:
             pin = load_pin(product)
