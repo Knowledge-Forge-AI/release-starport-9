@@ -191,6 +191,110 @@ class ReplayProgressObserverTests(unittest.TestCase):
         self.assertIn("--rs9-replay-progress-expected-sha256", optional)
         self.assertEqual(optional[optional.index("--timeout-ms") + 1], "180000")
 
+    def test_current071_required_observation_uses_exact_owner_timeout(self):
+        prepared = self._prepared()
+        descriptor = {
+            "wrapper": self.wrapper,
+            "harness": self.tools / "native-rc-smoke.mjs",
+            "progress": self.evidence / "initial-progress.jsonl",
+            "path": self.evidence / "initial-observation.json",
+            "profile": diagnostic_module.CURRENT071_REPLAY_PROGRESS_PROFILE,
+            "harness_timeout_ms": diagnostic_module.CURRENT071_REQUIRED_HARNESS_TIMEOUT_MS,
+        }
+        command = _command(
+            prepared, "linux-arm64", "B", self.launch_root, self.evidence,
+            extras=False, initial_observation=descriptor,
+        )
+        self.assertIn("--timeout-ms", command)
+        self.assertEqual(command[command.index("--timeout-ms") + 1], "210000")
+        with self.assertRaises(ContractError):
+            _command(
+                prepared, "linux-arm64", "B", self.launch_root, self.evidence,
+                extras=False,
+                initial_observation={**descriptor, "harness_timeout_ms": 180000},
+            )
+        legacy = {**descriptor, "profile": diagnostic_module.CURRENT_REPLAY_PROGRESS_PROFILE,
+                  "harness_timeout_ms": None}
+        legacy_command = _command(
+            prepared, "linux-arm64", "B", self.launch_root, self.evidence,
+            extras=False, initial_observation=legacy,
+        )
+        self.assertNotIn("--timeout-ms", legacy_command)
+
+    def test_current071_required_observation_timeout_is_scenario_aware(self):
+        prepared = self._prepared()
+        cases = (
+            ("linux-arm64", "B", 210000),
+            ("linux-x64", "C", 210000),
+            ("linux-x64", "C-signal", 180000),
+        )
+        for platform, scenario, expected_timeout in cases:
+            with self.subTest(platform=platform, scenario=scenario):
+                descriptor = {
+                    "wrapper": self.wrapper,
+                    "harness": self.tools / "native-rc-smoke.mjs",
+                    "progress": self.evidence / (scenario + "-initial-progress.jsonl"),
+                    "path": self.evidence / (scenario + "-initial-observation.json"),
+                    "profile": diagnostic_module.CURRENT071_REPLAY_PROGRESS_PROFILE,
+                    "harness_timeout_ms": expected_timeout,
+                }
+                command = _command(
+                    prepared, platform, scenario, self.launch_root, self.evidence,
+                    extras=False, initial_observation=descriptor,
+                )
+                self.assertEqual(
+                    command[command.index("--timeout-ms") + 1], str(expected_timeout)
+                )
+        with self.assertRaises(ContractError):
+            _command(
+                prepared, "linux-x64", "C-signal", self.launch_root, self.evidence,
+                extras=False,
+                initial_observation={
+                    "wrapper": self.wrapper,
+                    "harness": self.tools / "native-rc-smoke.mjs",
+                    "progress": self.evidence / "invalid-progress.jsonl",
+                    "path": self.evidence / "invalid-observation.json",
+                    "profile": diagnostic_module.CURRENT071_REPLAY_PROGRESS_PROFILE,
+                    "harness_timeout_ms": 210000,
+                },
+            )
+        with self.assertRaises(ContractError):
+            _command(
+                prepared, "linux-x64", "C", self.launch_root, self.evidence,
+                extras=False,
+                initial_observation={
+                    "wrapper": self.wrapper,
+                    "harness": self.tools / "native-rc-smoke.mjs",
+                    "progress": self.evidence / "missing-budget-progress.jsonl",
+                    "path": self.evidence / "missing-budget-observation.json",
+                    "profile": diagnostic_module.CURRENT071_REPLAY_PROGRESS_PROFILE,
+                    "harness_timeout_ms": None,
+                },
+            )
+
+    def test_historical070_and_darwin_keep_default_command_paths(self):
+        prepared = self._prepared()
+        legacy = {
+            "wrapper": self.wrapper,
+            "harness": self.tools / "native-rc-smoke.mjs",
+            "progress": self.evidence / "legacy-progress.jsonl",
+            "path": self.evidence / "legacy-observation.json",
+            "profile": diagnostic_module.CURRENT_REPLAY_PROGRESS_PROFILE,
+            "harness_timeout_ms": None,
+        }
+        legacy_command = _command(
+            prepared, "linux-arm64", "B", self.launch_root, self.evidence,
+            extras=False, initial_observation=legacy,
+        )
+        self.assertNotIn("--timeout-ms", legacy_command)
+        darwin_command = _command(
+            prepared, "darwin-arm64", "A", self.launch_root, self.evidence,
+            extras=False,
+        )
+        self.assertNotIn("xvfb-run", darwin_command)
+        self.assertNotIn("dbus-run-session", darwin_command)
+        self.assertNotIn("--timeout-ms", darwin_command)
+
     def test_python_enablement_requires_the_authenticated_harness_identity(self):
         helper = Path(diagnostic_module.__file__).with_name("replay_progress_wrapper.mjs")
         prepared = self._prepared()

@@ -92,7 +92,7 @@ def _current_source_inventory_sha256(inventory):
     return digest(canonical({key: inventory.get(key) for key in CURRENT_SOURCE_INVENTORY_FIELDS}))
 
 
-def _validate_current_policy(policy):
+def _validate_current_policy(policy, *, policy_variant=None):
     """Only the complete source-owned current disposition may authorize preservation."""
     status = policy.get('status')
     authorized = status == 'authorized'
@@ -107,7 +107,7 @@ def _validate_current_policy(policy):
     closed(policy, _CURRENT_POLICY_FIELDS, required=_CURRENT_DIAGNOSTIC_FIELDS)
     root = Path(__file__).resolve().parents[2]
     if authorized:
-        selected = root / rpm_policy_path(CURRENT_GENERATION)
+        selected = root / rpm_policy_path(CURRENT_GENERATION, policy_variant=policy_variant)
         if selected.is_symlink() or not selected.is_file() or selected.stat().st_size > 512 * 1024:
             raise ContractError('INVALID_POLICY', 'Physical source-owned current disposition required')
         source_policy = json.loads(selected.read_bytes())
@@ -117,7 +117,11 @@ def _validate_current_policy(policy):
     # Exact frozen caller bytes accompany this070 policy; active071 source
     # metadata must neither invalidate that replay nor inherit its exceptions.
     from rs9.nebular_callers import _load_current_contract
-    callers = _load_current_contract()
+    if policy_variant == 'current071':
+        from rs9.nebular_callers import _load_current071_contract
+        callers = _load_current071_contract()
+    else:
+        callers = _load_current_contract()
     for name, entry in policy['projects'].items():
         closed(entry, _CURRENT_PROJECT_FIELDS, required=_CURRENT_PROJECT_REQUIRED)
         native = name in {'theme-forge-stellar-burst', 'theme-forge-nebular-fusion'}
@@ -190,8 +194,8 @@ def _validate_current_policy(policy):
             raise ContractError('INVALID_POLICY', 'Blocked diagnostic policy cannot carry authorization inventory')
 
 
-def _validate_policy(policy, *, generation=HISTORICAL_GENERATION):
-    generation_paths(generation)
+def _validate_policy(policy, *, generation=HISTORICAL_GENERATION, policy_variant=None):
+    rpm_policy_path(generation, policy_variant=policy_variant)
     json.dumps(policy, allow_nan=False)
     if not isinstance(policy, dict) or policy.get('schema') != RPM_LINT_POLICY_SCHEMA:
         raise ContractError('INVALID_POLICY', 'Invalid candidate lint policy schema')
@@ -205,6 +209,8 @@ def _validate_policy(policy, *, generation=HISTORICAL_GENERATION):
     if not isinstance(codes, list) or set(codes) != PERMITTED_EXCEPTION_CLASSES or not isinstance(projects, dict) or not projects:
         raise ContractError('INVALID_POLICY', 'Malformed candidate lint policy')
     versions = CURRENT_VERSIONS if generation == HISTORICAL_GENERATION else CURRENT_POLICY_VERSIONS
+    if policy_variant == 'current071':
+        versions = dict(CURRENT_POLICY_VERSIONS, **{'theme-forge-nebular-fusion':'0.7.1'})
     for name, entry in projects.items():
         if not isinstance(entry, dict) or entry.get('package_name') != name or entry.get('version') != versions.get(name):
             raise ContractError('INVALID_POLICY', 'Malformed exact project identity')
@@ -295,16 +301,16 @@ def _validate_policy(policy, *, generation=HISTORICAL_GENERATION):
                     elif discriminator is not None or 'systems' in rule:
                         raise ContractError('INVALID_POLICY', 'Unknown or ambiguous discriminator')
     if generation == CURRENT_GENERATION:
-        _validate_current_policy(policy)
+        _validate_current_policy(policy, policy_variant=policy_variant)
     return policy
 
 
-def load_policy(path=None, *, generation=HISTORICAL_GENERATION):
-    generation_paths(generation)
+def load_policy(path=None, *, generation=HISTORICAL_GENERATION, policy_variant=None):
+    rpm_policy_path(generation, policy_variant=policy_variant)
     selected = (DEFAULT_POLICY_PATH if generation == HISTORICAL_GENERATION else
-                Path(__file__).resolve().parents[2]/rpm_policy_path(generation))
+                Path(__file__).resolve().parents[2]/rpm_policy_path(generation, policy_variant=policy_variant))
     try:
-        return _validate_policy(json.loads((Path(path) if path is not None else selected).read_bytes()), generation=generation)
+        return _validate_policy(json.loads((Path(path) if path is not None else selected).read_bytes()), generation=generation, policy_variant=policy_variant)
     except (OSError, ValueError, TypeError) as exc:
         raise ContractError('INVALID_POLICY', 'Candidate lint policy unavailable or malformed') from exc
 
@@ -630,7 +636,7 @@ def _blocked_evaluation(reason, raw, inputs):
             'raw_exit_code': receipt.get('exit_code') if isinstance(receipt, dict) else None}
 
 
-def _evaluate_policy(raw_evidence, inventory, inputs, policy=None, *, generation=HISTORICAL_GENERATION):
+def _evaluate_policy(raw_evidence, inventory, inputs, policy=None, *, generation=HISTORICAL_GENERATION, policy_variant=None):
     """Only complete raw results and exact member proofs can accept exceptions."""
     if not isinstance(raw_evidence, dict):
         return _blocked_evaluation('malformed-raw-evidence', raw_evidence, inputs)
@@ -639,8 +645,8 @@ def _evaluate_policy(raw_evidence, inventory, inputs, policy=None, *, generation
     accepted, proofs, duplicates, rule_blockers = [], [], [], []
     payload_compromised = False
     try:
-        policy = (_validate_policy(policy, generation=generation) if policy is not None
-                  else load_policy(generation=generation))
+        policy = (_validate_policy(policy, generation=generation, policy_variant=policy_variant) if policy is not None
+                  else load_policy(generation=generation, policy_variant=policy_variant))
         entry = policy['projects'].get(inputs.get('project_id'))
         blockers = _raw_blockers(raw_evidence, policy)
         if generation == CURRENT_GENERATION and policy['status'] == 'blocked':
@@ -745,13 +751,122 @@ def _evaluate_policy(raw_evidence, inventory, inputs, policy=None, *, generation
     return result
 
 
-def evaluate_policy(raw_evidence, inventory, inputs, policy=None, *, generation=HISTORICAL_GENERATION):
+def evaluate_policy(raw_evidence, inventory, inputs, policy=None, *, generation=HISTORICAL_GENERATION, policy_variant=None):
     """Malformed observations and serialization must also produce a blocked result."""
     try:
-        return _evaluate_policy(raw_evidence, inventory, inputs, policy, generation=generation)
+        return _evaluate_policy(raw_evidence, inventory, inputs, policy, generation=generation, policy_variant=policy_variant)
     except OSError:
         if generation == HISTORICAL_GENERATION:
             raise
         return _blocked_evaluation('malformed-or-unavailable-policy-evidence', raw_evidence, inputs)
     except (ContractError, ValueError, TypeError, KeyError, AttributeError, OverflowError, RecursionError):
         return _blocked_evaluation('malformed-or-unavailable-policy-evidence', raw_evidence, inputs)
+
+
+def assert_policy_capture(capture, intent, policy_variant):
+    """Real authenticated release/asset selection; JSON cannot select a context."""
+    from rs9.release_core import authenticated_record_hash, authenticated_tree
+    from rs9.nebular_callers import current_contract_for_capture
+    from rs9.operator import assert_release_expectations
+    authenticated_record_hash(capture)
+    authenticated_tree(capture)
+    rpm_policy_path(CURRENT_GENERATION, policy_variant=policy_variant)
+    product = intent['project']['id']
+    versions = dict(CURRENT_POLICY_VERSIONS)
+    if policy_variant == 'current071':
+        versions['theme-forge-nebular-fusion'] = '0.7.1'
+    if product not in versions or intent.get('version') != versions[product]:
+        raise ContractError('INVALID_SELECTION', 'RPM capture/version context differs')
+    if product == 'theme-forge-nebular-fusion':
+        contract = current_contract_for_capture(capture)
+        if contract['identity']['tag'] != 'v' + versions[product]:
+            raise ContractError('INVALID_SELECTION', 'RPM capture release context differs')
+    else:
+        rows = _current_policy_expectations()
+        selected = [row for row in rows if row['project'] == product]
+        if len(selected) != 1:
+            raise ContractError('INVALID_SELECTION', 'Exact RPM project expectation required')
+        assert_release_expectations(capture, selected[0])
+
+
+def _select_current_rpm_variant(captures):
+    """Closed four-release live selection, independent of the generation label."""
+    from rs9.nebular_callers import current_contract_for_capture
+    if not isinstance(captures, (list, tuple)) or len(captures) != 4:
+        raise ContractError('INVALID_SELECTION', 'Exact RPM capture batch required')
+    rows = {intent['project']['id']:(capture,intent) for capture,intent,_ in captures}
+    if set(rows) != set(CURRENT_POLICY_VERSIONS) or len(rows) != len(captures):
+        raise ContractError('INVALID_SELECTION', 'Exact unique RPM products required')
+    nebular = current_contract_for_capture(rows['theme-forge-nebular-fusion'][0])
+    variant = {'v0.7.0':'current070', 'v0.7.1':'current071'}.get(nebular['identity']['tag'])
+    if variant is None:
+        raise ContractError('INVALID_SELECTION', 'Unsupported RPM release context')
+    for capture,intent in rows.values():
+        assert_policy_capture(capture,intent,variant)
+    return variant
+
+
+def _policy_variant_for_evaluations(repository, receipt):
+    """Fixed-source digest/tuple validation only; never an authentication proof.
+
+    Physical custody, original source/run provenance and native gates remain
+    mandatory at the summary consumer. Existing default validators stay070.
+    """
+    policies = receipt.get('details', {}).get('rpm_lint_policy', {})
+    if not isinstance(policies, dict) or set(policies) != set(CURRENT_POLICY_VERSIONS):
+        default = load_policy(Path(repository)/rpm_policy_path(CURRENT_GENERATION), generation=CURRENT_GENERATION)
+        if default.get('blocking') is True or default.get('status') == 'blocked':
+            raise ContractError('CURRENT_RPM_POLICY_HELD', 'Selected current RPM policy blocks qualification')
+        raise ContractError('HOSTED_POLICY', 'Complete RPM policy context required')
+    hashes = {row.get('policy_sha256') for row in policies.values() if isinstance(row,dict)}
+    if len(hashes) != 1 or len(policies) != 4:
+        raise ContractError('HOSTED_POLICY', 'Mixed RPM policy contexts')
+    for variant in (None,'current071'):
+        kwargs = {} if variant is None else {'policy_variant':variant}
+        selected = load_policy(Path(repository)/rpm_policy_path(CURRENT_GENERATION,**kwargs),
+                               generation=CURRENT_GENERATION,**kwargs)
+        if selected.get('blocking') is True or selected.get('status') == 'blocked':
+            raise ContractError('CURRENT_RPM_POLICY_HELD', 'Selected current RPM policy blocks qualification')
+        if hashes != {digest(canonical(selected))}:
+            continue
+        for product,row in policies.items():
+            entry = selected['projects'][product]
+            inputs = row.get('inputs',{})
+            if (row.get('product', inputs.get('project_id')) != product or inputs.get('project_id') != product
+                    or inputs.get('version') != entry['version'] or inputs.get('system') != receipt.get('system')
+                    or inputs.get('system') not in entry['allowed_systems']
+                    or inputs.get('arch') not in entry['allowed_architectures']
+                    or inputs.get('arch') != ('noarch' if entry['allowed_architectures'] == ['noarch']
+                        else inputs.get('system','').removesuffix('-linux'))
+                    or row.get('system', inputs.get('system')) != inputs.get('system')
+                    or row.get('version', inputs.get('version')) != inputs.get('version')
+                    or row.get('architecture', inputs.get('arch')) != inputs.get('arch')):
+                raise ContractError('HOSTED_POLICY', 'RPM context product/version/platform differs')
+            system = inputs['system'];auth = entry['authenticated_inputs']
+            assets = {x['sha256'] for x in auth.get('assets',[]) if system.removesuffix('-linux')+'-unknown-linux-gnu' in x['name']}
+            if 'asset_sha256' in auth:
+                assets = {auth['asset_sha256']}
+            if (inputs.get('asset_sha256') not in assets or inputs.get('closure_sha256') != auth.get('closure_sha256')
+                    or inputs.get('payload_manifest_sha256') != entry['inventory_bindings'][system]['payload_manifest_sha256']):
+                raise ContractError('HOSTED_POLICY', 'RPM context asset/closure/payload differs')
+        return variant
+    raise ContractError('HOSTED_POLICY', 'Unsupported RPM policy source digest')
+
+
+def _current_policy_expectations():
+    root = Path(__file__).resolve().parents[2]
+    return json.loads((root/'operators/theme-forge-current-202610/expectations.json').read_bytes())['projects']
+
+
+def select_current_rpm_variant(captures):
+    try:
+        return _select_current_rpm_variant(captures)
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise ContractError('INVALID_SELECTION', 'Malformed RPM capture batch') from None
+
+
+def policy_variant_for_evaluations(repository, receipt):
+    try:
+        return _policy_variant_for_evaluations(repository, receipt)
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise ContractError('HOSTED_POLICY', 'Malformed RPM policy context evidence') from None

@@ -37,6 +37,14 @@ PROBE_SCHEMA = "rs9.application-smoke-boundary-probes.v1"
 # optional post-failure replay so the unchanged 240-second outer attempt still
 # has time to reap the harness and retain its bounded evidence.
 DIAGNOSTIC_REPLAY_HARNESS_TIMEOUT_MS = 180_000
+# The current 0.7.1 required observation may ask the released harness to
+# finish its own watchdog/finalization before the unchanged 240-second Python
+# boundary. This is an owner-decision value; it does not alter the optional
+# replay budget above.
+CURRENT071_REQUIRED_HARNESS_TIMEOUT_MS = 210_000
+CURRENT071_SIGNAL_HARNESS_TIMEOUT_MS = 180_000
+REPLAY_SKIP_REASON_ORIGINAL_CLEANUP_UNPROVEN = "original-cleanup-unproven"
+REPLAY_SKIP_REASON_ORIGINAL_HARNESS_NOT_PASSED = "original-harness-not-passed"
 DIAGNOSTIC_REPLAY_TIMEOUT_TARGETS = frozenset({
     ("linux-arm64", "B"), ("linux-x64", "C"),
 })
@@ -104,11 +112,20 @@ REPLAY_LINUX_TARGETS = {"linux-arm64": "aarch64-unknown-linux-gnu", "linux-x64":
 def extract_log_categories(stdout, stderr, exit_code=None):
     """Closed observations, never guessed tool identity from a generic exit 127."""
     text = (stderr + b"\n" + stdout).lower()
-    failure = any(t in text for t in (b"failed", b"error", b"no such", b"not found", b"refused"))
+    failure_tokens = (b"failed", b"error", b"no such", b"not found", b"refused")
+    records = text.splitlines()
     categories = []
-    if b"session.conf" in text and (b"no such" in text or b"failed" in text):
+    if any(
+        b"session.conf" in record
+        and any(token in record for token in (b"no such", b"failed"))
+        for record in records
+    ):
         categories.append("dbus-session-conf-missing")
-    elif failure and (b"dbus-daemon" in text or b"dbus-run-session" in text):
+    elif any(
+        (b"dbus-daemon" in record or b"dbus-run-session" in record)
+        and any(token in record for token in failure_tokens)
+        for record in records
+    ):
         categories.append("dbus-daemon-error")
     patterns = {"xvfb-display-error": (b"cannot open display", b"xvfb failed", b"x server failed", b"xvfb-run: error"),
         "xvfb-auth-error": (b"xauth: error", b"authorization required", b"no protocol specified"),
@@ -662,6 +679,59 @@ def _read_initial_observation(path, expected_profile=None):
         return _unobserved_initial_observation("invalid")
 
 
+def _current071_initial_timeout_ms(platform, scenario):
+    """Return the bounded inner budget for an authenticated current071 lane."""
+    return {
+        ("linux-arm64", "B"): CURRENT071_REQUIRED_HARNESS_TIMEOUT_MS,
+        ("linux-x64", "C"): CURRENT071_REQUIRED_HARNESS_TIMEOUT_MS,
+        ("linux-x64", "C-signal"): CURRENT071_SIGNAL_HARNESS_TIMEOUT_MS,
+    }.get((platform, scenario))
+
+
+def _original_replay_cleanup_proven(fields):
+    """Allow a follow-up replay only after source-owned finalization completed."""
+    if not isinstance(fields, dict) or fields.get("error") is not None \
+            or fields.get("stream_capture_complete") is not True \
+            or fields.get("raw_returncode") is None or fields.get("cleanup_error") is not None:
+        return False
+    observation = fields.get("initial_observation")
+    if not isinstance(observation, dict) or observation.get("status") != "completed":
+        return False
+    events = {(item.get("stage"), item.get("event")) for item in observation.get("phase_events", [])
+              if isinstance(item, dict)}
+    required = {
+        ("candidate", "exited"), ("receipt", "finalized"),
+        ("run-record", "finalized"), ("run-smoke", "returned"),
+    }
+    # This is only a replay-scheduling guard. It is not a claim that arbitrary
+    # descendants outside the harness candidate-root scan are absent.
+    return required <= events
+
+
+def _original_replay_skip_reason(fields):
+    """Return the bounded reason for suppressing a current071 replay."""
+    if _original_replay_cleanup_proven(fields):
+        return None
+    observation = fields.get("initial_observation") if isinstance(fields, dict) else None
+    if (isinstance(fields, dict) and fields.get("error") is None
+            and fields.get("stream_capture_complete") is True
+            and fields.get("raw_returncode") is not None
+            and fields.get("cleanup_error") is None
+            and isinstance(observation, dict)
+            and observation.get("status") == "failed"):
+        events = {(item.get("stage"), item.get("event")) for item in observation.get("phase_events", [])
+                  if isinstance(item, dict)}
+        required = {
+            ("candidate", "exited"), ("receipt", "finalized"),
+            ("run-record", "finalized"), ("run-smoke", "returned"),
+        }
+        if required <= events:
+            # The harness reached its terminal failed result; conservative
+            # replay suppression remains in force without mislabeling cleanup.
+            return REPLAY_SKIP_REASON_ORIGINAL_HARNESS_NOT_PASSED
+    return REPLAY_SKIP_REASON_ORIGINAL_CLEANUP_UNPROVEN
+
+
 def read_and_validate_receipt(path, command_details):
     raw, meta, error = _read_regular(path, MAX_RECEIPT)
     command_details["receipt_identity"] = meta
@@ -1017,6 +1087,13 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
         profile = initial_observation.get("profile")
         if profile not in (CURRENT_REPLAY_PROGRESS_PROFILE, CURRENT071_REPLAY_PROGRESS_PROFILE):
             raise ContractError("APPLICATION_SMOKE", "Unknown initial observation source profile")
+        initial_timeout_ms = initial_observation.get("harness_timeout_ms")
+        if profile.get("id") == "nebular071":
+            expected_timeout_ms = _current071_initial_timeout_ms(platform, scenario)
+            if expected_timeout_ms is None or initial_timeout_ms != expected_timeout_ms:
+                raise ContractError("APPLICATION_SMOKE", "Unsupported current required harness timeout")
+        elif initial_timeout_ms is not None:
+            raise ContractError("APPLICATION_SMOKE", "Unsupported historical harness timeout")
         command[2:2] = [
             "--rs9-replay-progress-harness", str(initial_observation["harness"]),
             "--rs9-replay-progress-file", str(initial_observation["progress"]),
@@ -1031,6 +1108,8 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
         ]
         for name, row in profile["modules"].items():
             command[2:2] = ["--rs9-replay-progress-closure-member", name + "=" + row["sha256"]]
+        if initial_timeout_ms is not None:
+            command.extend(["--timeout-ms", str(initial_timeout_ms)])
     if harness_timeout_ms is not None:
         if harness_timeout_ms != DIAGNOSTIC_REPLAY_HARNESS_TIMEOUT_MS:
             raise ContractError("APPLICATION_SMOKE", "Unsupported diagnostic harness timeout")
@@ -1203,7 +1282,8 @@ def _failure_details(fields, *, extras, receipt_name):
 
 
 def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, env, fields, not_run,
-                    session_bus_argv=None, include_replay=True, boundary_probes=False):
+                    session_bus_argv=None, include_replay=True, boundary_probes=False,
+                    replay_skip_reason=None):
     if include_replay:
         replay_progress_wrapper = _replay_progress_wrapper(prepared)
         _, replay = run_replay(scenario=scenario, platform=platform, launch_root=launch_root,
@@ -1213,7 +1293,7 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
             replay_progress_profile=(_current_replay_progress_profile(prepared)
                                      if replay_progress_wrapper is not None else None))
     else:
-        replay = {"status": "not-run", "reason": "boundary-probe-only"}
+        replay = {"status": "not-run", "reason": replay_skip_reason or "boundary-probe-only"}
     if boundary_probes:
         try:
             probes = run_boundary_probes(prefix=prefix, env=env, session_bus_argv=session_bus_argv)
@@ -1322,6 +1402,8 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
                 "progress": evidence / (platform + "-" + scenario + ".initial-progress.jsonl"),
                 "path": evidence / (platform + "-" + scenario + ".initial-observation.json"),
                 "profile": profile,
+                "harness_timeout_ms": (_current071_initial_timeout_ms(platform, scenario)
+                                        if profile.get("id") == "nebular071" else None),
             }
         fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, False, session_bus_argv=session_bus_argv,
                           system=system, initial_observation=initial_observation)
@@ -1329,10 +1411,23 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
             from rs9.pages_smoke_diagnostic import validate_smoke_observation
             observation = validate_smoke_observation(fields, system=system)
             details = _failure_details(fields, extras=extras, receipt_name=platform+"-"+scenario+".run.json")
+            replay_requested = bool(extras or diagnostic_replay)
+            replay_allowed = replay_requested
+            replay_skip_reason = None
+            current071_observation = (
+                isinstance(initial_observation, dict)
+                and isinstance(initial_observation.get("profile"), dict)
+                and initial_observation["profile"].get("id") == "nebular071"
+            )
+            if replay_requested and current071_observation:
+                replay_skip_reason = _original_replay_skip_reason(fields)
+                if replay_skip_reason is not None:
+                    replay_allowed = False
             if extras or diagnostic_boundary_probes or diagnostic_replay or diagnostic_initial_observation:
                 details["diagnostic_sha256"] = _retain_failure(prepared, system, platform, scenario,
                     launch_root, prefix, env, fields, scenarios[index+1:], session_bus_argv=session_bus_argv,
-                    include_replay=(extras or diagnostic_replay), boundary_probes=diagnostic_boundary_probes)
+                    include_replay=replay_allowed, boundary_probes=diagnostic_boundary_probes,
+                    replay_skip_reason=replay_skip_reason)
             err = ContractError("APPLICATION_SMOKE", "Released application-aware smoke failed", details=details)
             err.smoke_observation = observation
             raise err

@@ -146,18 +146,18 @@ def validate_rpm_custody(directory, manifest, receipt):
     return verify_rpm_custody(directory, manifest, receipt)
 
 
-def validate_rpm_policy_source(repository, receipt, *, generation=HISTORICAL_GENERATION):
+def validate_rpm_policy_source(repository, receipt, *, generation=HISTORICAL_GENERATION, policy_variant=None):
     """Bind retained policy evaluations to the source file in builder provenance."""
     distribution_paths(generation)
     if receipt.get('lane') != 'rpm':
         return
-    policy_path = repository / rpm_policy_path(generation)
+    policy_path = repository / rpm_policy_path(generation, policy_variant=policy_variant)
     if generation == CURRENT_GENERATION and (not policy_path.is_file() or policy_path.is_symlink()):
         raise ContractError("CURRENT_RPM_POLICY_HELD", "Selected current RPM policy is not ready")
     from rs9.rpm_lint_policy import load_policy
     selected = None
     if generation == CURRENT_GENERATION:
-        selected = load_policy(policy_path, generation=generation)
+        selected = load_policy(policy_path, generation=generation, **({} if policy_variant is None else {"policy_variant":policy_variant}))
         if selected.get("blocking") is True or selected.get("status") == "blocked":
             raise ContractError("CURRENT_RPM_POLICY_HELD", "Selected current RPM policy blocks qualification")
     details = receipt.get('details', {})
@@ -173,6 +173,17 @@ def validate_rpm_policy_source(repository, receipt, *, generation=HISTORICAL_GEN
     expected = hashlib.sha256(canonical(selected)).hexdigest()
     if any(not isinstance(p, dict) or p.get('policy_sha256') != expected for p in policies.values()):
         raise ContractError('HOSTED_POLICY', 'RPM policy evaluation differs from reviewed source')
+
+
+def _validate_hosted_rpm_policy_source(repository, receipt, *, generation=HISTORICAL_GENERATION):
+    # Ordinary summaries opt in; the old importer and public validator stay070.
+    variant_args = {}
+    if generation == CURRENT_GENERATION and receipt.get('lane') == 'rpm':
+        from rs9.rpm_lint_policy import policy_variant_for_evaluations
+        selected = policy_variant_for_evaluations(repository, receipt)
+        if selected is not None:
+            variant_args['policy_variant'] = selected
+    validate_rpm_policy_source(repository, receipt, generation=generation, **variant_args)
 
 
 def contract(repository, *, generation=HISTORICAL_GENERATION):
@@ -288,7 +299,7 @@ def summarize(repository, inputs, output, *, generation=HISTORICAL_GENERATION):
 
         # Guarded step: RPM policy source
         try:
-            validate_rpm_policy_source(repository, receipt, generation=generation)
+            _validate_hosted_rpm_policy_source(repository, receipt, generation=generation)
         except ContractError as error:
             reasons.append(lane_name + ":" + error.code)
         except Exception:
@@ -417,7 +428,7 @@ def validate_summary(summary, repository, commit, *, generation=HISTORICAL_GENER
                 raise ContractError("HOSTED_POLICY", "Malformed RPM policy details")
             if details.get("rpm_evidence_contract") != CURRENT_RPM_EVIDENCE_CONTRACT:
                 raise ContractError("HOSTED_NOT_QUALIFIED", "Historical marker-free RPM evidence cannot acquire new qualification")
-        validate_rpm_policy_source(repository, row, generation=generation)
+        _validate_hosted_rpm_policy_source(repository, row, generation=generation)
         tokens, errors = promotion_restrictions(lane, row)
         if errors:
             raise ContractError(errors[0], "Receipt has invalid promotion restrictions")

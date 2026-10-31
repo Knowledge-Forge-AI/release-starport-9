@@ -1,0 +1,27 @@
+# Nebular 0.7.1 RPM preservation policy
+
+Activation of this exact preservation policy requires explicit owner authorization. Static package-byte evidence supports the preservation disposition; fresh per-candidate native and source-bound runtime, caller, client, manifest and custody gates remain required. Production and publication flags remain false. Policy presence or source selection alone supplies no completed native qualification or publication authority.
+
+The existing current 0.7.0 JSON, default loader/evaluator/source-validator behavior, historical branch, frozen 0.7.0 caller and old own-repository importer modules remain unchanged. The 0.7.1 source path is `operators/theme-forge-current-202610/rpm-lint-policy-nebular071.json`, selected only through the closed `current071` variant. The three CLI entries are identical to 0.7.0. Nebular rules bind the exact 0.7.1 asset hashes, nine-field stable source projections, script modes/member hashes and observed duplicate groups/totals. Permitted classes and raw lint behavior are unchanged.
+
+The stable source inventory projection has nine fields. Earlier prose described ten; existing field tuples, canonical byte equality and hashes were correct. No extra field is introduced. Icon authentication joins actual authentication-projection `source_files` SHA-256, size and Git blob facts; retained tag metadata alone is insufficient.
+
+Producer selection authenticates the complete four-capture batch, checks exact Nebular repository/release/tag/commit/tree/assets through `current_contract_for_capture`, and checks unchanged CLI expectations through existing authentication APIs. JSON, generation labels and version strings do not create captures. The selected variant reaches client floor binding, source policy, caller collection, each builder and policy evaluation. Explicit builder selection rechecks its live capture and supplied source policy before commands. Existing unselected APIs retain 0.7.0/default behavior. Post-capture readiness validates the selected file, and source configuration hashes enumerate both variants and caller inputs.
+
+Ordinary hosted summaries use the shared fixed-source hash and complete tuple validator. It selects one canonical source-owned policy across the four products and requires exact product/version/system/architecture/asset/closure/payload identities. The direct source-validator default and both old importer modules remain scoped to 0.7.0. Serialized summary/source metadata is nonadmitting. Existing raw/chunk/file custody, original-run/source provenance, required gates and promotion restrictions remain mandatory. No new receipt schema, capability or native pass marker is introduced.
+
+## Original package-byte evidence
+
+Original failed run 41200359390 supplied both architecture-specific RPMs. Their uninstalled package headers bind name/version/architecture, rdev/inode pairs, modes, root:root ownership and non-GHOST facts. Each header has 1,774 entries: 1,386 regular files, 387 directories and one symlink. All 1,773 source-projected members match their applicable type, mode, size, digest or target fields. The one extra permitted header directory is `/usr/share/licenses/theme-forge-nebular-fusion`; it is not an extra product-root directory.
+
+The actual package-header rdev values and inode values prove distinct member identities within each RPM. These are uninstalled package-header query facts, not live installed-filesystem `stat()` observations. File flags are 0 or the license flag 128; the GHOST flag 64 is absent. The exact 130-group duplicate set equals the original native observations for each architecture and the source-owned policy group set. Source inventory identities continue to exclude volatile device/inode values; runtime preservation checks still require the actual package-query facts.
+
+All 1,386 regular CPIO body sizes and SHA-256 digests per architecture match the RPM header and authenticated source projection. The bounded callback did not independently retain nonregular CPIO bodies or their CPIO metadata. Symlink-target and directory metadata claims therefore remain RPM-header-only. No independent nonregular CPIO body proof or installed-filesystem stat proof is claimed.
+
+## Qualification boundary
+
+Original run 41200359390 remains failed, including its raw rpmlint result of 9 errors, 141 warnings and exit code 64. The preservation decision does not convert that run into a pass. Earlier client receipts observed system Node 22.22.2 under the prior client module; they do not qualify changed client source. Embedded archive Node 22.23.4 has a separate role and byte binding.
+
+Fresh per-candidate RPM build/query and raw lint evidence, source-bound caller and client/runtime acceptance, repository indexing, Burst native-addon checks, GPG/tamper checks, complete manifests/custody/provenance and all required native gates remain mandatory. Explicit 0.7.1 evaluation with absent required inventory stays blocked. Source selection alone supplies no new own-repository admission descriptor or 0.7.1 import proof. Controlled semantic fixtures and static archive proof do not substitute for those runtime gates.
+
+Rollback uses a separately reviewed source revision to remove explicit 0.7.1 forwarding and the selected variant, returning to unchanged 0.7.0 defaults. Old receipts remain immutable and cannot qualify a successor source tree. No workflow, runner, dependency, lockfile or published wheel change is introduced by this policy.

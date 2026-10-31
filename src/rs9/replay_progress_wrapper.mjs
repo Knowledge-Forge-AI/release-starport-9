@@ -112,6 +112,8 @@ const MAX_INITIAL_OBSERVATION_BYTES = 16 * 1024;
 const MAX_INITIAL_STREAM_BYTES = 1024 * 1024;
 const MAX_INITIAL_SNAPSHOT_WRITES = 32;
 const INITIAL_SNAPSHOT_INTERVAL_MS = 8_000;
+const CURRENT071_REQUIRED_INITIAL_TIMEOUT_MS = 210_000;
+const CURRENT071_SIGNAL_INITIAL_TIMEOUT_MS = 180_000;
 const FIXED_PROGRESS_EVENTS = new Set([
   "harness|import-start", "harness|imported", "harness|import-failed", "harness|export-missing",
   "candidate|launch-failed", "candidate|launched", "candidate|exited",
@@ -776,6 +778,12 @@ function writeLegacyError(error) {
   }
 }
 
+function current071InitialTimeoutMs(options) {
+  if (options.platform === "linux-x64" && options.scenario === "C-signal")
+    return CURRENT071_SIGNAL_INITIAL_TIMEOUT_MS;
+  return CURRENT071_REQUIRED_INITIAL_TIMEOUT_MS;
+}
+
 async function main() {
   const args = parseInternalArgs(process.argv.slice(2));
   const { harnessPath, progressPath, expectedSha256, closureMembers, forwarded,
@@ -787,8 +795,10 @@ async function main() {
   const options = current ? parseSmokeArgs(forwarded) : null;
   if (current && !((options.platform === "linux-x64" && ["C", "C-signal"].includes(options.scenario))
       || (options.platform === "linux-arm64" && options.scenario === "B"))) throw new Error("Current replay scenario differs");
-  if (initialObservationKind !== undefined && options.timeoutMs !== undefined)
-    throw new Error("Initial observation must use the released smoke default timeout");
+  if (initialObservationKind !== undefined && options.timeoutMs !== undefined
+      && !(current?.profile?.id === "nebular071"
+        && options.timeoutMs === current071InitialTimeoutMs(options)))
+    throw new Error("Initial observation timeout is not authorized for this source profile");
   const initialObservation = initialObservationKind === INITIAL_OBSERVATION_KIND
     ? makeInitialObservation(initialObservationPath, current.profile) : null;
   const restoreSupport = installCurrentSupport(current);

@@ -464,9 +464,20 @@ def build_rpm_candidate(
     client_runtime: Mapping[str, Any] | None = None,
     caller_evidence: Mapping[str, Any] | None = None,
     generation: str = HISTORICAL_GENERATION,
+    policy_variant: str | None = None,
 ) -> dict[str, Any]:
     """Build Fedora 43 RPM candidate package using real rpmbuild, rpmlint, and createrepo."""
     generation_paths(generation)
+    if policy_variant is not None:
+        from rs9.rpm_lint_policy import assert_policy_capture
+        from rs9.current_generation import CURRENT_GENERATION
+        if generation != CURRENT_GENERATION:
+            raise ContractError('INVALID_SELECTION', 'Current RPM variant needs current capture')
+        assert_policy_capture(capture, intent, policy_variant)
+        if policy is not None:
+            from rs9.rpm_lint_policy import _validate_policy
+            _validate_policy(policy, generation=generation, policy_variant=policy_variant)
+    variant_args = {} if policy_variant is None else {'policy_variant':policy_variant}
     scratch = validate_scratch_root(scratch_dir)
 
     ctx = validate_build_inputs(
@@ -619,7 +630,7 @@ def build_rpm_candidate(
             from rs9.nebular_callers import release_runtime_floor
             from rs9.rpm_lint_policy import load_policy
             current_policy = policy if policy is not None else (
-                load_policy() if generation == HISTORICAL_GENERATION else load_policy(generation=generation))
+                load_policy() if generation == HISTORICAL_GENERATION else load_policy(generation=generation, **variant_args))
             floor = (release_runtime_floor(ctx["asset_file"], current_policy["projects"][project_id])
                      if generation == HISTORICAL_GENERATION else
                      release_runtime_floor(ctx["asset_file"], current_policy["projects"][project_id], capture=capture))
@@ -953,7 +964,7 @@ def build_rpm_candidate(
     if resolved_policy is None:
         try:
             from rs9.rpm_lint_policy import load_policy
-            resolved_policy = load_policy() if generation == HISTORICAL_GENERATION else load_policy(generation=generation)
+            resolved_policy = load_policy() if generation == HISTORICAL_GENERATION else load_policy(generation=generation, **variant_args)
         except Exception:
             # Current selection failure remains explicit; None would reload a default.
             resolved_policy = None if generation == HISTORICAL_GENERATION else {}
@@ -1026,6 +1037,7 @@ def build_rpm_candidate(
         inputs=policy_inputs,
         policy=resolved_policy,
         **({"generation": generation} if generation != HISTORICAL_GENERATION else {}),
+        **variant_args,
     )
 
     # Check policy acceptance
