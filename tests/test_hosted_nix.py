@@ -1096,6 +1096,8 @@ class NixHostedTests(unittest.TestCase):
             pin_val = "d1f67c86eed016214864ba08bfb9529c307aea7e8fafb74853f96fcc3bfd8a60"
             if system == "aarch64-darwin":
                 pin_val = "3baa0af88a1ef4e2cc82cb64cd384b1805ecc3771b574e97277ae213d52711d8"
+            elif system == "aarch64-linux":
+                pin_val = "64db528412096d718b4bf8f78f85e5ac2b714b774e5005500dee37d23f560456"
             identity_doc = {
                 "version": "2.31.2",
                 "system": system,
@@ -1208,6 +1210,7 @@ class NixHostedTests(unittest.TestCase):
                 self.assertIn("nix-native-closure", gate_names)
                 self.assertIn("nix-build-check-run", gate_names)
                 self.assertEqual(verify_runtime.call_args.kwargs["diagnostic_initial_observation"], expected_observation)
+                self.assertEqual(verify_runtime.call_args.kwargs["current_nix_environment_transform"], expected_observation)
                 self.assertEqual(verify_runtime.call_args.kwargs["session_bus_argv"], None if system.endswith("darwin") else [
                     "/nix/store/" + "a" * 32 + "-dbus-1/bin/dbus-run-session",
                     "--dbus-daemon=/nix/store/" + "a" * 32 + "-dbus-1/bin/dbus-daemon",
@@ -1232,6 +1235,7 @@ class NixHostedTests(unittest.TestCase):
         self.assertIsNotNone(prepared["fixture_capture"])
         for system, generation, expected in [
             ("x86_64-linux", CURRENT_GENERATION, True),
+            ("aarch64-linux", CURRENT_GENERATION, True),
             ("x86_64-linux", HISTORICAL_GENERATION, False),
             ("aarch64-darwin", CURRENT_GENERATION, False),
         ]:

@@ -23,7 +23,7 @@ CAUSE_CATEGORIES = frozenset({"process-timeout", "process-nonzero", "process-sig
     "process-output-limit", "dbus-session-failure", "xvfb-failure", "display-unavailable",
     "socket-unavailable", "receipt-missing", "receipt-invalid", "receipt-corrupt",
     "receipt-malformed", "receipt-oversize", "receipt-failed", "harness-error", "process-cleanup-failure",
-    "shared-library-missing", "webkit-crash", "assertion", "unknown"})
+    "execution-source-unverified", "shared-library-missing", "webkit-crash", "assertion", "unknown"})
 SAFE_LOG_CATEGORIES = frozenset({"dbus-session-conf-missing", "dbus-daemon-error",
     "xvfb-display-error", "xvfb-auth-error", "module-not-found", "command-not-found",
     "shared-library-missing", "webkit-crash", "assertion", "socket-unavailable", "unclassified"})
@@ -86,6 +86,41 @@ INITIAL_OBSERVATION_SCHEMA = "rs9.application-smoke-initial-observation.v1"
 INITIAL_OBSERVATION_KIND = "initial-observation"
 INITIAL_OBSERVATION_MAX_BYTES = 16 * 1024
 INITIAL_OBSERVATION_MAX_STREAM_BYTES = 1024 * 1024
+CURRENT_NIX_ENVIRONMENT_TRANSFORM_SCHEMA = "rs9.current-nix-smoke-environment-transform.v1"
+CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID = "current071-nix-inherited-xdg-fontconfig-v1"
+CURRENT_NIX_ENVIRONMENT_EXECUTION_MODE = "execution-transform-and-observation"
+CURRENT_NIX_EXECUTION_SOURCE_SCHEMA = "rs9.current-nix-execution-source-provenance.v1"
+EXECUTION_SOURCE_UNVERIFIED_CAUSE = "execution-source-unverified"
+CURRENT071_UPSTREAM_HARNESS_SHA256 = "874355e36496884e55a6e4dae6986ecde817d20863bb3fe26d1b1b5a1d283e69"
+CURRENT071_UPSTREAM_HARNESS_BYTES = 30732
+CURRENT071_DERIVED_HARNESS_SHA256 = "15b34fe8680f1df983be3f79b72404c78bc4c5506bf9f1943b5e9b24bc4f633f"
+CURRENT071_DERIVED_HARNESS_BYTES = 30772
+CURRENT_NIX_RESTORED_ENV_KEYS = ("XDG_DATA_DIRS", "FONTCONFIG_FILE")
+_REQUIRED_OBSERVATION_COMPLETION_EVENTS = frozenset({
+    ("candidate", "exited"), ("receipt", "finalized"),
+    ("run-record", "finalized"), ("run-smoke", "returned"),
+})
+_OBSERVATION_FAILURE_EVENTS = frozenset({
+    ("harness", "import-failed"), ("harness", "export-missing"),
+    ("candidate", "launch-failed"), ("run-smoke", "error"),
+    ("receipt", "write-failed"), ("run-record", "write-failed"),
+})
+EXPECTED_CURRENT_NIX_EXECUTION_TRANSFORM = {
+    "schema": CURRENT_NIX_ENVIRONMENT_TRANSFORM_SCHEMA,
+    "transform_id": CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID,
+    "mode": CURRENT_NIX_ENVIRONMENT_EXECUTION_MODE,
+    "target_module": "native-rc-smoke.mjs",
+    "upstream_sha256": CURRENT071_UPSTREAM_HARNESS_SHA256,
+    "upstream_bytes": CURRENT071_UPSTREAM_HARNESS_BYTES,
+    "executed_derived_sha256": CURRENT071_DERIVED_HARNESS_SHA256,
+    "executed_derived_bytes": CURRENT071_DERIVED_HARNESS_BYTES,
+    "restored_env_keys": list(CURRENT_NIX_RESTORED_ENV_KEYS),
+    "modified_from_upstream": True,
+    "non_admitting": True,
+    "fhs_origin_proven": False,
+    "native_qualified": False,
+    "causal_attribution_proven": False,
+}
 REPLAY_PROGRESS_EVENTS = {
     ("harness", "import-start"), ("harness", "imported"),
     ("harness", "import-failed"), ("harness", "export-missing"),
@@ -762,7 +797,251 @@ def _validate_initial_environment_presence(env_presence):
     return validated
 
 
-def _read_initial_observation(path, expected_profile=None):
+def _carrier_entry_matches(actual, expected_value):
+    """Return whether one execution-transform field matches its exact typed contract."""
+    if isinstance(expected_value, list):
+        return (isinstance(actual, list)
+                and [type(item) for item in actual] == [str] * len(expected_value)
+                and actual == expected_value)
+    return type(actual) is type(expected_value) and actual == expected_value
+
+
+def _validate_current_nix_execution_transform(carrier):
+    """Validate the closed non-admitting current-Nix environment transform carrier."""
+    if not isinstance(carrier, dict) or set(carrier) != set(EXPECTED_CURRENT_NIX_EXECUTION_TRANSFORM):
+        return None
+    for key, expected_value in EXPECTED_CURRENT_NIX_EXECUTION_TRANSFORM.items():
+        if not _carrier_entry_matches(carrier.get(key), expected_value):
+            return None
+    return {
+        **EXPECTED_CURRENT_NIX_EXECUTION_TRANSFORM,
+        "restored_env_keys": list(CURRENT_NIX_RESTORED_ENV_KEYS),
+    }
+
+
+def _project_restored_environment_presence(env_presence):
+    """Project the two restored Nix keys from a validated nine-key observation map."""
+    validated = _validate_initial_environment_presence(env_presence)
+    if validated is None:
+        return None
+    return {
+        stage_name: (
+            None if stage_env is None
+            else {key: stage_env[key] for key in CURRENT_NIX_RESTORED_ENV_KEYS}
+        )
+        for stage_name, stage_env in validated.items()
+    }
+
+
+def _restored_environment_stage_ok(projected_env, stage_name):
+    """Return whether one stage recorded boolean True for both restored Nix env keys."""
+    if not isinstance(projected_env, dict) or set(projected_env) != {"wrapper_entry", "first_spawn"}:
+        return False
+    stage_env = projected_env.get(stage_name)
+    expected_stage = {key: True for key in CURRENT_NIX_RESTORED_ENV_KEYS}
+    if stage_env != expected_stage:
+        return False
+    return all(type(stage_env[key]) is bool for key in CURRENT_NIX_RESTORED_ENV_KEYS)
+
+
+def _stream_summary_untruncated(stream):
+    """Return whether one initial-observation stream summary is a non-truncated dict."""
+    return isinstance(stream, dict) and stream.get("truncated") is False
+
+
+def _observation_streams_and_errors_clean(observation):
+    """Return whether initial observation has zero observer faults and untruncated streams."""
+    if not isinstance(observation, dict) or observation.get("truncated") is not False:
+        return False
+    counts = observation.get("error_counts")
+    expected_zero = {"observer-fault": 0, "stream-fault": 0, "write-failure": 0}
+    if counts != expected_zero or any(type(val) is not int for val in counts.values()):
+        return False
+    streams = observation.get("streams")
+    if not isinstance(streams, dict) or set(streams) != {"stdout", "stderr"}:
+        return False
+    return (_stream_summary_untruncated(streams["stdout"])
+            and _stream_summary_untruncated(streams["stderr"]))
+
+
+def _observation_completion_events_present(observation):
+    """Return whether all four finalization events are present without failure events."""
+    events = observation.get("phase_events") if isinstance(observation, dict) else None
+    if not isinstance(events, list):
+        return False
+    pairs = {(item.get("stage"), item.get("event")) for item in events if isinstance(item, dict)}
+    return _REQUIRED_OBSERVATION_COMPLETION_EVENTS <= pairs and not (pairs & _OBSERVATION_FAILURE_EVENTS)
+
+
+def _observation_envelope_failure(observation):
+    """Return an initial-observation envelope error token, or None when readable."""
+    if not isinstance(observation, dict):
+        return "initial-observation-invalid"
+    if observation.get("status") == "unobserved":
+        reason = observation.get("reason")
+        suffix = reason if isinstance(reason, str) and reason else "unobserved"
+        return "initial-observation-" + suffix
+    envelope = (
+        observation.get("schema"),
+        observation.get("attempt_kind"),
+        observation.get("non_admitting") is True,
+    )
+    if envelope != (INITIAL_OBSERVATION_SCHEMA, INITIAL_OBSERVATION_KIND, True):
+        return "initial-observation-invalid"
+    return None
+
+
+def _classify_current_nix_provenance_failure(observation, profile_matches, carrier, projected_env, *, require_completed):
+    """Return the first fail-closed provenance failure reason, or None when verified."""
+    envelope_error = _observation_envelope_failure(observation)
+    if envelope_error is not None:
+        return envelope_error
+    allowed_statuses = {"completed"} if require_completed else {"completed", "failed"}
+    checks = (
+        (profile_matches, "source-profile-mismatch"),
+        (carrier is not None, "execution-transform-mismatch"),
+        (_observation_streams_and_errors_clean(observation), "observer-error-or-truncation"),
+        (_restored_environment_stage_ok(projected_env, "wrapper_entry"), "wrapper-entry-environment-missing"),
+        (_restored_environment_stage_ok(projected_env, "first_spawn"), "first-spawn-environment-missing"),
+        (_observation_completion_events_present(observation), "initial-observation-incomplete"),
+        (observation.get("status") in allowed_statuses, "initial-observation-not-completed"),
+    )
+    for ok, reason in checks:
+        if not ok:
+            return reason
+    return None
+
+
+def _evaluate_current_nix_execution_source(observation, expected_profile, *, require_completed):
+    """Build the closed non-admitting current-Nix execution-source provenance summary."""
+    expected_obs_profile = _initial_observation_profile(CURRENT071_REPLAY_PROGRESS_PROFILE)
+    actual_profile = observation.get("source_profile") if isinstance(observation, dict) else None
+    profile_matches = (
+        expected_profile == CURRENT071_REPLAY_PROGRESS_PROFILE
+        and actual_profile == expected_obs_profile
+    )
+    raw_carrier = observation.get("execution_transform") if isinstance(observation, dict) else None
+    carrier = _validate_current_nix_execution_transform(raw_carrier)
+    raw_env = observation.get("environment_presence") if isinstance(observation, dict) else None
+    projected_env = _project_restored_environment_presence(raw_env)
+    reason = _classify_current_nix_provenance_failure(
+        observation, profile_matches, carrier, projected_env,
+        require_completed=require_completed,
+    )
+    record = {
+        "schema": CURRENT_NIX_EXECUTION_SOURCE_SCHEMA,
+        "status": "verified" if reason is None else "failed",
+        "non_admitting": True,
+        "source_profile": _initial_observation_profile(CURRENT071_REPLAY_PROGRESS_PROFILE) if profile_matches else None,
+        "execution_transform": carrier,
+        "environment_presence": projected_env,
+    }
+    if reason is not None:
+        record["reason"] = reason
+    return record
+
+
+def _validate_verified_execution_source(source_record):
+    """Validate a closed verified current-Nix execution-source provenance record."""
+    expected_keys = {
+        "schema", "status", "non_admitting",
+        "source_profile", "execution_transform", "environment_presence",
+    }
+    if not isinstance(source_record, dict) or set(source_record) != expected_keys:
+        return None
+    expected_profile = _initial_observation_profile(CURRENT071_REPLAY_PROGRESS_PROFILE)
+    header = (
+        source_record.get("schema"),
+        source_record.get("status"),
+        source_record.get("non_admitting") is True,
+        source_record.get("source_profile"),
+    )
+    carrier = _validate_current_nix_execution_transform(source_record.get("execution_transform"))
+    projected_env = source_record.get("environment_presence")
+    stages_ok = (
+        _restored_environment_stage_ok(projected_env, "wrapper_entry")
+        and _restored_environment_stage_ok(projected_env, "first_spawn")
+    )
+    if header != (CURRENT_NIX_EXECUTION_SOURCE_SCHEMA, "verified", True, expected_profile):
+        return None
+    if carrier is None or not stages_ok:
+        return None
+    return {
+        "schema": CURRENT_NIX_EXECUTION_SOURCE_SCHEMA,
+        "status": "verified",
+        "non_admitting": True,
+        "source_profile": expected_profile,
+        "execution_transform": carrier,
+        "environment_presence": {
+            "wrapper_entry": {key: True for key in CURRENT_NIX_RESTORED_ENV_KEYS},
+            "first_spawn": {key: True for key in CURRENT_NIX_RESTORED_ENV_KEYS},
+        },
+    }
+
+
+def _bind_attempt_execution_source(fields, initial_observation):
+    """Attach and enforce fail-closed execution-source provenance on transformed attempts."""
+    if not isinstance(initial_observation, dict):
+        return
+    if initial_observation.get("environment_transform") != CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID:
+        return
+    process_failed = bool(
+        fields.get("error")
+        or fields.get("raw_returncode") != 0
+        or fields.get("receipt_error")
+        or fields.get("cleanup_error")
+    )
+    provenance = _evaluate_current_nix_execution_source(
+        fields.get("initial_observation"),
+        initial_observation.get("profile"),
+        require_completed=not process_failed,
+    )
+    fields["execution_source"] = provenance
+    if provenance["status"] != "verified" and not process_failed:
+        fields["failed"] = True
+        fields["cause"] = EXECUTION_SOURCE_UNVERIFIED_CAUSE
+        fields["reason_token"] = EXECUTION_SOURCE_UNVERIFIED_CAUSE
+
+
+def _scenario_run_projection(scenario, fields, *, environment_transform):
+    """Build the public scenario smoke summary, requiring verified provenance when transformed."""
+    run = {
+        "scenario": scenario,
+        "receipt_sha256": fields["receipt"]["sha256"],
+        "executable_sha256": fields["receipt"]["executable_sha256"],
+    }
+    if not environment_transform:
+        if "execution_source" in fields:
+            raise ContractError("APPLICATION_SMOKE", "Unexpected current Nix execution provenance")
+        return run
+    verified = _validate_verified_execution_source(fields.get("execution_source"))
+    if verified is None:
+        raise ContractError("APPLICATION_SMOKE", "Verified current Nix execution provenance required")
+    run["execution_source"] = verified
+    return run
+
+
+def _validate_initial_execution_transform(value, expected_profile, expected_execution_transform):
+    """Validate expected vs actual execution-transform carrier on initial observation."""
+    if type(expected_execution_transform) is not bool:
+        raise ValueError("initial observation execution transform expectation")
+    if not expected_execution_transform:
+        if "execution_transform" in value:
+            raise ValueError("unexpected initial observation execution transform")
+        return
+    profile = value["source_profile"]
+    allowed_profile = (profile["id"], profile["harness_sha256"]) == (
+        "nebular071", CURRENT071_UPSTREAM_HARNESS_SHA256
+    )
+    if expected_profile is not None:
+        allowed_profile = allowed_profile and expected_profile == CURRENT071_REPLAY_PROGRESS_PROFILE
+    validated = _validate_current_nix_execution_transform(value.get("execution_transform"))
+    if not allowed_profile or validated is None:
+        raise ValueError("invalid initial observation execution transform")
+    value["execution_transform"] = validated
+
+
+def _read_initial_observation(path, expected_profile=None, *, expected_execution_transform=False):
     """Read only the closed live-observation summary; never retain child bytes."""
     raw, _meta, error = _read_regular(path, INITIAL_OBSERVATION_MAX_BYTES)
     if error:
@@ -774,7 +1053,7 @@ def _read_initial_observation(path, expected_profile=None):
         required = {"schema", "attempt_kind", "non_admitting", "status", "source_profile",
                     "phase_events", "error_counts", "error_category_counts", "helper_identifier_counts",
                     "streams", "truncated"}
-        optional = {"environment_presence"}
+        optional = {"environment_presence", "execution_transform"}
         if not isinstance(value, dict) or not (required <= set(value) <= (required | optional)):
             raise ValueError("initial observation fields")
         if (value["schema"] != INITIAL_OBSERVATION_SCHEMA
@@ -842,6 +1121,7 @@ def _read_initial_observation(path, expected_profile=None):
                 value["environment_presence"] = validated_env
         if expected_profile is not None and profile != _initial_observation_profile(expected_profile):
             return _unobserved_initial_observation("source-binding-mismatch")
+        _validate_initial_execution_transform(value, expected_profile, expected_execution_transform)
         return value
     except (ContractError, UnicodeError, ValueError, TypeError, json.JSONDecodeError, RecursionError):
         return _unobserved_initial_observation("invalid")
@@ -856,47 +1136,46 @@ def _current071_initial_timeout_ms(platform, scenario):
     }.get((platform, scenario))
 
 
-def _original_replay_cleanup_proven(fields):
-    """Allow a follow-up replay only after source-owned finalization completed."""
-    if not isinstance(fields, dict) or fields.get("error") is not None \
-            or fields.get("stream_capture_complete") is not True \
-            or fields.get("raw_returncode") is None or fields.get("cleanup_error") is not None:
+def _original_attempt_finalization_clean(fields, allowed_statuses):
+    """Return whether the initial attempt exited and recorded all four finalization events."""
+    if not isinstance(fields, dict):
+        return False
+    attempt_state = (
+        fields.get("error"),
+        (type(fields.get("stream_capture_complete")), fields.get("stream_capture_complete")),
+        fields.get("raw_returncode") is not None,
+        fields.get("cleanup_error"),
+    )
+    if attempt_state != (None, (bool, True), True, None):
         return False
     observation = fields.get("initial_observation")
-    if not isinstance(observation, dict) or observation.get("status") != "completed":
+    if not isinstance(observation, dict) or observation.get("status") not in allowed_statuses:
         return False
-    events = {(item.get("stage"), item.get("event")) for item in observation.get("phase_events", [])
-              if isinstance(item, dict)}
-    required = {
-        ("candidate", "exited"), ("receipt", "finalized"),
-        ("run-record", "finalized"), ("run-smoke", "returned"),
+    events = {
+        (item.get("stage"), item.get("event"))
+        for item in observation.get("phase_events", [])
+        if isinstance(item, dict)
     }
+    return _REQUIRED_OBSERVATION_COMPLETION_EVENTS <= events
+
+
+def _original_replay_cleanup_proven(fields):
+    """Allow a follow-up replay only after source-owned finalization completed."""
+    if not _original_attempt_finalization_clean(fields, {"completed"}):
+        return False
     # This is only a replay-scheduling guard. It is not a claim that arbitrary
     # descendants outside the harness candidate-root scan are absent.
-    return required <= events
+    return "execution_source" not in fields
 
 
 def _original_replay_skip_reason(fields):
     """Return the bounded reason for suppressing a current071 replay."""
     if _original_replay_cleanup_proven(fields):
         return None
-    observation = fields.get("initial_observation") if isinstance(fields, dict) else None
-    if (isinstance(fields, dict) and fields.get("error") is None
-            and fields.get("stream_capture_complete") is True
-            and fields.get("raw_returncode") is not None
-            and fields.get("cleanup_error") is None
-            and isinstance(observation, dict)
-            and observation.get("status") == "failed"):
-        events = {(item.get("stage"), item.get("event")) for item in observation.get("phase_events", [])
-                  if isinstance(item, dict)}
-        required = {
-            ("candidate", "exited"), ("receipt", "finalized"),
-            ("run-record", "finalized"), ("run-smoke", "returned"),
-        }
-        if required <= events:
-            # The harness reached its terminal failed result; conservative
-            # replay suppression remains in force without mislabeling cleanup.
-            return REPLAY_SKIP_REASON_ORIGINAL_HARNESS_NOT_PASSED
+    if _original_attempt_finalization_clean(fields, {"failed", "completed"}):
+        # The harness reached its terminal failed result; conservative
+        # replay suppression remains in force without mislabeling cleanup.
+        return REPLAY_SKIP_REASON_ORIGINAL_HARNESS_NOT_PASSED
     return REPLAY_SKIP_REASON_ORIGINAL_CLEANUP_UNPROVEN
 
 
@@ -1216,6 +1495,65 @@ def run_boundary_probes(*, prefix=(), env=None, session_bus_argv=None):
     }
 
 
+def _initial_observation_transform_args(initial_observation, profile, platform, scenario):
+    """Return validated wrapper args for the optional current-Nix environment transform."""
+    transform = initial_observation.get("environment_transform")
+    if transform is None:
+        return []
+    if transform != CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID:
+        raise ContractError("APPLICATION_SMOKE", "Unsupported current Nix environment transform")
+    if profile != CURRENT071_REPLAY_PROGRESS_PROFILE:
+        raise ContractError("APPLICATION_SMOKE", "Current Nix environment transform requires current 0.7.1 profile")
+    if (platform, scenario) not in {("linux-arm64", "B"), ("linux-x64", "C"), ("linux-x64", "C-signal")}:
+        raise ContractError("APPLICATION_SMOKE", "Current Nix environment transform requires current Linux scenario")
+    return ["--rs9-current-nix-environment-transform", transform]
+
+
+def _resolve_initial_observation_source(prepared, system, *, environment_transform=False):
+    """Authenticate the current source profile and wrapper for initial observation."""
+    if not system.endswith("-linux"):
+        raise ContractError("APPLICATION_SMOKE", "Initial observation is Linux-only")
+    wrapper = _replay_progress_wrapper(prepared)
+    profile = _current_replay_progress_profile(prepared) if wrapper else None
+    if profile is None:
+        raise ContractError("APPLICATION_SMOKE", "Authenticated initial-observation source is unavailable")
+    if environment_transform and profile != CURRENT071_REPLAY_PROGRESS_PROFILE:
+        raise ContractError(
+            "APPLICATION_SMOKE",
+            "Current Nix environment transform requires current 0.7.1 source profile",
+        )
+    return wrapper, profile
+
+
+def _build_initial_observation_descriptor(
+    prepared, system, platform, scenario, evidence, *, enabled, environment_transform=False
+):
+    """Build and validate the optional initial-observation descriptor for one scenario."""
+    if type(environment_transform) is not bool:
+        raise ContractError("APPLICATION_SMOKE", "Invalid current Nix environment transform option")
+    if not enabled:
+        if environment_transform:
+            raise ContractError(
+                "APPLICATION_SMOKE",
+                "Current Nix environment transform requires diagnostic initial observation",
+            )
+        return None
+    wrapper, profile = _resolve_initial_observation_source(
+        prepared, system, environment_transform=environment_transform)
+    descriptor = {
+        "wrapper": wrapper,
+        "harness": prepared["tools"] / "native-rc-smoke.mjs",
+        "progress": evidence / (platform + "-" + scenario + ".initial-progress.jsonl"),
+        "path": evidence / (platform + "-" + scenario + ".initial-observation.json"),
+        "profile": profile,
+        "harness_timeout_ms": (_current071_initial_timeout_ms(platform, scenario)
+                                if profile.get("id") == "nebular071" else None),
+    }
+    if environment_transform:
+        descriptor["environment_transform"] = CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID
+    return descriptor
+
+
 def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
              session_bus_argv=None, harness_timeout_ms=None, replay_progress=None,
              initial_observation=None):
@@ -1269,6 +1607,7 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
             profile["modules"]["native-rc-smoke.mjs"]["sha256"],
             "--rs9-initial-observation-kind", INITIAL_OBSERVATION_KIND,
             "--rs9-initial-observation-file", str(initial_observation["path"]),
+            *_initial_observation_transform_args(initial_observation, profile, platform, scenario),
             "--rs9-replay-progress-profile", profile["id"],
             "--rs9-replay-progress-source-commit", profile["commit"],
             "--rs9-replay-progress-source-tree", profile["tree"],
@@ -1337,13 +1676,19 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
     fields["receipt_error"], fields["problem_codes"] = receipt_error, codes
     if initial_observation is not None:
         fields["initial_observation"] = _read_initial_observation(
-            initial_observation["path"], expected_profile=initial_observation.get("profile"))
+            initial_observation["path"],
+            expected_profile=initial_observation.get("profile"),
+            expected_execution_transform=(
+                initial_observation.get("environment_transform") == CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID
+            ),
+        )
     fields["cause"] = error or classify_smoke_cause(exit_code=ec_val, signal=sig_val, timed_out=(error == "process-timeout"), receipt_error=receipt_error,
         log_categories=fields["log_categories"], has_problems=bool(codes))
     if cleanup_error and fields["cause"] == "unknown":
         fields["cause"] = "process-cleanup-failure"
     fields["reason_token"] = error or ("process-signal" if sig_val is not None else ("process-nonzero" if ec_val else receipt_error)) or cleanup_error or "pass"
     fields["failed"] = bool(error or rc != 0 or receipt_error or cleanup_error)
+    _bind_attempt_execution_source(fields, initial_observation)
     current071_observation = (
         isinstance(initial_observation, dict)
         and initial_observation.get("profile") == CURRENT071_REPLAY_PROGRESS_PROFILE
@@ -1467,6 +1812,36 @@ def _failure_details(fields, *, extras, receipt_name):
     return details
 
 
+def _compact_execution_source_for_size_cap(source_record):
+    """Retain a compact typed execution-source marker when diagnostic size cap is reached."""
+    status = source_record.get("status") if isinstance(source_record, dict) else None
+    reason = source_record.get("reason") if isinstance(source_record, dict) else None
+    compact = {
+        "schema": CURRENT_NIX_EXECUTION_SOURCE_SCHEMA,
+        "status": status if status in {"verified", "failed"} else "failed",
+        "non_admitting": True,
+        "omitted": "diagnostic-size-cap",
+    }
+    if isinstance(reason, str) and reason:
+        compact["reason"] = reason
+    return compact
+
+
+def _shed_execution_source_for_size_cap(record, raw):
+    """Compact or drop execution_source only after larger optional observation fields are shed."""
+    if len(raw) <= MAX_DIAGNOSTIC or "execution_source" not in record["initial_run"]:
+        return raw
+    initial = dict(record["initial_run"])
+    initial["execution_source"] = _compact_execution_source_for_size_cap(initial["execution_source"])
+    record["initial_run"] = initial
+    raw = canonical(record)
+    if len(raw) > MAX_DIAGNOSTIC:
+        initial.pop("execution_source")
+        record["initial_run"] = initial
+        raw = canonical(record)
+    return raw
+
+
 def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, env, fields, not_run,
                     session_bus_argv=None, include_replay=True, boundary_probes=False,
                     replay_skip_reason=None):
@@ -1568,6 +1943,7 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
         initial.pop("harness_problem_categories")
         record["initial_run"] = initial
         raw = canonical(record)
+    raw = _shed_execution_source_for_size_cap(record, raw)
     if len(raw) > MAX_DIAGNOSTIC:
         raise ContractError("APPLICATION_SMOKE", "Smoke diagnostic bound exceeded")
     scan_for_credentials(raw.decode())
@@ -1584,7 +1960,16 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
 
 def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=None, diagnostic_extras=False,
                              diagnostic_boundary_probes=False, diagnostic_replay=False,
-                             diagnostic_initial_observation=False, session_bus_argv=None):
+                             diagnostic_initial_observation=False,
+                             diagnostic_current_nix_environment_transform=False,
+                             current_nix_environment_transform=False,
+                             session_bus_argv=None):
+    if (type(diagnostic_current_nix_environment_transform) is not bool
+            or type(current_nix_environment_transform) is not bool):
+        raise ContractError("APPLICATION_SMOKE", "Invalid current Nix environment transform option")
+    environment_transform = (
+        diagnostic_current_nix_environment_transform or current_nix_environment_transform
+    )
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
@@ -1598,23 +1983,11 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
     for index, scenario in enumerate(scenarios):
         # Keep the qualification attempt comparable with run 15/16. Only a
         # explicitly requested initial observation uses the instrumented process/argv path.
-        initial_observation = None
-        if diagnostic_initial_observation:
-            if not system.endswith("-linux"):
-                raise ContractError("APPLICATION_SMOKE", "Initial observation is Linux-only")
-            wrapper = _replay_progress_wrapper(prepared)
-            profile = _current_replay_progress_profile(prepared) if wrapper is not None else None
-            if wrapper is None or profile is None:
-                raise ContractError("APPLICATION_SMOKE", "Authenticated initial-observation source is unavailable")
-            initial_observation = {
-                "wrapper": wrapper,
-                "harness": prepared["tools"] / "native-rc-smoke.mjs",
-                "progress": evidence / (platform + "-" + scenario + ".initial-progress.jsonl"),
-                "path": evidence / (platform + "-" + scenario + ".initial-observation.json"),
-                "profile": profile,
-                "harness_timeout_ms": (_current071_initial_timeout_ms(platform, scenario)
-                                        if profile.get("id") == "nebular071" else None),
-            }
+        initial_observation = _build_initial_observation_descriptor(
+            prepared, system, platform, scenario, evidence,
+            enabled=bool(diagnostic_initial_observation),
+            environment_transform=environment_transform,
+        )
         fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, False, session_bus_argv=session_bus_argv,
                           system=system, initial_observation=initial_observation)
         if fields["failed"]:
@@ -1641,6 +2014,6 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
             err = ContractError("APPLICATION_SMOKE", "Released application-aware smoke failed", details=details)
             err.smoke_observation = observation
             raise err
-        runs.append({"scenario": scenario, "receipt_sha256": fields["receipt"]["sha256"],
-                     "executable_sha256": fields["receipt"]["executable_sha256"]})
+        runs.append(_scenario_run_projection(
+            scenario, fields, environment_transform=environment_transform))
     return runs

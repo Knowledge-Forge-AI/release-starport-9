@@ -115,6 +115,9 @@ const MAX_INITIAL_SNAPSHOT_WRITES = 32;
 const INITIAL_SNAPSHOT_INTERVAL_MS = 8_000;
 const CURRENT071_REQUIRED_INITIAL_TIMEOUT_MS = 210_000;
 const CURRENT071_SIGNAL_INITIAL_TIMEOUT_MS = 180_000;
+const CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID = "current071-nix-inherited-xdg-fontconfig-v1";
+const CURRENT071_DERIVED_HARNESS_SHA256 = "15b34fe8680f1df983be3f79b72404c78bc4c5506bf9f1943b5e9b24bc4f633f";
+const CURRENT071_DERIVED_HARNESS_BYTES = 30772;
 const FIXED_PROGRESS_EVENTS = new Set([
   "harness|import-start", "harness|imported", "harness|import-failed", "harness|export-missing",
   "candidate|launch-failed", "candidate|launched", "candidate|exited",
@@ -168,6 +171,7 @@ const INTERNAL = Object.freeze({
   support: "--rs9-replay-progress-support-member",
   initialKind: "--rs9-initial-observation-kind",
   initialFile: "--rs9-initial-observation-file",
+  environmentTransform: "--rs9-current-nix-environment-transform",
 });
 
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -181,6 +185,7 @@ function parseInternalArgs(argv) {
   const forwarded = [];
   let initialObservationKind;
   let initialObservationPath;
+  let environmentTransform;
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     const value = argv[index + 1];
@@ -207,6 +212,13 @@ function parseInternalArgs(argv) {
         initialObservationPath = value;
       }
       index += 1;
+    } else if (flag === INTERNAL.environmentTransform) {
+      if (value === undefined || environmentTransform !== undefined
+          || value !== CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID) {
+        throw new Error("Current Nix environment transform argument is invalid");
+      }
+      environmentTransform = value;
+      index += 1;
     } else {
       forwarded.push(flag);
     }
@@ -217,8 +229,10 @@ function parseInternalArgs(argv) {
   }
   if ((initialObservationKind === undefined) !== (initialObservationPath === undefined))
     throw new Error("Initial observation arguments must be paired");
+  if (environmentTransform !== undefined && initialObservationKind !== INITIAL_OBSERVATION_KIND)
+    throw new Error("Current Nix environment transform requires initial observation");
   return { harnessPath, progressPath, expectedSha256, closureMembers, forwarded, currentArgs,
-    initialObservationKind, initialObservationPath };
+    initialObservationKind, initialObservationPath, environmentTransform };
 }
 
 function parseSmokeArgs(argv) {
@@ -343,7 +357,7 @@ function buildAuthenticatedClosure(harnessPath, expectedSha256, rawMembers, curr
   return { entryPath, sources };
 }
 
-function installAuthenticatedLoader(closure) {
+function installAuthenticatedLoader(closure, derivedEntry = null) {
   if (typeof registerHooks !== "function") throw new Error("Authenticated ESM loader hooks are unavailable");
   const hooks = registerHooks({
     resolve(specifier, context, nextResolve) {
@@ -365,7 +379,9 @@ function installAuthenticatedLoader(closure) {
       if (url.startsWith("node:")) return nextLoad(url, context);
       if (!url.startsWith("file:")) throw new Error("Replay harness loaded a non-file module");
       const path = fileURLToPath(new URL(url));
-      const source = closure.sources.get(path);
+      const source = derivedEntry && path === closure.entryPath
+        ? derivedEntry.derivedBytes
+        : closure.sources.get(path);
       if (source === undefined) throw new Error("Replay harness loaded outside its authenticated closure");
       return { format: "module", source, shortCircuit: true };
     },
@@ -638,7 +654,7 @@ function sampleEnvironmentPresence(envSource) {
   return presence;
 }
 
-function makeInitialObservation(path, profile) {
+function makeInitialObservation(path, profile, executionTransform = null) {
   const state = {
     schema: INITIAL_OBSERVATION_SCHEMA,
     attempt_kind: INITIAL_OBSERVATION_KIND,
@@ -655,6 +671,12 @@ function makeInitialObservation(path, profile) {
     },
     truncated: false,
   };
+  if (executionTransform) {
+    state.execution_transform = {
+      ...executionTransform,
+      restored_env_keys: [...executionTransform.restored_env_keys],
+    };
+  }
   const hashes = {stdout: crypto.createHash("sha256"), stderr: crypto.createHash("sha256")};
   let disabled = false;
   let writing = false;
@@ -723,6 +745,12 @@ function makeInitialObservation(path, profile) {
         first_spawn: state.environment_presence.first_spawn
           ? {...state.environment_presence.first_spawn}
           : null,
+      };
+    }
+    if (state.execution_transform) {
+      copy.execution_transform = {
+        ...state.execution_transform,
+        restored_env_keys: [...state.execution_transform.restored_env_keys],
       };
     }
     return copy;
@@ -885,10 +913,24 @@ function current071InitialTimeoutMs(options) {
   return CURRENT071_REQUIRED_INITIAL_TIMEOUT_MS;
 }
 
+async function loadEnvironmentTransformHelper() {
+  const helperPath = fileURLToPath(new URL("./current_nix_smoke_environment.mjs", import.meta.url));
+  let info;
+  try {
+    info = fs.lstatSync(helperPath);
+  } catch {
+    throw new Error("Current Nix environment transform helper is unavailable");
+  }
+  if (!info.isFile() || info.isSymbolicLink()) {
+    throw new Error("Current Nix environment transform helper is unavailable");
+  }
+  return import(pathToFileURL(helperPath).href);
+}
+
 async function main() {
   const args = parseInternalArgs(process.argv.slice(2));
   const { harnessPath, progressPath, expectedSha256, closureMembers, forwarded,
-    initialObservationKind, initialObservationPath } = args;
+    initialObservationKind, initialObservationPath, environmentTransform } = args;
   const current = currentProfile(args);
   if (initialObservationKind !== undefined && !current)
     throw new Error("Initial observation requires the authenticated current profile");
@@ -900,10 +942,32 @@ async function main() {
       && !(current?.profile?.id === "nebular071"
         && options.timeoutMs === current071InitialTimeoutMs(options)))
     throw new Error("Initial observation timeout is not authorized for this source profile");
+  let derivedEntry = null;
+  if (environmentTransform !== undefined) {
+    const transformHelper = await loadEnvironmentTransformHelper();
+    derivedEntry = transformHelper.deriveCurrentNixSmokeModule(
+      closure.sources.get(closure.entryPath),
+      {
+        transformId: environmentTransform,
+        profile: current?.profile,
+        platform: options?.platform,
+        scenario: options?.scenario,
+      },
+    );
+    if (!Buffer.isBuffer(derivedEntry?.derivedBytes)
+        || derivedEntry.derivedBytes.length !== CURRENT071_DERIVED_HARNESS_BYTES
+        || sha256(derivedEntry.derivedBytes) !== CURRENT071_DERIVED_HARNESS_SHA256) {
+      throw new Error("Derived smoke harness identity mismatch");
+    }
+    transformHelper.validateCurrentNixEnvironmentCarrier(
+      derivedEntry.executionTransform,
+      { expected: true },
+    );
+  }
   const initialObservation = initialObservationKind === INITIAL_OBSERVATION_KIND
-    ? makeInitialObservation(initialObservationPath, current.profile) : null;
+    ? makeInitialObservation(initialObservationPath, current.profile, derivedEntry?.executionTransform ?? null) : null;
   const restoreSupport = installCurrentSupport(current);
-  const loader = installAuthenticatedLoader(closure);
+  const loader = installAuthenticatedLoader(closure, derivedEntry);
   const observer = installProgressObservers(progressPath, current, options, initialObservation);
   let harness;
   let result;
