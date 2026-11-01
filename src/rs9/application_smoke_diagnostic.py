@@ -1630,8 +1630,23 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
     return command
 
 
+def _failure_diagnostic_options(prepared, platform, initial_observation, *,
+                                current071_observation=False, current_nix_text=False):
+    """Return strict boolean keyword options for collect_failure_diagnostics on a failed attempt."""
+    options = {}
+    if current071_observation is True:
+        options["current071"] = True
+        if (current_nix_text is True and isinstance(initial_observation, dict)
+                and initial_observation.get("environment_transform") == CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID):
+            options["current_nix_text"] = True
+    if _current071_problem_projection(prepared, platform):
+        options["current071_problems"] = True
+    return options
+
+
 def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, extras, timeout=240, session_bus_argv=None,
-             system=None, harness_timeout_ms=None, replay_progress=None, initial_observation=None):
+             system=None, harness_timeout_ms=None, replay_progress=None, initial_observation=None,
+             current_nix_text=False):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
@@ -1708,11 +1723,14 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
             # Classify the existing 0.7.1 cleanup token only after exact source
             # authentication, independently of optional Nix observer activation.
             # This enables no observer/finalization fields for other routes.
-            current071_problems = _current071_problem_projection(prepared, platform)
-            diagnostic = collect_failure_diagnostics(err, dict(fields), evidence, platform, scenario, record=record,
-                                                     system=system,
-                                                     **({"current071": True} if current071_observation else {}),
-                                                     **({"current071_problems": True} if current071_problems else {}))
+            diagnostic = collect_failure_diagnostics(
+                err, dict(fields), evidence, platform, scenario, record=record, system=system,
+                **_failure_diagnostic_options(
+                    prepared, platform, initial_observation,
+                    current071_observation=current071_observation,
+                    current_nix_text=current_nix_text,
+                ),
+            )
             fields.update({k: diagnostic[k] for k in (
                 "stderr_diagnostic", "evidence_inventory", "harness_run_record", "inner_stderr_diagnostic",
                 "harness_problem_categories",
@@ -1842,6 +1860,21 @@ def _shed_execution_source_for_size_cap(record, raw):
     return raw
 
 
+def _shed_current_nix_inner_text_for_size_cap(record, raw):
+    """Drop only the optional nested inner-stderr current_nix_text extension first at the size cap."""
+    if len(raw) <= MAX_DIAGNOSTIC:
+        return raw
+    inner = record["initial_run"].get("inner_stderr_diagnostic")
+    if not isinstance(inner, dict) or "current_nix_text" not in inner:
+        return raw
+    initial = dict(record["initial_run"])
+    inner = dict(inner)
+    inner.pop("current_nix_text")
+    initial["inner_stderr_diagnostic"] = inner
+    record["initial_run"] = initial
+    return canonical(record)
+
+
 def _shed_current_nix_inner_tokens_for_size_cap(record, raw):
     """Drop only the optional nested inner-stderr current_nix_tokens extension first at the size cap."""
     if len(raw) <= MAX_DIAGNOSTIC:
@@ -1899,6 +1932,7 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
         record["boundary_probes"] = probes
     raw = canonical(record)
     # New optional fields must not displace established observation evidence.
+    raw = _shed_current_nix_inner_text_for_size_cap(record, raw)
     raw = _shed_current_nix_inner_tokens_for_size_cap(record, raw)
     if len(raw) > MAX_DIAGNOSTIC and "resolution_matches" in record["initial_run"]:
         initial = dict(record["initial_run"])
@@ -2005,7 +2039,8 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
             environment_transform=environment_transform,
         )
         fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, False, session_bus_argv=session_bus_argv,
-                          system=system, initial_observation=initial_observation)
+                          system=system, initial_observation=initial_observation,
+                          current_nix_text=current_nix_environment_transform)
         if fields["failed"]:
             from rs9.pages_smoke_diagnostic import validate_smoke_observation
             observation = validate_smoke_observation(fields, system=system)
