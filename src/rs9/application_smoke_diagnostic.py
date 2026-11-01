@@ -658,6 +658,19 @@ def _current_replay_progress_profile(prepared):
         return None
 
 
+
+def _current071_problem_projection(prepared, platform):
+    """Recognize only the authenticated current Linux problem vocabulary."""
+    if platform not in {"linux-arm64", "linux-x64"}:
+        return False
+    try:
+        return _current_replay_progress_profile(prepared) == CURRENT071_REPLAY_PROGRESS_PROFILE
+    except Exception:
+        # Optional source observation cannot mask a fixed failed result or
+        # suppress the other independent diagnostic projections.
+        return False
+
+
 def _replay_progress_wrapper(prepared):
     """Return the owned observer only for the authenticated harness pair."""
     tools = prepared.get("tools")
@@ -1347,9 +1360,14 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
         # Optional observations happen after the original outcome is fixed.
         from rs9.smoke_stream_tokens import collect_failure_diagnostics
         try:
+            # Classify the existing 0.7.1 cleanup token only after exact source
+            # authentication, independently of optional Nix observer activation.
+            # This enables no observer/finalization fields for other routes.
+            current071_problems = _current071_problem_projection(prepared, platform)
             diagnostic = collect_failure_diagnostics(err, dict(fields), evidence, platform, scenario, record=record,
                                                      system=system,
-                                                     **({"current071": True} if current071_observation else {}))
+                                                     **({"current071": True} if current071_observation else {}),
+                                                     **({"current071_problems": True} if current071_problems else {}))
             fields.update({k: diagnostic[k] for k in (
                 "stderr_diagnostic", "evidence_inventory", "harness_run_record", "inner_stderr_diagnostic",
                 "harness_problem_categories",
