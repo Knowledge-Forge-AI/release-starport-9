@@ -1842,6 +1842,21 @@ def _shed_execution_source_for_size_cap(record, raw):
     return raw
 
 
+def _shed_current_nix_inner_tokens_for_size_cap(record, raw):
+    """Drop only the optional nested inner-stderr current_nix_tokens extension first at the size cap."""
+    if len(raw) <= MAX_DIAGNOSTIC:
+        return raw
+    inner = record["initial_run"].get("inner_stderr_diagnostic")
+    if not isinstance(inner, dict) or "current_nix_tokens" not in inner:
+        return raw
+    initial = dict(record["initial_run"])
+    inner = dict(inner)
+    inner.pop("current_nix_tokens")
+    initial["inner_stderr_diagnostic"] = inner
+    record["initial_run"] = initial
+    return canonical(record)
+
+
 def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, env, fields, not_run,
                     session_bus_argv=None, include_replay=True, boundary_probes=False,
                     replay_skip_reason=None):
@@ -1884,6 +1899,7 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
         record["boundary_probes"] = probes
     raw = canonical(record)
     # New optional fields must not displace established observation evidence.
+    raw = _shed_current_nix_inner_tokens_for_size_cap(record, raw)
     if len(raw) > MAX_DIAGNOSTIC and "resolution_matches" in record["initial_run"]:
         initial = dict(record["initial_run"])
         initial.pop("resolution_matches")
