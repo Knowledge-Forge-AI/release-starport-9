@@ -57,11 +57,96 @@ def _matches_pin(value: str, target: str) -> bool:
     return v == t
 
 
+def _check_production_pin_group(
+    data: dict[str, Any],
+    aliases: tuple[str, str],
+    marker_key: str,
+    expected_pin: str,
+    label: str,
+    *,
+    require_present: bool,
+) -> str | None:
+    present_aliases = [k for k in aliases if k in data]
+    if require_present and not present_aliases:
+        raise ContractError("UNPINNED_TRUST", f"Validator result missing {label} identifier")
+    keys_to_check = [*present_aliases, *([marker_key] if marker_key in data else [])]
+    if not keys_to_check:
+        return None
+    values = [data[k] for k in keys_to_check]
+    if not all(isinstance(v, str) and _matches_pin(v, expected_pin) for v in values):
+        raise ContractError("UNPINNED_TRUST", f"{label} does not match approved production pin")
+    return values[0]
+
+
+def _validate_production_trust(
+    valid_result: dict[str, Any],
+    evidence: dict[str, Any],
+) -> None:
+    val_primary = _check_production_pin_group(
+        valid_result,
+        ("primary_key_id", "primary_fingerprint"),
+        "verified_primary_key",
+        PRODUCTION_PRIMARY_FINGERPRINT,
+        "Primary fingerprint",
+        require_present=True,
+    )
+    val_subkey = _check_production_pin_group(
+        valid_result,
+        ("signing_subkey", "subkey_id"),
+        "verified_signing_subkey",
+        PRODUCTION_SIGNING_SUBKEY,
+        "Signing subkey",
+        require_present=True,
+    )
+    ev_primary = _check_production_pin_group(
+        evidence,
+        ("primary_key_id", "primary_fingerprint"),
+        "verified_primary_key",
+        PRODUCTION_PRIMARY_FINGERPRINT,
+        "Primary fingerprint",
+        require_present=False,
+    )
+    ev_subkey = _check_production_pin_group(
+        evidence,
+        ("signing_subkey", "subkey_id"),
+        "verified_signing_subkey",
+        PRODUCTION_SIGNING_SUBKEY,
+        "Signing subkey",
+        require_present=False,
+    )
+    if (ev_primary is not None and not _matches_pin(ev_primary, val_primary)) or (
+        ev_subkey is not None and not _matches_pin(ev_subkey, val_subkey)
+    ):
+        raise ContractError("UNPINNED_TRUST", "Caller identity claim contradicts validator result")
+    if (
+        "verified_issuer" in evidence
+        and "verified_issuer" in valid_result
+        and evidence["verified_issuer"] != valid_result["verified_issuer"]
+    ):
+        raise ContractError("UNPINNED_TRUST", "Caller verified_issuer claim contradicts validator result")
+
+
+def _validate_persisted_trust(
+    rec_evidence: dict[str, Any],
+    trust_config: dict[str, Any] | set[str] | list[str] | tuple[str, ...] | None,
+) -> None:
+    if trust_config is None:
+        if "verified_primary_key" not in rec_evidence or "verified_signing_subkey" not in rec_evidence:
+            raise ContractError("UNPINNED_TRUST", "Persisted production record missing verified identity markers")
+        _validate_production_trust(rec_evidence, {})
+        return
+    _validate_trust(rec_evidence, {}, trust_config)
+
+
 def _validate_trust(
     valid_result: dict[str, Any],
     evidence: dict[str, Any],
     trust_config: dict[str, Any] | set[str] | list[str] | tuple[str, ...] | None,
 ) -> None:
+    if trust_config is None:
+        _validate_production_trust(valid_result, evidence)
+        return
+
     primary = valid_result.get("primary_key_id") or valid_result.get("primary_fingerprint")
     if not primary:
         raise ContractError("UNPINNED_TRUST", "Validator result missing primary key identifier")
@@ -72,14 +157,6 @@ def _validate_trust(
         or evidence.get("signing_subkey")
         or evidence.get("subkey_id")
     )
-
-    if trust_config is None:
-        # Real production mode: require independently approved public production fingerprint pin
-        if not _matches_pin(str(primary), PRODUCTION_PRIMARY_FINGERPRINT):
-            raise ContractError("UNPINNED_TRUST", "Primary fingerprint does not match approved production pin")
-        if subkey is not None and not _matches_pin(str(subkey), PRODUCTION_SIGNING_SUBKEY):
-            raise ContractError("UNPINNED_TRUST", "Signing subkey does not match approved production pin")
-        return
 
     # Explicit synthetic trust configuration
     if isinstance(trust_config, (set, list, tuple)):
@@ -364,7 +441,7 @@ class SignedStore:
                 raise ContractError("TAMPER_DETECTED", "Record content tampered on disk")
             if rec_data["issuer"] != rec_data["evidence"].get("verified_issuer"):
                 raise ContractError("ISSUER_MISMATCH", "Stored issuer differs from verified issuer")
-            _validate_trust(rec_data["evidence"], {}, self.trust_config)
+            _validate_persisted_trust(rec_data["evidence"], self.trust_config)
 
             # All bytes integrity before any get/replay
             obj_file = self.objects_dir / signed_sha
@@ -540,8 +617,16 @@ class SignedStore:
             except Exception:
                 raise ContractError("VERIFICATION_FAILED", "Signature verification error") from None
 
-            if (not isinstance(valid_result, dict)
-                    or not {"verified_issuer", "primary_key_id"} <= set(valid_result)):
+            effective_trust = self.trust_config if trust_config is None else trust_config
+            if not isinstance(valid_result, dict) or not (
+                {
+                    "verified_issuer",
+                    "primary_fingerprint"
+                    if ("primary_fingerprint" in valid_result if effective_trust is None else False)
+                    else "primary_key_id",
+                }
+                <= set(valid_result)
+            ):
                 raise ContractError("VERIFICATION_FAILED", "Independent validator rejected signature")
 
             # Bind caller issuer to validator verified_issuer on first retain
@@ -549,7 +634,6 @@ class SignedStore:
                 raise ContractError("ISSUER_MISMATCH", "Caller issuer does not match validator verified_issuer")
 
             # Validate trust pin (production or synthetic)
-            effective_trust = self.trust_config if trust_config is None else trust_config
             _validate_trust(valid_result, evidence, effective_trust)
 
             # Persist retained signature issuer independently from validator-return verified info
@@ -560,7 +644,11 @@ class SignedStore:
             _validate_public_evidence(valid_result)
             final_evidence.update(snapshot(valid_result))
             persisted_issuer = valid_result["verified_issuer"]
-            final_evidence["verified_primary_key"] = valid_result["primary_key_id"]
+            final_evidence["verified_primary_key"] = (
+                valid_result["primary_key_id"]
+                if "primary_key_id" in valid_result
+                else valid_result["primary_fingerprint"]
+            )
             if "signing_subkey" in valid_result:
                 final_evidence["verified_signing_subkey"] = valid_result["signing_subkey"]
             elif "subkey_id" in valid_result:
