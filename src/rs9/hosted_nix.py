@@ -33,20 +33,23 @@ _LOADER_FACT_KEYS = ("loader", "glibc_lib", "library_path", "python", "node", "r
 _DBUS_FACT_KEYS = ("dbus_run_session", "dbus_daemon", "dbus_session_config")
 
 
+def _current_linux_lane(generation, system):
+    return generation == CURRENT_GENERATION and system in {"x86_64-linux", "aarch64-linux"}
+
+
 def _nix_application_environment(source, generation, system):
     env = runtime_environment(source)
     flags = ("WEBKIT_DISABLE_COMPOSITING_MODE", "WEBKIT_DISABLE_DMABUF_RENDERER")
     for name in flags:
         env.pop(name, None)
-    if generation == CURRENT_GENERATION and system in {"x86_64-linux", "aarch64-linux"}:
+    if _current_linux_lane(generation, system):
         env.update({name: "1" for name in flags})
     return env
 
 
 def _current_linux_initial_observation_enabled(generation, system, prepared):
     """Opt in only after prepare_smoke has authenticated the current Nebular source."""
-    return (generation == CURRENT_GENERATION
-            and system in {"x86_64-linux", "aarch64-linux"}
+    return (_current_linux_lane(generation, system)
             and isinstance(prepared, dict)
             and prepared.get("source_generation") == CURRENT_GENERATION
             and prepared.get("capture") is not None
@@ -439,7 +442,9 @@ def execute(context):
                     gui_discovery_path = diagnostic_root / "nix-gui-discovery.json"
                     try:
                         record_fhs_gui_discovery(
-                            runtime_facts, prefix, runtime_prefix, env, gui_discovery_path)
+                            runtime_facts, prefix, runtime_prefix, env, gui_discovery_path,
+                            **({"current_linux_egl_metadata": True}
+                               if _current_linux_lane(generation, system) else {}))
                     except Exception:
                         # Optional observation or custody faults cannot preempt a required gate.
                         gui_discovery_path = None

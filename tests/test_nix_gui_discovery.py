@@ -520,6 +520,27 @@ class NixGuiDiscoveryNodeTests(unittest.TestCase):
             _validate_observation({"schema": SCHEMA, "status": "fail",
                                    "reason": "ok", "token": "forbidden"})
 
+    def test_default_discovery_omits_egl_metadata_and_uses_original_source(self):
+        import hashlib
+        import tempfile
+        from subprocess import CompletedProcess
+        from unittest.mock import patch
+        from rs9.nix_gui_discovery import record_fhs_gui_discovery
+
+        facts = _facts()
+        good = _run_script(_discovery_request(facts), _fixture_model(facts))
+        self.assertNotIn("egl_metadata", good)
+        expected_sha = hashlib.sha256(NODE_FS_SOURCE.encode("utf-8")).hexdigest()
+        with tempfile.TemporaryDirectory() as tmp, patch(
+                "rs9.nix_gui_discovery.subprocess.run",
+                return_value=CompletedProcess([], 0, json.dumps(good).encode(), b"")) as run:
+            destination = Path(tmp) / "diagnostic.json"
+            retained = record_fhs_gui_discovery(facts, [], [], {}, destination)
+            self.assertEqual(run.call_args.args[0][-2:], ["-e", NODE_FS_SOURCE])
+            self.assertEqual(retained["script_sha256"], expected_sha)
+            self.assertNotIn("egl_metadata", retained)
+            self.assertNotIn("egl_metadata", json.loads(destination.read_bytes()))
+
 
 if __name__ == "__main__":
     unittest.main()
