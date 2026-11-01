@@ -2,6 +2,7 @@
 import copy
 import hashlib
 import inspect
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -24,13 +25,6 @@ from rs9.errors import ContractError
 FIXTURE_SMOKE_PATH = Path(__file__).resolve().parent / "fixtures" / "current071-native-rc-smoke.mjs.txt"
 EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 _REAL_SUBPROCESS_RUN = subprocess.run
-
-
-def _fail_if_gpg_invoked(*_args, **_kwargs):
-    raise AssertionError("GPG discovery is forbidden in current-Nix environment binding tests")
-
-
-signing_fixture.find_gpg_binary = _fail_if_gpg_invoked
 
 
 def _pin_bytes(raw):
@@ -389,6 +383,17 @@ class CurrentNixEnvironmentBindingTests(unittest.TestCase):
         smoke_path.write_bytes(b"// tampered\n" + FIXTURE_SMOKE_PATH.read_bytes())
         self._assert_wrapper_rejects(node_argv, obs_file)
         smoke_path.write_bytes(FIXTURE_SMOKE_PATH.read_bytes())
+
+
+class ModuleImportIsolationTests(unittest.TestCase):
+    def test_import_preserves_shared_gpg_discovery_identity(self):
+        spec = importlib.util.spec_from_file_location("rs9_current_nix_import_probe", __file__)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        with patch.object(signing_fixture, "find_gpg_binary") as discovery:
+            spec.loader.exec_module(module)
+            self.assertIs(signing_fixture.find_gpg_binary, discovery)
 
 
 if __name__ == "__main__":
