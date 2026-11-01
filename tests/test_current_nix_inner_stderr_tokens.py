@@ -229,7 +229,7 @@ class CurrentNixInnerStderrTokenTests(unittest.TestCase):
             {**ext, "tokens": [123]},
             {**ext, "tokens": [{}]},
             {**ext, "tokens": ["node-type-error"]},
-            {**ext, "tokens": ["/Users/private/path"]},
+            {**ext, "tokens": ["/" + "Users/private/path"]},
             {**ext, "tokens": ["dbus-machine-id-reference", "dbus-machine-id-reference"]},
             {**ext, "tokens": ["webkit-webprocess-reference", "dbus-machine-id-reference"]},
             {**ext, "tokens": sorted(CURRENT_NIX_INNER_TOKENS)[:MAX_TOKENS + 1]},

@@ -175,6 +175,15 @@ _CURRENT_NIX_INNER_TOKEN_KEYS = frozenset({
     "native_qualified",
     "causal_attribution_proven",
 })
+CURRENT_NIX_INNER_TEXT_SCHEMA = "rs9.current-nix-inner-stderr-text.v1"
+CURRENT_NIX_INNER_TEXT_MAX_BYTES = 16 * 1024
+_CURRENT_NIX_INNER_TEXT_KEYS = frozenset({
+    "schema",
+    "text",
+    "non_admitting",
+    "native_qualified",
+    "causal_attribution_proven",
+})
 PRIVATE = re.compile(r"/(?:Users|home|private|var/folders)/|(?:https?|postgres(?:ql)?|mysql)://|"
                      r"(?i:password|passwd|api[_-]?key|access[_-]?token|cookie)\s*[:=]|"
                      r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
@@ -830,7 +839,93 @@ def _attach_validated_current_nix_inner_tokens(result, raw_nix):
     return result
 
 
-def read_inner_stderr(directory, platform, scenario, *, current_nix_tokens=False):
+def _current_nix_inner_text_display_safe(text):
+    """Reject hidden display controls only for the new optional text field."""
+    return all(char.isprintable() or char in "\n\t" for char in text)
+
+
+def _classify_current_nix_inner_text(text):
+    """Bounded non-admitting inner stderr text envelope over held validated inner stderr text."""
+    return {
+        "schema": CURRENT_NIX_INNER_TEXT_SCHEMA,
+        "text": text,
+        "non_admitting": True,
+        "native_qualified": False,
+        "causal_attribution_proven": False,
+    }
+
+
+def _attach_current_nix_inner_text(result, raw, *, current_nix_text=False):
+    """Attach optional current_nix_text from the same held snapshot when eligible and <= 16 KiB."""
+    if (current_nix_text is True and result.get("withheld_reason") is None
+            and 0 < len(raw) <= CURRENT_NIX_INNER_TEXT_MAX_BYTES):
+        try:
+            text = raw.decode("utf-8")
+            if _current_nix_inner_text_display_safe(text):
+                result["current_nix_text"] = _classify_current_nix_inner_text(text)
+        except Exception:  # noqa: BLE001, S110 - optional extension fault must not drop base or token records.
+            pass
+    return result
+
+
+def _validate_current_nix_inner_text(raw, result):
+    """Validate the closed non-admitting current_nix_text extension bound to result, or return None."""
+    if not isinstance(raw, dict) or set(raw) != _CURRENT_NIX_INNER_TEXT_KEYS:
+        return None
+    text = raw.get("text")
+    header = (
+        raw.get("schema"),
+        type(text) is str,
+        (type(raw.get("non_admitting")), raw.get("non_admitting")),
+        (type(raw.get("native_qualified")), raw.get("native_qualified")),
+        (type(raw.get("causal_attribution_proven")), raw.get("causal_attribution_proven")),
+    )
+    if header != (CURRENT_NIX_INNER_TEXT_SCHEMA, True, (bool, True), (bool, False), (bool, False)):
+        return None
+    if not 0 < len(text) <= CURRENT_NIX_INNER_TEXT_MAX_BYTES:
+        return None
+    if not _current_nix_inner_text_display_safe(text):
+        return None
+    try:
+        encoded = text.encode("utf-8", errors="strict")
+    except UnicodeError:
+        return None
+    if not 0 < len(encoded) <= CURRENT_NIX_INNER_TEXT_MAX_BYTES:
+        return None
+    if _withheld_stream(encoded, True) != (None, text):
+        return None
+    binding = (len(encoded), digest(encoded), len(encoded.splitlines()))
+    if binding != (result.get("bytes"), result.get("sha256"), result.get("line_count")):
+        return None
+    return {
+        "schema": CURRENT_NIX_INNER_TEXT_SCHEMA,
+        "text": str(text),
+        "non_admitting": True,
+        "native_qualified": False,
+        "causal_attribution_proven": False,
+    }
+
+
+def _attach_validated_current_nix_inner_text(result, raw_text):
+    """Preserve a valid current_nix_text extension only on an eligible complete base record."""
+    if (result.get("complete") is True and result.get("withheld_reason") is None
+            and result.get("read_error") is None and result.get("utf8_valid") is True):
+        validated = _validate_current_nix_inner_text(raw_text, result)
+        if validated is not None:
+            result["current_nix_text"] = validated
+    return result
+
+
+def _linux_inner_stderr_options(*, current071=False, current_nix_text=False):
+    """Return strict boolean read_inner_stderr keyword options for Linux B/C failure collection."""
+    if current071 is not True:
+        return {}
+    if current_nix_text is True:
+        return {"current_nix_tokens": True, "current_nix_text": True}
+    return {"current_nix_tokens": True}
+
+
+def read_inner_stderr(directory, platform, scenario, *, current_nix_tokens=False, current_nix_text=False):
     """Physical no-follow descriptor read of original inner application stderr.
 
     `complete` means only that this bounded regular-file read finished; the released
@@ -874,7 +969,7 @@ def read_inner_stderr(directory, platform, scenario, *, current_nix_tokens=False
     finally:
         os.close(dir_fd)
     classified = _classify_stream(raw, stage=INNER_STAGE, complete=True)
-    return _attach_current_nix_inner_tokens({
+    result = _attach_current_nix_inner_tokens({
         "stage": INNER_STAGE,
         "bytes": classified["bytes"],
         "sha256": classified["sha256"],
@@ -886,9 +981,11 @@ def read_inner_stderr(directory, platform, scenario, *, current_nix_tokens=False
         "tokens_omitted": classified["tokens_omitted"],
         "withheld_reason": classified["withheld_reason"],
     }, raw, current_nix_tokens=current_nix_tokens)
+    return _attach_current_nix_inner_text(result, raw, current_nix_text=current_nix_text)
 
 
-def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require_inventory=False):
+def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require_inventory=False,
+                                 current_nix_text=False):
     """Idempotent closed validator for original inner application stderr bound to evidence_inventory."""
     if not isinstance(raw, dict):
         return None
@@ -897,7 +994,8 @@ def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require
         "stage", "bytes", "sha256", "complete", "read_error",
         "line_count", "utf8_valid", "tokens", "tokens_omitted", "withheld_reason",
     }
-    if set(raw.keys()) - {"current_nix_tokens"} != expected_keys or raw.get("stage") != INNER_STAGE:
+    if (set(raw.keys()) - {"current_nix_tokens", "current_nix_text"} != expected_keys
+            or raw.get("stage") != INNER_STAGE):
         return _unavailable_inner(None, fallback_reason)
     byte_count = raw.get("bytes")
     sha256 = raw.get("sha256")
@@ -977,7 +1075,7 @@ def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require
             if (err_art is None or err_art.get("regular") is not True or
                     err_art.get("symlink") is not False or err_art.get("bytes") != byte_count):
                 return _unavailable_inner(None, "binding-mismatch")
-    return _attach_validated_current_nix_inner_tokens({
+    result = _attach_validated_current_nix_inner_tokens({
         "stage": INNER_STAGE,
         "bytes": byte_count,
         "sha256": sha256,
@@ -989,10 +1087,13 @@ def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require
         "tokens_omitted": omitted,
         "withheld_reason": reason,
     }, raw.get("current_nix_tokens"))
+    if current_nix_text is True:
+        return _attach_validated_current_nix_inner_text(result, raw.get("current_nix_text"))
+    return result
 
 
 def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, record=None, *, system=None,
-                                current071=False, current071_problems=False):
+                                current071=False, current071_problems=False, current_nix_text=False):
     """Each optional observation fails independently after the gate outcome is fixed."""
     result = {}
     try:
@@ -1020,7 +1121,7 @@ def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, re
         try:
             result["inner_stderr_diagnostic"] = read_inner_stderr(
                 evidence, platform, scenario,
-                **({"current_nix_tokens": True} if current071 is True else {}),
+                **_linux_inner_stderr_options(current071=current071, current_nix_text=current_nix_text),
             )
         except Exception:  # noqa: BLE001, S110 - optional fault must not mask failure or log private payloads.
             pass
