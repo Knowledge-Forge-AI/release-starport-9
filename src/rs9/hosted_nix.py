@@ -56,12 +56,14 @@ def _current_linux_initial_observation_enabled(generation, system, prepared):
 def _verify_final_nebular_runtime(runtime_root, prepared, system, prefix, runtime_prefix, env,
                                   baseline, runtime_facts, generation):
     session_bus_argv = _pinned_session_bus_argv(runtime_facts) if system.endswith("-linux") else None
+    current_linux_observation = _current_linux_initial_observation_enabled(
+        generation, system, prepared)
     return verify_nebular_runtime(
         runtime_root, prepared, system, [*prefix, *runtime_prefix], env, baseline=baseline,
         diagnostic_boundary_probes=system.endswith("-linux"),
         diagnostic_replay=system.endswith("-linux"),
-        diagnostic_initial_observation=_current_linux_initial_observation_enabled(
-            generation, system, prepared),
+        diagnostic_initial_observation=current_linux_observation,
+        current_nix_environment_transform=current_linux_observation,
         session_bus_argv=session_bus_argv)
 
 
