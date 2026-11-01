@@ -148,6 +148,33 @@ SYSCALLS = ("open", "mkdir", "scandir", "lstat", "stat", "unlink", "rmdir", "rea
 TOKENS = frozenset((*FIXED.values(), *PATTERNS,
                     *("node-errno-" + x.lower() for x in ERRNOS),
                     *("node-syscall-" + x for x in SYSCALLS)))
+CURRENT_NIX_INNER_TOKENS_SCHEMA = "rs9.current-nix-inner-stderr-tokens.v1"
+CURRENT_NIX_INNER_TOKEN_RULES = (
+    ("dbus-config-read-failed", (
+        ("dbus",),
+        ("failed to open", "failed to load"),
+        ("configuration", "session.conf", "system.conf"),
+    )),
+    ("dbus-service-activation-failed", (("dbus",), ("failed to activate service",))),
+    ("dbus-program-exec-failed", (("dbus",), ("failed to execute program", "failed to exec"))),
+    ("dbus-address-connect-failed", (("dbus",), ("failed to connect", "could not connect"))),
+    ("dbus-machine-id-reference", (("dbus",), ("machine-id",))),
+    ("portal-desktop-reference", (("org.freedesktop.portal.desktop",),)),
+    ("portal-settings-reference", (("org.freedesktop.portal.settings",),)),
+    ("webkit-webprocess-reference", (("webkitwebprocess",),)),
+    ("webkit-networkprocess-reference", (("webkitnetworkprocess",),)),
+    ("sandbox-helper-reference", (("bwrap", "xdg-dbus-proxy"),)),
+    ("gsettings-schema-reference", (("gsettings", "settings schema"),)),
+)
+CURRENT_NIX_INNER_TOKENS = frozenset(token for token, _ in CURRENT_NIX_INNER_TOKEN_RULES)
+_CURRENT_NIX_INNER_TOKEN_KEYS = frozenset({
+    "schema",
+    "tokens",
+    "tokens_omitted",
+    "non_admitting",
+    "native_qualified",
+    "causal_attribution_proven",
+})
 PRIVATE = re.compile(r"/(?:Users|home|private|var/folders)/|(?:https?|postgres(?:ql)?|mysql)://|"
                      r"(?i:password|passwd|api[_-]?key|access[_-]?token|cookie)\s*[:=]|"
                      r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
@@ -731,7 +758,79 @@ def _unavailable_inner(read_error, withheld_reason, byte_count=None):
     }
 
 
-def read_inner_stderr(directory, platform, scenario):
+def _classify_current_nix_inner_tokens(text):
+    """Closed non-admitting literal marker presence over held validated inner stderr text."""
+    lines = [line.lower() for line in text.splitlines()]
+    matched = sorted({
+        token for token, groups in CURRENT_NIX_INNER_TOKEN_RULES
+        if any(all(any(marker in line for marker in group) for group in groups) for line in lines)
+    })
+    return {
+        "schema": CURRENT_NIX_INNER_TOKENS_SCHEMA,
+        "tokens": matched[:MAX_TOKENS],
+        "tokens_omitted": max(0, len(matched) - MAX_TOKENS),
+        "non_admitting": True,
+        "native_qualified": False,
+        "causal_attribution_proven": False,
+    }
+
+
+def _attach_current_nix_inner_tokens(result, raw, *, current_nix_tokens=False):
+    """Attach optional current_nix_tokens from the same held snapshot when eligible."""
+    if current_nix_tokens is True and result.get("withheld_reason") is None:
+        try:
+            result["current_nix_tokens"] = _classify_current_nix_inner_tokens(raw.decode("utf-8"))
+        except Exception:  # noqa: BLE001, S110 - optional extension fault must not drop legacy base record.
+            pass
+    return result
+
+
+def _validate_current_nix_inner_tokens(raw):
+    """Validate the closed non-admitting current_nix_tokens extension, or return None."""
+    if not isinstance(raw, dict) or set(raw) != _CURRENT_NIX_INNER_TOKEN_KEYS:
+        return None
+    tokens = raw.get("tokens")
+    omitted = raw.get("tokens_omitted")
+    header = (
+        raw.get("schema"),
+        isinstance(tokens, list),
+        type(omitted) is int,
+        (type(raw.get("non_admitting")), raw.get("non_admitting")),
+        (type(raw.get("native_qualified")), raw.get("native_qualified")),
+        (type(raw.get("causal_attribution_proven")), raw.get("causal_attribution_proven")),
+    )
+    if header != (CURRENT_NIX_INNER_TOKENS_SCHEMA, True, True, (bool, True), (bool, False), (bool, False)):
+        return None
+    if not (len(tokens) <= MAX_TOKENS and [type(t) for t in tokens] == [str] * len(tokens)):
+        return None
+    valid_tokens = (
+        0 <= omitted <= len(CURRENT_NIX_INNER_TOKENS) - MAX_TOKENS,
+        set(tokens) <= CURRENT_NIX_INNER_TOKENS,
+        tokens == sorted(set(tokens)),
+        omitted == 0 or len(tokens) == MAX_TOKENS,
+    )
+    if valid_tokens != (True, True, True, True):
+        return None
+    return {
+        "schema": CURRENT_NIX_INNER_TOKENS_SCHEMA,
+        "tokens": list(tokens),
+        "tokens_omitted": omitted,
+        "non_admitting": True,
+        "native_qualified": False,
+        "causal_attribution_proven": False,
+    }
+
+
+def _attach_validated_current_nix_inner_tokens(result, raw_nix):
+    """Preserve a valid current_nix_tokens extension only on an eligible complete base record."""
+    if result.get("complete") is True and result.get("withheld_reason") is None:
+        validated = _validate_current_nix_inner_tokens(raw_nix)
+        if validated is not None:
+            result["current_nix_tokens"] = validated
+    return result
+
+
+def read_inner_stderr(directory, platform, scenario, *, current_nix_tokens=False):
     """Physical no-follow descriptor read of original inner application stderr.
 
     `complete` means only that this bounded regular-file read finished; the released
@@ -775,7 +874,7 @@ def read_inner_stderr(directory, platform, scenario):
     finally:
         os.close(dir_fd)
     classified = _classify_stream(raw, stage=INNER_STAGE, complete=True)
-    return {
+    return _attach_current_nix_inner_tokens({
         "stage": INNER_STAGE,
         "bytes": classified["bytes"],
         "sha256": classified["sha256"],
@@ -786,7 +885,7 @@ def read_inner_stderr(directory, platform, scenario):
         "tokens": classified["tokens"],
         "tokens_omitted": classified["tokens_omitted"],
         "withheld_reason": classified["withheld_reason"],
-    }
+    }, raw, current_nix_tokens=current_nix_tokens)
 
 
 def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require_inventory=False):
@@ -798,7 +897,7 @@ def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require
         "stage", "bytes", "sha256", "complete", "read_error",
         "line_count", "utf8_valid", "tokens", "tokens_omitted", "withheld_reason",
     }
-    if set(raw.keys()) != expected_keys or raw.get("stage") != INNER_STAGE:
+    if set(raw.keys()) - {"current_nix_tokens"} != expected_keys or raw.get("stage") != INNER_STAGE:
         return _unavailable_inner(None, fallback_reason)
     byte_count = raw.get("bytes")
     sha256 = raw.get("sha256")
@@ -878,7 +977,7 @@ def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require
             if (err_art is None or err_art.get("regular") is not True or
                     err_art.get("symlink") is not False or err_art.get("bytes") != byte_count):
                 return _unavailable_inner(None, "binding-mismatch")
-    return {
+    return _attach_validated_current_nix_inner_tokens({
         "stage": INNER_STAGE,
         "bytes": byte_count,
         "sha256": sha256,
@@ -889,7 +988,7 @@ def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require
         "tokens": list(tokens),
         "tokens_omitted": omitted,
         "withheld_reason": reason,
-    }
+    }, raw.get("current_nix_tokens"))
 
 
 def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, record=None, *, system=None,
@@ -919,7 +1018,10 @@ def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, re
           (system, platform, scenario) in _CATEGORY_BINDINGS):
         # Linux B/C: same released <platform>-<scenario>.stderr.log; no retry, EOF or cause claim.
         try:
-            result["inner_stderr_diagnostic"] = read_inner_stderr(evidence, platform, scenario)
+            result["inner_stderr_diagnostic"] = read_inner_stderr(
+                evidence, platform, scenario,
+                **({"current_nix_tokens": True} if current071 is True else {}),
+            )
         except Exception:  # noqa: BLE001, S110 - optional fault must not mask failure or log private payloads.
             pass
     try:
