@@ -64,6 +64,7 @@ def _verify_final_nebular_runtime(runtime_root, prepared, system, prefix, runtim
         diagnostic_replay=system.endswith("-linux"),
         diagnostic_initial_observation=current_linux_observation,
         current_nix_environment_transform=current_linux_observation,
+        current_linux_nix_egl_debug=current_linux_observation and bool(prefix),
         session_bus_argv=session_bus_argv)
 
 

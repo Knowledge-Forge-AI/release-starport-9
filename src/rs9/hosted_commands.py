@@ -183,17 +183,26 @@ def service_protocol(argv, env=None):
                 stream.close()
 
 
-def runtime_environment(env=None):
+CURRENT_LINUX_NIX_EGL_DEBUG_ENV = (
+    ("EGL_LOG_LEVEL", "debug"),
+    ("LIBGL_DEBUG", "verbose"),
+)
+
+
+def runtime_environment(env=None, *, current_linux_nix_egl_debug=False):
     allowed = {"PATH","HOME","TMPDIR","LANG","LC_ALL","TZ","THEME_FORGE_CACHE_DIR",
         "PYTHONDONTWRITEBYTECODE","DISPLAY","XAUTHORITY","DBUS_SESSION_BUS_ADDRESS",
         "WEBKIT_DISABLE_COMPOSITING_MODE","WEBKIT_DISABLE_DMABUF_RENDERER",
         "WAYLAND_DISPLAY","LD_LIBRARY_PATH","DYLD_LIBRARY_PATH","XDG_RUNTIME_DIR",
         "XDG_CONFIG_HOME","XDG_DATA_HOME","XDG_STATE_HOME","XDG_CACHE_HOME"}
     source = os.environ if env is None else env
-    return {key:value for key,value in source.items() if key in allowed}
+    result = {key: value for key, value in source.items() if key in allowed}
+    if current_linux_nix_egl_debug is True:
+        result.update(CURRENT_LINUX_NIX_EGL_DEBUG_ENV)
+    return result
 
 
-def linux_runtime_prefix(env=None):
+def linux_runtime_prefix(env=None, *, current_linux_nix_egl_debug=False):
     """Deny network, drop privileges, then restore only the runtime environment.
 
     sudo's env_reset and secure_path run before this explicit env command. Keep
@@ -203,7 +212,7 @@ def linux_runtime_prefix(env=None):
     uid, gid = os.getuid(), os.getgid()
     if not uid or not gid:
         raise ContractError("UNPRIVILEGED_CLIENT_REQUIRED", "Runtime probes require nonroot identity")
-    env = runtime_environment(env)
+    env = runtime_environment(env, current_linux_nix_egl_debug=current_linux_nix_egl_debug is True)
     return ["sudo", "-n", "unshare", "--net", "--", "setpriv",
             f"--reuid={uid}", f"--regid={gid}", "--clear-groups", "--",
             "/usr/bin/env", "-i", *[key + "=" + env[key] for key in sorted(env)]]

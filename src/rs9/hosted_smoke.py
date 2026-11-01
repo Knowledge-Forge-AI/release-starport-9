@@ -8,7 +8,8 @@ import subprocess
 from pathlib import Path
 
 from rs9.errors import ContractError, safe_details
-from rs9.hosted_commands import runtime_environment
+from rs9.hosted_commands import linux_runtime_prefix, runtime_environment
+from rs9.current_generation import CURRENT_GENERATION
 from rs9.nebular_callers import CURRENT070_COMMIT, CURRENT070_TREE, current_contract_for_capture
 from rs9.current_os071 import (CURRENT071_COMMIT, CURRENT071_TREE, CURRENT071_VERIFIER_FILES,
                                CURRENT071_VERIFIER_IMPORTS)
@@ -960,11 +961,30 @@ def bound_diagnostic(diagnostic, max_bytes=60 * 1024):
     return result
 
 
+def _application_smoke_environment(prefix, env, prepared, system, *, current_linux_nix_egl_debug=False):
+    """Opt in after existing source/verifier gates; preserve every default prefix."""
+    eligible = (current_linux_nix_egl_debug is True
+                and system in {"x86_64-linux", "aarch64-linux"}
+                and isinstance(prepared, dict)
+                and prepared.get("source_generation") == CURRENT_GENERATION
+                and prepared.get("capture") is not None
+                and prepared.get("fixture_capture") is not None)
+    if not eligible:
+        return prefix, env
+    original = linux_runtime_prefix(env)
+    size = len(original)
+    if list(prefix[:size]) != original:
+        raise ContractError("APPLICATION_SMOKE", "Current Nix app requires its existing isolated runtime prefix")
+    debug_env = runtime_environment(env, current_linux_nix_egl_debug=True)
+    return [*linux_runtime_prefix(debug_env, current_linux_nix_egl_debug=True), *prefix[size:]], debug_env
+
+
 def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, discovered=None, baseline=None,
                             label=None, diagnostic_extras: bool = False, diagnostic_boundary_probes: bool = False,
                             diagnostic_replay: bool = False, diagnostic_initial_observation: bool = False,
                             current_nix_environment_transform: bool = False,
-                            session_bus_argv=None):
+                            session_bus_argv=None, *,
+                            current_linux_nix_egl_debug: bool = False):
     """No extraction here: runtime_root is the wheel cache, Nix cache, or installed package."""
     if type(current_nix_environment_transform) is not bool:
         raise ContractError("APPLICATION_SMOKE", "Invalid current Nix environment transform option")
@@ -1026,6 +1046,8 @@ def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, 
                                      "system": system, "reason": verifier["reason_token"],
                                      **{k: v for k, v in verifier.items() if k in {"exit_code", "stdout_sha256", "stderr_sha256", "exception_type", "phase"}}})
     from rs9.application_smoke_diagnostic import execute_application_smoke
+    prefix, env = _application_smoke_environment(
+        prefix, env, prepared, system, current_linux_nix_egl_debug=current_linux_nix_egl_debug)
     runs = execute_application_smoke(
         prepared=prepared,
         system=system,
