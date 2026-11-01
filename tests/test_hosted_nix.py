@@ -1242,6 +1242,45 @@ class NixHostedTests(unittest.TestCase):
             with self.subTest(system=system, generation=generation):
                 self._execute_nix_success_fixture(system, generation, prepared, expected)
 
+    def test_execute_routes_current_linux_egl_metadata_opt_in_by_lane(self):
+        from tests.test_current_smoke_source_transport import CurrentSourceTransportTests
+        from rs9.current_generation import CURRENT_GENERATION, HISTORICAL_GENERATION
+        fixture = CurrentSourceTransportTests()
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        prepared = fixture.prepared
+        original_facts = _mock_dbus_loader_facts
+        calls = []
+
+        def facts_with_gui(*args, **kwargs):
+            result = original_facts(*args, **kwargs)
+            kwargs["facts_out"]["gui_discovery"] = {}
+            return result
+
+        def observe(*args, **kwargs):
+            calls.append((args, kwargs))
+            args[4].write_bytes(canonical({"status": "pass", "diagnostic_only": True}))
+            return {"status": "pass", "diagnostic_only": True}
+
+        matrix = [
+            ("x86_64-linux", CURRENT_GENERATION, prepared, True, [{"current_linux_egl_metadata": True}]),
+            ("aarch64-linux", CURRENT_GENERATION, prepared, True, [{"current_linux_egl_metadata": True}]),
+            ("x86_64-linux", HISTORICAL_GENERATION, prepared, False, [{}]),
+            ("aarch64-linux", HISTORICAL_GENERATION, prepared, False, [{}]),
+            ("x86_64-linux", None, None, False, [{}]),
+            ("aarch64-darwin", CURRENT_GENERATION, prepared, False, []),
+            ("aarch64-darwin", HISTORICAL_GENERATION, prepared, False, []),
+        ]
+        for system, generation, prep, expected_obs, expected_kwargs in matrix:
+            calls.clear()
+            with self.subTest(system=system, generation=generation), patch(
+                __name__ + "._mock_dbus_loader_facts", side_effect=facts_with_gui
+            ), patch("rs9.hosted_nix.record_fhs_gui_discovery", side_effect=observe):
+                self._execute_nix_success_fixture(system, generation, prep, expected_obs)
+            self.assertEqual([kw for _, kw in calls], expected_kwargs)
+            for pos_args, _ in calls:
+                self.assertEqual(len(pos_args), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -21,10 +21,31 @@ from rs9.scratch import canonical
 
 SCHEMA = "rs9.nix-fhs-gui-observation.v1"
 FACTS_SCHEMA = "rs9.nix-fhs-gui-discovery.v1"
+EGL_SCHEMA = "rs9.nix-fhs-egl-guest-metadata.v1"
 _ROLES = ("glib", "gtk", "webkit", "pixbuf")
 _CATEGORIES = (
     "helper", "libexec", "gio-module", "gsettings-schema",
     "pixbuf-loader", "font", "data",
+)
+_EGL_GUEST_PATHS = (
+    ("usr-share-mesa", "/usr/share/glvnd/egl_vendor.d/50_mesa.json"),
+    ("etc-mesa", "/etc/glvnd/egl_vendor.d/50_mesa.json"),
+    ("usr-lib-egl", "/usr/lib/libEGL.so.1"),
+    ("usr-lib64-egl", "/usr/lib64/libEGL.so.1"),
+    ("usr-lib-mesa", "/usr/lib/libEGL_mesa.so.0"),
+    ("usr-lib64-mesa", "/usr/lib64/libEGL_mesa.so.0"),
+    ("usr-lib-swrast", "/usr/lib/dri/swrast_dri.so"),
+    ("usr-lib64-swrast", "/usr/lib64/dri/swrast_dri.so"),
+)
+_EGL_GUEST_IDS = tuple(item_id for item_id, _ in _EGL_GUEST_PATHS)
+_EGL_KINDS = ("regular", "directory", "symlink", "other")
+_EGL_TARGET_CLASSES = ("public-nix-store", "fixed-guest-path", "other")
+_EGL_NODE_OMITTED_REASONS = ("output-bound",)
+_EGL_NODE_UNAVAILABLE_REASONS = ("observation-failed",)
+_EGL_OMITTED_REASONS = ("output-bound", "custody-bound", "custody-withheld")
+_EGL_UNAVAILABLE_REASONS = (
+    "observation-failed", "output-unavailable", "not-returned",
+    "validation-failed", "discovery-failed", "discovery-unavailable",
 )
 _STORE_ROOT = re.compile(
     r"^/nix/store/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]+$"
@@ -395,6 +416,127 @@ try {
 }
 """
 
+_NODE_EGL_FRAGMENT_1 = r"""
+const EGL_SCHEMA = 'rs9.nix-fhs-egl-guest-metadata.v1';
+const EGL_GUEST = [
+  ['usr-share-mesa', '/usr/share/glvnd/egl_vendor.d/50_mesa.json'],
+  ['etc-mesa', '/etc/glvnd/egl_vendor.d/50_mesa.json'],
+  ['usr-lib-egl', '/usr/lib/libEGL.so.1'],
+  ['usr-lib64-egl', '/usr/lib64/libEGL.so.1'],
+  ['usr-lib-mesa', '/usr/lib/libEGL_mesa.so.0'],
+  ['usr-lib64-mesa', '/usr/lib64/libEGL_mesa.so.0'],
+  ['usr-lib-swrast', '/usr/lib/dri/swrast_dri.so'],
+  ['usr-lib64-swrast', '/usr/lib64/dri/swrast_dri.so'],
+];
+const EGL_FIXED_PATHS = new Set(EGL_GUEST.map((pair) => pair[1]));
+function eglErrorStatus(error) {
+  const code = error && typeof error === 'object' ? error.code : undefined;
+  if (code === 'ENOENT') return 'missing';
+  if (code === 'EACCES' || code === 'EPERM') return 'inaccessible';
+  return 'error';
+}
+function eglKind(stat) {
+  if (typeof stat.isSymbolicLink === 'function' && stat.isSymbolicLink()) return 'symlink';
+  if (typeof stat.isFile === 'function' && stat.isFile()) return 'regular';
+  if (typeof stat.isDirectory === 'function' && stat.isDirectory()) return 'directory';
+  return 'other';
+}
+function eglTargetClass(guestPath, rawTarget) {
+  let target;
+  if (Buffer.isBuffer(rawTarget)) {
+    if (rawTarget.length === 0 || rawTarget.length > 4096 || rawTarget.includes(0))
+      return {status: 'bounded', kind: 'symlink', target_class: 'unavailable'};
+    const decoded = rawTarget.toString('utf8');
+    if (!Buffer.from(decoded, 'utf8').equals(rawTarget))
+      return {status: 'bounded', kind: 'symlink', target_class: 'unavailable'};
+    target = decoded;
+  } else if (typeof rawTarget === 'string') {
+    const rawBytes = Buffer.from(rawTarget, 'utf8');
+    if (rawTarget.length === 0 || rawTarget.includes('\0') || rawBytes.length > 4096
+        || rawBytes.toString('utf8') !== rawTarget)
+      return {status: 'bounded', kind: 'symlink', target_class: 'unavailable'};
+    target = rawTarget;
+  } else {
+    return {status: 'bounded', kind: 'symlink', target_class: 'unavailable'};
+  }
+  if (target.split('/').includes('..'))
+    return {status: 'present', kind: 'symlink', target_class: 'other'};
+  const posixPath = path.posix || path;
+  const resolved = posixPath.resolve(posixPath.dirname(guestPath), target);
+  if (STORE_PATH.test(resolved))
+    return {status: 'present', kind: 'symlink', target_class: 'public-nix-store'};
+  if (EGL_FIXED_PATHS.has(resolved))
+    return {status: 'present', kind: 'symlink', target_class: 'fixed-guest-path'};
+  return {status: 'present', kind: 'symlink', target_class: 'other'};
+}
+function observeEglEntry(guestPath) {
+  let stat;
+  try {
+    stat = lstat(guestPath);
+  } catch (error) {
+    return {status: eglErrorStatus(error)};
+  }
+  const kind = eglKind(stat);
+  if (kind !== 'symlink') return {status: 'present', kind};
+  let rawTarget;
+  try {
+    rawTarget = fs.readlinkSync(guestPath, {encoding: 'buffer'});
+  } catch (_) {
+    return {status: 'error', kind: 'symlink', target_class: 'unavailable'};
+  }
+  return eglTargetClass(guestPath, rawTarget);
+}
+function observeEglEntries() {
+  const entries = {};
+  for (const [id, guestPath] of EGL_GUEST)
+    entries[id] = observeEglEntry(guestPath);
+  return {schema: EGL_SCHEMA, status: 'observed', entries};
+}
+function attachEglMetadata(result) {
+  try {
+    result.egl_metadata = observeEglEntries();
+  } catch (_) {
+    result.egl_metadata = {schema: EGL_SCHEMA, status: 'unavailable', reason: 'observation-failed'};
+  }
+}
+function shedEglForOutput(result, encoded) {
+  if (Buffer.byteLength(encoded, 'utf8') <= 4 * 1024 * 1024) return encoded;
+  if (result.egl_metadata) {
+    result.egl_metadata = {schema: EGL_SCHEMA, status: 'omitted', reason: 'output-bound'};
+    return JSON.stringify(result);
+  }
+  return encoded;
+}"""
+_NODE_EGL_FRAGMENT_2 = "\n  attachEglMetadata(result);"
+_NODE_EGL_FRAGMENT_3 = "\n  encoded = shedEglForOutput(result, encoded);"
+_NODE_EGL_FRAGMENTS = (
+    _NODE_EGL_FRAGMENT_1, _NODE_EGL_FRAGMENT_2, _NODE_EGL_FRAGMENT_3,
+)
+
+
+def _build_egl_metadata_source(base_source: str) -> str:
+    anchor1 = "\nfunction emit(status, reason = null) {\n"
+    anchor2 = "    samples: state.samples, records: state.records};"
+    anchor3 = (
+        "\n  let encoded = JSON.stringify(result);"
+        "\n  if (Buffer.byteLength(encoded, 'utf8') > 4 * 1024 * 1024) {"
+    )
+    for anchor in (anchor1, anchor2, anchor3):
+        if base_source.count(anchor) != 1:
+            raise RuntimeError("NODE_FS_SOURCE anchor mismatch")
+    step1 = base_source.replace(anchor1, _NODE_EGL_FRAGMENT_1 + anchor1, 1)
+    step2 = step1.replace(anchor2, anchor2 + _NODE_EGL_FRAGMENT_2, 1)
+    return step2.replace(
+        anchor3,
+        "\n  let encoded = JSON.stringify(result);"
+        + _NODE_EGL_FRAGMENT_3
+        + "\n  if (Buffer.byteLength(encoded, 'utf8') > 4 * 1024 * 1024) {",
+        1,
+    )
+
+
+NODE_FS_EGL_METADATA_SOURCE = _build_egl_metadata_source(NODE_FS_SOURCE)
+
 
 def _store_root(value: Any) -> str:
     if not isinstance(value, str) or "\x00" in value or not _STORE_ROOT.fullmatch(value):
@@ -638,12 +780,129 @@ def _validate_record(record: Any, full9_keys: set[str]) -> None:
     raise ValueError("observation record kind mismatch")
 
 
+def _egl_omitted(reason: str) -> dict[str, Any]:
+    if reason not in _EGL_OMITTED_REASONS:
+        raise ValueError("invalid EGL omission reason")
+    return {"schema": EGL_SCHEMA, "status": "omitted", "reason": reason}
+
+
+def _egl_unavailable(reason: str) -> dict[str, Any]:
+    if reason not in _EGL_UNAVAILABLE_REASONS:
+        raise ValueError("invalid EGL unavailable reason")
+    return {"schema": EGL_SCHEMA, "status": "unavailable", "reason": reason}
+
+
+def _validate_egl_entry(entry: Any) -> dict[str, str]:
+    if not isinstance(entry, Mapping) or any(type(key) is not str for key in entry):
+        raise ValueError("EGL entry map required")
+    status = entry.get("status")
+    if type(status) is not str:
+        raise ValueError("EGL entry status string required")
+    if status == "present":
+        kind = entry.get("kind")
+        if type(kind) is not str or kind not in _EGL_KINDS:
+            raise ValueError("EGL entry kind mismatch")
+        if kind == "symlink":
+            target_class = entry.get("target_class")
+            if (set(entry) != {"status", "kind", "target_class"}
+                    or type(target_class) is not str
+                    or target_class not in _EGL_TARGET_CLASSES):
+                raise ValueError("EGL symlink target class mismatch")
+            return {"status": "present", "kind": "symlink", "target_class": target_class}
+        if set(entry) != {"status", "kind"}:
+            raise ValueError("EGL non-symlink entry fields mismatch")
+        return {"status": "present", "kind": kind}
+    if status == "bounded":
+        if (set(entry) != {"status", "kind", "target_class"}
+                or type(entry.get("kind")) is not str or entry["kind"] != "symlink"
+                or type(entry.get("target_class")) is not str
+                or entry["target_class"] != "unavailable"):
+            raise ValueError("EGL bounded entry mismatch")
+        return {"status": "bounded", "kind": "symlink", "target_class": "unavailable"}
+    if status in {"missing", "inaccessible"}:
+        if set(entry) != {"status"}:
+            raise ValueError("EGL absence/access entry mismatch")
+        return {"status": status}
+    if status == "error":
+        if set(entry) == {"status"}:
+            return {"status": "error"}
+        if (set(entry) == {"status", "kind", "target_class"}
+                and type(entry.get("kind")) is str and entry["kind"] == "symlink"
+                and type(entry.get("target_class")) is str
+                and entry["target_class"] == "unavailable"):
+            return {"status": "error", "kind": "symlink", "target_class": "unavailable"}
+        raise ValueError("EGL error entry mismatch")
+    raise ValueError("EGL entry status mismatch")
+
+
+def _validated_egl(value: Any, *, present: bool = True) -> dict[str, Any]:
+    if not present:
+        return _egl_unavailable("not-returned")
+    try:
+        if (not isinstance(value, Mapping)
+                or any(type(key) is not str for key in value)
+                or type(value.get("schema")) is not str
+                or value["schema"] != EGL_SCHEMA):
+            raise ValueError("EGL schema mismatch")
+        status = value.get("status")
+        if type(status) is not str:
+            raise ValueError("EGL status string required")
+        if status == "omitted":
+            reason = value.get("reason")
+            if (set(value) != {"schema", "status", "reason"}
+                    or type(reason) is not str
+                    or reason not in _EGL_NODE_OMITTED_REASONS):
+                raise ValueError("EGL omitted reason mismatch")
+            checked = _egl_omitted(reason)
+        elif status == "unavailable":
+            reason = value.get("reason")
+            if (set(value) != {"schema", "status", "reason"}
+                    or type(reason) is not str
+                    or reason not in _EGL_NODE_UNAVAILABLE_REASONS):
+                raise ValueError("EGL unavailable reason mismatch")
+            checked = _egl_unavailable(reason)
+        elif status == "observed":
+            entries = value.get("entries")
+            if (set(value) != {"schema", "status", "entries"}
+                    or not isinstance(entries, Mapping)
+                    or any(type(key) is not str for key in entries)
+                    or set(entries) != set(_EGL_GUEST_IDS)):
+                raise ValueError("EGL observed entries mismatch")
+            checked = {
+                "schema": EGL_SCHEMA,
+                "status": "observed",
+                "entries": {
+                    item_id: _validate_egl_entry(entries[item_id])
+                    for item_id in _EGL_GUEST_IDS
+                },
+            }
+        else:
+            raise ValueError("EGL status mismatch")
+        _check_metadata(checked)
+        return checked
+    except ValueError:
+        return _egl_unavailable("validation-failed")
+
+
+def _shed_egl_metadata(
+    record: Mapping[str, Any], encoded: bytes,
+) -> tuple[dict[str, Any], bytes]:
+    egl = record.get("egl_metadata")
+    if isinstance(egl, Mapping) and egl.get("status") == "observed":
+        updated = {**record, "egl_metadata": _egl_omitted("custody-bound")}
+        return updated, canonical(updated)
+    return dict(record), encoded
+
+
 def _write_record(destination: Path, record: Mapping[str, Any]) -> dict[str, Any]:
     """Preflight the existing custody contract; optional output never admits a gate."""
     from rs9.hosted_custody import diagnostic_bytes
+    has_egl = "egl_metadata" in record
     temporary = None
     try:
         encoded = canonical(record)
+        if len(encoded) > _MAX_CUSTODY_BYTES and has_egl:
+            record, encoded = _shed_egl_metadata(record, encoded)
         observed = record.get("result")
         if len(encoded) > _MAX_CUSTODY_BYTES and isinstance(observed, Mapping) and observed.get("status") in {"pass", "partial"}:
             # Keep a deterministic prefix that fits the existing diagnostic
@@ -694,14 +953,21 @@ def _write_record(destination: Path, record: Mapping[str, Any]) -> dict[str, Any
             # optional observation becomes a small, admissible failure record.
             record = {"schema": SCHEMA, "status": "fail", "diagnostic_only": True,
                       "reason": "diagnostic-custody-withheld", "custody_reason": error.code}
+            if has_egl:
+                record["egl_metadata"] = _egl_omitted("custody-withheld")
             temporary.write_bytes(canonical(record))
             diagnostic_bytes(temporary)
         os.replace(temporary, destination)
         temporary = None
         return dict(record)
     except (OSError, ContractError):
-        return {"schema": SCHEMA, "status": "fail", "diagnostic_only": True,
-                "reason": "diagnostic-output-unavailable"}
+        failed: dict[str, Any] = {
+            "schema": SCHEMA, "status": "fail", "diagnostic_only": True,
+            "reason": "diagnostic-output-unavailable",
+        }
+        if has_egl:
+            failed["egl_metadata"] = _egl_unavailable("output-unavailable")
+        return failed
     finally:
         if temporary is not None:
             try:
@@ -712,20 +978,27 @@ def _write_record(destination: Path, record: Mapping[str, Any]) -> dict[str, Any
 
 def record_fhs_gui_discovery(
     facts: Mapping[str, Any], prefix: Sequence[str], runtime_prefix: Sequence[str],
-    env: Mapping[str, str], destination: Path,
+    env: Mapping[str, str], destination: Path, *,
+    current_linux_egl_metadata: bool = False,
 ) -> dict[str, Any]:
     """Record bounded store-only discovery without affecting any production gate."""
-    script_sha256 = hashlib.sha256(NODE_FS_SOURCE.encode("utf-8")).hexdigest()
+    enabled = current_linux_egl_metadata is True
+    script_source = NODE_FS_EGL_METADATA_SOURCE if enabled else NODE_FS_SOURCE
+    script_sha256 = hashlib.sha256(script_source.encode("utf-8")).hexdigest()
     try:
         request = _discovery_request(facts)
     except (TypeError, ValueError, KeyError):
-        record = {"schema": SCHEMA, "status": "fail", "diagnostic_only": True,
-                  "reason": "invalid-source-bound-facts", "script_sha256": script_sha256}
+        record: dict[str, Any] = {
+            "schema": SCHEMA, "status": "fail", "diagnostic_only": True,
+            "reason": "invalid-source-bound-facts", "script_sha256": script_sha256,
+        }
+        if enabled:
+            record["egl_metadata"] = _egl_unavailable("discovery-unavailable")
         return _write_record(destination, record)
     input_bytes = canonical(request)
     request_sha256 = hashlib.sha256(input_bytes).hexdigest()
     argv = [*prefix, *runtime_prefix, request["node"], "--input-type=commonjs",
-            "-e", NODE_FS_SOURCE]
+            "-e", script_source]
     try:
         completed = subprocess.run(argv, env=dict(env), input=input_bytes,
                                    capture_output=True, timeout=30)
@@ -735,6 +1008,11 @@ def record_fhs_gui_discovery(
             raise ValueError("diagnostic stream bound exceeded")
         result = json.loads(stdout) if stdout else {
             "schema": SCHEMA, "status": "fail", "reason": "empty-observation"}
+        raw_egl_present = False
+        raw_egl = None
+        if enabled and isinstance(result, dict):
+            raw_egl_present = "egl_metadata" in result
+            raw_egl = result.pop("egl_metadata", None)
         _validate_observation(result)
         inner_status = result["status"]
         status = "fail" if completed.returncode != 0 or stderr or inner_status == "fail" else inner_status
@@ -745,8 +1023,15 @@ def record_fhs_gui_discovery(
             "stdout_sha256": hashlib.sha256(stdout).hexdigest(), "stderr_bytes": len(stderr),
             "stderr_sha256": hashlib.sha256(stderr).hexdigest(), "result": result,
         }
+        if enabled:
+            if status == "fail":
+                record["egl_metadata"] = _egl_unavailable("discovery-failed")
+            else:
+                record["egl_metadata"] = _validated_egl(raw_egl, present=raw_egl_present)
     except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, RecursionError):
         record = {"schema": SCHEMA, "status": "fail", "diagnostic_only": True,
                   "reason": "bounded-observation-unavailable", "script_sha256": script_sha256,
                   "request_sha256": request_sha256}
+        if enabled:
+            record["egl_metadata"] = _egl_unavailable("discovery-unavailable")
     return _write_record(destination, record)
