@@ -26,6 +26,17 @@ Theme Forge publication surfaces remain authoritative.
   and [staged migration map](docs/architecture/migration-map.md)
 - [Nebular shadow candidate and evidence](docs/foundation2-candidate.md)
 
+### Hosted qualification checkpoint: 2026-11-02
+
+At [commit `25ebf458`](https://github.com/Knowledge-Forge-AI/release-starport-9/commit/25ebf4581ae6c01726a82dee27988605a1dd861a),
+[current-generation run 41450606108](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/41450606108)
+passed 3,572 unit tests and all ten completed Linux, package and Pages receipt
+lanes (365 gates). Its Apple Silicon macOS job received no runner and executed
+no steps; GitHub reported hosted-runner capacity constraints. This run remains
+unqualified. Current-generation admission requires a complete original
+main-branch push campaign; a manual dispatch or later attempt cannot substitute
+for that source-bound evidence.
+
 ## Mission
 
 RS9 exists to centralize publication machinery that would otherwise be duplicated across projects:
