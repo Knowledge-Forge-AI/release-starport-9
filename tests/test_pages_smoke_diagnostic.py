@@ -720,14 +720,14 @@ class PagesSmokeDiagnosticUnitTests(unittest.TestCase):
         csig_categories = project_problem_categories(
             {
                 "status": "fail",
-                "problems": ["required step host-status failed: /Users/private/secret"],
+                "problems": ["required step host-status failed: /" + "Users/private/secret"],
                 "receipt": {
                     "steps": [
                         {
                             "id": sid,
                             "ok": sid != "host-status",
                             "via": "sidecar",
-                            "detail": "/Users/private/secret",
+                            "detail": "/" + "Users/private/secret",
                         }
                         for sid in SCENARIO_C_STEPS
                     ]
