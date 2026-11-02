@@ -5,7 +5,7 @@ import re
 import uuid
 
 from rs9.application_smoke_diagnostic import (
-    CAUSE_CATEGORIES, SAFE_LOG_CATEGORIES, validate_resolution_matches,
+    CAUSE_CATEGORIES, MAX_DIAGNOSTIC, SAFE_LOG_CATEGORIES, validate_resolution_matches,
 )
 from rs9.errors import ContractError
 from rs9.release_core import digest
@@ -46,7 +46,7 @@ def _problem_codes(raw):
     return result
 
 
-def validate_smoke_observation(raw, *, system=None):
+def validate_smoke_observation(raw, *, system=None, family=None):
     """Project hostile JSON with no invented hashes, counts, success or signal."""
     raw = raw if isinstance(raw, dict) else {}
     rc = raw.get("raw_returncode")
@@ -125,6 +125,28 @@ def validate_smoke_observation(raw, *, system=None):
             if "receipt" in categories:
                 # Positive binding only: carry the same-read identity so host re-projection stays a fixed point.
                 result["receipt"] = {"bytes": categories["receipt"]["bytes"], "sha256": categories["receipt"]["sha256"]}
+    if "cleanup_observation" in raw:
+        from rs9.current071_cleanup_observation import (
+            validate_current071_cleanup_observation,
+            withheld_current071_cleanup_observation,
+        )
+        try:
+            cleanup_obs = validate_current071_cleanup_observation(
+                raw.get("cleanup_observation"),
+                system=system,
+                scenario=scenario,
+                stderr_bytes=counts["stderr_bytes"],
+                stderr_sha256=hashes["stderr_sha256"],
+                complete=complete,
+                mismatch=mismatch,
+                family=family,
+            )
+        except Exception:
+            cleanup_obs = withheld_current071_cleanup_observation(
+                "binding-mismatch" if mismatch else "invalid-observation"
+            )
+        if cleanup_obs is not None:
+            result["cleanup_observation"] = cleanup_obs
     return result
 
 
@@ -133,12 +155,29 @@ def retain_host_smoke_diagnostic(directory, observation, *, family, system):
     try:
         if family not in {"apt", "dnf", "pacman"} or system not in {"x86_64-linux", "aarch64-linux"}:
             return None
-        observation = validate_smoke_observation(observation, system=system)
+        observation = validate_smoke_observation(observation, system=system, family=family)
         record = {"schema": "rs9.application-smoke-diagnostic.v1alpha1", "family": family, "system": system,
                   "product": "theme-forge-nebular-fusion", "status": "fail", "gate_status": "fail",
                   "origin": "original-producer-attempt", "single_attempt": True, "diagnostic_replay": False,
                   "scenario": observation["scenario"], "cause": observation["cause"], "initial_run": observation}
+        if "cleanup_observation" in observation:
+            record["cleanup_observation"] = observation["cleanup_observation"]
+            if "harness_problem_categories" in observation:
+                record["harness_problem_categories"] = observation["harness_problem_categories"]
         raw = canonical(record)
+        if len(raw) > MAX_DIAGNOSTIC:
+            initial = dict(record["initial_run"])
+            initial.pop("cleanup_observation", None)
+            categories = initial.get("harness_problem_categories")
+            if isinstance(categories, dict) and "receipt_steps" in categories:
+                categories = dict(categories)
+                categories.pop("receipt_steps")
+                initial["harness_problem_categories"] = categories
+            record["initial_run"] = initial
+            record.pop("cleanup_observation", None)
+            if "harness_problem_categories" in record:
+                record["harness_problem_categories"] = initial["harness_problem_categories"]
+            raw = canonical(record)
         scan_for_credentials(raw.decode())
         directory = Path(directory)
         if any(p.is_symlink() for p in (directory, *directory.parents)):

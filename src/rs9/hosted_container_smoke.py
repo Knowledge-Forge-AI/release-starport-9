@@ -251,7 +251,7 @@ def _accept_container_output(binding, receipt):
         diagnostic_sha = None
         if smoke_obs or code == "APPLICATION_SMOKE":
             from rs9.pages_smoke_diagnostic import validate_smoke_observation, retain_host_smoke_diagnostic
-            validated_obs = validate_smoke_observation(smoke_obs, system=binding["system"])
+            validated_obs = validate_smoke_observation(smoke_obs, system=binding["system"], family=binding["family"])
             prepared = binding.get("prepared")
             if prepared and "scratch" in prepared:
                 try:
@@ -350,7 +350,7 @@ def guest_main(*, expected_request_sha256=None):
         prepared = {"source": source, "tools": source / request["tools_relative"],
                     "scratch": scratch, "probe": GUEST / "input/probe", "container_client": True,
                     "records": request["records"], "expected_members": request["expected_members"],
-                    "manifest_sha256": request["manifest_sha256"], "label": request["family"]}
+                    "manifest_sha256": request["manifest_sha256"], "family": request["family"], "label": request["family"]}
         if current:
             prepared.update(source_generation=GENERATION, source_readback=envelope,
                             _source_readback_proof=mint_guest_readback(envelope, source, prepared["tools"]))
@@ -368,9 +368,22 @@ def guest_main(*, expected_request_sha256=None):
         prepared["checkout"] = checkout
         if not Path(RUNTIME).is_dir():
             raise FileNotFoundError(2, "Installed runtime absent", RUNTIME)
+        from rs9.current_os071 import CURRENT071_COMMIT, CURRENT071_TREE
+        nebular_producer = (envelope.get("producers", {}).get("nebular")
+                            if isinstance(envelope, dict) and isinstance(envelope.get("producers"), dict)
+                            else None)
+        current071_apt = (
+            current
+            and request["family"] == "apt"
+            and isinstance(nebular_producer, dict)
+            and nebular_producer.get("tag") == "v0.7.1"
+            and nebular_producer.get("commit") == CURRENT071_COMMIT
+            and nebular_producer.get("tree") == CURRENT071_TREE
+        )
+        runtime_kwargs = {"current071_cleanup_observation": True} if current071_apt else {}
         evidence = verify_nebular_runtime(RUNTIME, prepared, request["system"], env={
             "PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": "/tmp",
-            "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "/tmp"})
+            "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "/tmp"}, **runtime_kwargs)
         _guest_source_readback(prepared)
         _guest_checkout_readback(prepared, checkout)
         evidence.pop("source_bindings", None)

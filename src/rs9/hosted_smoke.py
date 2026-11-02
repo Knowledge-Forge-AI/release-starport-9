@@ -984,10 +984,13 @@ def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, 
                             diagnostic_replay: bool = False, diagnostic_initial_observation: bool = False,
                             current_nix_environment_transform: bool = False,
                             session_bus_argv=None, *,
-                            current_linux_nix_egl_debug: bool = False):
+                            current_linux_nix_egl_debug: bool = False,
+                            current071_cleanup_observation: bool = False):
     """No extraction here: runtime_root is the wheel cache, Nix cache, or installed package."""
     if type(current_nix_environment_transform) is not bool:
         raise ContractError("APPLICATION_SMOKE", "Invalid current Nix environment transform option")
+    if type(current071_cleanup_observation) is not bool:
+        raise ContractError("APPLICATION_SMOKE", "Invalid current071 cleanup observation option")
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
@@ -1048,6 +1051,9 @@ def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, 
     from rs9.application_smoke_diagnostic import execute_application_smoke
     prefix, env = _application_smoke_environment(
         prefix, env, prepared, system, current_linux_nix_egl_debug=current_linux_nix_egl_debug)
+    smoke_kwargs = {}
+    if current071_cleanup_observation:
+        smoke_kwargs["current071_cleanup_observation"] = True
     runs = execute_application_smoke(
         prepared=prepared,
         system=system,
@@ -1060,6 +1066,7 @@ def verify_nebular_runtime(runtime_root, prepared, system, prefix=(), env=None, 
         diagnostic_initial_observation=diagnostic_initial_observation,
         current_nix_environment_transform=current_nix_environment_transform,
         session_bus_argv=session_bus_argv,
+        **smoke_kwargs,
     )
     # Raw harness logs can contain ephemeral paths. Keep only bounded public identities.
     res = {"sidecar": {"verifier_stdout_sha256": digest(canonical(verification)), "verified": True},

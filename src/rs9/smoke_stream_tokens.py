@@ -29,7 +29,47 @@ SCENARIO_A_STEPS = (
     "brand-system-view",
     "host-status-final",
 )
+SCENARIO_B_STEPS = (
+    "app-shell",
+    "app-theme-status",
+    "app-theme-compile",
+    "theme-lab-compile",
+    "brand-system-view",
+    "host-start",
+    "host-status",
+    "project-open-upper",
+    "brand-read-upper",
+    "project-open-lower",
+    "brand-read-lower",
+    "host-status-final",
+)
+SCENARIO_C_STEPS = (
+    "app-shell",
+    "host-start",
+    "host-start-idempotent",
+    "host-stop",
+    "host-start-again",
+    "host-status",
+    "project-open-case",
+    "derive-plan-cancel",
+    "derive-plan-apply",
+    "host-status-final",
+)
+SCENARIO_STEPS = {
+    "A": SCENARIO_A_STEPS,
+    "B": SCENARIO_B_STEPS,
+    "C": SCENARIO_C_STEPS,
+    "C-signal": SCENARIO_C_STEPS,
+}
 STEP_STATES = frozenset({"pass", "fail", "unknown", "missing", "duplicate"})
+RECEIPT_STEPS_STATUSES = frozenset({"observed", "unavailable"})
+RECEIPT_STEPS_SCHEMA_KEYS = frozenset({
+    "status",
+    "steps",
+    "entries_observed",
+    "entries_unlisted",
+    "entries_omitted",
+})
 RUN_WITHHELD = frozenset({
     "receipt-missing",
     "receipt-invalid",
@@ -612,8 +652,105 @@ def _closed_finalization(raw, *, allow_schema=False):
     }
 
 
+def _project_receipt_steps(record, *, scenario):
+    """Project already-read Linux B/C/C-signal run_record.receipt.steps into closed step states."""
+    scenario_steps = SCENARIO_STEPS.get(scenario)
+    if scenario_steps is None or not isinstance(record, dict):
+        return None
+    inner_receipt = record.get("receipt")
+    if not isinstance(inner_receipt, dict) or "steps" not in inner_receipt:
+        return None
+    raw_steps = inner_receipt.get("steps")
+    if isinstance(raw_steps, list):
+        window = raw_steps[:MAX_STEP_ENTRIES]
+        entries_observed = len(window)
+        entries_omitted = max(0, len(raw_steps) - MAX_STEP_ENTRIES)
+        entries_unlisted = 0
+        seen = {}
+        for item in window:
+            if not isinstance(item, dict) or not isinstance(item.get("id"), str) or item["id"] not in scenario_steps:
+                entries_unlisted += 1
+                continue
+            sid = item["id"]
+            ok = item.get("ok")
+            state = ("pass" if ok else "fail") if type(ok) is bool else "unknown"
+            seen[sid] = "duplicate" if sid in seen else state
+        default_state = "unknown" if entries_omitted > 0 else "missing"
+        steps = [{"id": s, "state": seen.get(s, default_state)} for s in scenario_steps]
+        return {
+            "status": "observed",
+            "steps": steps,
+            "entries_observed": entries_observed,
+            "entries_unlisted": entries_unlisted,
+            "entries_omitted": entries_omitted,
+        }
+    return {
+        "status": "unavailable",
+        "steps": [{"id": s, "state": "unknown"} for s in scenario_steps],
+        "entries_observed": 0,
+        "entries_unlisted": 0,
+        "entries_omitted": 0,
+    }
+
+
+def _closed_receipt_steps(raw, *, scenario):
+    """Validate closed Linux B/C/C-signal receipt_steps projection against scenario step IDs."""
+    if not isinstance(raw, dict) or set(raw.keys()) != RECEIPT_STEPS_SCHEMA_KEYS:
+        return None
+    scenario_steps = SCENARIO_STEPS.get(scenario)
+    if scenario_steps is None:
+        return None
+    status = raw.get("status")
+    steps = raw.get("steps")
+    obs_cnt = raw.get("entries_observed")
+    unl_cnt = raw.get("entries_unlisted")
+    omi_cnt = raw.get("entries_omitted")
+    if (
+        not isinstance(status, str)
+        or status not in RECEIPT_STEPS_STATUSES
+        or not isinstance(steps, list)
+        or len(steps) != len(scenario_steps)
+        or any(
+            not isinstance(s, dict)
+            or set(s.keys()) != {"id", "state"}
+            or s.get("id") != scenario_steps[i]
+            or not isinstance(s.get("state"), str)
+            or s["state"] not in STEP_STATES
+            for i, s in enumerate(steps)
+        )
+        or any(type(v) is not int for v in (obs_cnt, unl_cnt, omi_cnt))
+        or not (0 <= obs_cnt <= MAX_STEP_ENTRIES and 0 <= unl_cnt <= obs_cnt and 0 <= omi_cnt <= 1024 * 1024)
+        or (omi_cnt > 0 and (obs_cnt != MAX_STEP_ENTRIES or any(s["state"] == "missing" for s in steps)))
+    ):
+        return None
+    if status == "unavailable":
+        if obs_cnt != 0 or unl_cnt != 0 or omi_cnt != 0 or any(s["state"] != "unknown" for s in steps):
+            return None
+    else:
+        recognized = obs_cnt - unl_cnt
+        min_req = sum(
+            1
+            if s["state"] in {"pass", "fail"} or (omi_cnt == 0 and s["state"] == "unknown")
+            else 2
+            if s["state"] == "duplicate"
+            else 0
+            for s in steps
+        )
+        if min_req > recognized:
+            return None
+        if omi_cnt == 0 and all(s["state"] != "duplicate" for s in steps) and recognized != min_req:
+            return None
+    return {
+        "status": status,
+        "steps": [{"id": s["id"], "state": s["state"]} for s in steps],
+        "entries_observed": obs_cnt,
+        "entries_unlisted": unl_cnt,
+        "entries_omitted": omi_cnt,
+    }
+
+
 def project_problem_categories(record, identity, *, system, platform, scenario, current071=False,
-                               current071_problems=False):
+                               current071_problems=False, current071_receipt_steps=False):
     """Category-only Linux B/C projection of the already-read original .run.json; no reread."""
     if (not all(isinstance(v, str) for v in (system, platform, scenario)) or
             (system, platform, scenario) not in _CATEGORY_BINDINGS or not isinstance(record, dict)):
@@ -623,11 +760,13 @@ def project_problem_categories(record, identity, *, system, platform, scenario, 
     receipt = _receipt_identity(identity)
     if receipt is None:
         return None
-    problems = _classify_problems(record.get("problems"),
-                                  current071=current071 is True or current071_problems is True)
+    current071_enabled = current071 is True or current071_problems is True
+    problems = _classify_problems(record.get("problems"), current071=current071_enabled)
     total = problems["total"]
     finalization = (_closed_finalization(record.get("finalization"), allow_schema=True)
                     if current071 is True else None)
+    receipt_steps = (_project_receipt_steps(record, scenario=scenario)
+                     if current071_enabled and current071_receipt_steps is True else None)
     result = {
         "schema": CATEGORY_SCHEMA,
         "stage": CATEGORY_STAGE,
@@ -646,12 +785,17 @@ def project_problem_categories(record, identity, *, system, platform, scenario, 
     }
     if finalization is not None:
         result["finalization"] = finalization
+    if receipt_steps is not None:
+        result["receipt_steps"] = receipt_steps
     return result
 
 
 def _closed_categories(raw):
     """Exact positive envelope structure and count closure, or None; binding is separate."""
-    if not isinstance(raw, dict) or set(raw) not in (_CATEGORY_KEYS, _CATEGORY_KEYS | {"finalization"}):
+    if not isinstance(raw, dict):
+        return None
+    extra = set(raw) - _CATEGORY_KEYS
+    if not _CATEGORY_KEYS <= set(raw) or not extra <= {"finalization", "receipt_steps"}:
         return None
     system, scenario, receipt, probs = raw["system"], raw["scenario"], raw["receipt"], raw["problems"]
     if (raw["schema"] != CATEGORY_SCHEMA or raw["stage"] != CATEGORY_STAGE or
@@ -665,6 +809,11 @@ def _closed_categories(raw):
     if "finalization" in raw:
         finalization = _closed_finalization(raw["finalization"])
         if finalization is None:
+            return None
+    receipt_steps = None
+    if "receipt_steps" in raw:
+        receipt_steps = _closed_receipt_steps(raw["receipt_steps"], scenario=scenario)
+        if receipt_steps is None:
             return None
     total, scanned, cats = probs["total"], probs["scanned"], probs["categories"]
     unrec, nonstr, omitted, unavail = (probs[k] for k in ("unrecognized", "non_string", "omitted", "unavailable"))
@@ -706,6 +855,8 @@ def _closed_categories(raw):
     }
     if finalization is not None:
         result["finalization"] = finalization
+    if receipt_steps is not None:
+        result["receipt_steps"] = receipt_steps
     return result
 
 
@@ -1093,7 +1244,8 @@ def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require
 
 
 def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, record=None, *, system=None,
-                                current071=False, current071_problems=False, current_nix_text=False):
+                                current071=False, current071_problems=False, current_nix_text=False,
+                                current071_receipt_steps=False):
     """Each optional observation fails independently after the gate outcome is fixed."""
     result = {}
     try:
@@ -1130,6 +1282,7 @@ def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, re
             record, fields.get("receipt"), system=system, platform=platform, scenario=scenario,
             **({"current071": True} if current071 is True else {}),
             **({"current071_problems": True} if current071_problems is True else {}),
+            **({"current071_receipt_steps": True} if current071_receipt_steps is True else {}),
         )
         if categories is not None:
             result["harness_problem_categories"] = categories

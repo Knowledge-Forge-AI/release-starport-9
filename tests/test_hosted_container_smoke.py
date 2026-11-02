@@ -355,3 +355,114 @@ class DisjointFilesystemTests(unittest.TestCase):
 
         self.assertEqual(caught.exception.code, 'APPLICATION_SMOKE')
         self.assertIsNotNone(caught.exception.smoke_observation)
+
+    def test_guest_main_routes_cleanup_observation_only_for_apt_current071_and_accept_validates_family(self):
+        import copy
+        from rs9.current071_cleanup_observation import (
+            observe_current071_cleanup,
+            withheld_current071_cleanup_observation,
+        )
+        from rs9.current_os071 import CURRENT071_COMMIT, CURRENT071_TREE
+        from rs9 import hosted_container_smoke as hcs
+        from rs9.smoke_source_envelope import GENERATION
+
+        req_path = self.guest_smoke / 'input/request.json'
+        orig_req = json.loads(req_path.read_bytes())
+
+        for family, version, expected_cleanup in (
+            ("apt", "0.7.1", True),
+            ("pacman", "0.7.1", False),
+            ("dnf", "0.7.1", False),
+            ("apt", "0.7.0", False),
+        ):
+            with self.subTest(family=family, version=version):
+                for path in (self.guest_smoke / 'out').iterdir():
+                    shutil.rmtree(path) if path.is_dir() else path.unlink()
+                req = copy.deepcopy(orig_req)
+                req["family"] = family
+                envelope = {
+                    "schema": "rs9.current-smoke-source-readback.v1",
+                    "generation": GENERATION,
+                    "producers": {
+                        "nebular": {
+                            "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+                            "tag": f"v{version}",
+                            "commit": CURRENT071_COMMIT if version == "0.7.1" else "0" * 40,
+                            "tree": CURRENT071_TREE if version == "0.7.1" else "1" * 40,
+                        }
+                    },
+                    "records": req["records"],
+                }
+                req["source_readback"] = envelope
+                raw_req = canonical(req)
+                req_path.write_bytes(raw_req)
+
+                captured = {}
+                def fake_verify_nebular_runtime(*args, **kwargs):
+                    captured.update(kwargs)
+                    return {"sidecar": {"verified": True}, "scenarios": [{"scenario": "C"}, {"scenario": "C-signal"}]}
+
+                with patch.object(hcs, "GUEST", self.guest_smoke), \
+                     patch.object(hcs, "RUNTIME", str(self.runtime)), \
+                     patch("os.getuid", return_value=65534), \
+                     patch.object(hcs, "_checked_current_request", return_value=envelope), \
+                     patch.object(hcs, "mint_guest_readback", return_value=object()), \
+                     patch.object(hcs, "_check_current_probes"), \
+                     patch.object(hcs, "_guest_source_readback"), \
+                     patch.object(hcs, "_guest_checkout_readback"), \
+                     patch.object(hcs, "verify_nebular_runtime", side_effect=fake_verify_nebular_runtime):
+                    rc = hcs.guest_main(expected_request_sha256=digest(raw_req))
+                self.assertEqual(rc, 0)
+                if expected_cleanup:
+                    self.assertIs(captured.get("current071_cleanup_observation"), True)
+                else:
+                    self.assertNotIn("current071_cleanup_observation", captured)
+
+        # Verify host-side _accept_container_output withholds cross-family cleanup_observation on pacman
+        raw_stderr = b"RS9_CURRENT071_CLEANUP_ERRNO=EBUSY\n"
+        cleanup_obs = observe_current071_cleanup(
+            raw_stderr,
+            system="x86_64-linux",
+            scenario="C",
+            stderr_bytes=len(raw_stderr),
+            stderr_sha256=digest(raw_stderr),
+            complete=True,
+        )
+        res_data = {
+            "schema": SCHEMA,
+            "request_sha256": self.binding["request_sha256"],
+            "family": "pacman",
+            "system": "x86_64-linux",
+            "uid": 65534,
+            "status": "fail",
+            "code": "APPLICATION_SMOKE",
+            "details": {"reason_token": "process-nonzero"},
+            "smoke_observation": {
+                "scenario": "C",
+                "cause": "process-nonzero",
+                "raw_returncode": 1,
+                "stdout_bytes": 10,
+                "stderr_bytes": len(raw_stderr),
+                "stdout_sha256": "0" * 64,
+                "stderr_sha256": digest(raw_stderr),
+                "stream_capture_complete": True,
+                "log_categories": ["unclassified"],
+                "problem_codes": [],
+                "elapsed_ms": 100,
+                "reason_token": "process-nonzero",
+                "cleanup_observation": cleanup_obs,
+            },
+        }
+        (self.binding["output"] / "result.json").write_bytes(canonical(res_data))
+
+        class FailClient:
+            def exec(self, argv, **kwargs):
+                return CommandReceipt(argv, 2, b"", b"", executed=True)
+
+        with self.assertRaises(ContractError) as caught:
+            verify_container_nebular(FailClient(), self.binding, user="65534:65534")
+        self.assertEqual(
+            caught.exception.smoke_observation["cleanup_observation"],
+            withheld_current071_cleanup_observation("binding-mismatch"),
+        )
+

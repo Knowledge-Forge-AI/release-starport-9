@@ -611,6 +611,193 @@ class PagesSmokeDiagnosticUnitTests(unittest.TestCase):
         )
         self.assertNotIn("/private/secret", json.dumps(hostile))
 
+    def test_cleanup_observation_and_receipt_steps_pass_through_pages_diagnostic_validation(self):
+        from rs9.current071_cleanup_observation import (
+            observe_current071_cleanup,
+            withheld_current071_cleanup_observation,
+        )
+        from rs9.smoke_stream_tokens import (
+            FINALIZATION_SCHEMA,
+            INVENTORY_STAGE,
+            SCENARIO_C_STEPS,
+            project_problem_categories,
+        )
+
+        # 1. Debian arm64 B cleanup_observation validation & host diagnostic retention
+        arm_receipt = {"present": True, "bytes": 1779, "sha256": "c" * 64}
+        arm_inv = {
+            "stage": INVENTORY_STAGE,
+            "status": "observed",
+            "artifacts": [{"kind": "run.json", "bytes": 1779, "regular": True, "symlink": False}],
+            "entries_observed": 1,
+            "unlisted": 0,
+        }
+        arm_categories = project_problem_categories(
+            {
+                "status": "fail",
+                "problems": ["harness cleanup of the owned scratch directory failed"],
+                "finalization": {
+                    "schema": FINALIZATION_SCHEMA,
+                    "status": "failed",
+                    "phase": "cleanup",
+                    "exceptionFamily": "filesystem",
+                    "spawned": True,
+                    "exitObserved": True,
+                    "applicationReceiptObservation": "present-at-read",
+                    "applicationReceiptCopy": "written",
+                },
+            },
+            arm_receipt,
+            system="aarch64-linux",
+            platform="linux-arm64",
+            scenario="B",
+            current071=True, current071_receipt_steps=True,
+        )
+        arm_stderr = b"RS9_CURRENT071_CLEANUP_ERRNO=EBUSY\n"
+        cleanup_obs = observe_current071_cleanup(
+            arm_stderr,
+            system="aarch64-linux",
+            scenario="B",
+            stderr_bytes=len(arm_stderr),
+            stderr_sha256=digest(arm_stderr),
+            complete=True,
+        )
+        arm_obs = {
+            "scenario": "B",
+            "cause": "process-nonzero",
+            "raw_returncode": 1,
+            "stdout_bytes": 111,
+            "stderr_bytes": len(arm_stderr),
+            "stdout_sha256": "4c01e0ee066068fba7bb6f3bee1ec7c6afc82cba982193c284d0f0b87efd7a9a",
+            "stderr_sha256": digest(arm_stderr),
+            "stream_capture_complete": True,
+            "log_categories": ["unclassified"],
+            "receipt_error": "receipt-failed",
+            "problem_codes": ["withheld-token"],
+            "elapsed_ms": 120,
+            "reason_token": "process-nonzero",
+            "receipt": arm_receipt,
+            "evidence_inventory": arm_inv,
+            "harness_problem_categories": arm_categories,
+            "cleanup_observation": cleanup_obs,
+        }
+        p1 = validate_smoke_observation(arm_obs, system="aarch64-linux", family="apt")
+        p2 = validate_smoke_observation(p1, system="aarch64-linux", family="apt")
+        p3 = validate_smoke_observation(p2, system="aarch64-linux", family="apt")
+        self.assertEqual(p1, p2)
+        self.assertEqual(p2, p3)
+        self.assertEqual(p1["cleanup_observation"], cleanup_obs)
+
+        # Cross-family (pacman / dnf) withholds cleanup_observation as binding-mismatch
+        for non_apt in ("pacman", "dnf"):
+            with self.subTest(family=non_apt):
+                cross_fam = validate_smoke_observation(arm_obs, system="aarch64-linux", family=non_apt)
+                self.assertEqual(
+                    cross_fam["cleanup_observation"],
+                    withheld_current071_cleanup_observation("binding-mismatch"),
+                )
+
+        # Hostile cleanup_observation is reduced to invalid-observation without leaking private strings
+        hostile_cleanup = validate_smoke_observation(
+            {
+                **arm_obs,
+                "cleanup_observation": {
+                    **cleanup_obs,
+                    "errno_code": "/private/secret/ebusy",
+                },
+            },
+            system="aarch64-linux",
+            family="apt",
+        )
+        self.assertEqual(
+            hostile_cleanup["cleanup_observation"],
+            withheld_current071_cleanup_observation("invalid-observation"),
+        )
+        self.assertNotIn("/private/secret", json.dumps(hostile_cleanup))
+
+        # 2. Debian amd64 C-signal receipt_steps & no-cleanup-error-observed retention
+        csig_receipt = {"present": True, "bytes": 1779, "sha256": "c" * 64}
+        csig_categories = project_problem_categories(
+            {
+                "status": "fail",
+                "problems": ["required step host-status failed: /Users/private/secret"],
+                "receipt": {
+                    "steps": [
+                        {
+                            "id": sid,
+                            "ok": sid != "host-status",
+                            "via": "sidecar",
+                            "detail": "/Users/private/secret",
+                        }
+                        for sid in SCENARIO_C_STEPS
+                    ]
+                },
+            },
+            csig_receipt,
+            system="x86_64-linux",
+            platform="linux-x64",
+            scenario="C-signal",
+            current071=True, current071_receipt_steps=True,
+        )
+        csig_cleanup = observe_current071_cleanup(
+            b"",
+            system="x86_64-linux",
+            scenario="C-signal",
+            stderr_bytes=0,
+            stderr_sha256=digest(b""),
+            complete=True,
+        )
+        csig_obs = {
+            "scenario": "C-signal",
+            "cause": "receipt-failed",
+            "raw_returncode": 1,
+            "stdout_bytes": 107,
+            "stderr_bytes": 0,
+            "stdout_sha256": "37a7cf19b7b0e415cebe5d56d843c44b2c4048d33f15b91a0369322c4f632b8e",
+            "stderr_sha256": digest(b""),
+            "stream_capture_complete": True,
+            "log_categories": ["unclassified"],
+            "receipt_error": "receipt-failed",
+            "problem_codes": ["withheld-token"],
+            "elapsed_ms": 220,
+            "reason_token": "receipt-failed",
+            "receipt": csig_receipt,
+            "evidence_inventory": arm_inv,
+            "harness_problem_categories": csig_categories,
+            "cleanup_observation": csig_cleanup,
+        }
+        c1 = validate_smoke_observation(csig_obs, system="x86_64-linux", family="apt")
+        c2 = validate_smoke_observation(c1, system="x86_64-linux", family="apt")
+        c3 = validate_smoke_observation(c2, system="x86_64-linux", family="apt")
+        self.assertEqual(c1, c2)
+        self.assertEqual(c2, c3)
+        self.assertEqual(
+            c1["harness_problem_categories"]["receipt_steps"],
+            {
+                "status": "observed",
+                "steps": [
+                    {"id": sid, "state": "fail" if sid == "host-status" else "pass"}
+                    for sid in SCENARIO_C_STEPS
+                ],
+                "entries_observed": len(SCENARIO_C_STEPS),
+                "entries_unlisted": 0,
+                "entries_omitted": 0,
+            },
+        )
+        self.assertEqual(c1["cleanup_observation"], csig_cleanup)
+
+        with tempfile.TemporaryDirectory() as td:
+            out_dir = Path(td).resolve()
+            sha = retain_host_smoke_diagnostic(out_dir, c1, family="apt", system="x86_64-linux")
+            self.assertIsNotNone(sha)
+            retained = json.loads((out_dir / "application-smoke-failure-apt.json").read_bytes())
+            self.assertEqual(retained["cleanup_observation"], csig_cleanup)
+            self.assertEqual(
+                retained["harness_problem_categories"]["receipt_steps"],
+                c1["harness_problem_categories"]["receipt_steps"],
+            )
+
+
 
 class PagesNebularControlTests(unittest.TestCase):
     """Failing Pages Nebular all-other-clients-pass and all-pass controls, incumbent gates, one attempt."""
