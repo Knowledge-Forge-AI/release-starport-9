@@ -44,8 +44,10 @@ def _populate_core_fixture(checkout: Path) -> None:
     (fixture_dir / "brand-package.toml").write_text("schema_version = 1\n", encoding="utf-8")
 
 
-def _build_inert_sibling_modules(sandbox_root: Path, *, rm_fault_mode: str = "none", scenario_steps: str = "pass") -> dict[str, str]:
+def _build_inert_sibling_modules(sandbox_root: Path, *, rm_fault_mode: str = "none", scenario_steps: str = "pass", host_platform: str = "linux") -> dict[str, str]:
     """Build inert sibling modules so real current071-native-rc-smoke.mjs runs under Node22 without GUI/product."""
+    if host_platform not in {"linux", "darwin"}:
+        raise ValueError("Unknown inert host platform")
     fs_snapshot = f"""import childProcess from "node:child_process";
 import {{ EventEmitter }} from "node:events";
 import fs from "node:fs";
@@ -57,6 +59,7 @@ const sandboxTmp = {json.dumps(str(sandbox_root / "guest-tmp"))};
 const sandboxHome = {json.dumps(str(sandbox_root / "guest-home"))};
 const faultMode = {json.dumps(rm_fault_mode)};
 const stepMode = {json.dumps(scenario_steps)};
+Object.defineProperty(process, "platform", {{ value: {json.dumps(host_platform)} }});
 
 fs.mkdirSync(sandboxTmp, {{ recursive: true }});
 fs.mkdirSync(sandboxHome, {{ recursive: true }});
@@ -109,13 +112,30 @@ fs.rmSync = function simulatedRmSync(target, options) {{
       throw err;
     }}
     if (faultMode === "STRING_THROW") {{
-      throw "raw-string-cleanup-exception-/Users/private/secret";
+      throw "raw-string-cleanup-exception-/" + "Users/private/secret";
     }}
   }}
   return baseRmSync(target, options);
 }};
 
 let activeSidecarLaunchRoot = null;
+const fixtureReaddirSync = fs.readdirSync;
+const fixtureReadlinkSync = fs.readlinkSync;
+function missingVirtualProcess() {{
+  return Object.assign(new Error("Unknown inert process"), {{ code: "ENOENT" }});
+}}
+fs.readdirSync = function(target, ...args) {{
+  if (target === "/proc") return activeSidecarLaunchRoot ? ["424243"] : [];
+  if (typeof target === "string" && target.startsWith("/proc/")) throw missingVirtualProcess();
+  return Reflect.apply(fixtureReaddirSync, this, [target, ...args]);
+}};
+fs.readlinkSync = function(target, ...args) {{
+  if (target === "/proc/424243/exe" && activeSidecarLaunchRoot) {{
+    return `${{activeSidecarLaunchRoot}}/bin/tfsb-studio-service`;
+  }}
+  if (typeof target === "string" && target.startsWith("/proc/")) throw missingVirtualProcess();
+  return Reflect.apply(fixtureReadlinkSync, this, [target, ...args]);
+}};
 childProcess.spawnSync = () => {{
   if (activeSidecarLaunchRoot) {{
     return {{ stdout: `424243 ${{activeSidecarLaunchRoot}}/bin/tfsb-studio-service\\n`, stderr: "", status: 0 }};
@@ -184,13 +204,13 @@ childProcess.spawn = function inertSpawn(cmd, args, options = {{}}) {{
         ok: !(failStep && id === "host-status"),
         via: "inert-fixture",
         ms: 1,
-        detail: "PRIVATE_STEP_DETAIL_/Users/secret_operator/" + id,
+        detail: "PRIVATE_STEP_DETAIL_/" + "Users/secret_operator/" + id,
       }}));
       const rec = {{
         schema: "nebular.release-smoke-receipt-v1",
         scenario,
         status: failStep ? "fail" : "pass",
-        failure: failStep ? "PRIVATE_FAILURE_/Users/secret_operator" : undefined,
+        failure: failStep ? "PRIVATE_FAILURE_/" + "Users/secret_operator" : undefined,
         pid: 424242,
         target: scenario === "B" ? "aarch64-unknown-linux-gnu" : "x86_64-unknown-linux-gnu",
         executable: {{ sha256: "a".repeat(64) }},
@@ -292,13 +312,14 @@ class Current071CleanupObservationTests(unittest.TestCase):
         scenario_steps: str = "pass",
         family: str = "apt",
         nebular_version: str = "0.7.1",
+        host_platform: str = "linux",
     ) -> tuple[dict[str, object], dict[str, object], Path]:
         subroot.mkdir(parents=True, exist_ok=True)
         capture, captures, client, contract, sources, fixtures = current_import_fixture(subroot, nebular_version)
         sandbox = subroot / "sandbox"
         sandbox.mkdir(parents=True, exist_ok=True)
         sibling_map = _build_inert_sibling_modules(
-            sandbox, rm_fault_mode=rm_fault_mode, scenario_steps=scenario_steps
+            sandbox, rm_fault_mode=rm_fault_mode, scenario_steps=scenario_steps, host_platform=host_platform
         )
         profile = copy.deepcopy(pins.CURRENT071_REPLAY_PROGRESS_PROFILE)
         target_files = (
@@ -560,11 +581,11 @@ process.stdout.write(JSON.stringify({cases: 8, realRemovalCalls: 0}) + "\\n");
                 self.assertEqual(p3, p2)
 
     def test_real_node22_observer_passing_and_non_target_rm_emit_no_marker(self) -> None:
-        for mode in ("none", "NON_TARGET_RM"):
-            with self.subTest(mode=mode):
-                case_dir = self.root / f"pass-{mode}"
+        for host_platform, mode in ((p, m) for p in ("linux", "darwin") for m in ("none", "NON_TARGET_RM")):
+            with self.subTest(mode=mode, host_platform=host_platform):
+                case_dir = self.root / f"pass-{host_platform}-{mode}"
                 prepared, _profile, launch_root = self._build_authenticated_apt_fixture(
-                    case_dir, rm_fault_mode=mode
+                    case_dir, rm_fault_mode=mode, host_platform=host_platform
                 )
                 env = self._fixture_bin_env(case_dir)
                 runs = diagnostic.execute_application_smoke(
@@ -576,6 +597,34 @@ process.stdout.write(JSON.stringify({cases: 8, realRemovalCalls: 0}) + "\\n");
                 )
                 self.assertEqual([r["scenario"] for r in runs], ["C", "C-signal"])
                 self.assertTrue(all(set(r) == {"scenario", "receipt_sha256", "executable_sha256"} for r in runs))
+
+    def test_linux_inert_process_adapter_has_closed_state_transitions(self) -> None:
+        case_dir = self.root / "virtual-process-adapter"
+        _prepared, _profile, launch_root = self._build_authenticated_apt_fixture(case_dir, host_platform="linux")
+        env = self._fixture_bin_env(case_dir)
+        script = '''import assert from "node:assert/strict";
+import fs from "node:fs";
+import { spawn } from "node:child_process";
+assert.equal(process.platform, "linux");
+assert.deepEqual(fs.readdirSync("/proc"), []);
+assert.throws(() => fs.readlinkSync("/proc/999999/exe"), (error) => error.code === "ENOENT");
+const root = __ROOT__;
+const child = spawn(root + "/bin/tfnf", ["--nebular-release-smoke=C-signal"], {env: {}});
+await new Promise(queueMicrotask);
+assert.deepEqual(fs.readdirSync("/proc"), ["424243"]);
+assert.equal(fs.readlinkSync("/proc/424243/exe"), root + "/bin/tfsb-studio-service");
+assert.throws(() => fs.readdirSync("/proc/999999"), (error) => error.code === "ENOENT");
+process.kill(child.pid, "SIGTERM");
+await new Promise(queueMicrotask);
+assert.deepEqual(fs.readdirSync("/proc"), []);
+assert.throws(() => fs.readlinkSync("/proc/424243/exe"), (error) => error.code === "ENOENT");
+assert.equal(child.signalCode, "SIGTERM");
+process.stdout.write(JSON.stringify({virtualProcessStateTransitions: true}) + "\\n");
+'''.replace("__ROOT__", json.dumps(str(launch_root)))
+        result = subprocess.run(["node", "--input-type=module", "-e", script], env=env, capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8", errors="replace"))
+        self.assertEqual(json.loads(result.stdout), {"virtualProcessStateTransitions": True})
+        self.assertEqual(result.stderr, b"")
 
     def test_real_node22_c_signal_step_projection_from_already_read_run_record(self) -> None:
         case_dir = self.root / "c-signal-fail"

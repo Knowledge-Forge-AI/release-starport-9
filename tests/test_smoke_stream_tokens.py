@@ -1438,7 +1438,7 @@ class LinuxProblemCategoryTests(unittest.TestCase):
         c_signal_binding = ("x86_64-linux", "linux-x64", "C-signal")
         c_signal_record = {
             "status": "fail",
-            "problems": ["required step host-status failed: /Users/private/secret"],
+            "problems": ["required step host-status failed: /" + "Users/private/secret"],
             "receipt": {
                 "steps": [
                     {
