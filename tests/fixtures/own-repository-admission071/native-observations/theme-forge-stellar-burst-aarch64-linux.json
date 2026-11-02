@@ -1,0 +1,745 @@
+{
+  "artifact": 13108780455,
+  "inputs": {
+    "arch": "aarch64",
+    "asset_sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+    "closure_sha256": "40eccea0c4dbc9f8559825e53897b76459d824d0d447e1bedb034ed5d09c46d2",
+    "payload_manifest_sha256": "1ff83709aca07841cffdcbebb6665831d14132892f5098da240ca29f9953b33a",
+    "project_id": "theme-forge-stellar-burst",
+    "system": "aarch64-linux",
+    "version": "0.7.0"
+  },
+  "originalInventoryObjectReconstructed": false,
+  "originalQualifiedRun": 41368171900,
+  "policyChunksAndSummaryVerified": true,
+  "policy_evaluation": {
+    "accepted": true,
+    "accepted_findings": [
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "087887a5e724b20431127cba2d898e72cc254b2036f927b78f3b7546e4a89a60",
+        "code": "non-executable-script",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/cli.d.ts 644 package:usr/bin/env node",
+        "mode": "644",
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/cli.d.ts",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "f995daf1e5a2823ccd94232f634e1dcc8c824336abaac432f5ca2b224e1a020f",
+        "code": "non-executable-script",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/cli.js 644 package:usr/bin/env node",
+        "mode": "644",
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/cli.js",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "9e695d5ae7f00a845128c53ad8371b262485292a350309c369d60e61459ea36c",
+        "code": "non-executable-script",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.d.ts 644 package:usr/bin/env node",
+        "mode": "644",
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.d.ts",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "06d2a5de1923d103a51cdb2c2be6d8218ae47829ea9092c5b3665898df2ae1e9",
+        "code": "non-executable-script",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.js 644 package:usr/bin/env node",
+        "mode": "644",
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.js",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "f112760bc2b4e0349a5d6127a4c800525dc024f51dfcd48e27e6dbd6fca282a0",
+        "code": "files-duplicated-waste",
+        "level": "E",
+        "message": "214129",
+        "target": "theme-forge-stellar-burst.aarch64",
+        "waste_bytes": 214129
+      }
+    ],
+    "blockers": [],
+    "calculated_duplicate_waste": 214129,
+    "duplicate_groups": [
+      {
+        "members": [
+          "/usr/lib/theme-forge-stellar-burst/dist/design-evidence/index.d.ts",
+          "/usr/lib/theme-forge-stellar-burst/dist/design-evidence/index.js"
+        ],
+        "possible_waste_bytes": [
+          133
+        ],
+        "sha256": "1e5b09b1d29215e6cb4680df385126347f7676abb1ee387c686e77cb631cc279",
+        "size": 133,
+        "waste": 133
+      },
+      {
+        "members": [
+          "/usr/lib/theme-forge-stellar-burst/NOTICE",
+          "/usr/share/licenses/theme-forge-stellar-burst/NOTICE"
+        ],
+        "possible_waste_bytes": [
+          0
+        ],
+        "sha256": "4a65d0820387e60ff6cd04282d335104a3deb2f32f7c56f3e34fc6576a3089ba",
+        "size": 611,
+        "waste": 0
+      },
+      {
+        "members": [
+          "/usr/lib/theme-forge-stellar-burst/LICENSE",
+          "/usr/share/licenses/theme-forge-stellar-burst/LICENSE"
+        ],
+        "possible_waste_bytes": [
+          0
+        ],
+        "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+        "size": 34460,
+        "waste": 0
+      },
+      {
+        "members": [
+          "/usr/lib/theme-forge-stellar-burst/dist/design-evidence/v1-types.js",
+          "/usr/lib/theme-forge-stellar-burst/dist/scene/import-svg-types.js",
+          "/usr/lib/theme-forge-stellar-burst/dist/scene/types.js",
+          "/usr/lib/theme-forge-stellar-burst/dist/schema2-types.js",
+          "/usr/lib/theme-forge-stellar-burst/dist/types.js"
+        ],
+        "possible_waste_bytes": [
+          44
+        ],
+        "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+        "size": 11,
+        "waste": 44
+      },
+      {
+        "members": [
+          "/usr/lib/theme-forge-stellar-burst/node_modules/fflate/esm/browser.d.ts",
+          "/usr/lib/theme-forge-stellar-burst/node_modules/fflate/esm/index.d.mts",
+          "/usr/lib/theme-forge-stellar-burst/node_modules/fflate/lib/browser.d.cts",
+          "/usr/lib/theme-forge-stellar-burst/node_modules/fflate/lib/index.d.ts",
+          "/usr/lib/theme-forge-stellar-burst/node_modules/fflate/lib/node.d.cts"
+        ],
+        "possible_waste_bytes": [
+          213952
+        ],
+        "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+        "size": 53488,
+        "waste": 213952
+      }
+    ],
+    "inputs": {
+      "arch": "aarch64",
+      "asset_sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+      "closure_sha256": "40eccea0c4dbc9f8559825e53897b76459d824d0d447e1bedb034ed5d09c46d2",
+      "payload_manifest_sha256": "1ff83709aca07841cffdcbebb6665831d14132892f5098da240ca29f9953b33a",
+      "project_id": "theme-forge-stellar-burst",
+      "system": "aarch64-linux",
+      "version": "0.7.0"
+    },
+    "inventory_sha256": "750bc1320e426847159f64a39866af01ccc8742feceb50230262f3554a1b3cbe",
+    "member_proofs": [
+      {
+        "input_archive_sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+        "input_member": "package/dist/cli.d.ts",
+        "intent": "typescript-declaration-data",
+        "mode": 420,
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/cli.d.ts",
+        "sha256": "5c32ef46b90997fc6de2a43c40a92643d025b64f1ed7c360e1cd40997528797b",
+        "shebang": "#!/usr/bin/env node"
+      },
+      {
+        "input_archive_sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+        "input_member": "package/dist/cli.js",
+        "intent": "private-implementation-node-wrapper",
+        "launcher": "/usr/bin/tfsb",
+        "mode": 420,
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/cli.js",
+        "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+        "shebang": "#!/usr/bin/env node"
+      },
+      {
+        "input_archive_sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+        "input_member": "package/dist/service-protocol/server-cli.d.ts",
+        "intent": "typescript-declaration-data",
+        "mode": 420,
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.d.ts",
+        "sha256": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012",
+        "shebang": "#!/usr/bin/env node"
+      },
+      {
+        "input_archive_sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+        "input_member": "package/dist/service-protocol/server-cli.js",
+        "intent": "private-implementation-node-wrapper",
+        "launcher": "/usr/bin/tfsb-studio-service",
+        "mode": 420,
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.js",
+        "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+        "shebang": "#!/usr/bin/env node"
+      }
+    ],
+    "observed_duplicate_groups": [
+      {
+        "members": [
+          "/usr/lib/theme-forge-stellar-burst/dist/design-evidence/index.d.ts",
+          "/usr/lib/theme-forge-stellar-burst/dist/design-evidence/index.js"
+        ],
+        "possible_waste_bytes": [
+          133
+        ],
+        "sha256": "1e5b09b1d29215e6cb4680df385126347f7676abb1ee387c686e77cb631cc279",
+        "size": 133,
+        "waste": 133
+      },
+      {
+        "members": [
+          "/usr/lib/theme-forge-stellar-burst/NOTICE",
+          "/usr/share/licenses/theme-forge-stellar-burst/NOTICE"
+        ],
+        "possible_waste_bytes": [
+          0
+        ],
+        "sha256": "4a65d0820387e60ff6cd04282d335104a3deb2f32f7c56f3e34fc6576a3089ba",
+        "size": 611,
+        "waste": 0
+      },
+      {
+        "members": [
+          "/usr/lib/theme-forge-stellar-burst/LICENSE",
+          "/usr/share/licenses/theme-forge-stellar-burst/LICENSE"
+        ],
+        "possible_waste_bytes": [
+          0
+        ],
+        "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+        "size": 34460,
+        "waste": 0
+      },
+      {
+        "members": [
+          "/usr/lib/theme-forge-stellar-burst/dist/design-evidence/v1-types.js",
+          "/usr/lib/theme-forge-stellar-burst/dist/scene/import-svg-types.js",
+          "/usr/lib/theme-forge-stellar-burst/dist/scene/types.js",
+          "/usr/lib/theme-forge-stellar-burst/dist/schema2-types.js",
+          "/usr/lib/theme-forge-stellar-burst/dist/types.js"
+        ],
+        "possible_waste_bytes": [
+          44
+        ],
+        "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+        "size": 11,
+        "waste": 44
+      },
+      {
+        "members": [
+          "/usr/lib/theme-forge-stellar-burst/node_modules/fflate/esm/browser.d.ts",
+          "/usr/lib/theme-forge-stellar-burst/node_modules/fflate/esm/index.d.mts",
+          "/usr/lib/theme-forge-stellar-burst/node_modules/fflate/lib/browser.d.cts",
+          "/usr/lib/theme-forge-stellar-burst/node_modules/fflate/lib/index.d.ts",
+          "/usr/lib/theme-forge-stellar-burst/node_modules/fflate/lib/node.d.cts"
+        ],
+        "possible_waste_bytes": [
+          213952
+        ],
+        "sha256": "985db2599e33d85a70a6da5f2b7b6f1b0bf9b9119781b684573a1a9b463e0cc4",
+        "size": 53488,
+        "waste": 213952
+      }
+    ],
+    "observed_error_members": [
+      {
+        "code": "non-executable-script",
+        "input_archive_sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+        "input_member": "package/dist/cli.d.ts",
+        "mode": 420,
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/cli.d.ts",
+        "preserved": true,
+        "sha256": "5c32ef46b90997fc6de2a43c40a92643d025b64f1ed7c360e1cd40997528797b",
+        "shebang": "#!/usr/bin/env node"
+      },
+      {
+        "code": "non-executable-script",
+        "input_archive_sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+        "input_member": "package/dist/cli.js",
+        "mode": 420,
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/cli.js",
+        "preserved": true,
+        "sha256": "b0a781f63cc4324562b9a1cf98a428da1b8e382f8f70028558486c747f52d4f9",
+        "shebang": "#!/usr/bin/env node"
+      },
+      {
+        "code": "non-executable-script",
+        "input_archive_sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+        "input_member": "package/dist/service-protocol/server-cli.d.ts",
+        "mode": 420,
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.d.ts",
+        "preserved": true,
+        "sha256": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012",
+        "shebang": "#!/usr/bin/env node"
+      },
+      {
+        "code": "non-executable-script",
+        "input_archive_sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+        "input_member": "package/dist/service-protocol/server-cli.js",
+        "mode": 420,
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.js",
+        "preserved": true,
+        "sha256": "a1b217a25d27c050b147235d6b6a9909456ef27f2244be6f1cf7df8e0bd09c17",
+        "shebang": "#!/usr/bin/env node"
+      }
+    ],
+    "policy_sha256": "da323f91e2803ba8339c7a00a18b2f1944d6ca08d23289e802dce9e6b48578c2",
+    "raw_exit_code": 64,
+    "raw_lint_status": "fail",
+    "rule_blocker_causes": [],
+    "rule_blockers": [],
+    "schema": "rs9.rpm-lint-policy-evaluation.v1",
+    "status": "accepted"
+  },
+  "product": "theme-forge-stellar-burst",
+  "production_enabled": false,
+  "publication_authority": false,
+  "purpose": "Captured source material for non-admitting tests; no live admission or signing authority",
+  "raw": {
+    "architecture": "aarch64",
+    "arguments": [
+      "theme-forge-stellar-burst.spec",
+      "theme-forge-stellar-burst-0.7.0-1.fc43.aarch64.rpm"
+    ],
+    "clean": false,
+    "counts": {
+      "E": 5,
+      "I": 0,
+      "W": 12
+    },
+    "effective_configuration": {
+      "filtered_count": 8,
+      "invocation": "default-tool-config-no-added-filters",
+      "listing_sha256": "d7970ce0b844e71731d12cd215384df251caf5643c13618fe2c6a7fbbf88b828",
+      "session_header_sha256": "81448ae7753336dcd6deb5312dfde15ac0221cdf44a840ccfeb52e0c82f502d5"
+    },
+    "error_overflow": false,
+    "error_records": [
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "087887a5e724b20431127cba2d898e72cc254b2036f927b78f3b7546e4a89a60",
+        "code": "non-executable-script",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/cli.d.ts 644 package:usr/bin/env node",
+        "mode": "644",
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/cli.d.ts",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "f995daf1e5a2823ccd94232f634e1dcc8c824336abaac432f5ca2b224e1a020f",
+        "code": "non-executable-script",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/cli.js 644 package:usr/bin/env node",
+        "mode": "644",
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/cli.js",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "9e695d5ae7f00a845128c53ad8371b262485292a350309c369d60e61459ea36c",
+        "code": "non-executable-script",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.d.ts 644 package:usr/bin/env node",
+        "mode": "644",
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.d.ts",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "06d2a5de1923d103a51cdb2c2be6d8218ae47829ea9092c5b3665898df2ae1e9",
+        "code": "non-executable-script",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.js 644 package:usr/bin/env node",
+        "mode": "644",
+        "path": "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.js",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "f112760bc2b4e0349a5d6127a4c800525dc024f51dfcd48e27e6dbd6fca282a0",
+        "code": "files-duplicated-waste",
+        "level": "E",
+        "message": "214129",
+        "target": "theme-forge-stellar-burst.aarch64",
+        "waste_bytes": 214129
+      }
+    ],
+    "findings": [
+      {
+        "check": "non-executable-script",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/cli.d.ts 644 package:usr/bin/env node",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "non-executable-script",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/cli.js 644 package:usr/bin/env node",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "non-executable-script",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.d.ts 644 package:usr/bin/env node",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "non-executable-script",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.js 644 package:usr/bin/env node",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "files-duplicated-waste",
+        "level": "E",
+        "message": "214129",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "unstripped-binary-or-object",
+        "level": "W",
+        "message": "package:usr/lib/theme-forge-stellar-burst/native/directory-snapshot/prebuilds/linux-arm64-gnu/native-addon-posix-openat-v1.node",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "unstripped-binary-or-object",
+        "level": "W",
+        "message": "package:usr/lib/theme-forge-stellar-burst/native/directory-snapshot/prebuilds/linux-x64-gnu/native-addon-posix-openat-v1.node",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "no-manual-page-for-binary",
+        "level": "W",
+        "message": "tfsb",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "no-manual-page-for-binary",
+        "level": "W",
+        "message": "tfsb-studio-service",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "no-documentation",
+        "level": "W",
+        "message": "",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "no-%check-section",
+        "level": "W",
+        "message": "",
+        "target": "theme-forge-stellar-burst.spec"
+      },
+      {
+        "check": "invalid-url",
+        "level": "W",
+        "message": "Source3: npm-closure.tar.gz",
+        "target": "theme-forge-stellar-burst.spec"
+      },
+      {
+        "check": "invalid-url",
+        "level": "W",
+        "message": "Source0: knowledge-forge-ai-theme-forge-stellar-burst-0.7.0.tgz",
+        "target": "theme-forge-stellar-burst.spec"
+      },
+      {
+        "check": "hidden-file-or-dir",
+        "level": "W",
+        "message": "package:usr/lib/theme-forge-stellar-burst/node_modules/@xmldom/xmldom/lib/.eslintrc.yml",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "files-duplicate",
+        "level": "W",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/design-evidence/index.js package:usr/lib/theme-forge-stellar-burst/dist/design-ev",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "files-duplicate",
+        "level": "W",
+        "message": "package:usr/lib/theme-forge-stellar-burst/dist/types.js package:usr/lib/theme-forge-stellar-burst/dist/design-evidence/v1-types.",
+        "target": "theme-forge-stellar-burst.aarch64"
+      },
+      {
+        "check": "files-duplicate",
+        "level": "W",
+        "message": "package:usr/lib/theme-forge-stellar-burst/node_modules/fflate/lib/node.d.cts package:usr/lib/theme-forge-stellar-burst/node_modu",
+        "target": "theme-forge-stellar-burst.aarch64"
+      }
+    ],
+    "findings_summary": {
+      "errors": 5,
+      "filtered": 8,
+      "information": 0,
+      "packages": 1,
+      "specfiles": 1,
+      "warnings": 12
+    },
+    "findings_truncated": false,
+    "groups": [
+      {
+        "code": "files-duplicated-waste",
+        "count": 1,
+        "samples": [
+          {
+            "check": "files-duplicated-waste",
+            "level": "E",
+            "message": "214129",
+            "target": "theme-forge-stellar-burst.aarch64"
+          }
+        ],
+        "severity": "E"
+      },
+      {
+        "code": "non-executable-script",
+        "count": 4,
+        "samples": [
+          {
+            "check": "non-executable-script",
+            "level": "E",
+            "message": "package:usr/lib/theme-forge-stellar-burst/dist/cli.d.ts 644 package:usr/bin/env node",
+            "target": "theme-forge-stellar-burst.aarch64"
+          },
+          {
+            "check": "non-executable-script",
+            "level": "E",
+            "message": "package:usr/lib/theme-forge-stellar-burst/dist/cli.js 644 package:usr/bin/env node",
+            "target": "theme-forge-stellar-burst.aarch64"
+          },
+          {
+            "check": "non-executable-script",
+            "level": "E",
+            "message": "package:usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.d.ts 644 package:usr/bin/env node",
+            "target": "theme-forge-stellar-burst.aarch64"
+          }
+        ],
+        "severity": "E"
+      },
+      {
+        "code": "files-duplicate",
+        "count": 3,
+        "samples": [
+          {
+            "check": "files-duplicate",
+            "level": "W",
+            "message": "package:usr/lib/theme-forge-stellar-burst/dist/design-evidence/index.js package:usr/lib/theme-forge-stellar-burst/dist/design-ev",
+            "target": "theme-forge-stellar-burst.aarch64"
+          },
+          {
+            "check": "files-duplicate",
+            "level": "W",
+            "message": "package:usr/lib/theme-forge-stellar-burst/dist/types.js package:usr/lib/theme-forge-stellar-burst/dist/design-evidence/v1-types.",
+            "target": "theme-forge-stellar-burst.aarch64"
+          },
+          {
+            "check": "files-duplicate",
+            "level": "W",
+            "message": "package:usr/lib/theme-forge-stellar-burst/node_modules/fflate/lib/node.d.cts package:usr/lib/theme-forge-stellar-burst/node_modu",
+            "target": "theme-forge-stellar-burst.aarch64"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "hidden-file-or-dir",
+        "count": 1,
+        "samples": [
+          {
+            "check": "hidden-file-or-dir",
+            "level": "W",
+            "message": "package:usr/lib/theme-forge-stellar-burst/node_modules/@xmldom/xmldom/lib/.eslintrc.yml",
+            "target": "theme-forge-stellar-burst.aarch64"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "invalid-url",
+        "count": 2,
+        "samples": [
+          {
+            "check": "invalid-url",
+            "level": "W",
+            "message": "Source3: npm-closure.tar.gz",
+            "target": "theme-forge-stellar-burst.spec"
+          },
+          {
+            "check": "invalid-url",
+            "level": "W",
+            "message": "Source0: knowledge-forge-ai-theme-forge-stellar-burst-0.7.0.tgz",
+            "target": "theme-forge-stellar-burst.spec"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "no-%check-section",
+        "count": 1,
+        "samples": [
+          {
+            "check": "no-%check-section",
+            "level": "W",
+            "message": "",
+            "target": "theme-forge-stellar-burst.spec"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "no-documentation",
+        "count": 1,
+        "samples": [
+          {
+            "check": "no-documentation",
+            "level": "W",
+            "message": "",
+            "target": "theme-forge-stellar-burst.aarch64"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "no-manual-page-for-binary",
+        "count": 2,
+        "samples": [
+          {
+            "check": "no-manual-page-for-binary",
+            "level": "W",
+            "message": "tfsb",
+            "target": "theme-forge-stellar-burst.aarch64"
+          },
+          {
+            "check": "no-manual-page-for-binary",
+            "level": "W",
+            "message": "tfsb-studio-service",
+            "target": "theme-forge-stellar-burst.aarch64"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "unstripped-binary-or-object",
+        "count": 2,
+        "samples": [
+          {
+            "check": "unstripped-binary-or-object",
+            "level": "W",
+            "message": "package:usr/lib/theme-forge-stellar-burst/native/directory-snapshot/prebuilds/linux-arm64-gnu/native-addon-posix-openat-v1.node",
+            "target": "theme-forge-stellar-burst.aarch64"
+          },
+          {
+            "check": "unstripped-binary-or-object",
+            "level": "W",
+            "message": "package:usr/lib/theme-forge-stellar-burst/native/directory-snapshot/prebuilds/linux-x64-gnu/native-addon-posix-openat-v1.node",
+            "target": "theme-forge-stellar-burst.aarch64"
+          }
+        ],
+        "severity": "W"
+      }
+    ],
+    "identity_status": {
+      "package": "available",
+      "spec": "available"
+    },
+    "package_file": "theme-forge-stellar-burst-0.7.0-1.fc43.aarch64.rpm",
+    "package_sha256": "111f8af6058f1106de51fd40ceeb97f2e6b984ec754f09bf22b3f5a26ce680ec",
+    "parse_complete": true,
+    "product": "theme-forge-stellar-burst",
+    "reason_token": "lint-errors",
+    "rpm_identity": {
+      "arch": "aarch64",
+      "name": "theme-forge-stellar-burst",
+      "release": "1.fc43",
+      "version": "0.7.0"
+    },
+    "rpm_payload_digest": {
+      "algo_tag": "PAYLOADSHA256ALGO",
+      "algorithm": "sha256",
+      "algorithm_numeric": 8,
+      "capability": "rpm6",
+      "digest": "f54751676efcc9bbc9447b7d8bc8275e44532dd75afe454c8b60bcf6e6cd9a63",
+      "payload_digest": "f54751676efcc9bbc9447b7d8bc8275e44532dd75afe454c8b60bcf6e6cd9a63",
+      "payload_digest_algo": "sha256",
+      "querytags_sha256": "4ea0771d2bcf05e86b8ab9e4bb84502072a0cbb35244d943662296e37860af35",
+      "scope": "compressed-payload",
+      "tag": "PAYLOADSHA256"
+    },
+    "schema": "rs9.rpmlint-evidence.v1alpha1",
+    "session_headers": [
+      "============================ rpmlint session starts ============================",
+      "rpmlint: 2.8.0",
+      "configuration:",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "checks: 32, packages: 2"
+    ],
+    "spec_file": "theme-forge-stellar-burst.spec",
+    "spec_sha256": "bff9534317fa81db5f81b606d0f56bae92a173203775af925a8ac671dc272a8d",
+    "status": "fail",
+    "tool_receipt": {
+      "command": [
+        "rpmlint",
+        "theme-forge-stellar-burst.spec",
+        "theme-forge-stellar-burst-0.7.0-1.fc43.aarch64.rpm"
+      ],
+      "command_sha256": "8dd6660e0f078829ebb20b50fb72b72d2c4ea2686fbffdedd1ec5c5f44d7ad5f",
+      "executed": true,
+      "exit_code": 64,
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 3037,
+      "stdout_sha256": "60d6c4da0e6f1cff603255b8d45fae0e378c1e48640e2abdf625706919e1c20f",
+      "tool": "rpmlint"
+    },
+    "tool_version": {
+      "exit_code": 0,
+      "package_query": {
+        "exit_code": 0,
+        "stderr_length": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_length": 28,
+        "stdout_sha256": "cf549ae7e9ea58b8e92884a6c88b4c1968295b2e1a6af2313a9798f3f463bd73",
+        "version": "rpmlint|2.8.0|2.fc43|noarch"
+      },
+      "stderr_length": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_length": 6,
+      "stdout_sha256": "dceb827995520dae388b7283c5bc7847ef58a16e8013318c3bb436feeb5dc51e",
+      "tool": "rpmlint",
+      "tool_identity_sha256": "485a5836e2ecfd91834d329c85a99f0e6b5ccba0e21a7f93146b95c549b4daa5",
+      "version": "2.8.0"
+    },
+    "unparsed_count": 0,
+    "unparsed_samples": [],
+    "unparsed_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  },
+  "schema": "fixture.current071.native-rpm-observation.v1",
+  "sourceCommit": "51c3eb411c7f1f803ac09dde45a43bac21a81383",
+  "system": "aarch64-linux"
+}

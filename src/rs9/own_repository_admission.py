@@ -24,10 +24,10 @@ TARGET = "Knowledge-Forge-AI/theme-forge-packages"
 DESCRIPTOR = "tools/verification/current-rs9-inputs.json"
 IMPORTER = "tools/verification/current_import_routing.py"
 VERSIONS = {"theme-forge-stellar-burst":"0.7.0", "theme-forge-stellar-loom":"0.5.0",
-            "theme-forge-solar-sail":"0.3.0", "theme-forge-nebular-fusion":"0.7.0"}
+            "theme-forge-solar-sail":"0.3.0", "theme-forge-nebular-fusion":"0.7.1"}
 # Filled from the actual paired P body + immutable P9 bytes by the retained
 # preparation sealer. No caller/env/JSON can choose these expected identities.
-CONSUMER_FILE_HASHES = {'.github/workflows/publish.yml': '3fef1507c55fefb30d07c5cef8aef110974b12d102e08768f4958561431db590', 'flake.lock': 'ed928e945c79e3d7f19d37b13a05f0d97b98440b38661d97bf77844e40606431', 'flake.nix': '67be263eae65764407ef29126d28183f0270f60ad45acb8fd1202cec6411d9dd', 'keys/knowledge-forge-ai-packages.asc': '6931a99cf38e204c0adc75dd868f8c0e79d68e58e2644f575d4be1da2ea18d95', 'package-matrix.json': '85316f9c08ef226130189fa680864e57bf360daeea087b9aa37081121105de5f', 'release-lock.json': 'c12e976de5660ae411f9ed1dd8c575a732afcdacfd3609bcf30eaa814061c96c', 'tools/verification/current_import_routing.py': '6807f16e8b6be540799020dc63c4ef1e62030fb54f44907b828728492c034d07', 'tools/verification/generate-publication-provenance.mjs': '1fd13ff84ca4267fb2d2207f006fb966e910426d7555528d115a9afd9119b695', 'tools/verification/verify-publication-provenance.mjs': '50abdc435dc2a34bdc8a7511329f7fe9baad7c3554a7eecdab258c004145ef87'}  # PAIR_BODY_HASHES
+CONSUMER_FILE_HASHES = {'.github/workflows/publish.yml': '3fef1507c55fefb30d07c5cef8aef110974b12d102e08768f4958561431db590', 'flake.lock': 'ed928e945c79e3d7f19d37b13a05f0d97b98440b38661d97bf77844e40606431', 'flake.nix': '67be263eae65764407ef29126d28183f0270f60ad45acb8fd1202cec6411d9dd', 'keys/knowledge-forge-ai-packages.asc': '6931a99cf38e204c0adc75dd868f8c0e79d68e58e2644f575d4be1da2ea18d95', 'package-matrix.json': 'd1f0bead68f21c50b899eaf74bbb4f6b325986c515cf8802efa348bafaae885d', 'release-lock.json': 'c324a61b98c061cea2eab89f8dcd1d214b8524642db7bbe907984907effaa9ae', 'tools/verification/current_import_routing.py': 'db21314230cc56a3b889743907d4cf2bdcee3e550513911c9f8eb8884dd665f6', 'tools/verification/generate-publication-provenance.mjs': '1fd13ff84ca4267fb2d2207f006fb966e910426d7555528d115a9afd9119b695', 'tools/verification/verify-publication-provenance.mjs': '50abdc435dc2a34bdc8a7511329f7fe9baad7c3554a7eecdab258c004145ef87'}  # PAIR_BODY_HASHES
 _PROOF = object()
 _ACTIVE = WeakKeyDictionary()
 _CONSUMERS = WeakKeyDictionary()
@@ -215,7 +215,7 @@ def admit(repository,output,summary,expected,consumer):
             _CONSUMERS.get(consumer)!=(digest(consumer.record),digest(expected)) or
             consumer.record.get("repository")!=TARGET):
         fail("Fresh fixed-consumer source proof required")
-    selected=load_policy(repository/rpm_policy_path(CURRENT_GENERATION),generation=CURRENT_GENERATION)
+    selected=load_policy(repository/rpm_policy_path(CURRENT_GENERATION,policy_variant="current071"),generation=CURRENT_GENERATION,policy_variant="current071")
     if (selected.get("generation")!=CURRENT_GENERATION or selected.get("status")!="authorized" or
             selected.get("blocking") is not False or set(selected.get("projects",{}))!=set(VERSIONS)):
         fail("Complete adopted current policy required", "CURRENT_RPM_POLICY_HELD")
@@ -230,7 +230,7 @@ def admit(repository,output,summary,expected,consumer):
         tokens=_restriction(lane,receipt)
         if lane["lane"]=="rpm":
             rpm_systems.add(lane["system"])
-            validate_rpm_policy_source(repository,receipt,generation=CURRENT_GENERATION)
+            validate_rpm_policy_source(repository,receipt,generation=CURRENT_GENERATION,policy_variant="current071")
             raw_projections=verify_rpm_custody(directory,manifest,receipt)
             details=receipt.get("details",{});policies=details.get("rpm_lint_policy",{});raws=details.get("rpm_lint_raw",{})
             if set(policies)!=set(VERSIONS) or set(raws)!=set(VERSIONS):fail("Exact four current raw/policy products required")

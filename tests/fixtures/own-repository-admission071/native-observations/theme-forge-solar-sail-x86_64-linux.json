@@ -1,0 +1,357 @@
+{
+  "artifact": 13107784987,
+  "inputs": {
+    "arch": "noarch",
+    "asset_sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415",
+    "closure_sha256": "185af30352aae06502642cb5d7ab93f92e7934de9be26d2e8e9fe0a178e0bfa1",
+    "payload_manifest_sha256": "439d74f09a6e639906e83ea12956b2200df7fbf3d37d9f9c2d81c76f8c757735",
+    "project_id": "theme-forge-solar-sail",
+    "system": "x86_64-linux",
+    "version": "0.3.0"
+  },
+  "originalInventoryObjectReconstructed": false,
+  "originalQualifiedRun": 41368171900,
+  "policyChunksAndSummaryVerified": true,
+  "policy_evaluation": {
+    "accepted": true,
+    "accepted_findings": [
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "9f50fab84acce12206fe8a99632d0d921207c5f54373f377c7443ec068cfc22b",
+        "code": "env-script-interpreter",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-solar-sail/bin/tfss.js package:usr/bin/env node",
+        "path": "/usr/lib/theme-forge-solar-sail/bin/tfss.js",
+        "target": "theme-forge-solar-sail.noarch"
+      }
+    ],
+    "blockers": [],
+    "calculated_duplicate_waste": 0,
+    "duplicate_groups": [],
+    "inputs": {
+      "arch": "noarch",
+      "asset_sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415",
+      "closure_sha256": "185af30352aae06502642cb5d7ab93f92e7934de9be26d2e8e9fe0a178e0bfa1",
+      "payload_manifest_sha256": "439d74f09a6e639906e83ea12956b2200df7fbf3d37d9f9c2d81c76f8c757735",
+      "project_id": "theme-forge-solar-sail",
+      "system": "x86_64-linux",
+      "version": "0.3.0"
+    },
+    "inventory_sha256": "cdc8a3d7a114e4ec04ad4a3a7e7f3a886387e571bcc7904a07e2bc92d1de1c9d",
+    "member_proofs": [
+      {
+        "input_archive_sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415",
+        "input_member": "package/bin/tfss.js",
+        "intent": "private-implementation-node-wrapper",
+        "launcher": "/usr/bin/tfss",
+        "mode": 493,
+        "path": "/usr/lib/theme-forge-solar-sail/bin/tfss.js",
+        "sha256": "d4ef4ff625b5f5155256b0265580ab1bf4b406a0c58a1c8dd890692b2b4186a4",
+        "shebang": "#!/usr/bin/env node"
+      }
+    ],
+    "observed_duplicate_groups": [
+      {
+        "members": [
+          "/usr/lib/theme-forge-solar-sail/LICENSE",
+          "/usr/share/licenses/theme-forge-solar-sail/LICENSE"
+        ],
+        "possible_waste_bytes": [
+          0
+        ],
+        "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+        "size": 34460,
+        "waste": 0
+      },
+      {
+        "members": [
+          "/usr/lib/theme-forge-solar-sail/NOTICE",
+          "/usr/share/licenses/theme-forge-solar-sail/NOTICE"
+        ],
+        "possible_waste_bytes": [
+          0
+        ],
+        "sha256": "eff05b5c04e18b0d12d6ddf523fddc4d39c0d9af6349f6fd126519e523dba942",
+        "size": 602,
+        "waste": 0
+      }
+    ],
+    "observed_error_members": [
+      {
+        "code": "env-script-interpreter",
+        "input_archive_sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415",
+        "input_member": "package/bin/tfss.js",
+        "mode": 493,
+        "path": "/usr/lib/theme-forge-solar-sail/bin/tfss.js",
+        "preserved": true,
+        "sha256": "d4ef4ff625b5f5155256b0265580ab1bf4b406a0c58a1c8dd890692b2b4186a4",
+        "shebang": "#!/usr/bin/env node"
+      }
+    ],
+    "policy_sha256": "da323f91e2803ba8339c7a00a18b2f1944d6ca08d23289e802dce9e6b48578c2",
+    "raw_exit_code": 64,
+    "raw_lint_status": "fail",
+    "rule_blocker_causes": [],
+    "rule_blockers": [],
+    "schema": "rs9.rpm-lint-policy-evaluation.v1",
+    "status": "accepted"
+  },
+  "product": "theme-forge-solar-sail",
+  "production_enabled": false,
+  "publication_authority": false,
+  "purpose": "Captured source material for non-admitting tests; no live admission or signing authority",
+  "raw": {
+    "architecture": "noarch",
+    "arguments": [
+      "theme-forge-solar-sail.spec",
+      "theme-forge-solar-sail-0.3.0-1.fc43.noarch.rpm"
+    ],
+    "clean": false,
+    "counts": {
+      "E": 1,
+      "I": 0,
+      "W": 6
+    },
+    "effective_configuration": {
+      "filtered_count": 8,
+      "invocation": "default-tool-config-no-added-filters",
+      "listing_sha256": "d7970ce0b844e71731d12cd215384df251caf5643c13618fe2c6a7fbbf88b828",
+      "session_header_sha256": "81448ae7753336dcd6deb5312dfde15ac0221cdf44a840ccfeb52e0c82f502d5"
+    },
+    "error_overflow": false,
+    "error_records": [
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "9f50fab84acce12206fe8a99632d0d921207c5f54373f377c7443ec068cfc22b",
+        "code": "env-script-interpreter",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-solar-sail/bin/tfss.js package:usr/bin/env node",
+        "path": "/usr/lib/theme-forge-solar-sail/bin/tfss.js",
+        "target": "theme-forge-solar-sail.noarch"
+      }
+    ],
+    "findings": [
+      {
+        "check": "env-script-interpreter",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-solar-sail/bin/tfss.js package:usr/bin/env node",
+        "target": "theme-forge-solar-sail.noarch"
+      },
+      {
+        "check": "only-non-binary-in-usr-lib",
+        "level": "W",
+        "message": "",
+        "target": "theme-forge-solar-sail.noarch"
+      },
+      {
+        "check": "no-manual-page-for-binary",
+        "level": "W",
+        "message": "tfss",
+        "target": "theme-forge-solar-sail.noarch"
+      },
+      {
+        "check": "no-documentation",
+        "level": "W",
+        "message": "",
+        "target": "theme-forge-solar-sail.noarch"
+      },
+      {
+        "check": "no-%check-section",
+        "level": "W",
+        "message": "",
+        "target": "theme-forge-solar-sail.spec"
+      },
+      {
+        "check": "invalid-url",
+        "level": "W",
+        "message": "Source3: npm-closure.tar.gz",
+        "target": "theme-forge-solar-sail.spec"
+      },
+      {
+        "check": "invalid-url",
+        "level": "W",
+        "message": "Source0: knowledge-forge-ai-theme-forge-solar-sail-0.3.0.tgz",
+        "target": "theme-forge-solar-sail.spec"
+      }
+    ],
+    "findings_summary": {
+      "errors": 1,
+      "filtered": 8,
+      "information": 0,
+      "packages": 1,
+      "specfiles": 1,
+      "warnings": 6
+    },
+    "findings_truncated": false,
+    "groups": [
+      {
+        "code": "env-script-interpreter",
+        "count": 1,
+        "samples": [
+          {
+            "check": "env-script-interpreter",
+            "level": "E",
+            "message": "package:usr/lib/theme-forge-solar-sail/bin/tfss.js package:usr/bin/env node",
+            "target": "theme-forge-solar-sail.noarch"
+          }
+        ],
+        "severity": "E"
+      },
+      {
+        "code": "invalid-url",
+        "count": 2,
+        "samples": [
+          {
+            "check": "invalid-url",
+            "level": "W",
+            "message": "Source3: npm-closure.tar.gz",
+            "target": "theme-forge-solar-sail.spec"
+          },
+          {
+            "check": "invalid-url",
+            "level": "W",
+            "message": "Source0: knowledge-forge-ai-theme-forge-solar-sail-0.3.0.tgz",
+            "target": "theme-forge-solar-sail.spec"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "no-%check-section",
+        "count": 1,
+        "samples": [
+          {
+            "check": "no-%check-section",
+            "level": "W",
+            "message": "",
+            "target": "theme-forge-solar-sail.spec"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "no-documentation",
+        "count": 1,
+        "samples": [
+          {
+            "check": "no-documentation",
+            "level": "W",
+            "message": "",
+            "target": "theme-forge-solar-sail.noarch"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "no-manual-page-for-binary",
+        "count": 1,
+        "samples": [
+          {
+            "check": "no-manual-page-for-binary",
+            "level": "W",
+            "message": "tfss",
+            "target": "theme-forge-solar-sail.noarch"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "only-non-binary-in-usr-lib",
+        "count": 1,
+        "samples": [
+          {
+            "check": "only-non-binary-in-usr-lib",
+            "level": "W",
+            "message": "",
+            "target": "theme-forge-solar-sail.noarch"
+          }
+        ],
+        "severity": "W"
+      }
+    ],
+    "identity_status": {
+      "package": "available",
+      "spec": "available"
+    },
+    "package_file": "theme-forge-solar-sail-0.3.0-1.fc43.noarch.rpm",
+    "package_sha256": "9a12ae47a139f42acd2364de9ddd390c57dfe9d903476198a20b8f43c038c6a8",
+    "parse_complete": true,
+    "product": "theme-forge-solar-sail",
+    "reason_token": "lint-errors",
+    "rpm_identity": {
+      "arch": "noarch",
+      "name": "theme-forge-solar-sail",
+      "release": "1.fc43",
+      "version": "0.3.0"
+    },
+    "rpm_payload_digest": {
+      "algo_tag": "PAYLOADSHA256ALGO",
+      "algorithm": "sha256",
+      "algorithm_numeric": 8,
+      "capability": "rpm6",
+      "digest": "d779236a56d48359719123f9bf2ce1b1b15aa8f929d523a053713ca50970dd40",
+      "payload_digest": "d779236a56d48359719123f9bf2ce1b1b15aa8f929d523a053713ca50970dd40",
+      "payload_digest_algo": "sha256",
+      "querytags_sha256": "4ea0771d2bcf05e86b8ab9e4bb84502072a0cbb35244d943662296e37860af35",
+      "scope": "compressed-payload",
+      "tag": "PAYLOADSHA256"
+    },
+    "schema": "rs9.rpmlint-evidence.v1alpha1",
+    "session_headers": [
+      "============================ rpmlint session starts ============================",
+      "rpmlint: 2.8.0",
+      "configuration:",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "checks: 32, packages: 2"
+    ],
+    "spec_file": "theme-forge-solar-sail.spec",
+    "spec_sha256": "6fa1bb4c0e35117b50cd9e18154a9e3f987b822ff8cda270a98d34b5ffbb08bf",
+    "status": "fail",
+    "tool_receipt": {
+      "command": [
+        "rpmlint",
+        "theme-forge-solar-sail.spec",
+        "theme-forge-solar-sail-0.3.0-1.fc43.noarch.rpm"
+      ],
+      "command_sha256": "18a4d466e0e0ffbb990a753dd390dbcd9499098ba5b1327b64012e8eaab3cb71",
+      "executed": true,
+      "exit_code": 64,
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 1021,
+      "stdout_sha256": "14a5d894a023d150b29f9aeb64ca356a2eaf1052791c9c85e217ff04316d3b18",
+      "tool": "rpmlint"
+    },
+    "tool_version": {
+      "exit_code": 0,
+      "package_query": {
+        "exit_code": 0,
+        "stderr_length": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_length": 28,
+        "stdout_sha256": "cf549ae7e9ea58b8e92884a6c88b4c1968295b2e1a6af2313a9798f3f463bd73",
+        "version": "rpmlint|2.8.0|2.fc43|noarch"
+      },
+      "stderr_length": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_length": 6,
+      "stdout_sha256": "dceb827995520dae388b7283c5bc7847ef58a16e8013318c3bb436feeb5dc51e",
+      "tool": "rpmlint",
+      "tool_identity_sha256": "ec9d086bc2171679466f2ce727e4932d950fe3bfc941a617cae54da263bfc39f",
+      "version": "2.8.0"
+    },
+    "unparsed_count": 0,
+    "unparsed_samples": [],
+    "unparsed_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  },
+  "schema": "fixture.current071.native-rpm-observation.v1",
+  "sourceCommit": "51c3eb411c7f1f803ac09dde45a43bac21a81383",
+  "system": "x86_64-linux"
+}

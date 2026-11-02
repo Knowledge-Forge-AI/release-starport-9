@@ -1,0 +1,421 @@
+{
+  "artifact": 13108780455,
+  "inputs": {
+    "arch": "noarch",
+    "asset_sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f",
+    "closure_sha256": "185af30352aae06502642cb5d7ab93f92e7934de9be26d2e8e9fe0a178e0bfa1",
+    "payload_manifest_sha256": "935db93826672dff2667c397426954830f97a07ea9e110336b172b5531ade7ea",
+    "project_id": "theme-forge-stellar-loom",
+    "system": "aarch64-linux",
+    "version": "0.5.0"
+  },
+  "originalInventoryObjectReconstructed": false,
+  "originalQualifiedRun": 41368171900,
+  "policyChunksAndSummaryVerified": true,
+  "policy_evaluation": {
+    "accepted": true,
+    "accepted_findings": [
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "bd606a9578d73413e9c0e0e5ddca26ff01ec2d526cff5d53aaab6e750562687b",
+        "code": "env-script-interpreter",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js package:usr/bin/env node",
+        "path": "/usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js",
+        "target": "theme-forge-stellar-loom.noarch"
+      },
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "09854b4c9c3fdc2f514d2d8e913fb23727c12321f348797bddaafbabc52c5b66",
+        "code": "env-script-interpreter",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-loom/bin/tfsl.js package:usr/bin/env node",
+        "path": "/usr/lib/theme-forge-stellar-loom/bin/tfsl.js",
+        "target": "theme-forge-stellar-loom.noarch"
+      }
+    ],
+    "blockers": [],
+    "calculated_duplicate_waste": 0,
+    "duplicate_groups": [],
+    "inputs": {
+      "arch": "noarch",
+      "asset_sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f",
+      "closure_sha256": "185af30352aae06502642cb5d7ab93f92e7934de9be26d2e8e9fe0a178e0bfa1",
+      "payload_manifest_sha256": "935db93826672dff2667c397426954830f97a07ea9e110336b172b5531ade7ea",
+      "project_id": "theme-forge-stellar-loom",
+      "system": "aarch64-linux",
+      "version": "0.5.0"
+    },
+    "inventory_sha256": "5d4651a14f6bd685a6fda9b92622ca8da4fb2d285e985a74410a869cda641cda",
+    "member_proofs": [
+      {
+        "input_archive_sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f",
+        "input_member": "package/bin/tfsl-batch.js",
+        "intent": "private-implementation-node-wrapper",
+        "launcher": "/usr/bin/tfsl-batch",
+        "mode": 493,
+        "path": "/usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js",
+        "sha256": "b58052712f9426a7669fe7f719aa20c30e19fa4c4d8be6e6a9de41e5b2a081d4",
+        "shebang": "#!/usr/bin/env node"
+      },
+      {
+        "input_archive_sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f",
+        "input_member": "package/bin/tfsl.js",
+        "intent": "private-implementation-node-wrapper",
+        "launcher": "/usr/bin/tfsl",
+        "mode": 493,
+        "path": "/usr/lib/theme-forge-stellar-loom/bin/tfsl.js",
+        "sha256": "6f4196e9a8eb744308a38328d396329901ca7619d8155fb15acfba26257ab316",
+        "shebang": "#!/usr/bin/env node"
+      }
+    ],
+    "observed_duplicate_groups": [
+      {
+        "members": [
+          "/usr/lib/theme-forge-stellar-loom/LICENSE",
+          "/usr/share/licenses/theme-forge-stellar-loom/LICENSE"
+        ],
+        "possible_waste_bytes": [
+          0
+        ],
+        "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+        "size": 34460,
+        "waste": 0
+      },
+      {
+        "members": [
+          "/usr/lib/theme-forge-stellar-loom/NOTICE",
+          "/usr/share/licenses/theme-forge-stellar-loom/NOTICE"
+        ],
+        "possible_waste_bytes": [
+          0
+        ],
+        "sha256": "a7cef97febccf21c5db0854d09806c2b42ed526190d0ef3fd39d877de53a1a0a",
+        "size": 608,
+        "waste": 0
+      }
+    ],
+    "observed_error_members": [
+      {
+        "code": "env-script-interpreter",
+        "input_archive_sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f",
+        "input_member": "package/bin/tfsl-batch.js",
+        "mode": 493,
+        "path": "/usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js",
+        "preserved": true,
+        "sha256": "b58052712f9426a7669fe7f719aa20c30e19fa4c4d8be6e6a9de41e5b2a081d4",
+        "shebang": "#!/usr/bin/env node"
+      },
+      {
+        "code": "env-script-interpreter",
+        "input_archive_sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f",
+        "input_member": "package/bin/tfsl.js",
+        "mode": 493,
+        "path": "/usr/lib/theme-forge-stellar-loom/bin/tfsl.js",
+        "preserved": true,
+        "sha256": "6f4196e9a8eb744308a38328d396329901ca7619d8155fb15acfba26257ab316",
+        "shebang": "#!/usr/bin/env node"
+      }
+    ],
+    "policy_sha256": "da323f91e2803ba8339c7a00a18b2f1944d6ca08d23289e802dce9e6b48578c2",
+    "raw_exit_code": 64,
+    "raw_lint_status": "fail",
+    "rule_blocker_causes": [],
+    "rule_blockers": [],
+    "schema": "rs9.rpm-lint-policy-evaluation.v1",
+    "status": "accepted"
+  },
+  "product": "theme-forge-stellar-loom",
+  "production_enabled": false,
+  "publication_authority": false,
+  "purpose": "Captured source material for non-admitting tests; no live admission or signing authority",
+  "raw": {
+    "architecture": "noarch",
+    "arguments": [
+      "theme-forge-stellar-loom.spec",
+      "theme-forge-stellar-loom-0.5.0-1.fc43.noarch.rpm"
+    ],
+    "clean": false,
+    "counts": {
+      "E": 2,
+      "I": 0,
+      "W": 7
+    },
+    "effective_configuration": {
+      "filtered_count": 8,
+      "invocation": "default-tool-config-no-added-filters",
+      "listing_sha256": "d7970ce0b844e71731d12cd215384df251caf5643c13618fe2c6a7fbbf88b828",
+      "session_header_sha256": "81448ae7753336dcd6deb5312dfde15ac0221cdf44a840ccfeb52e0c82f502d5"
+    },
+    "error_overflow": false,
+    "error_records": [
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "bd606a9578d73413e9c0e0e5ddca26ff01ec2d526cff5d53aaab6e750562687b",
+        "code": "env-script-interpreter",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js package:usr/bin/env node",
+        "path": "/usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js",
+        "target": "theme-forge-stellar-loom.noarch"
+      },
+      {
+        "arguments_complete": true,
+        "arguments_sha256": "09854b4c9c3fdc2f514d2d8e913fb23727c12321f348797bddaafbabc52c5b66",
+        "code": "env-script-interpreter",
+        "interpreter": "/usr/bin/env node",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-loom/bin/tfsl.js package:usr/bin/env node",
+        "path": "/usr/lib/theme-forge-stellar-loom/bin/tfsl.js",
+        "target": "theme-forge-stellar-loom.noarch"
+      }
+    ],
+    "findings": [
+      {
+        "check": "env-script-interpreter",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js package:usr/bin/env node",
+        "target": "theme-forge-stellar-loom.noarch"
+      },
+      {
+        "check": "env-script-interpreter",
+        "level": "E",
+        "message": "package:usr/lib/theme-forge-stellar-loom/bin/tfsl.js package:usr/bin/env node",
+        "target": "theme-forge-stellar-loom.noarch"
+      },
+      {
+        "check": "only-non-binary-in-usr-lib",
+        "level": "W",
+        "message": "",
+        "target": "theme-forge-stellar-loom.noarch"
+      },
+      {
+        "check": "no-manual-page-for-binary",
+        "level": "W",
+        "message": "tfsl",
+        "target": "theme-forge-stellar-loom.noarch"
+      },
+      {
+        "check": "no-manual-page-for-binary",
+        "level": "W",
+        "message": "tfsl-batch",
+        "target": "theme-forge-stellar-loom.noarch"
+      },
+      {
+        "check": "no-documentation",
+        "level": "W",
+        "message": "",
+        "target": "theme-forge-stellar-loom.noarch"
+      },
+      {
+        "check": "no-%check-section",
+        "level": "W",
+        "message": "",
+        "target": "theme-forge-stellar-loom.spec"
+      },
+      {
+        "check": "invalid-url",
+        "level": "W",
+        "message": "Source3: npm-closure.tar.gz",
+        "target": "theme-forge-stellar-loom.spec"
+      },
+      {
+        "check": "invalid-url",
+        "level": "W",
+        "message": "Source0: knowledge-forge-ai-theme-forge-stellar-loom-0.5.0.tgz",
+        "target": "theme-forge-stellar-loom.spec"
+      }
+    ],
+    "findings_summary": {
+      "errors": 2,
+      "filtered": 8,
+      "information": 0,
+      "packages": 1,
+      "specfiles": 1,
+      "warnings": 7
+    },
+    "findings_truncated": false,
+    "groups": [
+      {
+        "code": "env-script-interpreter",
+        "count": 2,
+        "samples": [
+          {
+            "check": "env-script-interpreter",
+            "level": "E",
+            "message": "package:usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js package:usr/bin/env node",
+            "target": "theme-forge-stellar-loom.noarch"
+          },
+          {
+            "check": "env-script-interpreter",
+            "level": "E",
+            "message": "package:usr/lib/theme-forge-stellar-loom/bin/tfsl.js package:usr/bin/env node",
+            "target": "theme-forge-stellar-loom.noarch"
+          }
+        ],
+        "severity": "E"
+      },
+      {
+        "code": "invalid-url",
+        "count": 2,
+        "samples": [
+          {
+            "check": "invalid-url",
+            "level": "W",
+            "message": "Source3: npm-closure.tar.gz",
+            "target": "theme-forge-stellar-loom.spec"
+          },
+          {
+            "check": "invalid-url",
+            "level": "W",
+            "message": "Source0: knowledge-forge-ai-theme-forge-stellar-loom-0.5.0.tgz",
+            "target": "theme-forge-stellar-loom.spec"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "no-%check-section",
+        "count": 1,
+        "samples": [
+          {
+            "check": "no-%check-section",
+            "level": "W",
+            "message": "",
+            "target": "theme-forge-stellar-loom.spec"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "no-documentation",
+        "count": 1,
+        "samples": [
+          {
+            "check": "no-documentation",
+            "level": "W",
+            "message": "",
+            "target": "theme-forge-stellar-loom.noarch"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "no-manual-page-for-binary",
+        "count": 2,
+        "samples": [
+          {
+            "check": "no-manual-page-for-binary",
+            "level": "W",
+            "message": "tfsl",
+            "target": "theme-forge-stellar-loom.noarch"
+          },
+          {
+            "check": "no-manual-page-for-binary",
+            "level": "W",
+            "message": "tfsl-batch",
+            "target": "theme-forge-stellar-loom.noarch"
+          }
+        ],
+        "severity": "W"
+      },
+      {
+        "code": "only-non-binary-in-usr-lib",
+        "count": 1,
+        "samples": [
+          {
+            "check": "only-non-binary-in-usr-lib",
+            "level": "W",
+            "message": "",
+            "target": "theme-forge-stellar-loom.noarch"
+          }
+        ],
+        "severity": "W"
+      }
+    ],
+    "identity_status": {
+      "package": "available",
+      "spec": "available"
+    },
+    "package_file": "theme-forge-stellar-loom-0.5.0-1.fc43.noarch.rpm",
+    "package_sha256": "c8b47a27b66615064cf0ec418a3b5134b59393fe2835e5d55321a81ad085f946",
+    "parse_complete": true,
+    "product": "theme-forge-stellar-loom",
+    "reason_token": "lint-errors",
+    "rpm_identity": {
+      "arch": "noarch",
+      "name": "theme-forge-stellar-loom",
+      "release": "1.fc43",
+      "version": "0.5.0"
+    },
+    "rpm_payload_digest": {
+      "algo_tag": "PAYLOADSHA256ALGO",
+      "algorithm": "sha256",
+      "algorithm_numeric": 8,
+      "capability": "rpm6",
+      "digest": "4279901a79b1f65e5c27f2d18ef204f2def9e0f4ffaf3d2a21761df6f832badd",
+      "payload_digest": "4279901a79b1f65e5c27f2d18ef204f2def9e0f4ffaf3d2a21761df6f832badd",
+      "payload_digest_algo": "sha256",
+      "querytags_sha256": "4ea0771d2bcf05e86b8ab9e4bb84502072a0cbb35244d943662296e37860af35",
+      "scope": "compressed-payload",
+      "tag": "PAYLOADSHA256"
+    },
+    "schema": "rs9.rpmlint-evidence.v1alpha1",
+    "session_headers": [
+      "============================ rpmlint session starts ============================",
+      "rpmlint: 2.8.0",
+      "configuration:",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "[CONFIG_PATH]",
+      "checks: 32, packages: 2"
+    ],
+    "spec_file": "theme-forge-stellar-loom.spec",
+    "spec_sha256": "71e851f133375ccb1a170dfda3848ccd01a72e69cd7045db8e20d9addc5fa5f7",
+    "status": "fail",
+    "tool_receipt": {
+      "command": [
+        "rpmlint",
+        "theme-forge-stellar-loom.spec",
+        "theme-forge-stellar-loom-0.5.0-1.fc43.noarch.rpm"
+      ],
+      "command_sha256": "403b86e3b046d8cb2685d8c3b1e880555ccc6cbdbf599ff37696d87ac605567e",
+      "executed": true,
+      "exit_code": 64,
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 1241,
+      "stdout_sha256": "8707b9d80878789d351b9c4c673d81827efcc33340fdeecac8450f91fee5eee6",
+      "tool": "rpmlint"
+    },
+    "tool_version": {
+      "exit_code": 0,
+      "package_query": {
+        "exit_code": 0,
+        "stderr_length": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_length": 28,
+        "stdout_sha256": "cf549ae7e9ea58b8e92884a6c88b4c1968295b2e1a6af2313a9798f3f463bd73",
+        "version": "rpmlint|2.8.0|2.fc43|noarch"
+      },
+      "stderr_length": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_length": 6,
+      "stdout_sha256": "dceb827995520dae388b7283c5bc7847ef58a16e8013318c3bb436feeb5dc51e",
+      "tool": "rpmlint",
+      "tool_identity_sha256": "485a5836e2ecfd91834d329c85a99f0e6b5ccba0e21a7f93146b95c549b4daa5",
+      "version": "2.8.0"
+    },
+    "unparsed_count": 0,
+    "unparsed_samples": [],
+    "unparsed_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  },
+  "schema": "fixture.current071.native-rpm-observation.v1",
+  "sourceCommit": "51c3eb411c7f1f803ac09dde45a43bac21a81383",
+  "system": "aarch64-linux"
+}
