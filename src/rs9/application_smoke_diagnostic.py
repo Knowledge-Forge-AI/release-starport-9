@@ -1556,17 +1556,32 @@ def _build_initial_observation_descriptor(
 
 def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
              session_bus_argv=None, harness_timeout_ms=None, replay_progress=None,
-             initial_observation=None):
+             initial_observation=None, cleanup_observation_plan=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
-    harness = (replay_progress["wrapper"] if replay_progress else
-               initial_observation["wrapper"] if initial_observation else
-               prepared["tools"] / "native-rc-smoke.mjs")
-    command = ["node", str(harness), "--platform", platform,
-        "--scenario", scenario, "--launch-root", str(launch_root),
-        "--checkout", str(prepared.get("checkout", prepared["source"])),
-        "--evidence", str(evidence), "--label", platform + "-" + scenario]
+    if cleanup_observation_plan is not None:
+        if extras or replay_progress is not None or initial_observation is not None or harness_timeout_ms is not None:
+            raise ContractError(
+                "APPLICATION_SMOKE",
+                "Current071 cleanup observation cannot be combined with replay or initial observation",
+            )
+        from rs9.current071_cleanup_observation import validate_cleanup_observation_plan
+        wrapper, target_harness = validate_cleanup_observation_plan(
+            cleanup_observation_plan, prepared=prepared, platform=platform, scenario=scenario
+        )
+        command = ["node", str(wrapper), str(target_harness), "--platform", platform,
+            "--scenario", scenario, "--launch-root", str(launch_root),
+            "--checkout", str(prepared.get("checkout", prepared["source"])),
+            "--evidence", str(evidence), "--label", platform + "-" + scenario]
+    else:
+        harness = (replay_progress["wrapper"] if replay_progress else
+                   initial_observation["wrapper"] if initial_observation else
+                   prepared["tools"] / "native-rc-smoke.mjs")
+        command = ["node", str(harness), "--platform", platform,
+            "--scenario", scenario, "--launch-root", str(launch_root),
+            "--checkout", str(prepared.get("checkout", prepared["source"])),
+            "--evidence", str(evidence), "--label", platform + "-" + scenario]
     if replay_progress:
         if replay_progress.get("profile") is not None:
             profile = replay_progress["profile"]
@@ -1646,13 +1661,14 @@ def _failure_diagnostic_options(prepared, platform, initial_observation, *,
 
 def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, extras, timeout=240, session_bus_argv=None,
              system=None, harness_timeout_ms=None, replay_progress=None, initial_observation=None,
-             current_nix_text=False):
+             current_nix_text=False, cleanup_observation_plan=None):
     if session_bus_argv is not None:
         from rs9.nix_proot_dbus_command import validate_session_bus_argv
         session_bus_argv = validate_session_bus_argv(session_bus_argv)
     command = _command(prepared, platform, scenario, launch_root, evidence, extras=extras,
                        session_bus_argv=session_bus_argv, harness_timeout_ms=harness_timeout_ms,
-                       replay_progress=replay_progress, initial_observation=initial_observation)
+                       replay_progress=replay_progress, initial_observation=initial_observation,
+                       cleanup_observation_plan=cleanup_observation_plan)
     start = time.monotonic()
     error, rc, out, err = None, None, b"", b""
     sizes, cleanup_error, child_reaped = None, None, None
@@ -1723,13 +1739,16 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
             # Classify the existing 0.7.1 cleanup token only after exact source
             # authentication, independently of optional Nix observer activation.
             # This enables no observer/finalization fields for other routes.
+            diagnostic_options = _failure_diagnostic_options(
+                prepared, platform, initial_observation,
+                current071_observation=current071_observation,
+                current_nix_text=current_nix_text,
+            )
+            if cleanup_observation_plan is not None:
+                diagnostic_options["current071_receipt_steps"] = True
             diagnostic = collect_failure_diagnostics(
                 err, dict(fields), evidence, platform, scenario, record=record, system=system,
-                **_failure_diagnostic_options(
-                    prepared, platform, initial_observation,
-                    current071_observation=current071_observation,
-                    current_nix_text=current_nix_text,
-                ),
+                **diagnostic_options,
             )
             fields.update({k: diagnostic[k] for k in (
                 "stderr_diagnostic", "evidence_inventory", "harness_run_record", "inner_stderr_diagnostic",
@@ -1737,6 +1756,22 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
             ) if k in diagnostic})
         except Exception:
             pass
+        if cleanup_observation_plan is not None:
+            from rs9.current071_cleanup_observation import (
+                observe_current071_cleanup,
+                withheld_current071_cleanup_observation,
+            )
+            try:
+                fields["cleanup_observation"] = observe_current071_cleanup(
+                    err,
+                    system=system,
+                    scenario=scenario,
+                    stderr_bytes=fields["stderr_bytes"],
+                    stderr_sha256=fields["stderr_sha256"],
+                    complete=fields["stream_capture_complete"],
+                )
+            except Exception:
+                fields["cleanup_observation"] = withheld_current071_cleanup_observation("invalid-observation")
     if fields["failed"] and extras:
         # Reuse only the closed enum/count projection of the already-read replay
         # receipt. Its original-attempt envelope must not label replay evidence.
@@ -1934,6 +1969,20 @@ def _retain_failure(prepared, system, platform, scenario, launch_root, prefix, e
     # New optional fields must not displace established observation evidence.
     raw = _shed_current_nix_inner_text_for_size_cap(record, raw)
     raw = _shed_current_nix_inner_tokens_for_size_cap(record, raw)
+    if len(raw) > MAX_DIAGNOSTIC and "cleanup_observation" in record["initial_run"]:
+        initial = dict(record["initial_run"])
+        initial.pop("cleanup_observation")
+        record["initial_run"] = initial
+        raw = canonical(record)
+    if len(raw) > MAX_DIAGNOSTIC:
+        categories = record["initial_run"].get("harness_problem_categories")
+        if isinstance(categories, dict) and "receipt_steps" in categories:
+            initial = dict(record["initial_run"])
+            categories = dict(categories)
+            categories.pop("receipt_steps")
+            initial["harness_problem_categories"] = categories
+            record["initial_run"] = initial
+            raw = canonical(record)
     if len(raw) > MAX_DIAGNOSTIC and "resolution_matches" in record["initial_run"]:
         initial = dict(record["initial_run"])
         initial.pop("resolution_matches")
@@ -2013,10 +2062,13 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
                              diagnostic_initial_observation=False,
                              diagnostic_current_nix_environment_transform=False,
                              current_nix_environment_transform=False,
+                             current071_cleanup_observation=False,
                              session_bus_argv=None):
     if (type(diagnostic_current_nix_environment_transform) is not bool
             or type(current_nix_environment_transform) is not bool):
         raise ContractError("APPLICATION_SMOKE", "Invalid current Nix environment transform option")
+    if type(current071_cleanup_observation) is not bool:
+        raise ContractError("APPLICATION_SMOKE", "Invalid current071 cleanup observation option")
     environment_transform = (
         diagnostic_current_nix_environment_transform or current_nix_environment_transform
     )
@@ -2038,12 +2090,23 @@ def execute_application_smoke(*, prepared, system, launch_root, prefix=(), env=N
             enabled=bool(diagnostic_initial_observation),
             environment_transform=environment_transform,
         )
+        cleanup_observation_plan = None
+        if current071_cleanup_observation:
+            from rs9.current071_cleanup_observation import prepare_current071_cleanup_observation
+            cleanup_observation_plan = prepare_current071_cleanup_observation(
+                prepared, system=system, platform=platform, scenario=scenario
+            )
         fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, False, session_bus_argv=session_bus_argv,
                           system=system, initial_observation=initial_observation,
-                          current_nix_text=current_nix_environment_transform)
+                          current_nix_text=current_nix_environment_transform,
+                          cleanup_observation_plan=cleanup_observation_plan)
         if fields["failed"]:
             from rs9.pages_smoke_diagnostic import validate_smoke_observation
-            observation = validate_smoke_observation(fields, system=system)
+            observation = validate_smoke_observation(
+                fields,
+                system=system,
+                family="apt" if current071_cleanup_observation else None,
+            )
             details = _failure_details(fields, extras=extras, receipt_name=platform+"-"+scenario+".run.json")
             replay_requested = bool(extras or diagnostic_replay)
             replay_allowed = replay_requested

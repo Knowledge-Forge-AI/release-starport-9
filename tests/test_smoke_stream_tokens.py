@@ -617,11 +617,13 @@ class LinuxProblemCategoryTests(unittest.TestCase):
             {"code": "object-problem"},
         ]
 
-    def project(self, record, identity=None, binding=("x86_64-linux", "linux-x64", "C"), *, current071=False):
+    def project(self, record, identity=None, binding=("x86_64-linux", "linux-x64", "C"), *, current071=False,
+                current071_receipt_steps=False):
         from rs9.smoke_stream_tokens import project_problem_categories
         system, platform, scenario = binding
         return project_problem_categories(record, self.identity() if identity is None else identity,
-                                          system=system, platform=platform, scenario=scenario, current071=current071)
+                                          system=system, platform=platform, scenario=scenario, current071=current071,
+                                          **({"current071_receipt_steps": True} if current071_receipt_steps else {}))
 
     def validate(self, raw, *, system="x86_64-linux", scenario="C", receipt=None, receipt_error="receipt-failed",
                  raw_inventory="default-observed", mismatch=False):
@@ -1407,3 +1409,221 @@ class LinuxProblemCategoryTests(unittest.TestCase):
             validate_inner_stream_tokens(doc, inventory=rejected_inventories["limit-exceeded-with-row"]),
             doc,
         )
+
+    def test_current071_receipt_steps_projection_and_validation(self):
+        from rs9.smoke_stream_tokens import (
+            CATEGORY_SCHEMA,
+            CATEGORY_STAGE,
+            MAX_STEP_ENTRIES,
+            RECEIPT_STEPS_SCHEMA_KEYS,
+            RECEIPT_STEPS_STATUSES,
+            SCENARIO_B_STEPS,
+            SCENARIO_C_STEPS,
+            SCENARIO_STEPS,
+            STEP_STATES,
+            collect_failure_diagnostics,
+        )
+        self.assertEqual(SCENARIO_STEPS["C-signal"], SCENARIO_C_STEPS)
+        self.assertEqual(SCENARIO_STEPS["C"], SCENARIO_C_STEPS)
+        self.assertEqual(SCENARIO_STEPS["B"], SCENARIO_B_STEPS)
+        self.assertEqual(len(SCENARIO_B_STEPS), 12)
+        self.assertEqual(len(SCENARIO_C_STEPS), 10)
+        self.assertEqual(STEP_STATES, frozenset({"pass", "fail", "unknown", "missing", "duplicate"}))
+        self.assertEqual(RECEIPT_STEPS_STATUSES, frozenset({"observed", "unavailable"}))
+        self.assertEqual(
+            RECEIPT_STEPS_SCHEMA_KEYS,
+            frozenset({"status", "steps", "entries_observed", "entries_unlisted", "entries_omitted"}),
+        )
+
+        c_signal_binding = ("x86_64-linux", "linux-x64", "C-signal")
+        c_signal_record = {
+            "status": "fail",
+            "problems": ["required step host-status failed: /Users/private/secret"],
+            "receipt": {
+                "steps": [
+                    {
+                        "id": sid,
+                        "ok": sid != "host-status",
+                        "via": "sidecar",
+                        "detail": self.PRIV_PATH,
+                    }
+                    for sid in SCENARIO_C_STEPS
+                ]
+            },
+        }
+        # Default (current071=False) does not attach receipt_steps.
+        legacy_doc = self.project(c_signal_record, binding=c_signal_binding, current071=False)
+        self.assertNotIn("receipt_steps", legacy_doc)
+        current_default = self.project(c_signal_record, binding=c_signal_binding, current071=True)
+        self.assertNotIn("receipt_steps", current_default)
+
+        # current071=True, current071_receipt_steps=True without receipt.steps does not attach receipt_steps.
+        no_steps_doc = self.project(
+            {"status": "fail", "problems": ["required step host-status failed: detail"], "receipt": {"status": "fail"}},
+            binding=c_signal_binding,
+            current071=True, current071_receipt_steps=True,
+        )
+        self.assertNotIn("receipt_steps", no_steps_doc)
+
+        # current071=True, current071_receipt_steps=True projects already-read receipt.steps without rereading disk.
+        with patch("pathlib.Path.read_bytes", side_effect=AssertionError("unexpected disk read")):
+            doc = self.project(c_signal_record, binding=c_signal_binding, current071=True, current071_receipt_steps=True)
+        expected_steps = [
+            {"id": sid, "state": "fail" if sid == "host-status" else "pass"}
+            for sid in SCENARIO_C_STEPS
+        ]
+        self.assertEqual(
+            doc["receipt_steps"],
+            {
+                "status": "observed",
+                "steps": expected_steps,
+                "entries_observed": len(SCENARIO_C_STEPS),
+                "entries_unlisted": 0,
+                "entries_omitted": 0,
+            },
+        )
+        self.assertNotIn(self.PRIV_PATH, json.dumps(doc))
+        p1 = self.validate(doc, system="x86_64-linux", scenario="C-signal")
+        p2 = self.validate(p1, system="x86_64-linux", scenario="C-signal", receipt=dict(p1["receipt"]))
+        p3 = self.validate(p2, system="x86_64-linux", scenario="C-signal", receipt=dict(p2["receipt"]))
+        self.assertEqual(p1, doc)
+        self.assertEqual(p2, p1)
+        self.assertEqual(p3, p2)
+
+        # Non-list receipt.steps projects status="unavailable" with all steps "unknown".
+        for non_list_steps in (None, {"app-shell": True}, "pass", 42, True):
+            with self.subTest(non_list_steps=repr(non_list_steps)):
+                unavail_doc = self.project(
+                    {"status": "fail", "problems": [], "receipt": {"steps": non_list_steps}},
+                    binding=c_signal_binding,
+                    current071=True, current071_receipt_steps=True,
+                )
+                self.assertEqual(
+                    unavail_doc["receipt_steps"],
+                    {
+                        "status": "unavailable",
+                        "steps": [{"id": sid, "state": "unknown"} for sid in SCENARIO_C_STEPS],
+                        "entries_observed": 0,
+                        "entries_unlisted": 0,
+                        "entries_omitted": 0,
+                    },
+                )
+                self.assertEqual(
+                    self.validate(unavail_doc, system="x86_64-linux", scenario="C-signal"),
+                    unavail_doc,
+                )
+
+        # Unlisted step keys, non-bool ok values, duplicates, and overflow past MAX_STEP_ENTRIES are reduced safely.
+        mixed_steps = [
+            {"id": "app-shell", "ok": True},
+            {"id": "host-start", "ok": self.PRIV_PATH},
+            {"id": "host-status", "ok": True},
+            {"id": "host-status", "ok": False},
+            {"id": self.PRIV_PATH, "ok": True},
+            {"id": "project-open-upper", "ok": True},
+        ]
+        for idx in range(MAX_STEP_ENTRIES):
+            mixed_steps.append({"id": f"extra-{idx}", "ok": self.PRIV_EMAIL})
+        mixed_doc = self.project(
+            {"status": "fail", "problems": [], "receipt": {"steps": mixed_steps}},
+            binding=c_signal_binding,
+            current071=True, current071_receipt_steps=True,
+        )
+        self.assertEqual(
+            mixed_doc["receipt_steps"],
+            {
+                "status": "observed",
+                "steps": [
+                    {
+                        "id": sid,
+                        "state": (
+                            "pass"
+                            if sid == "app-shell"
+                            else "duplicate"
+                            if sid == "host-status"
+                            else "unknown"
+                        ),
+                    }
+                    for sid in SCENARIO_C_STEPS
+                ],
+                "entries_observed": MAX_STEP_ENTRIES,
+                "entries_unlisted": MAX_STEP_ENTRIES - 4,
+                "entries_omitted": 6,
+            },
+        )
+        self.assertNotIn(self.PRIV_PATH, json.dumps(mixed_doc))
+        self.assertNotIn(self.PRIV_EMAIL, json.dumps(mixed_doc))
+        self.assertEqual(
+            self.validate(mixed_doc, system="x86_64-linux", scenario="C-signal"),
+            mixed_doc,
+        )
+
+        # collect_failure_diagnostics forwards current071_problems to project_problem_categories.
+        with tempfile.TemporaryDirectory() as tmp:
+            ev = Path(tmp).resolve()
+            fields = {"stream_capture_complete": True, "receipt": self.identity(), "receipt_error": "receipt-failed"}
+            diag = collect_failure_diagnostics(
+                b"",
+                fields,
+                ev,
+                "linux-x64",
+                "C-signal",
+                record=c_signal_record,
+                system="x86_64-linux",
+                current071_problems=True, current071_receipt_steps=True,
+            )
+            self.assertEqual(diag["harness_problem_categories"]["receipt_steps"], doc["receipt_steps"])
+
+        # Consumer rejects malformed or cross-scenario receipt_steps as invalid-observation.
+        invalid_env = {
+            "schema": CATEGORY_SCHEMA,
+            "stage": CATEGORY_STAGE,
+            "withheld_reason": "invalid-observation",
+        }
+        mismatch_env = {
+            "schema": CATEGORY_SCHEMA,
+            "stage": CATEGORY_STAGE,
+            "withheld_reason": "binding-mismatch",
+        }
+        good_rs = doc["receipt_steps"]
+        for bad_rs in (
+            None,
+            [],
+            "observed",
+            {**good_rs, "extra": 1},
+            {**good_rs, "status": "unknown"},
+            {**good_rs, "steps": expected_steps[:-1]},
+            {**good_rs, "steps": [{"id": sid, "state": "pass"} for sid in SCENARIO_B_STEPS]},
+            {**good_rs, "steps": [{**expected_steps[0], "state": self.PRIV_PATH}, *expected_steps[1:]]},
+            {**good_rs, "entries_observed": True},
+            {**good_rs, "entries_unlisted": -1},
+            {**good_rs, "entries_omitted": -1},
+            {**good_rs, "entries_observed": 2, "entries_unlisted": 3},
+            {**good_rs, "entries_observed": MAX_STEP_ENTRIES + 1},
+            {**good_rs, "entries_observed": len(SCENARIO_C_STEPS), "entries_omitted": 1},
+            {
+                "status": "unavailable",
+                "steps": expected_steps,
+                "entries_observed": 0,
+                "entries_unlisted": 0,
+                "entries_omitted": 0,
+            },
+            {
+                "status": "unavailable",
+                "steps": [{"id": sid, "state": "unknown"} for sid in SCENARIO_C_STEPS],
+                "entries_observed": 1,
+                "entries_unlisted": 0,
+                "entries_omitted": 0,
+            },
+        ):
+            with self.subTest(bad_receipt_steps=repr(bad_rs)):
+                hostile = {**doc, "receipt_steps": bad_rs}
+                projected = self.validate(hostile, system="x86_64-linux", scenario="C-signal")
+                self.assertEqual(projected, invalid_env)
+                self.assertEqual(self.validate(projected, system="x86_64-linux", scenario="C-signal"), invalid_env)
+                self.assertEqual(
+                    self.validate(hostile, system="x86_64-linux", scenario="C-signal", mismatch=True),
+                    mismatch_env,
+                )
+                self.assertNotIn(self.PRIV_PATH, json.dumps(projected))
+
