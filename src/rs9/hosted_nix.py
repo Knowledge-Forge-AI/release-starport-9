@@ -232,6 +232,10 @@ os.execv(str(exe),[str(exe),*sys.argv[2:]])
             code = code.replace("EXPECTED", repr(manifest["manifest_sha256"])).replace("LAUNCHER", repr(launcher))
             (runtime / "launch.py").write_text(code)
         row.update(authenticated=True, asset_sha256=payload["sha256"], package_class=package_class(pid))
+        if native and _current_linux_lane(generation, context["system"]):
+            # Explicit authenticated discriminator for the shared Nebular recipe;
+            # historical and Darwin rows remain byte-identical.
+            row["source_generation"] = CURRENT_GENERATION
         products[pid] = row
     if set(products) != set(PRODUCTS):
         raise ContractError("NIX_CAPTURE", "All four products required")
