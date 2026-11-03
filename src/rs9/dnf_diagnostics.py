@@ -21,10 +21,30 @@ from rs9.scratch import canonical
 STREAM_LIMIT = 1024 * 1024
 CONFIG_LIMIT = 128 * 1024
 DNF_REPO_ID = "rs9-fedora-nonproduction"
+FIXTURE_KEY_FILENAME = "rs9-candidate-fixture-NONPRODUCTION.asc"
+PRODUCTION_KEY_FILENAME = "knowledge-forge-ai-packages.asc"
 KEY_URI = "file:///srv/rs9/keys/rs9-candidate-fixture-NONPRODUCTION.asc"
+PRODUCTION_KEY_URI = "file:///srv/rs9/keys/knowledge-forge-ai-packages.asc"
+PRODUCTION_KEY_SHA256 = "6931a99cf38e204c0adc75dd868f8c0e79d68e58e2644f575d4be1da2ea18d95"
+PRODUCTION_PUBLIC_FINGERPRINT = "7D03EE84F8C7025FD2F3D772BF89DF6643C2F1AF"
+PUBLIC_KEY_ROLES = {
+    FIXTURE_KEY_FILENAME: KEY_URI,
+    PRODUCTION_KEY_FILENAME: PRODUCTION_KEY_URI,
+}
+ALLOWED_KEY_URIS = {KEY_URI, PRODUCTION_KEY_URI}
 CACHE_ROOT = "/var/cache/libdnf5"
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
 _FINGERPRINT = re.compile(r"[0-9A-F]{40}\Z")
+
+
+def _valid_key_binding(key_uri: Any, key_sha256: Any, public_fingerprint: Any) -> bool:
+    if type(key_uri) is not str or type(key_sha256) is not str or type(public_fingerprint) is not str:
+        return False
+    if key_uri == KEY_URI:
+        return _SHA.fullmatch(key_sha256) is not None and _FINGERPRINT.fullmatch(public_fingerprint) is not None
+    if key_uri == PRODUCTION_KEY_URI:
+        return key_sha256 == PRODUCTION_KEY_SHA256 and public_fingerprint == PRODUCTION_PUBLIC_FINGERPRINT
+    return False
 
 from rs9.dnf_commands import (DNF_PRESENTATION, DNF_VERSION, DNF_TOOL_VERSION,
     guest_prefix, command_matches, command_identities, stage_command)
@@ -295,20 +315,26 @@ def probe_dnf_client(client, spec: Mapping[str, Any]) -> dict[str, Any]:
         image_id = image_out.rstrip("\n")
         if client.image.startswith("sha256:") and image_id != client.image:
             raise ValueError("container-image-drift")
+        key_uri = spec["key_uri"] if "key_uri" in spec else KEY_URI
+        if type(key_uri) is not str or key_uri not in ALLOWED_KEY_URIS:
+            raise ValueError("key-binding-missing")
+        expected_key_cache = ["python3", "-I", "-c", _KEY_CACHE_PROBE, key_uri.removeprefix("file://"), CACHE_ROOT, DNF_REPO_ID]
+        if [argv for stage, argv in probe_cmds if stage in {"cache-before", "cache-after"}] != [expected_key_cache, expected_key_cache]:
+            raise ValueError("key-or-cache-readback-mismatch")
         before, after = (json.loads(decoded[n]) for n in ("cache-before", "cache-after"))
         if any(set(row) != {"key_sha256", "candidate_cache_entries"}
                or row["key_sha256"] != spec.get("expected_key_sha256")
                or type(row["candidate_cache_entries"]) is not int or row["candidate_cache_entries"] != 0
                for row in (before, after)):
             raise ValueError("key-or-cache-readback-mismatch")
-        if not _SHA.fullmatch(spec.get("expected_key_sha256") or "") or not _FINGERPRINT.fullmatch(spec.get("public_fingerprint") or ""):
+        if not _valid_key_binding(key_uri, spec.get("expected_key_sha256"), spec.get("public_fingerprint")):
             raise ValueError("key-binding-missing")
         sections = _config_sections(decoded["repo-config"])
         enabled = {name for name, options in sections.items() if _boolean(options["enabled"])}
         if enabled != {DNF_REPO_ID}:
             raise ValueError("enabled-repository-set-mismatch")
         repo = sections[DNF_REPO_ID]
-        if (repo["baseurl"] != spec["source_uri"] or repo["gpgkey"] != KEY_URI
+        if (repo["baseurl"] != spec["source_uri"] or repo["gpgkey"] != key_uri
                 or repo.get("metalink", "") or repo.get("mirrorlist", "")
                 or not _boolean(repo["repo_gpgcheck"]) or _boolean(repo["skip_if_unavailable"])):
             raise ValueError("repository-trust-config-mismatch")
@@ -340,7 +366,7 @@ def probe_dnf_client(client, spec: Mapping[str, Any]) -> dict[str, Any]:
         if tools["dnf-version"]["version"] != f"dnf5 version {DNF_VERSION}":
             raise ValueError("dnf-version-mismatch")
 
-        identity = {"repo_id": DNF_REPO_ID, "source_uri": spec["source_uri"], "key_uri": KEY_URI,
+        identity = {"repo_id": DNF_REPO_ID, "source_uri": spec["source_uri"], "key_uri": repo["gpgkey"],
                     "key_sha256": before["key_sha256"], "public_fingerprint": spec["public_fingerprint"],
                     "image_id": image_id, "image_sha256": digest(image_id.encode()),
                     "image_reference_sha256": digest(client.image.encode()), "platform": client.platform,
@@ -358,8 +384,10 @@ def probe_dnf_client(client, spec: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
-def probe_commands(base: list[str]) -> list[tuple[str, list[str]]]:
-    key_cache = ["python3", "-I", "-c", _KEY_CACHE_PROBE, KEY_URI.removeprefix("file://"), CACHE_ROOT, DNF_REPO_ID]
+def probe_commands(base: list[str], key_uri: str = KEY_URI) -> list[tuple[str, list[str]]]:
+    if type(key_uri) is not str or key_uri not in ALLOWED_KEY_URIS:
+        raise ContractError("INVALID_ARGUMENT", "Unsupported DNF key URI")
+    key_cache = ["python3", "-I", "-c", _KEY_CACHE_PROBE, key_uri.removeprefix("file://"), CACHE_ROOT, DNF_REPO_ID]
     env_probe = [*guest_prefix(), "python3", "-I", "-c",
                  "import json, os; print(json.dumps({k: os.environ.get(k) for k in ('FORCE_COLUMNS', 'LC_ALL', 'LANG', 'DNF5_FORCE_INTERACTIVE')}))"]
     return [("cache-before", key_cache), ("presentation", env_probe),
@@ -384,9 +412,8 @@ def _identity_matches(probe) -> bool:
                      "repo_gpgcheck": True, "skip_if_unavailable": False,
                      "system_cachedir": CACHE_ROOT, "cacheonly": "none", "locale": "C"}
     return (isinstance(identity, Mapping) and probe.get("identity_sha256") == digest(canonical(identity))
-            and identity.get("repo_id") == DNF_REPO_ID and _SHA.fullmatch(identity.get("key_sha256") or "") is not None
-            and _FINGERPRINT.fullmatch(identity.get("public_fingerprint") or "") is not None
-            and identity.get("key_uri") == KEY_URI
+            and identity.get("repo_id") == DNF_REPO_ID
+            and _valid_key_binding(identity.get("key_uri"), identity.get("key_sha256"), identity.get("public_fingerprint"))
             and identity.get("source_uri") in {"file:///srv/rs9/rpm/fedora/43/x86_64", "file:///srv/rs9/rpm/fedora/43/aarch64"}
             and identity.get("configuration") == configuration
             and identity.get("presentation") == DNF_PRESENTATION
@@ -451,7 +478,7 @@ def qualify_dnf(kind, refresh, install, query, *, configure, context):
         relative = target_file.removeprefix(prefix) if isinstance(target_file, str) and target_file.startswith(prefix) else ""
         expected_path = probe["identity"]["source_uri"] + "/" + relative
         uris = re.findall(r"file:[^\s\"']+", combined)
-        if any(uri.rstrip(":") not in {probe["identity"]["source_uri"], expected_path, KEY_URI} for uri in uris):
+        if any(uri.rstrip(":") not in {probe["identity"]["source_uri"], expected_path, probe["identity"]["key_uri"]} for uri in uris):
             return False, category, "dnf-package-source-unproven", diag
         paths = re.findall(r"(?:Librepo error: )?Cannot download ([^\s:]+|file://[^\s]+): All mirrors were tried", combined)
         has_path = (bool(relative) and re.fullmatch(r"Packages/" + re.escape(product) + r"-[A-Za-z0-9_.+-]+\.(?:" + re.escape(arch) + r"|noarch)\.rpm", relative)

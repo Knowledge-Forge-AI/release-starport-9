@@ -64,10 +64,11 @@ class SourceFixtures(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
         self.config=SourceBoundConfiguration(ROOT,COMMIT,TREE,7,START,*(['a'*64]*5))
-        # Reuse the six unchanged P source bodies from the legacy fixture and
-        # overlay only the current 0.7.1 release metadata and paired importer.
+        # Overlay every exact current P consumer source body; retain the legacy
+        # fixture unchanged for historical-source refusal checks.
         self.p=self.root/'p';shutil.copytree(OLD_FIXTURES/'p-source',self.p)
-        for name in ('package-matrix.json','release-lock.json'):
+        for name in sorted(set(own.CONSUMER_FILE_HASHES) - {own.IMPORTER}):
+            (self.p/name).parent.mkdir(parents=True,exist_ok=True)
             (self.p/name).write_bytes((FIXTURES/'p-source'/name).read_bytes())
         (self.p/own.IMPORTER).write_bytes((FIXTURES/'paired-importer.py').read_bytes())
         self.descriptor={'schema':'theme-forge.current-rs9-input-source.v1','generation':CURRENT_GENERATION,
