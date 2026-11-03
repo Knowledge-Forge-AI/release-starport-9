@@ -1,7 +1,13 @@
 """Current-only unsigned import and APT indexing. No signing/deployment API."""
+import sys
+if __name__ == "__main__" and (not sys.flags.isolated or not sys.flags.dont_write_bytecode):
+    raise SystemExit("SIGNER_BOOTSTRAP_FLAGS")
 from dataclasses import dataclass
 from contextlib import contextmanager
+import gzip
 import hashlib
+import lzma
+import zlib
 import json
 import os
 from pathlib import Path
@@ -11,6 +17,110 @@ import sys
 import threading
 import weakref
 from types import MappingProxyType
+
+# Acyclic root bootstrap: this importer is directly pinned by RS9.
+LEAF_MANIFEST_SHA256 = "c3b53509fbde486fb70cb6028bfa56e0e91cd2e8885c001d074117419411d9ba"
+
+
+def _bootstrap_source_bytes(path, limit=2 * 1024 * 1024):
+    if any(parent.is_symlink() for parent in (path, *path.parents)):
+        raise SystemExit("SIGNER_BOOTSTRAP_SYMLINK")
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    except OSError:
+        raise SystemExit("SIGNER_BOOTSTRAP_FILE") from None
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_size > limit:
+            raise SystemExit("SIGNER_BOOTSTRAP_FILE")
+        chunks, left = [], limit + 1
+        while left:
+            block = os.read(fd, min(left, 65536))
+            if not block:
+                break
+            chunks.append(block)
+            left -= len(block)
+        body = b"".join(chunks)
+        after = os.fstat(fd)
+        identity = lambda s: (s.st_dev,s.st_ino,s.st_mode,s.st_nlink,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
+        if len(body) > limit or len(body) != before.st_size or identity(before) != identity(after):
+            raise SystemExit("SIGNER_BOOTSTRAP_CHANGED")
+        return body
+    finally:
+        os.close(fd)
+
+
+def _bootstrap_leaf_bytes(root):
+    manifest = _bootstrap_source_bytes(root / "tools/verification/current_signer/leaf-manifest.json",65536)
+    if hashlib.sha256(manifest).hexdigest() != LEAF_MANIFEST_SHA256:
+        raise SystemExit("SIGNER_BOOTSTRAP_MANIFEST_PIN")
+    def closed_pairs(pairs):
+        result = {}
+        for key,value in pairs:
+            if key in result:
+                raise SystemExit("SIGNER_BOOTSTRAP_DUPLICATE")
+            result[key] = value
+        return result
+    try:
+        doc = json.loads(manifest,object_pairs_hook=closed_pairs)
+    except (ValueError,UnicodeError):
+        raise SystemExit("SIGNER_BOOTSTRAP_SCHEMA") from None
+    if not isinstance(doc,dict) or doc.get("schema") != "tf.current-signer-leaf-manifest.v1":
+        raise SystemExit("SIGNER_BOOTSTRAP_SCHEMA")
+    files = doc.get("files")
+    if not isinstance(files,dict) or not 1 <= len(files) <= 64:
+        raise SystemExit("SIGNER_BOOTSTRAP_INVENTORY")
+    held = {}
+    for rel,expected in files.items():
+        if not isinstance(rel,str) or not (rel in {"tools/verification/p-current-nix-contract.json","tools/verification/current-command-contracts.json"} or re.fullmatch(r"tools/verification/(?:current_signer/[A-Za-z0-9_]+\.py|b3/(?:inputs/)?[A-Za-z0-9_]+\.py)",rel)):
+            raise SystemExit("SIGNER_BOOTSTRAP_PATH")
+        if not isinstance(expected,str) or not re.fullmatch("[0-9a-f]{64}",expected):
+            raise SystemExit("SIGNER_BOOTSTRAP_HASH")
+        body = _bootstrap_source_bytes(root / rel)
+        if hashlib.sha256(body).hexdigest() != expected:
+            raise SystemExit("SIGNER_BOOTSTRAP_LEAF_PIN")
+        if rel.startswith("tools/verification/current_signer/"):
+            if Path(rel).stem in sys.stdlib_module_names or Path(rel).stem in {"current_import_routing","rs9","b3"}:
+                raise SystemExit("SIGNER_BOOTSTRAP_MODULE_IDENTITY")
+            held[Path(rel).stem] = (root / rel,body)
+    return held
+
+
+def _bootstrap_current_signer():
+    if not sys.flags.isolated or not sys.flags.dont_write_bytecode:
+        raise SystemExit("SIGNER_BOOTSTRAP_FLAGS")
+    import importlib.abc
+    import importlib.util
+    entries = {"--current-signer-host":"signer_host_controller","--current-signer-worker":"signer_worker","--current-signer-publish":"retained_publication","--current-signer-client":"package_client_qualification","--current-signer-runtime":"runtime_workflow_bridge"}
+    if len(sys.argv) < 2 or sys.argv[1] not in entries:
+        raise SystemExit("CURRENT_SIGNER_MODE_REQUIRED")
+    root = Path(os.path.abspath(__file__)).parents[2]
+    held = _bootstrap_leaf_bytes(root)
+    held["current_import_routing"] = (Path(os.path.abspath(__file__)),_bootstrap_source_bytes(Path(os.path.abspath(__file__))))
+    entry = entries[sys.argv[1]]
+    if entry not in held or any(name in sys.modules for name in held):
+        raise SystemExit("SIGNER_BOOTSTRAP_MODULE_IDENTITY")
+    class HeldLoader(importlib.abc.Loader):
+        def __init__(self,name):
+            self.name = name
+        def create_module(self,spec):
+            return None
+        def exec_module(self,module):
+            path,body = held[self.name]
+            module.__file__ = str(path)
+            exec(compile(body,str(path),"exec",dont_inherit=True),module.__dict__)
+    class HeldFinder(importlib.abc.MetaPathFinder):
+        def find_spec(self,fullname,path=None,target=None):
+            if fullname in held:
+                return importlib.util.spec_from_loader(fullname,HeldLoader(fullname),origin=str(held[fullname][0]))
+            return None
+    sys.meta_path.insert(0,HeldFinder())
+    module = importlib.import_module(entry)
+    raise SystemExit(module.main(sys.argv[2:]))
+
+
+if __name__ == "__main__":
+    _bootstrap_current_signer()
 
 from rs9.errors import ContractError
 from rs9.hosted_custody import source_tree_identity
@@ -33,6 +143,16 @@ ARCH_SYSTEM = {"deb": {"amd64": "amd64", "arm64": "arm64"},
                "rpm": {"x86_64": "x86_64-linux", "aarch64": "aarch64-linux"},
                "pacman": {"x86_64": "x86_64-linux"}}
 MAX_PACKAGE = 512 * 1024 * 1024
+APT_DISTRIBUTION = "resolute"
+APT_COMPONENTS = ("main",)
+APT_INDEX_NAMES = ("Packages", "Packages.gz", "Packages.xz")
+APT_RELEASE = f"dists/{APT_DISTRIBUTION}/Release"
+MAX_APT_MEMBERS = 128
+MAX_APT_DEPTH = 6
+MAX_APT_METADATA = 16 * 1024 * 1024
+_SHA256_TEXT = re.compile(r"[0-9a-f]{64}")
+_APT_RELEASE_ROW = re.compile(r" ([0-9a-f]{64}) (0|[1-9][0-9]{0,11}) (\S+)")
+_APT_FIELD = re.compile(r"([A-Za-z][A-Za-z0-9-]*): ?(.*)")
 
 
 def fail(message):
@@ -62,6 +182,151 @@ def held_bytes(path, maximum=MAX_PACKAGE):
 
 def sha(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def _apt_release_entries(release_bytes):
+    """Strictly parse the RS9 ``build_indices`` Release shape.
+
+    Returns ``(entries, architectures)`` where ``entries`` maps each SHA256
+    index path to ``(sha256, size)``.  The index set is derived from the
+    Release Architectures/Components fields, which must equal the routed DEB
+    systems; no count is assumed.
+    """
+    from rs9.security import validate_safe_relative_posix_path
+    if not isinstance(release_bytes, bytes) or not 0 < len(release_bytes) <= MAX_APT_METADATA:
+        fail("Bounded APT Release required")
+    try:
+        text = release_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        fail("APT Release encoding differs")
+    if "\r" in text or not text.endswith("\n"):
+        fail("APT Release framing differs")
+    lines = text[:-1].split("\n")
+    if lines.count("SHA256:") != 1:
+        fail("APT Release SHA256 block differs")
+    marker = lines.index("SHA256:")
+    header = {}
+    for line in lines[:marker]:
+        match = _APT_FIELD.fullmatch(line)
+        if match is None or match.group(1) in header:
+            fail("APT Release header differs")
+        header[match.group(1)] = match.group(2)
+    entries = {}
+    for line in lines[marker + 1:]:
+        match = _APT_RELEASE_ROW.fullmatch(line)
+        if match is None:
+            fail("APT Release SHA256 row differs")
+        path = match.group(3)
+        validate_safe_relative_posix_path(path)
+        if path in entries:
+            fail("Duplicate APT Release SHA256 row")
+        entries[path] = (match.group(1), int(match.group(2)))
+    architectures = tuple(header.get("Architectures", "").split(" "))
+    components = tuple(header.get("Components", "").split(" "))
+    if (header.get("Suite") != APT_DISTRIBUTION or header.get("Codename") != APT_DISTRIBUTION
+            or header.get("Acquire-By-Hash") != "yes" or components != APT_COMPONENTS
+            or len(set(architectures)) != len(architectures) or set(architectures) != SYSTEMS["deb"]):
+        fail("APT Release scope differs from routed DEB systems")
+    expected = {f"{component}/binary-{arch}/{name}" for component in components
+                for arch in architectures for name in APT_INDEX_NAMES}
+    if set(entries) != expected:
+        fail("APT Release index set differs")
+    return entries, architectures
+
+
+def _apt_member_map(release_sha256, release_size, entries, pool):
+    """Derive the exact APT member map relative to the APT root.
+
+    Members are Release and its by-hash copy, every Release SHA256 index and
+    its by-hash copy, and every pool DEB.  ``pool`` is ``(filename, sha, size)``.
+    """
+    from rs9.security import validate_safe_relative_posix_path
+    members = {}
+
+    def add(path, digest, size):
+        validate_safe_relative_posix_path(path)
+        if (not isinstance(digest, str) or _SHA256_TEXT.fullmatch(digest) is None
+                or type(size) is not int or not 0 < size <= MAX_PACKAGE):
+            fail("APT member identity is not bounded")
+        if members.setdefault(path, (digest, size)) != (digest, size):
+            fail("APT member identity conflicts")
+
+    base = f"dists/{APT_DISTRIBUTION}"
+    add(APT_RELEASE, release_sha256, release_size)
+    add(f"{base}/by-hash/SHA256/{release_sha256}", release_sha256, release_size)
+    for path, (digest, size) in sorted(entries.items()):
+        add(f"{base}/{path}", digest, size)
+        add(f"{base}/{path.rsplit('/', 1)[0]}/by-hash/SHA256/{digest}", digest, size)
+    for filename, digest, size in pool:
+        if (not isinstance(filename, str) or not filename.startswith("pool/")
+                or not filename.endswith(".deb") or filename in members):
+            fail("APT pool member differs")
+        add(filename, digest, size)
+    if len(members) > MAX_APT_MEMBERS:
+        fail("Too many APT members")
+    return members
+
+
+def _apt_tree_entries(paths):
+    """Exact walker view: member files plus every ancestor directory as ``dir/``."""
+    entries = set(paths)
+    for path in paths:
+        parts = path.split("/")
+        for index in range(1, len(parts)):
+            entries.add("/".join(parts[:index]) + "/")
+    return frozenset(entries)
+
+
+def _bounded_decompress(data, kind):
+    if kind == "Packages.gz":
+        engine = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        try:
+            body = engine.decompress(data, MAX_APT_METADATA + 1)
+        except zlib.error:
+            fail("APT compressed index is not decodable")
+        if not engine.eof or engine.unused_data or engine.unconsumed_tail:
+            fail("APT compressed index framing differs")
+    else:
+        engine = lzma.LZMADecompressor(format=lzma.FORMAT_XZ)
+        try:
+            body = engine.decompress(data, max_length=MAX_APT_METADATA + 1)
+        except lzma.LZMAError:
+            fail("APT compressed index is not decodable")
+        if not engine.eof or engine.unused_data:
+            fail("APT compressed index framing differs")
+    if len(body) > MAX_APT_METADATA:
+        fail("APT compressed index exceeds bound")
+    return body
+
+
+def _apt_package_stanzas(data):
+    """Strict bounded Packages parser; continuation lines belong to one field."""
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        fail("APT Packages encoding differs")
+    if "\r" in text or not text.endswith("\n") or text == "\n":
+        fail("APT Packages framing differs")
+    stanzas = []
+    for block in text[:-1].split("\n\n"):
+        fields, current = {}, None
+        for line in block.split("\n"):
+            if line.startswith((" ", "\t")) and current is not None:
+                fields[current] += "\n" + line
+                continue
+            match = _APT_FIELD.fullmatch(line)
+            if match is None or match.group(1) in fields:
+                fail("APT Packages stanza differs")
+            current = match.group(1)
+            fields[current] = match.group(2)
+        if (any(key not in fields for key in ("Package", "Version", "Architecture", "Filename", "Size", "SHA256"))
+                or re.fullmatch(r"[1-9][0-9]{0,11}", fields["Size"]) is None
+                or _SHA256_TEXT.fullmatch(fields["SHA256"]) is None):
+            fail("APT Packages stanza differs")
+        stanzas.append(fields)
+        if len(stanzas) > MAX_SIGNING_MEMBERS:
+            fail("Too many APT Packages stanzas")
+    return stanzas
 
 
 @dataclass(frozen=True)
@@ -161,6 +426,7 @@ def _write_unsigned(plan, stage, release_date):
     apt = AptRepositoryCandidate(stage / "apt", distribution="resolute",
                                  origin="Knowledge Forge AI", label="Knowledge Forge AI")
     objects = []
+    packages = []
     for row, data, destinations in plan:
         for relative in destinations:
             target = stage / relative
@@ -171,12 +437,31 @@ def _write_unsigned(plan, stage, release_date):
                 fail("Staged unsigned bytes differ")
         if row["family"] == "deb":
             package = apt.add_package(deb_bytes=data)
-            if package.sha256 != row["sha256"]:
+            if (package.sha256 != row["sha256"] or package.size != row["size"]
+                    or Path(package.filename).name != row["name"]):
                 fail("APT pool changed DEB bytes")
+            packages.append(package)
         objects.append({**row, "destinations": destinations})
     indices = apt.build_indices(release_date=release_date)
-    validate_apt_repository(stage / "apt", "resolute")
-    return objects, {k: v for k, v in indices.items() if k != "release_bytes"}
+    validate_apt_repository(stage / "apt", APT_DISTRIBUTION)
+    # The member inventory is derived only from the actual RS9 DebPackage
+    # rows and the Release bytes build_indices wrote; Release bytes are not
+    # serialized, only their size and digest.
+    release_bytes = indices.get("release_bytes")
+    if (indices.get("distribution") != APT_DISTRIBUTION or not isinstance(release_bytes, bytes)
+            or sha(release_bytes) != indices.get("release_sha256")):
+        fail("APT Release anchor differs")
+    entries, _ = _apt_release_entries(release_bytes)
+    if {path: digest for path, (digest, _) in entries.items()} != indices.get("indices"):
+        fail("APT Release SHA256 rows differ from built indices")
+    members = _apt_member_map(indices["release_sha256"], len(release_bytes), entries,
+                              [(package.filename, package.sha256, package.size) for package in packages])
+    return objects, {
+        "distribution": APT_DISTRIBUTION, "release_sha256": indices["release_sha256"],
+        "release_size": len(release_bytes), "indices": dict(indices["indices"]),
+        "members": [{"path": path, "sha256": digest, "size": size}
+                    for path, (digest, size) in sorted(members.items())],
+    }
 
 
 def prepare_unsigned(config, production, collection, stage, *, release_date, zip_transport="actions", timeout=7200):
@@ -239,10 +524,16 @@ _NATIVE_PHASES = frozenset({
     "public-key-import", "private-key-import", "rpm-public-key-import",
     "rpm-package-sign", "rpm-package-verify", "pacman-package-sign",
     "pacman-package-verify",
+    # Closed later-runtime names; admitting a name executes nothing here.
+    "apt-release-clearsign", "apt-release-detach-sign",
+    "rpm-metadata-create", "rpm-metadata-sign", "rpm-metadata-verify",
+    "pacman-database-create", "pacman-database-sign", "pacman-database-verify",
 })
 _ASSEMBLY_PHASES = frozenset({
     "apt-output", "rpm-output", "noarch-output", "pacman-output",
     "signature-output", "final-output-inventory",
+    "apt-release-output", "apt-inrelease-output", "apt-release-gpg-output",
+    "apt-tree-output", "rpm-metadata-output", "pacman-database-output",
 })
 
 
@@ -479,7 +770,8 @@ class _LiveSigningLease:
 
     __slots__ = ("__weakref__", "_record", "_marker", "_pid", "_state", "_lock", "_frozen", "_rows", "_held", "_roots",
                  "_destination_parent", "_destination", "_copies", "_members", "_stage_members", "_routing",
-                 "_origin", "_source_roots", "_object_cache")
+                 "_origin", "_source_roots", "_object_cache", "_apt_tree", "_apt_held", "_apt_release",
+                 "_apt_anchor")
 
     def __init__(self, mint_token, record):
         if mint_token is not _LEASE_MINT_TOKEN or not isinstance(record, dict) or record.get("minted") is not True:
@@ -502,6 +794,10 @@ class _LiveSigningLease:
         self._origin = record["origin"]
         self._source_roots = tuple(record["source_roots"])
         self._object_cache = None
+        self._apt_tree = frozenset(record["apt_members"])
+        self._apt_held = MappingProxyType(dict(record["apt_held"]))
+        self._apt_release = record["apt_release"]
+        self._apt_anchor = tuple(record["apt_anchor"])
 
     @property
     def state(self):
@@ -540,6 +836,8 @@ class _LiveSigningLease:
             fail("Live routing file differs from retained custody")
         if _package_members(self._roots[1]) != self._stage_members:
             fail("Live unsigned package membership differs")
+        if _apt_members(self._roots[1]) != self._apt_tree:
+            fail("Live APT tree membership differs")
         for item in self._copies:
             item.read()
         if _destination_members(self._destination) != self._members:
@@ -709,6 +1007,47 @@ class _LiveSigningLease:
                 self._record["object_ids"] = object_ids
             return self._object_cache
 
+    def _read_apt_held(self, item, anchor=None):
+        """Full custody check, then one held-descriptor read; never a path."""
+        with _SIGNING_LOCK, self._lock:
+            try:
+                self._require()
+                data = item.read()
+                if anchor is not None:
+                    digest, size = anchor
+                    if (len(data) != size or sha(data) != digest
+                            or digest != self._frozen["apt_indices"]["release_sha256"]
+                            or size != self._frozen["apt_indices"]["release_size"]):
+                        fail("Held APT Release differs from frozen anchor")
+            except BaseException as error:
+                self._retain((error,))
+                raise
+            return data
+
+    def read_apt_release(self):
+        """Exact held Release bytes bound to the frozen routing anchor."""
+        _lease_record(self)
+        return self._read_apt_held(self._apt_release, self._apt_anchor)
+
+    def apt_tree_members(self):
+        """Sorted held APT member paths relative to the APT root."""
+        _lease_record(self)
+        with _SIGNING_LOCK, self._lock:
+            try:
+                self._require()
+            except BaseException as error:
+                self._retain((error,))
+                raise
+            return tuple(sorted(self._apt_held))
+
+    def read_apt_member(self, relative):
+        """Read one exact minted APT member; no normalization or filesystem path."""
+        _lease_record(self)
+        if type(relative) is not str or relative not in self._apt_held:
+            fail("Lease APT reads require an exact held member")
+        item = self._apt_held[relative]
+        return self._read_apt_held(item, self._apt_anchor if relative == APT_RELEASE else None)
+
     @contextmanager
     def _phase(self, name, allowed):
         if name not in allowed:
@@ -821,8 +1160,9 @@ class _EnumerationResource:
 class _EnumerationFailure(ContractError):
     """Enumeration body/cleanup failure retaining its temporary resources."""
 
-    def __init__(self, body_error, resources, cleanup_errors, *, body_cause=None):
-        super().__init__("CURRENT_IMPORT_ROUTING", "Unsigned package enumeration failed")
+    def __init__(self, body_error, resources, cleanup_errors, *, body_cause=None,
+                 message="Unsigned package enumeration failed"):
+        super().__init__("CURRENT_IMPORT_ROUTING", message)
         self.body_error = body_error
         self.body_cause = body_cause
         self.resources = tuple(resources)
@@ -918,6 +1258,193 @@ def _package_members(stage, *, resource_sink=None):
     return found
 
 
+def _apt_members(stage, *, resource_sink=None):
+    """Exact held stage APT subtree: member files plus ``dir/`` entries.
+
+    Same enrollment, close-once and typed-failure discipline as
+    ``_package_members``; it opens only ``apt`` and never the unsigned tree.
+    """
+    found = set()
+    entries = 0
+    root_fd = None
+    root_identity = None
+    expected_directories = {}
+    visited = set()
+    walked_fds = []
+    owned_resources = []
+    close_errors = []
+    body_error = None
+    body_cause = None
+
+    def enroll(fd, expected, kind):
+        resource = _EnumerationResource(fd, expected, kind)
+        owned_resources.append(resource)
+        if resource_sink is not None:
+            resource_sink.append(resource)
+        return resource
+
+    def refuse_walk_error(error):
+        raise error
+    try:
+        root_fd = os.open("apt", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=stage.fd)
+        root_entry = enroll(root_fd, None, "apt-root")
+        root_info = os.fstat(root_fd)
+        root_identity = _directory_identity(root_info)
+        root_entry.expected = _stable(root_info)
+        expected_directories = {".": _stable(root_info)}
+        for directory, children, files, fd in os.fwalk(".", follow_symlinks=False, dir_fd=root_fd, onerror=refuse_walk_error):
+            relative = Path(directory).as_posix()
+            if (relative in visited or relative not in expected_directories
+                    or _stable(os.fstat(fd)) != expected_directories[relative]):
+                fail("APT tree directory changed during enumeration")
+            visited.add(relative)
+            duplicate = os.dup(fd)
+            walked_fds.append(enroll(duplicate, expected_directories[relative], "apt-walk"))
+            if len(Path(directory).parts) > MAX_APT_DEPTH:
+                fail("Unexpected APT tree directory depth")
+            entries += len(children) + len(files)
+            if entries > 2 * MAX_APT_MEMBERS:
+                fail("Too many APT tree entries")
+            for name in children:
+                info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                if not stat.S_ISDIR(info.st_mode):
+                    fail("Aliased APT tree directory")
+                child = (Path(directory) / name).as_posix()
+                if child in expected_directories:
+                    fail("Duplicate APT tree directory")
+                expected_directories[child] = _stable(info)
+                found.add(child + "/")
+            for name in files:
+                info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                    fail("Unexpected or aliased APT tree member")
+                found.add((Path(directory) / name).as_posix())
+        if visited != set(expected_directories):
+            fail("APT tree directory was skipped")
+        if any(_stable(os.fstat(entry.fd)) != entry.expected for entry in walked_fds):
+            fail("APT tree directory entries changed during enumeration")
+        if _directory_identity(os.stat("apt", dir_fd=stage.fd, follow_symlinks=False)) != root_identity:
+            fail("APT tree root changed")
+    except OSError as error:
+        body_cause = error
+        body_error = ContractError("CURRENT_IMPORT_ROUTING", "APT tree directory enumeration failed")
+        body_error.original_error = error
+    except BaseException as error:
+        body_cause = error
+        body_error = error
+    finally:
+        for entry in reversed(owned_resources):
+            if entry.status != "open":
+                continue
+            try:
+                entry.close()
+            except BaseException as error:
+                close_errors.append(error)
+        if close_errors:
+            if body_error is None:
+                body_error = ContractError("CURRENT_IMPORT_ROUTING", "APT tree enumeration cleanup failed")
+            raise _EnumerationFailure(body_error, owned_resources, close_errors, body_cause=body_cause,
+                                      message="APT tree enumeration failed") from body_error
+    if body_error is not None:
+        raise body_error
+    stage.check()
+    return found
+
+
+def _hold_apt_tree(stage, apt_indices, rows, held, provisional):
+    """Hold every APT member and bind the held bytes to frozen routing rows.
+
+    The frozen member inventory is never trusted alone: the map is re-derived
+    from held Release/Packages bytes and the authenticated DEB routing rows,
+    then must equal the frozen inventory exactly.
+    """
+    if (not isinstance(apt_indices, dict)
+            or set(apt_indices) != {"distribution", "release_sha256", "release_size", "indices", "members"}
+            or apt_indices["distribution"] != APT_DISTRIBUTION
+            or not isinstance(apt_indices["release_sha256"], str)
+            or _SHA256_TEXT.fullmatch(apt_indices["release_sha256"]) is None
+            or type(apt_indices["release_size"]) is not int
+            or not 0 < apt_indices["release_size"] <= MAX_APT_METADATA
+            or not isinstance(apt_indices["indices"], dict)
+            or not isinstance(apt_indices["members"], list)
+            or not 0 < len(apt_indices["members"]) <= MAX_APT_MEMBERS):
+        fail("Live APT anchor differs")
+    frozen_members = {}
+    for item in apt_indices["members"]:
+        if (not isinstance(item, dict) or set(item) != {"path", "sha256", "size"}
+                or not isinstance(item["path"], str) or not isinstance(item["sha256"], str)
+                or type(item["size"]) is not int or item["path"] in frozen_members):
+            fail("Live APT member inventory differs")
+        frozen_members[item["path"]] = (item["sha256"], item["size"])
+    if [item["path"] for item in apt_indices["members"]] != sorted(frozen_members):
+        fail("Live APT member inventory is not canonical")
+    holds = {}
+
+    def hold(path, digest, size):
+        if path in holds:
+            fail("Duplicate APT member hold")
+        current = _SigningFile(stage, "apt/" + path, digest, size, provisional=provisional)
+        held.append(current)
+        holds[path] = current
+        return current.read()
+
+    release_sha, release_size = apt_indices["release_sha256"], apt_indices["release_size"]
+    entries, architectures = _apt_release_entries(hold(APT_RELEASE, release_sha, release_size))
+    if {path: digest for path, (digest, _) in entries.items()} != apt_indices["indices"]:
+        fail("Held APT Release differs from frozen indices")
+    base = f"dists/{APT_DISTRIBUTION}"
+    index_bytes = {}
+    for path, (digest, size) in sorted(entries.items()):
+        if size > MAX_APT_METADATA:
+            fail("APT index exceeds bound")
+        index_bytes[path] = hold(f"{base}/{path}", digest, size)
+    deb_rows = {row["name"]: row for row in rows if row["family"] == "deb"}
+    pool = {}
+    for arch in architectures:
+        prefix = f"{APT_COMPONENTS[0]}/binary-{arch}/"
+        plain = index_bytes[prefix + "Packages"]
+        for name in APT_INDEX_NAMES[1:]:
+            if _bounded_decompress(index_bytes[prefix + name], name) != plain:
+                fail("APT compressed index differs from Packages")
+        listed = set()
+        for stanza in _apt_package_stanzas(plain):
+            filename = stanza["Filename"]
+            name = Path(filename).name
+            row = deb_rows.get(name)
+            if (row is None or name in listed
+                    or (stanza["SHA256"], int(stanza["Size"])) != (row["sha256"], row["size"])
+                    or stanza["Package"] != row["product"] or stanza["Version"] != name.split("_")[1]
+                    or stanza["Architecture"] != row["architecture"]
+                    or row["architecture"] not in (arch, "all")):
+                fail("APT index package row differs from routing")
+            if pool.setdefault(name, filename) != filename:
+                fail("APT index package filename differs between architectures")
+            listed.add(name)
+        if listed != {name for name, row in deb_rows.items() if row["architecture"] in (arch, "all")}:
+            fail("APT index package set differs from routing")
+    if set(pool) != set(deb_rows):
+        fail("APT pool set differs from routing")
+    derived = _apt_member_map(release_sha, release_size, entries,
+                              [(pool[name], deb_rows[name]["sha256"], deb_rows[name]["size"]) for name in sorted(pool)])
+    if derived != frozen_members:
+        fail("Held APT tree differs from frozen member inventory")
+    for path, (digest, size) in sorted(derived.items()):
+        if path not in holds:
+            hold(path, digest, size)
+    if set(holds) != set(frozen_members):
+        fail("Held APT members differ from frozen inventory")
+    return holds
+
+
+def _apt_holds(held, frozen):
+    """Recover the held APT map and exact tree view from one fresh owner value."""
+    holds = {item.relative[len("apt/"):]: item for item in held if item.relative.startswith("apt/")}
+    expected = {item["path"] for item in frozen["apt_indices"]["members"]}
+    if set(holds) != expected or APT_RELEASE not in holds:
+        fail("Held APT members differ from frozen inventory")
+    return holds, _apt_tree_entries(holds)
+
+
 @contextmanager
 def fresh_signing_inputs(config, production, collection, stage, *, release_date,
                          zip_transport="actions", timeout=7200):
@@ -986,6 +1513,11 @@ def fresh_signing_inputs(config, production, collection, stage, *, release_date,
             rows.append((row, tuple(copies)))
         if _package_members(roots[1], resource_sink=pre_state["resources"]) != members:
             fail("Extra or missing unsigned package member")
+        apt_holds = _hold_apt_tree(roots[1], frozen["apt_indices"], [row for row, _ in rows], held,
+                                   pre_state["resources"])
+        apt_tree = _apt_tree_entries(apt_holds)
+        if _apt_members(roots[1], resource_sink=pre_state["resources"]) != apt_tree:
+            fail("Extra or missing APT tree member")
         source_roots = (physical_directory(production.root), physical_directory(config.repository))
         handle = _LiveSigningInputs(_SIGNING_SENTINEL)
         with _SIGNING_LOCK:
@@ -1002,6 +1534,8 @@ def fresh_signing_inputs(config, production, collection, stage, *, release_date,
                     item.read()
                 if _package_members(roots[1], resource_sink=pre_state["resources"]) != members:
                     fail("Unsigned package membership changed")
+                if _apt_members(roots[1], resource_sink=pre_state["resources"]) != apt_tree:
+                    fail("APT tree membership changed")
     except OSError:
         raise ContractError("CURRENT_IMPORT_ROUTING", "Physical signing custody unavailable") from None
     finally:
@@ -1078,6 +1612,9 @@ def _transfer_destination(value, destination, owner_state=None):
         expected_stage_members = {relative for row, _ in rows for relative in row["destinations"]}
         if _package_members(roots[1], resource_sink=provisional["resources"]) != expected_stage_members:
             fail("Unsigned package membership changed before lease transfer")
+        apt_held, apt_tree = _apt_holds(held, frozen)
+        if _apt_members(roots[1], resource_sink=provisional["resources"]) != apt_tree:
+            fail("APT tree membership changed before lease transfer")
         parent = _DirectoryHold(target.parent, provisional=provisional["resources"])
         parent_info = os.fstat(parent.fd)
         if parent_info.st_uid != os.getuid() or stat.S_IMODE(parent_info.st_mode) & 0o022:
@@ -1147,6 +1684,8 @@ def _transfer_destination(value, destination, owner_state=None):
             item.read()
         if _package_members(roots[1], resource_sink=provisional["resources"]) != expected_stage_members:
             fail("Unsigned package membership changed during lease transfer")
+        if _apt_members(roots[1], resource_sink=provisional["resources"]) != apt_tree:
+            fail("APT tree membership changed during lease transfer")
         if _destination_members(destination_hold) != {row["name"] for row, _ in rows}:
             fail("Signing lease copied member set differs during transfer")
         created_entry = provisional["fds"][0]
@@ -1165,6 +1704,10 @@ def _transfer_destination(value, destination, owner_state=None):
                   "routing_bytes": canonical(frozen),
                   "origin": frozen_immutable.get("p_source", {}).get("repository", ""),
                   "source_roots": tuple(source_roots),
+                  "apt_members": apt_tree, "apt_held": MappingProxyType(dict(apt_held)),
+                  "apt_release": apt_held[APT_RELEASE],
+                  "apt_anchor": (frozen_immutable["apt_indices"]["release_sha256"],
+                                 frozen_immutable["apt_indices"]["release_size"]),
                   "errors": (), "provisional": provisional}
         lease = _LiveSigningLease(_LEASE_MINT_TOKEN, record)
         _LEASE_REGISTRY[lease] = record
@@ -1337,6 +1880,9 @@ def copy_signing_inputs(handle, destination):
     expected_members = {relative for row, _ in rows for relative in row["destinations"]}
     if _package_members(roots[1]) != expected_members:
         fail("Unsigned package membership differs before intake")
+    _, apt_tree = _apt_holds(held, frozen)
+    if _apt_members(roots[1]) != apt_tree:
+        fail("APT tree membership differs before intake")
     for item in held:
         item.read()
     target = Path(destination)
@@ -1400,6 +1946,8 @@ def copy_signing_inputs(handle, destination):
             root.check()
         if _package_members(roots[1]) != expected_members:
             fail("Unsigned package membership changed during intake")
+        if _apt_members(roots[1]) != apt_tree:
+            fail("APT tree membership changed during intake")
     except BaseException as error:
         if created_identity is not None:
             parent.check()

@@ -655,24 +655,70 @@ def apt_spec(apt_dir: Path, keyring: Path, arch: str, *, public_fingerprint=None
     }
 
 
-def dnf_spec(rpm_dir: Path, keys_dir: Path, arch: str, *, public_fingerprint=None) -> dict[str, Any]:
+def _read_production_dnf_key(keys_dir: Path, filename: str, public_fingerprint: Any) -> str:
+    from rs9.dnf_diagnostics import PRODUCTION_KEY_SHA256, PRODUCTION_PUBLIC_FINGERPRINT
+    if type(public_fingerprint) is not str or public_fingerprint != PRODUCTION_PUBLIC_FINGERPRINT:
+        raise ContractError("UNPINNED_TRUST", "Production DNF trust requires the pinned primary fingerprint")
+    root = physical_directory(keys_dir)
+    key = root / filename
+    try:
+        before = key.lstat()
+        if stat.S_ISLNK(before.st_mode):
+            raise ContractError("SYMLINK_REJECTED", "Production public certificate cannot be a symlink")
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or not 0 < before.st_size <= 1024 * 1024:
+            raise ContractError("INVALID_FILE", "Production public certificate must be a bounded unaliased regular file")
+        fd = os.open(key, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0))
+        with os.fdopen(fd, "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            data = stream.read(1024 * 1024 + 1)
+            after = os.fstat(stream.fileno())
+        named = key.lstat()
+    except ContractError:
+        raise
+    except OSError:
+        raise ContractError("INVALID_FILE", "Production public certificate is unreadable") from None
+    fields = lambda s: (s.st_dev, s.st_ino, s.st_mode, s.st_size, s.st_mtime_ns, s.st_ctime_ns, s.st_nlink)
+    if len(data) != before.st_size or fields(before) != fields(opened) or fields(before) != fields(after) or fields(before) != fields(named):
+        raise ContractError("INVALID_FILE", "Production public certificate changed during read")
+    key_sha256 = digest(data)
+    if key_sha256 != PRODUCTION_KEY_SHA256:
+        raise ContractError("UNPINNED_TRUST", "Production public certificate digest mismatch")
+    return key_sha256
+
+
+def dnf_spec(
+    rpm_dir: Path,
+    keys_dir: Path,
+    arch: str,
+    *,
+    public_fingerprint=None,
+    public_key_filename: str = "rs9-candidate-fixture-NONPRODUCTION.asc",
+) -> dict[str, Any]:
     if arch not in {"x86_64", "aarch64"}:
         raise ContractError("INVALID_ARCHITECTURE", "Fedora client architecture must be x86_64 or aarch64")
+    from rs9.dnf_commands import command_base, guest_prefix
+    from rs9.dnf_diagnostics import FIXTURE_KEY_FILENAME, KEY_URI, PUBLIC_KEY_ROLES, probe_commands
+    if type(public_key_filename) is not str or public_key_filename not in PUBLIC_KEY_ROLES:
+        raise ContractError("INVALID_ARGUMENT", "Unsupported DNF public key filename")
+    key_uri = PUBLIC_KEY_ROLES[public_key_filename]
+    keys_path = Path(keys_dir)
+    if public_key_filename == FIXTURE_KEY_FILENAME:
+        key = keys_path / FIXTURE_KEY_FILENAME
+        expected_key_sha256 = digest(key.read_bytes()) if key.is_file() and not key.is_symlink() else None
+    else:
+        expected_key_sha256 = _read_production_dnf_key(keys_path, public_key_filename, public_fingerprint)
     repo = [
         f"[{DNF_REPO_ID}]", "name=RS9 Fedora 43 NONPRODUCTION candidate",
         f"baseurl=file://{SERVER_ROOT}/rpm/fedora/43/{arch}", "enabled=1",
         "gpgcheck=1", "repo_gpgcheck=1", "skip_if_unavailable=False",
-        f"gpgkey=file://{SERVER_ROOT}/keys/rs9-candidate-fixture-NONPRODUCTION.asc",
+        f"gpgkey={key_uri}",
     ]
-    from rs9.dnf_commands import command_base, guest_prefix
-    from rs9.dnf_diagnostics import probe_commands
     base = command_base()
-    key = keys_dir / "rs9-candidate-fixture-NONPRODUCTION.asc"
-    return {
+    spec = {
         "family": "dnf", "arch": arch, "public_fingerprint": public_fingerprint,
-        "expected_key_sha256": digest(key.read_bytes()) if key.is_file() and not key.is_symlink() else None,
+        "expected_key_sha256": expected_key_sha256,
         "source_uri": f"file://{SERVER_ROOT}/rpm/fedora/43/{arch}",
-        "dnf_probe_commands": probe_commands(base),
+        "dnf_probe_commands": probe_commands(base, key_uri),
         "mounts": [(str(rpm_dir), f"{SERVER_ROOT}/rpm", False), (str(keys_dir), f"{SERVER_ROOT}/keys", False)],
         "configure": [_printf_file(DNF_REPO_FILE, repo)],
         "refresh": [*base, "--refresh", "makecache"],
@@ -680,6 +726,9 @@ def dnf_spec(rpm_dir: Path, keys_dir: Path, arch: str, *, public_fingerprint=Non
         "remove": lambda pkg: [*guest_prefix(), "dnf", "-y", "--disablerepo=*", "--setopt=clean_requirements_on_remove=False", "remove", pkg],
         "query": lambda pkg: ["rpm", "-q", "--qf", "%{VERSION}-%{RELEASE} %{ARCH}\\n", pkg],
     }
+    if key_uri != KEY_URI:
+        spec["key_uri"] = key_uri
+    return spec
 
 
 def pacman_spec(pacman_dir: Path, keys_dir: Path, fingerprint: str) -> dict[str, Any]:
