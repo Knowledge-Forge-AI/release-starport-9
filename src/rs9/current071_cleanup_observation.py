@@ -1,4 +1,4 @@
-"""Bounded current071 Linux APT harness cleanup-error observer and closed validators."""
+"""Authenticated current071 APT scratch cleanup retries and closed error observation."""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -22,8 +22,9 @@ from rs9.smoke_source_envelope import (
 )
 
 CURRENT071_CLEANUP_OBSERVATION_SCHEMA = "rs9.current071-cleanup-observation.v1alpha1"
-CURRENT071_CLEANUP_OBSERVER_ID = "current071-apt-cleanup-rm-sync-v1"
-CURRENT071_CLEANUP_POLICY_ID = "rs9.runner-policy.current071-apt-cleanup-observation.v1alpha1"
+CURRENT071_CLEANUP_OBSERVER_ID = "current071-apt-cleanup-rm-sync-retry-v1"
+CURRENT071_LEGACY_CLEANUP_OBSERVER_ID = "current071-apt-cleanup-rm-sync-v1"
+CURRENT071_CLEANUP_POLICY_ID = "rs9.runner-policy.current071-apt-cleanup-bounded-retry.v1alpha1"
 CURRENT071_CLEANUP_OBSERVER_FILENAME = "current071-cleanup-observer.mjs"
 CURRENT071_CLEANUP_MARKER_PREFIX = "RS9_CURRENT071_CLEANUP_ERRNO="
 CURRENT071_CLEANUP_MAX_STDERR_BYTES = 64 * 1024
@@ -339,12 +340,35 @@ function isTargetCleanupCall(args) {
   return true;
 }
 
+function isRetryEligible(args) {
+  if (Reflect.ownKeys(args[1]).length !== 2) {
+    return false;
+  }
+  try {
+    const st = originalLstatSync(args[0], { throwIfNoEntry: false });
+    return Boolean(
+      st &&
+      !st.isSymbolicLink() &&
+      st.isDirectory() &&
+      typeof process.getuid === "function" &&
+      st.uid === process.getuid() &&
+      (st.mode & 0o777) === 0o700
+    );
+  } catch {
+    return false;
+  }
+}
+
 let observedTargetCalls = 0;
 
 fs.rmSync = function wrappedRmSync(...args) {
   const matched = isTargetCleanupCall(args);
   try {
-    return Reflect.apply(originalRmSync, this, args);
+    // Node owns its bounded per-operation backoff; retain every final error.
+    const callArgs = matched && observedTargetCalls === 0 && isRetryEligible(args)
+      ? [args[0], { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }]
+      : args;
+    return Reflect.apply(originalRmSync, this, callArgs);
   } catch (error) {
     if (matched && observedTargetCalls === 0) {
       observedTargetCalls += 1;
@@ -536,7 +560,7 @@ def prepare_current071_cleanup_observation(
             "harness_sha256": CURRENT071_NATIVE_RC_SMOKE_PIN["sha256"],
             "observer_sha256": script_sha256,
         },
-        "execution_mode": "reviewed-test-execution-observation",
+        "execution_mode": "reviewed-test-execution-bounded-cleanup",
         "non_admitting": True,
         "untouched_original_argv_execution": False,
         "family": "apt",
@@ -562,7 +586,7 @@ def validate_cleanup_observation_plan(
     system = plan.get("system")
     if (
         plan.get("observer_id") != CURRENT071_CLEANUP_OBSERVER_ID
-        or plan.get("execution_mode") != "reviewed-test-execution-observation"
+        or plan.get("execution_mode") != "reviewed-test-execution-bounded-cleanup"
         or plan.get("non_admitting") is not True
         or plan.get("untouched_original_argv_execution") is not False
         or plan.get("family") != "apt"
@@ -608,12 +632,16 @@ def validate_cleanup_observation_plan(
     return wrapper, harness
 
 
-def withheld_current071_cleanup_observation(reason: str) -> dict[str, object]:
+def withheld_current071_cleanup_observation(
+    reason: str, *, observer_id: str = CURRENT071_CLEANUP_OBSERVER_ID
+) -> dict[str, object]:
     """Return the canonical closed withheld cleanup-observation record (3-pass fixed point)."""
     closed_reason = reason if isinstance(reason, str) and reason in CURRENT071_CLEANUP_WITHHELD_REASONS else "invalid-observation"
+    if observer_id not in (CURRENT071_CLEANUP_OBSERVER_ID, CURRENT071_LEGACY_CLEANUP_OBSERVER_ID):
+        observer_id = CURRENT071_CLEANUP_OBSERVER_ID
     return {
         "schema": CURRENT071_CLEANUP_OBSERVATION_SCHEMA,
-        "observer_id": CURRENT071_CLEANUP_OBSERVER_ID,
+        "observer_id": observer_id,
         "family": "apt",
         "system": None,
         "scenario": None,
@@ -711,22 +739,33 @@ def validate_current071_cleanup_observation(
     family: str | None = None,
 ) -> dict[str, object] | None:
     """Idempotent host-side closed validator for cleanup_observation bound to outer stderr."""
+    observer_id = (
+        raw.get("observer_id")
+        if isinstance(raw, dict) and raw.get("observer_id") in (
+            CURRENT071_CLEANUP_OBSERVER_ID, CURRENT071_LEGACY_CLEANUP_OBSERVER_ID
+        )
+        else CURRENT071_CLEANUP_OBSERVER_ID
+    )
+
+    def withheld(reason: str) -> dict[str, object]:
+        return withheld_current071_cleanup_observation(reason, observer_id=observer_id)
+
     if raw is None:
         return None
     if family is not None and family != "apt":
         mismatch = True
     fallback = "binding-mismatch" if mismatch else "invalid-observation"
     if not isinstance(raw, dict) or set(raw.keys()) != _CLEANUP_OBSERVATION_KEYS:
-        return withheld_current071_cleanup_observation(fallback)
+        return withheld(fallback)
     if (
         raw.get("schema") != CURRENT071_CLEANUP_OBSERVATION_SCHEMA
-        or raw.get("observer_id") != CURRENT071_CLEANUP_OBSERVER_ID
+        or raw.get("observer_id") not in (CURRENT071_CLEANUP_OBSERVER_ID, CURRENT071_LEGACY_CLEANUP_OBSERVER_ID)
         or raw.get("family") != "apt"
     ):
-        return withheld_current071_cleanup_observation(fallback)
+        return withheld(fallback)
     status = raw.get("status")
     if not isinstance(status, str) or status not in CURRENT071_CLEANUP_STATUSES:
-        return withheld_current071_cleanup_observation(fallback)
+        return withheld(fallback)
     if status == "withheld":
         reason = raw.get("withheld_reason")
         if (
@@ -734,10 +773,10 @@ def validate_current071_cleanup_observation(
             or not isinstance(reason, str)
             or reason not in CURRENT071_CLEANUP_WITHHELD_REASONS
         ):
-            return withheld_current071_cleanup_observation("binding-mismatch" if mismatch else "invalid-observation")
+            return withheld("binding-mismatch" if mismatch else "invalid-observation")
         if mismatch:
-            return withheld_current071_cleanup_observation("binding-mismatch")
-        return withheld_current071_cleanup_observation(reason)
+            return withheld("binding-mismatch")
+        return withheld(reason)
     obs_system = raw.get("system")
     obs_scenario = raw.get("scenario")
     obs_bytes = raw.get("stderr_bytes")
@@ -758,7 +797,7 @@ def validate_current071_cleanup_observation(
         or (obs_bytes > 0 and obs_sha == _EMPTY_SHA256)
         or obs_reason is not None
     ):
-        return withheld_current071_cleanup_observation("binding-mismatch" if mismatch else "invalid-observation")
+        return withheld("binding-mismatch" if mismatch else "invalid-observation")
     if status == "cleanup-error-observed":
         min_marker_bytes = len(CURRENT071_CLEANUP_MARKER_PREFIX) + 2
         if (
@@ -768,10 +807,10 @@ def validate_current071_cleanup_observation(
             or obs_count != 1
             or obs_bytes < min_marker_bytes
         ):
-            return withheld_current071_cleanup_observation("binding-mismatch" if mismatch else "invalid-observation")
+            return withheld("binding-mismatch" if mismatch else "invalid-observation")
     elif status == "no-cleanup-error-observed":
         if obs_errno is not None or type(obs_count) is not int or obs_count != 0:
-            return withheld_current071_cleanup_observation("binding-mismatch" if mismatch else "invalid-observation")
+            return withheld("binding-mismatch" if mismatch else "invalid-observation")
     if (
         mismatch
         or (system is not None and obs_system != system)
@@ -779,12 +818,12 @@ def validate_current071_cleanup_observation(
         or obs_bytes != stderr_bytes
         or obs_sha != stderr_sha256
     ):
-        return withheld_current071_cleanup_observation("binding-mismatch")
+        return withheld("binding-mismatch")
     if complete is not True:
-        return withheld_current071_cleanup_observation("incomplete-stream")
+        return withheld("incomplete-stream")
     return {
         "schema": CURRENT071_CLEANUP_OBSERVATION_SCHEMA,
-        "observer_id": CURRENT071_CLEANUP_OBSERVER_ID,
+        "observer_id": raw["observer_id"],
         "family": "apt",
         "system": obs_system,
         "scenario": obs_scenario,

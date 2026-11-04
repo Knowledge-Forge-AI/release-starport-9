@@ -99,6 +99,13 @@ fs.readFileSync = function(target, options) {{
 const baseRmSync = fs.rmSync;
 fs.rmSync = function simulatedRmSync(target, options) {{
   if (typeof target === "string" && basename(target).startsWith("nebular-rc-smoke-")) {{
+    if (faultMode === "REQUIRE_RETRY_OPTIONS" &&
+        (options?.maxRetries !== 3 || options?.retryDelay !== 100 ||
+         options?.recursive !== true || options?.force !== true)) {{
+      const error = new Error("bounded cleanup options were not forwarded");
+      error.code = "ENOTEMPTY";
+      throw error;
+    }}
     if (faultMode === "ENOTEMPTY" || faultMode === "EBUSY" || faultMode === "EACCES" || faultMode === "EPERM") {{
       const err = new Error(`${{faultMode}}: simulated cleanup failure on '/private/secret-user/${{basename(target)}}'`);
       err.code = faultMode;
@@ -459,7 +466,7 @@ const codes = new Set(__CODES__);
 function build(original) {
   return new Function("fs", "originalRmSync", "originalLstatSync", "originalRealpathSync",
     "tmpdir", "resolve", "dirname", "basename", "ALLOWED_ERRNO_CODES", block + "; return fs.rmSync;")(
-      {}, original, () => ({isSymbolicLink: () => false}), (value) => value,
+      {}, original, () => ({isSymbolicLink: () => false, isDirectory: () => true, uid: process.getuid(), mode: 0o40700}), (value) => value,
       () => "/fixture-tmp", resolve, dirname, basename, codes);
 }
 const target = "/fixture-tmp/nebular-rc-smoke-fixture";
@@ -473,7 +480,7 @@ let calls = 0;
 try {
   const successful = build(function(...args) {
     calls++; assert.equal(this, receiver); assert.equal(args.length, 2);
-    assert.equal(args[0], target); assert.equal(args[1], options); return result;
+    assert.equal(args[0], target); assert.deepEqual(args[1], {recursive: true, force: true, maxRetries: 3, retryDelay: 100}); return result;
   });
   assert.equal(successful.call(receiver, target, options), result);
   assert.equal(calls, 1); assert.deepEqual(emitted, []);
@@ -482,7 +489,7 @@ try {
     calls = 0; emitted.length = 0;
     const failing = build(function(...args) {
       calls++; assert.equal(this, receiver); assert.equal(args[0], target);
-      assert.equal(args[1], options); throw originalError;
+      assert.deepEqual(args[1], {recursive: true, force: true, maxRetries: 3, retryDelay: 100}); throw originalError;
     });
     assert.throws(() => failing.call(receiver, target, options), (error) => error === originalError);
     assert.equal(calls, 1);
@@ -626,10 +633,58 @@ process.stdout.write(JSON.stringify({virtualProcessStateTransitions: true}) + "\
         self.assertEqual(json.loads(result.stdout), {"virtualProcessStateTransitions": True})
         self.assertEqual(result.stderr, b"")
 
+    def test_authenticated_harness_forwards_retry_options_without_admitting_body_failure(self) -> None:
+        for system in ("aarch64-linux", "x86_64-linux"):
+            with self.subTest(system=system):
+                case_dir = self.root / ("retry-" + system)
+                prepared, _profile, launch_root = self._build_authenticated_apt_fixture(
+                    case_dir, rm_fault_mode="REQUIRE_RETRY_OPTIONS"
+                )
+                plan = cleanup_obs.prepare_current071_cleanup_observation(
+                    prepared, system=system,
+                    platform="linux-arm64" if system == "aarch64-linux" else "linux-x64",
+                    scenario="B" if system == "aarch64-linux" else "C",
+                )
+                self.assertEqual(plan["public_identity"]["policy_id"],
+                    "rs9.runner-policy.current071-apt-cleanup-bounded-retry.v1alpha1")
+                self.assertEqual(plan["execution_mode"], "reviewed-test-execution-bounded-cleanup")
+                old_plan = copy.deepcopy(plan)
+                old_plan["public_identity"]["policy_id"] = (
+                    "rs9.runner-policy.current071-apt-cleanup-observation.v1alpha1"
+                )
+                with self.assertRaises(ContractError):
+                    cleanup_obs.validate_cleanup_observation_plan(
+                        old_plan, prepared=prepared,
+                        platform=plan["platform"], scenario=plan["scenario"]
+                    )
+                old_mode = copy.deepcopy(plan)
+                old_mode["execution_mode"] = "reviewed-test-execution-observation"
+                with self.assertRaises(ContractError):
+                    cleanup_obs.validate_cleanup_observation_plan(
+                        old_mode, prepared=prepared,
+                        platform=plan["platform"], scenario=plan["scenario"]
+                    )
+                old_id = copy.deepcopy(plan)
+                old_id["observer_id"] = cleanup_obs.CURRENT071_LEGACY_CLEANUP_OBSERVER_ID
+                with self.assertRaises(ContractError):
+                    cleanup_obs.validate_cleanup_observation_plan(
+                        old_id, prepared=prepared,
+                        platform=plan["platform"], scenario=plan["scenario"]
+                    )
+                runs = diagnostic.execute_application_smoke(
+                    prepared=prepared, system=system, launch_root=launch_root,
+                    env=self._fixture_bin_env(case_dir), current071_cleanup_observation=True,
+                )
+                self.assertEqual([r["scenario"] for r in runs],
+                    ["B"] if system == "aarch64-linux" else ["C", "C-signal"])
+                self.assertTrue(all(set(r) == {"scenario", "receipt_sha256", "executable_sha256"}
+                                    for r in runs))
+
+
     def test_real_node22_c_signal_step_projection_from_already_read_run_record(self) -> None:
         case_dir = self.root / "c-signal-fail"
         prepared, _profile, launch_root = self._build_authenticated_apt_fixture(
-            case_dir, rm_fault_mode="none", scenario_steps="fail-host-status"
+            case_dir, rm_fault_mode="REQUIRE_RETRY_OPTIONS", scenario_steps="fail-host-status"
         )
         env = self._fixture_bin_env(case_dir)
         with self.assertRaises(ContractError) as caught:
