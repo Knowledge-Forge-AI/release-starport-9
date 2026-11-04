@@ -419,7 +419,7 @@ class DisjointFilesystemTests(unittest.TestCase):
                     self.assertNotIn("current071_cleanup_observation", captured)
 
         # Verify host-side _accept_container_output withholds cross-family cleanup_observation on pacman
-        raw_stderr = b"RS9_CURRENT071_CLEANUP_ERRNO=EBUSY\n"
+        raw_stderr = b"RS9_CURRENT071_CLEANUP_REWALK=nonretryable-after-1\nRS9_CURRENT071_CLEANUP_ERRNO=EBUSY\n"
         cleanup_obs = observe_current071_cleanup(
             raw_stderr,
             system="x86_64-linux",
@@ -428,6 +428,8 @@ class DisjointFilesystemTests(unittest.TestCase):
             stderr_sha256=digest(raw_stderr),
             complete=True,
         )
+        self.assertEqual(cleanup_obs["status"], "cleanup-error-observed")
+        self.assertEqual(cleanup_obs["rewalk_outcome"], "nonretryable-after-1")
         res_data = {
             "schema": SCHEMA,
             "request_sha256": self.binding["request_sha256"],

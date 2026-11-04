@@ -31,6 +31,11 @@ CLEANUP_PROBLEM = "harness cleanup of the owned scratch directory failed"
 EXPECTED_B_CLEANUP_STDOUT_SHA256 = "4c01e0ee066068fba7bb6f3bee1ec7c6afc82cba982193c284d0f0b87efd7a9a"
 
 
+def _rewalk_marker(errno: str, outcome: str = "exhausted-4") -> bytes:
+    return ("RS9_CURRENT071_CLEANUP_REWALK=" + outcome + "\n"
+            "RS9_CURRENT071_CLEANUP_ERRNO=" + errno + "\n").encode()
+
+
 def _pin_bytes(raw: bytes) -> dict[str, object]:
     blob = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
     return {"sha256": digest(raw), "blob": blob, "size": len(raw)}
@@ -99,8 +104,8 @@ fs.readFileSync = function(target, options) {{
 const baseRmSync = fs.rmSync;
 fs.rmSync = function simulatedRmSync(target, options) {{
   if (typeof target === "string" && basename(target).startsWith("nebular-rc-smoke-")) {{
-    if (faultMode === "REQUIRE_RETRY_OPTIONS" &&
-        (options?.maxRetries !== 3 || options?.retryDelay !== 100 ||
+    if (faultMode === "REQUIRE_ORIGINAL_OPTIONS" &&
+        (options?.maxRetries !== undefined || options?.retryDelay !== undefined ||
          options?.recursive !== true || options?.force !== true)) {{
       const error = new Error("bounded cleanup options were not forwarded");
       error.code = "ENOTEMPTY";
@@ -466,7 +471,7 @@ const codes = new Set(__CODES__);
 function build(original) {
   return new Function("fs", "originalRmSync", "originalLstatSync", "originalRealpathSync",
     "tmpdir", "resolve", "dirname", "basename", "ALLOWED_ERRNO_CODES", block + "; return fs.rmSync;")(
-      {}, original, () => ({isSymbolicLink: () => false, isDirectory: () => true, uid: process.getuid(), mode: 0o40700}), (value) => value,
+      {}, original, () => ({isSymbolicLink: () => false, isDirectory: () => true, uid: process.getuid(), mode: 0o40700, dev:1, ino:2}), (value) => value,
       () => "/fixture-tmp", resolve, dirname, basename, codes);
 }
 const target = "/fixture-tmp/nebular-rc-smoke-fixture";
@@ -480,7 +485,7 @@ let calls = 0;
 try {
   const successful = build(function(...args) {
     calls++; assert.equal(this, receiver); assert.equal(args.length, 2);
-    assert.equal(args[0], target); assert.deepEqual(args[1], {recursive: true, force: true, maxRetries: 3, retryDelay: 100}); return result;
+    assert.equal(args[0], target); assert.equal(args[1], options); return result;
   });
   assert.equal(successful.call(receiver, target, options), result);
   assert.equal(calls, 1); assert.deepEqual(emitted, []);
@@ -489,11 +494,11 @@ try {
     calls = 0; emitted.length = 0;
     const failing = build(function(...args) {
       calls++; assert.equal(this, receiver); assert.equal(args[0], target);
-      assert.deepEqual(args[1], {recursive: true, force: true, maxRetries: 3, retryDelay: 100}); throw originalError;
+      assert.equal(args[1], options); throw originalError;
     });
     assert.throws(() => failing.call(receiver, target, options), (error) => error === originalError);
-    assert.equal(calls, 1);
-    assert.deepEqual(emitted, ["RS9_CURRENT071_CLEANUP_ERRNO=" + (codes.has(code) ? code : "OTHER") + "\\n"]);
+    assert.equal(calls, code === "ENOTEMPTY" ? 4 : 1);
+    assert.deepEqual(emitted, ["RS9_CURRENT071_CLEANUP_REWALK=" + (code === "ENOTEMPTY" ? "exhausted-4" : "nonretryable-after-1") + "\\nRS9_CURRENT071_CLEANUP_ERRNO=" + (codes.has(code) ? code : "OTHER") + "\\n"]);
   }
   const originalError = Object.assign(new Error("original"), {code: "EPERM"});
   emitted.length = 0;
@@ -549,7 +554,8 @@ process.stdout.write(JSON.stringify({cases: 8, realRemovalCalls: 0}) + "\\n");
                 self.assertEqual(obs["stdout_bytes"], 111)
                 self.assertEqual(obs["stdout_sha256"], EXPECTED_B_CLEANUP_STDOUT_SHA256)
                 self.assertEqual(obs["receipt_error"], "receipt-failed")
-                expected_stderr = f"RS9_CURRENT071_CLEANUP_ERRNO={expected_errno}\n".encode("utf-8")
+                outcome = "exhausted-4" if fault_mode == "ENOTEMPTY" else "nonretryable-after-1"
+                expected_stderr = _rewalk_marker(expected_errno, outcome)
                 self.assertEqual(obs["stderr_bytes"], len(expected_stderr))
                 self.assertEqual(obs["stderr_sha256"], digest(expected_stderr))
                 self.assertEqual(
@@ -564,6 +570,7 @@ process.stdout.write(JSON.stringify({cases: 8, realRemovalCalls: 0}) + "\\n");
                         "stderr_sha256": digest(expected_stderr),
                         "status": "cleanup-error-observed",
                         "errno_code": expected_errno,
+                        "rewalk_outcome": outcome,
                         "marker_count": 1,
                         "withheld_reason": None,
                     },
@@ -638,7 +645,7 @@ process.stdout.write(JSON.stringify({virtualProcessStateTransitions: true}) + "\
             with self.subTest(system=system):
                 case_dir = self.root / ("retry-" + system)
                 prepared, _profile, launch_root = self._build_authenticated_apt_fixture(
-                    case_dir, rm_fault_mode="REQUIRE_RETRY_OPTIONS"
+                    case_dir, rm_fault_mode="REQUIRE_ORIGINAL_OPTIONS"
                 )
                 plan = cleanup_obs.prepare_current071_cleanup_observation(
                     prepared, system=system,
@@ -646,8 +653,8 @@ process.stdout.write(JSON.stringify({virtualProcessStateTransitions: true}) + "\
                     scenario="B" if system == "aarch64-linux" else "C",
                 )
                 self.assertEqual(plan["public_identity"]["policy_id"],
-                    "rs9.runner-policy.current071-apt-cleanup-bounded-retry.v1alpha1")
-                self.assertEqual(plan["execution_mode"], "reviewed-test-execution-bounded-cleanup")
+                    "rs9.runner-policy.current071-apt-cleanup-rewalk.v1alpha1")
+                self.assertEqual(plan["execution_mode"], "reviewed-test-execution-bounded-rewalk")
                 old_plan = copy.deepcopy(plan)
                 old_plan["public_identity"]["policy_id"] = (
                     "rs9.runner-policy.current071-apt-cleanup-observation.v1alpha1"
@@ -671,6 +678,26 @@ process.stdout.write(JSON.stringify({virtualProcessStateTransitions: true}) + "\
                         old_id, prepared=prepared,
                         platform=plan["platform"], scenario=plan["scenario"]
                     )
+                for key, value in (
+                    ("execution_mode", "reviewed-test-execution-bounded-cleanup"),
+                    ("observer_id", cleanup_obs.CURRENT071_BUILTIN_RETRY_CLEANUP_OBSERVER_ID),
+                ):
+                    previous = copy.deepcopy(plan)
+                    previous[key] = value
+                    with self.assertRaises(ContractError):
+                        cleanup_obs.validate_cleanup_observation_plan(
+                            previous, prepared=prepared, platform=plan["platform"],
+                            scenario=plan["scenario"]
+                        )
+                previous = copy.deepcopy(plan)
+                previous["public_identity"]["policy_id"] = (
+                    "rs9.runner-policy.current071-apt-cleanup-bounded-retry.v1alpha1"
+                )
+                with self.assertRaises(ContractError):
+                    cleanup_obs.validate_cleanup_observation_plan(
+                        previous, prepared=prepared, platform=plan["platform"],
+                        scenario=plan["scenario"]
+                    )
                 runs = diagnostic.execute_application_smoke(
                     prepared=prepared, system=system, launch_root=launch_root,
                     env=self._fixture_bin_env(case_dir), current071_cleanup_observation=True,
@@ -684,7 +711,7 @@ process.stdout.write(JSON.stringify({virtualProcessStateTransitions: true}) + "\
     def test_real_node22_c_signal_step_projection_from_already_read_run_record(self) -> None:
         case_dir = self.root / "c-signal-fail"
         prepared, _profile, launch_root = self._build_authenticated_apt_fixture(
-            case_dir, rm_fault_mode="REQUIRE_RETRY_OPTIONS", scenario_steps="fail-host-status"
+            case_dir, rm_fault_mode="REQUIRE_ORIGINAL_OPTIONS", scenario_steps="fail-host-status"
         )
         env = self._fixture_bin_env(case_dir)
         with self.assertRaises(ContractError) as caught:
@@ -807,7 +834,7 @@ process.stdout.write(JSON.stringify({virtualProcessStateTransitions: true}) + "\
             harness.write_bytes(orig_bytes)
 
     def test_observe_and_validate_cleanup_observation_closed_states_and_idempotence(self) -> None:
-        raw_marker = b"RS9_CURRENT071_CLEANUP_ERRNO=ENOTEMPTY\n"
+        raw_marker = _rewalk_marker('ENOTEMPTY', 'exhausted-4')
         obs = cleanup_obs.observe_current071_cleanup(
             raw_marker,
             system="aarch64-linux",
@@ -900,7 +927,7 @@ process.stdout.write(JSON.stringify({virtualProcessStateTransitions: true}) + "\
     def test_pages_smoke_diagnostic_retains_and_validates_cleanup_observation(self):
         from rs9.pages_smoke_diagnostic import validate_smoke_observation
 
-        raw_marker = b"RS9_CURRENT071_CLEANUP_ERRNO=EBUSY\n"
+        raw_marker = _rewalk_marker('EBUSY', 'nonretryable-after-1')
         obs = cleanup_obs.observe_current071_cleanup(
             raw_marker,
             system="aarch64-linux",

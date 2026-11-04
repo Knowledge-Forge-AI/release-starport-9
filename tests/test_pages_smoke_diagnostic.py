@@ -653,7 +653,7 @@ class PagesSmokeDiagnosticUnitTests(unittest.TestCase):
             scenario="B",
             current071=True, current071_receipt_steps=True,
         )
-        arm_stderr = b"RS9_CURRENT071_CLEANUP_ERRNO=EBUSY\n"
+        arm_stderr = b"RS9_CURRENT071_CLEANUP_REWALK=nonretryable-after-1\nRS9_CURRENT071_CLEANUP_ERRNO=EBUSY\n"
         cleanup_obs = observe_current071_cleanup(
             arm_stderr,
             system="aarch64-linux",
@@ -662,6 +662,8 @@ class PagesSmokeDiagnosticUnitTests(unittest.TestCase):
             stderr_sha256=digest(arm_stderr),
             complete=True,
         )
+        self.assertEqual(cleanup_obs["status"], "cleanup-error-observed")
+        self.assertEqual(cleanup_obs["rewalk_outcome"], "nonretryable-after-1")
         arm_obs = {
             "scenario": "B",
             "cause": "process-nonzero",

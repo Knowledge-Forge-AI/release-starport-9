@@ -21,12 +21,21 @@ from rs9.smoke_source_envelope import (
     verify_checkout,
 )
 
-CURRENT071_CLEANUP_OBSERVATION_SCHEMA = "rs9.current071-cleanup-observation.v1alpha1"
-CURRENT071_CLEANUP_OBSERVER_ID = "current071-apt-cleanup-rm-sync-retry-v1"
+CURRENT071_CLEANUP_OBSERVATION_SCHEMA = "rs9.current071-cleanup-observation.v1alpha2"
+CURRENT071_LEGACY_CLEANUP_OBSERVATION_SCHEMA = "rs9.current071-cleanup-observation.v1alpha1"
+CURRENT071_CLEANUP_OBSERVER_ID = "current071-apt-cleanup-rm-sync-rewalk-v1"
+CURRENT071_BUILTIN_RETRY_CLEANUP_OBSERVER_ID = "current071-apt-cleanup-rm-sync-retry-v1"
 CURRENT071_LEGACY_CLEANUP_OBSERVER_ID = "current071-apt-cleanup-rm-sync-v1"
-CURRENT071_CLEANUP_POLICY_ID = "rs9.runner-policy.current071-apt-cleanup-bounded-retry.v1alpha1"
+CURRENT071_CLEANUP_POLICY_ID = "rs9.runner-policy.current071-apt-cleanup-rewalk.v1alpha1"
 CURRENT071_CLEANUP_OBSERVER_FILENAME = "current071-cleanup-observer.mjs"
 CURRENT071_CLEANUP_MARKER_PREFIX = "RS9_CURRENT071_CLEANUP_ERRNO="
+CURRENT071_REWALK_MARKER_PREFIX = "RS9_CURRENT071_CLEANUP_REWALK="
+CURRENT071_REWALK_OUTCOMES = frozenset({
+    "ineligible", "identity-lost-after-1", "identity-lost-after-2",
+    "identity-lost-after-3", "exhausted-4", "nonretryable-after-1",
+    "nonretryable-after-2", "nonretryable-after-3", "nonretryable-after-4",
+    "unclassified",
+})
 CURRENT071_CLEANUP_MAX_STDERR_BYTES = 64 * 1024
 
 CURRENT071_NATIVE_RC_SMOKE_PIN = {
@@ -79,7 +88,7 @@ CURRENT071_CLEANUP_WITHHELD_REASONS = frozenset({
     "invalid-observation",
     "binding-mismatch",
 })
-_CLEANUP_OBSERVATION_KEYS = frozenset({
+_LEGACY_CLEANUP_OBSERVATION_KEYS = frozenset({
     "schema",
     "observer_id",
     "family",
@@ -92,6 +101,7 @@ _CLEANUP_OBSERVATION_KEYS = frozenset({
     "marker_count",
     "withheld_reason",
 })
+_CLEANUP_OBSERVATION_KEYS = _LEGACY_CLEANUP_OBSERVATION_KEYS | {"rewalk_outcome"}
 _EMPTY_SHA256 = digest(b"")
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 
@@ -340,22 +350,62 @@ function isTargetCleanupCall(args) {
   return true;
 }
 
-function isRetryEligible(args) {
-  if (Reflect.ownKeys(args[1]).length !== 2) {
-    return false;
+function retryIdentity(args) {
+  const keys = Reflect.ownKeys(args[1]);
+  if (keys.length !== 2 || !keys.includes("recursive") || !keys.includes("force")) {
+    return null;
   }
   try {
     const st = originalLstatSync(args[0], { throwIfNoEntry: false });
-    return Boolean(
+    if (
       st &&
       !st.isSymbolicLink() &&
       st.isDirectory() &&
       typeof process.getuid === "function" &&
       st.uid === process.getuid() &&
-      (st.mode & 0o777) === 0o700
-    );
+      (st.mode & 0o777) === 0o700 &&
+      Number.isSafeInteger(st.dev) &&
+      Number.isSafeInteger(st.ino)
+    ) {
+      return st;
+    }
   } catch {
-    return false;
+    // Retry eligibility failure never replaces an original cleanup error.
+  }
+  return null;
+}
+
+function cleanupWithRewalk(receiver, args, state) {
+  const identity = retryIdentity(args);
+  if (!identity) {
+    state.outcome = "ineligible";
+    return Reflect.apply(originalRmSync, receiver, args);
+  }
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return Reflect.apply(originalRmSync, receiver, args);
+    } catch (error) {
+      let code;
+      try {
+        code = error !== null && typeof error === "object" ? error.code : undefined;
+      } catch {
+        throw error;
+      }
+      if (code !== "ENOTEMPTY") {
+        state.outcome = "nonretryable-after-" + (attempt + 1);
+        throw error;
+      }
+      if (attempt === 3) {
+        state.outcome = "exhausted-4";
+        throw error;
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, (attempt + 1) * 100);
+      const next = retryIdentity(args);
+      if (!next || next.dev !== identity.dev || next.ino !== identity.ino) {
+        state.outcome = "identity-lost-after-" + (attempt + 1);
+        throw error;
+      }
+    }
   }
 }
 
@@ -363,12 +413,11 @@ let observedTargetCalls = 0;
 
 fs.rmSync = function wrappedRmSync(...args) {
   const matched = isTargetCleanupCall(args);
+  const rewalk = { outcome: "unclassified" };
   try {
-    // Node owns its bounded per-operation backoff; retain every final error.
-    const callArgs = matched && observedTargetCalls === 0 && isRetryEligible(args)
-      ? [args[0], { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }]
-      : args;
-    return Reflect.apply(originalRmSync, this, callArgs);
+    return matched && observedTargetCalls === 0
+      ? cleanupWithRewalk(this, args, rewalk)
+      : Reflect.apply(originalRmSync, this, args);
   } catch (error) {
     if (matched && observedTargetCalls === 0) {
       observedTargetCalls += 1;
@@ -378,7 +427,9 @@ fs.rmSync = function wrappedRmSync(...args) {
             ? error.code
             : "";
         const code = ALLOWED_ERRNO_CODES.has(rawCode) ? rawCode : "OTHER";
-        process.stderr.write(`RS9_CURRENT071_CLEANUP_ERRNO=${code}\\n`);
+        const outcome = /^(?:ineligible|identity-lost-after-[1-3]|exhausted-4|nonretryable-after-[1-4]|unclassified)$/.test(rewalk.outcome)
+          ? rewalk.outcome : "unclassified";
+        process.stderr.write(`RS9_CURRENT071_CLEANUP_REWALK=${outcome}\\nRS9_CURRENT071_CLEANUP_ERRNO=${code}\\n`);
       } catch {
         // Never allow diagnostic emission to mask or alter the original cleanup error.
       }
@@ -560,7 +611,7 @@ def prepare_current071_cleanup_observation(
             "harness_sha256": CURRENT071_NATIVE_RC_SMOKE_PIN["sha256"],
             "observer_sha256": script_sha256,
         },
-        "execution_mode": "reviewed-test-execution-bounded-cleanup",
+        "execution_mode": "reviewed-test-execution-bounded-rewalk",
         "non_admitting": True,
         "untouched_original_argv_execution": False,
         "family": "apt",
@@ -586,7 +637,7 @@ def validate_cleanup_observation_plan(
     system = plan.get("system")
     if (
         plan.get("observer_id") != CURRENT071_CLEANUP_OBSERVER_ID
-        or plan.get("execution_mode") != "reviewed-test-execution-bounded-cleanup"
+        or plan.get("execution_mode") != "reviewed-test-execution-bounded-rewalk"
         or plan.get("non_admitting") is not True
         or plan.get("untouched_original_argv_execution") is not False
         or plan.get("family") != "apt"
@@ -637,10 +688,11 @@ def withheld_current071_cleanup_observation(
 ) -> dict[str, object]:
     """Return the canonical closed withheld cleanup-observation record (3-pass fixed point)."""
     closed_reason = reason if isinstance(reason, str) and reason in CURRENT071_CLEANUP_WITHHELD_REASONS else "invalid-observation"
-    if observer_id not in (CURRENT071_CLEANUP_OBSERVER_ID, CURRENT071_LEGACY_CLEANUP_OBSERVER_ID):
+    if observer_id not in (CURRENT071_CLEANUP_OBSERVER_ID, CURRENT071_BUILTIN_RETRY_CLEANUP_OBSERVER_ID, CURRENT071_LEGACY_CLEANUP_OBSERVER_ID):
         observer_id = CURRENT071_CLEANUP_OBSERVER_ID
-    return {
-        "schema": CURRENT071_CLEANUP_OBSERVATION_SCHEMA,
+    result = {
+        "schema": (CURRENT071_CLEANUP_OBSERVATION_SCHEMA if observer_id == CURRENT071_CLEANUP_OBSERVER_ID
+                   else CURRENT071_LEGACY_CLEANUP_OBSERVATION_SCHEMA),
         "observer_id": observer_id,
         "family": "apt",
         "system": None,
@@ -653,6 +705,20 @@ def withheld_current071_cleanup_observation(
         "withheld_reason": closed_reason,
     }
 
+    if observer_id == CURRENT071_CLEANUP_OBSERVER_ID:
+        result["rewalk_outcome"] = None
+    return result
+
+
+def _valid_rewalk_outcome(errno_code: object, outcome: object) -> bool:
+    if not isinstance(outcome, str) or outcome not in CURRENT071_REWALK_OUTCOMES:
+        return False
+    if outcome == "exhausted-4" or outcome.startswith("identity-lost-after-"):
+        return errno_code == "ENOTEMPTY"
+    if outcome.startswith("nonretryable-after-"):
+        return errno_code != "ENOTEMPTY"
+    return True
+
 
 def observe_current071_cleanup(
     stderr: bytes,
@@ -663,7 +729,7 @@ def observe_current071_cleanup(
     stderr_sha256: str | None,
     complete: bool,
 ) -> dict[str, object]:
-    """Extract only the closed errno code from outer stderr of a failed current071 APT attempt."""
+    """Extract fixed errno and rewalk outcome from failed current071 APT outer stderr."""
     if (
         not isinstance(system, str)
         or not isinstance(scenario, str)
@@ -683,6 +749,8 @@ def observe_current071_cleanup(
         return withheld_current071_cleanup_observation("incomplete-stream")
     raw = bytes(stderr)
     if b"RS9_CURRENT071_CLEANUP_ERRNO" not in raw:
+        if b"RS9_CURRENT071_CLEANUP_REWALK" in raw:
+            return withheld_current071_cleanup_observation("invalid-marker")
         return {
             "schema": CURRENT071_CLEANUP_OBSERVATION_SCHEMA,
             "observer_id": CURRENT071_CLEANUP_OBSERVER_ID,
@@ -695,6 +763,7 @@ def observe_current071_cleanup(
             "errno_code": None,
             "marker_count": 0,
             "withheld_reason": None,
+            "rewalk_outcome": None,
         }
     try:
         text = raw.decode("utf-8")
@@ -712,6 +781,12 @@ def observe_current071_cleanup(
     errno_code = marker_line[len(CURRENT071_CLEANUP_MARKER_PREFIX):]
     if errno_code not in CURRENT071_CLEANUP_ERRNO_CODES:
         return withheld_current071_cleanup_observation("invalid-marker")
+    rewalk_lines = [line for line in lines if "RS9_CURRENT071_CLEANUP_REWALK" in line]
+    if len(rewalk_lines) != 1 or not rewalk_lines[0].startswith(CURRENT071_REWALK_MARKER_PREFIX):
+        return withheld_current071_cleanup_observation("invalid-marker")
+    outcome = rewalk_lines[0][len(CURRENT071_REWALK_MARKER_PREFIX):]
+    if not _valid_rewalk_outcome(errno_code, outcome):
+        return withheld_current071_cleanup_observation("invalid-marker")
     return {
         "schema": CURRENT071_CLEANUP_OBSERVATION_SCHEMA,
         "observer_id": CURRENT071_CLEANUP_OBSERVER_ID,
@@ -724,6 +799,7 @@ def observe_current071_cleanup(
         "errno_code": errno_code,
         "marker_count": 1,
         "withheld_reason": None,
+        "rewalk_outcome": outcome,
     }
 
 
@@ -742,7 +818,8 @@ def validate_current071_cleanup_observation(
     observer_id = (
         raw.get("observer_id")
         if isinstance(raw, dict) and raw.get("observer_id") in (
-            CURRENT071_CLEANUP_OBSERVER_ID, CURRENT071_LEGACY_CLEANUP_OBSERVER_ID
+            CURRENT071_CLEANUP_OBSERVER_ID, CURRENT071_BUILTIN_RETRY_CLEANUP_OBSERVER_ID,
+            CURRENT071_LEGACY_CLEANUP_OBSERVER_ID
         )
         else CURRENT071_CLEANUP_OBSERVER_ID
     )
@@ -755,11 +832,15 @@ def validate_current071_cleanup_observation(
     if family is not None and family != "apt":
         mismatch = True
     fallback = "binding-mismatch" if mismatch else "invalid-observation"
-    if not isinstance(raw, dict) or set(raw.keys()) != _CLEANUP_OBSERVATION_KEYS:
+    current = observer_id == CURRENT071_CLEANUP_OBSERVER_ID
+    expected_keys = _CLEANUP_OBSERVATION_KEYS if current else _LEGACY_CLEANUP_OBSERVATION_KEYS
+    expected_schema = (CURRENT071_CLEANUP_OBSERVATION_SCHEMA if current
+                       else CURRENT071_LEGACY_CLEANUP_OBSERVATION_SCHEMA)
+    if not isinstance(raw, dict) or set(raw.keys()) != expected_keys:
         return withheld(fallback)
     if (
-        raw.get("schema") != CURRENT071_CLEANUP_OBSERVATION_SCHEMA
-        or raw.get("observer_id") not in (CURRENT071_CLEANUP_OBSERVER_ID, CURRENT071_LEGACY_CLEANUP_OBSERVER_ID)
+        raw.get("schema") != expected_schema
+        or raw.get("observer_id") not in (CURRENT071_CLEANUP_OBSERVER_ID, CURRENT071_BUILTIN_RETRY_CLEANUP_OBSERVER_ID, CURRENT071_LEGACY_CLEANUP_OBSERVER_ID)
         or raw.get("family") != "apt"
     ):
         return withheld(fallback)
@@ -772,6 +853,7 @@ def validate_current071_cleanup_observation(
             any(raw.get(k) is not None for k in ("system", "scenario", "stderr_bytes", "stderr_sha256", "errno_code", "marker_count"))
             or not isinstance(reason, str)
             or reason not in CURRENT071_CLEANUP_WITHHELD_REASONS
+            or (current and raw.get("rewalk_outcome") is not None)
         ):
             return withheld("binding-mismatch" if mismatch else "invalid-observation")
         if mismatch:
@@ -811,6 +893,13 @@ def validate_current071_cleanup_observation(
     elif status == "no-cleanup-error-observed":
         if obs_errno is not None or type(obs_count) is not int or obs_count != 0:
             return withheld("binding-mismatch" if mismatch else "invalid-observation")
+    if current:
+        outcome = raw.get("rewalk_outcome")
+        if status == "cleanup-error-observed":
+            if not _valid_rewalk_outcome(obs_errno, outcome):
+                return withheld(fallback)
+        elif outcome is not None:
+            return withheld(fallback)
     if (
         mismatch
         or (system is not None and obs_system != system)
@@ -821,8 +910,8 @@ def validate_current071_cleanup_observation(
         return withheld("binding-mismatch")
     if complete is not True:
         return withheld("incomplete-stream")
-    return {
-        "schema": CURRENT071_CLEANUP_OBSERVATION_SCHEMA,
+    result = {
+        "schema": expected_schema,
         "observer_id": raw["observer_id"],
         "family": "apt",
         "system": obs_system,
@@ -834,3 +923,6 @@ def validate_current071_cleanup_observation(
         "marker_count": obs_count,
         "withheld_reason": None,
     }
+    if current:
+        result["rewalk_outcome"] = raw["rewalk_outcome"]
+    return result
