@@ -26,16 +26,20 @@ Theme Forge publication surfaces remain authoritative.
   and [staged migration map](docs/architecture/migration-map.md)
 - [Nebular shadow candidate and evidence](docs/foundation2-candidate.md)
 
-### Hosted qualification checkpoint: 2026-11-02
+### Hosted qualification checkpoint: 2026-11-04
 
-At [commit `25ebf458`](https://github.com/Knowledge-Forge-AI/release-starport-9/commit/25ebf4581ae6c01726a82dee27988605a1dd861a),
-[current-generation run 41450606108](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/41450606108)
-passed 3,572 unit tests and all ten completed Linux, package and Pages receipt
-lanes (365 gates). Its Apple Silicon macOS job received no runner and executed
-no steps; GitHub reported hosted-runner capacity constraints. This run remains
-unqualified. Current-generation admission requires a complete original
-main-branch push campaign; a manual dispatch or later attempt cannot substitute
-for that source-bound evidence.
+At [commit `108022e1`](https://github.com/Knowledge-Forge-AI/release-starport-9/commit/108022e16e3523dcfaeddb6f7577b5a213227eb8),
+[original current-generation run 41870931047](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/41870931047)
+passed twelve jobs, including unit checks and all completed Linux, package and
+Pages receipt lanes. Its Apple Silicon macOS job received no hosted runner and
+executed no steps; GitHub reported that the job was not acquired after multiple
+attempts. The summary failed, and this source remains unqualified.
+
+The earlier [run 41838474598](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/41838474598)
+passed all fourteen jobs for its earlier source. It does not qualify this new
+source. Current-generation admission requires a complete original main-branch
+push campaign; a manual dispatch or rerun attempt cannot substitute for that
+source-bound evidence.
 
 ## Mission
 
