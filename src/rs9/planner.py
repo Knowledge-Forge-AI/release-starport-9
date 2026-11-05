@@ -1,5 +1,6 @@
 """Pure destination planning and revision allocation. No mutation or clock access."""
 from rs9.errors import ContractError
+from rs9.current_generation import HISTORICAL_GENERATION
 from rs9.gates import check_gates
 from rs9.observation import validate_destination, validate_subject, validate_observation
 from rs9.records import Record, closed, parse_rfc3339_utc, record_sha256, semantic_identity_sha256, snapshot, validate_bounded_int, validate_sha256, validate_sanitized_string
@@ -185,7 +186,21 @@ def adapter_outputs_from_shadow(authenticated, manifest):
     return sorted(outputs, key=lambda row: row["destination"]["id"])
 
 
-def plan(intent, capture, profile_result, output, gates, policy, observation, *, evaluated_at, ingestion_record=None):
+def _packaging_policy(capture, intent, adapter, *, generation):
+    from rs9.current_generation import (HISTORICAL_GENERATION, generation_paths,
+                                        bind_native_build_generation)
+    from rs9.product_classes import get_product_class, supported_architectures
+    generation_paths(generation)
+    if generation != HISTORICAL_GENERATION:
+        bind_native_build_generation(capture, intent, generation=generation)
+    return {"package_class": get_product_class(intent["project"]["id"]),
+            "qualified_architectures": sorted(supported_architectures(
+                intent["project"]["id"], adapter, generation=generation))}
+
+
+def plan(intent, capture, profile_result, output, gates, policy, observation, *, evaluated_at, ingestion_record=None, generation=HISTORICAL_GENERATION):
+    from rs9.current_generation import generation_paths
+    generation_paths(generation)
     from rs9.release_core import authenticated_record_hash
     release_hash = authenticated_record_hash(capture)
     from rs9.bootstrap import require_configuration_authority
@@ -223,9 +238,7 @@ def plan(intent, capture, profile_result, output, gates, policy, observation, *,
     else:
         config = {"configuration": record_sha256(intent)}
     if "packaging_policy" in identity["configuration_identity"]:
-        from rs9.product_classes import get_product_class, supported_architectures
-        packaging_policy = {"package_class": get_product_class(intent["project"]["id"]),
-                            "qualified_architectures": sorted(supported_architectures(intent["project"]["id"], output["destination"]["adapter"]))}
+        packaging_policy = _packaging_policy(capture, intent, output["destination"]["adapter"], generation=generation)
         config["packaging_policy"] = record_sha256(packaging_policy)
         if any(output["source_manifest"].get(key) != value for key, value in packaging_policy.items()):
             raise ContractError("OUTPUT_BINDING", "Publication architecture policy differs from the explicit product contract")

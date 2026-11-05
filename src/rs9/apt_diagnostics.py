@@ -466,7 +466,7 @@ def trust_identity(spec):
         if target.startswith('/rs9') or '/smoke' in target: continue
         files=([p] if p.is_file() else
                [f for f in p.rglob('*') if f.is_file() and not f.is_symlink() and
-                (f.name in {'InRelease','Release','Release.gpg','repomd.xml','repomd.xml.asc','rs9.db','rs9.db.sig','rs9.db.tar.gz','rs9.db.tar.gz.sig'}
+                (f.name in {'InRelease','Release','Release.gpg','repomd.xml','repomd.xml.asc','rs9.db','rs9.db.sig','rs9.db.tar.gz','rs9.db.tar.gz.sig','knowledge-forge-ai.db','knowledge-forge-ai.db.sig','knowledge-forge-ai.db.tar.gz','knowledge-forge-ai.db.tar.gz.sig'}
                  or f.suffix in {'.asc','.gpg'})])
         identities.append({'destination':target,'files':[
             {'path':f.name if p.is_file() else f.relative_to(p).as_posix(),'sha256':digest(f.read_bytes())}

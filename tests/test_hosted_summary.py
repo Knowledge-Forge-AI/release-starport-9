@@ -43,7 +43,7 @@ class HostedSummaryTests(unittest.TestCase):
         env=patch.dict("os.environ",{"GITHUB_SHA":"1"*40,"GITHUB_REF":"refs/heads/main",
             "GITHUB_EVENT_NAME":"push","GITHUB_RUN_ATTEMPT":"1","RS9_JOB_CONCLUSIONS":json.dumps(jobs)})
         env.start();self.addCleanup(env.stop)
-        for row in required(ROOT):
+        for row in [*required(ROOT), *getattr(self, "extra_rows", ())]:
             scratch=self.root / row["artifact_name"];scratch.mkdir()
             files=[]
             if row.get("custody_required"):
@@ -59,8 +59,9 @@ class HostedSummaryTests(unittest.TestCase):
                         arch = "noarch" if pure else {"x86_64-linux": "x86_64", "aarch64-linux": "aarch64"}[row["system"]]
                         name = product + "-0.6.1-1." + arch + ".rpm"
                     else:
-                        name = product + "-0.6.1-1-" + ("any" if pure else "x86_64") + ".pkg.tar.zst"
-                    path=scratch / "unsigned" / name;path.parent.mkdir(exist_ok=True)
+                        name = product + "-0.6.1-1-" + ("any" if pure else {"x86_64-linux": "x86_64", "aarch64-linux": "aarch64"}[row["system"]]) + ".pkg.tar.zst"
+                    directory = ("lane-work/canonical-any/files" if row["lane"] == "pacman" and row["system"] == "aarch64-linux" and pure else "unsigned")
+                    path=scratch / directory / name;path.parent.mkdir(parents=True, exist_ok=True)
                     if row["lane"] == "rpm":
                         path.write_bytes(_make_synthetic_rpm(product, arch=arch, is_source=False))
                     else:
@@ -73,6 +74,11 @@ class HostedSummaryTests(unittest.TestCase):
                 "execution_error":None,"policy_blockers":[],"runner":{},"provenance":provenance(ROOT,"a"*64),
                 "production_promotion_blockers": [LINUX_WHEEL_PROMOTION_BLOCKER] if row["lane"] == "wheels" and row["system"].endswith("linux") else [],
                 "gates":[{"name":g,"status":"pass"} for g in row["required_gates"]]}
+            if row["lane"] == "pacman" and row["system"] == "aarch64-linux":
+                # Extra current ARM component row; caller supplies the complete
+                # synthetic source binding before summary validation.
+                from rs9.current_generation import CURRENT_GENERATION
+                receipt["provenance"]["generation"] = CURRENT_GENERATION
             if row["lane"] == "rpm":
                 from tests.rpm_summary_fixtures import add_rpm_annex
                 add_rpm_annex(scratch,receipt,files)

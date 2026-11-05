@@ -27,7 +27,7 @@ VERSIONS = {"theme-forge-stellar-burst":"0.7.0", "theme-forge-stellar-loom":"0.5
             "theme-forge-solar-sail":"0.3.0", "theme-forge-nebular-fusion":"0.7.1"}
 # Filled from the actual paired P body + immutable P9 bytes by the retained
 # preparation sealer. No caller/env/JSON can choose these expected identities.
-CONSUMER_FILE_HASHES = {'.github/workflows/publish.yml': '14b0627bc7a4f8e8eb9a92349489724cadbd0c9a9875ff38f819cc53588f7cfb', 'flake.lock': 'ed928e945c79e3d7f19d37b13a05f0d97b98440b38661d97bf77844e40606431', 'flake.nix': '67be263eae65764407ef29126d28183f0270f60ad45acb8fd1202cec6411d9dd', 'keys/knowledge-forge-ai-packages.asc': '6931a99cf38e204c0adc75dd868f8c0e79d68e58e2644f575d4be1da2ea18d95', 'package-matrix.json': 'd1f0bead68f21c50b899eaf74bbb4f6b325986c515cf8802efa348bafaae885d', 'release-lock.json': 'c324a61b98c061cea2eab89f8dcd1d214b8524642db7bbe907984907effaa9ae', 'tools/verification/current_import_routing.py': '43b0b20f5836e4564580586d4408b4508dd749d5e32fcefc1df39af46b2d447a', 'tools/verification/generate-publication-provenance.mjs': '1fd13ff84ca4267fb2d2207f006fb966e910426d7555528d115a9afd9119b695', 'tools/verification/verify-publication-provenance.mjs': '50abdc435dc2a34bdc8a7511329f7fe9baad7c3554a7eecdab258c004145ef87'}  # PAIR_BODY_HASHES
+CONSUMER_FILE_HASHES = {'.github/workflows/publish.yml': '14b0627bc7a4f8e8eb9a92349489724cadbd0c9a9875ff38f819cc53588f7cfb', 'flake.lock': 'ed928e945c79e3d7f19d37b13a05f0d97b98440b38661d97bf77844e40606431', 'flake.nix': '67be263eae65764407ef29126d28183f0270f60ad45acb8fd1202cec6411d9dd', 'keys/knowledge-forge-ai-packages.asc': '6931a99cf38e204c0adc75dd868f8c0e79d68e58e2644f575d4be1da2ea18d95', 'package-matrix.json': 'd1f0bead68f21c50b899eaf74bbb4f6b325986c515cf8802efa348bafaae885d', 'release-lock.json': 'c324a61b98c061cea2eab89f8dcd1d214b8524642db7bbe907984907effaa9ae', 'tools/verification/current_import_routing.py': 'd132737e4dcece3f7e6056437620e7ff2f500ca771b2c3c28c3e9fbf37828597', 'tools/verification/generate-publication-provenance.mjs': '1fd13ff84ca4267fb2d2207f006fb966e910426d7555528d115a9afd9119b695', 'tools/verification/verify-publication-provenance.mjs': '50abdc435dc2a34bdc8a7511329f7fe9baad7c3554a7eecdab258c004145ef87'}  # PAIR_BODY_HASHES
 _PROOF = object()
 _ACTIVE = WeakKeyDictionary()
 _CONSUMERS = WeakKeyDictionary()
@@ -98,15 +98,17 @@ def verify_execution_source(root):
                 list(rs9.__path__) != [str(executing)] or
                 rs9.__spec__ is None or rs9.__spec__.origin != str(executing/"__init__.py")):
             fail("Executing RS9 package origin differs", "OWN_REPOSITORY_SOURCE")
-        names = {p.name for p in executing.glob("*.py")}
-        if names != {p.name for p in selected.glob("*.py")}:
+        names = {p.relative_to(executing).as_posix() for p in executing.rglob("*.py")}
+        if names != {p.relative_to(selected).as_posix() for p in selected.rglob("*.py")}:
             fail("Executing RS9 source inventory differs", "OWN_REPOSITORY_SOURCE")
         for name in sorted(names):
             if held(executing/name) != held(selected/name):
                 fail("Executing RS9 helper bytes differ from selected checkout", "OWN_REPOSITORY_SOURCE")
         for name, module in list(sys.modules.items()):
             if name == "rs9" or name.startswith("rs9."):
-                leaf = "__init__.py" if name == "rs9" else name.removeprefix("rs9.")+".py"
+                relative = name.removeprefix("rs9.").replace(".", "/")
+                leaf = ("__init__.py" if name == "rs9" else
+                        relative + "/__init__.py" if hasattr(module, "__path__") else relative + ".py")
                 expected = executing/leaf
                 if (leaf not in names or module is None or
                         getattr(module, "__file__", None) != str(expected) or
@@ -118,7 +120,11 @@ def verify_execution_source(root):
                         if not inspect.isfunction(unwrapped):
                             fail("Mixed RS9 imported helper type", "OWN_REPOSITORY_SOURCE")
                         origin = Path(unwrapped.__code__.co_filename)
-                        if origin.parent != executing or origin.name not in names:
+                        try:
+                            relative_origin = origin.relative_to(executing).as_posix()
+                        except ValueError:
+                            fail("Mixed RS9 imported helper origin", "OWN_REPOSITORY_SOURCE")
+                        if relative_origin not in names:
                             fail("Mixed RS9 imported helper origin", "OWN_REPOSITORY_SOURCE")
     except (OSError, TypeError, AttributeError, ValueError):
         fail("Executing RS9 helper source unavailable", "OWN_REPOSITORY_SOURCE")

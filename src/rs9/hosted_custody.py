@@ -66,6 +66,14 @@ def builder_identity(repository, *, generation=HISTORICAL_GENERATION):
                     repository / "flake.nix", repository / "operators/live1/targets.json",
                     repository / "operators/live1/command-contracts.json",
                     repository / "operators/live1/rpm-lint-policy.json"])
+    if generation == CURRENT_GENERATION:
+        # The current SDK is a package, with exact public pin inputs. Include
+        # all executable support bytes in the builder identity as well as Git's
+        # complete source-tree binding; historical hashes remain unchanged.
+        support = repository / "src/rs9/_archarm_support"
+        paths = sorted(set(paths) | set(support.rglob("*.py")) | {
+            support / "pins" / name for name in
+            ("ROOTFS-PIN.json", "PACKAGE-PINS.json", "archlinuxarm-builder-public.gpg")})
     rows = [{"path": p.relative_to(repository).as_posix(), **file_identity(p)} for p in paths if p.is_file()]
     if generation == CURRENT_GENERATION:
         rows.append({"selected_configuration_sha256": configuration_identity(repository, generation=generation)})
@@ -284,7 +292,7 @@ def retain(scratch, output, files, record):
         role = None
         if kind == "custody":
             from rs9.package_roles import producer_role, UNCLASSIFIED_PACKAGE
-            role = producer_role(record["lane"], relative)
+            role = producer_role(record["lane"], relative, generation=record["provenance"].get("generation"), system=record["system"])
             if role == UNCLASSIFIED_PACKAGE:
                 # Preserve the object and all other evidence while refusing its
                 # authority. Role verification rejects this explicit unknown role.

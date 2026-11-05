@@ -65,11 +65,13 @@ class CurrentDistributionQualificationTests(unittest.TestCase):
         current = load_hosted_lanes(ROOT, generation=CURRENT_GENERATION)
         self.assertEqual(current["required_jobs"], list(DISTRIBUTION_JOBS))
         selected = {"unit", "pins", "authenticate", "nix", "pacman", "rpm", "deb", "pages", "summary"}
-        self.assertEqual(current["lanes"], [row for row in old["lanes"] if row["lane"] in selected])
+        unchanged = [row for row in current["lanes"]
+                     if (row["lane"], row["system"]) != ("pacman", "aarch64-linux")]
+        self.assertEqual(unchanged, [row for row in old["lanes"] if row["lane"] in selected])
         keys = {(row["lane"], row["system"]) for row in required(ROOT, generation=CURRENT_GENERATION)}
         self.assertEqual(keys, {("authenticate", "generation"), ("pins", "generation"), ("pages", "generation"),
             ("nix", "aarch64-darwin"), ("nix", "x86_64-linux"), ("nix", "aarch64-linux"),
-            ("deb", "amd64"), ("deb", "arm64"), ("rpm", "x86_64-linux"), ("rpm", "aarch64-linux"), ("pacman", "x86_64-linux")})
+            ("deb", "amd64"), ("deb", "arm64"), ("rpm", "x86_64-linux"), ("rpm", "aarch64-linux"), ("pacman", "x86_64-linux"), ("pacman", "aarch64-linux")})
         self.assertEqual(current["experiments"], [])
         matrix = generate_matrix_outputs(current)
         self.assertEqual(len(json.loads(matrix["matrix_nix"])["include"]), 3)
@@ -195,11 +197,17 @@ class CurrentDistributionQualificationTests(unittest.TestCase):
         self.assertEqual(packet_classification({"generation": CURRENT_GENERATION, "validation": {"status": "pass"}}), "qualified-current-distribution-candidate")
 
     @patch("rs9.rpm_lint_policy.load_policy", side_effect=lambda *args, **kwargs: blocked_policy())
-    def test_complete_synthetic_distribution_evidence_stays_held_for_explicit_blocked_policy(self, selected_policy):
+    @patch("rs9.current_pacman_reuse.candidate_reuse", return_value={"replicas": {
+        "theme-forge-stellar-loom": None, "theme-forge-solar-sail": None}})
+    def test_complete_synthetic_distribution_evidence_stays_held_for_explicit_blocked_policy(self, selected_reuse, selected_policy):
+        # Isolate the existing RPM policy hold. Real original-provider reuse
+        # admission and every refused witness are covered in reuse_join tests.
         from tests.test_hosted_summary import HostedSummaryTests
         from rs9.scratch import canonical
         from rs9.hosted_nix import PRODUCTS
         fixture = HostedSummaryTests()
+        fixture.extra_rows = [row for row in required(ROOT, generation=CURRENT_GENERATION)
+                              if (row["lane"], row["system"]) == ("pacman", "aarch64-linux")]
         fixture.setUp()
         self.addCleanup(fixture.doCleanups)
         lanes = required(ROOT, generation=CURRENT_GENERATION)
@@ -229,6 +237,7 @@ class CurrentDistributionQualificationTests(unittest.TestCase):
             self.assertEqual(summary["qualification_scope"], DISTRIBUTION_SCOPE)
             self.assertEqual(summary["qualification_verdict"], "not-qualified")
             self.assertEqual(summary["blocking_reasons"], ["candidate-rpm-aarch64-linux:CURRENT_RPM_POLICY_HELD", "candidate-rpm-x86_64-linux:CURRENT_RPM_POLICY_HELD"])
+            summary["receipts"].sort(key=lambda row: row["lane"] != "rpm")
             with self.assertRaises(ContractError) as error:
                 validate_summary(summary, ROOT, COMMIT, generation=CURRENT_GENERATION, run_id=7, original_run=self.admitted_context())
             self.assertEqual(error.exception.code, "CURRENT_RPM_POLICY_HELD")

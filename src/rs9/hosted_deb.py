@@ -39,7 +39,7 @@ import shutil
 from typing import Any, Mapping, Sequence
 import uuid
 
-from rs9.current_generation import HISTORICAL_GENERATION, generation_paths
+from rs9.current_generation import HISTORICAL_GENERATION, CURRENT_GENERATION, generation_paths
 from rs9.apt_diagnostics import (
     trust_identity,
     build_positive_control,
@@ -731,10 +731,12 @@ def dnf_spec(
     return spec
 
 
-def pacman_spec(pacman_dir: Path, keys_dir: Path, fingerprint: str) -> dict[str, Any]:
+def pacman_spec(pacman_dir: Path, keys_dir: Path, fingerprint: str, *, architecture: str = "x86_64") -> dict[str, Any]:
+    if architecture not in {"x86_64", "aarch64"}:
+        raise ContractError("INVALID_ARCHITECTURE", "Closed Pacman client architecture required")
     if not _FINGERPRINT_RE.fullmatch(fingerprint):
         raise ContractError("INVALID_ARGUMENT", "Signing fixture fingerprint required for pacman trust")
-    conf = ["[options]", "Architecture = x86_64", "SigLevel = Required DatabaseRequired", "[rs9]",
+    conf = ["[options]", "Architecture = " + architecture, "SigLevel = Required DatabaseRequired", "[rs9]",
             f"Server = file://{SERVER_ROOT}/pacman/$arch"]
     base = ["pacman", "--config", PACMAN_CONF]
     return {
@@ -813,6 +815,46 @@ def _cleanup_installed_client(client, spec, product, label, before, family):
     return rows,evidence
 
 
+def _archarm_client_route(sdk_lease, *, family, spec, image, platform, system, generation, probe_root,
+                          client_outputs):
+    """Current pacman/aarch64-linux client route through one genuine held ArchARM SDK lease.
+
+    ``None`` (no lease, any other family/platform) keeps every default, historical, x86_64
+    and previous-lane route byte-identical. A current pacman ``linux/arm64``/``aarch64-linux``
+    client without a lease is refused before any command; so is a lease whose
+    generation/system/image/platform/runner identity or ``Architecture = aarch64`` spec does
+    not join, or a spec mount that is writable. ``generation=None`` (tamper) relies on the
+    lease's own current-generation readback. The route keeps one owner-only probe-output
+    root, which is the only writable host path any client receives.
+    """
+    from rs9.current_generation import CURRENT_GENERATION
+    arm_target = platform == "linux/arm64" or system == "aarch64-linux"
+    if sdk_lease is None:
+        if family == "pacman" and arm_target and generation in (None, CURRENT_GENERATION):
+            raise ContractError("ARCHARM_CLIENT_LEASE", "Current pacman/aarch64 clients require a held ArchARM SDK lease",
+                                details={"substage": "sdk-lease", "reason": "lease-missing"})
+        return None
+    from rs9.hosted_container_smoke import archarm_lease_identity, archarm_probe_root
+    identity = archarm_lease_identity(sdk_lease)
+    configure = spec.get("configure") if isinstance(spec, Mapping) else None
+    mounts = spec.get("mounts") if isinstance(spec, Mapping) else None
+    try:
+        configured = json.dumps(configure) if isinstance(configure, list) else ""
+    except (TypeError, ValueError):
+        configured = ""
+    if (generation not in (None, CURRENT_GENERATION) or family != "pacman" or not isinstance(spec, Mapping)
+            or spec.get("family") != "pacman"
+            or platform != "linux/arm64" or system != "aarch64-linux" or image != identity["image"]
+            or configured.count("Architecture = aarch64") != 1 or "Architecture = x86_64" in configured
+            or not isinstance(mounts, list) or not mounts
+            or any(not isinstance(m, (tuple, list)) or len(m) != 3 or m[2] is not False for m in mounts)
+            or (client_outputs and probe_root is None)):
+        raise ContractError("ARCHARM_CLIENT_LEASE", "Client route does not join the held ArchARM SDK lease",
+                            details={"substage": "sdk-lease", "reason": "route-join"})
+    return {"identity": identity,
+            "probe_root": archarm_probe_root(Path(probe_root), identity) if client_outputs else None}
+
+
 def client_cycle(
     host: RecordingRunner,
     spec: Mapping[str, Any],
@@ -827,12 +869,24 @@ def client_cycle(
     burst_record: Mapping[str, Any] | None = None,
     burst_scratch: Path | None = None,
     generation=HISTORICAL_GENERATION,
+    sdk_lease: Any = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Fresh container per product: configure, inventory, install, probe, remove, inventory."""
+    """Fresh container per product: configure, inventory, install, probe, remove, inventory.
+
+    ``sdk_lease`` is required for, and only admitted on, the current pacman/aarch64-linux
+    route. There each product gets a fresh lease client whose public inputs are read-only.
+    Its sole writable bind is ``burst_scratch/<product>`` (owner-only), and probes run as the
+    verified runner UID:GID through the SDK drop-only preamble (never 65534). Burst and
+    smoke results are accepted only after that client exited (writer quiesced) and its
+    tree passed held SDK custody ingestion.
+    """
     generation_paths(generation)
     gates: list[dict[str, Any]] = []
     evidence: dict[str, Any] = {}
     family = spec["family"]
+    route = _archarm_client_route(sdk_lease, family=family, spec=spec, image=image, platform=platform, system=system,
+                                  generation=generation, probe_root=burst_scratch, client_outputs=True)
+    run_user = CLIENT_USER if route is None else route["identity"]["user"]
     setup_sha256 = trust_identity(spec)
     for product in products:
         label = f"{prefix}.{product}"
@@ -843,26 +897,53 @@ def client_cycle(
         client = None
         installed_ok = False
         container_smoke = None
+        pending: dict[str, Any] = {}
         try:
             mounts = list(spec["mounts"])
             if burst_record is not None or (product == NATIVE_PRODUCT and smoke):
-                mounts.append((str(repository / "src"), "/rs9-source", False))
-            if product == "theme-forge-stellar-burst" and burst_scratch is not None:
+                if route is None:
+                    mounts.append((str(repository / "src"), "/rs9-source", False))
+                else:
+                    from rs9.hosted_container_smoke import ARCHARM_GUEST_SOURCE
+                    mounts.append((str(repository / "src"), ARCHARM_GUEST_SOURCE, False))
+            if route is None and product == "theme-forge-stellar-burst" and burst_scratch is not None:
                 burst_scratch.mkdir(parents=True, exist_ok=True)
                 burst_scratch.chmod(0o755)
                 mounts.append((str(burst_scratch), str(burst_scratch), True))
             if product == NATIVE_PRODUCT and smoke:
-                from rs9.hosted_container_smoke import prepare_container_smoke
-                container_smoke = prepare_container_smoke(smoke, system, family)
+                if route is None:
+                    from rs9.hosted_container_smoke import prepare_container_smoke
+                    container_smoke = prepare_container_smoke(smoke, system, family)
+                else:
+                    from rs9.hosted_container_smoke import prepare_archarm_container_smoke
+                    container_smoke = prepare_archarm_container_smoke(smoke, system, family, lease=sdk_lease)
                 mounts.extend(container_smoke["mounts"])
                 from rs9.pages_smoke_diagnostic import extract_smoke_context
                 product_evidence["smoke_context"] = extract_smoke_context(container_smoke)
+                if route is not None:
+                    product_evidence["smoke_context"].update(uid=route["identity"]["uid"], gid=route["identity"]["gid"])
                 if family == "apt":
                     from rs9.pages_smoke_diagnostic import probe_apt_runtime_image
                     product_evidence["apt_image_probe"] = probe_apt_runtime_image(host, image, platform=platform)
-            with ClientContainer(host, image, platform, mounts, family) as client_ctx:
+            if route is None:
+                client_manager = ClientContainer(host, image, platform, mounts, family)
+            else:
+                # Fresh lease client: public mounts read-only plus exactly one writable
+                # owner-only probe-output tree for this product (the SDK refuses others).
+                from rs9.hosted_container_smoke import archarm_product_output
+                client_manager = sdk_lease.client(
+                    mounts, archarm_product_output(route["probe_root"], product, route["identity"]))
+            with client_manager as client_ctx:
                 client = client_ctx
-                if container_smoke:
+                if route is not None:
+                    from rs9.hosted_container_smoke import archarm_lease_identity
+                    current_stage = "unprivileged-identity"
+                    archarm_lease_identity(sdk_lease, client)
+                    client.verify_unprivileged_identity()
+                    product_evidence["archarm_client"] = {
+                        "route": "archarm-sdk-lease", "uid": route["identity"]["uid"], "gid": route["identity"]["gid"],
+                        "entry": "exec-user-drop-only-preamble", "writable_binds": 1, "registry_provisioner_used": False}
+                if container_smoke and route is None:
                     from rs9.hosted_container_smoke import configure_container_output
                     configure_container_output(client, user=CLIENT_USER)
                 current_stage = "configure"
@@ -882,7 +963,7 @@ def client_cycle(
                                                      "stdout_sha256": cfg_rcpt.stdout_sha256, "stderr_sha256": cfg_rcpt.stderr_sha256})
                 current_stage = "network-denial"
                 negative = client.exec(["python3","-c",
-                    "import socket;s=socket.socket();s.settimeout(2);assert s.connect_ex(('1.1.1.1',443))!=0"], user=CLIENT_USER)
+                    "import socket;s=socket.socket();s.settimeout(2);assert s.connect_ex(('1.1.1.1',443))!=0"], user=run_user)
                 if negative.exit_code:
                     raise ContractError("NETWORK_DENIAL", "Disconnected client still has runtime egress")
                 rows.append(_gate(f"{label}.network-denial", "pass"))
@@ -987,11 +1068,17 @@ def client_cycle(
                         current_stage = "burst"
                         if burst_record is None or burst_scratch is None or system is None:
                             raise ContractError("BURST_NATIVE_TARGET", "Authenticated installed Burst proof required")
-                        from rs9.hosted_burst_clients import verify_client_burst
-                        product_evidence["native_loader"] = verify_client_burst(
-                            client, burst_record, system, burst_scratch / product, user=CLIENT_USER)
-                        rows.append(_gate(f"{label}.burst-native-addon-target", "pass"))
-                        rows.append(_gate(f"{label}.burst-native-addon-load", "pass"))
+                        if route is None:
+                            from rs9.hosted_burst_clients import verify_client_burst
+                            product_evidence["native_loader"] = verify_client_burst(
+                                client, burst_record, system, burst_scratch / product, user=CLIENT_USER)
+                            rows.append(_gate(f"{label}.burst-native-addon-target", "pass"))
+                            rows.append(_gate(f"{label}.burst-native-addon-load", "pass"))
+                        else:
+                            # Held, not accepted: gates are emitted only after quiesced custody.
+                            from rs9.hosted_burst_clients import run_archarm_client_burst
+                            pending["native_loader"] = run_archarm_client_burst(
+                                client, burst_record, system, lease=sdk_lease)
                     if product == NATIVE_PRODUCT:
                         current_stage = "native-closure"
                         closure = client.exec(["python3","-c",
@@ -999,14 +1086,20 @@ def client_cycle(
                             "files=[p for p in root.rglob('*') if p.is_file() and not p.is_symlink() and p.read_bytes()[:4]==bytes([127])+b'ELF'];"
                             "assert files;"
                             "results=[subprocess.run(['ldd',str(p)],capture_output=True) for p in files];"
-                            "assert all(b'not found' not in r.stdout+r.stderr and (r.returncode==0 or b'not a dynamic' in r.stdout+r.stderr or b'statically linked' in r.stdout+r.stderr) for r in results)"], user=CLIENT_USER)
+                            "assert all(b'not found' not in r.stdout+r.stderr and (r.returncode==0 or b'not a dynamic' in r.stdout+r.stderr or b'statically linked' in r.stdout+r.stderr) for r in results)"], user=run_user)
                         rows.append(_gate(f"{label}.native-closure", *_pair(closure.exit_code == 0)))
                         if smoke:
                             current_stage = "smoke"
-                            from rs9.hosted_container_smoke import verify_container_nebular
-                            product_evidence["application_smoke"] = verify_container_nebular(
-                                client, container_smoke, user=CLIENT_USER)
-                            rows.append(_gate(f"{label}.application-smoke","pass"))
+                            if route is None:
+                                from rs9.hosted_container_smoke import verify_container_nebular
+                                product_evidence["application_smoke"] = verify_container_nebular(
+                                    client, container_smoke, user=CLIENT_USER)
+                                rows.append(_gate(f"{label}.application-smoke","pass"))
+                            else:
+                                # Only the host receipt now; the result file is read after quiescence.
+                                from rs9.hosted_container_smoke import run_archarm_container_nebular
+                                pending["smoke_receipt"] = run_archarm_container_nebular(
+                                    client, container_smoke, lease=sdk_lease)
                 finally:
                     if installed_ok:
                         cleanup_rows, cleanup_evidence = _cleanup_installed_client(client, spec, product, label, before, family)
@@ -1020,6 +1113,33 @@ def client_cycle(
                 evidence[product] = {**product_evidence, "family": family, "stage": "post-remove"}
                 if counters_source:
                     evidence[product]["counters_source"] = counters_source
+            if route is not None:
+                # The lease client has exited: its stop was read back, so the only writer is
+                # quiesced. Ingest the untrusted tree through held no-follow SDK descriptors,
+                # then accept the held Burst/smoke results (failures still fail below).
+                from rs9.hosted_burst_clients import archarm_burst_declarations
+                from rs9.hosted_container_smoke import (accept_archarm_container_nebular, archarm_ingest_output,
+                                                        archarm_smoke_declarations)
+                current_stage = "probe-output-custody"
+                declared: dict[str, Any] = {}
+                if "native_loader" in pending:
+                    declared.update(archarm_burst_declarations())
+                if "smoke_receipt" in pending:
+                    declared.update(archarm_smoke_declarations())
+                output = archarm_ingest_output(client, sdk_lease, declared)
+                accepted: dict[str, Any] = {"archarm_probe_output": output.record()}
+                if "native_loader" in pending:
+                    current_stage = "burst"
+                    accepted["native_loader"] = pending["native_loader"]
+                    rows.append(_gate(f"{label}.burst-native-addon-target", "pass"))
+                    rows.append(_gate(f"{label}.burst-native-addon-load", "pass"))
+                if "smoke_receipt" in pending:
+                    current_stage = "smoke"
+                    accepted["application_smoke"] = accept_archarm_container_nebular(
+                        container_smoke, pending["smoke_receipt"], output, lease=sdk_lease)
+                    rows.append(_gate(f"{label}.application-smoke", "pass"))
+                product_evidence.update(accepted)
+                evidence[product].update(accepted)
         except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
             err_family = (err.details.get("family") if isinstance(err, ContractError) and err.details else None) or family
             err_stage = (err.details.get("stage") if isinstance(err, ContractError) and err.details else None) or current_stage
@@ -1289,7 +1409,9 @@ def tamper_family_copy(
     elif family == "pacman":
         copy = dest / "pacman"
         shutil.copytree(dirs["pacman"], copy)
-        base = copy / "x86_64"
+        if arch not in {"x86_64", "aarch64"}:
+            raise ContractError("INVALID_ARCHITECTURE", "Closed Pacman tamper architecture required")
+        base = copy / arch
         if kind == "package":
             _flip_last_byte(_product_files(base, "*.pkg.tar.zst", product)[0])
         elif kind == "index":
@@ -1324,9 +1446,19 @@ def tamper_cycle(
     kinds: Sequence[str],
     prefix: str,
     positive_control: Mapping[str, Any] | None = None,
+    sdk_lease: Any = None,
 ) -> list[dict[str, Any]]:
-    """Every tamper must stop installation; causal qualification requires explicit positive control."""
+    """Every tamper must stop installation; causal qualification requires explicit positive control.
+
+    ``sdk_lease`` is required for, and only admitted on, current pacman/aarch64: each kind
+    uses a fresh lease client (never ``ClientContainer``/provisioning) with read-only tampered
+    public inputs and one empty owner-only probe-output directory. Fixture homes are never
+    mounted, and the mutation must land inside the ``aarch64`` repository tree.
+    """
     gates = []
+    route = _archarm_client_route(sdk_lease, family=family, spec=spec_for(dirs) if sdk_lease is not None else None,
+                                  image=image, platform=platform, system="aarch64-linux" if arch == "aarch64" else None,
+                                  generation=None, probe_root=None, client_outputs=False)
     control_ok, control_reason = validate_positive_control(
         positive_control,
         family=family,
@@ -1362,7 +1494,23 @@ def tamper_cycle(
                 signature_context = {"source_uri": "file:/srv/rs9/apt", "distribution": "resolute",
                                      "mutation_verified": mutation["verified"],
                                      "positive_control_valid": control_ok, "network_disconnected": False}
-            with ClientContainer(host, image, platform, spec["mounts"], family) as client:
+            archarm_client = None
+            if route is not None:
+                from rs9.hosted_container_smoke import archarm_product_output
+                trees = [{path.relative_to(root).as_posix(): digest(path.read_bytes())
+                          for path in Path(root).rglob("*") if path.is_file() and not path.is_symlink()}
+                         for root in (dirs[family], tampered[family])]
+                changed = {name for name in trees[0].keys() | trees[1].keys() if trees[0].get(name) != trees[1].get(name)}
+                if not changed or any(not name.startswith(arch + "/") for name in changed):
+                    raise ContractError("ARCHARM_TAMPER_MUTATION", "Tamper copy did not mutate the aarch64 repository",
+                                        details={"substage": "archarm-tamper-mutation", "kind": kind})
+                archarm_client = sdk_lease.client(spec["mounts"], archarm_product_output(
+                    work, f"tamper-{family}-{kind}-probe-output", route["identity"]))
+            with (ClientContainer(host, image, platform, spec["mounts"], family) if route is None
+                  else archarm_client) as client:
+                if route is not None:
+                    from rs9.hosted_container_smoke import archarm_lease_identity
+                    archarm_lease_identity(sdk_lease, client)
                 cfg_rcpt = None
                 for command in spec["configure"]:
                     cfg_rcpt = client.exec(command)
@@ -1966,6 +2114,8 @@ def execute_pages(context: dict[str, Any]) -> dict[str, Any]:
 
     try:
         needed = [("deb", "amd64"), ("deb", "arm64"), ("rpm", "x86_64-linux"), ("rpm", "aarch64-linux"), ("pacman", "x86_64-linux")]
+        if context.get("generation") == CURRENT_GENERATION:
+            needed.append(("pacman", "aarch64-linux"))
         try:
             rpm_receipts = []
             if inputs is not None:
@@ -2055,7 +2205,8 @@ def _assemble_and_test_pages(
         completed.append(substage)
         substage = "family-tool-preparation"
 
-        files: dict[str, bytes | str] = dict(render_install_docs())
+        files: dict[str, bytes | str] = dict(render_install_docs(
+            qualification_generation=context.get("generation", HISTORICAL_GENERATION)))
         # RPM and pacman metadata is rebuilt by the family tools in their own containers.
         rpm_image = provision_native("rpm", "x86_64-linux", pins, runner=host)
         pacman_image = provision_native("pacman", "x86_64-linux", pins, runner=host)
@@ -2124,17 +2275,33 @@ def _assemble_and_test_pages(
                                         details={"system": system, "target": name})
         completed.append(substage)
         substage = "pacman-metadata"
-        pac_dir = stage / "pacman/x86_64"
-        pac_dir.mkdir(parents=True)
-        for name, path in sorted(bundles[("pacman", "x86_64-linux")]["packages"].items()):
-            shutil.copyfile(path, pac_dir / name)
-            (pac_dir / f"{name}.sig").write_bytes(fixture.detach_sign(path.read_bytes(), armor=False))
-        _run_tool_container(
-            host, pacman_image["image_ref"], "linux/amd64", stage,
-            ["sh", "-c", f"cd {pac_dir} && repo-add rs9.db.tar.gz *.pkg.tar.zst && "
-                         "for n in db files; do rm -f rs9.$n; cp rs9.$n.tar.gz rs9.$n; done"])
-        for name in ("rs9.db.tar.gz", "rs9.db", "rs9.files.tar.gz", "rs9.files"):
-            (pac_dir / f"{name}.sig").write_bytes(fixture.detach_sign((pac_dir / name).read_bytes(), armor=False))
+        if context.get("generation") == CURRENT_GENERATION:
+            from rs9.current_pacman_reuse import candidate_reuse, repository_package_sets
+            from rs9.hosted_custody import provenance
+            reuse = candidate_reuse(repository, Path(context["inputs"]),
+                                    provenance(repository, context["authentication_sha256"], generation=CURRENT_GENERATION))
+            package_sets = repository_package_sets(bundles, reuse)
+        else:
+            package_sets = {"x86_64": bundles[("pacman", "x86_64-linux")]["packages"]}
+        package_signatures = {}
+        for pac_arch, packages in package_sets.items():
+            pac_dir = stage / "pacman" / pac_arch
+            pac_dir.mkdir(parents=True)
+            for name, path in sorted(packages.items()):
+                data = path.read_bytes()
+                shutil.copyfile(path, pac_dir / name)
+                identity = digest(data)
+                if identity not in package_signatures:
+                    package_signatures[identity] = fixture.detach_sign(data, armor=False)
+                (pac_dir / f"{name}.sig").write_bytes(package_signatures[identity])
+            # Metadata tools do not execute target binaries. Preserve this existing
+            # x64 Pages tool route; ARM product/client execution uses its native SDK.
+            _run_tool_container(
+                host, pacman_image["image_ref"], "linux/amd64", stage,
+                ["sh", "-c", f"cd {pac_dir} && repo-add rs9.db.tar.gz *.pkg.tar.zst && "
+                             "for n in db files; do rm -f rs9.$n; cp rs9.$n.tar.gz rs9.$n; done"])
+            for name in ("rs9.db.tar.gz", "rs9.db", "rs9.files.tar.gz", "rs9.files"):
+                (pac_dir / f"{name}.sig").write_bytes(fixture.detach_sign((pac_dir / name).read_bytes(), armor=False))
         completed.append(substage)
         for family_dir in ((stage / "rpm"), pac_dir.parent):
             for path in sorted(family_dir.rglob("*")):
@@ -2144,7 +2311,7 @@ def _assemble_and_test_pages(
         substage = "inventory"
         sources = collect_candidate_sources(files=files, cname=PAGES_HOST, signing_fixture=fixture, apt_repo=repo)
         inventory = exact_inventory_for(sources)
-        verify_pages_completeness(inventory)
+        verify_pages_completeness(inventory, qualification_generation=context.get("generation", HISTORICAL_GENERATION))
         completed.append(substage)
         substage = "assembly"
         tree = scratch / "pages-tree"

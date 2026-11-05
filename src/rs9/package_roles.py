@@ -21,12 +21,14 @@ from rs9.security import validate_safe_relative_posix_path
 from rs9.product_classes import extract_package_arch
 
 BINARY_PACKAGE: str = "binary-package"
+RAW_REUSE_REPLICA: str = "raw-unsigned-reuse-replica"
 SOURCE_PACKAGE_EVIDENCE: str = "source-package-evidence"
 FIXTURE_SIGNED_COPY: str = "fixture-signed-copy"
 UNCLASSIFIED_PACKAGE: str = "unclassified-package"
 
 ALL_ROLES: frozenset[str] = frozenset({
     BINARY_PACKAGE,
+    RAW_REUSE_REPLICA,
     SOURCE_PACKAGE_EVIDENCE,
     FIXTURE_SIGNED_COPY,
     UNCLASSIFIED_PACKAGE,
@@ -34,6 +36,7 @@ ALL_ROLES: frozenset[str] = frozenset({
 
 VALID_PRODUCER_ROLES: frozenset[str] = frozenset({
     BINARY_PACKAGE,
+    RAW_REUSE_REPLICA,
     SOURCE_PACKAGE_EVIDENCE,
     FIXTURE_SIGNED_COPY,
 })
@@ -62,12 +65,24 @@ def _is_pinned_source_rpm_path(posix: str) -> bool:
     return False
 
 
-def producer_role(lane: str, relative_path: str | Path) -> str:
+def producer_role(lane: str, relative_path: str | Path, *, generation=None, system=None) -> str:
     """Classify producer package role from lane and relative path. Unknown roles fail closed."""
     if lane not in {"rpm", "deb", "pacman", "wheels", "pages"}:
         return UNCLASSIFIED_PACKAGE
 
     posix = _normalize_posix_path(relative_path)
+    from rs9.current_generation import CURRENT_GENERATION
+    if (generation == CURRENT_GENERATION and lane == "pacman" and system == "aarch64-linux"
+            and any(Path(posix).name.startswith(product + "-") for product in
+                    ("theme-forge-stellar-loom", "theme-forge-solar-sail"))
+            and Path(posix).name.endswith("-any.pkg.tar.zst")):
+        parts = Path(posix).parts
+        if len(parts) == 4 and parts[:3] == ("lane-work", "canonical-any", "files"):
+            return RAW_REUSE_REPLICA
+        if len(parts) == 4 and parts[:3] == ("lane-work", "pacman", "aarch64"):
+            return FIXTURE_SIGNED_COPY
+        # Current ARM never constructs an any package, even if its bytes match.
+        return UNCLASSIFIED_PACKAGE
     if not any(posix.endswith(ext) for ext in PACKAGE_EXTENSIONS):
         return UNCLASSIFIED_PACKAGE
 
@@ -217,7 +232,7 @@ def validate_role_declarations(manifest):
         if row.get("kind") != "custody":
             continue
         role = row.get("role")
-        if role not in VALID_PRODUCER_ROLES or role != producer_role(manifest.get("lane"), path):
+        if role not in VALID_PRODUCER_ROLES or role != producer_role(manifest.get("lane"), path, generation=manifest.get("generation"), system=manifest.get("system")):
             raise ContractError("CUSTODY_ROLE", "Explicit producer package role required")
         allowed = {"fixture-test-only"} if role == FIXTURE_SIGNED_COPY else {"candidate-only", "candidate-policy-pending"}
         if row.get("promotion") not in allowed:

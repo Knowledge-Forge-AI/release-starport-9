@@ -5,6 +5,7 @@ from __future__ import annotations
 import types
 from typing import Mapping, NamedTuple
 
+from rs9.current_generation import CURRENT_GENERATION, GENERATIONS, HISTORICAL_GENERATION
 from rs9.errors import ContractError
 
 class NativePackagingMapping(NamedTuple):
@@ -180,8 +181,37 @@ _SUPPORTED_ARCHITECTURES: dict[str, dict[str, frozenset[str]]] = {
 }
 
 
-def supported_architectures(product_id: str, adapter: str) -> frozenset[str]:
-    """Return supported packaging architectures for an exact product and adapter."""
+# Current-generation-only extension: native pacman products (Stellar Burst 0.7.0,
+# Nebular Fusion 0.7.1) may target official Arch Linux ARM AArch64 in addition to
+# x86_64. Pure JS CLI products remain 'any'. The historical generation is unchanged.
+_CURRENT_GENERATION_OVERRIDES: dict[str, dict[str, frozenset[str]]] = {
+    "pacman": {
+        NATIVE_NODE_CLI: frozenset({"x86_64", "aarch64"}),
+        NATIVE_DESKTOP: frozenset({"x86_64", "aarch64"}),
+    },
+}
+
+
+def _require_generation(generation: str) -> str:
+    """Fail closed for any generation outside the closed source-owned set."""
+    if not isinstance(generation, str) or generation not in GENERATIONS:
+        raise ContractError("GENERATION_SELECTION", "Unknown capture generation")
+    return generation
+
+
+def supported_architectures(
+    product_id: str,
+    adapter: str,
+    *,
+    generation: str = HISTORICAL_GENERATION,
+) -> frozenset[str]:
+    """Return supported packaging architectures for an exact product and adapter.
+
+    The default (historical) generation keeps its original contract: native
+    pacman is x86_64 only. Only CURRENT_GENERATION additionally admits native
+    pacman 'aarch64'; pure JS CLI products are never widened.
+    """
+    _require_generation(generation)
     p_class = get_product_class(product_id)
     adapter_key = "debian" if adapter in ("debian", "apt", "deb") else "rpm" if adapter == "dnf" else "pypi" if adapter == "wheels" else adapter
     if adapter_key not in _SUPPORTED_ARCHITECTURES:
@@ -190,17 +220,33 @@ def supported_architectures(product_id: str, adapter: str) -> frozenset[str]:
             f"Unsupported packaging adapter: {adapter}",
             details={"product": product_id},
         )
+    if generation == CURRENT_GENERATION:
+        override = _CURRENT_GENERATION_OVERRIDES.get(adapter_key, {}).get(p_class)
+        if override is not None:
+            return override
     return _SUPPORTED_ARCHITECTURES[adapter_key][p_class]
 
 
-def packaging_system_for_arch(adapter: str, arch: str) -> str:
-    """Resolve Linux platform system triple for a native packaging architecture."""
+def packaging_system_for_arch(
+    adapter: str,
+    arch: str,
+    *,
+    generation: str = HISTORICAL_GENERATION,
+) -> str:
+    """Resolve Linux platform system triple for a native packaging architecture.
+
+    Pacman 'aarch64' resolves to 'aarch64-linux' only for CURRENT_GENERATION;
+    the historical generation keeps pacman x86_64-only. 'any' never resolves.
+    """
+    _require_generation(generation)
     arch_norm = arch.strip().lower()
     adapter_key = "debian" if adapter in ("debian", "apt", "deb") else adapter
 
     if adapter_key == "pacman":
         if arch_norm == "x86_64":
             return "x86_64-linux"
+        elif arch_norm == "aarch64" and generation == CURRENT_GENERATION:
+            return "aarch64-linux"
     elif adapter_key == "rpm":
         if arch_norm == "x86_64":
             return "x86_64-linux"

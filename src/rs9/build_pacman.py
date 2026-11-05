@@ -1,11 +1,15 @@
-"""Normal-tool native package candidate driver for pacman x86_64 and any (Arch Linux).
+"""Normal-tool native package candidate driver for pacman x86_64, aarch64 and any (Arch Linux).
 
 Executes real host makepkg (strictly nonroot) and repo-add to generate candidate packages
 and repository databases:
 - Rejects root execution (makepkg nonroot requirement).
 - Requires empty scratch root and exact authenticated release capture.
 - Pure JS CLI projects enforce arch 'any' and authenticated offline npm closure.
-- Native Node CLI and native desktop products enforce arch 'x86_64'.
+- Native Node CLI and native desktop products enforce arch 'x86_64' for the historical
+  (default) generation. Only the current generation (CURRENT_GENERATION, selected via the
+  ``generation`` argument) additionally admits native 'aarch64' (Arch Linux ARM), built
+  natively on an AArch64 host by the host makepkg; no cross compiler is used. The CLI
+  ``main`` entry point builds the historical generation only.
 - Native prerequisites absent -> explicit unavailable, never fabricated files.
 - Subprocess derivation records bound to artifact, tool, container, and source.
 """
@@ -33,7 +37,7 @@ from rs9.build_native import (
     validate_build_inputs,
     validate_scratch_root,
 )
-from rs9.current_generation import HISTORICAL_GENERATION, generation_paths
+from rs9.current_generation import CURRENT_GENERATION, HISTORICAL_GENERATION, generation_paths
 from rs9.errors import ContractError
 from rs9.profiles import png_size
 from rs9.release_core import ReleaseCapture, digest
@@ -260,6 +264,8 @@ def build_pacman_candidate(
         for soname in sorted(system_sonames - bundled):
             receipt = r.run(["pacman","-Qo","--quiet","/usr/lib/" + soname])
             if receipt.exit_code or not receipt.stdout_text.strip():
+                if generation == CURRENT_GENERATION and matched_arch == "aarch64":
+                    raise ContractError("DEPENDENCY_DERIVATION", "Pinned installed provider required; catalogue fallback is forbidden")
                 receipt = r.run(["pacman","-F","--machinereadable",soname])
                 package_names = {line.split(chr(0))[1] for line in receipt.stdout_text.splitlines()
                                  if len(line.split(chr(0))) >= 4}
@@ -338,6 +344,8 @@ def build_pacman_candidate(
         for soname in sorted(system_sonames):
             receipt = r.run(["pacman", "-Qo", "--quiet", "/usr/lib/" + soname])
             if receipt.exit_code or not receipt.stdout_text.strip():
+                if generation == CURRENT_GENERATION and matched_arch == "aarch64":
+                    raise ContractError("DEPENDENCY_DERIVATION", "Pinned installed provider required; catalogue fallback is forbidden")
                 receipt = r.run(["pacman", "-F", "--machinereadable", soname])
                 package_names = {line.split(chr(0))[1] for line in receipt.stdout_text.splitlines()
                                  if len(line.split(chr(0))) >= 4}
@@ -420,7 +428,14 @@ def build_pacman_candidate(
         "--force",
         "--clean",
     ]
-    makepkg_receipt = r.run(makepkg_cmd, cwd=pkg_work, env={"SOURCE_DATE_EPOCH":"1767225600"})
+    makepkg_env = {"SOURCE_DATE_EPOCH": "1767225600"}
+    if generation == CURRENT_GENERATION and matched_arch == "aarch64":
+        # Current ARM policy requires makepkg's real dependency checks.
+        makepkg_cmd.remove("--nodeps")
+        # ArchARM defaults to .xz; the closed current publication format is .zst.
+        # makepkg(8) documents PKGEXT as an environment override.
+        makepkg_env["PKGEXT"] = ".pkg.tar.zst"
+    makepkg_receipt = r.run(makepkg_cmd, cwd=pkg_work, env=makepkg_env)
     if makepkg_receipt.exit_code != 0:
         raise ContractError(
             "BUILD_FAILED",
@@ -434,6 +449,13 @@ def build_pacman_candidate(
         if p.name.startswith(f"{project_id}-{version}")
         and (p.name.endswith(".pkg.tar.zst") or p.name.endswith(".pkg.tar.xz") or p.name.endswith(".pkg.tar.gz"))
     ]
+    if generation == CURRENT_GENERATION and matched_arch == "aarch64":
+        expected_name = f"{project_id}-{version}-{revision}-aarch64.pkg.tar.zst"
+        if len(pkg_files) != 1 or pkg_files[0].name != expected_name:
+            raise ContractError(
+                "BUILD_FAILED",
+                "Current aarch64 makepkg output differs from the exact package identity",
+            )
     if not pkg_files:
         # In a seam runner, the runner might not generate physical output on disk;
         # if the file doesn't exist, we do NOT fabricate fake files!
@@ -512,7 +534,10 @@ def build_pacman_candidate(
 def main(argv: list[str] | None = None) -> int:
     """CLI driver for pacman candidate builder."""
     parser = argparse.ArgumentParser(description="RS9 Pacman Candidate Package Driver")
-    parser.add_argument("--arch", required=True, help="Target architecture (x86_64 or any)")
+    parser.add_argument("--arch", required=True,
+                        help="Target architecture (x86_64 or any; this CLI builds the historical "
+                             "generation, so native aarch64 is rejected here and is available only "
+                             "to current-generation callers of build_pacman_candidate)")
     parser.add_argument("--capture", required=True, help="Path to evidence capture directory")
     parser.add_argument("--intent", required=True, help="Path to intent JSON")
     parser.add_argument("--scratch", required=True, help="Path to empty scratch directory")

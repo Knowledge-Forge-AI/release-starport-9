@@ -21,10 +21,13 @@ import sys
 # An externally supplied P test module must have those same reviewed bytes.
 
 from rs9 import own_repository_admission as own
+from rs9 import current_pacman_any as any_mod
 from rs9.collect_candidate import collect
 from rs9.current_generation import CURRENT_GENERATION, distribution_paths, rpm_policy_path
+from rs9.current_pacman_reuse import ARM_ARTIFACT, CANONICAL_ARTIFACT, WITNESS_PATH, candidate_reuse
 from rs9.errors import ContractError
-from rs9.hosted_custody import provenance, retain
+from rs9.hosted_custody import builder_identity, provenance, retain
+from rs9.package_roles import RAW_REUSE_REPLICA, is_installable_binary
 from rs9.hosted_summary import (
     required,
     contract,
@@ -42,6 +45,7 @@ from rs9.rpm_lint_policy import load_policy
 from rs9.scratch import canonical
 from tests.test_hosted_summary_roles import _make_synthetic_rpm
 from tests.test_repo_apt import build_minimal_deb
+from tests import current_archarm_own_fixtures as arm
 
 OLD_FIXTURES=Path(__file__).resolve().parent/'fixtures/own-repository-admission'
 FIXTURES=Path(__file__).resolve().parent/'fixtures/own-repository-admission071'
@@ -62,7 +66,8 @@ PRODUCER=dict(GITHUB_REPOSITORY='Knowledge-Forge-AI/release-starport-9',GITHUB_S
 
 class SourceFixtures(unittest.TestCase):
     def setUp(self):
-        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
+        # Physical (symlink-free) root: custody/importer helpers refuse linked ancestry.
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name).resolve()
         self.config=SourceBoundConfiguration(ROOT,COMMIT,TREE,7,START,*(['a'*64]*5))
         # Overlay every exact current P consumer source body; retain the legacy
         # fixture unchanged for historical-source refusal checks.
@@ -197,9 +202,17 @@ class QualifiedFixture(SourceFixtures):
     current-native raw/policy evaluations from run 41368171900, real collector/
     summary/raw+chunk/role/facade validators, and explicit synthetic package
     bodies/API metadata doubles.
+
+    Current pacman: the canonical x86_64 constructor artifact is retained by the
+    real producer code; the current-only ARM lane holds native Burst/Nebular
+    aarch64 custody plus the two raw reuse replicas and witness minted by the
+    REAL canonical-any importer against an import-time view of the same
+    controlled original run. candidate_reuse/original_reuse/role/summary
+    validators all run unpatched. Unit-only; no native qualification claim.
     """
     def setUp(self):
         super().setUp()
+        any_mod._ACQUIRED.clear();self.addCleanup(any_mod._ACQUIRED.clear)
         self.rs=self.root/'rs9';self.rs.mkdir()
         for name in ['src','operators','bootstrap','nix','.github']:
             shutil.copytree(ROOT/name,self.rs/name)
@@ -218,9 +231,43 @@ class QualifiedFixture(SourceFixtures):
             ('workflow_sha256','contract_sha256','builder_source_sha256','configuration_sha256','release_ingestion_sha256')])
         self.descriptor['rs9']={**self.config.expected(),'not_before':START.isoformat()};self.write_descriptor();self.rebuild_tree()
         self.inputs=self.root/'inputs';self.inputs.mkdir();self.summaryroot=self.root/'summary'
+        self.run_document=arm.run_document(COMMIT,status='completed',conclusion='success')
+        self.collection=None
         self.make_artifacts()
+    @staticmethod
+    def job_name(lane):
+        return lane['lane']+'-'+lane['system'] if lane['lane'] in {'nix','rpm','deb','pacman'} else lane['lane']
+    def job_names(self):
+        return {self.job_name(lane) for lane in required(self.rs,generation=CURRENT_GENERATION)}|{'config','unit','summary'}
+    def artifact_directories(self):
+        return [(lane['artifact_name'],self.inputs/lane['artifact_name'],self.job_name(lane))
+                for lane in required(self.rs,generation=CURRENT_GENERATION)]+[('hosted-summary',self.summaryroot,'summary')]
+    def api_artifacts(self,names=None):
+        rows,zips=[],{}
+        for identity,(name,directory,job) in enumerate(self.artifact_directories(),10):
+            if names is not None and name not in names:continue
+            body=arm.zip_directory(directory);zips[identity]=body
+            rows.append(arm.artifact_row(identity,name,body,arm.artifact_created(job),COMMIT))
+        return rows,zips
+    def make_arm_lane(self,lane):
+        # The ARM importer reads the in-progress original run: same ids, steps,
+        # timestamps and constructor ZIP bytes the final collector later reads.
+        final_jobs=arm.jobs(self.job_names(),COMMIT,arm.job_runners(self.rs))
+        earlier=[name for name,_,job in self.artifact_directories() if arm.artifact_created(job)<arm.importer_started()]
+        rows,zips=self.api_artifacts(set(earlier))
+        self.import_api=arm.ImportTimeApi(arm.run_document(COMMIT,status='in_progress',conclusion=None),
+                                          arm.import_time_jobs(final_jobs),arm.import_time_artifacts(rows),zips)
+        scratch=self.root/('scratch-'+lane['artifact_name'])
+        _,self.witness=arm.produce_arm_lane(self.rs,scratch,self.inputs/lane['artifact_name'],source=self.expected,
+                                            versions=own.VERSIONS,gates=lane['required_gates'],api=self.import_api)
     def make_artifacts(self):
+        arm_lane=None
         for lane in required(self.rs,generation=CURRENT_GENERATION):
+            if (lane['lane'],lane['system'])==('pacman','x86_64-linux'):
+                arm.retain_constructor(self.root/'constructor-x86_64',self.inputs/lane['artifact_name'],self.expected,own.VERSIONS)
+                continue
+            if (lane['lane'],lane['system'])==('pacman','aarch64-linux'):
+                arm_lane=lane;continue
             scratch=self.root/('scratch-'+lane['artifact_name']);scratch.mkdir();files=[]
             receipt=dict(schema='rs9.hosted-candidate-diagnostic.v1alpha2',lane=lane['lane'],system=lane['system'],
                 production_enabled=False,publication_authority=False,attended_gates_satisfied=False,
@@ -239,8 +286,6 @@ class QualifiedFixture(SourceFixtures):
                     data=_make_synthetic_rpm(product,version=version,arch=arch)
                 elif lane['lane']=='deb':
                     arch='all' if pure else lane['system'];name=f'{product}_{version}-1_{arch}.deb';data=build_minimal_deb(product,version+'-1',arch)
-                elif lane['lane']=='pacman':
-                    arch='any' if pure else 'x86_64';name=f'{product}-{version}-1-{arch}.pkg.tar.zst';data=('CONTROLLED-ROUTING:'+name).encode()
                 else:continue
                 package=scratch/'unsigned'/name;package.parent.mkdir(exist_ok=True);package.write_bytes(data);files.append(package)
                 if lane['lane']!='rpm':continue
@@ -260,23 +305,55 @@ class QualifiedFixture(SourceFixtures):
             if not files:
                 f=scratch/'fixture-evidence.json';f.write_bytes(b'{}');files.append(f)
             receipt['details']=details;retain(scratch,self.inputs/lane['artifact_name'],files,receipt)
+        self.make_arm_lane(arm_lane)
         jobs={name:{'result':'success'} for name in contract(self.rs,generation=CURRENT_GENERATION)['required_jobs'] if name!='summary'}
         with patch.dict(os.environ,{'RS9_JOB_CONCLUSIONS':json.dumps(jobs)}):
             self.assertEqual(summarize(self.rs,self.inputs,self.summaryroot,generation=CURRENT_GENERATION),0)
         self.summary=json.loads((self.summaryroot/'hosted-summary.json').read_text())
         self.repack()
     def repack(self):
-        self.artifacts=[];self.zips={}
-        directories=[(lane['artifact_name'],self.inputs/lane['artifact_name']) for lane in required(self.rs,generation=CURRENT_GENERATION)]+[('hosted-summary',self.summaryroot)]
-        for identity,(name,directory) in enumerate(directories,10):
-            stream=io.BytesIO()
-            with zipfile.ZipFile(stream,'w') as z:
-                for path in sorted(directory.rglob('*')):
-                    if path.is_file():z.writestr(path.relative_to(directory).as_posix(),path.read_bytes())
-            body=stream.getvalue();self.zips[identity]=body
-            self.artifacts.append(dict(id=identity,name=name,digest='sha256:'+hashlib.sha256(body).hexdigest(),expired=False,size_in_bytes=len(body)))
-        names={lane['lane']+'-'+lane['system'] if lane['lane'] in {'nix','rpm','deb','pacman'} else lane['lane'] for lane in required(self.rs,generation=CURRENT_GENERATION)}|{'config','unit','summary'}
-        self.jobs=[dict(id=i,name=name,status='completed',conclusion='success',steps=[dict(name='controlled fixture',conclusion='success')]) for i,name in enumerate(sorted(names),1)]
+        # Deterministic ZIP bytes: unchanged lanes keep their provider digest,
+        # so the importer witness keeps joining the same constructor artifact.
+        self.artifacts,self.zips=self.api_artifacts()
+        self.jobs=arm.jobs(self.job_names(),COMMIT,arm.job_runners(self.rs))
+    def api_row(self,name):
+        return next(row for row in self.artifacts if row['name']==name)
+    def api_job(self,name):
+        return next(row for row in self.jobs if row['name']==name)
+    def collection_reasons(self):
+        return json.loads((self.collection/'manager-packet.json').read_text())['validation']['reasons']
+    def derived_binary_rows(self):
+        """Inventory expectations measured from the retained original manifests."""
+        rows=[]
+        for lane in required(self.rs,generation=CURRENT_GENERATION):
+            if lane['lane'] not in {'deb','rpm','pacman'}:continue
+            manifest=json.loads((self.inputs/lane['artifact_name']/'artifact-manifest.json').read_text())
+            rows.extend((lane['lane'],lane['artifact_name'],lane['system'],row['path']) for row in manifest['files']
+                        if is_installable_binary(row) or row.get('role')==RAW_REUSE_REPLICA)
+        return rows
+    def assert_current_inventory(self,binaries):
+        rows=self.derived_binary_rows()
+        self.assertEqual(sorted((b['family'],b['name']) for b in binaries),sorted({(r[0],Path(r[3]).name) for r in rows}))
+        self.assertEqual(len(binaries),18)
+        self.assertEqual(sorted((b['family'],o['artifact'],o['system'],o['path']) for b in binaries for o in b['origins']),sorted(rows))
+        pacman={b['name']:b for b in binaries if b['family']=='pacman'}
+        natives=own.VERSIONS.keys()-arm.ANY_PRODUCTS
+        self.assertEqual({(b['product'],b['architecture']) for b in pacman.values()},
+                         {(p,'any') for p in arm.ANY_PRODUCTS}|{(p,a) for p in natives for a in ('x86_64','aarch64')})
+        for product in arm.ANY_PRODUCTS:
+            name=arm.package_name(product,own.VERSIONS)
+            # Two canonical x86_64 construction-custody origins, then exactly one ARM reuse replica.
+            self.assertEqual(pacman[name]['origins'],[
+                {'artifact':CANONICAL_ARTIFACT,'system':'x86_64-linux','path':'objects/lane-work/unsigned-custody/files/'+name},
+                {'artifact':CANONICAL_ARTIFACT,'system':'x86_64-linux','path':'objects/lane-work/unsigned/'+name},
+                {'artifact':ARM_ARTIFACT,'system':'aarch64-linux','path':'objects/lane-work/canonical-any/files/'+name}])
+            body=(self.inputs/CANONICAL_ARTIFACT/'objects/lane-work/unsigned-custody/files'/name).read_bytes()
+            self.assertEqual((pacman[name]['sha256'],pacman[name]['size']),(hashlib.sha256(body).hexdigest(),len(body)))
+        for product in natives:
+            for arch,artifact in (('x86_64',CANONICAL_ARTIFACT),('aarch64',ARM_ARTIFACT)):
+                name=f'{product}-{own.VERSIONS[product]}-1-{arch}.pkg.tar.zst'
+                self.assertEqual(sorted((o['artifact'],o['path']) for o in pacman[name]['origins']),
+                                 [(artifact,'objects/lane-work/unsigned-custody/files/'+name),(artifact,'objects/lane-work/unsigned/'+name)])
     def mutate_receipt(self,lane,system,change):
         directory=self.inputs/('candidate-'+lane+'-'+system);path=directory/(lane+'-'+system+'.json')
         receipt=json.loads(path.read_text());change(receipt);path.write_bytes(canonical(receipt))
@@ -289,10 +366,10 @@ class QualifiedFixture(SourceFixtures):
         if endpoint.endswith('/zip'):return self.zips[int(endpoint.split('/')[-2])]
         if '/jobs?' in endpoint:return json.dumps({'total_count':len(self.jobs),'jobs':self.jobs})
         if '/artifacts?' in endpoint:return json.dumps({'total_count':len(self.artifacts),'artifacts':self.artifacts})
-        return json.dumps(dict(id=7,head_sha=COMMIT,event='push',head_branch='main',path=distribution_paths(CURRENT_GENERATION)[0],run_attempt=1,
-             status='completed',conclusion='success',repository={'full_name':'Knowledge-Forge-AI/release-starport-9'},created_at='2026-10-29T00:00:01Z'))
+        if endpoint!=f'repos/{own.RS9_REPOSITORY}/actions/runs/7':raise AssertionError('unexpected original endpoint')
+        return json.dumps(self.run_document)
     def run_facade(self,scoped):
-        output=self.root/('collection-'+str(len(list(self.root.glob('collection-*')))));output.mkdir()
+        output=self.root/('collection-'+str(len(list(self.root.glob('collection-*')))));output.mkdir();self.collection=output
         with patch.object(own,'source_tree_identity',return_value=PTREE),patch.object(own,'gh_read',side_effect=self.api), \
              patch('rs9.collect_candidate.output_directory',return_value=output), \
              patch('rs9.collect_candidate.gh_read',side_effect=lambda root,argv,runner=None:self.original_api(root,['gh',*argv])), \
@@ -307,6 +384,15 @@ class QualifiedFixture(SourceFixtures):
         self.assertFalse(record['raw_clean_claim']);self.assertFalse(record['official_fedora_qualification_claim'])
         self.assertTrue(all(row['raw_clean'] is False for row in record['raw_policy_evidence']))
         self.assertEqual({row['product']:row['version'] for row in inventory['binaries']},own.VERSIONS)
+        self.assert_current_inventory(inventory['binaries'])
+        # The live collector re-admitted the original API rows, constructor ZIP
+        # bytes and witness; its public packet retains identities only.
+        packet=json.loads((self.collection/'manager-packet.json').read_text())
+        self.assertEqual(packet['canonical_any']['construction_authority'],'pacman/x86_64-linux')
+        self.assertEqual(packet['canonical_any']['provider'],{'lane':'pacman','system':'x86_64-linux','run_id':7,
+            'job_id':self.api_job(arm.CONSTRUCTOR_JOB)['id'],'artifact_id':self.api_row(CANONICAL_ARTIFACT)['id'],
+            'artifact_digest':self.api_row(CANONICAL_ARTIFACT)['digest']})
+        self.assertNotIn('custody_paths',packet['canonical_any'])
         from rs9.candidate import configuration_rows
         active={intent['project']['id']:intent['version'] for _,intent in configuration_rows(self.rs,generation=CURRENT_GENERATION)}
         self.assertEqual(active['theme-forge-nebular-fusion'],'0.7.1')
@@ -568,9 +654,14 @@ class QualifiedFixture(SourceFixtures):
         self.assertEqual(error.exception.code,'OWN_REPOSITORY_SOURCE')
     def test_changed_selected_helper_refuses_before_collection(self):
         path=self.rs/'src/rs9/hosted_summary.py';path.write_bytes(path.read_bytes()+b'\n# different helper\n')
-        with patch('rs9.qualified_distribution_inputs.collect') as collector:
+        # run_facade installs its own collect wrapper, so observe the original API
+        # transport itself: any collection would read it.
+        calls=[];original=self.original_api
+        def recording(root,argv):
+            calls.append(argv);return original(root,argv)
+        with patch.object(self,'original_api',side_effect=recording):
             with self.assertRaises(ContractError) as error:self.run_facade(True)
-            self.assertEqual(error.exception.code,'OWN_REPOSITORY_SOURCE');collector.assert_not_called()
+            self.assertEqual(error.exception.code,'OWN_REPOSITORY_SOURCE');self.assertEqual(calls,[])
     def test_mixed_helper_file_and_spec_origins_refuse(self):
         import rs9.hosted_summary as helper
         with patch.object(helper,'__file__',str(self.root/'hosted_summary.py')):
@@ -651,6 +742,172 @@ class QualifiedFixture(SourceFixtures):
         for row in result['objects']:
             for path in row['destinations']:self.assertEqual(hashlib.sha256((stage/path).read_bytes()).hexdigest(),row['sha256'])
         self.assertEqual({row['product'] for row in result['objects']},set(own.VERSIONS))
+        self.assert_current_inventory(result['objects'])
+        for product in arm.ANY_PRODUCTS:
+            name=arm.package_name(product,own.VERSIONS)
+            row=next(r for r in result['objects'] if r['family']=='pacman' and r['name']==name)
+            # P stages the canonical x86_64 construction bytes once; the ARM replica only witnesses them.
+            self.assertEqual(row['destinations'],['unsigned/pacman/'+name])
+            self.assertEqual((stage/row['destinations'][0]).read_bytes(),
+                             (collection/CANONICAL_ARTIFACT/'objects/lane-work/unsigned-custody/files'/name).read_bytes())
+
+    # ---- current ARM pacman reuse: real importer, collector and validators ----
+    def test_current_arm_lane_is_reuse_witness_with_native_only_custody(self):
+        directory=self.inputs/ARM_ARTIFACT
+        manifest=json.loads((directory/'artifact-manifest.json').read_text())
+        receipt=json.loads((directory/'pacman-aarch64-linux.json').read_text())
+        any_names={arm.package_name(p,own.VERSIONS) for p in arm.ANY_PRODUCTS}
+        natives=own.VERSIONS.keys()-arm.ANY_PRODUCTS
+        native_names={arm.native_arm_name(p,own.VERSIONS) for p in natives}
+        self.assertEqual({row['path'] for row in manifest['files'] if row.get('role')==RAW_REUSE_REPLICA},
+                         {'objects/lane-work/canonical-any/files/'+n for n in any_names})
+        self.assertEqual({row['path'] for row in manifest['files'] if is_installable_binary(row)},
+                         {prefix+n for n in native_names for prefix in ('objects/lane-work/unsigned/','objects/lane-work/unsigned-custody/files/')})
+        # No ARM any construction: no any build manifest, custody row or fixture-signed construction.
+        self.assertFalse([row for row in manifest['files'] if row['path'].endswith('-any.pkg.tar.zst') and row.get('role')!=RAW_REUSE_REPLICA])
+        self.assertEqual({row['path'] for row in manifest['files'] if row['path'].endswith('/pacman-manifest.json')},
+                         {'objects/lane-work/build/'+p+'/pacman-manifest.json' for p in natives})
+        from rs9.pages_candidate import CUSTODY_MANIFEST
+        custody=json.loads((directory/'objects/lane-work/unsigned-custody'/CUSTODY_MANIFEST).read_text())
+        self.assertEqual((custody['family'],custody['system'],set(custody['files'])),('pacman','aarch64-linux',native_names))
+        witness=(directory/WITNESS_PATH).read_bytes();self.assertEqual(witness,self.witness)
+        doc=json.loads(witness);row=self.api_row(CANONICAL_ARTIFACT)
+        self.assertEqual(doc['source'],self.expected)
+        self.assertEqual((doc['constructor']['job_id'],doc['importer']['job_id']),
+                         (self.api_job(arm.CONSTRUCTOR_JOB)['id'],self.api_job(arm.IMPORTER_JOB)['id']))
+        self.assertEqual((doc['constructor']['artifact_id'],doc['constructor']['artifact_digest'],doc['constructor']['artifact_size']),
+                         (row['id'],row['digest'],row['size_in_bytes']))
+        self.assertEqual(doc['constructor']['artifact_manifest_sha256'],
+                         hashlib.sha256((self.inputs/CANONICAL_ARTIFACT/'artifact-manifest.json').read_bytes()).hexdigest())
+        declared=receipt['details']['canonical_any_reuse']
+        self.assertIs(declared['construction_on_this_lane'],False)
+        self.assertEqual(declared['witness_sha256'],hashlib.sha256(witness).hexdigest())
+        prefix=f'repos/{own.RS9_REPOSITORY}/actions/'
+        self.assertEqual([call[4] for call in self.import_api.calls],[prefix+'runs/7',prefix+'runs/7/attempts/1/jobs?per_page=100&page=1',
+                         prefix+'runs/7/artifacts?per_page=100&page=1',prefix+f'artifacts/{row["id"]}/zip'])
+        self.assertEqual(self.import_api.zips[row['id']],self.zips[row['id']])
+        self.assertNotIn(ARM_ARTIFACT,{a['name'] for a in self.import_api.artifacts})
+        self.assertEqual(set(candidate_reuse(self.rs,self.inputs,self.expected)['replicas']),set(arm.ANY_PRODUCTS))
+        self.assertEqual(self.summary['qualification_verdict'],'qualified')
+    def test_arm_reuse_declaration_is_enforced_by_real_summary_and_collector(self):
+        path=self.inputs/ARM_ARTIFACT/'pacman-aarch64-linux.json';saved=json.loads(path.read_text())
+        first=sorted(arm.ANY_PRODUCTS)[0]
+        mutations={'arm-construction':lambda r:r['details']['canonical_any_reuse'].update(construction_on_this_lane=True),
+                   'other-replica-digest':lambda r:r['details']['canonical_any_reuse']['replicas'][first].update(sha256='0'*64),
+                   'other-witness-digest':lambda r:r['details']['canonical_any_reuse'].update(witness_sha256='0'*64),
+                   'missing-declaration':lambda r:r['details'].pop('canonical_any_reuse')}
+        for label,change in mutations.items():
+            with self.subTest(case=label):
+                self.mutate_receipt('pacman','aarch64-linux',change)
+                try:
+                    self.assertEqual(self.summary['qualification_verdict'],'not-qualified')
+                    self.assertIn(ARM_ARTIFACT+':CANONICAL_ANY_REUSE',self.summary['blocking_reasons'])
+                    for product in arm.ANY_PRODUCTS:
+                        self.assertIn(ARM_ARTIFACT+':missing-product:'+product,self.summary['blocking_reasons'])
+                    with self.assertRaises(ContractError) as error:self.run_facade(True)
+                    self.assertEqual(error.exception.code,'DISTRIBUTION_NOT_QUALIFIED')
+                finally:
+                    self.mutate_receipt('pacman','aarch64-linux',lambda r:(r.clear(),r.update(copy.deepcopy(saved))))
+        self.assertEqual(self.summary['qualification_verdict'],'qualified')
+        self.assertEqual(len(own._ACTIVE),0)
+    def test_api_metadata_cannot_replace_original_constructor_zip_byte_join(self):
+        row=self.api_row(CANONICAL_ARTIFACT);original=self.zips[row['id']]
+        # Metadata-only substitution: the served bytes no longer match the API digest.
+        row['digest']='sha256:'+hashlib.sha256(original+b'other').hexdigest()
+        with self.assertRaises(ContractError) as error:self.run_facade(True)
+        self.assertEqual(error.exception.code,'DISTRIBUTION_NOT_QUALIFIED')
+        self.assertEqual(self.collection_reasons(),['HOSTED_ARTIFACTS'])
+        # Same extracted custody in a different ZIP with self-consistent API metadata:
+        # the importer witness still binds the original artifact bytes.
+        other=arm.zip_directory(self.inputs/CANONICAL_ARTIFACT,date_time=(2026,10,29,0,39,0))
+        self.assertNotEqual(other,original)
+        self.zips[row['id']]=other;row.update(digest='sha256:'+hashlib.sha256(other).hexdigest(),size_in_bytes=len(other))
+        with self.assertRaises(ContractError) as error:self.run_facade(True)
+        self.assertEqual(error.exception.code,'DISTRIBUTION_NOT_QUALIFIED')
+        self.assertEqual(self.collection_reasons(),['CANONICAL_ANY_WITNESS'])
+        self.assertEqual(len(own._ACTIVE),0)
+    def test_final_original_jobs_must_join_importer_witness(self):
+        def strip_upload():
+            job=self.api_job(arm.CONSTRUCTOR_JOB)
+            job['steps']=[s for s in job['steps'] if not s['name'].startswith(any_mod.UPLOAD_STEP_PREFIX)]
+        cases=[('importer-id',lambda:self.api_job(arm.IMPORTER_JOB).update(id=99),'CANONICAL_ANY_WITNESS'),
+               ('constructor-id',lambda:self.api_job(arm.CONSTRUCTOR_JOB).update(id=98),'CANONICAL_ANY_WITNESS'),
+               ('constructor-upload-step-missing',strip_upload,'CANONICAL_ANY_JOB')]
+        for label,mutate,code in cases:
+            with self.subTest(case=label):
+                self.repack();mutate()
+                with self.assertRaises(ContractError) as error:self.run_facade(True)
+                self.assertEqual(error.exception.code,'DISTRIBUTION_NOT_QUALIFIED')
+                self.assertEqual(self.collection_reasons(),[code])
+        self.assertEqual(len(own._ACTIVE),0)
+    def test_original_run_must_remain_main_push_attempt_one(self):
+        for label,change in (('attempt',{'run_attempt':2}),('event',{'event':'workflow_dispatch'}),('branch',{'head_branch':'topic'})):
+            with self.subTest(case=label):
+                saved=copy.deepcopy(self.run_document);self.run_document.update(change)
+                try:
+                    with self.assertRaises(ContractError) as error:self.run_facade(True)
+                    self.assertEqual(error.exception.code,'DISTRIBUTION_NOT_QUALIFIED')
+                    self.assertEqual(self.collection_reasons(),['HOSTED_BINDING'])
+                finally:
+                    self.run_document=saved
+        self.assertEqual(len(own._ACTIVE),0)
+
+    # ---- nested SDK source hygiene ----
+    def test_nested_sdk_modules_join_selected_checkout(self):
+        import rs9.archarm_sdk  # loads the nested rs9._archarm_support package
+        self.assertTrue(any(name.startswith('rs9._archarm_support.') for name in sys.modules))
+        own.verify_execution_source(self.rs)
+        self.execution_root_join.stop()
+        own.verify_execution_source(ROOT)
+    def test_nested_sdk_body_inventory_and_origin_mismatches_refuse(self):
+        import rs9.archarm_sdk
+        from rs9._archarm_support import refusal as nested
+        support=self.rs/'src/rs9/_archarm_support'
+        def changed(name):
+            path=support/name;original=path.read_bytes();path.write_bytes(original+b'\n# changed\n')
+            return lambda:path.write_bytes(original)
+        def extra():
+            path=support/'unselected_helper.py';path.write_bytes(b'');return path.unlink
+        def missing():
+            path=support/'refusal.py';original=path.read_bytes();path.unlink()
+            return lambda:path.write_bytes(original)
+        for label,mutate in (('changed-nested-body',lambda:changed('origin.py')),('changed-nested-init',lambda:changed('__init__.py')),
+                             ('extra-nested-module',extra),('missing-nested-module',missing)):
+            with self.subTest(case=label):
+                restore=mutate()
+                try:
+                    with self.assertRaises(ContractError) as error:own.verify_execution_source(self.rs)
+                    self.assertEqual(error.exception.code,'OWN_REPOSITORY_SOURCE')
+                finally:
+                    restore()
+        own.verify_execution_source(self.rs)
+        foreign=str(self.root/'refusal.py')
+        with patch.object(nested,'__file__',foreign),self.assertRaises(ContractError) as error:own.verify_execution_source(self.rs)
+        self.assertEqual(error.exception.code,'OWN_REPOSITORY_SOURCE')
+        with patch.object(nested.__spec__,'origin',foreign),self.assertRaises(ContractError) as error:own.verify_execution_source(self.rs)
+        self.assertEqual(error.exception.code,'OWN_REPOSITORY_SOURCE')
+        namespace={'__name__':'rs9._archarm_support.refusal'}
+        exec(compile('def require(*a,**kw): return None',foreign,'exec'),namespace)
+        with patch.object(nested,'require',namespace['require']),self.assertRaises(ContractError) as error:own.verify_execution_source(self.rs)
+        self.assertEqual(error.exception.code,'OWN_REPOSITORY_SOURCE')
+    def test_current_builder_identity_covers_nested_sdk_pin_data(self):
+        self.assertEqual(builder_identity(self.rs,generation=CURRENT_GENERATION),self.expected['builder_source_sha256'])
+        pins=self.rs/'src/rs9/_archarm_support/pins'
+        for name in ('ROOTFS-PIN.json','PACKAGE-PINS.json','archlinuxarm-builder-public.gpg'):
+            with self.subTest(pin=name):
+                path=pins/name;original=path.read_bytes();path.write_bytes(original+b'\n')
+                try:
+                    self.assertNotEqual(builder_identity(self.rs,generation=CURRENT_GENERATION),self.expected['builder_source_sha256'])
+                finally:
+                    path.write_bytes(original)
+        path=pins/'PACKAGE-PINS.json';path.write_bytes(path.read_bytes()+b'\n')
+        calls=[];original=self.original_api
+        def recording(root,argv):
+            calls.append(argv);return original(root,argv)
+        with patch.object(self,'original_api',side_effect=recording),self.assertRaises(ContractError) as error:self.run_facade(True)
+        self.assertEqual(error.exception.code,'DISTRIBUTION_SOURCE')
+        self.assertEqual(calls,[])
+        self.assertEqual(len(own._ACTIVE),0)
 
 
 if __name__=='__main__':unittest.main()

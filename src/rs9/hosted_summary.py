@@ -275,11 +275,22 @@ def summarize(repository, inputs, output, *, generation=HISTORICAL_GENERATION):
         except Exception:
             reasons.append(lane_name + ":CUSTODY_ARCHITECTURE")
 
+        # Raw replicas are reuse witnesses, never a second construction provider.
+        reuse_products = set()
+        if (generation == CURRENT_GENERATION
+                and (lane["lane"], lane["system"]) == ("pacman", "aarch64-linux")):
+            try:
+                from rs9.current_pacman_reuse import candidate_reuse
+                from rs9.current_pacman_any import SOURCE_KEYS
+                reuse_products = set(candidate_reuse(repository, inputs,
+                    {key:manifest[key] for key in SOURCE_KEYS})["replicas"])
+            except (ContractError, OSError, ValueError, KeyError, TypeError) as error:
+                reasons.append(lane_name + ":" + (error.code if isinstance(error, ContractError) else "CANONICAL_ANY_REUSE"))
         # Guarded step: Required binary presence
         for product in lane.get("required_products", []):
             needle = product.replace("-", "_") if lane["lane"] == "wheels" else product
             prefix = needle + "_" if lane["lane"] == "deb" else needle + "-"
-            if not any(Path(r["path"]).name.startswith(prefix)
+            if product not in reuse_products and not any(Path(r["path"]).name.startswith(prefix)
                        and is_installable_binary(r) for r in manifest.get("files", [])):
                 reasons.append(lane_name + ":missing-product:" + product)
 
@@ -435,10 +446,14 @@ def validate_summary(summary, repository, commit, *, generation=HISTORICAL_GENER
         manifest = next(m for m in manifests if (m["lane"],m["system"]) == (row["lane"],row["system"]))
         validate_role_declarations(manifest)
         validate_product_architectures(lane, manifest.get("files", []))
+        from rs9.current_pacman_reuse import declared_reuse_products
+        reuse_products = declared_reuse_products(manifest,row) if generation == CURRENT_GENERATION else set()
+        # Declared consistency is insufficient for import: collect() separately
+        # re-admits the original provider API, constructor bytes and witness.
         for product in lane.get("required_products", []):
             needle = product.replace("-", "_") if lane["lane"] == "wheels" else product
             prefix = needle + "_" if lane["lane"] == "deb" else needle + "-"
-            if not any(Path(r["path"]).name.startswith(prefix)
+            if product not in reuse_products and not any(Path(r["path"]).name.startswith(prefix)
                        and is_installable_binary(r) for r in manifest.get("files", [])):
                 raise ContractError("HOSTED_CUSTODY", f"Missing required installable binary for {product}")
         receipt_name = row["lane"] + "-" + row["system"] + ".json"

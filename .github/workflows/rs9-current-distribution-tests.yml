@@ -190,8 +190,48 @@ jobs:
           path: ${{ runner.temp }}/rs9-output/
           retention-days: 90
           if-no-files-found: error
-  pages:
+  native-arm:
+    name: pacman-aarch64-linux
     needs: [config, authenticate, pins, native]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Require existing host tools
+        run: |
+          command -v docker
+          command -v gpg
+          command -v gpgv
+          command -v gh
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          pattern: candidate-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/rs9-inputs
+      - name: Execute non-production native lane
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rs9-work" "$RUNNER_TEMP/rs9-output" "$RUNNER_TEMP/rs9-inputs"
+          python3 -m rs9.hosted_pipeline 'pacman' --system 'aarch64-linux' --scratch "$RUNNER_TEMP/rs9-work" --receipts "$RUNNER_TEMP/rs9-output" --inputs "$RUNNER_TEMP/rs9-inputs" --generation theme-forge-current-202610
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: candidate-pacman-aarch64-linux
+          path: ${{ runner.temp }}/rs9-output/
+          retention-days: 90
+          if-no-files-found: error
+  pages:
+    needs: [config, authenticate, pins, native, native-arm]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -227,7 +267,7 @@ jobs:
           if-no-files-found: error
   summary:
     if: ${{ always() }}
-    needs: [config, unit, authenticate, pins, nix, native, pages]
+    needs: [config, unit, authenticate, pins, nix, native, native-arm, pages]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

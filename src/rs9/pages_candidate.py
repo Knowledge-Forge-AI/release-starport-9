@@ -7,6 +7,8 @@ Enforces exact inventory bindings and strictly prohibits any live deployment or 
 
 from __future__ import annotations
 
+from rs9.current_generation import CURRENT_GENERATION, HISTORICAL_GENERATION, generation_paths
+
 import hashlib
 import json
 import os
@@ -301,15 +303,18 @@ NONPRODUCTION_BANNER = "NONPRODUCTION CANDIDATE: signed with an ephemeral fixtur
 CLIENT_KEYRING_PATH = "/etc/apt/keyrings/rs9-nonproduction.gpg"
 
 
-def render_install_docs() -> dict[str, str]:
+def render_install_docs(*, qualification_generation=HISTORICAL_GENERATION) -> dict[str, str]:
     """Static candidate docs; every page states the NONPRODUCTION fixture trust boundary."""
+    generation_paths(qualification_generation)
     steps = (
         f"{NONPRODUCTION_BANNER}\n\n"
         "APT (Ubuntu 26.04 resolute, amd64 or arm64):\n"
         f"  curl -fsSL https://{PAGES_HOST}/keys/rs9-candidate-fixture-NONPRODUCTION.gpg -o {CLIENT_KEYRING_PATH}\n"
         f"  deb [signed-by={CLIENT_KEYRING_PATH}] https://{PAGES_HOST}/apt resolute main\n\n"
         "DNF (Fedora 43, x86_64 or aarch64): use rpm/rs9.repo with gpgcheck=1 and repo_gpgcheck=1.\n"
-        "Pacman (Arch Linux x86_64): add keys/rs9-candidate-fixture-NONPRODUCTION.asc to the pacman keyring, then use SigLevel = Required.\n"
+        + ("Pacman (Arch Linux x86_64 or Arch Linux ARM aarch64): add keys/rs9-candidate-fixture-NONPRODUCTION.asc to the pacman keyring, then use SigLevel = Required.\n"
+         if qualification_generation == CURRENT_GENERATION else
+         "Pacman (Arch Linux x86_64): add keys/rs9-candidate-fixture-NONPRODUCTION.asc to the pacman keyring, then use SigLevel = Required.\n")
     )
     return {
         "docs/install/README.md": "# RS9 candidate install notes\n\n" + steps,
@@ -339,13 +344,16 @@ REQUIRED_PAGES_FILES = frozenset({
 })
 
 
-def verify_pages_completeness(inventory: dict[str, str], families: tuple[str, ...] = ("apt", "rpm", "pacman")) -> None:
+def verify_pages_completeness(inventory: dict[str, str], families: tuple[str, ...] = ("apt", "rpm", "pacman"), *, qualification_generation=HISTORICAL_GENERATION) -> None:
     """Strict tree shape: documents, keys, CNAME and each requested family's signed metadata."""
+    generation_paths(qualification_generation)
     missing = sorted(REQUIRED_PAGES_FILES - set(inventory))
     required_by_family = {
         "apt": ("apt/dists/resolute/Release", "apt/dists/resolute/InRelease", "apt/dists/resolute/Release.gpg"),
         "rpm": tuple(f"rpm/fedora/43/{a}/repodata/{n}" for a in ("x86_64", "aarch64") for n in ("repomd.xml", "repomd.xml.asc")),
-        "pacman": ("pacman/x86_64/rs9.db.tar.gz", "pacman/x86_64/rs9.db.tar.gz.sig"),
+        "pacman": tuple(f"pacman/{arch}/{name}"
+                        for arch in (("x86_64", "aarch64") if qualification_generation == CURRENT_GENERATION else ("x86_64",))
+                        for name in ("rs9.db.tar.gz", "rs9.db.tar.gz.sig")),
     }
     for family in families:
         if family not in required_by_family:
