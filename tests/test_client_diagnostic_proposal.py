@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import uuid
 from unittest.mock import MagicMock, patch
 
 from rs9.build_native import CommandReceipt
@@ -94,6 +95,9 @@ class ClientDiagnosticProposalTests(unittest.TestCase):
         self.assertNotIn("command", details["failed_receipt"])
         self.assertFalse((self.scratch / "wheel-client-deb-receipt.json").exists())
 
+    # A valid randomized suffix may contain "deb" even for the RPM client.
+    @patch("rs9.hosted_wheel_clients.uuid.uuid4",
+           new=lambda: uuid.UUID("deb00000-0000-0000-0000-000000000000"))
     def test_successful_client_receipts_and_gates_are_unchanged(self):
         context = self._qualify_context()
         wheels = {"theme-forge-stellar-burst": self.scratch / "burst.whl"}
@@ -105,7 +109,9 @@ class ClientDiagnosticProposalTests(unittest.TestCase):
         def runner_factory(*args, **kwargs):
             runner = MagicMock()
             runner.run.return_value = receipts.pop(0)
-            family = "deb" if "deb" in args[1] else "rpm"
+            prefix = args[1].partition(":")[0]
+            self.assertIn(prefix, {"rs9-wheel-client-deb", "rs9-wheel-client-rpm"})
+            family = prefix.removeprefix("rs9-wheel-client-")
             (self.scratch / f"wheel-client-{family}-receipt.json").write_bytes(b"{}")
             return runner
 
