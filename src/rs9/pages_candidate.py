@@ -194,12 +194,14 @@ def assemble_pages_candidate(
     signing_fixture: Any = None,
     apt_repo: Any = None,
     require_exact_inventory: bool = True,
+    qualification_generation=HISTORICAL_GENERATION,
 ) -> PagesCandidate:
     """Construct and validate candidate Pages tree in empty scratch.
 
     Binds exact inventories, executes strict privacy/credential scan,
     and returns a candidate handle that forbids deployment.
     """
+    generation_paths(qualification_generation)
     target = physical_directory(target_dir)
     _check_no_symlinks(target)
 
@@ -289,8 +291,9 @@ def assemble_pages_candidate(
         bound_inventory = computed_inventory
 
     # Strict privacy scan and pages tree validation
-    manifest_record = (validate_pages_tree(target, manifest=bound_inventory) if exact_inventory is not None
-                       else scan_pages_tree(target))
+    manifest_record = (validate_pages_tree(target, manifest=bound_inventory,
+                       qualification_generation=qualification_generation) if exact_inventory is not None
+                       else scan_pages_tree(target, qualification_generation=qualification_generation))
 
     return PagesCandidate(
         root=target,
