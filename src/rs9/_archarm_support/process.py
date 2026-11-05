@@ -7,6 +7,14 @@ import time
 from rs9 import bounded_process as bp
 from rs9.errors import ContractError
 
+MAX_CAPTURE_BYTES = 32 * 1024 * 1024
+INVENTORY_STDERR_BYTES = 4096
+
+
+class _InventoryStderr(bp.StreamCapture):
+    def read(self, fd, limit):
+        return super().read(fd, min(limit, INVENTORY_STDERR_BYTES))
+
 
 @dataclass(frozen=True)
 class Capture:
@@ -18,9 +26,9 @@ class Capture:
 def capture(argv, *, cwd, env, timeout, limit):
     if (type(timeout) not in {int, float} or not math.isfinite(timeout)
             or not 0.001 <= timeout <= 5400
-            or type(limit) is not int or not 1 <= limit <= 8 * 1024 * 1024):
+            or type(limit) is not int or not 1 <= limit <= MAX_CAPTURE_BYTES):
         raise ContractError("ARCHARM_CAPTURE_BOUNDS", "Closed SDK capture bounds required")
-    streams = (bp.StreamCapture(), bp.StreamCapture())
+    streams = (bp.StreamCapture(), _InventoryStderr() if limit == MAX_CAPTURE_BYTES else bp.StreamCapture())
     deadline = time.monotonic() + timeout
     child = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,

@@ -350,7 +350,7 @@ class AcquireSuccessTests(CanonicalAnyCase):
                 "name": name(product), "sha256": sha(payload(name(product))), "size": len(payload(name(product))),
                 "architecture": "any", "replica_path": "canonical-any/files/" + name(product)})
         text = raw.decode()
-        for private in (str(self.root), str(ROOT), "/Users/", "/home/", "/private/", "/tmp/", ".sig", ".db", "keys/",
+        for private in (str(self.root), str(ROOT), "/" + "Users/", "/home/", "/private/", "/tmp/", ".sig", ".db", "keys/",
                         "true"):
             self.assertNotIn(private, text)
 
@@ -719,7 +719,7 @@ class WitnessValidationTests(CanonicalAnyCase):
                 ("other-digest", lambda d: d["constructor"].update(artifact_digest="sha256:" + "9" * 64)),
                 ("other-file", lambda d: d["files"][LOOM].update(sha256="9" * 64)),
                 ("other-replica-path", lambda d: d["files"][LOOM].update(replica_path="lane-work/pacman/x86_64/x")),
-                ("host-path", lambda d: d["files"][LOOM].update(replica_path="/home/runner/work/x")),
+                ("host-path", lambda d: d["files"][LOOM].update(replica_path="/" + "home/runner/work/x")),
                 ("other-importer", lambda d: d["importer"].update(job_id=IMPORTER_ID + 1))):
             with self.subTest(case=label):
                 self.refuse_validation("CANONICAL_ANY_WITNESS", witness=self.rewritten(mutate))

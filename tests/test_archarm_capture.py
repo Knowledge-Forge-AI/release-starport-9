@@ -84,7 +84,7 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual(stops,1)
 
     def test_invalid_bounds_never_spawn(self):
-        for timeout,limit in ((0,1),(5401,1),(True,1),(float("nan"),1),(1,0),(1,True),(1,8388609)):
+        for timeout,limit in ((0,1),(5401,1),(True,1),(float("nan"),1),(1,0),(1,True),(1,33554433)):
             with self.subTest(timeout=timeout,limit=limit),patch.object(process.subprocess,"Popen") as spawn:
                 with self.assertRaises(ContractError):
                     process.capture(["tool"],cwd=None,env={},timeout=timeout,limit=limit)

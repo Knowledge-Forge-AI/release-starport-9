@@ -977,6 +977,15 @@ class ArchArmClient:
 
     def exec(self, argv: Sequence[str], *, user: str | None = None,
              env: Mapping[str, str] | None = None) -> CommandReceipt:
+        return self._exec_with_capture(argv, user=user, env=env, output_limit=MAX_WORKER_OUTPUT)
+
+    def _exec_with_capture(self, argv: Sequence[str], *, user: str | None = None,
+                           env: Mapping[str, str] | None = None, output_limit: int) -> CommandReceipt:
+        if output_limit != MAX_WORKER_OUTPUT:
+            from rs9.client_inventory import MAX_STDOUT_BYTES, scanner_argv
+            require(type(output_limit) is int and output_limit == MAX_STDOUT_BYTES
+                    and user is None and env is None
+                    and list(argv) == scanner_argv(family="pacman"), "INVENTORY_COMMAND")
         s = self._running()
         argv = _check_argv(argv)
         items = _check_env(env, CLIENT_ENV_KEYS, "CLIENT_ENV")
@@ -989,7 +998,7 @@ class ArchArmClient:
                 _pacman_key_policy(argv)
             outer = s.docker.receipt(["exec", "--user", "0:0", "--workdir", "/", *env_args,
                                       self._record.id, *argv],
-                                     timeout=CLIENT_EXEC_SECONDS, limit=MAX_WORKER_OUTPUT)
+                                     timeout=CLIENT_EXEC_SECONDS, limit=output_limit)
             return CommandReceipt(list(argv), outer.exit_code, outer.stdout_bytes,
                                   outer.stderr_bytes, tool_name=argv[0], tool_path=TOOL_PATH,
                                   executed=outer.executed)
@@ -999,7 +1008,7 @@ class ArchArmClient:
         outer = s.docker.receipt(["exec", "--user", self._sdk.user, "--workdir", "/tmp",
                                   "-e", f"HOME={GUEST_HOME}", "-e", "TMPDIR=/tmp", *env_args,
                                   self._record.id, *command],
-                                 timeout=CLIENT_EXEC_SECONDS, limit=MAX_WORKER_OUTPUT)
+                                 timeout=CLIENT_EXEC_SECONDS, limit=output_limit)
         stderr = strip_attestation(outer.exit_code, outer.stderr_bytes)
         return CommandReceipt(list(argv), outer.exit_code, outer.stdout_bytes, stderr,
                               tool_name=argv[0], tool_path=TOOL_PATH, executed=outer.executed)
@@ -1024,12 +1033,16 @@ class ArchArmClient:
                 "/usr/bin/bash", "-c", script, PREAMBLE_ARG0]
 
     def inventory(self, stage: str | None = None) -> dict[str, str]:
-        from rs9.client_inventory import run_and_parse
+        from rs9.client_inventory import MAX_STDOUT_BYTES, run_and_parse
         from rs9.hosted_deb import inventory_excluded
         self._running()
         self.last_inventory_stage = stage
         self.last_diagnostics = {}
-        result = run_and_parse(self, exclusion=lambda path: inventory_excluded("pacman", path),
+        # The unchanged shared inventory protocol permits at most 32 MiB. Only
+        # its exact root scanner command receives that bound; ordinary exec
+        # remains at MAX_WORKER_OUTPUT, with no caller-selectable limit.
+        result = run_and_parse(lambda argv: self._exec_with_capture(argv, output_limit=MAX_STDOUT_BYTES),
+                               exclusion=lambda path: inventory_excluded("pacman", path),
                                file_exclusion=None, with_modes=True, stage=stage,
                                family="pacman", return_diagnostics=True)
         if isinstance(result, tuple):

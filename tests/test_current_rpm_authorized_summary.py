@@ -12,6 +12,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 from tests import test_hosted_summary as summary_fixtures
 from tests import test_original_run_context as original_context
+from tests import current_archarm_context_fixtures as current_pacman
 from tests.test_original_run_context import COMMIT, TREE, STARTED, PACKAGES
 from rs9.current_generation import CURRENT_GENERATION, DISTRIBUTION_JOBS
 from rs9.hosted_summary import required, summarize, validate_rpm_policy_custody, RPM_POLICY_PROMOTION_BLOCKER, validate_rpm_policy_source
@@ -50,7 +51,12 @@ def probe(case):
         jobs = {job: {'result': 'success'} for job in DISTRIBUTION_JOBS if job != 'summary'}
         with patch.dict(os.environ, {'RS9_JOB_CONCLUSIONS': json.dumps(jobs)}):
             selected = provenance(ROOT, 'a' * 64, generation=CURRENT_GENERATION)
+            # Current pacman: real-producer x86_64 constructor custody; the ARM
+            # reuse lane is minted by the real importer after earlier uploads are final.
+            current_pacman.retain_canonical_constructor(ROOT, fixture.root, fixture.inputs, selected)
             for lane in lanes:
+                if lane['artifact_name'] in current_pacman.CURRENT_PACMAN_ARTIFACTS:
+                    continue
                 directory = fixture.inputs / lane['artifact_name']
                 name = lane['lane'] + '-' + lane['system'] + '.json'
                 receipt = json.loads((directory / name).read_bytes())
@@ -116,6 +122,7 @@ def probe(case):
                 manifest.update(selected)
                 manifest['qualification_receipt_hashes'] = {name: hashlib.sha256(raw).hexdigest()}
                 mp.write_bytes(canonical(manifest))
+            current_pacman.produce_arm_reuse_lane(ROOT, fixture.root, fixture.inputs, fixture.output, selected, COMMIT)
             code = summarize(ROOT, fixture.inputs, fixture.output, generation=CURRENT_GENERATION)
             summary = json.loads((fixture.output / 'hosted-summary.json').read_bytes())
             if case == 'intact':
@@ -136,18 +143,8 @@ def probe(case):
             expected_reasons = sorted(('candidate-rpm-' + system + ':' + reason for system in ('aarch64-linux', 'x86_64-linux') for reason in reason_codes))
             if not sorted(summary['blocking_reasons']) == expected_reasons:
                 raise AssertionError(summary['blocking_reasons'])
-            context.artifacts = []
-            context.zips = {}
-            for identity, (name, directory) in enumerate([(x['artifact_name'], fixture.inputs / x['artifact_name']) for x in lanes] + [('hosted-summary', fixture.output)], 10):
-                buf = io.BytesIO()
-                with zipfile.ZipFile(buf, 'w') as z:
-                    for path in sorted(directory.rglob('*')):
-                        if path.is_file():
-                            z.writestr(path.relative_to(directory).as_posix(), path.read_bytes())
-                body = buf.getvalue()
-                context.zips[identity] = body
-                context.artifacts.append(dict(id=identity, name=name, digest='sha256:' + hashlib.sha256(body).hexdigest(), expired=False, size_in_bytes=len(body)))
-            context.jobs = [dict(id=i, name=name, status='completed', conclusion='success', steps=[dict(name='fixture', conclusion='success')]) for i, name in enumerate(sorted({x['lane'] + '-' + x['system'] if x['lane'] in {'nix', 'rpm', 'deb', 'pacman'} else x['lane'] for x in lanes} | {'config', 'unit', 'summary'}), 1)]
+            # Exact original-run rows shared with the ARM importer's import-time view.
+            context.artifacts, context.zips, context.jobs = current_pacman.original_api(ROOT, fixture.inputs, fixture.output, COMMIT)
             config = SourceBoundConfiguration(ROOT, COMMIT, TREE, 7, STARTED, *[selected[k] for k in ('workflow_sha256', 'contract_sha256', 'builder_source_sha256', 'configuration_sha256', 'release_ingestion_sha256')])
             output = fixture.root / 'facade'
             output.mkdir()
