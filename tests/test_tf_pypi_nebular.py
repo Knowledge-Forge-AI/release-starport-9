@@ -1885,7 +1885,27 @@ class NebularPyPIContractTests(unittest.TestCase):
         from rs9.tf_pypi_nebular import _nebular_import_closure_paths
 
         closure_paths = _nebular_import_closure_paths(ROOT)
-        self.assertEqual(len(closure_paths), 119)
+        self.assertEqual(len(closure_paths), 137)
+        self.assertTrue({
+            "src/rs9/_archarm_support/cleanup.py",
+            "src/rs9/_archarm_support/docker.py",
+            "src/rs9/_archarm_support/evidence.py",
+            "src/rs9/_archarm_support/fetch.py",
+            "src/rs9/_archarm_support/origin.py",
+            "src/rs9/_archarm_support/pins.py",
+            "src/rs9/_archarm_support/process.py",
+            "src/rs9/_archarm_support/profiles.py",
+            "src/rs9/_archarm_support/refusal.py",
+            "src/rs9/_archarm_support/rootfs.py",
+            "src/rs9/_archarm_support/scripts.py",
+            "src/rs9/archarm_sdk.py",
+            "src/rs9/candidate_readiness.py",
+            "src/rs9/collect_candidate.py",
+            "src/rs9/current_archarm_packaging.py",
+            "src/rs9/current_pacman_any.py",
+            "src/rs9/current_pacman_reuse.py",
+            "src/rs9/public_release_transport.py",
+        } <= set(closure_paths))
         self.assertTrue({
             "src/rs9/nix_gui_discovery.py",
             "src/rs9/provision_observation.py",

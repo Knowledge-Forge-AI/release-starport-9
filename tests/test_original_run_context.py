@@ -114,6 +114,7 @@ class OriginalRunContextTests(unittest.TestCase):
 
     def prepare_artifacts(self, *, mixed=False):
         from tests.test_hosted_summary import HostedSummaryTests
+        from tests import current_archarm_context_fixtures as current_pacman
         from rs9.hosted_nix import PRODUCTS
         fixture = HostedSummaryTests(); fixture.setUp(); self.addCleanup(fixture.doCleanups)
         lanes = required(ROOT, generation=CURRENT_GENERATION)
@@ -121,7 +122,12 @@ class OriginalRunContextTests(unittest.TestCase):
         for directory in fixture.inputs.iterdir():
             if directory.name not in names:
                 shutil.rmtree(directory)
+        # Current pacman: real-producer x86_64 constructor custody; the ARM reuse
+        # lane is minted below by the real importer once earlier uploads are final.
+        current_pacman.retain_canonical_constructor(ROOT, fixture.root, fixture.inputs, self.expected)
         for lane in lanes:
+            if lane["artifact_name"] in current_pacman.CURRENT_PACMAN_ARTIFACTS:
+                continue
             directory = fixture.inputs / lane["artifact_name"]
             name = lane["lane"] + "-" + lane["system"] + ".json"
             receipt = json.loads((directory / name).read_bytes()); receipt["provenance"] = self.expected
@@ -130,6 +136,7 @@ class OriginalRunContextTests(unittest.TestCase):
             (directory / name).write_bytes(canonical(receipt))
             path = directory / "artifact-manifest.json"; manifest = json.loads(path.read_bytes()); manifest.update(self.expected)
             manifest["qualification_receipt_hashes"] = {name: hashlib.sha256(canonical(receipt)).hexdigest()}; path.write_bytes(canonical(manifest))
+        current_pacman.produce_arm_reuse_lane(ROOT, fixture.root, fixture.inputs, fixture.output, self.expected, COMMIT)
         jobs = {job: {"result": "success"} for job in DISTRIBUTION_JOBS if job != "summary"}
         # Isolate the environment join from the separately held policy-admission layer.
         with patch.dict(os.environ, {"RS9_JOB_CONCLUSIONS": json.dumps(jobs)}), patch("rs9.hosted_summary._validate_hosted_rpm_policy_source"):
@@ -143,18 +150,9 @@ class OriginalRunContextTests(unittest.TestCase):
                 receipt["provenance"] = {**receipt["provenance"], "run_id": 8}
             target.write_bytes(canonical(receipt))
             path = target.parent / "artifact-manifest.json"; manifest = json.loads(path.read_bytes()); manifest["qualification_receipt_hashes"] = {target.name: hashlib.sha256(canonical(receipt)).hexdigest()}; path.write_bytes(canonical(manifest))
-        directories = [(lane["artifact_name"], fixture.inputs / lane["artifact_name"]) for lane in lanes] + [("hosted-summary", fixture.output)]
-        self.artifacts, self.zips = [], {}
-        for identity, (name, directory) in enumerate(directories, 10):
-            data = io.BytesIO()
-            with zipfile.ZipFile(data, "w") as zipper:
-                for path in sorted(directory.rglob("*")):
-                    if path.is_file():
-                        zipper.writestr(path.relative_to(directory).as_posix(), path.read_bytes())
-            raw = data.getvalue(); self.zips[identity] = raw
-            self.artifacts.append({"id": identity, "name": name, "digest": "sha256:" + hashlib.sha256(raw).hexdigest(), "expired": False, "size_in_bytes": len(raw)})
-        self.jobs = [{"id": index, "name": name, "status": "completed", "conclusion": "success", "steps": [{"name": "fixture", "conclusion": "success"}]}
-                     for index, name in enumerate(sorted({lane["lane"] + "-" + lane["system"] if lane["lane"] in {"nix", "rpm", "deb", "pacman"} else lane["lane"] for lane in lanes} | {"config", "unit", "summary"}), 1)]
+        # Exact original-run rows (ids, timestamps, origin, deterministic ZIP bytes,
+        # executed pacman steps) shared with the ARM importer's import-time view.
+        self.artifacts, self.zips, self.jobs = current_pacman.original_api(ROOT, fixture.inputs, fixture.output, COMMIT)
 
     def api(self, root, argv):
         endpoint = argv[-1]

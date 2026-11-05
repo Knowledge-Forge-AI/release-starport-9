@@ -17,11 +17,21 @@ import warnings
 import zipfile
 
 from rs9.security import PRIVATE_BLOCK_RE, TOKEN_PATTERNS
+from rs9.pages import parse_openpgp_packets, validate_openpgp_public_key
+from rs9.errors import ContractError
 
 ROOT = Path(__file__).resolve().parents[1]
 LIMIT = 512 * 1024
 HISTORICAL = {row["path"]: row for row in json.loads(
     (ROOT / "tests/fixtures/historical-binary-evidence.json").read_text())["files"]}
+PUBLIC_TRUST_INPUTS = {
+    "src/rs9/_archarm_support/pins/archlinuxarm-builder-public.gpg": {
+        "size": 3857,
+        "sha256": "4e4202772328674af68f90f675e077d192337fc8ced15cddcd35875a9de5b5f9",
+        "fingerprint": "68B3537F39A313B3E574D06777193F152BDBE6A6",
+        "mode": "100644",
+    },
+}
 
 
 def product_files(root=ROOT):
@@ -89,12 +99,39 @@ def zip_texts(data):
             raise ValueError("ZIP extra local data")
 
 
-def file_texts(path, root=ROOT, historical=HISTORICAL):
+def public_trust_texts(relative, data, record):
+    """Inspect one pinned public certificate with the existing strict parser."""
+    if (set(record) != {"size", "sha256", "fingerprint", "mode"}
+            or record["mode"] != "100644" or len(data) > LIMIT
+            or len(data) != record["size"]
+            or hashlib.sha256(data).hexdigest() != record["sha256"]):
+        raise ValueError("Public trust input pin mismatch")
+    validate_openpgp_public_key(data)
+    scan_text(data.decode("latin-1"))
+    packets = parse_openpgp_packets(data, strict=True)
+    primary = [body for tag, body in packets if tag == 6]
+    if len(primary) != 1 or not primary[0] or primary[0][0] != 4 or len(primary[0]) > 65535:
+        raise ValueError("Pinned public primary identity required")
+    fingerprint = hashlib.sha1(b"\x99" + len(primary[0]).to_bytes(2, "big") + primary[0]).hexdigest().upper()
+    if fingerprint != record["fingerprint"]:
+        raise ValueError("Public trust input fingerprint mismatch")
+    texts = [(relative + ":public-identity", json.dumps(record, sort_keys=True))]
+    texts.extend((relative + ":uid-" + str(i), bounded_text(body))
+                 for i, (tag, body) in enumerate(packets) if tag == 13)
+    return texts
+
+
+def file_texts(path, root=ROOT, historical=HISTORICAL, *, public_inputs=PUBLIC_TRUST_INPUTS):
     if any(p.is_symlink() for p in (path, *path.parents)):
         raise ValueError("Physical product file required")
     with path.open("rb") as stream:
         data = stream.read(LIMIT + 1)
     relative = path.relative_to(root).as_posix()
+    if relative in public_inputs:
+        if (relative in historical or stat.S_IMODE(path.stat().st_mode) != 0o644
+                or os.access(path, os.X_OK)):
+            raise ValueError("Public trust input file metadata mismatch")
+        return public_trust_texts(relative, data, public_inputs[relative])
     record = historical.get(relative)
     if record is None:
         return [(relative, bounded_text(data))]
@@ -168,6 +205,57 @@ class HygieneTests(unittest.TestCase):
                 self.assertEqual(import_roots(node), expected)
         allowed = sys.stdlib_module_names | {"rs9"}
         self.assertFalse(set(import_roots(ast.parse("from tf_pypi_model import X").body[0])).issubset(allowed))
+
+
+class PublicTrustInputTests(unittest.TestCase):
+    relative = next(iter(PUBLIC_TRUST_INPUTS))
+
+    def key(self):
+        return (ROOT / self.relative).read_bytes()
+
+    def check(self, data, *, relative=None, mode=0o644, record=None):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            path = root / (relative or self.relative)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+            path.chmod(mode)
+            inputs = PUBLIC_TRUST_INPUTS if record is None else {self.relative: record}
+            texts = file_texts(path, root, {}, public_inputs=inputs)
+            for _, text in texts:
+                scan_text(text)
+            return texts
+
+    def repinned(self, data):
+        return {**PUBLIC_TRUST_INPUTS[self.relative], "size": len(data),
+                "sha256": hashlib.sha256(data).hexdigest()}
+
+    def test_exact_existing_public_key_has_expected_identity_and_scanned_uids(self):
+        texts = self.check(self.key())
+        self.assertEqual(json.loads(texts[0][1])["fingerprint"], PUBLIC_TRUST_INPUTS[self.relative]["fingerprint"])
+        self.assertTrue(any(":uid-" in name for name, _ in texts))
+
+    def test_changed_unlisted_executable_and_wrong_identity_refuse(self):
+        data = self.key()
+        for body, kwargs in ((data + b"x", {}), (data, {"relative": "other.gpg"}),
+                             (data, {"mode": 0o755}),
+                             (data, {"record": {**PUBLIC_TRUST_INPUTS[self.relative], "fingerprint": "0" * 40}})):
+            with self.subTest(kwargs=tuple(kwargs)), self.assertRaises((ValueError, ContractError)):
+                self.check(body, **kwargs)
+
+    def test_secret_packets_malformed_packets_and_trailers_never_bypass_parser(self):
+        for suffix in (b"\xc5\x00", b"\xc7\x00", b"\xc6\xe0", b"\xfc\x00", b"\x00"):
+            body = self.key() + suffix
+            with self.subTest(suffix=suffix.hex()), self.assertRaises((ValueError, ContractError)):
+                self.check(body, record=self.repinned(body))
+
+    def test_public_uid_text_still_receives_existing_credential_and_path_scan(self):
+        for text in (("/" + "Users/" + "synthetic/fixture").encode(),
+                     ("ghp" + "_" + "a" * 36).encode()):
+            for tag in (2, 13, 17):
+                body = self.key() + bytes([0xc0 | tag, len(text)]) + text
+                with self.subTest(size=len(text), packet=tag), self.assertRaises(ValueError):
+                    self.check(body, record=self.repinned(body))
 
 
 class HistoricalEvidenceTests(unittest.TestCase):
