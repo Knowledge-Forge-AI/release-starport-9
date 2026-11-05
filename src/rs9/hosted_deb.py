@@ -2317,7 +2317,8 @@ def _assemble_and_test_pages(
         tree = scratch / "pages-tree"
         tree.mkdir()
         candidate = assemble_pages_candidate(
-            tree, files=files, cname=PAGES_HOST, signing_fixture=fixture, apt_repo=repo, exact_inventory=inventory)
+            tree, files=files, cname=PAGES_HOST, signing_fixture=fixture, apt_repo=repo, exact_inventory=inventory,
+            qualification_generation=context.get("generation", HISTORICAL_GENERATION))
         completed.append(substage)
         substage = "assembled-inventory-and-scans"
         if (tree / "apt").exists():

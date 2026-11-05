@@ -30,6 +30,7 @@ from typing import Any
 import zlib
 
 from rs9.errors import ContractError
+from rs9.current_generation import CURRENT_GENERATION, HISTORICAL_GENERATION, generation_paths
 from rs9.records import Record, closed, record_sha256, snapshot, validate_bounded_int, validate_sha256
 from rs9.scratch import canonical, physical_directory
 from rs9.security import (
@@ -784,11 +785,12 @@ def verify_merkle_inventory(document: Any, inventory: dict[str, str]) -> None:
         raise ContractError("MERKLE_MISMATCH", "Merkle inventory differs from exact file inventory")
 
 
-def classify_pages_path(rel_path: str) -> tuple[bool, str]:
+def classify_pages_path(rel_path: str, *, qualification_generation=HISTORICAL_GENERATION) -> tuple[bool, str]:
     """Classify a relative POSIX path into allowed pages categories.
 
     Returns (is_allowed, category_name).
     """
+    generation_paths(qualification_generation)
     validate_safe_relative_posix_path(rel_path)
     parts = rel_path.split("/")
     filename = parts[-1]
@@ -811,6 +813,8 @@ def classify_pages_path(rel_path: str) -> tuple[bool, str]:
     if filename in INDEX_FILENAMES:
         if parts[0] in {"apt", "rpm", "pacman", "keys"}:
             valid_parent = parts[:-1] in (["apt"], ["rpm"], ["pacman"], ["pacman", "x86_64"])
+            if qualification_generation == CURRENT_GENERATION and parts[:-1] == ["pacman", "aarch64"]:
+                valid_parent = True
             if len(parts) == 5 and parts[:3] == ["rpm", "fedora", "43"] and parts[3] in {"x86_64", "aarch64"}:
                 valid_parent = True
             return (True, CATEGORY_INDEX) if valid_parent else (False, "")
@@ -882,7 +886,7 @@ def classify_pages_path(rel_path: str) -> tuple[bool, str]:
         return False, ""
 
     # 5c. Pacman / Arch repository:
-    # Required prefix: pacman/x86_64 packages/db/files and exact signatures
+    # Historical x64 namespace; current qualification also admits native ARM.
     PACMAN_EXTENSIONS = (
         ".pkg.tar.zst",
         ".pkg.tar.zst.sig",
@@ -896,7 +900,9 @@ def classify_pages_path(rel_path: str) -> tuple[bool, str]:
         ".files.tar.gz.sig",
     )
     if parts[0] == "pacman":
-        if len(parts) == 3 and parts[1] == "x86_64" and filename.endswith(PACMAN_EXTENSIONS):
+        if (len(parts) == 3 and (parts[1] == "x86_64" or
+                qualification_generation == CURRENT_GENERATION and parts[1] == "aarch64")
+                and filename.endswith(PACMAN_EXTENSIONS)):
             return True, CATEGORY_CANDIDATE_ASSET
         return False, ""
 
@@ -963,12 +969,14 @@ def scan_pages_tree(
     require_manifest: bool = False,
     max_total_bytes: int = 2 * 1024 * 1024 * 1024,
     max_files: int = 20000,
+    qualification_generation=HISTORICAL_GENERATION,
 ) -> Record:
     """Scan and validate a public Pages tree fail-closed.
 
     When manifest is provided, validates exact manifest inventory and hashes.
     When manifest is omitted, operates as non-authoritative discovery helper.
     """
+    generation_paths(qualification_generation)
     if require_manifest and manifest is None:
         raise ContractError("MANIFEST_REQUIRED", "Manifest is mandatory for candidate validation")
 
@@ -1017,7 +1025,7 @@ def scan_pages_tree(
             if manifest_paths is not None and rel_path not in manifest_paths:
                 raise ContractError("UNMANIFESTED_FILE", "Unmanifested file found in pages tree")
 
-            is_allowed, category = classify_pages_path(rel_path)
+            is_allowed, category = classify_pages_path(rel_path, qualification_generation=qualification_generation)
             if not is_allowed:
                 raise ContractError("DISALLOWED_FILE", "Disallowed file or private payload detected",
                                     details=pages_path_details("pages-path-classification", rel_path))
@@ -1080,11 +1088,13 @@ def scan_pages_tree(
     return Record(snapshot(result_data))
 
 
-def validate_pages_tree(root: str | Path, manifest: Any = None) -> Record:
+def validate_pages_tree(root: str | Path, manifest: Any = None, *, qualification_generation=HISTORICAL_GENERATION) -> Record:
     """Validate a public Pages tree for production candidate.
 
     Manifest is mandatory for production candidate validation.
     """
+    generation_paths(qualification_generation)
     if manifest is None:
         raise ContractError("MANIFEST_REQUIRED", "Manifest is mandatory for production candidate scanner")
-    return scan_pages_tree(root, manifest=manifest, require_manifest=True)
+    return scan_pages_tree(root, manifest=manifest, require_manifest=True,
+                           qualification_generation=qualification_generation)
