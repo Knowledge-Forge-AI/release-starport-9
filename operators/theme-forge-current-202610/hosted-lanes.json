@@ -109,6 +109,32 @@
       ]
     },
     {
+      "lane": "pacman",
+      "system": "aarch64-linux",
+      "runner": "ubuntu-24.04-arm",
+      "timeout_minutes": 90,
+      "family": "pacman",
+      "module": "rs9.hosted_native",
+      "artifact_name": "candidate-pacman-aarch64-linux",
+      "required_gates": [
+        "pacman-container-environment",
+        "pacman-package-build",
+        "pacman-repository-indexing",
+        "pacman-client-qualification",
+        "burst-native-addon-target",
+        "burst-native-addon-load",
+        "pacman-canonical-any-reuse",
+        "pacman-sdk-cleanup"
+      ],
+      "custody_required": true,
+      "required_products": [
+        "theme-forge-stellar-burst",
+        "theme-forge-stellar-loom",
+        "theme-forge-solar-sail",
+        "theme-forge-nebular-fusion"
+      ]
+    },
+    {
       "lane": "rpm",
       "system": "x86_64-linux",
       "runner": "ubuntu-24.04",
@@ -251,6 +277,7 @@
     "pins",
     "nix",
     "native",
+    "native-arm",
     "pages",
     "summary"
   ],

@@ -100,7 +100,7 @@ def bind_catalog_product(row, capture, intent, *, generation=HISTORICAL_GENERATI
 
 
 DISTRIBUTION_SCOPE = "current-distribution-only"
-DISTRIBUTION_JOBS = ("config", "unit", "authenticate", "pins", "nix", "native", "pages", "summary")
+DISTRIBUTION_JOBS = ("config", "unit", "authenticate", "pins", "nix", "native", "native-arm", "pages", "summary")
 DISTRIBUTION_LANES = ("unit", "pins", "authenticate", "nix", "pacman", "rpm", "deb", "pages", "summary")
 
 

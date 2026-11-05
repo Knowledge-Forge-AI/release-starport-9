@@ -103,10 +103,17 @@ class QualifiedDistributionInputTests(unittest.TestCase):
             self.assertIs(result[field], False)
 
     @patch("rs9.rpm_lint_policy.load_policy", side_effect=lambda *args, **kwargs: blocked_policy())
-    def test_forged_green_packet_cannot_override_explicit_current_rpm_policy_hold(self, selected_policy):
+    @patch("rs9.current_pacman_reuse.candidate_reuse", return_value={"replicas": {
+        "theme-forge-stellar-loom": None, "theme-forge-solar-sail": None}})
+    def test_forged_green_packet_cannot_override_explicit_current_rpm_policy_hold(self, selected_reuse, selected_policy):
+        # Isolate the existing RPM policy hold. Real original-provider reuse
+        # admission and every refused witness are covered in reuse_join tests.
         from tests.test_hosted_summary import HostedSummaryTests
         from rs9.hosted_nix import PRODUCTS
-        fixture = HostedSummaryTests(); fixture.setUp(); self.addCleanup(fixture.doCleanups)
+        fixture = HostedSummaryTests()
+        fixture.extra_rows = [row for row in required(ROOT, generation=CURRENT_GENERATION)
+                              if (row["lane"],row["system"]) == ("pacman","aarch64-linux")]
+        fixture.setUp(); self.addCleanup(fixture.doCleanups)
         lanes = required(ROOT, generation=CURRENT_GENERATION)
         names = {lane["artifact_name"] for lane in lanes}
         for directory in fixture.inputs.iterdir():
@@ -125,6 +132,10 @@ class QualifiedDistributionInputTests(unittest.TestCase):
             jobs = {job: {"result": "success"} for job in DISTRIBUTION_JOBS if job != "summary"}
             with patch.dict(os.environ, {"RS9_JOB_CONCLUSIONS": json.dumps(jobs)}):
                 self.assertEqual(summarize(ROOT, fixture.inputs, fixture.output, generation=CURRENT_GENERATION), 2)
+            summary_path = fixture.output / "hosted-summary.json"
+            focused = json.loads(summary_path.read_bytes())
+            focused["receipts"].sort(key=lambda row: row["lane"] != "rpm")
+            summary_path.write_bytes(canonical(focused))
             destination = fixture.inputs / "hosted-summary"; fixture.output.rename(destination)
             with patch("rs9.qualified_distribution_inputs.collect", return_value=self.packet), self.assertRaises(ContractError) as error:
                 qualified_distribution_inputs(self.config, fixture.inputs)

@@ -156,6 +156,10 @@ def run_lane(repository, scratch, receipts, lane, system, *, client=None, inputs
         context = {"repository": repository, "scratch": lane_scratch, "captures": captures, "client": client,
                    "binding": {"source_commit": commit, "checkout_binding": "hosted:" + commit}, "system": system,
                    "generation": generation, "inputs": inputs, "pins": pins, "authentication_sha256": ingestion, "family": lane, "phase": phase}
+        if (generation == CURRENT_GENERATION and lane == "pacman"
+                and system == "aarch64-linux"):
+            context["upstream"] = upstream
+            context["producer_provenance"] = initial_source
         if lane == "authenticate":
             record["gates"] = [{"name": n, "status": "pass"} for n in row["required_gates"]]
         else:

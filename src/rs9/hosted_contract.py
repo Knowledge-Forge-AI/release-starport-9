@@ -118,6 +118,15 @@ def load_hosted_lanes(repository: Path, *, generation=HISTORICAL_GENERATION) -> 
     if generation == CURRENT_GENERATION:
         historical = json.loads((Path(repository) / "operators/live1/hosted-lanes.json").read_bytes())
         selected = [row for row in historical["lanes"] if row["lane"] in DISTRIBUTION_LANES]
+        # One closed current-only extension; historical rows remain the authority
+        # for every unchanged lane. ARM consumes the original x64 any packages.
+        canonical = next(row for row in selected
+                         if (row["lane"], row["system"]) == ("pacman", "x86_64-linux"))
+        arm = {**canonical, "system": "aarch64-linux", "runner": "ubuntu-24.04-arm",
+               "artifact_name": "candidate-pacman-aarch64-linux",
+               "required_gates": [*canonical["required_gates"],
+                                  "pacman-canonical-any-reuse", "pacman-sdk-cleanup"]}
+        selected.insert(selected.index(canonical) + 1, arm)
         if (doc.get("generation") != generation or doc.get("qualification_scope") != DISTRIBUTION_SCOPE
                 or doc.get("publication_authority") is not False
                 or doc.get("required_jobs") != list(DISTRIBUTION_JOBS) or doc["lanes"] != selected
@@ -147,6 +156,8 @@ def generate_matrix_outputs(lanes_doc: dict) -> dict[str, str]:
          "timeout_minutes": l["timeout_minutes"], "artifact_name": l["artifact_name"]}
         for l in lanes
         if l.get("lane") in {"pacman", "rpm", "deb"}
+        and not (lanes_doc.get("generation") == CURRENT_GENERATION
+                 and (l.get("lane"), l.get("system")) == ("pacman", "aarch64-linux"))
     ]
     candidate = [
         {"lane": l["lane"], "system": l["system"], "runner": l["runner"], "job_name":l["lane"]+"-"+l["system"],

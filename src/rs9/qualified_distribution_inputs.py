@@ -82,7 +82,14 @@ def _binary_inputs(repository, output, summary, expected, *, _admission=None):
     manifests = {(row["lane"], row["system"]): row for row in summary["artifact_manifests"]}
     unique, independent, bundles = {}, {}, {"deb": [], "rpm": [], "pacman": []}
     nix = {}
-    for lane in required(repository, generation=CURRENT_GENERATION):
+    from rs9.current_pacman_reuse import candidate_reuse
+    from rs9.current_pacman_any import ANY_PRODUCTS, select_canonical_any_provider
+    from rs9.package_roles import RAW_REUSE_REPLICA
+    selected_lanes = required(repository, generation=CURRENT_GENERATION)
+    reuse = (candidate_reuse(repository, output, expected)
+             if any((row["lane"],row["system"]) == ("pacman","aarch64-linux") for row in selected_lanes)
+             else None)
+    for lane in selected_lanes:
         key = lane["lane"], lane["system"]
         directory = output / lane["artifact_name"]
         manifest = verify_set(directory, expected_provenance=expected)
@@ -111,8 +118,16 @@ def _binary_inputs(repository, output, summary, expected, *, _admission=None):
             continue
         family, packages, present = lane["lane"], {}, set()
         for row in manifest["files"]:
-            if not is_installable_binary(row):
+            is_reuse = row.get("role") == RAW_REUSE_REPLICA
+            if not is_installable_binary(row) and not is_reuse:
                 continue
+            if is_reuse:
+                # This path witnesses installed ARM reuse; it never becomes a
+                # second construction provider or the selected signing input.
+                expected_paths = {path.relative_to(directory).as_posix()
+                                  for path in reuse["replicas"].values()}
+                if key != ("pacman", "aarch64-linux") or row["path"] not in expected_paths:
+                    raise ContractError("CANONICAL_ANY_REPLICA", "Unexpected raw reuse witness path")
             name = Path(row["path"]).name
             product = next((product for product in versions if name.startswith(product + ("_" if family == "deb" else "-"))), None)
             if product is None:
@@ -141,6 +156,19 @@ def _binary_inputs(repository, output, summary, expected, *, _admission=None):
         if present != set(lane.get("required_products", [])):
             raise ContractError("DISTRIBUTION_BINARY_SCOPE", "Exact required installable binary products missing")
         bundles[family].append({"manifest": {"family": family, "system": lane["system"]}, "packages": packages})
+    if bundles["pacman"]:
+        providers = []
+        for system, role in (("x86_64-linux", "construction"), ("aarch64-linux", "reuse-witness")):
+            files = {}
+            for row in unique.values():
+                if row["family"] == "pacman" and row["product"] in ANY_PRODUCTS and row["architecture"] == "any":
+                    if any(origin["system"] == system for origin in row["origins"]):
+                        files[row["product"]] = row["sha256"]
+                    # Keep the canonical constructor first for the unchanged physical
+                    # routing schema. ARM origins remain explicit reuse witnesses.
+                    row["origins"].sort(key=lambda origin: (origin["system"] != "x86_64-linux", origin["path"]))
+            providers.append({"lane":"pacman", "system":system, "role":role, "files":files})
+        select_canonical_any_provider(providers)
     _custody_unique(bundles["deb"])
     _custody_unique(bundles["pacman"])
     _rpm_custody_unique(bundles["rpm"])

@@ -32,7 +32,12 @@ from typing import Any, Mapping
 
 from rs9.archives import inspect_archive
 from rs9.bootstrap import require_configuration_authority
-from rs9.current_generation import HISTORICAL_GENERATION, generation_paths, bind_native_build_generation
+from rs9.current_generation import (
+    CURRENT_GENERATION,
+    HISTORICAL_GENERATION,
+    bind_native_build_generation,
+    generation_paths,
+)
 from rs9.errors import ContractError
 from rs9.npm_deps import authenticate_dependencies, closure_for_capture
 from rs9.records import closed, record_sha256, snapshot, validate_sanitized_string, validate_sha256
@@ -209,14 +214,19 @@ class SubprocessRunner(CommandRunner):
 
         start_time = time.monotonic()
         try:
-            proc = subprocess.run(
-                argv,
-                cwd=str(cwd) if cwd else None,
-                env=cmd_env,
-                capture_output=True,
-                check=False,
-                timeout=self.timeout,
-            )
+            if getattr(self, "_archarm_capture_limit", None) is not None:
+                from rs9._archarm_support.process import capture
+                proc = capture(argv, cwd=str(cwd) if cwd else None, env=cmd_env,
+                               timeout=self.timeout, limit=self._archarm_capture_limit)
+            else:
+                proc = subprocess.run(
+                    argv,
+                    cwd=str(cwd) if cwd else None,
+                    env=cmd_env,
+                    capture_output=True,
+                    check=False,
+                    timeout=self.timeout,
+                )
         except subprocess.TimeoutExpired as error:
             elapsed_ms = max(0, int(round((time.monotonic() - start_time) * 1000)))
             deadline = error.timeout if error.timeout is not None else self.timeout
@@ -381,7 +391,12 @@ def validate_build_inputs(
     distro: str | None = None,
     generation: str = HISTORICAL_GENERATION,
 ) -> dict[str, Any]:
-    """Validate release capture, bootstrap authority, architecture, and licensing."""
+    """Validate release capture, bootstrap authority, architecture, and licensing.
+
+    The selected generation is passed to the architecture contract: only the
+    current generation admits native pacman 'aarch64' (Burst -> linux-arm64-gnu
+    prebuild, Nebular -> exact AArch64 release payload). Historical is unchanged.
+    """
     generation_paths(generation)
     authenticated_record_hash(capture)
     require_configuration_authority(capture, intent)
@@ -435,7 +450,7 @@ def validate_build_inputs(
     is_cli = product_class in (PURE_JS_CLI, NATIVE_NODE_CLI)
 
     arch_norm = arch.strip().lower()
-    allowed_archs = supported_architectures(project_id, adapter)
+    allowed_archs = supported_architectures(project_id, adapter, generation=generation)
     if arch_norm not in allowed_archs:
         if is_pure_js:
             cli_arch_expected = {
@@ -453,13 +468,27 @@ def validate_build_inputs(
                 f"Native project '{project_id}' architecture '{arch}' not supported for {adapter}; allowed: {sorted(allowed_archs)}",
             )
 
+    # Current-generation-only native pacman AArch64: resolve the system through the
+    # generation-aware contract and never let an 'any' payload satisfy the native
+    # desktop (GUI) target; it must select its exact AArch64 release payload.
+    # Burst ships one cross-platform release tarball, so its prebuild is selected
+    # below via packaging_system_for_arch. All previously accepted paths unchanged.
+    current_pacman_aarch64 = (
+        generation == CURRENT_GENERATION and adapter == "pacman"
+        and is_native and arch_norm == "aarch64"
+    )
     matched_payload = None
     for p in capture.record.get("payloads", []):
         plats = p.get("platforms", ["any"])
-        system = (
-            "aarch64-linux" if arch_norm in {"aarch64", "arm64"} else "x86_64-linux"
-        )
-        if system in plats or "any" in plats:
+        if current_pacman_aarch64:
+            system = packaging_system_for_arch(adapter, arch_norm, generation=generation)
+            any_allowed = is_native_node
+        else:
+            system = (
+                "aarch64-linux" if arch_norm in {"aarch64", "arm64"} else "x86_64-linux"
+            )
+            any_allowed = True
+        if system in plats or (any_allowed and "any" in plats):
             matched_payload = p
             break
     if not matched_payload:
@@ -485,7 +514,7 @@ def validate_build_inputs(
         inspect_archive(Path(asset_file), {}, on_file=lambda name, data, mode: cli_files.update({name: data}))
         assert_no_native_payloads(cli_files, context=f"CLI project payload '{project_id}'")
     elif is_native_node:
-        target_system = packaging_system_for_arch(adapter, arch_norm)
+        target_system = packaging_system_for_arch(adapter, arch_norm, generation=generation)
         burst_files: dict[str, bytes] = {}
         inspect_archive(Path(asset_file), {}, on_file=lambda name, data, mode: burst_files.update({name: data}))
         burst_origins = {name: "release-payload" for name in burst_files}

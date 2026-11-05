@@ -597,6 +597,13 @@ def collect(repository, output, *, commit, started_at, run_id=None, timeout=7200
             raise ContractError("HOSTED_STEPS", "Workflow has unsuccessful steps")
         if summary.get("qualification_verdict", summary.get("verdict")) != "qualified":
             raise ContractError("HOSTED_NOT_QUALIFIED", "Hosted candidate is not qualified")
+        if generation == CURRENT_GENERATION:
+            from rs9.current_pacman_reuse import original_reuse
+            from rs9.current_pacman_any import SOURCE_KEYS
+            selected = original_reuse(root, output, packet, original_run,
+                                     {key:summary[key] for key in SOURCE_KEYS})
+            # Paths stay local; this public packet retains source/provider identities only.
+            packet["canonical_any"] = {key:value for key,value in selected.items() if key != "custody_paths"}
         packet["validation"] = {"status": "pass", "reasons": []}
         packet["diagnostic_scope"]["full_live1_qualification"] = generation == HISTORICAL_GENERATION
         if generation == CURRENT_GENERATION:
