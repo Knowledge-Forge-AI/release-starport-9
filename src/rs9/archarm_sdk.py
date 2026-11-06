@@ -451,7 +451,8 @@ class ArchArmSDK:
         require(not presence(docker, "container", s.records["installer"].name),
                 "OWNED_NAME_COLLISION")
 
-        gpg_env = {"HOME": str(layout.home), "GNUPGHOME": str(layout.home), **FIXED_ENV}
+        # _gpgv binds this public-only home through --homedir; no GPG env is needed.
+        gpg_env = {"HOME": str(layout.home), **FIXED_ENV}
         rootfs_pin = pins.rootfs_pin
         fetch = s.seams.fetcher.fetch
         clock = _monotonic

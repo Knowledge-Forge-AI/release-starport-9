@@ -63,6 +63,28 @@ class LeasePreparationTest(RefusalMixin, unittest.TestCase):
         self.assertEqual(self.h.engine.images, {})
         self.assertEqual(self.h.engine.containers, {})
 
+    def test_public_signature_verification_uses_explicit_home_without_gpg_environment(self):
+        calls = []
+        run = self.h.engine.run
+
+        def record(argv, *, cwd=None, env=None):
+            if argv[0] == "gpgv":
+                calls.append((list(argv), dict(env)))
+            return run(argv, cwd=cwd, env=env)
+
+        self.h.engine.run = record
+        with self.h.lease():
+            pass
+        home = str(self.h.root / "work" / "public-home")
+        self.assertEqual(len(calls), 1 + len(self.h.bundle.packages))
+        for argv, env in calls:
+            self.assertEqual(argv[:5], ["gpgv", "--homedir", home, "--keyring",
+                                      str(self.h.bundle.certificate)])
+            self.assertEqual(env, {"HOME": home, "LANG": "C", "LC_ALL": "C"})
+        self.assertFalse((self.h.root / "work").exists())
+        self.assertEqual(self.h.engine.images, {})
+        self.assertEqual(self.h.engine.containers, {})
+
     def test_records_carry_no_host_paths_or_names(self):
         with self.h.lease() as lease:
             text = json.dumps(lease.records)
