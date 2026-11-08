@@ -1077,6 +1077,8 @@ def build_rpm_candidate(
         err.spec_path = str(spec_path)
         err.spec_sha256 = rpmlint_evidence.get("spec_sha256", "")
         err.package_sha256 = rpmlint_evidence.get("package_sha256", "")
+        err.preservation_inventory = inventory
+        err.preservation_inventory_receipts = inventory_receipts
         raise _attach_witness(err)
 
     # Execute createrepo gzip --no-database (atomic: reached ONLY after policy acceptance!)

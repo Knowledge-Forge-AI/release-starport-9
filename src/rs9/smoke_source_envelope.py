@@ -35,25 +35,34 @@ def _expectations(commit=None):
     elif commit == s.CURRENT071_COMMIT:
         files, imports = s.CURRENT071_VERIFIER_FILES, s.CURRENT071_VERIFIER_IMPORTS
         commit, tree, tag = s.CURRENT071_COMMIT, s.CURRENT071_TREE, "v0.7.1"
+    elif commit == s.CURRENT080_COMMIT:
+        files, imports = s.CURRENT080_VERIFIER_FILES, s.CURRENT080_VERIFIER_IMPORTS
+        commit, tree, tag = s.CURRENT080_COMMIT, s.CURRENT080_TREE, "v0.8.0"
     else:
         _fail()
     modules = set(files) - {"package.json"}
     if (set(imports) != modules
             or any(set(edges) - modules for edges in imports.values())):
         _fail()
-    pins = {**files, **s.CURRENT070_FIXTURE_FILES}
+    fixture_files = (s.CURRENT080_FIXTURE_FILES if commit == s.CURRENT080_COMMIT
+                     else s.CURRENT070_FIXTURE_FILES)
+    fixture_commit = (s.CURRENT080_FIXTURE_COMMIT if commit == s.CURRENT080_COMMIT
+                      else s.CURRENT070_FIXTURE_COMMIT)
+    fixture_tree = (s.CURRENT080_FIXTURE_TREE if commit == s.CURRENT080_COMMIT
+                    else s.CURRENT070_FIXTURE_TREE)
+    pins = {**files, **fixture_files}
     records = {}
     for name, pin in pins.items():
-        fixture = name in s.CURRENT070_FIXTURE_FILES
+        fixture = name in fixture_files
         role = ("fixture" if fixture else "verifier-support" if name == "package.json"
                 else "application-smoke" if name == "tools/native-rc-smoke.mjs" else "verifier-module")
         records[name] = {"path": name, **pin, "role": role,
-                         "tag_commit": s.CURRENT070_FIXTURE_COMMIT if fixture else commit}
+                         "tag_commit": fixture_commit if fixture else commit}
     producers = {
         "nebular": {"repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion", "tag": tag,
                     "commit": commit, "tree": tree},
         "fixture": {"repository": "Knowledge-Forge-AI/theme-forge-stellar-burst", "tag": "v0.7.0",
-                    "commit": s.CURRENT070_FIXTURE_COMMIT, "tree": s.CURRENT070_FIXTURE_TREE}}
+                    "commit": fixture_commit, "tree": fixture_tree}}
     return records, producers
 
 

@@ -48,12 +48,45 @@ def _nix_application_environment(source, generation, system):
 
 
 def _current_linux_initial_observation_enabled(generation, system, prepared):
-    """Opt in only after prepare_smoke has authenticated the current Nebular source."""
-    return (_current_linux_lane(generation, system)
+    """Opt in for an authenticated current-generation Nebular source profile."""
+    if not (_current_linux_lane(generation, system)
             and isinstance(prepared, dict)
             and prepared.get("source_generation") == CURRENT_GENERATION
             and prepared.get("capture") is not None
-            and prepared.get("fixture_capture") is not None)
+            and prepared.get("fixture_capture") is not None):
+        return False
+    # The application diagnostic verifies the complete profile closure before
+    # launch.  Check it here as well so an OS080 source cannot silently fall
+    # back to an ordinary smoke after its required Nix observation seam was
+    # requested.
+    try:
+        from rs9.application_smoke_diagnostic import _current_replay_progress_profile
+        profile = _current_replay_progress_profile(prepared)
+    except (ContractError, OSError, ValueError, TypeError, KeyError):
+        return False
+    return isinstance(profile, dict) and profile.get("id") in {
+        "nebular070", "nebular071", "nebular080",
+    }
+
+
+def _current080_observation_required(generation, system, prepared):
+    """Require the new diagnostic seam for 0.8.0, preserving older current lanes."""
+    if not (_current_linux_lane(generation, system)
+            and isinstance(prepared, dict)
+            and prepared.get("source_generation") == CURRENT_GENERATION):
+        return False
+    try:
+        source = Path(prepared["source"])
+        raw = (source / "package.json").read_bytes()
+        if len(raw) > 4 * 1024 * 1024:
+            return True
+        version = json.loads(raw).get("version")
+    except (OSError, ValueError, TypeError, KeyError):
+        # An unreadable current source cannot silently downgrade the 0.8.0
+        # path to ordinary smoke; known 0.7.x package versions retain their
+        # historical fallback below.
+        return True
+    return version not in {"0.7.0", "0.7.1"}
 
 
 def _verify_final_nebular_runtime(runtime_root, prepared, system, prefix, runtime_prefix, env,
@@ -61,6 +94,9 @@ def _verify_final_nebular_runtime(runtime_root, prepared, system, prefix, runtim
     session_bus_argv = _pinned_session_bus_argv(runtime_facts) if system.endswith("-linux") else None
     current_linux_observation = _current_linux_initial_observation_enabled(
         generation, system, prepared)
+    if (_current080_observation_required(generation, system, prepared)
+            and not current_linux_observation):
+        raise ContractError("NIX_SOURCE", "Authenticated current replay profile closure unavailable")
     return verify_nebular_runtime(
         runtime_root, prepared, system, [*prefix, *runtime_prefix], env, baseline=baseline,
         diagnostic_boundary_probes=system.endswith("-linux"),

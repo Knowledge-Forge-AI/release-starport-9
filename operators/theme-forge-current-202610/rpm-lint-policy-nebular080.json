@@ -1,0 +1,187 @@
+{
+  "blocking": true,
+  "generation": "theme-forge-current-202610",
+  "permitted_preservation_exception_classes": [
+    "env-script-interpreter",
+    "non-executable-script",
+    "files-duplicated-waste"
+  ],
+  "policy_authority": "OS080 preservation policy is blocked: archive/package-image identities are read back, but key-free RPM construction, RPM header/digest/inode readback, duplicate-waste results, rpmlint receipt and owner-authorized activation are not yet derived. No 0.7.1 preservation exception is copied.",
+  "production_enabled": false,
+  "projects": {
+    "theme-forge-nebular-fusion": {
+      "allowed_architectures": [
+        "x86_64",
+        "aarch64"
+      ],
+      "allowed_systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ],
+      "archive_contract_members": [
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/sidecar-payload/manifest.json",
+        "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/package.json"
+      ],
+      "authenticated_inputs": {
+        "assets": [
+          {
+            "name": "theme-forge-nebular-fusion-v0.8.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "498f0f6ff81c32200843e04016f86f7733905df0b0712c3f3639162ad5655abc"
+          },
+          {
+            "name": "theme-forge-nebular-fusion-v0.8.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "4bbc40f180d954e1ca496606da9b63d7ce0f49dd29e802893aabc4aa0e859e94"
+          }
+        ]
+      },
+      "blocking": true,
+      "exceptions": {},
+      "launchers": {},
+      "package_name": "theme-forge-nebular-fusion",
+      "public_symlinks": {
+        "tfnf": {
+          "path": "/usr/bin/tfnf",
+          "target": "/usr/lib/theme-forge-nebular-fusion/bin/tfnf",
+          "type": "symlink"
+        }
+      },
+      "runtime_requires_contract": {
+        "member": "/usr/lib/theme-forge-nebular-fusion/lib/theme-forge-nebular-fusion/loom-payload/package.json",
+        "pointer": "/engines/node",
+        "sha256": "168b43aba5a8966b0caee78d441f4bb63787889bb2895120e44f505194b3236c"
+      },
+      "status": "blocked",
+      "version": "0.8.0"
+    },
+    "theme-forge-solar-sail": {
+      "allowed_architectures": [
+        "noarch"
+      ],
+      "allowed_systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ],
+      "authenticated_inputs": {
+        "asset_name": "knowledge-forge-ai-theme-forge-solar-sail-0.3.0.tgz",
+        "asset_sha256": "65070c3478a1d55476c1b09fbe1dcadfdf7c3d3aa54a154bc9ac9e299411f415",
+        "closure_sha256": null,
+        "closure_status": "held_pending_observed_npm_closure"
+      },
+      "blocking": true,
+      "engine_constraints": {
+        "engine": "node",
+        "interpreter": "/usr/bin/env node",
+        "requires_spec_dependency": "nodejs >= 22"
+      },
+      "exceptions": {},
+      "launchers": {
+        "tfss": {
+          "mode": "0755",
+          "path": "/usr/bin/tfss",
+          "target": "/usr/lib/theme-forge-solar-sail/bin/tfss.js",
+          "type": "node_wrapper"
+        }
+      },
+      "package_name": "theme-forge-solar-sail",
+      "status": "blocked",
+      "version": "0.3.0"
+    },
+    "theme-forge-stellar-burst": {
+      "allowed_architectures": [
+        "x86_64",
+        "aarch64"
+      ],
+      "allowed_systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ],
+      "authenticated_inputs": {
+        "asset_name": "knowledge-forge-ai-theme-forge-stellar-burst-0.7.0.tgz",
+        "asset_sha256": "c4b609a0b4705b17483577d5bde5deea518a83af08ce4d93c4662fa7cacc7d88",
+        "closure_sha256": null,
+        "closure_status": "held_pending_observed_npm_closure"
+      },
+      "blocking": true,
+      "engine_constraints": {
+        "engine": "node",
+        "interpreter": "/usr/bin/env node",
+        "requires_spec_dependency": "nodejs >= 22"
+      },
+      "exceptions": {},
+      "launchers": {
+        "tfsb": {
+          "mode": "0755",
+          "path": "/usr/bin/tfsb",
+          "target": "/usr/lib/theme-forge-stellar-burst/dist/cli.js",
+          "type": "node_wrapper"
+        },
+        "tfsb-studio-service": {
+          "mode": "0755",
+          "path": "/usr/bin/tfsb-studio-service",
+          "target": "/usr/lib/theme-forge-stellar-burst/dist/service-protocol/server-cli.js",
+          "type": "node_wrapper"
+        }
+      },
+      "package_name": "theme-forge-stellar-burst",
+      "status": "blocked",
+      "version": "0.7.0"
+    },
+    "theme-forge-stellar-loom": {
+      "allowed_architectures": [
+        "noarch"
+      ],
+      "allowed_systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ],
+      "authenticated_inputs": {
+        "asset_name": "knowledge-forge-ai-theme-forge-stellar-loom-0.5.0.tgz",
+        "asset_sha256": "4e7a7d436c09ba111f5dca8101876c6e085ad15859d96bab8f728c5669880b5f",
+        "closure_sha256": null,
+        "closure_status": "held_pending_observed_npm_closure"
+      },
+      "blocking": true,
+      "engine_constraints": {
+        "engine": "node",
+        "interpreter": "/usr/bin/env node",
+        "requires_spec_dependency": "nodejs >= 22"
+      },
+      "exceptions": {},
+      "launchers": {
+        "tfsl": {
+          "mode": "0755",
+          "path": "/usr/bin/tfsl",
+          "target": "/usr/lib/theme-forge-stellar-loom/bin/tfsl.js",
+          "type": "node_wrapper"
+        },
+        "tfsl-batch": {
+          "mode": "0755",
+          "path": "/usr/bin/tfsl-batch",
+          "target": "/usr/lib/theme-forge-stellar-loom/bin/tfsl-batch.js",
+          "type": "node_wrapper"
+        }
+      },
+      "package_name": "theme-forge-stellar-loom",
+      "status": "blocked",
+      "version": "0.5.0"
+    }
+  },
+  "publication_authority": false,
+  "schema": "rs9.rpm-lint-policy.v1",
+  "scope": "Exact current-generation self-published RPM candidate preservation; not raw-clean lint, official Fedora repository qualification, production signing or publication authority",
+  "status": "blocked",
+  "tool_constraints": {
+    "allowed_exit_codes": [
+      0,
+      64
+    ],
+    "filtered_count": 8,
+    "package_version": "2.8.0-2.fc43",
+    "tool": "rpmlint",
+    "version": "2.8.0"
+  },
+  "unwaivable_error_classes": [
+    "no-changelogname-tag",
+    "explicit-lib-dependency"
+  ]
+}

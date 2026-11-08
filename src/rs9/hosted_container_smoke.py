@@ -24,6 +24,7 @@ from rs9.smoke_source_envelope import (GENERATION, checked_envelope, mint_guest_
     verify_guest_prepared, verify_checkout)
 from rs9.scratch import canonical
 from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
+from rs9.current_os080 import CURRENT080_COMMIT, CURRENT080_TAG, CURRENT080_TREE
 
 GUEST = Path("/srv/rs9/smoke")
 RUNTIME = "/usr/lib/theme-forge-nebular-fusion"
@@ -639,9 +640,17 @@ def guest_main(*, expected_request_sha256=None, archarm_identity=None):
         nebular_producer = (envelope.get("producers", {}).get("nebular")
                             if isinstance(envelope, dict) and isinstance(envelope.get("producers"), dict)
                             else None)
+        current080_source = (
+            current
+            and isinstance(nebular_producer, dict)
+            and nebular_producer.get("tag") == CURRENT080_TAG
+            and nebular_producer.get("commit") == CURRENT080_COMMIT
+            and nebular_producer.get("tree") == CURRENT080_TREE
+        )
         current071_apt = (
             current
             and request["family"] == "apt"
+            and not current080_source
             and isinstance(nebular_producer, dict)
             and nebular_producer.get("tag") == "v0.7.1"
             and nebular_producer.get("commit") == CURRENT071_COMMIT

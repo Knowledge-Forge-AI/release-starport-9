@@ -18,10 +18,14 @@ RPM_LINT_POLICY_SCHEMA = 'rs9.rpm-lint-policy.v1'
 RPM_POLICY_EVALUATION_SCHEMA = 'rs9.rpm-lint-policy-evaluation.v1'
 PERMITTED_EXCEPTION_CLASSES = frozenset({'env-script-interpreter','non-executable-script','files-duplicated-waste'})
 CURRENT_VERSIONS = {'theme-forge-stellar-burst':'0.6.1','theme-forge-stellar-loom':'0.4.0','theme-forge-solar-sail':'0.2.1','theme-forge-nebular-fusion':'0.6.1'}
-CURRENT_GENERATION_VERSIONS = {'theme-forge-stellar-burst':'0.7.0','theme-forge-stellar-loom':'0.5.0','theme-forge-solar-sail':'0.3.0','theme-forge-nebular-fusion':'0.7.1'}
+CURRENT_GENERATION_VERSIONS = {'theme-forge-stellar-burst':'0.7.0','theme-forge-stellar-loom':'0.5.0','theme-forge-solar-sail':'0.3.0','theme-forge-nebular-fusion':'0.8.0'}
+# The immediately preceding Nebular release remains an explicit compatibility
+# tuple; it is not the current-generation default.
+CURRENT071_GENERATION_VERSIONS = dict(CURRENT_GENERATION_VERSIONS, **{'theme-forge-nebular-fusion': '0.7.1'})
 # Policy bytes authorize the fixed070 inputs, independently of the advanced
 # active generation. Parsing them is not authority for a071 input tuple.
 CURRENT_POLICY_VERSIONS = {'theme-forge-stellar-burst':'0.7.0','theme-forge-stellar-loom':'0.5.0','theme-forge-solar-sail':'0.3.0','theme-forge-nebular-fusion':'0.7.0'}
+CURRENT080_POLICY_VERSIONS = dict(CURRENT_POLICY_VERSIONS, **{'theme-forge-nebular-fusion': '0.8.0'})
 UNWAIVABLE_ERROR_CLASSES = frozenset({'no-changelogname-tag','explicit-lib-dependency'})
 MISSING_EVIDENCE_PREDICATES = frozenset({'caller-contract-unproven', 'caller-member-missing',
     'caller-reference-unresolved', 'engine-floor-unproven', 'engine-floor-unmet',
@@ -120,6 +124,9 @@ def _validate_current_policy(policy, *, policy_variant=None):
     if policy_variant == 'current071':
         from rs9.nebular_callers import _load_current071_contract
         callers = _load_current071_contract()
+    elif policy_variant == 'current080':
+        from rs9.nebular_callers import _load_current080_contract
+        callers = _load_current080_contract()
     else:
         callers = _load_current_contract()
     for name, entry in policy['projects'].items():
@@ -211,6 +218,8 @@ def _validate_policy(policy, *, generation=HISTORICAL_GENERATION, policy_variant
     versions = CURRENT_VERSIONS if generation == HISTORICAL_GENERATION else CURRENT_POLICY_VERSIONS
     if policy_variant == 'current071':
         versions = dict(CURRENT_POLICY_VERSIONS, **{'theme-forge-nebular-fusion':'0.7.1'})
+    elif policy_variant == 'current080':
+        versions = CURRENT080_POLICY_VERSIONS
     for name, entry in projects.items():
         if not isinstance(entry, dict) or entry.get('package_name') != name or entry.get('version') != versions.get(name):
             raise ContractError('INVALID_POLICY', 'Malformed exact project identity')
@@ -775,6 +784,8 @@ def assert_policy_capture(capture, intent, policy_variant):
     versions = dict(CURRENT_POLICY_VERSIONS)
     if policy_variant == 'current071':
         versions['theme-forge-nebular-fusion'] = '0.7.1'
+    elif policy_variant == 'current080':
+        versions = dict(CURRENT080_POLICY_VERSIONS)
     if product not in versions or intent.get('version') != versions[product]:
         raise ContractError('INVALID_SELECTION', 'RPM capture/version context differs')
     if product == 'theme-forge-nebular-fusion':
@@ -798,7 +809,7 @@ def _select_current_rpm_variant(captures):
     if set(rows) != set(CURRENT_POLICY_VERSIONS) or len(rows) != len(captures):
         raise ContractError('INVALID_SELECTION', 'Exact unique RPM products required')
     nebular = current_contract_for_capture(rows['theme-forge-nebular-fusion'][0])
-    variant = {'v0.7.0':'current070', 'v0.7.1':'current071'}.get(nebular['identity']['tag'])
+    variant = {'v0.7.0':'current070', 'v0.7.1':'current071', 'v0.8.0':'current080'}.get(nebular['identity']['tag'])
     if variant is None:
         raise ContractError('INVALID_SELECTION', 'Unsupported RPM release context')
     for capture,intent in rows.values():
@@ -821,7 +832,7 @@ def _policy_variant_for_evaluations(repository, receipt):
     hashes = {row.get('policy_sha256') for row in policies.values() if isinstance(row,dict)}
     if len(hashes) != 1 or len(policies) != 4:
         raise ContractError('HOSTED_POLICY', 'Mixed RPM policy contexts')
-    for variant in (None,'current071'):
+    for variant in (None,'current071','current080'):
         kwargs = {} if variant is None else {'policy_variant':variant}
         selected = load_policy(Path(repository)/rpm_policy_path(CURRENT_GENERATION,**kwargs),
                                generation=CURRENT_GENERATION,**kwargs)
