@@ -395,9 +395,16 @@ class QualifiedFixture(SourceFixtures):
         self.assertNotIn('custody_paths',packet['canonical_any'])
         from rs9.candidate import configuration_rows
         active={intent['project']['id']:intent['version'] for _,intent in configuration_rows(self.rs,generation=CURRENT_GENERATION)}
-        self.assertEqual(active['theme-forge-nebular-fusion'],'0.7.1')
+        # This remains a complete historical 0.7.1 paired-admission positive.
+        # The active current-generation catalog is now the separately held
+        # 0.8.0 successor; this test must not silently promote the old profile.
+        self.assertEqual(active['theme-forge-nebular-fusion'],'0.8.0')
         self.assertEqual(own.VERSIONS['theme-forge-nebular-fusion'],'0.7.1')
-        self.assertEqual(active,own.VERSIONS)
+        self.assertNotEqual(active,own.VERSIONS)
+        self.assertEqual({name: version for name, version in active.items()
+                          if name != 'theme-forge-nebular-fusion'},
+                         {name: version for name, version in own.VERSIONS.items()
+                          if name != 'theme-forge-nebular-fusion'})
         default_policy=load_policy(self.rs/rpm_policy_path(CURRENT_GENERATION),generation=CURRENT_GENERATION)
         self.assertEqual(record['policy_sha256'],own.digest(self.policy))
         self.assertNotEqual(record['policy_sha256'],own.digest(default_policy))

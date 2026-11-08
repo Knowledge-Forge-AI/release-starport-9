@@ -35,17 +35,17 @@ from rs9.tf_pypi_archive import AdmissionError
 from rs9.tf_pypi_model import strict_json
 
 
-AUTHORITY = Path(coordinates.AUTHORITY)
+AUTHORITY = Path("operators/tf-pypi/nebular-fusion-0.8.0-universal-publication.json")
 SCHEMA = coordinates.SCHEMA
 MARKER_SCHEMA = coordinates.MARKER_SCHEMA
 READBACK_SCHEMA = coordinates.READBACK_SCHEMA
 PROJECT = coordinates.PROJECT
 WORKFLOW = coordinates.WORKFLOW
 ENVIRONMENT = coordinates.ENVIRONMENT
-REPOSITORY = coordinates.REPOSITORY
+REPOSITORY = coordinates.DEFAULT_GITHUB_REPOSITORY
 LICENSE_EXPRESSION = coordinates.LICENSE_EXPRESSION
 REQUIRES_PYTHON = coordinates.REQUIRES_PYTHON
-PUBLIC_INPUTS = coordinates.PUBLIC_INPUTS
+PUBLIC_INPUTS = coordinates.ARTIFACT_PREFIX + "public-inputs"
 BUNDLE = coordinates.BUNDLE
 QUALIFICATION = dict(coordinates.QUALIFICATION)
 FLOOR = dict(coordinates.FLOOR)

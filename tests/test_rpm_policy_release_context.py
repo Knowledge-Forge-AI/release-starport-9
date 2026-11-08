@@ -1,4 +1,4 @@
-"""Fixed070 policy replay is distinct from admission of current071 inputs."""
+"""Fixed070 replay, retained071 policy and active080 identity stay distinct."""
 import copy
 import unittest
 from unittest.mock import patch
@@ -8,10 +8,11 @@ from rs9.errors import ContractError
 from tests.test_current_rpm_preservation_policy import actual_case, blocked_policy
 
 class PolicyReleaseContextTests(unittest.TestCase):
-    def test_fixed070_policy_parses_without_changing_active071_identity(self):
+    def test_fixed070_policy_parses_without_changing_071_or_active080_identity(self):
         value=policy.load_policy(generation=CURRENT_GENERATION)
         self.assertEqual(value["projects"]["theme-forge-nebular-fusion"]["version"],"0.7.0")
-        self.assertEqual(policy.CURRENT_GENERATION_VERSIONS["theme-forge-nebular-fusion"],"0.7.1")
+        self.assertEqual(policy.CURRENT071_GENERATION_VERSIONS["theme-forge-nebular-fusion"],"0.7.1")
+        self.assertEqual(policy.CURRENT_GENERATION_VERSIONS["theme-forge-nebular-fusion"],"0.8.0")
         self.assertEqual(policy._validate_policy(blocked_policy(),generation=CURRENT_GENERATION)["status"],"blocked")
 
     def test071_cannot_inherit070_even_with_old_native_inventory_and_both_architectures(self):

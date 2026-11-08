@@ -153,12 +153,14 @@ class StaticContractTests(unittest.TestCase):
                         self.assertNotIn(node.func.attr, ("extract", "extractall"))
 
     def test_no_unmaterialized_workflows_or_apgr_mutations(self):
-        from rs9.nebular071_universal_workflow import complete_workflow_text as nebular_workflow_text
+        from rs9.nebular071_universal_workflow import complete_workflow_text as nebular071_workflow_text
+        from rs9.nebular080_universal_workflow import complete_workflow_text as nebular080_workflow_text
         workflows = ROOT / ".github/workflows"
         for product in PRODUCTS:
             pin = load_pin(product)
             self.assertEqual((workflows / pin["workflow"]).exists(), pin["source_status"] == "READY")
-        self.assertEqual((workflows / "rs9-tfnf-pypi-publish.yml").read_text(), nebular_workflow_text())
+        self.assertEqual((workflows / "rs9-tfnf-pypi-publish.yml").read_text(),
+                         nebular080_workflow_text(nebular071_workflow_text()))
         apgr = workflows / "rs9-pypi-publish.yml"
         # APGR v0.13.1 intentionally adds an explicit release-version input;
         # this guard pins that reviewed workflow revision.

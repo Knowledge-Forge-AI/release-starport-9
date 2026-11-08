@@ -10,6 +10,7 @@ import re
 import stat
 import struct
 import sys
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -31,6 +32,69 @@ PUBLIC_TRUST_INPUTS = {
         "fingerprint": "68B3537F39A313B3E574D06777193F152BDBE6A6",
         "mode": "100644",
     },
+}
+
+# This closed exception covers one pinned public NativeRC fixture.  It
+# is deliberately a complete byte/layout pin, rather than a suffix or archive
+# type exemption.  The maintained hygiene scanner remains the authority for
+# every decoded string.
+NATIVE_ARCHIVE_RELATIVE = (
+    "tests/fixtures/nebular-v0.8.0-native-evidence-run-42418673472-attempt-1.tar.gz"
+)
+NATIVE_INVENTORY_RELATIVE = NATIVE_ARCHIVE_RELATIVE.removesuffix(
+    ".tar.gz"
+) + "-inventory.json"
+NATIVE_ARCHIVE_BYTES = 216591
+NATIVE_ARCHIVE_SHA256 = "20f5aaf0dacad5437185981ab95448fb2f13f26001b19ac31fd83ac324795640"
+NATIVE_INVENTORY_BYTES = 17681
+NATIVE_INVENTORY_SHA256 = "89067774cbdf7b4ce931e3df6b08029bdee97873b8083460fd5b249ee4f5ec72"
+NATIVE_MEMBER_COUNT = 68
+NATIVE_SOURCE_BYTES = 1514913
+NATIVE_INDEX_MEMBER = "rc-index-original.zip"
+NATIVE_INDEX_BYTES = 3076
+NATIVE_INDEX_SHA256 = "1c5ce07befdb8907a36e808f55d7c43f9f5efef7ba33a3f1371d227e5a853d26"
+NATIVE_INDEX_JSON_MEMBER = "rc-index.json"
+NATIVE_INDEX_JSON_BYTES = 13991
+
+# The five values are exact public hosted-runner executable paths.  A value is
+# admissible only when its containing member, inventory row hash, JSON key path,
+# and value hash all match this table.  The value itself is still scanned by the
+# original credential and path scanners; only its exact path-match count is
+# accounted for.
+NATIVE_PUBLIC_PATH_FIELDS = frozenset({
+    (
+        "macos-arm64/smoke/darwin-arm64-A-npm-package.receipt.json",
+        "9a05282c75b8b2c7970bc78a51d19eb6a36f2b012b484bf8cd29797f9e6fbfad",
+        "executable.path",
+        "55da0ae0a9a9db7f08a9cf83e3153137d53fc1769a9b797d80f97e31a0d4d3e1",
+    ),
+    (
+        "macos-arm64/smoke/darwin-arm64-A-raw-archive.receipt.json",
+        "78b3724ad8880a87812b78c3d037f6b7bebcc3c1434559fa9345efd66942d13e",
+        "executable.path",
+        "1f5c9adb7c5b6f7767fdaa52e160edb25b9634233ab46144055659e6ebb816b4",
+    ),
+    (
+        "macos-arm64/smoke/darwin-arm64-appearance-pair-raw.phases/darwin-arm64-P-restart-raw.receipt.json",
+        "1b7f67f30ff340a5bdb145519bfe87f870ce3375d62fbe17ab2b684970c8ed68",
+        "executable.path",
+        "1f5c9adb7c5b6f7767fdaa52e160edb25b9634233ab46144055659e6ebb816b4",
+    ),
+    (
+        "macos-arm64/smoke/darwin-arm64-appearance-pair-raw.phases/darwin-arm64-P-save-raw.receipt.json",
+        "297981808fc283207c35d763c853743658aec1f9d1305488be2078753f0c8756",
+        "executable.path",
+        "1f5c9adb7c5b6f7767fdaa52e160edb25b9634233ab46144055659e6ebb816b4",
+    ),
+    (
+        "macos-arm64/smoke/darwin-arm64-paired-v2-raw-archive.receipt.json",
+        "5eaab40d6fd42e1f73e1cfac16b5523f09eccdeea687a4c900363dcc862f8079",
+        "executable.path",
+        "1f5c9adb7c5b6f7767fdaa52e160edb25b9634233ab46144055659e6ebb816b4",
+    ),
+})
+_NATIVE_ROW_HASHES = {
+    member: row_hash for member, row_hash, _keypath, _value_hash in NATIVE_PUBLIC_PATH_FIELDS
 }
 
 
@@ -99,6 +163,205 @@ def zip_texts(data):
             raise ValueError("ZIP extra local data")
 
 
+def _native_safe_member(name):
+    parts = name.split("/")
+    return bool(name) and PurePosixPath(name).as_posix() == name and not (
+        PurePosixPath(name).is_absolute()
+        or "\\" in name
+        or ":" in name
+        or any(part in ("", ".", "..") for part in parts)
+        or any(ord(char) < 32 or ord(char) == 127 for char in name)
+    )
+
+
+def _native_exact_file(path, size, sha256):
+    try:
+        if any(item.is_symlink() for item in (path, *path.parents)):
+            raise ValueError("Physical NativeRC fixture required")
+        with path.open("rb") as stream:
+            data = stream.read(LIMIT + 1)
+    except OSError as error:
+        raise ValueError("NativeRC fixture unreadable") from error
+    if len(data) != size or hashlib.sha256(data).hexdigest() != sha256:
+        raise ValueError("NativeRC fixture pin mismatch")
+    try:
+        metadata_bad = stat.S_IMODE(path.stat().st_mode) != 0o644 or os.access(path, os.X_OK)
+    except OSError as error:
+        raise ValueError("NativeRC fixture unreadable") from error
+    if metadata_bad:
+        raise ValueError("NativeRC fixture metadata mismatch")
+    return data
+
+
+def _native_inventory(root):
+    data = _native_exact_file(root / NATIVE_INVENTORY_RELATIVE,
+                              NATIVE_INVENTORY_BYTES, NATIVE_INVENTORY_SHA256)
+    try:
+        inventory = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("NativeRC inventory JSON required") from error
+    rows = inventory.get("files")
+    archive = inventory.get("archive")
+    if not isinstance(rows, list) or len(rows) != NATIVE_MEMBER_COUNT or not isinstance(archive, dict):
+        raise ValueError("NativeRC inventory shape mismatch")
+    if (archive.get("archive_bytes") != NATIVE_ARCHIVE_BYTES
+            or archive.get("file_count") != NATIVE_MEMBER_COUNT
+            or archive.get("filename") != NATIVE_ARCHIVE_RELATIVE.rsplit("/", 1)[-1]
+            or archive.get("sha256") != NATIVE_ARCHIVE_SHA256
+            or archive.get("source_bytes") != NATIVE_SOURCE_BYTES):
+        raise ValueError("NativeRC inventory archive pin mismatch")
+    seen = set()
+    total = 0
+    normalized = []
+    for row in rows:
+        if set(row) != {"bytes", "path", "role", "sha256"}:
+            raise ValueError("NativeRC inventory row shape mismatch")
+        path = row["path"]
+        if (not isinstance(path, str) or not _native_safe_member(path) or path in seen
+                or not isinstance(row["role"], str) or not row["role"]
+                or type(row["bytes"]) is not int or row["bytes"] < 0
+                or row["bytes"] > LIMIT
+                or not isinstance(row["sha256"], str)
+                or not re.fullmatch(r"[0-9a-f]{64}", row["sha256"])):
+            raise ValueError("NativeRC inventory row value mismatch")
+        seen.add(path)
+        total += row["bytes"]
+        normalized.append((path, row["bytes"], row["sha256"], row["role"]))
+    if total != NATIVE_SOURCE_BYTES:
+        raise ValueError("NativeRC inventory source size mismatch")
+    return normalized
+
+
+def _native_index_text(data):
+    if len(data) != NATIVE_INDEX_BYTES or hashlib.sha256(data).hexdigest() != NATIVE_INDEX_SHA256:
+        raise ValueError("NativeRC nested index pin mismatch")
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            members = archive.infolist()
+            if archive.comment or len(members) != 1:
+                raise ValueError("NativeRC nested index shape mismatch")
+            member = members[0]
+            if (member.filename != NATIVE_INDEX_JSON_MEMBER
+                    or member.orig_filename != NATIVE_INDEX_JSON_MEMBER
+                    or member.flag_bits != 8
+                    or member.compress_type != zipfile.ZIP_DEFLATED
+                    or member.extra or member.comment
+                    or member.file_size != NATIVE_INDEX_JSON_BYTES
+                    or member.compress_size > member.file_size
+                    or member.header_offset != 0
+                    or stat.S_IFMT(member.external_attr >> 16) != stat.S_IFREG
+                    or (member.external_attr >> 16) & 0o777 != 0o644):
+                raise ValueError("NativeRC nested index metadata mismatch")
+            if data[:4] != b"PK\x03\x04":
+                raise ValueError("NativeRC nested index local header mismatch")
+            name_size, extra_size = struct.unpack_from("<HH", data, 26)
+            data_start = 30 + name_size + extra_size
+            descriptor_start = data_start + member.compress_size
+            descriptor_end = descriptor_start + 16
+            if (extra_size or name_size != len(NATIVE_INDEX_JSON_MEMBER)
+                    or data[30:30 + name_size].decode("utf-8") != NATIVE_INDEX_JSON_MEMBER
+                    or archive.start_dir != descriptor_end
+                    or data[descriptor_start:descriptor_end][:4] != b"PK\x07\x08"
+                    or struct.unpack_from("<3L", data, descriptor_start + 4)
+                    != (member.CRC, member.compress_size, member.file_size)
+                    or archive.start_dir + 46 + name_size + 22 != len(data)):
+                raise ValueError("NativeRC nested index directory mismatch")
+            with archive.open(member) as stream:
+                body = stream.read(LIMIT + 1)
+            if len(body) != NATIVE_INDEX_JSON_BYTES:
+                raise ValueError("NativeRC nested index size mismatch")
+            return bounded_text(body)
+    except (OSError, ValueError, zipfile.BadZipFile, struct.error, UnicodeDecodeError) as error:
+        if isinstance(error, ValueError) and str(error).startswith("NativeRC"):
+            raise
+        raise ValueError("NativeRC nested index unreadable") from error
+
+
+def _native_json_strings(value, keypath=""):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            path = f"{keypath}.{key}" if keypath else str(key)
+            yield from _native_json_strings(child, path)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from _native_json_strings(child, f"{keypath}[{index}]")
+    elif isinstance(value, str):
+        yield keypath, value
+
+
+def _native_public_path_allowance(name, text, private_path):
+    prefix = NATIVE_ARCHIVE_RELATIVE + ":"
+    if not name.startswith(prefix):
+        return 0
+    member = name[len(prefix):]
+    if ":" in member or member not in _NATIVE_ROW_HASHES:
+        return 0
+    if hashlib.sha256(text.encode("utf-8")).hexdigest() != _NATIVE_ROW_HASHES[member]:
+        raise ValueError("NativeRC public path member pin mismatch")
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError:
+        return 0
+    allowance = 0
+    for keypath, string in _native_json_strings(value):
+        candidate = (member, _NATIVE_ROW_HASHES[member], keypath,
+                     hashlib.sha256(string.encode("utf-8")).hexdigest())
+        if candidate in NATIVE_PUBLIC_PATH_FIELDS:
+            matches = private_path.findall(string)
+            if not matches:
+                raise ValueError("NativeRC public path classification mismatch")
+            allowance += len(matches)
+    return allowance
+
+
+def native_evidence_texts(relative, data, root):
+    """Decode only the exact public capsule with bounded in-memory reads."""
+    if (relative != NATIVE_ARCHIVE_RELATIVE or len(data) != NATIVE_ARCHIVE_BYTES
+            or hashlib.sha256(data).hexdigest() != NATIVE_ARCHIVE_SHA256):
+        raise ValueError("NativeRC archive pin mismatch")
+    archive_path = root / NATIVE_ARCHIVE_RELATIVE
+    try:
+        archive_metadata_bad = (
+            any(item.is_symlink() for item in (archive_path, *archive_path.parents))
+            or stat.S_IMODE(archive_path.stat().st_mode) != 0o644
+            or os.access(archive_path, os.X_OK)
+        )
+    except OSError as error:
+        raise ValueError("NativeRC archive unreadable") from error
+    if archive_metadata_bad:
+        raise ValueError("NativeRC archive metadata mismatch")
+    rows = _native_inventory(root)
+    if len(rows) != NATIVE_MEMBER_COUNT:
+        raise ValueError("NativeRC member count mismatch")
+    row_names = [row[0] for row in rows]
+    texts = []
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
+        members = archive.getmembers()
+        if len(members) != NATIVE_MEMBER_COUNT or [member.name for member in members] != row_names:
+            raise ValueError("NativeRC TAR layout mismatch")
+        for member, (name, expected_bytes, expected_sha256, _role) in zip(members, rows):
+            if (member.name != name or member.type != tarfile.REGTYPE or member.mode != 0o644
+                    or member.uid != 0 or member.gid != 0 or member.mtime != 0
+                    or member.uname or member.gname or member.pax_headers
+                    or member.size != expected_bytes):
+                raise ValueError("NativeRC TAR metadata mismatch")
+            stream = archive.extractfile(member)
+            if stream is None:
+                raise ValueError("NativeRC TAR regular file required")
+            body = stream.read(LIMIT + 1)
+            if (len(body) != expected_bytes
+                    or hashlib.sha256(body).hexdigest() != expected_sha256):
+                raise ValueError("NativeRC TAR row pin mismatch")
+            if name == NATIVE_INDEX_MEMBER:
+                texts.append((relative + ":" + name + ":" + NATIVE_INDEX_JSON_MEMBER,
+                              _native_index_text(body)))
+            else:
+                texts.append((relative + ":" + name, bounded_text(body)))
+    if sum(row[1] for row in rows) != NATIVE_SOURCE_BYTES:
+        raise ValueError("NativeRC source size mismatch")
+    return texts
+
+
 def public_trust_texts(relative, data, record):
     """Inspect one pinned public certificate with the existing strict parser."""
     if (set(record) != {"size", "sha256", "fingerprint", "mode"}
@@ -132,6 +395,8 @@ def file_texts(path, root=ROOT, historical=HISTORICAL, *, public_inputs=PUBLIC_T
                 or os.access(path, os.X_OK)):
             raise ValueError("Public trust input file metadata mismatch")
         return public_trust_texts(relative, data, public_inputs[relative])
+    if relative == NATIVE_ARCHIVE_RELATIVE:
+        return native_evidence_texts(relative, data, root)
     record = historical.get(relative)
     if record is None:
         return [(relative, bounded_text(data))]
@@ -141,13 +406,25 @@ def file_texts(path, root=ROOT, historical=HISTORICAL, *, public_inputs=PUBLIC_T
     return [(relative + ":" + name, text) for name, text in zip_texts(data)]
 
 
-def scan_text(text, *, private_path=None, allow_pattern_source=False):
+def scan_text(text, *, private_path=None, allow_pattern_source=False,
+              allowed_private_match_count=0):
     if private_path is None:
         private_path = re.compile(r"/" + r"Users/|/" + r"home/[^/\s]+/|[A-Z]:\\" + r"Users\\")
     if PRIVATE_BLOCK_RE.search(text) or any(p.search(text) for p in TOKEN_PATTERNS):
         raise ValueError("Credential-shaped content")
-    if not allow_pattern_source and private_path.search(text):
-        raise ValueError("Private path")
+    if not allow_pattern_source:
+        matches = private_path.findall(text)
+        if len(matches) != allowed_private_match_count:
+            raise ValueError("Private path")
+
+
+def scan_file_text(name, text, *, private_path=None, allow_pattern_source=False):
+    if private_path is None:
+        private_path = re.compile(r"/" + r"Users/|/" + r"home/[^/\s]+/|[A-Z]:\\" + r"Users\\")
+    allowance = _native_public_path_allowance(name, text, private_path)
+    scan_text(text, private_path=private_path,
+              allow_pattern_source=allow_pattern_source,
+              allowed_private_match_count=allowance)
 
 
 def import_roots(node):
@@ -177,8 +454,8 @@ class HygieneTests(unittest.TestCase):
             with self.subTest(file=str(path.relative_to(self.root))):
                 for name, text in file_texts(path, self.root):
                     with self.subTest(member=name):
-                        scan_text(text, private_path=private_path,
-                                  allow_pattern_source=path.name == "test_hygiene.py" and ":" not in name)
+                        scan_file_text(name, text, private_path=private_path,
+                                       allow_pattern_source=path.name == "test_hygiene.py" and ":" not in name)
 
     def test_license_boundary_documented(self):
         self.assertIn("It does not relicense", (ROOT / "README.md").read_text())

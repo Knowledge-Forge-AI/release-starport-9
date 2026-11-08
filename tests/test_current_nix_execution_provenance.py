@@ -18,6 +18,7 @@ from rs9 import (
 from rs9.current_generation import CURRENT_GENERATION, HISTORICAL_GENERATION
 from rs9.errors import ContractError
 from rs9.scratch import canonical
+from tests.current_smoke_capture_fixtures import bind_replay_profile_to_prepared_source
 
 FIXTURE_SMOKE_PATH = Path(__file__).resolve().parent / "fixtures" / "current071-native-rc-smoke.mjs.txt"
 EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -204,25 +205,33 @@ class CurrentNixExecutionProvenanceTests(unittest.TestCase):
             )
 
     def test_caller_selection_only_authenticated_current_linux_nix_enables_transform(self):
+        from tests.test_current_smoke_source_transport import CurrentSourceTransportTests
+
         dbus_facts = {
             "dbus_run_session": "/nix/store/" + "a" * 32 + "-dbus-1/bin/dbus-run-session",
             "dbus_daemon": "/nix/store/" + "a" * 32 + "-dbus-1/bin/dbus-daemon",
             "dbus_session_config": "/nix/store/" + "a" * 32 + "-dbus-1/share/dbus-1/session.conf",
         }
-        prepared = self._prepared()
-        for system, generation, prep, expected in (
-            ("x86_64-linux", CURRENT_GENERATION, prepared, True), ("aarch64-linux", CURRENT_GENERATION, prepared, True),
-            ("x86_64-linux", HISTORICAL_GENERATION, prepared, False), ("aarch64-linux", HISTORICAL_GENERATION, prepared, False),
-            ("aarch64-darwin", CURRENT_GENERATION, prepared, False),
-            ("x86_64-linux", CURRENT_GENERATION, {**prepared, "capture": None}, False),
-            ("x86_64-linux", CURRENT_GENERATION, {**prepared, "fixture_capture": None}, False),
-            ("x86_64-linux", CURRENT_GENERATION, {**prepared, "source_generation": HISTORICAL_GENERATION}, False),
-        ):
-            with patch.object(hosted_nix, "verify_nebular_runtime", return_value={"status": "pass"}) as mock_verify:
-                hosted_nix._verify_final_nebular_runtime(
-                    self.launch_root, prep, system, [], [], {}, None, dbus_facts, generation)
-                self.assertEqual((mock_verify.call_args.kwargs["diagnostic_initial_observation"],
-                                  mock_verify.call_args.kwargs["current_nix_environment_transform"]), (expected, expected))
+        fixture = CurrentSourceTransportTests()
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        prepared = fixture.prepared
+        profile = bind_replay_profile_to_prepared_source(
+            prepared, diagnostic.CURRENT_REPLAY_PROGRESS_PROFILE)
+        with patch.object(diagnostic, "CURRENT_REPLAY_PROGRESS_PROFILE", profile):
+            for system, generation, prep, expected in (
+                ("x86_64-linux", CURRENT_GENERATION, prepared, True), ("aarch64-linux", CURRENT_GENERATION, prepared, True),
+                ("x86_64-linux", HISTORICAL_GENERATION, prepared, False), ("aarch64-linux", HISTORICAL_GENERATION, prepared, False),
+                ("aarch64-darwin", CURRENT_GENERATION, prepared, False),
+                ("x86_64-linux", CURRENT_GENERATION, {**prepared, "capture": None}, False),
+                ("x86_64-linux", CURRENT_GENERATION, {**prepared, "fixture_capture": None}, False),
+                ("x86_64-linux", CURRENT_GENERATION, {**prepared, "source_generation": HISTORICAL_GENERATION}, False),
+            ):
+                with patch.object(hosted_nix, "verify_nebular_runtime", return_value={"status": "pass"}) as mock_verify:
+                    hosted_nix._verify_final_nebular_runtime(
+                        self.launch_root, prep, system, [], [], {}, None, dbus_facts, generation)
+                    self.assertEqual((mock_verify.call_args.kwargs["diagnostic_initial_observation"],
+                                      mock_verify.call_args.kwargs["current_nix_environment_transform"]), (expected, expected))
         for bad_opt in ("true", 1, None):
             with self.assertRaises(ContractError):
                 hosted_smoke.verify_nebular_runtime(self.launch_root, prepared, "x86_64-linux", current_nix_environment_transform=bad_opt)

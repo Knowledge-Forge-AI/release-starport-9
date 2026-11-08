@@ -1886,7 +1886,9 @@ class NebularPyPIContractTests(unittest.TestCase):
         from rs9.tf_pypi_nebular import _nebular_import_closure_paths
 
         closure_paths = _nebular_import_closure_paths(ROOT)
-        self.assertEqual(len(closure_paths), 137)
+        self.assertEqual(len(closure_paths), 139)
+        self.assertEqual(hashlib.sha256(json.dumps(closure_paths, separators=(",", ":")).encode()).hexdigest(),
+                         "43590f8d6b84a0646ddba6827c83f4a73613fde97a826a61a4b87a804abed9c8")
         self.assertTrue({
             "src/rs9/_archarm_support/cleanup.py",
             "src/rs9/_archarm_support/docker.py",
