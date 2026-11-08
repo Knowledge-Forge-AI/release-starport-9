@@ -16,6 +16,7 @@ from rs9.nebular_lineage import select_forward_lineage_proof
 from rs9.profiles import evaluate_profile, selection_for_intent
 from rs9.records import record_sha256, snapshot
 from rs9.release_core import authenticate_release, capture_release, digest, authenticated_tree, authenticated_release_metadata, read_evidence
+from rs9.release_asset_inventory import validate_release_asset_inventory
 from rs9.scratch import ConfinedWriter, canonical, physical_directory
 
 BOOTSTRAP = "bootstrap/pre-rs9/theme-forge-live1/manifest-author-aligned.json"
@@ -201,6 +202,15 @@ def assert_release_expectations(capture, expected):
             raise ContractError("LIVE1_RELEASE_MISMATCH", "Authenticated payload differs from reviewed expectation")
         if matches[0]["github_asset_id"] != asset["id"]:
             raise ContractError("LIVE1_RELEASE_MISMATCH", "Release asset identity differs from reviewed expectation")
+    if "release_asset_inventory" in expected:
+        if expected.get("project") != "theme-forge-nebular-fusion" or expected.get("version") != "0.8.0":
+            raise ContractError("LIVE1_RELEASE_MISMATCH", "Versioned release inventory is outside its closed scope")
+        validate_release_asset_inventory(
+            expected["release_asset_inventory"],
+            release_metadata=release,
+            expected_assets=expected["assets"],
+            actual_selected_assets=actual["assets"],
+        )
 
 
 def authenticate_generation(repository, output, *, approved_bootstrap_sha256, client=None,

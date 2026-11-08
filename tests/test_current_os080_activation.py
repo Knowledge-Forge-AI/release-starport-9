@@ -9,7 +9,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT
-BASE_FIXTURE = ROOT / "tests" / "fixtures" / "current071-source"
+BASE_FIXTURE = SOURCE_ROOT / "tests" / "fixtures" / "current071-source"
+CANDIDATE_EXPECTATIONS = ROOT / "operators/theme-forge-current-202610/expectations.json"
 sys.path.insert(0, str(SOURCE_ROOT / "src"))
 import rs9  # noqa: E402
 
@@ -27,10 +28,12 @@ from rs9.current_os080 import (  # noqa: E402
     CURRENT080_VERIFIER_FILES,
 )
 from rs9.current_os071 import CURRENT071_REPLAY_PROGRESS_PROFILE  # noqa: E402
+from rs9.profiles import selection_for_intent  # noqa: E402
 
 
 def _load(relative):
-    return json.loads((SOURCE_ROOT / relative).read_bytes())
+    path = CANDIDATE_EXPECTATIONS if relative == "operators/theme-forge-current-202610/expectations.json" else SOURCE_ROOT / relative
+    return json.loads(path.read_bytes())
 
 
 def _digest(value):
@@ -66,7 +69,21 @@ class CurrentOs080ActivationTests(unittest.TestCase):
              "sha256": row["sha256"], "size": row["bytes"]}
             for row in sorted(CURRENT080_GITHUB_ASSETS, key=lambda row: row["name"])
         ]
-        self.assertEqual(expected["assets"], expected_assets)
+        self.assertEqual(expected["release_asset_inventory"]["schema"], "rs9.release-asset-inventory.v1alpha1")
+        self.assertEqual(
+            sorted(expected["release_asset_inventory"]["assets"], key=lambda row: row["name"]),
+            expected_assets,
+        )
+        intent = _load("bootstrap/pre-rs9/theme-forge-current-202610/theme-forge-nebular-fusion/intent.json")
+        selection = selection_for_intent(intent)
+        selected_names = {
+            *(asset["name"] for asset in selection["payload_assets"]),
+            *(asset["name"] for asset in selection["evidence_assets"]),
+            selection["checksums"],
+        }
+        selected_assets = [asset for asset in expected_assets if asset["name"] in selected_names]
+        self.assertEqual(len(selected_assets), 8)
+        self.assertEqual(expected["assets"], selected_assets)
         self.assertEqual([row["name"] for row in expected["assets"]],
                          sorted(row["name"] for row in expected["assets"]))
 
