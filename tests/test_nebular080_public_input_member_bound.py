@@ -75,7 +75,7 @@ class PublicInputMemberBoundTests(unittest.TestCase):
             original_file_record(row, limit)
 
         with mock.patch.object(publication, "_file_record", side_effect=observe_file_record):
-            publication._artifact(coordinates.PUBLIC_INPUTS, artifact)
+            publication._artifact(publication.PUBLIC_INPUTS, artifact)
         self.assertEqual(set(observed_limits), {64 * 1024 * 1024})
 
     def test_candidate_ceiling_and_nonpublic_limits_remain_closed(self) -> None:
@@ -86,7 +86,7 @@ class PublicInputMemberBoundTests(unittest.TestCase):
             ),
         }
         with self.assertRaises(ContractError):
-            publication._artifact(coordinates.PUBLIC_INPUTS, _artifact(over_candidate))
+            publication._artifact(publication.PUBLIC_INPUTS, _artifact(over_candidate))
 
         small_ok = {
             coordinates.DESCRIPTOR_MEMBER: _row(1, "b" * 64),

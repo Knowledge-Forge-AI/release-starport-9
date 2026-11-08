@@ -12,6 +12,8 @@ from rs9.errors import ContractError
 from rs9.hosted_commands import linux_runtime_prefix, runtime_environment
 from rs9.hosted_nix import _nix_application_environment
 from rs9 import hosted_smoke as smoke
+from rs9 import application_smoke_diagnostic as diagnostic
+from tests.current_smoke_capture_fixtures import bind_replay_profile_to_prepared_source
 
 FIXED = {"EGL_LOG_LEVEL": "debug", "LIBGL_DEBUG": "verbose"}
 
@@ -48,15 +50,24 @@ class CurrentNixEglDiagnosticsTests(unittest.TestCase):
 
     def test_nix_caller_preserves_the_existing_direct_fixture_route(self):
         from rs9 import hosted_nix
+        from tests.test_current_smoke_source_transport import CurrentSourceTransportTests
+
+        fixture = CurrentSourceTransportTests()
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        prepared = fixture.prepared
+        profile = bind_replay_profile_to_prepared_source(
+            prepared, diagnostic.CURRENT_REPLAY_PROGRESS_PROFILE)
         env = self.environment()
-        for prefix in ([], self.prefix(env)):
-            with patch.object(hosted_nix, "_pinned_session_bus_argv", return_value=["fixture"]), \
-                 patch.object(hosted_nix, "verify_nebular_runtime", return_value={}) as verify:
-                hosted_nix._verify_final_nebular_runtime(
-                    "runtime", self.prepared(), "aarch64-linux", prefix, [], env,
-                    None, {}, CURRENT_GENERATION)
-            self.assertIs(verify.call_args.kwargs["current_linux_nix_egl_debug"], bool(prefix))
-            self.assertEqual(verify.call_args.args[3], prefix)
+        with patch.object(diagnostic, "CURRENT_REPLAY_PROGRESS_PROFILE", profile):
+            for prefix in ([], self.prefix(env)):
+                with patch.object(hosted_nix, "_pinned_session_bus_argv", return_value=["fixture"]), \
+                     patch.object(hosted_nix, "verify_nebular_runtime", return_value={}) as verify:
+                    hosted_nix._verify_final_nebular_runtime(
+                        "runtime", prepared, "aarch64-linux", prefix, [], env,
+                        None, {}, CURRENT_GENERATION)
+                self.assertIs(verify.call_args.kwargs["current_linux_nix_egl_debug"], bool(prefix))
+                self.assertEqual(verify.call_args.args[3], prefix)
 
     def test_shared_helpers_require_literal_true_and_override_hostile_values(self):
         source = dict(self.environment(), EGL_LOG_LEVEL="hostile", LIBGL_DEBUG="hostile")

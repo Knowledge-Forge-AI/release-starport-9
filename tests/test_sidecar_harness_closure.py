@@ -85,8 +85,8 @@ class ClosureTests(unittest.TestCase):
         client = SimpleNamespace(get=lambda url, **kw: data[url.split("/", 6)[-1]])
         tree_rows = {"tree": [entry(path, value) for path, value in data.items()]}
         for commit, expected_tree in VERIFIER_SUPPORT_TREES.items():
-            if commit in (CURRENT070_COMMIT, smoke.CURRENT071_COMMIT):
-                continue  # Current 0.7 uses the separately authenticated closure tests below.
+            if commit in (CURRENT070_COMMIT, smoke.CURRENT071_COMMIT, smoke.CURRENT080_COMMIT):
+                continue  # Current generations use separately authenticated closure tests below.
             with self.subTest(commit=commit):
                 capture = SimpleNamespace(record={"repository": {"full_name": "fixture/nebular"},
                                                   "tag": {"commit": commit, "tree": expected_tree}})
@@ -102,7 +102,7 @@ class ClosureTests(unittest.TestCase):
     def test_known_commit_with_wrong_tree_and_tampered_support_fail_closed(self):
         for commit, expected_tree in VERIFIER_SUPPORT_TREES.items():
             if commit in (CURRENT070_COMMIT, smoke.CURRENT071_COMMIT):
-                continue  # Current 0.7 uses the separately authenticated closure tests below.
+                continue  # Current generations use separately authenticated closure tests below.
             with self.subTest(commit=commit), tempfile.TemporaryDirectory() as tmp:
                 capture = SimpleNamespace(record={"repository": {"full_name": "fixture/nebular"},
                                                   "tag": {"commit": commit, "tree": "0" * 40}})
@@ -129,7 +129,20 @@ class ClosureTests(unittest.TestCase):
                     with self.assertRaises(ContractError) as caught:
                         prepare_smoke(capture, [(fixture, {"project": {"id": "theme-forge-stellar-burst"}}, {})],
                                       client, Path(tmp) / "tampered")
-                self.assertEqual(caught.exception.code, "SMOKE_SOURCE")
+                if commit == smoke.CURRENT080_COMMIT:
+                    self.assertEqual(caught.exception.code, "SIDECAR_HARNESS_IMPORT")
+                    self.assertEqual(caught.exception.details["reason"], "current-capture-binding")
+                else:
+                    self.assertEqual(caught.exception.code, "SMOKE_SOURCE")
+
+    def test_current080_synthetic_capture_stops_at_authentication_before_source_tamper(self):
+        capture = SimpleNamespace(record={"repository": {"full_name": "fixture/nebular"},
+                                          "tag": {"commit": smoke.CURRENT080_COMMIT,
+                                                  "tree": smoke.CURRENT080_TREE}})
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ContractError) as caught:
+            prepare_smoke(capture, [], None, Path(tmp) / "tampered")
+        self.assertEqual(caught.exception.code, "SIDECAR_HARNESS_IMPORT")
+        self.assertEqual(caught.exception.details["reason"], "current-capture-binding")
 
     def test_transported_members_are_bound_before_runtime_evidence(self):
         members = [{"path": "app", "type": "directory", "mode": 0o755}]
@@ -312,17 +325,35 @@ class CurrentClosureTests(unittest.TestCase):
             verifier_import_preflight(prepared, "x86_64-linux")
         run.assert_not_called()
 
+    def test_current071_fixture_uses_the_authenticated_current_binding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            capture, captures, client, contract, source_pins, fixture_pins = current_import_fixture(
+                Path(tmp), nebular_version="0.7.1")
+            with patch("rs9.nebular_callers._load_current071_contract", return_value=contract), \
+                    patch("rs9.hosted_smoke.CURRENT071_VERIFIER_FILES", source_pins), \
+                    patch("rs9.hosted_smoke.CURRENT070_FIXTURE_FILES", fixture_pins):
+                prepared = prepare_smoke(capture, captures, client, Path(tmp) / "prepared")
+                smoke.verify_source_readback(prepared)
+            self.assertEqual(capture.record["tag"]["commit"], smoke.CURRENT071_COMMIT)
+            self.assertEqual(capture.record["tag"]["tree"], smoke.CURRENT071_TREE)
+            self.assertEqual(prepared["source_generation"], "theme-forge-current-202610")
+
     def test_current_support_table_is_exact_and_old_entries_remain(self):
-        self.assertEqual(len(VERIFIER_SUPPORT), 4)
+        self.assertEqual(len(VERIFIER_SUPPORT), 5)
         self.assertEqual(VERIFIER_SUPPORT[smoke.HISTORICAL_COMMIT], ("package.json",))
         self.assertEqual(VERIFIER_SUPPORT[smoke.CURRENT_COMMIT], ("package.json",))
         self.assertEqual(VERIFIER_SUPPORT[smoke.CURRENT070_COMMIT], ("package.json",))
         self.assertEqual(VERIFIER_SUPPORT[smoke.CURRENT071_COMMIT], ("package.json",))
+        self.assertEqual(VERIFIER_SUPPORT[smoke.CURRENT080_COMMIT], ("package.json",))
         self.assertEqual(VERIFIER_SUPPORT_TREES[smoke.CURRENT071_COMMIT], smoke.CURRENT071_TREE)
+        self.assertEqual(VERIFIER_SUPPORT_TREES[smoke.CURRENT080_COMMIT], smoke.CURRENT080_TREE)
         self.assertEqual(VERIFIER_SUPPORT_TREES[smoke.CURRENT070_COMMIT], "27c643b6375c2aafde314799c4f08e844c14992c")
         self.assertEqual(set(smoke.CURRENT070_VERIFIER_IMPORTS), set(smoke.CURRENT070_VERIFIER_FILES) - {"package.json"})
         self.assertEqual(len(smoke.CURRENT070_VERIFIER_FILES), 14)
         self.assertEqual(len(smoke.CURRENT070_FIXTURE_FILES), 14)
+        self.assertEqual(set(smoke.CURRENT080_VERIFIER_IMPORTS),
+                         set(smoke.CURRENT080_VERIFIER_FILES) - {"package.json"})
+        self.assertEqual(len(smoke.CURRENT080_VERIFIER_FILES), 15)
         self.assertTrue(all(set(paths) <= set(smoke.CURRENT070_VERIFIER_IMPORTS)
                             for paths in smoke.CURRENT070_VERIFIER_IMPORTS.values()))
 

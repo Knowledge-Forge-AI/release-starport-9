@@ -8,12 +8,14 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
+from rs9 import application_smoke_diagnostic as diagnostic
 from rs9.errors import ContractError
 from rs9.hosted_nix import (_pinned_session_bus_argv, command, execute, fhs_runtime_smoke,
                             prepare_input, record_direct_loader_evaluation, PRODUCTS, SYSTEMS)
 from rs9.hosted_summary import contract, gate_blockers
 from rs9.nix_gui_discovery import NODE_FS_SOURCE, _discovery_request, record_fhs_gui_discovery
 from rs9.scratch import canonical
+from tests.current_smoke_capture_fixtures import bind_replay_profile_to_prepared_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -1233,14 +1235,17 @@ class NixHostedTests(unittest.TestCase):
         self.assertEqual(prepared["source_generation"], CURRENT_GENERATION)
         self.assertIsNotNone(prepared["capture"])
         self.assertIsNotNone(prepared["fixture_capture"])
-        for system, generation, expected in [
-            ("x86_64-linux", CURRENT_GENERATION, True),
-            ("aarch64-linux", CURRENT_GENERATION, True),
-            ("x86_64-linux", HISTORICAL_GENERATION, False),
-            ("aarch64-darwin", CURRENT_GENERATION, False),
-        ]:
-            with self.subTest(system=system, generation=generation):
-                self._execute_nix_success_fixture(system, generation, prepared, expected)
+        profile = bind_replay_profile_to_prepared_source(
+            prepared, diagnostic.CURRENT_REPLAY_PROGRESS_PROFILE)
+        with patch.object(diagnostic, "CURRENT_REPLAY_PROGRESS_PROFILE", profile):
+            for system, generation, expected in [
+                ("x86_64-linux", CURRENT_GENERATION, True),
+                ("aarch64-linux", CURRENT_GENERATION, True),
+                ("x86_64-linux", HISTORICAL_GENERATION, False),
+                ("aarch64-darwin", CURRENT_GENERATION, False),
+            ]:
+                with self.subTest(system=system, generation=generation):
+                    self._execute_nix_success_fixture(system, generation, prepared, expected)
 
     def test_execute_routes_current_linux_egl_metadata_opt_in_by_lane(self):
         from tests.test_current_smoke_source_transport import CurrentSourceTransportTests
@@ -1249,6 +1254,8 @@ class NixHostedTests(unittest.TestCase):
         fixture.setUp()
         self.addCleanup(fixture.doCleanups)
         prepared = fixture.prepared
+        profile = bind_replay_profile_to_prepared_source(
+            prepared, diagnostic.CURRENT_REPLAY_PROGRESS_PROFILE)
         original_facts = _mock_dbus_loader_facts
         calls = []
 
@@ -1271,15 +1278,16 @@ class NixHostedTests(unittest.TestCase):
             ("aarch64-darwin", CURRENT_GENERATION, prepared, False, []),
             ("aarch64-darwin", HISTORICAL_GENERATION, prepared, False, []),
         ]
-        for system, generation, prep, expected_obs, expected_kwargs in matrix:
-            calls.clear()
-            with self.subTest(system=system, generation=generation), patch(
-                __name__ + "._mock_dbus_loader_facts", side_effect=facts_with_gui
-            ), patch("rs9.hosted_nix.record_fhs_gui_discovery", side_effect=observe):
-                self._execute_nix_success_fixture(system, generation, prep, expected_obs)
-            self.assertEqual([kw for _, kw in calls], expected_kwargs)
-            for pos_args, _ in calls:
-                self.assertEqual(len(pos_args), 5)
+        with patch.object(diagnostic, "CURRENT_REPLAY_PROGRESS_PROFILE", profile):
+            for system, generation, prep, expected_obs, expected_kwargs in matrix:
+                calls.clear()
+                with self.subTest(system=system, generation=generation), patch(
+                    __name__ + "._mock_dbus_loader_facts", side_effect=facts_with_gui
+                ), patch("rs9.hosted_nix.record_fhs_gui_discovery", side_effect=observe):
+                    self._execute_nix_success_fixture(system, generation, prep, expected_obs)
+                self.assertEqual([kw for _, kw in calls], expected_kwargs)
+                for pos_args, _ in calls:
+                    self.assertEqual(len(pos_args), 5)
 
 
 if __name__ == "__main__":
