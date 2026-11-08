@@ -43,6 +43,8 @@ DIAGNOSTIC_REPLAY_HARNESS_TIMEOUT_MS = 180_000
 # replay budget above.
 CURRENT071_REQUIRED_HARNESS_TIMEOUT_MS = 210_000
 CURRENT071_SIGNAL_HARNESS_TIMEOUT_MS = 180_000
+CURRENT080_REQUIRED_HARNESS_TIMEOUT_MS = 210_000
+CURRENT080_SIGNAL_HARNESS_TIMEOUT_MS = 180_000
 REPLAY_SKIP_REASON_ORIGINAL_CLEANUP_UNPROVEN = "original-cleanup-unproven"
 REPLAY_SKIP_REASON_ORIGINAL_HARNESS_NOT_PASSED = "original-harness-not-passed"
 DIAGNOSTIC_REPLAY_TIMEOUT_TARGETS = frozenset({
@@ -78,6 +80,7 @@ CURRENT_REPLAY_PROGRESS_PROFILE = {'id': 'nebular070',
              'blob': '161ee788b7a8660916e2b6fbbebbac0de4a87f42',
              'size': 1833}}
 from rs9.current_os071 import CURRENT071_REPLAY_PROGRESS_PROFILE
+from rs9.current_os080 import CURRENT080_REPLAY_PROGRESS_PROFILE
 
 REPLAY_PROGRESS_SCHEMA = "rs9.application-smoke-replay-progress.v1"
 REPLAY_PROGRESS_MAX_BYTES = 16 * 1024
@@ -95,7 +98,28 @@ CURRENT071_UPSTREAM_HARNESS_SHA256 = "874355e36496884e55a6e4dae6986ecde817d20863
 CURRENT071_UPSTREAM_HARNESS_BYTES = 30732
 CURRENT071_DERIVED_HARNESS_SHA256 = "15b34fe8680f1df983be3f79b72404c78bc4c5506bf9f1943b5e9b24bc4f633f"
 CURRENT071_DERIVED_HARNESS_BYTES = 30772
+CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID = "current080-nix-inherited-xdg-fontconfig-v1"
+CURRENT080_UPSTREAM_HARNESS_SHA256 = "ee2a26e00522f27d49550d3931cdd25e0f9956a0786d487f9af89755cf8bff39"
+CURRENT080_UPSTREAM_HARNESS_BYTES = 65040
+CURRENT080_DERIVED_HARNESS_SHA256 = "a792af12928867361a39132d0cdb2f0fc1c35444dc698d9c59e53a9038680afe"
+CURRENT080_DERIVED_HARNESS_BYTES = 65080
 CURRENT_NIX_RESTORED_ENV_KEYS = ("XDG_DATA_DIRS", "FONTCONFIG_FILE")
+CURRENT080_EXECUTION_TRANSFORM = {
+    "schema": CURRENT_NIX_ENVIRONMENT_TRANSFORM_SCHEMA,
+    "transform_id": CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID,
+    "mode": CURRENT_NIX_ENVIRONMENT_EXECUTION_MODE,
+    "target_module": "native-rc-smoke.mjs",
+    "upstream_sha256": CURRENT080_UPSTREAM_HARNESS_SHA256,
+    "upstream_bytes": CURRENT080_UPSTREAM_HARNESS_BYTES,
+    "executed_derived_sha256": CURRENT080_DERIVED_HARNESS_SHA256,
+    "executed_derived_bytes": CURRENT080_DERIVED_HARNESS_BYTES,
+    "restored_env_keys": list(CURRENT_NIX_RESTORED_ENV_KEYS),
+    "modified_from_upstream": True,
+    "non_admitting": True,
+    "fhs_origin_proven": False,
+    "native_qualified": False,
+    "causal_attribution_proven": False,
+}
 _REQUIRED_OBSERVATION_COMPLETION_EVENTS = frozenset({
     ("candidate", "exited"), ("receipt", "finalized"),
     ("run-record", "finalized"), ("run-smoke", "returned"),
@@ -676,7 +700,8 @@ def _current_replay_progress_profile(prepared):
             return None
         version = json.loads(package_raw).get("version")
         profile = ({"0.7.0": CURRENT_REPLAY_PROGRESS_PROFILE,
-                    "0.7.1": CURRENT071_REPLAY_PROGRESS_PROFILE}).get(version)
+                    "0.7.1": CURRENT071_REPLAY_PROGRESS_PROFILE,
+                    "0.8.0": CURRENT080_REPLAY_PROGRESS_PROFILE}).get(version)
         if profile is None:
             return None
         pins = {"tools/" + name: pin for name, pin in profile["modules"].items()}
@@ -686,7 +711,7 @@ def _current_replay_progress_profile(prepared):
             blob = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
             if error or meta.get("sha256") != pin["sha256"] or len(raw) != pin["size"] or blob != pin["blob"]:
                 return None
-        if json.loads(raw).get("version") != version:
+        if json.loads(package_raw).get("version") != version:
             return None
         return profile
     except (ContractError, OSError, ValueError, TypeError, KeyError):
@@ -764,13 +789,30 @@ def _initial_observation_profile(profile):
     harness = profile["modules"].get("native-rc-smoke.mjs")
     if not isinstance(harness, dict):
         return None
-    closure = {name: row.get("sha256") for name, row in profile["modules"].items()
+    execution_modules = profile.get("execution_modules") if profile.get("id") == "nebular080" else profile["modules"]
+    if not isinstance(execution_modules, dict):
+        return None
+    closure = {name: row.get("sha256") for name, row in execution_modules.items()
                if isinstance(name, str) and isinstance(row, dict)}
-    return {
+    result = {
         "id": profile.get("id"), "source_commit": profile.get("commit"),
         "source_tree": profile.get("tree"), "harness_sha256": harness.get("sha256"),
         "closure_sha256s": closure,
     }
+    if profile.get("id") == "nebular080":
+        result["source_closure_sha256s"] = {
+            name: row.get("sha256") for name, row in profile["modules"].items()
+            if isinstance(name, str) and isinstance(row, dict)
+        }
+    return result
+
+
+def _execution_profile_modules(profile):
+    """Return the fixed entry-point closure while retaining the full source inventory."""
+    if not isinstance(profile, dict):
+        return None
+    modules = profile.get("execution_modules") if profile.get("id") == "nebular080" else profile.get("modules")
+    return modules if isinstance(modules, dict) else None
 
 
 def _unobserved_initial_observation(reason):
@@ -806,15 +848,36 @@ def _carrier_entry_matches(actual, expected_value):
     return type(actual) is type(expected_value) and actual == expected_value
 
 
-def _validate_current_nix_execution_transform(carrier):
+def _profile_for_transform(transform_id):
+    if transform_id == CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID:
+        return CURRENT071_REPLAY_PROGRESS_PROFILE
+    if transform_id == CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID:
+        return CURRENT080_REPLAY_PROGRESS_PROFILE
+    return None
+
+
+def _execution_transform_for_profile(profile):
+    if profile == CURRENT071_REPLAY_PROGRESS_PROFILE:
+        return EXPECTED_CURRENT_NIX_EXECUTION_TRANSFORM
+    if profile == CURRENT080_REPLAY_PROGRESS_PROFILE:
+        return CURRENT080_EXECUTION_TRANSFORM
+    return None
+
+
+def _validate_current_nix_execution_transform(carrier, expected_profile=None):
     """Validate the closed non-admitting current-Nix environment transform carrier."""
-    if not isinstance(carrier, dict) or set(carrier) != set(EXPECTED_CURRENT_NIX_EXECUTION_TRANSFORM):
+    if not isinstance(carrier, dict):
         return None
-    for key, expected_value in EXPECTED_CURRENT_NIX_EXECUTION_TRANSFORM.items():
+    expected = _execution_transform_for_profile(expected_profile)
+    if expected is None:
+        expected = _execution_transform_for_profile(_profile_for_transform(carrier.get("transform_id")))
+    if expected is None or set(carrier) != set(expected):
+        return None
+    for key, expected_value in expected.items():
         if not _carrier_entry_matches(carrier.get(key), expected_value):
             return None
     return {
-        **EXPECTED_CURRENT_NIX_EXECUTION_TRANSFORM,
+        **expected,
         "restored_env_keys": list(CURRENT_NIX_RESTORED_ENV_KEYS),
     }
 
@@ -914,14 +977,14 @@ def _classify_current_nix_provenance_failure(observation, profile_matches, carri
 
 def _evaluate_current_nix_execution_source(observation, expected_profile, *, require_completed):
     """Build the closed non-admitting current-Nix execution-source provenance summary."""
-    expected_obs_profile = _initial_observation_profile(CURRENT071_REPLAY_PROGRESS_PROFILE)
+    expected_obs_profile = _initial_observation_profile(expected_profile)
     actual_profile = observation.get("source_profile") if isinstance(observation, dict) else None
     profile_matches = (
-        expected_profile == CURRENT071_REPLAY_PROGRESS_PROFILE
+        expected_profile in (CURRENT071_REPLAY_PROGRESS_PROFILE, CURRENT080_REPLAY_PROGRESS_PROFILE)
         and actual_profile == expected_obs_profile
     )
     raw_carrier = observation.get("execution_transform") if isinstance(observation, dict) else None
-    carrier = _validate_current_nix_execution_transform(raw_carrier)
+    carrier = _validate_current_nix_execution_transform(raw_carrier, expected_profile)
     raw_env = observation.get("environment_presence") if isinstance(observation, dict) else None
     projected_env = _project_restored_environment_presence(raw_env)
     reason = _classify_current_nix_provenance_failure(
@@ -932,7 +995,7 @@ def _evaluate_current_nix_execution_source(observation, expected_profile, *, req
         "schema": CURRENT_NIX_EXECUTION_SOURCE_SCHEMA,
         "status": "verified" if reason is None else "failed",
         "non_admitting": True,
-        "source_profile": _initial_observation_profile(CURRENT071_REPLAY_PROGRESS_PROFILE) if profile_matches else None,
+        "source_profile": expected_obs_profile if profile_matches else None,
         "execution_transform": carrier,
         "environment_presence": projected_env,
     }
@@ -949,20 +1012,27 @@ def _validate_verified_execution_source(source_record):
     }
     if not isinstance(source_record, dict) or set(source_record) != expected_keys:
         return None
-    expected_profile = _initial_observation_profile(CURRENT071_REPLAY_PROGRESS_PROFILE)
+    actual_profile = source_record.get("source_profile") if isinstance(source_record, dict) else None
+    expected_profile = _profile_for_transform(
+        source_record.get("execution_transform", {}).get("transform_id")
+        if isinstance(source_record.get("execution_transform"), dict) else None
+    )
+    if expected_profile is None or actual_profile != _initial_observation_profile(expected_profile):
+        return None
+    expected_observation_profile = _initial_observation_profile(expected_profile)
     header = (
         source_record.get("schema"),
         source_record.get("status"),
         source_record.get("non_admitting") is True,
         source_record.get("source_profile"),
     )
-    carrier = _validate_current_nix_execution_transform(source_record.get("execution_transform"))
+    carrier = _validate_current_nix_execution_transform(source_record.get("execution_transform"), expected_profile)
     projected_env = source_record.get("environment_presence")
     stages_ok = (
         _restored_environment_stage_ok(projected_env, "wrapper_entry")
         and _restored_environment_stage_ok(projected_env, "first_spawn")
     )
-    if header != (CURRENT_NIX_EXECUTION_SOURCE_SCHEMA, "verified", True, expected_profile):
+    if header != (CURRENT_NIX_EXECUTION_SOURCE_SCHEMA, "verified", True, expected_observation_profile):
         return None
     if carrier is None or not stages_ok:
         return None
@@ -970,7 +1040,7 @@ def _validate_verified_execution_source(source_record):
         "schema": CURRENT_NIX_EXECUTION_SOURCE_SCHEMA,
         "status": "verified",
         "non_admitting": True,
-        "source_profile": expected_profile,
+        "source_profile": expected_observation_profile,
         "execution_transform": carrier,
         "environment_presence": {
             "wrapper_entry": {key: True for key in CURRENT_NIX_RESTORED_ENV_KEYS},
@@ -983,7 +1053,8 @@ def _bind_attempt_execution_source(fields, initial_observation):
     """Attach and enforce fail-closed execution-source provenance on transformed attempts."""
     if not isinstance(initial_observation, dict):
         return
-    if initial_observation.get("environment_transform") != CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID:
+    profile = _profile_for_transform(initial_observation.get("environment_transform"))
+    if profile is None:
         return
     process_failed = bool(
         fields.get("error")
@@ -993,7 +1064,7 @@ def _bind_attempt_execution_source(fields, initial_observation):
     )
     provenance = _evaluate_current_nix_execution_source(
         fields.get("initial_observation"),
-        initial_observation.get("profile"),
+        profile,
         require_completed=not process_failed,
     )
     fields["execution_source"] = provenance
@@ -1030,13 +1101,22 @@ def _validate_initial_execution_transform(value, expected_profile, expected_exec
             raise ValueError("unexpected initial observation execution transform")
         return
     profile = value["source_profile"]
-    allowed_profile = (profile["id"], profile["harness_sha256"]) == (
-        "nebular071", CURRENT071_UPSTREAM_HARNESS_SHA256
+    candidates = (
+        ("nebular071", CURRENT071_UPSTREAM_HARNESS_SHA256, CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID,
+         CURRENT071_REPLAY_PROGRESS_PROFILE),
+        ("nebular080", CURRENT080_UPSTREAM_HARNESS_SHA256, CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID,
+         CURRENT080_REPLAY_PROGRESS_PROFILE),
     )
-    if expected_profile is not None:
-        allowed_profile = allowed_profile and expected_profile == CURRENT071_REPLAY_PROGRESS_PROFILE
-    validated = _validate_current_nix_execution_transform(value.get("execution_transform"))
-    if not allowed_profile or validated is None:
+    selected = next((candidate for candidate in candidates
+                     if profile.get("id") == candidate[0]
+                     and profile.get("harness_sha256") == candidate[1]), None)
+    if selected is None or (expected_profile is not None and expected_profile != selected[3]):
+        raise ValueError("invalid initial observation execution transform")
+    carrier = value.get("execution_transform")
+    if not isinstance(carrier, dict) or carrier.get("transform_id") != selected[2]:
+        raise ValueError("invalid initial observation execution transform")
+    validated = _validate_current_nix_execution_transform(carrier, selected[3])
+    if validated is None:
         raise ValueError("invalid initial observation execution transform")
     value["execution_transform"] = validated
 
@@ -1063,16 +1143,34 @@ def _read_initial_observation(path, expected_profile=None, *, expected_execution
                 or type(value["truncated"]) is not bool):
             raise ValueError("initial observation identity")
         profile = value["source_profile"]
+        is_current080 = isinstance(profile, dict) and profile.get("id") == "nebular080"
         profile_keys = {"id", "source_commit", "source_tree", "harness_sha256", "closure_sha256s"}
+        if is_current080:
+            profile_keys.add("source_closure_sha256s")
+        closure_name_pattern = (r"(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\.mjs"
+                                if is_current080 else r"[A-Za-z0-9._-]+\.mjs")
         if (not isinstance(profile, dict) or set(profile) != profile_keys
-                or not all(isinstance(profile[key], str) for key in profile_keys - {"closure_sha256s"})
+                or not all(isinstance(profile[key], str) for key in profile_keys
+                           - {"closure_sha256s", "source_closure_sha256s"})
                 or not re.fullmatch(r"[0-9a-f]{64}", profile["harness_sha256"])
                 or not isinstance(profile["closure_sha256s"], dict)
-                or len(profile["closure_sha256s"]) > 8
-                or any(not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9._-]+\.mjs", name)
+                or (is_current080 and len(profile["closure_sha256s"]) != 8)
+                or (not is_current080 and len(profile["closure_sha256s"]) > 8)
+                or any(not isinstance(name, str)
+                       or not re.fullmatch(closure_name_pattern, name)
+                       or any(part in {"", ".", ".."} for part in name.split("/"))
                        or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{64}", sha)
                        for name, sha in profile["closure_sha256s"].items())):
             raise ValueError("initial observation source profile")
+        if is_current080:
+            source_closure = profile.get("source_closure_sha256s")
+            if (not isinstance(source_closure, dict) or len(source_closure) != 14
+                    or any(not isinstance(name, str)
+                           or not re.fullmatch(closure_name_pattern, name)
+                           or any(part in {"", ".", ".."} for part in name.split("/"))
+                           or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{64}", sha)
+                           for name, sha in source_closure.items())):
+                raise ValueError("initial observation complete source inventory")
         events = value["phase_events"]
         if not isinstance(events, list) or len(events) > REPLAY_PROGRESS_MAX_EVENTS:
             raise ValueError("initial observation phase bound")
@@ -1112,7 +1210,7 @@ def _read_initial_observation(path, expected_profile=None, *, expected_execution
                     or type(stream["truncated"]) is not bool):
                 raise ValueError("initial observation stream")
         if "environment_presence" in value:
-            if profile["id"] != "nebular071":
+            if profile["id"] not in {"nebular071", "nebular080"}:
                 raise ValueError("initial observation environment presence profile")
             validated_env = _validate_initial_environment_presence(value["environment_presence"])
             if validated_env is None:
@@ -1134,6 +1232,23 @@ def _current071_initial_timeout_ms(platform, scenario):
         ("linux-x64", "C"): CURRENT071_REQUIRED_HARNESS_TIMEOUT_MS,
         ("linux-x64", "C-signal"): CURRENT071_SIGNAL_HARNESS_TIMEOUT_MS,
     }.get((platform, scenario))
+
+
+def _current080_initial_timeout_ms(platform, scenario):
+    """Return the same bounded inner budget for an authenticated 0.8.0 lane."""
+    return {
+        ("linux-arm64", "B"): CURRENT080_REQUIRED_HARNESS_TIMEOUT_MS,
+        ("linux-x64", "C"): CURRENT080_REQUIRED_HARNESS_TIMEOUT_MS,
+        ("linux-x64", "C-signal"): CURRENT080_SIGNAL_HARNESS_TIMEOUT_MS,
+    }.get((platform, scenario))
+
+
+def _current_initial_timeout_ms(profile, platform, scenario):
+    if profile.get("id") == "nebular071":
+        return _current071_initial_timeout_ms(platform, scenario)
+    if profile.get("id") == "nebular080":
+        return _current080_initial_timeout_ms(platform, scenario)
+    return None
 
 
 def _original_attempt_finalization_clean(fields, allowed_statuses):
@@ -1500,10 +1615,12 @@ def _initial_observation_transform_args(initial_observation, profile, platform, 
     transform = initial_observation.get("environment_transform")
     if transform is None:
         return []
-    if transform != CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID:
+    expected_profile = _profile_for_transform(transform)
+    if expected_profile is None:
         raise ContractError("APPLICATION_SMOKE", "Unsupported current Nix environment transform")
-    if profile != CURRENT071_REPLAY_PROGRESS_PROFILE:
-        raise ContractError("APPLICATION_SMOKE", "Current Nix environment transform requires current 0.7.1 profile")
+    if profile not in (CURRENT071_REPLAY_PROGRESS_PROFILE, CURRENT080_REPLAY_PROGRESS_PROFILE) \
+            or profile != expected_profile:
+        raise ContractError("APPLICATION_SMOKE", "Current Nix environment transform requires its matching source profile")
     if (platform, scenario) not in {("linux-arm64", "B"), ("linux-x64", "C"), ("linux-x64", "C-signal")}:
         raise ContractError("APPLICATION_SMOKE", "Current Nix environment transform requires current Linux scenario")
     return ["--rs9-current-nix-environment-transform", transform]
@@ -1517,10 +1634,11 @@ def _resolve_initial_observation_source(prepared, system, *, environment_transfo
     profile = _current_replay_progress_profile(prepared) if wrapper else None
     if profile is None:
         raise ContractError("APPLICATION_SMOKE", "Authenticated initial-observation source is unavailable")
-    if environment_transform and profile != CURRENT071_REPLAY_PROGRESS_PROFILE:
+    if environment_transform and profile not in (
+            CURRENT071_REPLAY_PROGRESS_PROFILE, CURRENT080_REPLAY_PROGRESS_PROFILE):
         raise ContractError(
             "APPLICATION_SMOKE",
-            "Current Nix environment transform requires current 0.7.1 source profile",
+            "Current Nix environment transform requires a current source profile",
         )
     return wrapper, profile
 
@@ -1546,11 +1664,13 @@ def _build_initial_observation_descriptor(
         "progress": evidence / (platform + "-" + scenario + ".initial-progress.jsonl"),
         "path": evidence / (platform + "-" + scenario + ".initial-observation.json"),
         "profile": profile,
-        "harness_timeout_ms": (_current071_initial_timeout_ms(platform, scenario)
-                                if profile.get("id") == "nebular071" else None),
+        "harness_timeout_ms": _current_initial_timeout_ms(profile, platform, scenario),
     }
     if environment_transform:
-        descriptor["environment_transform"] = CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID
+        descriptor["environment_transform"] = (
+            CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID
+            if profile.get("id") == "nebular080" else CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID
+        )
     return descriptor
 
 
@@ -1585,7 +1705,8 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
     if replay_progress:
         if replay_progress.get("profile") is not None:
             profile = replay_progress["profile"]
-            if profile not in (CURRENT_REPLAY_PROGRESS_PROFILE, CURRENT071_REPLAY_PROGRESS_PROFILE):
+            if profile not in (CURRENT_REPLAY_PROGRESS_PROFILE, CURRENT071_REPLAY_PROGRESS_PROFILE,
+                               CURRENT080_REPLAY_PROGRESS_PROFILE):
                 raise ContractError("APPLICATION_SMOKE", "Unknown replay source profile")
             command[2:2] = [
                 "--rs9-replay-progress-profile", profile["id"],
@@ -1606,11 +1727,12 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
         if replay_progress is not None or harness_timeout_ms is not None:
             raise ContractError("APPLICATION_SMOKE", "Initial observation options cannot be combined with replay timeout")
         profile = initial_observation.get("profile")
-        if profile not in (CURRENT_REPLAY_PROGRESS_PROFILE, CURRENT071_REPLAY_PROGRESS_PROFILE):
+        if profile not in (CURRENT_REPLAY_PROGRESS_PROFILE, CURRENT071_REPLAY_PROGRESS_PROFILE,
+                           CURRENT080_REPLAY_PROGRESS_PROFILE):
             raise ContractError("APPLICATION_SMOKE", "Unknown initial observation source profile")
         initial_timeout_ms = initial_observation.get("harness_timeout_ms")
-        if profile.get("id") == "nebular071":
-            expected_timeout_ms = _current071_initial_timeout_ms(platform, scenario)
+        if profile.get("id") in {"nebular071", "nebular080"}:
+            expected_timeout_ms = _current_initial_timeout_ms(profile, platform, scenario)
             if expected_timeout_ms is None or initial_timeout_ms != expected_timeout_ms:
                 raise ContractError("APPLICATION_SMOKE", "Unsupported current required harness timeout")
         elif initial_timeout_ms is not None:
@@ -1628,7 +1750,10 @@ def _command(prepared, platform, scenario, launch_root, evidence, *, extras,
             "--rs9-replay-progress-source-tree", profile["tree"],
             "--rs9-replay-progress-support-member", "package.json=" + profile["support"]["sha256"],
         ]
-        for name, row in profile["modules"].items():
+        execution_modules = _execution_profile_modules(profile)
+        if execution_modules is None:
+            raise ContractError("APPLICATION_SMOKE", "Authenticated execution closure is unavailable")
+        for name, row in execution_modules.items():
             command[2:2] = ["--rs9-replay-progress-closure-member", name + "=" + row["sha256"]]
         if initial_timeout_ms is not None:
             command.extend(["--timeout-ms", str(initial_timeout_ms)])
@@ -1710,7 +1835,10 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
             initial_observation["path"],
             expected_profile=initial_observation.get("profile"),
             expected_execution_transform=(
-                initial_observation.get("environment_transform") == CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID
+                initial_observation.get("environment_transform") in {
+                    CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID,
+                    CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID,
+                }
             ),
         )
     fields["cause"] = error or classify_smoke_cause(exit_code=ec_val, signal=sig_val, timed_out=(error == "process-timeout"), receipt_error=receipt_error,
@@ -1828,11 +1956,15 @@ def run_replay(*, scenario, platform, launch_root, checkout, tools, prefix, env,
             },
         }
     if replay_progress is not None and replay_progress_profile is not None:
-        if replay_progress_profile not in (CURRENT_REPLAY_PROGRESS_PROFILE, CURRENT071_REPLAY_PROGRESS_PROFILE):
+        if replay_progress_profile not in (CURRENT_REPLAY_PROGRESS_PROFILE, CURRENT071_REPLAY_PROGRESS_PROFILE,
+                                           CURRENT080_REPLAY_PROGRESS_PROFILE):
             raise ContractError("APPLICATION_SMOKE", "Unknown replay source profile")
+        execution_modules = _execution_profile_modules(replay_progress_profile)
+        if execution_modules is None:
+            raise ContractError("APPLICATION_SMOKE", "Authenticated execution closure is unavailable")
         replay_progress.update(profile=replay_progress_profile,
             expected_sha256=replay_progress_profile["modules"]["native-rc-smoke.mjs"]["sha256"],
-            closure={name: pin["sha256"] for name, pin in replay_progress_profile["modules"].items()})
+            closure={name: pin["sha256"] for name, pin in execution_modules.items()})
     fields = _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, True, timeout,
                       session_bus_argv=session_bus_argv, system=system,
                       harness_timeout_ms=harness_timeout_ms, replay_progress=replay_progress)

@@ -198,6 +198,15 @@ CURRENT071_ASSET_SHA256S = frozenset({
     "8341d0069dd729d4d7e535b42d411edb8fee02c402fbcf0c861514a64f09c608",
     "3a0f9fc991c94588ec06bbe9e0dc4a40250e11f8d238bd8a11cad9ce6fc98c5c",
 })
+from rs9.current_os080 import (
+    CURRENT080_ASSET_SHA256S,
+    CURRENT080_COMMIT,
+    CURRENT080_RELEASE_ID,
+    CURRENT080_TAG,
+    CURRENT080_TREE,
+)
+CURRENT080_CONTRACT_PATH = Path(__file__).resolve().parents[2] / "operators/theme-forge-current-202610/nebular-callers-080.json"
+CURRENT080_CONTRACT_SHA256 = "1afbb726f79bab516a5c191381d1950ab558469b6d4a2e33e8be0784e637d411"
 _CURRENT_CALLER_PROOF = object()
 
 
@@ -222,6 +231,10 @@ def _load_current071_contract():
     return _load_current_contract_bytes(CURRENT071_CONTRACT_PATH, CURRENT071_CONTRACT_SHA256)
 
 
+def _load_current080_contract():
+    return _load_current_contract_bytes(CURRENT080_CONTRACT_PATH, CURRENT080_CONTRACT_SHA256)
+
+
 def current_contract_for_capture(capture):
     """Select the current contract only from a real, exact authenticated release.
 
@@ -239,6 +252,8 @@ def current_contract_for_capture(capture):
          "v0.7.0", CURRENT070_COMMIT, CURRENT070_TREE): _load_current_contract,
         ("Knowledge-Forge-AI/theme-forge-nebular-fusion", 1358643872, CURRENT071_RELEASE_ID,
          "v0.7.1", CURRENT071_COMMIT, CURRENT071_TREE): _load_current071_contract,
+        ("Knowledge-Forge-AI/theme-forge-nebular-fusion", 1358643872, CURRENT080_RELEASE_ID,
+         CURRENT080_TAG, CURRENT080_COMMIT, CURRENT080_TREE): _load_current080_contract,
     }
     loader = loaders.get(identity)
     if loader is None or release.get("id") != identity[2] or release.get("tag_name") != identity[3]:
@@ -328,9 +343,9 @@ def collect_caller_sources(capture, client, scratch, entry=None):
             raise ContractError("CALLER_CLIENT_UNAVAILABLE", "Authenticated source client unavailable")
         tag = capture.record.get("tag") if isinstance(capture.record, dict) else None
         release = capture.record.get("release", {})
-        current = ((isinstance(tag, dict) and (tag.get("commit") in (CURRENT070_COMMIT, CURRENT071_COMMIT)
-                    or tag.get("tree") in (CURRENT070_TREE, CURRENT071_TREE)))
-                   or isinstance(release, dict) and release.get("tag") in ("v0.7.0", "v0.7.1"))
+        current = ((isinstance(tag, dict) and (tag.get("commit") in (CURRENT070_COMMIT, CURRENT071_COMMIT, CURRENT080_COMMIT)
+                    or tag.get("tree") in (CURRENT070_TREE, CURRENT071_TREE, CURRENT080_TREE)))
+                   or isinstance(release, dict) and release.get("tag") in ("v0.7.0", "v0.7.1", CURRENT080_TAG))
         if current:
             contract = current_contract_for_capture(capture)
             pins = contract["source_files"]
@@ -439,12 +454,12 @@ def verify_nebular_caller(path, rule, pin, inventory, inputs, *, caller_evidence
     """Verify a source relationship and byte preservation; no system Node inference."""
     evidence = caller_evidence if caller_evidence is not None else inventory.get("caller_evidence")
     if (isinstance(evidence, _CurrentCallerEvidence)
-            or isinstance(evidence, dict) and (evidence.get("tag_commit") in (CURRENT070_COMMIT, CURRENT071_COMMIT)
-                                               or evidence.get("tag_tree") in (CURRENT070_TREE, CURRENT071_TREE)
-                                               or evidence.get("tag_name") in ("v0.7.0", "v0.7.1"))):
+            or isinstance(evidence, dict) and (evidence.get("tag_commit") in (CURRENT070_COMMIT, CURRENT071_COMMIT, CURRENT080_COMMIT)
+                                               or evidence.get("tag_tree") in (CURRENT070_TREE, CURRENT071_TREE, CURRENT080_TREE)
+                                               or evidence.get("tag_name") in ("v0.7.0", "v0.7.1", CURRENT080_TAG))):
         return _verify_current_caller(path, rule, pin, inventory, inputs, evidence)
-    if (inputs.get("version") in ("0.7.0", "0.7.1")
-            or any(isinstance(value, str) and value in (CURRENT070_ASSET_SHA256S | CURRENT071_ASSET_SHA256S)
+    if (inputs.get("version") in ("0.7.0", "0.7.1", "0.8.0")
+            or any(isinstance(value, str) and value in (CURRENT070_ASSET_SHA256S | CURRENT071_ASSET_SHA256S | CURRENT080_ASSET_SHA256S)
                    for value in (inputs.get("asset_sha256"), inventory.get("asset_sha256"), pin.get("asset_sha256")))):
         return None, "caller-content-or-identity-unproven"
     try:

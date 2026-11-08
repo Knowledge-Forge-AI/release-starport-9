@@ -1,0 +1,118 @@
+[
+  {
+    "schema": "rs9.current080-rpm-keyfree-request.v1",
+    "generation": "theme-forge-current-202610",
+    "policy_variant": "current080",
+    "project": "theme-forge-nebular-fusion",
+    "version": "0.8.0",
+    "system": "x86_64-linux",
+    "architecture": "x86_64",
+    "distro": "fedora-43",
+    "source": {
+      "release_id": 437909062,
+      "tag": "v0.8.0",
+      "version": "0.8.0",
+      "commit": "516f5a7d8a449946a0246ea23d37991f586dfc2c",
+      "tree": "907163a09d2995c9080074294db54c54af626563"
+    },
+    "raw_asset": {
+      "github_asset_id": 722264633,
+      "name": "theme-forge-nebular-fusion-v0.8.0-x86_64-unknown-linux-gnu.tar.gz",
+      "bytes": 56825312,
+      "sha256": "498f0f6ff81c32200843e04016f86f7733905df0b0712c3f3639162ad5655abc",
+      "executable_sha256": "61773740d5a165ccbf287ba8eaa175470d7288d23bd6c332e209e6cc07a7d8b1",
+      "native_package_manifest_sha256": "fb2b250b354949fd704e0901bde79ff60ec66b92577a08d1b299945f02fef19d",
+      "release_payload_manifest_sha256": "7c3d40d57d30300ce0f6888e8fc8a975e96711ce9a01d79fb598b1656d0d4f88",
+      "sidecar_manifest_sha256": "5caf3591b05181a5c605e6d9929ed6660e2ca073359eeae8d42fc7a1c6253160",
+      "native_package_member_count": 1785,
+      "release_payload_member_count": 1785
+    },
+    "container": {
+      "repository": "registry.fedoraproject.org/fedora",
+      "tag": "43",
+      "digest": "sha256:c5e15bd1e07c25904d0c5b9865fb7ee4589f8ca234e635742b0c1195838f4bfd",
+      "platform": "linux/amd64"
+    },
+    "builder": {
+      "module": "rs9.build_rpm",
+      "function": "build_rpm_candidate",
+      "runner": "rs9.hosted_deb.ContainerRunner",
+      "container_repository": "registry.fedoraproject.org/fedora",
+      "container_tag": "43",
+      "required_tools": ["rpmbuild", "rpm", "rpmlint", "createrepo_c"]
+    },
+    "policy": {
+      "path": "operators/theme-forge-current-202610/rpm-lint-policy-nebular080.json",
+      "sha256": "6e0f66ab486b09992343ff32ff812b3eb51958daf5c1bd68b27cfa17e5781649",
+      "status": "blocked",
+      "blocking": true,
+      "exceptions": {},
+      "production_enabled": false,
+      "publication_authority": false
+    },
+    "mode": {
+      "signing": false,
+      "publication": false,
+      "installation": false,
+      "qualification": false
+    }
+  },
+  {
+    "schema": "rs9.current080-rpm-keyfree-request.v1",
+    "generation": "theme-forge-current-202610",
+    "policy_variant": "current080",
+    "project": "theme-forge-nebular-fusion",
+    "version": "0.8.0",
+    "system": "aarch64-linux",
+    "architecture": "aarch64",
+    "distro": "fedora-43",
+    "source": {
+      "release_id": 437909062,
+      "tag": "v0.8.0",
+      "version": "0.8.0",
+      "commit": "516f5a7d8a449946a0246ea23d37991f586dfc2c",
+      "tree": "907163a09d2995c9080074294db54c54af626563"
+    },
+    "raw_asset": {
+      "github_asset_id": 722265731,
+      "name": "theme-forge-nebular-fusion-v0.8.0-aarch64-unknown-linux-gnu.tar.gz",
+      "bytes": 57038323,
+      "sha256": "4bbc40f180d954e1ca496606da9b63d7ce0f49dd29e802893aabc4aa0e859e94",
+      "executable_sha256": "65cbd19123ace49cd45de5b812506ed6c085350105ea6eaffff2b6191091a1fc",
+      "native_package_manifest_sha256": "aaaf6f47d9a2aec517ff721f1eccb598804596185aec76ab6b607c37037bbeab",
+      "release_payload_manifest_sha256": "f2b980ab4e9b0bc2bd251708a47070be6a4fcb8836e03c6ef29abb27c5c0ffd5",
+      "sidecar_manifest_sha256": "8b275de7becbcd47886ebdfb1e156a64b3a5991cf181b34b8ce126af44df0eb4",
+      "native_package_member_count": 1785,
+      "release_payload_member_count": 1785
+    },
+    "container": {
+      "repository": "registry.fedoraproject.org/fedora",
+      "tag": "43",
+      "digest": "sha256:0b0303ee12217251f2ec18a71a21284f383e99d1d3bae1eb6c8970fd2e16e26b",
+      "platform": "linux/arm64"
+    },
+    "builder": {
+      "module": "rs9.build_rpm",
+      "function": "build_rpm_candidate",
+      "runner": "rs9.hosted_deb.ContainerRunner",
+      "container_repository": "registry.fedoraproject.org/fedora",
+      "container_tag": "43",
+      "required_tools": ["rpmbuild", "rpm", "rpmlint", "createrepo_c"]
+    },
+    "policy": {
+      "path": "operators/theme-forge-current-202610/rpm-lint-policy-nebular080.json",
+      "sha256": "6e0f66ab486b09992343ff32ff812b3eb51958daf5c1bd68b27cfa17e5781649",
+      "status": "blocked",
+      "blocking": true,
+      "exceptions": {},
+      "production_enabled": false,
+      "publication_authority": false
+    },
+    "mode": {
+      "signing": false,
+      "publication": false,
+      "installation": false,
+      "qualification": false
+    }
+  }
+]

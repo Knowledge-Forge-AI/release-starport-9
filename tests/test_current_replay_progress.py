@@ -136,10 +136,13 @@ class CurrentReplayProfileSelectionTests(unittest.TestCase):
         self.assertEqual(record["initial_run"]["legacy_failure"], "retain")
 
     def test_current_nix_join_enables_initial_observation_only_for_authenticated_current_linux(self):
-        prepared = {
+        unproven = {
             "source_generation": "theme-forge-current-202610",
             "capture": object(), "fixture_capture": object(),
         }
+        self.assertFalse(hosted_nix._current_linux_initial_observation_enabled(
+            "theme-forge-current-202610", "x86_64-linux", unproven))
+        prepared = self.prepared
         self.assertTrue(hosted_nix._current_linux_initial_observation_enabled(
             "theme-forge-current-202610", "x86_64-linux", prepared))
         self.assertFalse(hosted_nix._current_linux_initial_observation_enabled(

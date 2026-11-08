@@ -45,7 +45,7 @@ class Current071OsTests(unittest.TestCase):
         prepared = smoke.prepare_smoke(capture, captures, client, self.root / "prepared")
         return capture, prepared
 
-    def test_actual_source_metadata_and_unchanged_cli_coordinates(self):
+    def test_frozen071_pins_and_current080_metadata_keep_cli_coordinates(self):
         self.assertEqual(pins.CURRENT071_COMMIT, "f2c527ee6f3cbd53fd44e095d5355ca7f5c7519a")
         self.assertEqual(pins.CURRENT071_TREE, "6e3561855f6ee0093fb709488ad976b69bf501d2")
         self.assertEqual(set(pins.CURRENT071_VERIFIER_IMPORTS), set(pins.CURRENT071_VERIFIER_FILES)-{"package.json"})
@@ -62,9 +62,26 @@ class Current071OsTests(unittest.TestCase):
             approved_manifests=[digest((ROOT/manifest).read_bytes())])
         versions = {intent["project"]["id"]:intent["version"] for _,intent in configs}
         self.assertEqual(versions, {"theme-forge-stellar-burst":"0.7.0","theme-forge-stellar-loom":"0.5.0",
-            "theme-forge-solar-sail":"0.3.0","theme-forge-nebular-fusion":"0.7.1"})
+            "theme-forge-solar-sail":"0.3.0","theme-forge-nebular-fusion":"0.8.0"})
         self.assertEqual(generation_paths(HISTORICAL_GENERATION)[0], "bootstrap/pre-rs9/theme-forge-live1/manifest-author-aligned.json")
         with self.assertRaises(ContractError): generation_paths("0.7.1")
+
+    def test071_authenticated_current_nix_observation_remains_enabled(self):
+        from rs9 import hosted_nix
+
+        _, prepared = self.fixture()
+        profile = copy.deepcopy(pins.CURRENT071_REPLAY_PROGRESS_PROFILE)
+        source = prepared["source"]
+        profile["modules"] = {
+            name: replay_fixtures.pin((source / "tools" / name).read_bytes())
+            for name in profile["modules"]
+        }
+        profile["support"] = replay_fixtures.pin((source / "package.json").read_bytes())
+        with patch.object(diagnostic, "CURRENT071_REPLAY_PROGRESS_PROFILE", profile):
+            self.assertTrue(hosted_nix._current_linux_initial_observation_enabled(
+                CURRENT_GENERATION, "x86_64-linux", prepared))
+            self.assertFalse(hosted_nix._current_linux_initial_observation_enabled(
+                HISTORICAL_GENERATION, "x86_64-linux", prepared))
 
     def test_real_core_capture071_and_source_only_guest_roundtrip(self):
         capture, prepared = self.fixture()

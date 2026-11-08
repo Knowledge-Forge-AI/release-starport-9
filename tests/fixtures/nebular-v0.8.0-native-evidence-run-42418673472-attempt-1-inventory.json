@@ -1,0 +1,466 @@
+{
+  "archive": {
+    "archive_bytes": 216591,
+    "contains_capsule_manifest": false,
+    "file_count": 68,
+    "filename": "nebular-v0.8.0-native-evidence-run-42418673472-attempt-1.tar.gz",
+    "layout": "root-relative fixed capsule rows",
+    "sha256": "20f5aaf0dacad5437185981ab95448fb2f13f26001b19ac31fd83ac324795640",
+    "sha512": "ceb0f288efc67eed64768094ea1ce9704506cfbb2828ce8e1d7032c8638740d6ac3ecd56917db47a672518e43bcb064edaccbc099d7e9b729b58279272ad4c37",
+    "source_bytes": 1514913
+  },
+  "bindings": {
+    "canonical_capsule_manifest_sha256": "f755bd3f37006f949eca5a1a7c8f224fd93c5d2d755ec3ea66c386afe830e3dc",
+    "catalog_member_sha256": "a20866338376073f05fc8de2fa2de223c2a679903429f993c061313a05a32b39",
+    "catalog_sha256": "1c5ce07befdb8907a36e808f55d7c43f9f5efef7ba33a3f1371d227e5a853d26",
+    "native": {
+      "catalog_artifact_id": 13593057759,
+      "catalog_member_sha256": "a20866338376073f05fc8de2fa2de223c2a679903429f993c061313a05a32b39",
+      "catalog_sha256": "1c5ce07befdb8907a36e808f55d7c43f9f5efef7ba33a3f1371d227e5a853d26",
+      "native_attempt": 1,
+      "native_run": 42418673472,
+      "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+      "schema": "rs9.nebular080-product-native-reference.v1",
+      "tested_commit": "516f5a7d8a449946a0246ea23d37991f586dfc2c",
+      "tested_tree": "907163a09d2995c9080074294db54c54af626563",
+      "version": "0.8.0"
+    },
+    "native_reference_sha256": "ec9c78e97d86ec19758d5c9704b288051ec6a1013d0167f9323cc05d7333037c"
+  },
+  "files": [
+    {
+      "bytes": 3126,
+      "path": "api/artifacts.json",
+      "role": "native-api-snapshot",
+      "sha256": "c7566e7b039a87a00d2aa3875c1749ddc71b6888d8f875a26741e447d3b1cb05"
+    },
+    {
+      "bytes": 1300,
+      "path": "api/compiler-commit.json",
+      "role": "native-api-snapshot",
+      "sha256": "14848f5af08b753c6c4cc011f723f7497544991dab979a200f5e061ff725f271"
+    },
+    {
+      "bytes": 21787,
+      "path": "api/jobs.json",
+      "role": "native-api-snapshot",
+      "sha256": "5a54788d18dd8645ed8e746a1dcfe3ff019b2d5bf4cb16040cbce9049b9c107e"
+    },
+    {
+      "bytes": 14753,
+      "path": "api/run.json",
+      "role": "native-api-snapshot",
+      "sha256": "f70fb843dfa85122f3c8f93ffecd47e222301200e83e2b7672acc25ed69ea4f1"
+    },
+    {
+      "bytes": 14723,
+      "path": "api/source-run.json",
+      "role": "native-api-snapshot",
+      "sha256": "1246db2a43f8b72e8a0339d24bd216e67038e3e3a86d3ed2831c65fd50fc5f06"
+    },
+    {
+      "bytes": 833,
+      "path": "artifact-metadata.json",
+      "role": "catalog-api-metadata",
+      "sha256": "87ccbb9369f88be48d16e3d9bee7b2b0d234918cc90a0405e3a7d15d3e4817f0"
+    },
+    {
+      "bytes": 2157,
+      "path": "linux-arm64/build-receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "58c0c3d46bc71f57dc3df20d4c56a116b9ea3063f2084a8e3f32e9d855471faf"
+    },
+    {
+      "bytes": 850,
+      "path": "linux-arm64/node-authenticity.json",
+      "role": "native-evidence-body",
+      "sha256": "00d5766f8e73286d1788afc6e21661a6130d5692180f02d1df64c4086f9563a5"
+    },
+    {
+      "bytes": 425531,
+      "path": "linux-arm64/package-manifest.json",
+      "role": "native-evidence-body",
+      "sha256": "aaaf6f47d9a2aec517ff721f1eccb598804596185aec76ab6b607c37037bbeab"
+    },
+    {
+      "bytes": 911,
+      "path": "linux-arm64/package-record.json",
+      "role": "native-evidence-body",
+      "sha256": "d932bca0009d138b354ef771db257697489a78451130f3616b271562bc720209"
+    },
+    {
+      "bytes": 1462,
+      "path": "linux-arm64/plan.json",
+      "role": "native-evidence-body",
+      "sha256": "a71e89a451369ae78fbda2cfd571906b912491c3b2ba19eb7eeb15b6dc49a285"
+    },
+    {
+      "bytes": 2744,
+      "path": "linux-arm64/qualification.json",
+      "role": "native-evidence-body",
+      "sha256": "9e8a3c437e2b7257e77343cc3e643e795c3073d7261e28cc6fc6a633f3d660a8"
+    },
+    {
+      "bytes": 13087,
+      "path": "linux-arm64/rc-evidence.json",
+      "role": "native-evidence-body",
+      "sha256": "8f173238488204a9e475c85a2ecde8c1e4b79aa3c679eee4fb06cfd7d9b38309"
+    },
+    {
+      "bytes": 3148,
+      "path": "linux-arm64/smoke/linux-arm64-B-npm-package.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "1eab46b89a1711e73f64e72c8352bb06753cc812412574b4b6901fec33151242"
+    },
+    {
+      "bytes": 2652,
+      "path": "linux-arm64/smoke/linux-arm64-B-npm-package.run.json",
+      "role": "native-evidence-body",
+      "sha256": "e3158b9e92417db8080f75b7fae720da1237794b46553f981e25e51c5a3a8b33"
+    },
+    {
+      "bytes": 3159,
+      "path": "linux-arm64/smoke/linux-arm64-B-raw-archive.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "4f1a8b1783ed5615511c49a8033bd53fa0eecccc505fdb02ae7e3d6b00b44d2d"
+    },
+    {
+      "bytes": 2652,
+      "path": "linux-arm64/smoke/linux-arm64-B-raw-archive.run.json",
+      "role": "native-evidence-body",
+      "sha256": "10f7f2e97fa0614f35e218f00500d17d0821d186c334a3d44af9dc2a9d063bcb"
+    },
+    {
+      "bytes": 740,
+      "path": "linux-arm64/smoke/linux-arm64-appearance-pair-raw-view-a.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "fc4ffb53005af34cc46585f239140e023d146170158b1fce3f73804b71c9b032"
+    },
+    {
+      "bytes": 437,
+      "path": "linux-arm64/smoke/linux-arm64-appearance-pair-raw-view-b.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "756a24fe069749f2cf74220b7116070ba8d9d23ab6bcb316f89e1883aba87194"
+    },
+    {
+      "bytes": 3056,
+      "path": "linux-arm64/smoke/linux-arm64-appearance-pair-raw.pair.run.json",
+      "role": "native-evidence-body",
+      "sha256": "7f044dc4b6f434fb97adc3fb72fd6bd95a18a908bbadb456243770e0a68eb0c3"
+    },
+    {
+      "bytes": 1907,
+      "path": "linux-arm64/smoke/linux-arm64-appearance-pair-raw.phases/linux-arm64-P-restart-raw.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "3f40318d0b07449a2685620a46b3497cd65071aec52a0deab3b07ba96fbaf3e2"
+    },
+    {
+      "bytes": 1447,
+      "path": "linux-arm64/smoke/linux-arm64-appearance-pair-raw.phases/linux-arm64-P-restart-raw.run.json",
+      "role": "native-evidence-body",
+      "sha256": "89c5f6fb29c37ceed7b241a3173536b5ffd20a79783e6e99a7767f09c4bc6755"
+    },
+    {
+      "bytes": 2577,
+      "path": "linux-arm64/smoke/linux-arm64-appearance-pair-raw.phases/linux-arm64-P-save-raw.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "b613a1edbe0c5f84ca190d537cb8ee69f2af53799496581e04a8e060134369a7"
+    },
+    {
+      "bytes": 1780,
+      "path": "linux-arm64/smoke/linux-arm64-appearance-pair-raw.phases/linux-arm64-P-save-raw.run.json",
+      "role": "native-evidence-body",
+      "sha256": "095456bf9356e9a2af76d6c45f6d43235de94a375ea8b1af9c5038fc9d4a1132"
+    },
+    {
+      "bytes": 7598,
+      "path": "linux-arm64/smoke/linux-arm64-paired-v2-raw-archive.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "a75f745747b3720f7c8cd68920bc875da4e4c01fa612fd5de7db7f3317bb8402"
+    },
+    {
+      "bytes": 3009,
+      "path": "linux-arm64/smoke/linux-arm64-paired-v2-raw-archive.run.json",
+      "role": "native-evidence-body",
+      "sha256": "a4324c2585563b6dd68ff356a63f55788149ab70d3f2db25ea3f41e82465e610"
+    },
+    {
+      "bytes": 2151,
+      "path": "linux-x64/build-receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "6307c2a72ca5da52d326b23a2a91fbdde6a8117335eb2e588a8f80aa5492a31a"
+    },
+    {
+      "bytes": 847,
+      "path": "linux-x64/node-authenticity.json",
+      "role": "native-evidence-body",
+      "sha256": "ed28783d541a39b126dfb63e7f7d6b6aac3d71c3dfa718a7ca63896e7514ec26"
+    },
+    {
+      "bytes": 425521,
+      "path": "linux-x64/package-manifest.json",
+      "role": "native-evidence-body",
+      "sha256": "fb2b250b354949fd704e0901bde79ff60ec66b92577a08d1b299945f02fef19d"
+    },
+    {
+      "bytes": 906,
+      "path": "linux-x64/package-record.json",
+      "role": "native-evidence-body",
+      "sha256": "f73cfbc9abd72d6db960b3e6ecb9a9399797a74cd753d880d51049d31484c2ff"
+    },
+    {
+      "bytes": 1462,
+      "path": "linux-x64/plan.json",
+      "role": "native-evidence-body",
+      "sha256": "a71e89a451369ae78fbda2cfd571906b912491c3b2ba19eb7eeb15b6dc49a285"
+    },
+    {
+      "bytes": 2723,
+      "path": "linux-x64/qualification.json",
+      "role": "native-evidence-body",
+      "sha256": "70cedd0890b70d44d4eabd2c4ccfefbf8affbb9c6323a1ce872a7d28b1197256"
+    },
+    {
+      "bytes": 12632,
+      "path": "linux-x64/rc-evidence.json",
+      "role": "native-evidence-body",
+      "sha256": "dc59ce280cf353cdb9c11e75c04dacd97e4b2210e718248e68e064a55b200016"
+    },
+    {
+      "bytes": 2842,
+      "path": "linux-x64/smoke/linux-x64-C-raw-archive.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "cb319c63afc192e455897e7c2de0570f81d66cf3f211ab1c79d22f1a7acc99cf"
+    },
+    {
+      "bytes": 2580,
+      "path": "linux-x64/smoke/linux-x64-C-raw-archive.run.json",
+      "role": "native-evidence-body",
+      "sha256": "6ecd20b71d509bd7cfe3fd3aea5062535d89bb85cb24eaed4030d87b790590a9"
+    },
+    {
+      "bytes": 2844,
+      "path": "linux-x64/smoke/linux-x64-C-signal-npm-package.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "a0e867b1200d0cb4abaeb4619672c8d6e570e15af923831f393e0a8c925ba47f"
+    },
+    {
+      "bytes": 2973,
+      "path": "linux-x64/smoke/linux-x64-C-signal-npm-package.run.json",
+      "role": "native-evidence-body",
+      "sha256": "783851c3902a2d6e97d21589463da23158175869229addb4fa4e5f771bbc843f"
+    },
+    {
+      "bytes": 740,
+      "path": "linux-x64/smoke/linux-x64-appearance-pair-raw-view-a.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "c5ee3d19bce4300a2dd6f54d98ea409e438637be0cdfb7194f7816b2dd364be9"
+    },
+    {
+      "bytes": 437,
+      "path": "linux-x64/smoke/linux-x64-appearance-pair-raw-view-b.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "6c3efc322cd83f92b8120b834f2e47b3c23cd013bcefa6ed7e5577a917931686"
+    },
+    {
+      "bytes": 3050,
+      "path": "linux-x64/smoke/linux-x64-appearance-pair-raw.pair.run.json",
+      "role": "native-evidence-body",
+      "sha256": "294f40f7bd72b9a168e52fd68cb474ae161edaf841db0b7594ebe3e70116acd1"
+    },
+    {
+      "bytes": 1907,
+      "path": "linux-x64/smoke/linux-x64-appearance-pair-raw.phases/linux-x64-P-restart-raw.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "3caee9cbb7e21fc19cb8f5e450b5eca302ee930fead674ddcd784b446bc82760"
+    },
+    {
+      "bytes": 1443,
+      "path": "linux-x64/smoke/linux-x64-appearance-pair-raw.phases/linux-x64-P-restart-raw.run.json",
+      "role": "native-evidence-body",
+      "sha256": "2c60cdeca11be692e7879db61e57f8446b378729aba748368bae7d6b83b969e2"
+    },
+    {
+      "bytes": 2577,
+      "path": "linux-x64/smoke/linux-x64-appearance-pair-raw.phases/linux-x64-P-save-raw.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "4dfe13f4a7bb2a92fe171a87f680648ecce2e70a044bfa2c9502c6b715b43c94"
+    },
+    {
+      "bytes": 1776,
+      "path": "linux-x64/smoke/linux-x64-appearance-pair-raw.phases/linux-x64-P-save-raw.run.json",
+      "role": "native-evidence-body",
+      "sha256": "8e86b8de7b0af1ed20d62177f092b629436b1b4e99cb90d1459ebafb631e2c72"
+    },
+    {
+      "bytes": 7594,
+      "path": "linux-x64/smoke/linux-x64-paired-v2-raw-archive.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "060163273a7194bc9603cd5e258c99939a43b7290f6850aa4d6f3a75e9d09bfd"
+    },
+    {
+      "bytes": 3000,
+      "path": "linux-x64/smoke/linux-x64-paired-v2-raw-archive.run.json",
+      "role": "native-evidence-body",
+      "sha256": "87dd7754b8665b549f9c03fc98befe00fdff60072b0b7917a38668eab8689782"
+    },
+    {
+      "bytes": 2014,
+      "path": "macos-arm64/build-receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "704f265694899f8d52778f4f873fb89eee7460442902c310c593f9f8abf30590"
+    },
+    {
+      "bytes": 1171,
+      "path": "macos-arm64/node-authenticity.json",
+      "role": "native-evidence-body",
+      "sha256": "8ac235e8011b7b10f79924487107bd9f0c33801e621deca8333b2e2c6231c12b"
+    },
+    {
+      "bytes": 437637,
+      "path": "macos-arm64/package-manifest.json",
+      "role": "native-evidence-body",
+      "sha256": "2004bbac8b7f879000233497c95f5079a7f5a71b0d3d9f17b15152947a59ca95"
+    },
+    {
+      "bytes": 910,
+      "path": "macos-arm64/package-record.json",
+      "role": "native-evidence-body",
+      "sha256": "dc9f8402bdf334eb92a4a7aef023d2e3973f0d46e4d055da2a70327a02210b59"
+    },
+    {
+      "bytes": 1462,
+      "path": "macos-arm64/plan.json",
+      "role": "native-evidence-body",
+      "sha256": "a71e89a451369ae78fbda2cfd571906b912491c3b2ba19eb7eeb15b6dc49a285"
+    },
+    {
+      "bytes": 1997,
+      "path": "macos-arm64/qualification.json",
+      "role": "native-evidence-body",
+      "sha256": "546d4d5dc83bed94158a0a894791e8ec1fa37ee93a53fdc77a1c1cede0d9e394"
+    },
+    {
+      "bytes": 11746,
+      "path": "macos-arm64/rc-evidence.json",
+      "role": "native-evidence-body",
+      "sha256": "14ae45f18c4fbb6fbf9999fe2064cc1efe6d060614f4b0c2c8895e96ea80c3d6"
+    },
+    {
+      "bytes": 2845,
+      "path": "macos-arm64/smoke/darwin-arm64-A-npm-package.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "9a05282c75b8b2c7970bc78a51d19eb6a36f2b012b484bf8cd29797f9e6fbfad"
+    },
+    {
+      "bytes": 2350,
+      "path": "macos-arm64/smoke/darwin-arm64-A-npm-package.run.json",
+      "role": "native-evidence-body",
+      "sha256": "27560f96fcb8518fe772ce2175318475ac0e462ef940a7568696e798f607d753"
+    },
+    {
+      "bytes": 2829,
+      "path": "macos-arm64/smoke/darwin-arm64-A-raw-archive.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "78b3724ad8880a87812b78c3d037f6b7bebcc3c1434559fa9345efd66942d13e"
+    },
+    {
+      "bytes": 2350,
+      "path": "macos-arm64/smoke/darwin-arm64-A-raw-archive.run.json",
+      "role": "native-evidence-body",
+      "sha256": "4df7134cf7a17da77fc26f15db49ab20b22c5605c47bc2ed826476d2c0cc3011"
+    },
+    {
+      "bytes": 739,
+      "path": "macos-arm64/smoke/darwin-arm64-appearance-pair-raw-view-a.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "2a6278e81f7cdad9a0a91251d9d2daa9390385ef0548ca8133f3c0933ffb009c"
+    },
+    {
+      "bytes": 438,
+      "path": "macos-arm64/smoke/darwin-arm64-appearance-pair-raw-view-b.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "d88f1af5a182cbbec76099780316ceeccc4825f01f8d071e1985f60a05825b04"
+    },
+    {
+      "bytes": 3101,
+      "path": "macos-arm64/smoke/darwin-arm64-appearance-pair-raw.pair.run.json",
+      "role": "native-evidence-body",
+      "sha256": "6d9e66745754f585bfae0a0198da492227023fd159514c435c3ef747e3c41618"
+    },
+    {
+      "bytes": 1936,
+      "path": "macos-arm64/smoke/darwin-arm64-appearance-pair-raw.phases/darwin-arm64-P-restart-raw.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "1b7f67f30ff340a5bdb145519bfe87f870ce3375d62fbe17ab2b684970c8ed68"
+    },
+    {
+      "bytes": 1492,
+      "path": "macos-arm64/smoke/darwin-arm64-appearance-pair-raw.phases/darwin-arm64-P-restart-raw.run.json",
+      "role": "native-evidence-body",
+      "sha256": "109eb22df747db90a169a3bde5b4f3ae237e92e44fe51fa396b87c789783ca63"
+    },
+    {
+      "bytes": 2604,
+      "path": "macos-arm64/smoke/darwin-arm64-appearance-pair-raw.phases/darwin-arm64-P-save-raw.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "297981808fc283207c35d763c853743658aec1f9d1305488be2078753f0c8756"
+    },
+    {
+      "bytes": 1823,
+      "path": "macos-arm64/smoke/darwin-arm64-appearance-pair-raw.phases/darwin-arm64-P-save-raw.run.json",
+      "role": "native-evidence-body",
+      "sha256": "b99963ebd94e7d643ac5c57cbbfb1d2c02d59b84b1ca4356ba78df8ae8cd4b46"
+    },
+    {
+      "bytes": 7625,
+      "path": "macos-arm64/smoke/darwin-arm64-paired-v2-raw-archive.receipt.json",
+      "role": "native-evidence-body",
+      "sha256": "5eaab40d6fd42e1f73e1cfac16b5523f09eccdeea687a4c900363dcc862f8079"
+    },
+    {
+      "bytes": 3052,
+      "path": "macos-arm64/smoke/darwin-arm64-paired-v2-raw-archive.run.json",
+      "role": "native-evidence-body",
+      "sha256": "43dd8e50c8d71f357cd49e6e874e419fc87d3ae04e903b81e9941f65082fe005"
+    },
+    {
+      "bytes": 4285,
+      "path": "native-reference.json",
+      "role": "module-reference",
+      "sha256": "ec9c78e97d86ec19758d5c9704b288051ec6a1013d0167f9323cc05d7333037c"
+    },
+    {
+      "bytes": 3076,
+      "path": "rc-index-original.zip",
+      "role": "native-catalog-original",
+      "sha256": "1c5ce07befdb8907a36e808f55d7c43f9f5efef7ba33a3f1371d227e5a853d26"
+    }
+  ],
+  "limits": {
+    "max_archive_members": 68,
+    "max_member_bytes": 437637,
+    "max_source_bytes": 1514913,
+    "private_marker_scan": "fixed-marker-set; no matches",
+    "symlinks_allowed": false
+  },
+  "producer": {
+    "native_attempt": 1,
+    "native_run": 42418673472,
+    "native_workflow": ".github/workflows/native-rc.yml",
+    "source_attempt": 1,
+    "source_run": 42418673471,
+    "source_workflow": ".github/workflows/ci.yml",
+    "tested_commit": "516f5a7d8a449946a0246ea23d37991f586dfc2c",
+    "tested_tree": "907163a09d2995c9080074294db54c54af626563"
+  },
+  "release": {
+    "asset_id_bound": false,
+    "make_latest": false,
+    "prerelease": true,
+    "proposed_tag": "nebular-v0.8.0-native-evidence-run-42418673472-attempt-1",
+    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion"
+  },
+  "schema": "nebular080-native-evidence-release-inventory.v1",
+  "status": "source-prepared; release-not-published"
+}
