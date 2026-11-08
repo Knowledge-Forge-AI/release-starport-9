@@ -1,0 +1,81 @@
+name: Nebular OS080 key-free RPM construction proposal
+
+# Proposal only. Do not copy into the maintained workflow until the owner
+# authorizes this exact held-policy precursor and rebases the source binding.
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Exact reviewed RS9 source checkout commit
+        required: true
+      source_tree:
+        description: Exact reviewed RS9 source checkout tree
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  keyfree-rpm:
+    name: ${{ matrix.system }} held RPM readback
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-24.04
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      # Exact action pin already used by rs9-current-distribution-tests.yml;
+      # no new action dependency is introduced by this proposal.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.source_commit }}
+      - name: Bind actual reviewed checkout identity
+        id: checkout-identity
+        env:
+          EXPECTED_SOURCE_COMMIT: ${{ inputs.source_commit }}
+          EXPECTED_SOURCE_TREE: ${{ inputs.source_tree }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'Knowledge-Forge-AI/release-starport-9'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$GITHUB_SHA" = "$EXPECTED_SOURCE_COMMIT"
+          actual_commit="$(git rev-parse --verify HEAD)"
+          actual_tree="$(git rev-parse --verify 'HEAD^{tree}')"
+          test "$actual_commit" = "$EXPECTED_SOURCE_COMMIT"
+          test "$actual_tree" = "$EXPECTED_SOURCE_TREE"
+          printf 'source_commit=%s\n' "$actual_commit" >> "$GITHUB_OUTPUT"
+          printf 'source_tree=%s\n' "$actual_tree" >> "$GITHUB_OUTPUT"
+      - name: Use the maintained RS9 Python tool class
+        run: |
+          python3 -B -c 'import sys; assert sys.version_info >= (3, 11)'
+      - name: Run one key-free Nebular construction/readback
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+          RS9_GITHUB_READ_TOKEN: ${{ github.token }}
+          KEYFREE_SOURCE_COMMIT: ${{ steps.checkout-identity.outputs.source_commit }}
+          KEYFREE_SOURCE_TREE: ${{ steps.checkout-identity.outputs.source_tree }}
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/rs9-keyfree/${{ matrix.system }}" "$RUNNER_TEMP/rs9-keyfree-output/${{ matrix.system }}"
+          python3 -B -m rs9.current080_rpm_keyfree_job \
+            --repository "$GITHUB_WORKSPACE" \
+            --scratch "$RUNNER_TEMP/rs9-keyfree/${{ matrix.system }}" \
+            --receipts "$RUNNER_TEMP/rs9-keyfree-output/${{ matrix.system }}" \
+            --system '${{ matrix.system }}' \
+            --source-commit "$KEYFREE_SOURCE_COMMIT" \
+            --source-tree "$KEYFREE_SOURCE_TREE" \
+            --generation theme-forge-current-202610
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: nebular080-keyfree-${{ matrix.system }}
+          path: ${{ runner.temp }}/rs9-keyfree-output/${{ matrix.system }}/
+          retention-days: 14
+          if-no-files-found: error
