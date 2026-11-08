@@ -1,0 +1,45 @@
+{
+  "schema": "rs9.tracked080-release-binding.v1",
+  "status": "held; source-identity-late-bound",
+  "release": "0.8.0",
+  "repository": "Knowledge-Forge-AI/release-starport-9",
+  "candidate": "nebular080-r-os-complete-prep2",
+  "source_identity": {
+    "repository": "Knowledge-Forge-AI/release-starport-9",
+    "status": "late-bound-clean-checkout",
+    "commit": null,
+    "tree": null
+  },
+  "bootstrap": {
+    "path": "bootstrap/pre-rs9/theme-forge-current-202610/manifest.json",
+    "bytes": 3168,
+    "sha256": "9543dacd536623c891dd04a2163eca20be3ba5c75ef94686d47b45401e8ea8f6"
+  },
+  "expectations": {
+    "path": "operators/theme-forge-current-202610/expectations.json",
+    "bytes": 10351,
+    "sha256": "b9bb151acea81b16000e6c169a74e40f7e724f0d5867d39f92679f57ef32d08a"
+  },
+  "command_contracts": {
+    "path": "operators/theme-forge-current-202610/command-contracts.json",
+    "bytes": 6379,
+    "sha256": "a60527272a3c7915260bb3e7fdcd38f7c3c24eb0f3fba7739f9609f7cd5589b8"
+  },
+  "product_evidence": {
+    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+    "tag": "v0.8.0",
+    "release_id": 437909062,
+    "commit": "516f5a7d8a449946a0246ea23d37991f586dfc2c",
+    "tree": "907163a09d2995c9080074294db54c54af626563",
+    "relay_release_id": 438017969,
+    "relay_tag": "nebular-v0.8.0-native-evidence-run-42418673472-attempt-1",
+    "relay_archive_asset_id": 722806135,
+    "relay_inventory_asset_id": 722806134
+  },
+  "native_relay": {
+    "release_id": 438017969,
+    "tag": "nebular-v0.8.0-native-evidence-run-42418673472-attempt-1",
+    "archive_asset_id": 722806135,
+    "inventory_asset_id": 722806134
+  }
+}

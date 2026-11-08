@@ -26,12 +26,15 @@ class Output:
 
 class WorkflowTests(unittest.TestCase):
     def test_no_unqualified_first_wave_or_nebular_publisher(self):
-        from rs9.nebular071_universal_workflow import complete_workflow_text as nebular_workflow_text
+        from rs9.nebular080_universal_workflow import complete_workflow_text as nebular_workflow_text
+        from rs9.nebular071_universal_workflow import complete_workflow_text as predecessor_workflow_text
         workflows = ROOT / ".github/workflows"
         for product in PRODUCTS:
             pin = load_pin(product)
             self.assertEqual((workflows / pin["workflow"]).exists(), pin["source_status"] == "READY")
-        self.assertEqual((workflows / "rs9-tfnf-pypi-publish.yml").read_text(), nebular_workflow_text())
+        baseline = (ROOT / "tests/fixtures/workflows/rs9-tfnf-pypi-publish-baseline.yml").read_text()
+        self.assertEqual(baseline, predecessor_workflow_text())
+        self.assertEqual((workflows / "rs9-tfnf-pypi-publish.yml").read_text(), nebular_workflow_text(baseline))
         # APGR v0.13.1 intentionally adds an explicit release-version input;
         # this guard pins that reviewed workflow revision.
         self.assertEqual(hashlib.sha256((workflows / "rs9-pypi-publish.yml").read_bytes()).hexdigest(),

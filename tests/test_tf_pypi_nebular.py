@@ -255,7 +255,7 @@ class NebularPyPIContractTests(unittest.TestCase):
 
     def test_static_contract_and_workflow_yaml_parity(self) -> None:
         from rs9.tf_pypi_nebular import _legacy_workflow_text
-        from rs9.nebular071_universal_workflow import complete_workflow_text
+        from rs9.nebular080_universal_workflow import complete_workflow_text
 
         for mod_name in ("tf_pypi_nebular.py", "nebular_host_state.py", "tf_pypi_nebular070_publish.py"):
             path = ROOT / "src/rs9" / mod_name
@@ -276,7 +276,8 @@ class NebularPyPIContractTests(unittest.TestCase):
         wf_path = ROOT / ".github/workflows" / WORKFLOW
         self.assertTrue(wf_path.is_file())
         registered = wf_path.read_text(encoding="utf-8")
-        self.assertEqual(registered, complete_workflow_text())
+        baseline = (ROOT / "tests/fixtures/workflows/rs9-tfnf-pypi-publish-baseline.yml").read_text()
+        self.assertEqual(registered, complete_workflow_text(baseline))
         # Preserve the frozen 061/070 factory contract and its security assertions.
         text = workflow_text()
         self.assertNotEqual(registered, text)

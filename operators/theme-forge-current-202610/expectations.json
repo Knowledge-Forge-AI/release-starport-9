@@ -105,66 +105,179 @@
     {
       "assets": [
         {
-          "id": 694839709,
+          "id": 722499035,
           "name": "SHA256SUMS",
-          "sha256": "abaa657f58382cb369b566fbc7b799072d46851b842ed10057368288b1a6cea2",
-          "size": 1470
+          "sha256": "52901ccad88c2a003ea1f9413062ffe314ed03f8410abe77a30f09e6a85a643f",
+          "size": 1972
         },
         {
-          "id": 694680400,
-          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.7.1.tgz",
-          "sha256": "dd4420a827315267be16bb95f6982be396673e6b4cba17525bd25c49649c7200",
-          "size": 22541
+          "id": 722265755,
+          "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.8.0.tgz",
+          "sha256": "41792773942cc9b039ce8b26114152396c950e43a897a14bc778a3be07d2d81f",
+          "size": 22813
         },
         {
-          "id": 694839643,
-          "name": "nebular-v0.7.1-native-ci-provenance.json",
-          "sha256": "81b0431b358834d392e04f004e3e4922ff55e2e76248f2b257a1edbd11876ce0",
-          "size": 6933
+          "id": 722499032,
+          "name": "nebular-v0.8.0-native-ci-provenance.json",
+          "sha256": "736defe9853e0a9aaaae3e5dfe54d46fa562cac233b73b0053ddbc7ae4ebef5a",
+          "size": 14439
         },
         {
-          "id": 694680408,
-          "name": "nebular-v0.7.1-sbom.spdx.json",
-          "sha256": "0d727179a4773f752c141e217a6ae53fd8470ad7cca706b4b850967d254fe08a",
+          "id": 722333764,
+          "name": "nebular-v0.8.0-sbom.spdx.json",
+          "sha256": "26da7f1f69f8823e807290d3f8dab2a8b2e97e158f1503efee0222ef21feb103",
           "size": 63796
         },
         {
-          "id": 694680412,
-          "name": "nebular-v0.7.1-third-party-notices.tar.gz",
-          "sha256": "4ca86276f2954935ef9e7f410171945f4808059856d4af7c152562f1f51a689f",
-          "size": 610282
+          "id": 722333763,
+          "name": "nebular-v0.8.0-third-party-notices.tar.gz",
+          "sha256": "bf4c26e9527ea58f08b3064cb42608d3ed3533c9d4449790fdff2627fbbf8f60",
+          "size": 687484
         },
         {
-          "id": 694680425,
-          "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-apple-darwin.app.tar.gz",
-          "sha256": "903d7380dd54c9070e944be22c08137141d24a6e3c3f5a1f8fb53c61e9a2b342",
-          "size": 47380487
+          "id": 722264631,
+          "name": "theme-forge-nebular-fusion-v0.8.0-aarch64-apple-darwin.app.tar.gz",
+          "sha256": "0a7ab188afc4660f68bd6dabfda96309a348108a8d77a4786df1731cddaf6896",
+          "size": 49769994
         },
         {
-          "id": 694680442,
-          "name": "theme-forge-nebular-fusion-v0.7.1-aarch64-unknown-linux-gnu.tar.gz",
-          "sha256": "8341d0069dd729d4d7e535b42d411edb8fee02c402fbcf0c861514a64f09c608",
-          "size": 54621132
+          "id": 722265731,
+          "name": "theme-forge-nebular-fusion-v0.8.0-aarch64-unknown-linux-gnu.tar.gz",
+          "sha256": "4bbc40f180d954e1ca496606da9b63d7ce0f49dd29e802893aabc4aa0e859e94",
+          "size": 57038323
         },
         {
-          "id": 694680564,
-          "name": "theme-forge-nebular-fusion-v0.7.1-x86_64-unknown-linux-gnu.tar.gz",
-          "sha256": "3a0f9fc991c94588ec06bbe9e0dc4a40250e11f8d238bd8a11cad9ce6fc98c5c",
-          "size": 54473927
+          "id": 722264633,
+          "name": "theme-forge-nebular-fusion-v0.8.0-x86_64-unknown-linux-gnu.tar.gz",
+          "sha256": "498f0f6ff81c32200843e04016f86f7733905df0b0712c3f3639162ad5655abc",
+          "size": 56825312
         }
       ],
-      "commit": "f2c527ee6f3cbd53fd44e095d5355ca7f5c7519a",
+      "release_asset_inventory": {
+        "schema": "rs9.release-asset-inventory.v1alpha1",
+        "assets": [
+          {
+            "id": 722469272,
+            "name": "SOURCE-REBUILD.md",
+            "size": 7716,
+            "sha256": "eeedba349181e11bb4d45296ad6bc4c1cf1f9cf551cd25955983574133c1746a"
+          },
+          {
+            "id": 722265755,
+            "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.8.0.tgz",
+            "size": 22813,
+            "sha256": "41792773942cc9b039ce8b26114152396c950e43a897a14bc778a3be07d2d81f"
+          },
+          {
+            "id": 722264634,
+            "name": "knowledge-forge-ai-theme-forge-nebular-fusion-darwin-arm64-0.8.0.tgz",
+            "size": 49765857,
+            "sha256": "de475f7571c0f6b37e7bf9f1b96d3f3f67db08eb4df3c8640a5236d2305cd659"
+          },
+          {
+            "id": 722264639,
+            "name": "knowledge-forge-ai-theme-forge-nebular-fusion-linux-arm64-0.8.0.tgz",
+            "size": 56975011,
+            "sha256": "a254369453facc0cbaa32a3d8ed0230bfc7eee29549854e9bc94d6bcdf2f47a7"
+          },
+          {
+            "id": 722264635,
+            "name": "knowledge-forge-ai-theme-forge-nebular-fusion-linux-x64-0.8.0.tgz",
+            "size": 56762984,
+            "sha256": "27fac4293d90e0198797aaa0627d254ffb9aa35a18de91b92ee1c4c1ab79c53d"
+          },
+          {
+            "id": 722429154,
+            "name": "nebular-compiled-public-build-source-authority-v0.8.0.json",
+            "size": 1767,
+            "sha256": "53dea0e5ca138616a94d351e2490f94aa34de74d2665fd62119034ca1fb58dcf"
+          },
+          {
+            "id": 722333765,
+            "name": "nebular-v0.8.0-legal-assets-manifest.json",
+            "size": 5050,
+            "sha256": "d3b01883ae40433af201830afbf65d15dc2525fe0458ee91f30fd0a7af4e1b79"
+          },
+          {
+            "id": 722499032,
+            "name": "nebular-v0.8.0-native-ci-provenance.json",
+            "size": 14439,
+            "sha256": "736defe9853e0a9aaaae3e5dfe54d46fa562cac233b73b0053ddbc7ae4ebef5a"
+          },
+          {
+            "id": 722333761,
+            "name": "nebular-v0.8.0-sbom-inputs.tar.gz",
+            "size": 126834,
+            "sha256": "bf262a8b1009b8497a7fbc82c8e9d77aa9f5cca17c5106bbdc2efa1a78100049"
+          },
+          {
+            "id": 722333764,
+            "name": "nebular-v0.8.0-sbom.spdx.json",
+            "size": 63796,
+            "sha256": "26da7f1f69f8823e807290d3f8dab2a8b2e97e158f1503efee0222ef21feb103"
+          },
+          {
+            "id": 722469273,
+            "name": "nebular-v0.8.0-source-manifest.json",
+            "size": 951107,
+            "sha256": "8898ee256dcf60bb0793d23eb70e3c15bc1e623b9bea40a1785ec25d6c4ecb8d"
+          },
+          {
+            "id": 722469271,
+            "name": "nebular-v0.8.0-source-rebuild-inputs.json",
+            "size": 15658,
+            "sha256": "73741d6d5b369ac5d2bca52080cb5800df8620284447fc7a7281ca8790a8e091"
+          },
+          {
+            "id": 722333763,
+            "name": "nebular-v0.8.0-third-party-notices.tar.gz",
+            "size": 687484,
+            "sha256": "bf4c26e9527ea58f08b3064cb42608d3ed3533c9d4449790fdff2627fbbf8f60"
+          },
+          {
+            "id": 722499035,
+            "name": "SHA256SUMS",
+            "size": 1972,
+            "sha256": "52901ccad88c2a003ea1f9413062ffe314ed03f8410abe77a30f09e6a85a643f"
+          },
+          {
+            "id": 722264631,
+            "name": "theme-forge-nebular-fusion-v0.8.0-aarch64-apple-darwin.app.tar.gz",
+            "size": 49769994,
+            "sha256": "0a7ab188afc4660f68bd6dabfda96309a348108a8d77a4786df1731cddaf6896"
+          },
+          {
+            "id": 722265731,
+            "name": "theme-forge-nebular-fusion-v0.8.0-aarch64-unknown-linux-gnu.tar.gz",
+            "size": 57038323,
+            "sha256": "4bbc40f180d954e1ca496606da9b63d7ce0f49dd29e802893aabc4aa0e859e94"
+          },
+          {
+            "id": 722429152,
+            "name": "theme-forge-nebular-fusion-v0.8.0-source.tar.gz",
+            "size": 6725884,
+            "sha256": "9eb30214158d1bfaf2d7d4c2b5311ed43e02a26e455239b1873abb11353c63b6"
+          },
+          {
+            "id": 722264633,
+            "name": "theme-forge-nebular-fusion-v0.8.0-x86_64-unknown-linux-gnu.tar.gz",
+            "size": 56825312,
+            "sha256": "498f0f6ff81c32200843e04016f86f7733905df0b0712c3f3639162ad5655abc"
+          }
+        ]
+      },
+      "commit": "516f5a7d8a449946a0246ea23d37991f586dfc2c",
       "contains_rs9": false,
       "immutable": false,
       "project": "theme-forge-nebular-fusion",
-      "published_at": "2026-10-31T08:30:56Z",
-      "release_id": 429782340,
+      "published_at": "2026-11-08T01:18:04Z",
+      "release_id": 437909062,
       "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
       "repository_id": 1358643872,
-      "tag": "v0.7.1",
-      "tree": "6e3561855f6ee0093fb709488ad976b69bf501d2",
+      "tag": "v0.8.0",
+      "tree": "907163a09d2995c9080074294db54c54af626563",
       "truncated": false,
-      "version": "0.7.1"
+      "version": "0.8.0"
     }
   ],
   "schema": "rs9.current-generation-release-expectations.v1alpha1"

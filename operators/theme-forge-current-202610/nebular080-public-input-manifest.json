@@ -1,0 +1,53 @@
+{
+  "schema": "rs9.tracked080-public-input-manifest.v1",
+  "status": "held; source-identity-late-bound",
+  "source": {
+    "repository": "Knowledge-Forge-AI/release-starport-9",
+    "candidate": "nebular080-r-os-complete-prep2",
+    "candidate_status": "source-preparation-only",
+    "identity_status": "late-bound-clean-checkout",
+    "commit": null,
+    "tree": null,
+    "identity_reason": "The prepared candidate has no adopted R checkout identity; do not substitute the product release commit or tree."
+  },
+  "tracked_inputs": {
+    "bootstrap": {
+      "path": "bootstrap/pre-rs9/theme-forge-current-202610/manifest.json",
+      "bytes": 3168,
+      "sha256": "9543dacd536623c891dd04a2163eca20be3ba5c75ef94686d47b45401e8ea8f6"
+    },
+    "expectations": {
+      "path": "operators/theme-forge-current-202610/expectations.json",
+      "bytes": 10351,
+      "sha256": "b9bb151acea81b16000e6c169a74e40f7e724f0d5867d39f92679f57ef32d08a"
+    },
+    "command_contracts": {
+      "path": "operators/theme-forge-current-202610/command-contracts.json",
+      "bytes": 6379,
+      "sha256": "a60527272a3c7915260bb3e7fdcd38f7c3c24eb0f3fba7739f9609f7cd5589b8"
+    },
+    "verifier_closure": {
+      "candidate_file_count": 15,
+      "harness_path": "tests/fixtures/current080-native-rc-smoke.mjs.txt",
+      "harness_bytes": 65040,
+      "harness_sha256": "ee2a26e00522f27d49550d3931cdd25e0f9956a0786d487f9af89755cf8bff39"
+    }
+  },
+  "product_evidence": {
+    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+    "tag": "v0.8.0",
+    "release_id": 437909062,
+    "commit": "516f5a7d8a449946a0246ea23d37991f586dfc2c",
+    "tree": "907163a09d2995c9080074294db54c54af626563",
+    "relay_release_id": 438017969,
+    "relay_tag": "nebular-v0.8.0-native-evidence-run-42418673472-attempt-1",
+    "relay_archive_asset_id": 722806135,
+    "relay_inventory_asset_id": 722806134
+  },
+  "limits": {
+    "full_route": "held-until-clean-r-checkout",
+    "native_execution": false,
+    "hosted_qualification": false,
+    "publication": false
+  }
+}

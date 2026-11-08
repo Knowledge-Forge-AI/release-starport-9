@@ -46,8 +46,8 @@ SUPPORTED_VERSIONS = ("0.6.1", "0.7.0")
 REVIEWED_HELPERS = ("materialize.py", "archives.py", "errors.py", "scratch.py", "security.py")
 
 
-def extract_darwin_minimum_version(plist_bytes: bytes) -> tuple[int, int]:
-    """Parse Info.plist and enforce Darwin arm64 minimum version >= 11.0."""
+def _extract_darwin_minimum_version_triple(plist_bytes: bytes) -> tuple[int, int, int]:
+    """Parse the exact Info.plist deployment triple for strict floor checks."""
     try:
         data = plistlib.loads(plist_bytes)
     except Exception as exc:
@@ -60,12 +60,19 @@ def extract_darwin_minimum_version(plist_bytes: bytes) -> tuple[int, int]:
     if not version_str or not isinstance(version_str, str):
         raise ContractError("INVALID_PLIST", "Info.plist missing required LSMinimumSystemVersion string")
 
-    match = re.fullmatch(r"(\d+)(?:\.(\d+))?(?:\.\d+)?", version_str)
+    match = re.fullmatch(r"(\d+)(?:\.(\d+))?(?:\.(\d+))?", version_str)
     if not match:
         raise ContractError("INVALID_PLIST", f"Unrecognized version format in Info.plist: {version_str!r}")
 
     major = int(match.group(1))
     minor = int(match.group(2) or 0)
+    patch = int(match.group(3) or 0)
+    return major, minor, patch
+
+
+def extract_darwin_minimum_version(plist_bytes: bytes) -> tuple[int, int]:
+    """Return the legacy two-key Darwin floor for existing callers."""
+    major, minor, _patch = _extract_darwin_minimum_version_triple(plist_bytes)
     return max((11, 0), (major, minor))
 
 
@@ -112,6 +119,12 @@ def _thin_macho_build_versions(binary: bytes, *, offset: int = 0) -> list[tuple[
         if command == _MACHO_BUILD_VERSION:
             if command_size < 24:
                 raise ContractError("INVALID_MACHO", "LC_BUILD_VERSION command is truncated")
+            platform = struct.unpack_from(endian + "I", binary, cursor + 8)[0]
+            if platform != 1:
+                raise ContractError(
+                    "INVALID_MACHO",
+                    "LC_BUILD_VERSION platform is not macOS",
+                )
             minimum = struct.unpack_from(endian + "I", binary, cursor + 12)[0]
             versions.append(_decode_macho_version(minimum))
         cursor += command_size
@@ -168,8 +181,14 @@ def validate_darwin_payload_floor(
     resolver.  Existing v1 callers retain their historical contract.
     """
     plist_bytes = _extract_plist_from_payload_tar(payload_archive_bytes)
-    plist_floor = extract_darwin_minimum_version(plist_bytes)
-    if plist_floor < required_floor:
+    plist_version = _extract_darwin_minimum_version_triple(plist_bytes)
+    if plist_version[2] != 0:
+        raise ContractError(
+            "INVALID_PLIST",
+            "Strict Darwin floor evidence cannot represent a nonzero Info.plist patch component",
+        )
+    plist_floor = max((11, 0, 0), plist_version)
+    if plist_floor[:2] < required_floor:
         raise ContractError("DARWIN_FLOOR", "Info.plist minimum is below the Gate1 floor")
     binaries: list[tuple[str, str, tuple[int, int, int]]] = []
     scripts: list[str] = []
@@ -211,7 +230,7 @@ def validate_darwin_payload_floor(
         raise ContractError("INVALID_ARCHIVE", "Failed reading Darwin payload for floor verification") from exc
     if not binaries:
         raise ContractError("MACHO_FLOOR_MISSING", "Darwin payload has no Contents/MacOS native executable")
-    if any(version[:2] > plist_floor for _path, _role, version in binaries):
+    if any(version > plist_floor for _path, _role, version in binaries):
         raise ContractError(
             "DARWIN_FLOOR_MISMATCH",
             "A Mach-O LC_BUILD_VERSION floor exceeds the Info.plist floor",

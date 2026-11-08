@@ -1,0 +1,26 @@
+{
+  "schema": "rs9.tracked080-public-evidence.v1",
+  "product": {
+    "repository": "Knowledge-Forge-AI/theme-forge-nebular-fusion",
+    "tag": "v0.8.0",
+    "release_id": 437909062,
+    "assets": [
+      {"id": 722499035, "name": "SHA256SUMS", "bytes": 1972, "sha256": "52901ccad88c2a003ea1f9413062ffe314ed03f8410abe77a30f09e6a85a643f"},
+      {"id": 722429154, "name": "nebular-compiled-public-build-source-authority-v0.8.0.json", "bytes": 1767, "sha256": "53dea0e5ca138616a94d351e2490f94aa34de74d2665fd62119034ca1fb58dcf"},
+      {"id": 722499032, "name": "nebular-v0.8.0-native-ci-provenance.json", "bytes": 14439, "sha256": "736defe9853e0a9aaaae3e5dfe54d46fa562cac233b73b0053ddbc7ae4ebef5a"},
+      {"id": 722264631, "name": "theme-forge-nebular-fusion-v0.8.0-aarch64-apple-darwin.app.tar.gz", "bytes": 49769994, "sha256": "0a7ab188afc4660f68bd6dabfda96309a348108a8d77a4786df1731cddaf6896"},
+      {"id": 722265731, "name": "theme-forge-nebular-fusion-v0.8.0-aarch64-unknown-linux-gnu.tar.gz", "bytes": 57038323, "sha256": "4bbc40f180d954e1ca496606da9b63d7ce0f49dd29e802893aabc4aa0e859e94"},
+      {"id": 722429152, "name": "theme-forge-nebular-fusion-v0.8.0-source.tar.gz", "bytes": 6725884, "sha256": "9eb30214158d1bfaf2d7d4c2b5311ed43e02a26e455239b1873abb11353c63b6"},
+      {"id": 722264633, "name": "theme-forge-nebular-fusion-v0.8.0-x86_64-unknown-linux-gnu.tar.gz", "bytes": 56825312, "sha256": "498f0f6ff81c32200843e04016f86f7733905df0b0712c3f3639162ad5655abc"},
+      {"id": 722265755, "name": "knowledge-forge-ai-theme-forge-nebular-fusion-0.8.0.tgz", "bytes": 22813, "sha256": "41792773942cc9b039ce8b26114152396c950e43a897a14bc778a3be07d2d81f"}
+    ]
+  },
+  "native_relay": {
+    "release_id": 438017969,
+    "tag": "nebular-v0.8.0-native-evidence-run-42418673472-attempt-1",
+    "assets": [
+      {"id": 722806135, "name": "nebular-v0.8.0-native-evidence-run-42418673472-attempt-1.tar.gz", "bytes": 216591, "sha256": "20f5aaf0dacad5437185981ab95448fb2f13f26001b19ac31fd83ac324795640", "sha512": "ceb0f288efc67eed64768094ea1ce9704506cfbb2828ce8e1d7032c8638740d6ac3ecd56917db47a672518e43bcb064edaccbc099d7e9b729b58279272ad4c37"},
+      {"id": 722806134, "name": "nebular-v0.8.0-native-evidence-run-42418673472-attempt-1-inventory.json", "bytes": 17681, "sha256": "89067774cbdf7b4ce931e3df6b08029bdee97873b8083460fd5b249ee4f5ec72"}
+    ]
+  }
+}

@@ -13,6 +13,8 @@ from rs9.current_generation import CURRENT_GENERATION
 from rs9.nebular_callers import CURRENT070_COMMIT, CURRENT070_TREE, current_contract_for_capture
 from rs9.current_os071 import (CURRENT071_COMMIT, CURRENT071_TREE, CURRENT071_VERIFIER_FILES,
                                CURRENT071_VERIFIER_IMPORTS)
+from rs9.current_os080 import (CURRENT080_COMMIT, CURRENT080_TREE, CURRENT080_VERIFIER_FILES,
+                               CURRENT080_VERIFIER_IMPORTS)
 from rs9.nebular_lineage import (
     CURRENT_COMMIT,
     CURRENT_TREE,
@@ -66,12 +68,14 @@ VERIFIER_SUPPORT = {
     CURRENT_COMMIT: ("package.json",),
     CURRENT070_COMMIT: ("package.json",),
     CURRENT071_COMMIT: ("package.json",),
+    CURRENT080_COMMIT: ("package.json",),
 }
 VERIFIER_SUPPORT_TREES = {
     HISTORICAL_COMMIT: HISTORICAL_TREE,
     CURRENT_COMMIT: CURRENT_TREE,
     CURRENT070_COMMIT: CURRENT070_TREE,
     CURRENT071_COMMIT: CURRENT071_TREE,
+    CURRENT080_COMMIT: CURRENT080_TREE,
 }
 
 
@@ -192,6 +196,13 @@ CURRENT070_FIXTURE_FILES = {'docs/examples/v0.4/brand-system/core-minimal/.tfsb/
                                                                             'sha256': '53ece77670595a24f49bbdfb0af0498e093e5a08366ecaff090814a02c9f70e8',
                                                                             'size': 1110}}
 
+# 0.8.0 uses the same separately admitted Stellar Burst fixture.  Keep the
+# producer tuple explicit for the successor instead of making fixture rows look
+# like Nebular source-tree members.
+CURRENT080_FIXTURE_COMMIT = CURRENT070_FIXTURE_COMMIT
+CURRENT080_FIXTURE_TREE = CURRENT070_FIXTURE_TREE
+CURRENT080_FIXTURE_FILES = CURRENT070_FIXTURE_FILES
+
 
 def _reviewed_verifier_support(capture):
     """Return support paths only for an exact reviewed commit/tree pair."""
@@ -210,10 +221,10 @@ def _reviewed_verifier_support(capture):
     if tag.get("tree") != VERIFIER_SUPPORT_TREES[commit]:
         raise ContractError("SIDECAR_HARNESS_IMPORT", "Tagged verifier tree is not the reviewed closure",
                             details={"substage": "verifier-closure", "reason": "tag-tree-mismatch"})
-    if commit in (CURRENT070_COMMIT, CURRENT071_COMMIT):
+    if commit in (CURRENT070_COMMIT, CURRENT071_COMMIT, CURRENT080_COMMIT):
         _current_smoke_capture(capture)
     elif (isinstance(capture.record.get("release"), dict)
-          and capture.record["release"].get("tag") in ("v0.7.0", "v0.7.1")):
+          and capture.record["release"].get("tag") in ("v0.7.0", "v0.7.1", "v0.8.0")):
         raise ContractError("SIDECAR_HARNESS_IMPORT", "Mixed verifier generation is forbidden",
                             details={"substage": "verifier-closure", "reason": "mixed-generation"})
     return support
@@ -285,11 +296,15 @@ def prepare_smoke(capture, captures, client, scratch, label=None):
     source = scratch / "source"
     source.mkdir()
     support = _reviewed_verifier_support(capture)
-    current = capture.record["tag"]["commit"] in (CURRENT070_COMMIT, CURRENT071_COMMIT)
+    current = capture.record["tag"]["commit"] in (CURRENT070_COMMIT, CURRENT071_COMMIT, CURRENT080_COMMIT)
     if current:
+        verifier_files = {
+            CURRENT070_COMMIT: CURRENT070_VERIFIER_FILES,
+            CURRENT071_COMMIT: CURRENT071_VERIFIER_FILES,
+            CURRENT080_COMMIT: CURRENT080_VERIFIER_FILES,
+        }[capture.record["tag"]["commit"]]
         records = tagged_files(capture, client, source, (),
-                               paths=tuple(path for path in (CURRENT071_VERIFIER_FILES if capture.record["tag"]["commit"] == CURRENT071_COMMIT
-                                                            else CURRENT070_VERIFIER_FILES) if path != "package.json"))
+                               paths=tuple(path for path in verifier_files if path != "package.json"))
     else:
         records = tagged_files(capture, client, source, ("tools/", "apps/studio/tools/"))
     records += tagged_files(capture, client, source, (), paths=support, role="verifier-support")
@@ -305,7 +320,9 @@ def prepare_smoke(capture, captures, client, scratch, label=None):
     fixture = next(c for c, intent, _ in captures if intent["project"]["id"] == "theme-forge-stellar-burst")
     if current:
         _current_fixture_identity(fixture)
-        records += tagged_files(fixture, client, source, (), paths=tuple(CURRENT070_FIXTURE_FILES), role="fixture")
+        fixture_paths = (CURRENT080_FIXTURE_FILES if capture.record["tag"]["commit"] == CURRENT080_COMMIT
+                         else CURRENT070_FIXTURE_FILES)
+        records += tagged_files(fixture, client, source, (), paths=tuple(fixture_paths), role="fixture")
     else:
         records += tagged_files(fixture, client, source, ("docs/examples/v0.4/brand-system/core-minimal/",), role="fixture")
     if len(records) > 1000 or sum(r["size"] for r in records) > 32 * 1024 ** 2:
@@ -726,8 +743,8 @@ def verify_source_readback(prepared):
             or not isinstance(row.get("sha256"), str) or not isinstance(row.get("blob"), str) for row in rows)):
         raise ContractError("SIDECAR_HARNESS_IMPORT", "Malformed verifier source records")
     if (prepared.get("source_generation") == "theme-forge-current-202610"
-            or tag.get("commit") in (CURRENT070_COMMIT, CURRENT071_COMMIT)
-            or any(row.get("tag_commit") in (CURRENT070_COMMIT, CURRENT071_COMMIT) for row in rows)):
+            or tag.get("commit") in (CURRENT070_COMMIT, CURRENT071_COMMIT, CURRENT080_COMMIT)
+            or any(row.get("tag_commit") in (CURRENT070_COMMIT, CURRENT071_COMMIT, CURRENT080_COMMIT) for row in rows)):
         _verify_current_source_binding(prepared)
     if source.is_symlink():
         raise ContractError("SIDECAR_HARNESS_IMPORT", "Verifier source root cannot be an alias")

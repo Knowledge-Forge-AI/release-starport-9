@@ -1,0 +1,29 @@
+{
+  "schema": "rs9.tracked080-source-readback.v1",
+  "candidate": "nebular080-r-os-complete-prep2",
+  "status": "prepared-bytes-read-back; identity-held",
+  "files": [
+    {
+      "path": "bootstrap/pre-rs9/theme-forge-current-202610/manifest.json",
+      "bytes": 3168,
+      "sha256": "9543dacd536623c891dd04a2163eca20be3ba5c75ef94686d47b45401e8ea8f6"
+    },
+    {
+      "path": "operators/theme-forge-current-202610/expectations.json",
+      "bytes": 10351,
+      "sha256": "b9bb151acea81b16000e6c169a74e40f7e724f0d5867d39f92679f57ef32d08a"
+    },
+    {
+      "path": "operators/theme-forge-current-202610/command-contracts.json",
+      "bytes": 6379,
+      "sha256": "a60527272a3c7915260bb3e7fdcd38f7c3c24eb0f3fba7739f9609f7cd5589b8"
+    }
+  ],
+  "checkout": {
+    "repository": "Knowledge-Forge-AI/release-starport-9",
+    "exact_prepared_paths_available": false,
+    "commit": null,
+    "tree": null,
+    "next_gate": "clean checkout identity and byte readback"
+  }
+}

@@ -104,6 +104,107 @@ const CURRENT071_PROFILE = Object.freeze({
   },
   "tree": "6e3561855f6ee0093fb709488ad976b69bf501d2"
 });
+const CURRENT080_PROFILE = Object.freeze({
+  "id": "nebular080",
+  "commit": "516f5a7d8a449946a0246ea23d37991f586dfc2c",
+  "tree": "907163a09d2995c9080074294db54c54af626563",
+  "modules": {
+    "appearance-matrix-prep1/generate.mjs": {
+      "blob": "34f4072cf61c7f7d49b4120684f7f5379bf60b0c",
+      "sha256": "2472f6ede72c17152d51410146d126251a26821815111b6c1b214308484ad67d",
+      "size": 17120
+    },
+    "build-inputs.mjs": {
+      "blob": "2415e54e5f06cbb3b4a19cb713037238a07d5895",
+      "sha256": "cdb80c1a9742a8632a5eb9284d970669714340daf809c0368095658e38c65154",
+      "size": 16400
+    },
+    "build-settings.mjs": {
+      "blob": "87b69b40534ef60f1895bdd866ce7e74fa581dae",
+      "sha256": "f7578fccf935e14aee190a2de4378a986a182b038e41b261f3f9355e33449cd0",
+      "size": 24182
+    },
+    "candidate-provenance.mjs": {
+      "blob": "129b0da16329d07697daab619f8fdbc5690f72fa",
+      "sha256": "20244b6765d6e7d0ee5fd86452096a4546f189103b0acb9f065c4a1479c23155",
+      "size": 15484
+    },
+    "darwin-linkage-validator.mjs": {
+      "blob": "3ca8ede088162f10d922b9cbec1d091daa052c33",
+      "sha256": "67073d25aa00bc6c8086e8d10a2bd7302cc46c6416894bcba553880edf83f0f9",
+      "size": 7678
+    },
+    "fs-snapshot.mjs": {
+      "blob": "841cfecd874517d0c619cf9a3866c2697e12ecd6",
+      "sha256": "30ad6c3f0394126a7d3e5534507fe46c78c34946edd15bd5c91b36e2b36df351",
+      "size": 13794
+    },
+    "native-launcher.mjs": {
+      "blob": "9c84fff880957edcb98925bbaea941fc0f7e66fe",
+      "sha256": "3595cfaf0a2f1ac51a48862dc5f6aa842db6d3431a62159bcb93cb0abc812f2d",
+      "size": 7193
+    },
+    "native-rc-package.mjs": {
+      "blob": "570d4d2b6cee8551bb0d77417e54ee4a0d308ca8",
+      "sha256": "0ef948c2f9f45a9343586288681ae5ed6f6527b85912a52bd8c37aa50e3682c6",
+      "size": 33102
+    },
+    "native-rc-smoke.mjs": {
+      "blob": "4adeae77bb147cf7969054695a8af6dfeb335736",
+      "sha256": "ee2a26e00522f27d49550d3931cdd25e0f9956a0786d487f9af89755cf8bff39",
+      "size": 65040
+    },
+    "native-runtime.mjs": {
+      "blob": "333192471147289f232bd915c6813ae23b39f1bb",
+      "sha256": "a9d6c8e885b9db41877c5d2d79efe48f2e47daf791e0f1ad1ca06636d37d962e",
+      "size": 118749
+    },
+    "node-runtime-authority.mjs": {
+      "blob": "dfb5fb377c66463ec54ba81c87d1424857548436",
+      "sha256": "5495e291131a963c3e9bc9730aacb108d770954ce88f397e0f4a3c9ce768635e",
+      "size": 37973
+    },
+    "platform-targets.mjs": {
+      "blob": "ebe518bbf27856c496541bca46bf13066805a606",
+      "sha256": "35321c7e888038210589612873136c96bf697789f6f4e90918442faa41e13aec",
+      "size": 7292
+    },
+    "sidecar-common.mjs": {
+      "blob": "a79812c8b47bb9a0a34c341261c49f7c1060d12e",
+      "sha256": "e0ca4d4a4bba4abd756f1399e31a768a20873eefb6c50ac26a75adddccc1978c",
+      "size": 81902
+    },
+    "sidecar-verify.mjs": {
+      "blob": "a456da327097d26bec9a41fdfaf288af57f38657",
+      "sha256": "fba7f292b3c01ed062f4727e0c22912bc269b6ca76fca8328fb5329c098aac77",
+      "size": 1906
+    }
+  },
+  "support": {
+    "blob": "1001d40761261042da55c19e02874deb0c0002b5",
+    "sha256": "64df6f25e3fee6d56d31afdeefa6da1fdb4ebdf7d79033195caecb6fb2ed6be9",
+    "size": 1833
+  }
+});
+const CURRENT080_EXECUTION_MODULE_NAMES = Object.freeze([
+  "appearance-matrix-prep1/generate.mjs",
+  "candidate-provenance.mjs",
+  "fs-snapshot.mjs",
+  "native-launcher.mjs",
+  "native-rc-package.mjs",
+  "native-rc-smoke.mjs",
+  "native-runtime.mjs",
+  "platform-targets.mjs",
+]);
+const CURRENT080_RUNTIME_PROFILE = Object.freeze({
+  ...CURRENT080_PROFILE,
+  // The complete 14-module source inventory is authenticated before this
+  // fixed entry closure is imported.  These eight names are the only
+  // execution members accepted for native-rc-smoke.mjs.
+  execution_modules: Object.freeze(Object.fromEntries(
+    CURRENT080_EXECUTION_MODULE_NAMES.map(name => [name, CURRENT080_PROFILE.modules[name]]),
+  )),
+});
 const PROGRESS_SCHEMA = "rs9.application-smoke-replay-progress.v1";
 const MAX_PROGRESS_BYTES = 16 * 1024;
 const MAX_PROGRESS_EVENTS = 32;
@@ -115,9 +216,14 @@ const MAX_INITIAL_SNAPSHOT_WRITES = 32;
 const INITIAL_SNAPSHOT_INTERVAL_MS = 8_000;
 const CURRENT071_REQUIRED_INITIAL_TIMEOUT_MS = 210_000;
 const CURRENT071_SIGNAL_INITIAL_TIMEOUT_MS = 180_000;
+const CURRENT080_REQUIRED_INITIAL_TIMEOUT_MS = 210_000;
+const CURRENT080_SIGNAL_INITIAL_TIMEOUT_MS = 180_000;
 const CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID = "current071-nix-inherited-xdg-fontconfig-v1";
+const CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID = "current080-nix-inherited-xdg-fontconfig-v1";
 const CURRENT071_DERIVED_HARNESS_SHA256 = "15b34fe8680f1df983be3f79b72404c78bc4c5506bf9f1943b5e9b24bc4f633f";
 const CURRENT071_DERIVED_HARNESS_BYTES = 30772;
+const CURRENT080_DERIVED_HARNESS_SHA256 = "a792af12928867361a39132d0cdb2f0fc1c35444dc698d9c59e53a9038680afe";
+const CURRENT080_DERIVED_HARNESS_BYTES = 65080;
 const FIXED_PROGRESS_EVENTS = new Set([
   "harness|import-start", "harness|imported", "harness|import-failed", "harness|export-missing",
   "candidate|launch-failed", "candidate|launched", "candidate|exited",
@@ -157,7 +263,8 @@ const INITIAL_HELPER_PATTERNS = Object.freeze(INITIAL_HELPER_IDENTIFIERS.map(ide
 const MAX_INITIAL_CATEGORY_COUNT = 4096;
 const INITIAL_SCAN_TAIL_CHARS = 2048;
 const MAX_HARNESS_BYTES = 4 * 1024 * 1024;
-const MAX_CLOSURE_FILES = 8;
+const CURRENT071_MAX_CLOSURE_FILES = 8;
+const CURRENT080_MAX_CLOSURE_FILES = 16;
 const MAX_CLOSURE_BYTES = 8 * 1024 * 1024;
 const O_NOFOLLOW = fs.constants.O_NOFOLLOW;
 const INTERNAL = Object.freeze({
@@ -256,10 +363,27 @@ function parseSmokeArgs(argv) {
   return options;
 }
 
-function readHeldRegular(path, expectedSha256) {
+function verifyRealAncestors(path, trustedRoot) {
+  const root = resolve(trustedRoot);
+  let current = dirname(resolve(path));
+  while (true) {
+    const info = fs.lstatSync(current);
+    if (info.isSymbolicLink() || !info.isDirectory())
+      throw new Error("Authenticated replay source ancestor is unavailable");
+    if (current === root) return;
+    const parent = dirname(current);
+    const relativePath = relative(root, current).split(sep).join("/");
+    if (relativePath.startsWith("../") || relativePath === ".." || parent === current)
+      throw new Error("Authenticated replay source escaped its root");
+    current = parent;
+  }
+}
+
+function readHeldRegular(path, expectedSha256, trustedRoot = null) {
   if (typeof O_NOFOLLOW !== "number") throw new Error("No-follow harness read is unavailable");
   let fd;
   try {
+    if (trustedRoot !== null) verifyRealAncestors(path, trustedRoot);
     fd = fs.openSync(path, fs.constants.O_RDONLY | O_NOFOLLOW | fs.constants.O_NONBLOCK);
     const info = fs.fstatSync(fd);
     if (!info.isFile() || info.size > MAX_HARNESS_BYTES) throw new Error("Authenticated replay source is not a bounded regular file");
@@ -325,7 +449,9 @@ function buildAuthenticatedClosure(harnessPath, expectedSha256, rawMembers, curr
   if (expected.get(entryName) !== expectedSha256) {
     throw new Error("Authenticated replay source entry is not bound to its closure");
   }
-  if (expected.size + (current ? 1 : 0) > MAX_CLOSURE_FILES) throw new Error("Authenticated replay source closure is too large");
+  const maxClosureFiles = current?.profile?.id === "nebular080"
+    ? CURRENT080_MAX_CLOSURE_FILES : CURRENT071_MAX_CLOSURE_FILES;
+  if (expected.size + (current ? 1 : 0) > maxClosureFiles) throw new Error("Authenticated replay source closure is too large");
 
   const sources = new Map();
   const visited = new Set();
@@ -333,8 +459,8 @@ function buildAuthenticatedClosure(harnessPath, expectedSha256, rawMembers, curr
   const visit = (name) => {
     if (visited.has(name)) return;
     const path = closurePath(root, name);
-    const bytes = readHeldRegular(path, expected.get(name));
-    if (current) verifyCurrentBytes(bytes, current.profile.modules[name]);
+    const bytes = readHeldRegular(path, expected.get(name), root);
+    if (current) verifyCurrentBytes(bytes, current.profile.modules?.[name]);
     totalBytes += bytes.length;
     if (totalBytes > MAX_CLOSURE_BYTES) throw new Error("Authenticated replay source closure is too large");
     visited.add(name);
@@ -545,10 +671,29 @@ function verifyCurrentBytes(bytes, pin) {
       ])).digest("hex") !== pin.blob) throw new Error("Current replay source binding differs");
 }
 
+function executionModulePins(profile) {
+  if (!profile || typeof profile !== "object") throw new Error("Current replay profile is unavailable");
+  const pins = profile.id === "nebular080" ? profile.execution_modules : profile.modules;
+  if (!pins || typeof pins !== "object" || Array.isArray(pins)) {
+    throw new Error("Current replay execution closure is unavailable");
+  }
+  return pins;
+}
+
+function verifyCompleteSourceInventory(toolsRoot, profile) {
+  for (const [name, pin] of Object.entries(profile.modules)) {
+    const path = closurePath(toolsRoot, name);
+    const bytes = readHeldRegular(path, pin.sha256, toolsRoot);
+    verifyCurrentBytes(bytes, pin);
+  }
+}
+
 function currentProfile(args) {
   if (args.currentArgs.size === 0) return null;
   const id = args.currentArgs.get(INTERNAL.profile);
-  const profile = id === "nebular070" ? CURRENT_PROFILE : id === "nebular071" ? CURRENT071_PROFILE : null;
+  const profile = id === "nebular070" ? CURRENT_PROFILE
+    : id === "nebular071" ? CURRENT071_PROFILE
+      : id === "nebular080" ? CURRENT080_RUNTIME_PROFILE : null;
   if (!profile) throw new Error("Unknown current replay source profile");
   const expected = new Map([
     [INTERNAL.profile, profile.id], [INTERNAL.commit, profile.commit],
@@ -567,7 +712,7 @@ function currentProfile(args) {
     if (members.has(item.name)) throw new Error("Current replay closure duplicated");
     members.set(item.name, item.expectedSha256);
   }
-  const pins = profile.modules;
+  const pins = executionModulePins(profile);
   if (members.size !== Object.keys(pins).length || [...members].some(([name, hash]) => pins[name]?.sha256 !== hash)) {
     throw new Error("Current replay closure differs");
   }
@@ -576,10 +721,13 @@ function currentProfile(args) {
     const info = fs.lstatSync(root);
     if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Current replay source root differs");
   }
+  verifyCompleteSourceInventory(toolsRoot, profile);
   const supportPath = resolve(toolsRoot, "../package.json");
-  const supportBytes = readHeldRegular(supportPath, profile.support.sha256);
+  const supportBytes = readHeldRegular(supportPath, profile.support.sha256, dirname(toolsRoot));
   verifyCurrentBytes(supportBytes, profile.support);
-  if (JSON.parse(supportBytes.toString("utf8")).version !== (profile.id === "nebular071" ? "0.7.1" : "0.7.0")) throw new Error("Current replay version differs");
+  const expectedVersion = profile.id === "nebular071" ? "0.7.1"
+    : profile.id === "nebular080" ? "0.8.0" : "0.7.0";
+  if (JSON.parse(supportBytes.toString("utf8")).version !== expectedVersion) throw new Error("Current replay version differs");
   return { supportPath, supportBytes, profile };
 }
 
@@ -611,8 +759,12 @@ function initialObservationProfile(profile) {
     source_commit: profile.commit,
     source_tree: profile.tree,
     harness_sha256: profile.modules["native-rc-smoke.mjs"].sha256,
-    closure_sha256s: Object.fromEntries(Object.entries(profile.modules)
+    closure_sha256s: Object.fromEntries(Object.entries(executionModulePins(profile))
       .map(([name, pin]) => [name, pin.sha256])),
+    ...(profile.id === "nebular080" ? {
+      source_closure_sha256s: Object.fromEntries(Object.entries(profile.modules)
+        .map(([name, pin]) => [name, pin.sha256])),
+    } : {}),
   };
 }
 
@@ -691,7 +843,7 @@ function makeInitialObservation(path, profile, executionTransform = null) {
     state.status = "partial";
   };
 
-  if (profile.id === "nebular071") {
+  if (profile.id === "nebular071" || profile.id === "nebular080") {
     state.environment_presence = {wrapper_entry: null, first_spawn: null};
     try {
       state.environment_presence.wrapper_entry = sampleEnvironmentPresence(defaultEnvironmentSource());
@@ -913,6 +1065,12 @@ function current071InitialTimeoutMs(options) {
   return CURRENT071_REQUIRED_INITIAL_TIMEOUT_MS;
 }
 
+function current080InitialTimeoutMs(options) {
+  if (options.platform === "linux-x64" && options.scenario === "C-signal")
+    return CURRENT080_SIGNAL_INITIAL_TIMEOUT_MS;
+  return CURRENT080_REQUIRED_INITIAL_TIMEOUT_MS;
+}
+
 async function loadEnvironmentTransformHelper() {
   const helperPath = fileURLToPath(new URL("./current_nix_smoke_environment.mjs", import.meta.url));
   let info;
@@ -938,14 +1096,23 @@ async function main() {
   const options = current ? parseSmokeArgs(forwarded) : null;
   if (current && !((options.platform === "linux-x64" && ["C", "C-signal"].includes(options.scenario))
       || (options.platform === "linux-arm64" && options.scenario === "B"))) throw new Error("Current replay scenario differs");
-  if (initialObservationKind !== undefined && options.timeoutMs !== undefined
-      && !(current?.profile?.id === "nebular071"
-        && options.timeoutMs === current071InitialTimeoutMs(options)))
-    throw new Error("Initial observation timeout is not authorized for this source profile");
+  if (initialObservationKind !== undefined && options.timeoutMs !== undefined) {
+    const expectedTimeout = current?.profile?.id === "nebular071"
+      ? current071InitialTimeoutMs(options)
+      : current?.profile?.id === "nebular080"
+        ? current080InitialTimeoutMs(options)
+        : undefined;
+    if (expectedTimeout === undefined || options.timeoutMs !== expectedTimeout)
+      throw new Error("Initial observation timeout is not authorized for this source profile");
+  }
   let derivedEntry = null;
   if (environmentTransform !== undefined) {
     const transformHelper = await loadEnvironmentTransformHelper();
-    derivedEntry = transformHelper.deriveCurrentNixSmokeModule(
+    const isCurrent080 = environmentTransform === CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID;
+    const derive = isCurrent080
+      ? transformHelper.deriveCurrent080NixSmokeModule
+      : transformHelper.deriveCurrentNixSmokeModule;
+    derivedEntry = derive(
       closure.sources.get(closure.entryPath),
       {
         transformId: environmentTransform,
@@ -954,14 +1121,16 @@ async function main() {
         scenario: options?.scenario,
       },
     );
+    const expectedDerivedBytes = isCurrent080 ? CURRENT080_DERIVED_HARNESS_BYTES : CURRENT071_DERIVED_HARNESS_BYTES;
+    const expectedDerivedSha256 = isCurrent080 ? CURRENT080_DERIVED_HARNESS_SHA256 : CURRENT071_DERIVED_HARNESS_SHA256;
     if (!Buffer.isBuffer(derivedEntry?.derivedBytes)
-        || derivedEntry.derivedBytes.length !== CURRENT071_DERIVED_HARNESS_BYTES
-        || sha256(derivedEntry.derivedBytes) !== CURRENT071_DERIVED_HARNESS_SHA256) {
+        || derivedEntry.derivedBytes.length !== expectedDerivedBytes
+        || sha256(derivedEntry.derivedBytes) !== expectedDerivedSha256) {
       throw new Error("Derived smoke harness identity mismatch");
     }
     transformHelper.validateCurrentNixEnvironmentCarrier(
       derivedEntry.executionTransform,
-      { expected: true },
+      { expected: true, profileId: isCurrent080 ? "nebular080" : "nebular071" },
     );
   }
   const initialObservation = initialObservationKind === INITIAL_OBSERVATION_KIND
@@ -997,9 +1166,29 @@ async function main() {
   if (result.status !== "pass") process.exitCode = 1;
 }
 
-try {
-  await main();
-} catch (error) {
-  writeLegacyError(error);
-  process.exitCode = 1;
+export {
+  buildAuthenticatedClosure,
+  current071InitialTimeoutMs,
+  current080InitialTimeoutMs,
+  parseClosureMember,
+  verifyRealAncestors,
+  isMainModule,
+};
+
+function isMainModule(entryPath, moduleUrl) {
+  if (!entryPath) return false;
+  try {
+    return fs.realpathSync(entryPath) === fs.realpathSync(fileURLToPath(moduleUrl));
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule(process.argv[1], import.meta.url)) {
+  try {
+    await main();
+  } catch (error) {
+    writeLegacyError(error);
+    process.exitCode = 1;
+  }
 }
