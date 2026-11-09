@@ -750,7 +750,8 @@ def _closed_receipt_steps(raw, *, scenario):
 
 
 def project_problem_categories(record, identity, *, system, platform, scenario, current071=False,
-                               current071_problems=False, current071_receipt_steps=False):
+                               current071_problems=False, current071_receipt_steps=False,
+                               current080_receipt_steps=False):
     """Category-only Linux B/C projection of the already-read original .run.json; no reread."""
     if (not all(isinstance(v, str) for v in (system, platform, scenario)) or
             (system, platform, scenario) not in _CATEGORY_BINDINGS or not isinstance(record, dict)):
@@ -765,8 +766,13 @@ def project_problem_categories(record, identity, *, system, platform, scenario, 
     total = problems["total"]
     finalization = (_closed_finalization(record.get("finalization"), allow_schema=True)
                     if current071 is True else None)
+    receipt_steps_enabled = (
+        current071_enabled and current071_receipt_steps is True
+        or current080_receipt_steps is True
+        and (system, platform, scenario) == ("x86_64-linux", "linux-x64", "C-signal")
+    )
     receipt_steps = (_project_receipt_steps(record, scenario=scenario)
-                     if current071_enabled and current071_receipt_steps is True else None)
+                     if receipt_steps_enabled else None)
     result = {
         "schema": CATEGORY_SCHEMA,
         "stage": CATEGORY_STAGE,
@@ -1245,7 +1251,7 @@ def validate_inner_stream_tokens(raw, *, inventory=None, mismatch=False, require
 
 def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, record=None, *, system=None,
                                 current071=False, current071_problems=False, current_nix_text=False,
-                                current071_receipt_steps=False):
+                                current071_receipt_steps=False, current080_receipt_steps=False):
     """Each optional observation fails independently after the gate outcome is fixed."""
     result = {}
     try:
@@ -1283,6 +1289,7 @@ def collect_failure_diagnostics(stderr, fields, evidence, platform, scenario, re
             **({"current071": True} if current071 is True else {}),
             **({"current071_problems": True} if current071_problems is True else {}),
             **({"current071_receipt_steps": True} if current071_receipt_steps is True else {}),
+            **({"current080_receipt_steps": True} if current080_receipt_steps is True else {}),
         )
         if categories is not None:
             result["harness_problem_categories"] = categories
