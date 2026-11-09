@@ -35,6 +35,7 @@ PROCESS_FIELDS = frozenset({
     "exit_code", "signal", "stdout_sha256", "stderr_sha256", "duration_ms",
     "timed_out", "output_limit_exceeded", "cleanup_known", "output_complete", "forced_cleanup",
 })
+_MANIFEST_KEYS = frozenset({"commands", "manifest_sha256", "members", "root"})
 
 
 def _fail(code):
@@ -44,6 +45,63 @@ def _fail(code):
 
 def _sha(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def _empty_scratch_state() -> dict:
+    """Return the closed zero-path scratch frame used by this universal lane."""
+    return {"target_count": 0, "entry_count": 0, "sha256": _sha(canonical([]))}
+
+
+def _native_input(target: str, support: Mapping) -> dict:
+    """Derive only the invocation inputs; no native result is accepted here."""
+    from rs9 import nebular080_consumer_core as consumer
+
+    if target not in consumer._NEBULAR_NATIVE_RC_PLATFORMS:
+        _fail("TARGET")
+    scenario = consumer._NEBULAR_NATIVE_RC_SCENARIOS[target]["raw-archive"]
+    return {
+        "command": "tfnf",
+        "protocol": "nebular.native-rc-smoke",
+        "platform": consumer._NEBULAR_NATIVE_RC_PLATFORMS[target],
+        "scenario": scenario,
+        "argv": [f"--nebular-release-smoke={scenario}"],
+        "timeout_seconds": 60,
+        "state_paths": [],
+        "user_state_protocol": {
+            "schema": "nebular.native-rc-persistent-user-state-v1",
+            "method": "native-rc-smoke.persistentStateLocations+snapshotLocations",
+            "scope": "real-user-state",
+        },
+        "smoke_support": dict(support),
+    }
+
+
+def _native_package_record(raw: bytes, record_sha256: str, *, target: str,
+                           asset: Mapping, member_count: int) -> dict:
+    """Bind the producer's package record without treating it as a release record."""
+    from rs9 import nebular080_consumer_core as consumer
+    from rs9 import nebular080_product_native as native
+
+    platform = consumer._NEBULAR_NATIVE_RC_PLATFORMS.get(target)
+    lane = "macos-arm64" if target == "darwin-arm64" else platform
+    pin = native.evidence_pins().get(lane, {}).get("package-record.json")
+    if (not isinstance(pin, Mapping) or not isinstance(raw, bytes)
+            or len(raw) != pin["bytes"] or _sha(raw) != pin["sha256"]
+            or record_sha256 != pin["sha256"]):
+        _fail("NATIVE_CONTRACT")
+    value = strict_json(raw)
+    package = value.get("raw") if isinstance(value, Mapping) else None
+    if (not isinstance(value, Mapping)
+            or set(value) != {"glibcMinimum", "npm", "packageManifestSha256", "platform", "raw", "schema", "version"}
+            or value.get("schema") != "nebular.native-rc-package-v1"
+            or value.get("version") != builder.VERSION or value.get("platform") != platform
+            or not isinstance(package, Mapping)
+            or package.get("filename") != asset.get("name")
+            or package.get("size") != asset.get("size")
+            or package.get("sha256") != asset.get("sha256")
+            or package.get("members") != member_count):
+        _fail("NATIVE_CONTRACT")
+    return dict(value)
 
 
 def _minimum_python_version() -> tuple[int, int]:
@@ -600,7 +658,9 @@ def inspect_universal_wheel(
         raw_manifest = member(package + "/runtimes/" + key + ".json")
         value = strict_json(raw_manifest)
         members, root, digest = parse_manifest_members(value)
-        if (not isinstance(value, dict) or canonical(value) != raw_manifest
+        if (not isinstance(value, dict) or set(value) != _MANIFEST_KEYS
+                or value.get("commands") != {}
+                or canonical(value) != raw_manifest
                 or value.get("root") != root or root != spec["root"]
                 or digest != spec["manifest_sha256"]):
             _fail("MANIFEST")
@@ -648,17 +708,42 @@ def capture_universal_runtime(snapshot: Mapping, raw_root: Path,
     if (payload_sha != asset["sha256"] or len(payload) != asset["size"]
             or _descriptor_asset_name(desc) != asset["name"]):
         _fail("ARCHIVE")
-    raw_manifest, manifest_sha = consumer._nebular_descriptor(
+    raw_manifest, manifest_record_sha256 = consumer._nebular_descriptor(
         root, raw_target.get("manifest"), "manifest")
+    raw_manifest_value = strict_json(raw_manifest)
     manifest = snapshot["manifests"][target]
-    members = strict_json(raw_manifest)
-    if isinstance(members, Mapping):
-        members = members.get("members")
-    if (manifest_sha != spec["manifest_sha256"] or members != manifest["members"]):
+    if (not isinstance(raw_manifest_value, Mapping) or not isinstance(manifest, Mapping)
+            or set(raw_manifest_value) != _MANIFEST_KEYS
+            or set(manifest) != _MANIFEST_KEYS
+            or raw_manifest_value.get("commands") != {}
+            or manifest.get("commands") != {}):
         _fail("MANIFEST")
-    record_bytes, record_sha = consumer._nebular_descriptor(root, raw_target.get("record"), "record")
-    record = strict_json(record_bytes)
+    try:
+        raw_members, raw_root, semantic_manifest_sha256 = parse_manifest_members(raw_manifest_value)
+        embedded_members, embedded_root, embedded_manifest_sha256 = parse_manifest_members(manifest)
+    except ContractError:
+        _fail("MANIFEST")
+    if (
+        raw_manifest_value.get("root") != raw_root
+        or manifest.get("root") != embedded_root
+        or raw_root != spec["root"]
+        or embedded_root != spec["root"]
+        or raw_root != embedded_root
+        or raw_members != embedded_members
+        or semantic_manifest_sha256 != spec["manifest_sha256"]
+        or embedded_manifest_sha256 != spec["manifest_sha256"]
+        or semantic_manifest_sha256 != embedded_manifest_sha256
+    ):
+        _fail("MANIFEST")
+    package_bytes, package_record_sha = consumer._nebular_descriptor(
+        root, raw_target.get("record"), "record")
+    package_record = _native_package_record(
+        package_bytes, package_record_sha, target=target, asset=asset,
+        member_count=len(raw_members))
+    record = product_capture.record
+    record_sha = _sha(canonical(record))
     if (not isinstance(record, Mapping) or record.get("schema") != "rs9.release-record.v1alpha1"
+            or record_sha != product_source.get("record_sha256")
             or record.get("repository", {}).get("full_name") != release["repository"]
             or record.get("release", {}).get("tag") != release["tag"]
             or record.get("release", {}).get("draft") is not False
@@ -692,15 +777,25 @@ def capture_universal_runtime(snapshot: Mapping, raw_root: Path,
             or any(native_assets[0].get(key) != asset[key] for key in ("name", "sha256", "url"))):
         _fail("PROVENANCE")
     rows = raw_target.get("native_consumer")
-    native = rows.get(target) if isinstance(rows, Mapping) else None
-    if not isinstance(native, Mapping) or not isinstance(native.get("smoke_support"), Mapping):
+    if not isinstance(rows, Mapping) or set(rows) != {target}:
+        _fail("NATIVE_CONTRACT")
+    raw_native = rows[target]
+    if not isinstance(raw_native, Mapping) or set(raw_native) != {"smoke_support"}:
+        _fail("NATIVE_CONTRACT")
+    try:
+        from rs9.nebular080_smoke_support import validate_smoke_support
+        support = validate_smoke_support(raw_native["smoke_support"], target)
+    except Exception:
+        _fail("NATIVE_CONTRACT")
+    if not isinstance(support, Mapping):
         _fail("NATIVE_CONTRACT")
     release_join = join_product_native_release(
         product_capture, product_source, release, record, provenance,
         snapshot["runtime_inputs"]["product_native_reference"], asset,
         provenance_bytes=provenance_bytes,
-        support=native["smoke_support"], native_admission=native_admission,
+        support=support, native_admission=native_admission,
     )
+    native = _native_input(target, support)
     roles = consumer._nebular_native_role_paths(target, manifest)
     by_path = {item["path"]: item for item in manifest["members"]}
     executables = {}
@@ -713,49 +808,26 @@ def capture_universal_runtime(snapshot: Mapping, raw_root: Path,
         executable = {**item, "status": "verified", "executable": True, "label": role}
         consumer._nebular_payload_member(root, payload, executable)
         executables[role] = executable
+    if package_record["raw"].get("executableSha256") != executables["gui"]["sha256"]:
+        _fail("EXECUTABLE")
     if (spec["shell_target"] != roles["launcher"] or spec["gui_target"] != roles["gui"]):
         _fail("EXECUTABLE")
     gui = executables["gui"]
     gui.update(smoke_path=roles["smoke_gui"], runtime_path=roles["smoke_gui"],
                materialized_path=roles["materialized_gui"])
+    # Static system input and native evidence are intentionally absent from
+    # this proposed universal input boundary.  Core installed-smoke code
+    # remains responsible for live Linux/Darwin gates after this point.
     static = None
-    if target.startswith("linux"):
-        native, static = consumer._nebular_static_system_native(
-            native, target=target, manifest=manifest,
-            payload_digest=payload_sha, manifest_digest=manifest_sha)
-    expected = consumer._NEBULAR_NATIVE_RC_SCENARIOS[target]["raw-archive"]
-    protocol = native.get("user_state_protocol")
-    if (native.get("command") != "tfnf" or native.get("protocol") != "nebular.native-rc-smoke"
-            or native.get("platform") != consumer._NEBULAR_NATIVE_RC_PLATFORMS[target]
-            or native.get("scenario") != expected
-            or native.get("argv") != ["--nebular-release-smoke=" + expected]
-            or type(native.get("timeout_seconds")) is not int
-            or not 1 <= native["timeout_seconds"] <= 60
-            or not isinstance(native.get("state_paths"), list)
-            or any(not isinstance(item, str) for item in native["state_paths"])
-            or not isinstance(protocol, Mapping)
-            or protocol.get("schema") != "nebular.native-rc-persistent-user-state-v1"
-            or protocol.get("method") != "native-rc-smoke.persistentStateLocations+snapshotLocations"
-            or protocol.get("scope") != "real-user-state"):
-        _fail("NATIVE_CONTRACT")
     native_evidence = None
-    if target == "darwin-arm64":
-        loader, provider = native.get("loader"), native.get("provider_closure")
-        if (not isinstance(loader, Mapping) or not isinstance(provider, Mapping)
-                or loader.get("path") != executables["launcher"]["path"]
-                or loader.get("sha256") != executables["launcher"]["sha256"]
-                or loader.get("status") != "verified"
-                or provider.get("target") != target or provider.get("emulated") is True
-                or provider.get("mode") != "host-observed"):
-            _fail("NATIVE_CONTRACT")
-        native_evidence = consumer._nebular_native_evidence(
-            root, native, target=target, fixture_only=False,
-            loader=loader, provider=provider, gui=gui, sidecar=executables["sidecar"])
     return {
-        "root": root, "manifest": manifest, "manifest_sha256": manifest_sha,
+        "root": root, "manifest": manifest,
+        "manifest_sha256": semantic_manifest_sha256,
+        "manifest_record_sha256": manifest_record_sha256,
         "payload_sha256": payload_sha, "native": dict(native), "gui": gui,
         "system_static_input": static, "native_evidence": native_evidence,
         "release_record_sha256": record_sha, "provenance_sha256": provenance_sha,
+        "native_package_record_sha256": package_record_sha,
         "product_capture": product_capture,
         "product_source": product_source,
         "release_join": release_join,
@@ -825,12 +897,12 @@ def materialize_universal_handoff(descriptor: Mapping, output: Path, *, target: 
 
     try:
         row = json.loads(canonical(checked["raw_release"]["targets"][target]))
-        native = row["native_consumer"][target]
-        if target == "darwin-arm64":
-            stage(native["qualification"])
-            for channel in ("raw-archive", "npm-package"):
-                for key in ("run", "receipt"):
-                    stage(native["smoke"][channel][key])
+        native_rows = row.get("native_consumer")
+        if not isinstance(native_rows, Mapping) or set(native_rows) != {target}:
+            _fail("NATIVE_CONTRACT")
+        native = native_rows[target]
+        if not isinstance(native, Mapping) or set(native) != {"smoke_support"}:
+            _fail("NATIVE_CONTRACT")
         support = validate_smoke_support(
             native["smoke_support"], target,
             evidence_files=checked["evidence"]["files"], descriptor=True)
@@ -1014,6 +1086,21 @@ def consume_universal_wheel(
             install_runtime_for_consumer,
             spec=snapshot["runtime_inputs"]["targets"][target], target=target),
     )
+    user_state = installed.get("user_state")
+    scratch_state = user_state.get("scratch") if isinstance(user_state, Mapping) else None
+    empty_scratch = _empty_scratch_state()
+    if (not isinstance(user_state, Mapping) or not isinstance(scratch_state, Mapping)
+            or set(scratch_state) != {"before", "after", "unchanged"}
+            or scratch_state.get("before") != empty_scratch
+            or scratch_state.get("after") != empty_scratch
+            or scratch_state.get("unchanged") is not True):
+        _fail("USER_STATE")
+    user_state["scratch"] = {
+        "before": empty_scratch,
+        "after": dict(empty_scratch),
+        "unchanged": True,
+        "observation": "not-observed",
+    }
     application = validate_installed_smoke_summary(
         installed.get("application_smoke"), target=target,
         authenticated_gui=capture["gui"], distribution=DISTRIBUTION)
@@ -1038,7 +1125,10 @@ def consume_universal_wheel(
         "python_version": _runtime_python_version(installed.get("python_version")),
         "wheel": snapshot["wheel"], "runtime_inputs_sha256": snapshot["runtime_inputs_sha256"],
         "runtime_index_sha256": snapshot["runtime_index_sha256"],
-        "payload_sha256": capture["payload_sha256"], "manifest_sha256": capture["manifest_sha256"],
+        "payload_sha256": capture["payload_sha256"],
+        "manifest_sha256": capture["manifest_sha256"],
+        "manifest_record_sha256": capture["manifest_record_sha256"],
+        "native_package_record_sha256": capture["native_package_record_sha256"],
         "release_record_sha256": capture["release_record_sha256"],
         "provenance_sha256": capture["provenance_sha256"],
         "host_identity": host_identity, "host_observation": host, "host_extras": extras,
@@ -1115,6 +1205,8 @@ def validate_universal_consumer(value: Mapping, snapshot: Mapping, capture: Mapp
         "schema", "distribution", "status", "target", "consumer_host_role", "source", "run",
         "python_version",
         "wheel", "runtime_inputs_sha256", "runtime_index_sha256", "payload_sha256", "manifest_sha256",
+        "manifest_record_sha256",
+        "native_package_record_sha256",
         "release_record_sha256", "provenance_sha256", "host_identity", "host_observation", "host_extras",
         "gui", "sandbox", "process_observer", "user_state", "probes", "cleanup", "application_smoke",
         "runtime_setup", "native_qualified", "fixture_only", "publication_admitted", "public_writes", "identity",
@@ -1141,7 +1233,11 @@ def validate_universal_consumer(value: Mapping, snapshot: Mapping, capture: Mapp
     for key in ("runtime_inputs_sha256", "runtime_index_sha256"):
         if value[key] != snapshot[key]:
             _fail("CONSUMER_BINDING")
-    for key in ("payload_sha256", "manifest_sha256", "release_record_sha256", "provenance_sha256"):
+    for key in (
+        "payload_sha256", "manifest_sha256", "manifest_record_sha256",
+        "native_package_record_sha256",
+        "release_record_sha256", "provenance_sha256",
+    ):
         if value[key] != capture[key]:
             _fail("CONSUMER_BINDING")
     if value["gui"] != capture["gui"]:
@@ -1170,9 +1266,12 @@ def validate_universal_consumer(value: Mapping, snapshot: Mapping, capture: Mapp
         if not isinstance(state, Mapping) or state.get("unchanged") is not True:
             _fail("USER_STATE")
         if kind == "scratch":
-            if (not isinstance(state.get("before"), Mapping)
-                    or not isinstance(state.get("after"), Mapping)
-                    or state.get("before") != state.get("after")):
+            empty_scratch = _empty_scratch_state()
+            if (set(state) != {"before", "after", "unchanged", "observation"}
+                    or state.get("observation") != "not-observed"
+                    or state.get("unchanged") is not True
+                    or state.get("before") != empty_scratch
+                    or state.get("after") != empty_scratch):
                 _fail("USER_STATE")
         else:
             before = consumer._nebular_real_user_state(state.get("before"), target=target, phase="before")

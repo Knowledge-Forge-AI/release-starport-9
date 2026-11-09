@@ -605,7 +605,7 @@ class UniversalSupportTests(unittest.TestCase):
             "wheel_nebular080_universal.py": "249c69fdf9960e5de89d487630e2e27428af8f976da7eac13b2f077fb88066b5",
             "nebular080_product_capture.py": "748837dab28413b365fda3277549974692fb112197bba0ecd3118a4e131a629c",
             "nebular080_smoke_support.py": "3f8c1679b8d658daaf00d7ac9935e3133001caa4f554a28aec809dc25ea4a028",
-            "nebular080_universal_consumer.py": "daa1161423508ec3dbb7fac4d901daecefde892e4c812786c6c9309c42e95af9",
+            "nebular080_universal_consumer.py": "c91c4b41c485b3758224337dff594bbb4c01e084818c0a3568ae6075b04449a6",
         }
         roots = {name: SRC / "rs9" / name for name in expected}
         for name, digest in expected.items():
