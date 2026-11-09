@@ -23,6 +23,7 @@ ROOT = HERE.parents[1]
 SOURCE_ROOT = ROOT
 FIXTURE_ROOT = ROOT / "fixtures" if (ROOT / "fixtures").is_dir() else ROOT / "tests" / "fixtures"
 FIXTURE = FIXTURE_ROOT / "current080-rpm-keyfree-request.json"
+HELD_POLICY_FIXTURE = FIXTURE_ROOT / "current080-rpm-policy-held.json"
 ADAPTER = SOURCE_ROOT / "src" / "rs9" / "current080_rpm_keyfree.py"
 BASE_SOURCE = SOURCE_ROOT / "src"
 if str(BASE_SOURCE) not in sys.path:
@@ -37,6 +38,24 @@ spec.loader.exec_module(keyfree)
 def _requests() -> list[dict]:
     with FIXTURE.open(encoding="utf-8") as stream:
         return json.load(stream)
+
+
+def _held_policy(request: dict) -> tuple[dict, dict]:
+    """Exercise the key-free loader against the exact held-policy fixture.
+
+    The selected current080 source policy is now the prospective candidate. The
+    key-free adapter remains intentionally bound to the old blocked bytes, so
+    its tests use an isolated temporary repository containing only that held
+    policy rather than changing the production adapter contract.
+    """
+    from rs9.current080_rpm_keyfree_job import _load_policy
+
+    with tempfile.TemporaryDirectory(prefix="nebular080-held-policy-") as directory:
+        repository = Path(directory)
+        path = repository / keyfree.POLICY_PATH
+        path.parent.mkdir(parents=True)
+        path.write_bytes(HELD_POLICY_FIXTURE.read_bytes())
+        return _load_policy(repository, request)
 
 
 def _held_error(request: dict) -> object:
@@ -226,10 +245,9 @@ class Current080KeyfreeContractTests(unittest.TestCase):
 
     def test_real_builder_late_failure_reaches_adapter_with_separate_evidence(self) -> None:
         from rs9.build_rpm import build_rpm_candidate
-        from rs9.current080_rpm_keyfree_job import _load_policy
 
         request = _requests()[0]
-        raw_policy, summary_policy = _load_policy(SOURCE_ROOT, request)
+        raw_policy, summary_policy = _held_policy(request)
         build_context = {
             "project_id": keyfree.PROJECT,
             "version": keyfree.VERSION,
@@ -379,11 +397,10 @@ class Current080KeyfreeContractTests(unittest.TestCase):
 
     def test_real_native_desktop_builder_reaches_blocked_policy_without_runtime_or_caller_evidence(self) -> None:
         from rs9.build_rpm import build_rpm_candidate
-        from rs9.current080_rpm_keyfree_job import _load_policy
         from tests.elf_builder import build_elf
 
         request = _requests()[0]
-        raw_policy, summary_policy = _load_policy(SOURCE_ROOT, request)
+        raw_policy, summary_policy = _held_policy(request)
         observed_evidence: dict[str, object] = {}
         build_context: dict[str, object] = {
             "project_id": keyfree.PROJECT,

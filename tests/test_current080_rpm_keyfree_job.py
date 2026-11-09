@@ -48,12 +48,23 @@ job = _load(
 )
 VALID_COMMIT = "1" * 40
 VALID_TREE = "2" * 40
+HELD_POLICY_FIXTURE = ROOT / "tests" / "fixtures" / "current080-rpm-policy-held.json"
 
 
 def _fixture_requests() -> list[dict]:
     fixture_root = ROOT / "fixtures" if (ROOT / "fixtures").is_dir() else ROOT / "tests" / "fixtures"
     with (fixture_root / "current080-rpm-keyfree-request.json").open(encoding="utf-8") as stream:
         return json.load(stream)
+
+
+def _held_policy(request: dict) -> tuple[dict, dict]:
+    """Keep the key-free driver test on the exact pre-candidate policy bytes."""
+    with tempfile.TemporaryDirectory(prefix="nebular080-held-policy-") as directory:
+        repository = Path(directory)
+        path = repository / adapter.POLICY_PATH
+        path.parent.mkdir(parents=True)
+        path.write_bytes(HELD_POLICY_FIXTURE.read_bytes())
+        return job._load_policy(repository, request)
 
 
 def _capture(request: dict) -> tuple[types.SimpleNamespace, dict]:
@@ -189,10 +200,10 @@ class Current080KeyfreeJobTests(unittest.TestCase):
         for system in ("x86_64-linux", "aarch64-linux"):
             self.assertEqual(job.request_for_system(system), fixture[system])
 
-    def test_real_policy_binding_is_unpatched_and_blocked_for_both_systems(self) -> None:
+    def test_held_policy_fixture_binding_is_unpatched_and_blocked_for_both_systems(self) -> None:
         for system in ("x86_64-linux", "aarch64-linux"):
             request = job.request_for_system(system)
-            raw_policy, summary = job._load_policy(SOURCE_ROOT, request)
+            raw_policy, summary = _held_policy(request)
             self.assertEqual(summary["sha256"], "6e0f66ab486b09992343ff32ff812b3eb51958daf5c1bd68b27cfa17e5781649")
             self.assertEqual(raw_policy["status"], "blocked")
             self.assertFalse(raw_policy["production_enabled"])
