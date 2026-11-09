@@ -731,6 +731,18 @@ def _current071_problem_projection(prepared, platform):
         return False
 
 
+
+def _current080_signal_receipt_steps(prepared, platform, scenario, *, system):
+    """Optional closed step states for the authenticated 0.8 Linux x64 signal case."""
+    if (system, platform, scenario) != ("x86_64-linux", "linux-x64", "C-signal"):
+        return False
+    try:
+        return _current_replay_progress_profile(prepared) == CURRENT080_REPLAY_PROGRESS_PROFILE
+    except Exception:
+        # An optional source readback must not replace the original failed gate.
+        return False
+
+
 def _replay_progress_wrapper(prepared):
     """Return the owned observer only for the authenticated harness pair."""
     tools = prepared.get("tools")
@@ -1874,6 +1886,8 @@ def _attempt(prepared, platform, scenario, launch_root, evidence, prefix, env, e
             )
             if cleanup_observation_plan is not None:
                 diagnostic_options["current071_receipt_steps"] = True
+            if _current080_signal_receipt_steps(prepared, platform, scenario, system=system):
+                diagnostic_options["current080_receipt_steps"] = True
             diagnostic = collect_failure_diagnostics(
                 err, dict(fields), evidence, platform, scenario, record=record, system=system,
                 **diagnostic_options,
