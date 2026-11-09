@@ -26,19 +26,21 @@ Theme Forge publication surfaces remain authoritative.
   and [staged migration map](docs/architecture/migration-map.md)
 - [Nebular shadow candidate and evidence](docs/foundation2-candidate.md)
 
-### Hosted qualification checkpoint: 2026-11-04
+### Hosted qualification checkpoint: 2026-11-09
 
-At [commit `108022e1`](https://github.com/Knowledge-Forge-AI/release-starport-9/commit/108022e16e3523dcfaeddb6f7577b5a213227eb8),
-[original current-generation run 41870931047](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/41870931047)
-passed twelve jobs, including unit checks and all completed Linux, package and
-Pages receipt lanes. Its Apple Silicon macOS job received no hosted runner and
-executed no steps; GitHub reported that the job was not acquired after multiple
-attempts. The summary failed, and this source remains unqualified.
+At [commit `4f2fd09e`](https://github.com/Knowledge-Forge-AI/release-starport-9/commit/4f2fd09e80c1fe1690e53ca026e69365e9b2a4ee),
+[original current-generation run 42567605794](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/42567605794)
+passed configuration and the unit suite (4,039 tests, 57 skipped). Authentication
+and Pages stopped during public GitHub release-asset capture: their original
+receipts report HTTP 504 from `github.com`, before any redirect, for Stellar Burst
+and Stellar Loom respectively. These receipts do not identify the individual
+asset names or establish the underlying gateway cause.
 
-The earlier [run 41838474598](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/41838474598)
-passed all fourteen jobs for its earlier source. It does not qualify this new
-source. Current-generation admission requires a complete original main-branch
-push campaign; a manual dispatch or rerun attempt cannot substitute for that
+The remaining downstream jobs were skipped, and the summary failed. Commit
+`4f2fd09e` remains unqualified for the Nebular 0.8.0 OS-package publication route. A later successful
+download cannot replace the missing source-bound evidence. Current-generation admission
+requires all fifteen jobs in one original main-branch push campaign; a manual
+dispatch, rerun attempt or combination of campaigns cannot substitute for that
 source-bound evidence.
 
 ## Mission

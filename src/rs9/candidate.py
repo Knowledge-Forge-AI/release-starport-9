@@ -10,7 +10,7 @@ from rs9.errors import ContractError
 from rs9.github import PublicClient
 from rs9.nebular_lineage import select_forward_lineage_proof
 from rs9.operator import BOOTSTRAP, EXPECTATIONS, assert_release_expectations
-from rs9.current_generation import HISTORICAL_GENERATION, GENERATIONS, generation_paths
+from rs9.current_generation import CURRENT_GENERATION, HISTORICAL_GENERATION, GENERATIONS, generation_paths
 from rs9.profiles import (TAURI_PROFILE, TAURI_AUTHORITY_PROFILE, capture_supplemental,
                           evaluate_profile, record_corroboration_failure, selection_for_intent)
 from rs9.records import record_sha256
@@ -48,7 +48,10 @@ def capture_generation(repository, output, *, project=None, client=None, checkou
         stage = "capture"
         corroboration = None
         try:
-            capture_release(selection, target, client=client)
+            if generation == CURRENT_GENERATION:
+                capture_release(selection, target, client=client, asset_transport="release-api")
+            else:
+                capture_release(selection, target, client=client)
             stage = "core-authenticate"
             capture = authenticate_release(selection, target)
             stage = "expectations"
