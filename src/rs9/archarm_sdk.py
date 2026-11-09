@@ -156,25 +156,46 @@ class _Seams:
     nonce: Callable[[], str]
 
 
-def _real_seams():
+def _real_seams(input_profile="historical"):
+    # Named, source-bound profiles only. The historical loader and its origin
+    # remain immutable; no arbitrary path/loader is accepted by the public API.
+    if input_profile == "historical":
+        loader = load_qualified_pins
+        from rs9._archarm_support.origin import ORIGIN_FILES
+        expected_digest = ORIGIN_FILES["PACKAGE-PINS.json"]["sha256"]
+    elif input_profile == "successor-20261109":
+        from rs9._archarm_support.successor_20261109 import INPUTS, load_successor_pins
+        loader = load_successor_pins
+        expected_digest = INPUTS["package_pins_sha256"]
+    else:
+        raise SdkRefusal("PIN_FILE")
+
+    def load_selected():
+        pins = loader()
+        require(isinstance(pins, PinBundle) and pins.qualified is True
+                and pins.digests.get("packagePinsSha256") == expected_digest, "PIN_FILE")
+        return pins
+
     return _Seams(fetcher=AnonymousFetcher(), inspect_rootfs=inspect_members,
-                  pins_loader=load_qualified_pins,
+                  pins_loader=load_selected,
                   runner_identity=lambda: (os.getuid(), os.getgid()),
                   nonce=lambda: uuid.uuid4().hex[:12])
 
 
 def acquire_sdk(*, host: CommandRunner, workspace: Path, context: Mapping[str, Any],
-                uid: int, gid: int) -> "ArchArmSDK":
+                uid: int, gid: int, input_profile: str = "historical") -> "ArchArmSDK":
     """Return an unprepared lease; ``with`` enters (prepares eagerly) and closes strictly.
 
     ``context`` is closed: ``runId`` (decimal string), ``runAttempt`` (``"1"``/``1``),
     ``sourceSha`` (40 hex), ``generation`` (the current generation) and optional
     ``privateRoots`` (absolute host paths, e.g. fixture/runtime homes, that no
     worker bind may overlap). ``uid``/``gid`` must be this process's actual
-    numeric identity, each in 1..2147483647.
+    numeric identity, each in 1..2147483647. ``input_profile`` selects only the
+    exact historical inputs or the separately native-qualified 20261109 input
+    successor. It does not qualify this SDK implementation or product routes.
     """
     return ArchArmSDK(_TOKEN, host=host, workspace=workspace, context=context, uid=uid,
-                      gid=gid, seams=_real_seams())
+                      gid=gid, seams=_real_seams(input_profile))
 
 
 def _acquire(*, host, workspace, context, uid, gid, seams):

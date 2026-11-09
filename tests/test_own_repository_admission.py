@@ -900,7 +900,7 @@ class QualifiedFixture(SourceFixtures):
     def test_current_builder_identity_covers_nested_sdk_pin_data(self):
         self.assertEqual(builder_identity(self.rs,generation=CURRENT_GENERATION),self.expected['builder_source_sha256'])
         pins=self.rs/'src/rs9/_archarm_support/pins'
-        for name in ('ROOTFS-PIN.json','PACKAGE-PINS.json','archlinuxarm-builder-public.gpg'):
+        for name in ('ROOTFS-PIN.json','PACKAGE-PINS.json','PACKAGE-PINS-successor-20261109.json','archlinuxarm-builder-public.gpg'):
             with self.subTest(pin=name):
                 path=pins/name;original=path.read_bytes();path.write_bytes(original+b'\n')
                 try:

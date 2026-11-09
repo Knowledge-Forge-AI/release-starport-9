@@ -329,6 +329,19 @@ def runner_identity() -> tuple[int, int]:
     return uid, gid
 
 
+def _select_sdk_inputs(captures):
+    """Select a fixed input identity from the already closed product intents."""
+    versions = [intent.get("version") for _, intent, _ in captures
+                if intent.get("project", {}).get("id") == NEBULAR]
+    if versions == ["0.8.0"]:
+        from rs9._archarm_support.successor_20261109 import INPUTS, PROFILE
+        return PROFILE, dict(INPUTS)
+    if versions == ["0.7.1"]:
+        return "historical", dict(QUALIFIED_INPUTS)
+    raise ContractError("CONTEXT_INVALID", "No qualified ArchARM input profile for these intents",
+                        details={"substage": "context", "reason": "captures"})
+
+
 def _validate_context(context: Any) -> dict[str, Any]:
     if not isinstance(context, Mapping):
         raise ContractError("CONTEXT_INVALID", "Context must be a mapping")
@@ -361,6 +374,7 @@ def _validate_context(context: Any) -> dict[str, Any]:
     if sorted(ids, key=str) != sorted(REQUIRED_PRODUCTS):
         raise ContractError("CONTEXT_INVALID", "Captures differ from the four required products",
                             details={"substage": "context", "reason": "captures"})
+    sdk_input_profile, qualified_inputs = _select_sdk_inputs(captures)
     if context["client"] is None:
         raise ContractError("CONTEXT_INVALID", "Authenticated public client required", details={"substage": "context"})
     binding = context["binding"]
@@ -378,7 +392,8 @@ def _validate_context(context: Any) -> dict[str, Any]:
         raise ContractError("CONTEXT_INVALID", "Producer provenance must bind this source commit and run",
                             details={"substage": "context", "reason": "producer-provenance"})
     return {"repository": repository, "scratch": scratch, "captures": list(captures), "commit": commit,
-            "run_id": producer["run_id"], "attempt": producer["attempt"]}
+            "run_id": producer["run_id"], "attempt": producer["attempt"],
+            "sdk_input_profile": sdk_input_profile, "qualified_inputs": qualified_inputs}
 
 
 def _authenticate_captures(captures) -> None:
@@ -499,7 +514,7 @@ def _sdk_cleanup_readback(lease: Any) -> dict[str, Any]:
     return {"status": "pass"}
 
 
-def _validate_lease(lease: Any, uid: int, gid: int) -> tuple[Mapping[str, Any], bool]:
+def _validate_lease(lease: Any, uid: int, gid: int, expected_inputs=QUALIFIED_INPUTS) -> tuple[Mapping[str, Any], bool]:
     """Typed lease identity plus its closed ready readback; returns (records, executed)."""
     image = getattr(lease, "image", None)
     if (getattr(lease, "platform", None) != PLATFORM or getattr(lease, "uid", None) != uid
@@ -512,9 +527,15 @@ def _validate_lease(lease: Any, uid: int, gid: int) -> tuple[Mapping[str, Any], 
     flags = records.get("flags") if records is not None else None
     assertions = records.get("assertions") if records is not None else None
     identity = records.get("identity") if records is not None else None
+    digests = records.get("digests") if records is not None else None
+    expected_digests = {"rootfsSha256": expected_inputs["rootfs_sha256"],
+                        "rootfsPinSha256": expected_inputs["rootfs_pin_sha256"],
+                        "packagePinsSha256": expected_inputs["package_pins_sha256"]}
     if (records is None or records.get("state") != "ready" or records.get("platform") != PLATFORM
             or records.get("generation") != CURRENT_GENERATION
             or records.get("pinsMatchQualifiedOrigin") is not True
+            or not isinstance(digests, Mapping)
+            or any(digests.get(k) != v for k, v in expected_digests.items())
             or not isinstance(flags, Mapping) or not flags or not all(v is True for v in flags.values())
             or not isinstance(assertions, Mapping) or any(assertions.get(k) is not False for k in SDK_ASSERTIONS_FALSE)
             or not isinstance(identity, Mapping) or (identity.get("uid"), identity.get("gid")) != (uid, gid)):
@@ -537,6 +558,8 @@ class _ArmProducer:
         self.repository, self.scratch = inputs["repository"], inputs["scratch"]
         self.captures, self.commit = inputs["captures"], inputs["commit"]
         self.run_id, self.attempt = inputs["run_id"], inputs["attempt"]
+        self.sdk_input_profile = inputs["sdk_input_profile"]
+        self.qualified_inputs = inputs["qualified_inputs"]
         self.client = context["client"]
         self.any_token = None
         self.sdk_manager = None
@@ -570,7 +593,7 @@ class _ArmProducer:
             "schema": ENVIRONMENT_SCHEMA, "generation": CURRENT_GENERATION, "family": FAMILY, "system": SYSTEM,
             "architecture": ARCHITECTURE, "platform": None, "image": None,
             "runner_identity": {"uid": uid, "gid": gid}, "sdk_records_sha256": None,
-            "qualified_inputs": dict(QUALIFIED_INPUTS), "profiles": REQUESTED_PROFILES,
+            "qualified_inputs": dict(self.qualified_inputs), "profiles": REQUESTED_PROFILES,
             "provider_policy": PROVIDER_POLICY, "canonical_any_witness_sha256": None, "cleanup": {}}
 
     # ---- bookkeeping
@@ -676,10 +699,10 @@ class _ArmProducer:
                        "generation": CURRENT_GENERATION,
                        "privateRoots": [str(self.scratch / name) for name in PRIVATE_FIXTURE_HOMES]}
         manager = acquire_sdk(host=self.host, workspace=self.scratch / SDK_WORKSPACE, context=sdk_context,
-                              uid=self.uid, gid=self.gid)
+                              uid=self.uid, gid=self.gid, input_profile=self.sdk_input_profile)
         self.sdk_manager = manager
         self.lease = stack.enter_context(_held(manager, self.cleanup["sdk"], success_status="exited"))
-        records, executed = _validate_lease(self.lease, self.uid, self.gid)
+        records, executed = _validate_lease(self.lease, self.uid, self.gid, self.qualified_inputs)
         try:
             records_sha256 = digest(canonical(records))
         except (TypeError, ValueError, ContractError):

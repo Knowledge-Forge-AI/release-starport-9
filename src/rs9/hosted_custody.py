@@ -73,7 +73,8 @@ def builder_identity(repository, *, generation=HISTORICAL_GENERATION):
         support = repository / "src/rs9/_archarm_support"
         paths = sorted(set(paths) | set(support.rglob("*.py")) | {
             support / "pins" / name for name in
-            ("ROOTFS-PIN.json", "PACKAGE-PINS.json", "archlinuxarm-builder-public.gpg")})
+            ("ROOTFS-PIN.json", "PACKAGE-PINS.json", "PACKAGE-PINS-successor-20261109.json",
+             "archlinuxarm-builder-public.gpg")})
     rows = [{"path": p.relative_to(repository).as_posix(), **file_identity(p)} for p in paths if p.is_file()]
     if generation == CURRENT_GENERATION:
         rows.append({"selected_configuration_sha256": configuration_identity(repository, generation=generation)})
