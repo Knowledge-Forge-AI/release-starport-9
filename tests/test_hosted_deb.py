@@ -751,6 +751,193 @@ class ClientCycleTests(unittest.TestCase):
         self.assertEqual(product["command_diagnostics"]["arch"], product["refresh"]["arch"])
 
 
+class CurrentPacmanDesktopCacheBaselineTests(unittest.TestCase):
+    CACHE_PATH = "usr/share/applications/intent.cache"
+
+    class DesktopCacheDocker(ScriptedDocker):
+        def __init__(self, *, cache_failure=False, cache_modified=False, leftover=False):
+            super().__init__()
+            self.cache_failure = cache_failure
+            self.cache_modified = cache_modified
+            self.leftover = leftover
+
+        def _exec(self, argv):
+            index = next(i for i, value in enumerate(argv) if value.startswith("rs9-client-"))
+            state, command = self.containers[argv[index]], argv[index + 1:]
+            if command[:2] == ["sh", "-c"] and "update-desktop-database" in command[2]:
+                if self.cache_failure:
+                    return self.receipt(argv, 1, err=b"synthetic desktop cache failure")
+                state["desktop_cache_initialized"] = True
+                return self.receipt(argv)
+            if command[:5] == ci.scanner_argv()[:5]:
+                entries = list(BASE_INVENTORY)
+                if state.get("desktop_cache_initialized") or state.get("had_install"):
+                    entries.append(inventory_entry(CurrentPacmanDesktopCacheBaselineTests.CACHE_PATH,
+                        sha=("b" if self.cache_modified and state.get("had_install") else "a") * 64))
+                if self.leftover and state.get("had_install"):
+                    entries.extend(LEFTOVER)
+                return self.receipt(argv, out=inventory_frame(entries))
+            return super()._exec(argv)
+
+    def _cycle(self, docker, *, generation=hd.CURRENT_GENERATION, product=hd.NATIVE_PRODUCT,
+               platform="linux/amd64", system="x86_64-linux"):
+        spec = hd.pacman_spec(Path("/fixture/pacman"), Path("/fixture/keys"), "A" * 40,
+                             architecture="aarch64" if platform == "linux/arm64" else "x86_64")
+        host = hd.RecordingRunner(host_runner(docker, ExecutedMock))
+        with patch("rs9.hosted_deb.execute_probes", side_effect=stub_probes):
+            gates, evidence = hd.client_cycle(host, spec, image="fixture-image", platform=platform,
+                products=[product], repository=Path("."), prefix="pacman-client", system=system,
+                generation=generation)
+        return gates, evidence
+
+    def test_current_nebular_cache_is_initialized_before_baseline_and_restored(self):
+        docker = self.DesktopCacheDocker()
+        gates, evidence = self._cycle(docker)
+        row = next(row for row in gates if row["name"].endswith(".inventory"))
+        self.assertEqual(row["status"], "pass")
+        self.assertTrue(evidence[hd.NATIVE_PRODUCT]["inventory_clean"])
+        warm = next(i for i, command in enumerate(docker.calls) if any("update-desktop-database" in value for value in command))
+        scan = next(i for i, command in enumerate(docker.calls) if ci.scanner_argv()[0] in command and ci.scanner_argv()[1] in command)
+        self.assertLess(warm, scan)
+        self.assertFalse(hd.inventory_excluded("pacman", self.CACHE_PATH))
+
+    def test_modified_cache_and_unrelated_leftovers_still_fail_strict_inventory(self):
+        for kwargs, expected in (({"cache_modified": True}, self.CACHE_PATH), ({"leftover": True}, "usr/bin/tfsl")):
+            with self.subTest(kwargs=kwargs):
+                gates, _ = self._cycle(self.DesktopCacheDocker(**kwargs))
+                row = next(row for row in gates if row["name"].endswith(".inventory"))
+                self.assertEqual(row["status"], "fail")
+                self.assertIn(expected, row["leftover"])
+
+    def test_cache_preparation_failure_stops_before_inventory_or_install(self):
+        docker = self.DesktopCacheDocker(cache_failure=True)
+        gates, evidence = self._cycle(docker)
+        self.assertEqual(evidence[hd.NATIVE_PRODUCT]["error"], "CLIENT_CONFIGURE_FAILED")
+        self.assertTrue(any(row["status"] == "fail" for row in gates))
+        self.assertFalse(any("--needed" in command for command in docker.calls))
+        self.assertFalse(any(ci.scanner_argv()[1] in command for command in docker.calls))
+
+    def test_historical_and_other_product_routes_do_not_initialize_cache(self):
+        for generation, product in ((hd.HISTORICAL_GENERATION, hd.NATIVE_PRODUCT),
+                                    (hd.CURRENT_GENERATION, "theme-forge-stellar-loom")):
+            with self.subTest(generation=generation, product=product):
+                docker = self.DesktopCacheDocker()
+                self._cycle(docker, generation=generation, product=product)
+                self.assertFalse(any(any("update-desktop-database" in value for value in command) for command in docker.calls))
+
+    def test_arm_route_does_not_receive_the_x64_cache_command(self):
+        docker = self.DesktopCacheDocker()
+        with self.assertRaises(ContractError) as caught:
+            self._cycle(docker, platform="linux/arm64", system="aarch64-linux")
+        self.assertEqual(caught.exception.code, "ARCHARM_CLIENT_LEASE")
+        self.assertFalse(any(any("update-desktop-database" in value for value in command) for command in docker.calls))
+
+    def test_missing_system_does_not_silently_gain_cache_initialization(self):
+        docker = self.DesktopCacheDocker()
+        self._cycle(docker, system=None)
+        self.assertFalse(any(any("update-desktop-database" in value for value in command) for command in docker.calls))
+
+    def test_actual_packaging_callsite_supplies_current_lane_arguments(self):
+        import ast
+        import inspect
+        from rs9 import hosted_packaging
+        function = ast.parse(inspect.getsource(hosted_packaging.execute)).body[0]
+        context = {"family": "pacman", "system": "x86_64-linux",
+                   "generation": hd.CURRENT_GENERATION, "captures": []}
+        docker = self.DesktopCacheDocker()
+        namespace = {
+            "context": context, "HISTORICAL_GENERATION": hd.HISTORICAL_GENERATION,
+            "environment": {"platform": "linux/amd64"},
+            "client_cycle": hd.client_cycle,
+            "host": hd.RecordingRunner(host_runner(docker, ExecutedMock)),
+            "spec": hd.pacman_spec(Path("/fixture/pacman"), Path("/fixture/keys"), "A" * 40),
+            "client_image": "fixture-image", "products": [hd.NATIVE_PRODUCT],
+            "repository": Path("."), "prepared": None, "scratch": Path("fixture-scratch"),
+            "_burst_release_record": lambda captures, system: None,
+        }
+        # Execute the real producer's assignments and call expression. The only
+        # omitted work is package/image construction, already covered natively.
+        targets = {"generation", "family", "system", "architectures", "platform", "arch"}
+        assignments = [node for node in function.body if isinstance(node, ast.Assign)
+                       and any(isinstance(name, ast.Name) and name.id in targets
+                               for target in node.targets for name in ast.walk(target))]
+        exec(compile(ast.Module(body=assignments, type_ignores=[]), "<actual-packaging-arguments>", "exec"), namespace)
+        calls = [node for node in ast.walk(function) if isinstance(node, ast.Call)
+                 and isinstance(node.func, ast.Name) and node.func.id == "client_cycle"]
+        self.assertEqual(len(calls), 1)
+        with patch("rs9.hosted_deb.execute_probes", side_effect=stub_probes):
+            gates, _ = eval(compile(ast.Expression(calls[0]), "<actual-packaging-call>", "eval"), namespace)
+        self.assertEqual(next(row for row in gates if row["name"].endswith(".inventory"))["status"], "pass")
+        self.assertTrue(any(any("update-desktop-database" in value for value in command) for command in docker.calls))
+
+    def test_five_configure_receipts_validate_through_the_existing_trust_consumer(self):
+        import copy
+        docker = self.DesktopCacheDocker()
+        _, evidence = self._cycle(docker)
+        control = evidence[hd.NATIVE_PRODUCT]["positive_control"]
+        self.assertEqual(len(control["stages"]["configure"]), 5)
+        spec = hd.pacman_spec(Path("/fixture/pacman"), Path("/fixture/keys"), "A" * 40)
+        def validate(value):
+            return hd.validate_positive_control(value, family="pacman", image="fixture-image",
+                platform="linux/amd64", product=hd.NATIVE_PRODUCT, setup_sha256=hd.trust_identity(spec))
+        self.assertEqual(validate(control), (True, None))
+        for patch_value in ({"exit_code": 1}, {"executed": False}):
+            changed = copy.deepcopy(control)
+            changed["stages"]["configure"][-1].update(patch_value)
+            self.assertEqual(validate(changed), (False, "positive-control-stage-incomplete"))
+
+    def test_current_pages_client_caller_keeps_all_families_and_emits_cache_setup(self):
+        from tests.test_pages_smoke_diagnostic import ConnectedPagesControls
+        original_context = PagesLaneTests.context
+        def current_context(fixture):
+            return {**original_context(fixture), "generation": hd.CURRENT_GENERATION}
+        fixture = ConnectedPagesControls()
+        try:
+            with patch.object(PagesLaneTests, "context", current_context):
+                gates, details = fixture.exercise(False)
+            self.assertTrue(all(gate["status"] == "pass" for gate in gates))
+            self.assertEqual(set(details["client"]), {"apt", "dnf", "pacman"})
+            for family in ("apt", "dnf", "pacman"):
+                for product in hd.REQUIRED_PRODUCTS:
+                    control = details["client"][family][product]["positive_control"]
+                    expected = 5 if family == "pacman" and product == hd.NATIVE_PRODUCT else 4 if family == "pacman" else 1
+                    self.assertEqual(len(control["stages"]["configure"]), expected)
+        finally:
+            fixture.doCleanups()
+
+    def test_existing_shell_setup_handles_missing_inputs_and_propagates_tool_failure(self):
+        import shlex
+        docker = self.DesktopCacheDocker()
+        self._cycle(docker)
+        command = next(command for command in docker.calls if any("update-desktop-database" in value for value in command))
+        original_script = command[-1]
+        self.assertEqual(original_script.count("/usr/share/applications"), 2)
+        with tempfile.TemporaryDirectory(prefix="rs9-desktop-cache-shell-") as temporary:
+            root = Path(temporary)
+            applications = root / "applications"
+            binary_dir = root / "bin"
+            binary_dir.mkdir()
+            marker = root / "tool-called"
+            binary = binary_dir / "update-desktop-database"
+            script = original_script.replace("/usr/share/applications", shlex.quote(str(applications)))
+            env = {"PATH": str(binary_dir), "CACHE_MARKER": str(marker), "CACHE_EXIT": "0"}
+            def run():
+                return subprocess.run(["/bin/sh", "-c", script], env=env, capture_output=True, timeout=5)
+            applications.mkdir()
+            self.assertEqual(run().returncode, 0)  # tool absent
+            self.assertFalse(marker.exists())
+            binary.write_text('#!/bin/sh\nprintf \'%s\\n\' "$1" > "$CACHE_MARKER"\nexit "$CACHE_EXIT"\n')
+            binary.chmod(0o700)
+            applications.rmdir()
+            self.assertEqual(run().returncode, 0)  # directory absent
+            self.assertFalse(marker.exists())
+            applications.mkdir()
+            self.assertEqual(run().returncode, 0)
+            self.assertEqual(marker.read_text(), str(applications) + "\n")
+            env["CACHE_EXIT"] = "7"
+            self.assertEqual(run().returncode, 7)
+
+
 class TamperTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
