@@ -948,7 +948,17 @@ def client_cycle(
                     configure_container_output(client, user=CLIENT_USER)
                 current_stage = "configure"
                 cfg_receipts = []
-                for command in spec["configure"]:
+                configure_commands = list(spec["configure"])
+                if (generation == CURRENT_GENERATION and family == "pacman"
+                        and platform == "linux/amd64" and system == "x86_64-linux"
+                        and product == NATIVE_PRODUCT):
+                    # Establish existing desktop-tool caches before the strict
+                    # baseline, so install/remove must restore their bytes too.
+                    configure_commands.append(["sh", "-c",
+                        "if [ -d /usr/share/applications ] && "
+                        "command -v update-desktop-database >/dev/null 2>&1; then "
+                        "update-desktop-database /usr/share/applications; fi"])
+                for command in configure_commands:
                     cfg_rcpt = client.exec(command)
                     cfg_receipts.append(cfg_rcpt)
                     if cfg_rcpt.exit_code != 0:
