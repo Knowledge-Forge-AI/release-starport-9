@@ -74,8 +74,10 @@ def _authority_boundaries(record):
         raise ContractError("DISTRIBUTION_AUTHORITY", "Original non-production authority boundaries must remain false")
 
 
-def _binary_inputs(repository, output, summary, expected, *, _admission=None):
+def _binary_inputs(repository, output, summary, expected, *, _admission=None, _admission_080=None):
     """Join physical custody to the validated summary, then verify real byte roles."""
+    if _admission is not None and _admission_080 is not None:
+        raise ContractError("OWN_REPOSITORY_ADMISSION", "Mutually exclusive 0.7.1/0.8 admission proofs required")
     from rs9.hosted_deb import _custody_unique, _rpm_custody_unique
     versions = {intent["project"]["id"]: intent["version"] for _, intent in configuration_rows(repository, generation=CURRENT_GENERATION)}
     receipts = {(row["lane"], row["system"]): row for row in summary["receipts"]}
@@ -99,10 +101,15 @@ def _binary_inputs(repository, output, summary, expected, *, _admission=None):
             raise ContractError("DISTRIBUTION_CUSTODY", "Physical receipt/manifest differs from validated summary")
         _authority_boundaries(receipt)
         tokens, errors = promotion_restrictions(lane, receipt)
-        if _admission is None:
+        if _admission is None and _admission_080 is None:
             if tokens or errors or receipt.get("production_promotion_blockers") != []:
                 raise ContractError("DISTRIBUTION_PROMOTION_HELD", "Lane promotion restrictions prohibit import")
             validate_rpm_policy_source(repository, receipt, generation=CURRENT_GENERATION)
+        elif _admission_080 is not None:
+            from rs9.own_repository_admission080 import check_lane_080, VERSIONS_080
+            check_lane_080(_admission_080, lane, receipt, manifest)
+            versions = dict(VERSIONS_080)
+            validate_rpm_policy_source(repository, receipt, generation=CURRENT_GENERATION, policy_variant="current080")
         else:
             from rs9.own_repository_admission import check_lane, VERSIONS
             check_lane(_admission, lane, receipt, manifest)
@@ -266,3 +273,41 @@ def qualified_theme_forge_packages_inputs(config, output, *, consumer_repository
             release(proof)
         for binding in observations:
             release_consumer(binding)
+
+
+def qualified_theme_forge_packages_inputs_080(config, output, *, consumer_repository, consumer_commit, consumer_tree,
+                                             zip_transport="actions", timeout=7200):
+    """Fixed source-bound P unsigned 0.8 inputs; never a caller-selected policy."""
+    if type(config) is not SourceBoundConfiguration:
+        raise ContractError("DISTRIBUTION_CONFIG", "Closed source-bound configuration required")
+    from rs9.own_repository_admission import verify_execution_source
+    from rs9.own_repository_admission080 import (
+        admit_080,
+        consumer_source_080,
+        release_080,
+        release_consumer_080,
+    )
+    verify_execution_source(config.repository)
+    consumer = consumer_source_080(config, consumer_repository, consumer_commit, consumer_tree)
+    proof = None
+    observations = [consumer]
+    try:
+        repository, output, summary, expected = _verified_context(
+            config, output, zip_transport=zip_transport, timeout=timeout, _execution_source=True)
+        verify_execution_source(config.repository)
+        observations.append(consumer_source_080(config, consumer_repository, consumer_commit, consumer_tree))
+        if observations[-1].record != consumer.record:
+            raise ContractError("OWN_REPOSITORY_SOURCE", "Consumer changed during 0.8 original-run admission")
+        proof = admit_080(repository, output, summary, expected, consumer)
+        binaries, nix = _binary_inputs(repository, output, summary, expected, _admission_080=proof)
+        verify_execution_source(config.repository)
+        observations.append(consumer_source_080(config, consumer_repository, consumer_commit, consumer_tree))
+        if observations[-1].record != consumer.record:
+            raise ContractError("OWN_REPOSITORY_SOURCE", "Consumer changed during 0.8 input readback")
+        verify_execution_source(config.repository)
+        return {**_inventory(expected, binaries, nix), "own_repository_admission": proof.record}
+    finally:
+        if proof is not None:
+            release_080(proof)
+        for binding in observations:
+            release_consumer_080(binding)

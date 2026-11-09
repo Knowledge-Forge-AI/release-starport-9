@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT
 BASE_FIXTURE = SOURCE_ROOT / "tests" / "fixtures" / "current071-source"
 CANDIDATE_EXPECTATIONS = ROOT / "operators/theme-forge-current-202610/expectations.json"
+HELD_POLICY_FIXTURE = SOURCE_ROOT / "tests" / "fixtures" / "current080-rpm-policy-held.json"
 sys.path.insert(0, str(SOURCE_ROOT / "src"))
 import rs9  # noqa: E402
 
@@ -158,15 +159,44 @@ class CurrentOs080ActivationTests(unittest.TestCase):
             "tree": CURRENT080_SOURCE_FIXTURE_BINDING["fixture"]["tree"],
         })
 
-    def test_policy_gate_is_explicitly_blocked_until_new_rpm_evidence(self):
+    def test_current080_policy_candidate_is_authorized_and_other_rows_unchanged(self):
         policy = rpm_lint_policy.load_policy(
             generation=current_generation.CURRENT_GENERATION,
             policy_variant="current080",
         )
-        self.assertEqual(policy["status"], "blocked")
-        self.assertTrue(policy["blocking"])
-        self.assertIn("not yet derived", policy["policy_authority"])
+        self.assertEqual(policy["status"], "authorized")
+        self.assertFalse(policy["blocking"])
+        self.assertFalse(policy["production_enabled"])
+        self.assertFalse(policy["publication_authority"])
         self.assertEqual(policy["projects"]["theme-forge-nebular-fusion"]["version"], "0.8.0")
+        policy_bytes = (SOURCE_ROOT / current_generation.rpm_policy_path(
+            current_generation.CURRENT_GENERATION, policy_variant="current080"
+        )).read_bytes()
+        self.assertEqual(_digest(policy_bytes),
+                         "18beff59e710b79c5ea21eed9831010fd144cdab57e20db0e5a9e9efb7ceacb4")
+        self.assertEqual(_digest(_canonical(policy)),
+                         "18beff59e710b79c5ea21eed9831010fd144cdab57e20db0e5a9e9efb7ceacb4")
+        baseline = rpm_lint_policy.load_policy(
+            generation=current_generation.CURRENT_GENERATION,
+            policy_variant="current071",
+        )
+        for project in ("theme-forge-stellar-burst", "theme-forge-stellar-loom", "theme-forge-solar-sail"):
+            self.assertEqual(policy["projects"][project], baseline["projects"][project], project)
+        caller_rules = [
+            rule
+            for code, rules in policy["projects"]["theme-forge-nebular-fusion"]["exceptions"].items()
+            if code != "files-duplicated-waste"
+            for rule in rules.values()
+        ]
+        self.assertEqual(len(caller_rules), 8)
+        # Six rules are genuine caller contracts; the two .d.ts rows are the
+        # only data-only exceptions. The historical default-policy tests cover
+        # the shared serialized path; the dedicated current080 test module
+        # proves these rules fail closed without caller evidence.
+        self.assertEqual(
+            sum(rule.get("intent") != "typescript-declaration-data" for rule in caller_rules),
+            6,
+        )
         self.assertEqual(
             current_generation.rpm_policy_path(
                 current_generation.CURRENT_GENERATION,
@@ -179,6 +209,19 @@ class CurrentOs080ActivationTests(unittest.TestCase):
                 current_generation.CURRENT_GENERATION,
                 policy_variant="future-version",
             )
+
+    def test_held_policy_fixture_remains_blocked_and_is_not_selected(self):
+        policy = json.loads(HELD_POLICY_FIXTURE.read_bytes())
+        self.assertEqual(policy["status"], "blocked")
+        self.assertTrue(policy["blocking"])
+        self.assertIn("not yet derived", policy["policy_authority"])
+        self.assertEqual(_digest(HELD_POLICY_FIXTURE.read_bytes()),
+                         "6e0f66ab486b09992343ff32ff812b3eb51958daf5c1bd68b27cfa17e5781649")
+        selected = rpm_lint_policy.load_policy(
+            generation=current_generation.CURRENT_GENERATION,
+            policy_variant="current080",
+        )
+        self.assertEqual(selected["status"], "authorized")
 
     def test_os080_initial_observation_argv_uses_only_fixed_execution_closure(self):
         profile = CURRENT080_REPLAY_PROGRESS_PROFILE
@@ -224,9 +267,7 @@ class CurrentOs080ActivationTests(unittest.TestCase):
         result = rpm_lint_policy.evaluate_policy(
             {}, {}, {"project_id": "theme-forge-nebular-fusion", "version": "0.8.0",
                      "arch": "x86_64", "system": "x86_64-linux"},
-            policy=rpm_lint_policy.load_policy(
-                generation=current_generation.CURRENT_GENERATION, policy_variant="current080"
-            ),
+            policy=json.loads(HELD_POLICY_FIXTURE.read_bytes()),
             generation=current_generation.CURRENT_GENERATION,
             policy_variant="current080",
         )
