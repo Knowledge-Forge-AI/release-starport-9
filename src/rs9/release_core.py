@@ -138,9 +138,11 @@ def _selected(selection):
             {"name": selection["checksums"], "role": "checksums", "checksum_covered": False}]
 
 
-def capture_release(selection, output, *, client=None):
+def capture_release(selection, output, *, client=None, asset_transport="browser"):
     """Public transport capture only; authenticate_release checks the exact bytes."""
     limits = validate_selection(selection)
+    if type(asset_transport) is not str or asset_transport not in ("browser", "release-api"):
+        raise ContractError("ASSET_TRANSPORT", "Unknown release asset transport")
     client = client or PublicClient()
     repository, tag = selection["repository"], selection["tag"]
     base = "https://api.github.com/repos/" + repository
@@ -179,10 +181,18 @@ def capture_release(selection, output, *, client=None):
             expected = "https://github.com/" + repository + "/releases/download/" + quote(tag, safe="") + "/" + quote(name, safe="")
             if asset["browser_download_url"] != expected:
                 raise ContractError("ASSET_AUTHORITY", "Asset URL differs from selected authority")
+            request_url, request_class = expected, "github-asset"
+            if asset_transport == "release-api":
+                if type(asset.get("id")) is not int or asset["id"] <= 0:
+                    raise ContractError("ASSET_AUTHORITY", "Positive release asset identity required")
+                request_url = base + "/releases/assets/" + str(asset["id"])
+                if asset.get("url", request_url) != request_url:
+                    raise ContractError("ASSET_AUTHORITY", "Asset API URL differs from selected identity")
+                request_class = "github-public-release-asset"
             total += asset["size"]
             if total > limits["capture_bytes"]:
                 raise ContractError("FETCH_LIMIT", "Aggregate capture bound exceeded")
-            writer.write("assets/" + name, client.get(expected, request_class="github-asset", limit=limits["asset_bytes"], expected_size=asset["size"]))
+            writer.write("assets/" + name, client.get(request_url, request_class=request_class, limit=limits["asset_bytes"], expected_size=asset["size"]))
         for path in sorted(selection["source_paths"]):
             data = client.get("https://raw.githubusercontent.com/" + repository + "/" + obj["sha"] + "/" + quote(path, safe="/"), request_class="github-source", limit=limits["source_bytes"])
             total += len(data)

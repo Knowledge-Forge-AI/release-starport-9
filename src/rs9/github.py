@@ -21,6 +21,8 @@ REQUEST_CLASSES = {
     "github-api": ("application/vnd.github+json", {"api.github.com"}, {"api.github.com"}),
     "github-asset": ("*/*", {"github.com"},
                      {"github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"}),
+    "github-public-release-asset": ("application/octet-stream", {"api.github.com"},
+                                    {"objects.githubusercontent.com", "release-assets.githubusercontent.com"}),
     "github-source": ("*/*", {"raw.githubusercontent.com"}, {"raw.githubusercontent.com"}),
     "npm-packument": ("application/json", {"registry.npmjs.org"}, set()),
     "npm-tarball": ("*/*", {"registry.npmjs.org"}, {"registry.npmjs.org"}),
@@ -99,7 +101,7 @@ class ScopedGitHubAuthorization(BaseHandler):
         self._value = value
 
     def https_request(self, request):
-        if (getattr(request, "rs9_operation", None) == "github-api"
+        if (getattr(request, "rs9_operation", None) in {"github-api", "github-public-release-asset"}
                 and urlsplit(request.full_url).hostname == "api.github.com"
                 and request.get_method() == "GET"):
             request.add_unredirected_header("Authorization", "Bearer " + self._value)
