@@ -1057,15 +1057,23 @@ class ArchArmClient:
     def inventory(self, stage: str | None = None) -> dict[str, str]:
         from rs9.client_inventory import MAX_STDOUT_BYTES, run_and_parse
         from rs9.hosted_deb import inventory_excluded
-        self._running()
+        s = self._running()
         self.last_inventory_stage = stage
         self.last_diagnostics = {}
+        file_exclusion = None
+        if s.pins_qualified is True:
+            from rs9._archarm_support.successor_20261109 import INPUTS
+            if s.digests.get("packagePinsSha256") == INPUTS["package_pins_sha256"]:
+                # desktop-file-utils 0.29 generates this cache on desktop-file
+                # removal. The shared parser applies this only to regular files;
+                # historical SDKs and nonregular entries retain full comparison.
+                file_exclusion = lambda path: path == "usr/share/applications/intent.cache"
         # The unchanged shared inventory protocol permits at most 32 MiB. Only
         # its exact root scanner command receives that bound; ordinary exec
         # remains at MAX_WORKER_OUTPUT, with no caller-selectable limit.
         result = run_and_parse(lambda argv: self._exec_with_capture(argv, output_limit=MAX_STDOUT_BYTES),
                                exclusion=lambda path: inventory_excluded("pacman", path),
-                               file_exclusion=None, with_modes=True, stage=stage,
+                               file_exclusion=file_exclusion, with_modes=True, stage=stage,
                                family="pacman", return_diagnostics=True)
         if isinstance(result, tuple):
             self.last_diagnostics = result[1] or {}
