@@ -65,6 +65,10 @@ INTENTIONAL_SHAPE_CHANGES = {
         ),
     },
     "installed_smoke": {
+        "_native_execution_failure_code": (
+            (("ExceptHandler", 1), ("For", 3), ("If", 15), ("Return", 13), ("Try", 1)),
+            (("ExceptHandler", 1), ("For", 4), ("If", 16), ("Return", 14), ("Try", 1)),
+        ),
         "run_installed_smoke": (
             (("ExceptHandler", 2), ("For", 1), ("If", 27), ("Return", 1), ("Try", 2)),
             (("ExceptHandler", 2), ("For", 1), ("If", 34), ("Return", 1), ("Try", 2)),

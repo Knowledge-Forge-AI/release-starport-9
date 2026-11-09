@@ -30,6 +30,7 @@ from rs9 import wheel_nebular080_universal as wheel  # noqa: E402
 from rs9 import tf_pypi_universal_support as support  # noqa: E402
 from rs9.nebular080_smoke_support import (  # noqa: E402
     _REQUIRED_FIXTURES,
+    _REQUIRED_SUPPORT,
     _REQUIRED_TOOLS,
     _closure_digest,
 )
@@ -51,9 +52,11 @@ def _support(target: str) -> tuple[dict[str, object], dict[str, dict[str, object
     files: list[dict[str, object]] = []
     evidence: dict[str, dict[str, object]] = {}
     fixture_root = "docs/examples/v0.4/brand-system/core-minimal"
-    paths = ["tools/" + name for name in sorted(_REQUIRED_TOOLS)] + sorted(_REQUIRED_FIXTURES)
+    paths = (["tools/" + name for name in sorted(_REQUIRED_TOOLS)]
+             + sorted(_REQUIRED_FIXTURES) + sorted(_REQUIRED_SUPPORT))
     for path in paths:
         role = "application-smoke" if path == "tools/native-rc-smoke.mjs" else (
+            "verifier-support" if path in _REQUIRED_SUPPORT else
             "fixture" if path.startswith(fixture_root + "/") else "verifier-module"
         )
         row = {"path": path, "size": 1, "sha256": "a" * 64, "blob": "b" * 40, "role": role,
@@ -604,7 +607,7 @@ class UniversalSupportTests(unittest.TestCase):
             "nebular080_universal_launcher.py": "7a0e235e3d750a21a77ce7b7a7dba15ee91e3414c9ab5ec27c8b001325d4cbfa",
             "wheel_nebular080_universal.py": "249c69fdf9960e5de89d487630e2e27428af8f976da7eac13b2f077fb88066b5",
             "nebular080_product_capture.py": "748837dab28413b365fda3277549974692fb112197bba0ecd3118a4e131a629c",
-            "nebular080_smoke_support.py": "3f8c1679b8d658daaf00d7ac9935e3133001caa4f554a28aec809dc25ea4a028",
+            "nebular080_smoke_support.py": "17f4180b47ca02898a51e7249a56841c7a687f7bb6ed827b0c2e2301f32a8290",
             "nebular080_universal_consumer.py": "c91c4b41c485b3758224337dff594bbb4c01e084818c0a3568ae6075b04449a6",
         }
         roots = {name: SRC / "rs9" / name for name in expected}

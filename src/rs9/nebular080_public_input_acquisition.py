@@ -72,7 +72,9 @@ _SOURCE_TOOLS = frozenset({
     "fs-snapshot.mjs", "platform-targets.mjs", "build-inputs.mjs",
     "build-settings.mjs", "candidate-provenance.mjs",
     "darwin-linkage-validator.mjs", "node-runtime-authority.mjs",
+    "appearance-matrix-prep1/generate.mjs",
 })
+_SOURCE_SUPPORT = frozenset({"package.json"})
 _HEX64 = set("0123456789abcdef")
 
 
@@ -557,7 +559,11 @@ def _smoke_spec(
     evidence_files[archive_evidence_path] = _stage_evidence(evidence_files, archive_evidence_path, archive_data)
     evidence_files[authority_evidence_path] = _stage_evidence(evidence_files, authority_evidence_path, authority_data)
     files: list[dict[str, Any]] = []
-    selected_paths = {f"tools/{name}" for name in _SOURCE_TOOLS} | set(_SOURCE_FIXTURES)
+    selected_paths = (
+        {f"tools/{name}" for name in _SOURCE_TOOLS}
+        | set(_SOURCE_FIXTURES)
+        | set(_SOURCE_SUPPORT)
+    )
     for path in sorted(selected_paths):
         size, digest, blob, mode = source_members[path]
         body = _source_member_bytes(archive_data, path, size)
@@ -567,7 +573,9 @@ def _smoke_spec(
         _stage_raw(raw_path, body)
         evidence_path = f"smoke-source/{path}"
         evidence_files[evidence_path] = _stage_evidence(evidence_files, evidence_path, body)
-        role = "application-smoke" if path == "tools/native-rc-smoke.mjs" else (
+        role = (
+            "application-smoke" if path == "tools/native-rc-smoke.mjs" else
+            "verifier-support" if path in _SOURCE_SUPPORT else
             "fixture" if path in _SOURCE_FIXTURES else "verifier-module"
         )
         files.append({
