@@ -52,7 +52,9 @@ _REQUIRED_TOOLS = frozenset({
     "fs-snapshot.mjs", "platform-targets.mjs", "build-inputs.mjs",
     "build-settings.mjs", "candidate-provenance.mjs",
     "darwin-linkage-validator.mjs", "node-runtime-authority.mjs",
+    "appearance-matrix-prep1/generate.mjs",
 })
+_REQUIRED_SUPPORT = frozenset({"package.json"})
 _REQUIRED_FIXTURES = frozenset({
     "docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-dark.toml",
     "docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-light.toml",
@@ -365,9 +367,7 @@ def validate_smoke_support(
     if any(path != "package.json" and not path.startswith(allowed_prefixes) for path in paths):
         fail("NEBULAR_SMOKE_CLOSURE")
     required_paths = {f"{tool_root}/{name}" for name in _REQUIRED_TOOLS}
-    expected_paths = required_paths | _REQUIRED_FIXTURES
-    if "package.json" in paths:
-        expected_paths.add("package.json")
+    expected_paths = required_paths | _REQUIRED_FIXTURES | _REQUIRED_SUPPORT
     if set(paths) != expected_paths:
         fail("NEBULAR_SMOKE_CLOSURE")
     if any(item["role"] != _expected_role(
@@ -435,7 +435,7 @@ def _source_archive_members(
                     fail("NEBULAR_SMOKE_CLOSURE")
                 if member.size > MAX_SUPPORT_MEMBER_BYTES:
                     fail("NEBULAR_SMOKE_CLOSURE")
-                if name in _REQUIRED_TOOLS | _REQUIRED_FIXTURES and (
+                if name in _REQUIRED_TOOLS | _REQUIRED_FIXTURES | _REQUIRED_SUPPORT and (
                         member.pax_headers or member.mode & 0o111):
                     fail("NEBULAR_SMOKE_CLOSURE")
                 stream = archive.extractfile(member)
@@ -458,7 +458,7 @@ def _source_archive_members(
         fail("NEBULAR_SMOKE_CLOSURE")
     # The archive is a fresh 080 source offer. Required tool/fixture paths and
     # the ordinary bounded archive limits above remain the admission floor.
-    if len(members) < len(_REQUIRED_TOOLS | _REQUIRED_FIXTURES):
+    if len(members) < len(_REQUIRED_TOOLS | _REQUIRED_FIXTURES | _REQUIRED_SUPPORT):
         fail("NEBULAR_SMOKE_CLOSURE")
     return members
 

@@ -1109,6 +1109,17 @@ def _native_execution_failure_code(
     if process.get("output_complete") is False:
         return "NEBULAR_NATIVE_EXECUTION_OUTPUT_INCOMPLETE"
     if type(exit_code) is int and 0 < exit_code <= 255:
+        # Refine only the otherwise unclassified failed-process fallback.
+        # These untrusted labels never admit a run or retain child text.
+        stderr = process.get("stderr_token", "")
+        lines = stderr.splitlines() if isinstance(stderr, str) else []
+        for category, markers in (
+            ("WRAPPER_XVFB", ("xvfb-run: error:",)),
+            ("WRAPPER_DBUS_SESSION", ("dbus-run-session:",)),
+            ("WRAPPER_PRIVILEGE", ("sudo:", "unshare:", "setpriv:")),
+        ):
+            if any(line.startswith(marker) for line in lines for marker in markers):
+                return "NEBULAR_NATIVE_EXECUTION_" + category
         return "NEBULAR_NATIVE_EXECUTION_EXIT_NONZERO"
     if type(exit_code) is int and -64 <= exit_code < 0:
         return "NEBULAR_NATIVE_EXECUTION_SIGNAL"
