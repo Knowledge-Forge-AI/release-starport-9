@@ -175,7 +175,7 @@ class ActionsArtifactReader:
     def run(self, run_id: int) -> dict:
         from rs9.collect_candidate import gh_read
         raw = gh_read(self._root, ["api", "--method", "GET", f"repos/{REPOSITORY}/actions/runs/{run_id}"], self._runner)
-        return _json_object(raw.encode("utf-8") if isinstance(raw, str) else raw, "CANONICAL_ANY_RUN", "provider-run")
+        return _json_object(raw.encode("utf-8") if isinstance(raw, str) else raw, "CANONICAL_ANY_RUN", "provider-run-json")
 
     def attempt_jobs(self, run_id: int) -> list:
         from rs9.collect_candidate import api_rows
@@ -262,15 +262,27 @@ def _importer_context(context) -> tuple[Path, dict, dict, dict]:
 
 def _check_run(doc, local, *, status):
     repo, head = doc.get("repository"), doc.get("head_repository")
-    if (doc.get("id") != local["run_id"] or type(doc.get("id")) is not int
-            or type(doc.get("run_attempt")) is not int or doc["run_attempt"] != 1
-            or doc.get("head_sha") != local["source_commit"] or doc.get("event") != "push"
-            or doc.get("head_branch") != "main" or doc.get("path") != local["workflow_path"]
-            or not isinstance(repo, dict) or repo.get("full_name") != REPOSITORY or not _positive(repo.get("id"))
-            or not isinstance(head, dict) or head.get("full_name") != REPOSITORY or head.get("id") != repo["id"]):
-        raise _fail("CANONICAL_ANY_RUN", "Provider run differs from the importer's original push run", "provider-run")
+    checks = (
+        (doc.get("id") == local["run_id"] and type(doc.get("id")) is int, "provider-run-id"),
+        (type(doc.get("run_attempt")) is int and doc["run_attempt"] == 1, "provider-run-attempt"),
+        (doc.get("head_sha") == local["source_commit"], "provider-run-source"),
+        (doc.get("event") == "push", "provider-run-event"),
+        (doc.get("head_branch") == "main", "provider-run-branch"),
+        (doc.get("path") == local["workflow_path"], "provider-run-workflow"),
+        (isinstance(repo, dict) and repo.get("full_name") == REPOSITORY
+         and _positive(repo.get("id")), "provider-run-repository"),
+    )
+    for accepted, label in checks:
+        if not accepted:
+            raise _fail("CANONICAL_ANY_RUN", "Provider run differs from the importer's original push run", label)
+    if (not isinstance(head, dict) or head.get("full_name") != REPOSITORY
+            or head.get("id") != repo["id"]):
+        raise _fail("CANONICAL_ANY_RUN", "Provider run differs from the importer's original push run", "provider-run-head-repository")
     if doc.get("status") != status:
-        raise _fail("CANONICAL_ANY_RUN", "Provider run is not in the required lifecycle state", "provider-run")
+        label = ("provider-run-queued-null" if status == "in_progress"
+                 and doc.get("status") == "queued" and "conclusion" in doc
+                 and doc["conclusion"] is None else "provider-run-lifecycle")
+        raise _fail("CANONICAL_ANY_RUN", "Provider run is not in the required lifecycle state", label)
     return repo["id"]
 
 
