@@ -381,6 +381,11 @@ def _snapshot_state(root: Path, relatives: Sequence[str]) -> tuple[dict[str, Any
 
     for relative in relatives:
         visit(root / relative, relative, 0)
+        if relative not in rows:
+            if seen >= MAX_SNAPSHOT_ENTRIES:
+                fail("NEBULAR_USER_STATE_GUARD")
+            rows[relative] = None
+            seen += 1
     digest = sha256(canonical(rows))
     return rows, digest
 
@@ -417,7 +422,7 @@ def make_real_user_state_snapshotter(
             "scope": "real-user-state",
             "target": observed_target,
             "phase": phase,
-            "locations": len(rows),
+            "locations": len(relatives),
             "snapshot_sha256": digest,
             "changed": changed,
         }
