@@ -321,7 +321,7 @@ function parseInternalArgs(argv) {
       index += 1;
     } else if (flag === INTERNAL.environmentTransform) {
       if (value === undefined || environmentTransform !== undefined
-          || value !== CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID) {
+          || ![CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID, CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID].includes(value)) {
         throw new Error("Current Nix environment transform argument is invalid");
       }
       environmentTransform = value;
