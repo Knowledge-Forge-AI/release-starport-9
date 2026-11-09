@@ -1,6 +1,9 @@
 """Pure route/data checks for the isolated Nebular 0.8 RS9 candidate."""
 import hashlib
 import json
+import os
+import shutil
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -348,6 +351,99 @@ class CurrentOs080ActivationTests(unittest.TestCase):
         for candidate, base in zip(candidate_manifest["projects"], base_manifest["projects"]):
             if candidate["configuration"] != "theme-forge-nebular-fusion":
                 self.assertEqual(candidate, base)
+
+
+class CurrentOs080InitialWrapperBoundaryTests(unittest.TestCase):
+    """Exercise the real Python producer and Node parser without a GUI launch."""
+
+    def _run_wrapper(self, root, platform, scenario, profile, transform, mutate=None):
+        diagnostic = application_smoke_diagnostic
+        wrapper = Path(diagnostic.__file__).with_name("replay_progress_wrapper.mjs")
+        # A missing harness is intentional: accepted CLI input must reach the
+        # unchanged authenticated-source guard, without importing product code.
+        tools = root / "missing-tools"
+        tools.mkdir(exist_ok=True)
+        evidence = root / "evidence"
+        initial = {
+            "wrapper": wrapper, "harness": tools / "native-rc-smoke.mjs",
+            "progress": evidence / "progress.jsonl",
+            "path": evidence / "initial-observation.json",
+            "profile": profile,
+            "harness_timeout_ms": diagnostic._current_initial_timeout_ms(profile, platform, scenario),
+            "environment_transform": transform,
+        }
+        command = diagnostic._command(
+            {"source": root / "source", "tools": tools},
+            platform, scenario, root / "launch", evidence,
+            extras=False, initial_observation=initial,
+        )
+        command = command[command.index("node"):]
+        command[0] = shutil.which("node")
+        self.assertIsNotNone(command[0], "The existing pinned Node toolchain is required")
+        if mutate is not None:
+            command = mutate(command)
+        env = {key: os.environ[key] for key in ("PATH", "TMPDIR", "LANG", "LC_ALL") if key in os.environ}
+        result = subprocess.run(command, env=env, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, b"")
+        self.assertFalse(evidence.exists())
+        return result.stderr
+
+    def test_current080_generated_arguments_reach_authenticated_source_guard(self):
+        diagnostic = application_smoke_diagnostic
+        with tempfile.TemporaryDirectory(prefix="rs9-transform-parser-") as temporary:
+            for platform, scenario in (("linux-arm64", "B"), ("linux-x64", "C"), ("linux-x64", "C-signal")):
+                with self.subTest(platform=platform, scenario=scenario):
+                    stderr = self._run_wrapper(
+                        Path(temporary), platform, scenario, CURRENT080_REPLAY_PROGRESS_PROFILE,
+                        diagnostic.CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID,
+                    )
+                    self.assertEqual(stderr, b"Authenticated replay source is unavailable\n")
+
+    def test_current071_generated_arguments_retain_authenticated_source_guard(self):
+        diagnostic = application_smoke_diagnostic
+        with tempfile.TemporaryDirectory(prefix="rs9-transform-parser-") as temporary:
+            for platform, scenario in (("linux-arm64", "B"), ("linux-x64", "C"), ("linux-x64", "C-signal")):
+                with self.subTest(platform=platform, scenario=scenario):
+                    stderr = self._run_wrapper(
+                        Path(temporary), platform, scenario, CURRENT071_REPLAY_PROGRESS_PROFILE,
+                        diagnostic.CURRENT_NIX_ENVIRONMENT_TRANSFORM_ID,
+                    )
+                    self.assertEqual(stderr, b"Authenticated replay source is unavailable\n")
+
+    def test_transform_parser_still_rejects_unknown_missing_and_duplicate_values(self):
+        diagnostic = application_smoke_diagnostic
+        flag = "--rs9-current-nix-environment-transform"
+        def unknown(command):
+            command[command.index(flag) + 1] = "current999-nix-inherited-xdg-fontconfig-v1"
+            return command
+        def missing(command):
+            index = command.index(flag)
+            return [*command[:index], *command[index + 2:], flag]
+        def duplicate(command):
+            return [*command, flag, diagnostic.CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID]
+        with tempfile.TemporaryDirectory(prefix="rs9-transform-parser-") as temporary:
+            for mutation in (unknown, missing, duplicate):
+                with self.subTest(mutation=mutation.__name__):
+                    stderr = self._run_wrapper(
+                        Path(temporary), "linux-x64", "C", CURRENT080_REPLAY_PROGRESS_PROFILE,
+                        diagnostic.CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID, mutation,
+                    )
+                    self.assertEqual(stderr, b"Current Nix environment transform argument is invalid\n")
+
+    def test_transform_parser_still_requires_initial_observation(self):
+        diagnostic = application_smoke_diagnostic
+        def omit_initial(command):
+            for flag in ("--rs9-initial-observation-kind", "--rs9-initial-observation-file"):
+                index = command.index(flag)
+                del command[index:index + 2]
+            return command
+        with tempfile.TemporaryDirectory(prefix="rs9-transform-parser-") as temporary:
+            stderr = self._run_wrapper(
+                Path(temporary), "linux-x64", "C", CURRENT080_REPLAY_PROGRESS_PROFILE,
+                diagnostic.CURRENT080_NIX_ENVIRONMENT_TRANSFORM_ID, omit_initial,
+            )
+            self.assertEqual(stderr, b"Current Nix environment transform requires initial observation\n")
 
 
 if __name__ == "__main__":
