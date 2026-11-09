@@ -1,0 +1,1117 @@
+{
+  "api": {
+    "artifacts.json": {
+      "sha256": "f0b26898ee0d216bc003ad0b3dad521fb477fa57436fd1d70da6f8488dd738b2",
+      "size": 5994
+    },
+    "jobs.json": {
+      "sha256": "a405d10e339b43d7774499a192fc153d49ce840f07dce8c9f0b16f285424757d",
+      "size": 43922
+    },
+    "run.json": {
+      "sha256": "d2d3a1118cc6ed0cac00296ab8cfe06306d717dad5595d45cda9a3d81a30660c",
+      "size": 13985
+    }
+  },
+  "artifacts": {
+    "tfnf-080-universal-candidate-bundle": {
+      "archive_sha256": "17a66449b598ebb17505545b958cbf1d59ea56cae1baff701373ba251d2ad8bb",
+      "files": {
+        "bundle.json": {
+          "sha256": "e344c48052ccb92b46fe16b6eb5969cf2c80077630e0cd9e9e1268cab4ef537d",
+          "size": 1008
+        },
+        "dist/theme_forge_nebular_fusion-0.8.0-py3-none-any.whl": {
+          "sha256": "f426464f09acf316e416c34fce934e5920f48379caa6eebfcbd783b8ab3ad35e",
+          "size": 228274
+        },
+        "universal-build-receipt.json": {
+          "sha256": "9c47dc706f5a9f21d1951f0bc4a5ef3bc949697d45c584a5a962b58705bd72ee",
+          "size": 546
+        }
+      },
+      "id": 13644760744,
+      "size_in_bytes": 227665
+    },
+    "tfnf-080-universal-matrix-receipt": {
+      "archive_sha256": "7c4d406126ff0646cf44761c965514f7cf12c101425a04e0b933b29c3867398a",
+      "files": {
+        "matrix_receipt.json": {
+          "sha256": "0c047b94753c5c7d96a2691a3d82904c6c2c67b6287e835f11ed032f48006cfd",
+          "size": 4143
+        }
+      },
+      "id": 13644049428,
+      "size_in_bytes": 1664
+    },
+    "tfnf-080-universal-public-inputs": {
+      "archive_sha256": "427a8f69a0ed3093c15de430d93dbf0ea327205523191f51e3af27dc0283adb0",
+      "files": {
+        "evidence/public-release/api/commit.json": {
+          "sha256": "02b8026e8a0829bab91f4c91d5ac1a2c5d37d4481ae77b2295298ddfd3e7da41",
+          "size": 1469
+        },
+        "evidence/public-release/api/ref.json": {
+          "sha256": "7a73b42045ed7b87d5a7af51e402603efc7c52d21132d0abc55cd20770503c31",
+          "size": 430
+        },
+        "evidence/public-release/api/release.json": {
+          "sha256": "359ee5fc17617fea4f04bfa039b0b8f9e302a45ac120cb278cdbd375ed0ce48e",
+          "size": 38245
+        },
+        "evidence/public-release/api/repository.json": {
+          "sha256": "2de102b57664335990170701224986e71eb954edddb574d42fc805ba916b2f48",
+          "size": 8395
+        },
+        "evidence/public-release/api/tree.json": {
+          "sha256": "d2dd442ec0fbe3788cfd21bb8796e5ee1158b68f42c84e351e480e7efd00b079",
+          "size": 287553
+        },
+        "evidence/public-release/assets/PROVENANCE.json": {
+          "sha256": "736defe9853e0a9aaaae3e5dfe54d46fa562cac233b73b0053ddbc7ae4ebef5a",
+          "size": 14439
+        },
+        "evidence/public-release/assets/SHA256SUMS": {
+          "sha256": "52901ccad88c2a003ea1f9413062ffe314ed03f8410abe77a30f09e6a85a643f",
+          "size": 1972
+        },
+        "evidence/public-release/manifests/darwin-arm64.json": {
+          "sha256": "2bf0eabbe090ce75b863bb6a9e0ee08c17353fa57714bff19a34e6e197f6598b",
+          "size": 348085
+        },
+        "evidence/public-release/manifests/linux-arm64-gnu.json": {
+          "sha256": "f7e2a7d119ab6be5e1a0377b6e2e6cbc1b8c70d1805a5c04a874656bae0cd836",
+          "size": 380122
+        },
+        "evidence/public-release/manifests/linux-x64-gnu.json": {
+          "sha256": "bfd2a7230bb3c29c52c6f048bc7e6bb5ce943d2f01aaed4e8c065b64d895796b",
+          "size": 380116
+        },
+        "evidence/public-release/native-ci/api/artifacts.json": {
+          "sha256": "c7566e7b039a87a00d2aa3875c1749ddc71b6888d8f875a26741e447d3b1cb05",
+          "size": 3126
+        },
+        "evidence/public-release/native-ci/api/compiler-commit.json": {
+          "sha256": "14848f5af08b753c6c4cc011f723f7497544991dab979a200f5e061ff725f271",
+          "size": 1300
+        },
+        "evidence/public-release/native-ci/api/jobs.json": {
+          "sha256": "5a54788d18dd8645ed8e746a1dcfe3ff019b2d5bf4cb16040cbce9049b9c107e",
+          "size": 21787
+        },
+        "evidence/public-release/native-ci/api/run.json": {
+          "sha256": "f70fb843dfa85122f3c8f93ffecd47e222301200e83e2b7672acc25ed69ea4f1",
+          "size": 14753
+        },
+        "evidence/public-release/native-ci/api/source-run.json": {
+          "sha256": "1246db2a43f8b72e8a0339d24bd216e67038e3e3a86d3ed2831c65fd50fc5f06",
+          "size": 14723
+        },
+        "evidence/public-release/native-ci/artifact-metadata.json": {
+          "sha256": "87ccbb9369f88be48d16e3d9bee7b2b0d234918cc90a0405e3a7d15d3e4817f0",
+          "size": 833
+        },
+        "evidence/public-release/native-ci/linux-arm64/build-receipt.json": {
+          "sha256": "58c0c3d46bc71f57dc3df20d4c56a116b9ea3063f2084a8e3f32e9d855471faf",
+          "size": 2157
+        },
+        "evidence/public-release/native-ci/linux-arm64/node-authenticity.json": {
+          "sha256": "00d5766f8e73286d1788afc6e21661a6130d5692180f02d1df64c4086f9563a5",
+          "size": 850
+        },
+        "evidence/public-release/native-ci/linux-arm64/package-manifest.json": {
+          "sha256": "aaaf6f47d9a2aec517ff721f1eccb598804596185aec76ab6b607c37037bbeab",
+          "size": 425531
+        },
+        "evidence/public-release/native-ci/linux-arm64/package-record.json": {
+          "sha256": "d932bca0009d138b354ef771db257697489a78451130f3616b271562bc720209",
+          "size": 911
+        },
+        "evidence/public-release/native-ci/linux-arm64/plan.json": {
+          "sha256": "a71e89a451369ae78fbda2cfd571906b912491c3b2ba19eb7eeb15b6dc49a285",
+          "size": 1462
+        },
+        "evidence/public-release/native-ci/linux-arm64/qualification.json": {
+          "sha256": "9e8a3c437e2b7257e77343cc3e643e795c3073d7261e28cc6fc6a633f3d660a8",
+          "size": 2744
+        },
+        "evidence/public-release/native-ci/linux-arm64/rc-evidence.json": {
+          "sha256": "8f173238488204a9e475c85a2ecde8c1e4b79aa3c679eee4fb06cfd7d9b38309",
+          "size": 13087
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-B-npm-package.receipt.json": {
+          "sha256": "1eab46b89a1711e73f64e72c8352bb06753cc812412574b4b6901fec33151242",
+          "size": 3148
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-B-npm-package.run.json": {
+          "sha256": "e3158b9e92417db8080f75b7fae720da1237794b46553f981e25e51c5a3a8b33",
+          "size": 2652
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-B-raw-archive.receipt.json": {
+          "sha256": "4f1a8b1783ed5615511c49a8033bd53fa0eecccc505fdb02ae7e3d6b00b44d2d",
+          "size": 3159
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-B-raw-archive.run.json": {
+          "sha256": "10f7f2e97fa0614f35e218f00500d17d0821d186c334a3d44af9dc2a9d063bcb",
+          "size": 2652
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-appearance-pair-raw-view-a.receipt.json": {
+          "sha256": "fc4ffb53005af34cc46585f239140e023d146170158b1fce3f73804b71c9b032",
+          "size": 740
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-appearance-pair-raw-view-b.receipt.json": {
+          "sha256": "756a24fe069749f2cf74220b7116070ba8d9d23ab6bcb316f89e1883aba87194",
+          "size": 437
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-appearance-pair-raw.pair.run.json": {
+          "sha256": "7f044dc4b6f434fb97adc3fb72fd6bd95a18a908bbadb456243770e0a68eb0c3",
+          "size": 3056
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-appearance-pair-raw.phases/linux-arm64-P-restart-raw.receipt.json": {
+          "sha256": "3f40318d0b07449a2685620a46b3497cd65071aec52a0deab3b07ba96fbaf3e2",
+          "size": 1907
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-appearance-pair-raw.phases/linux-arm64-P-restart-raw.run.json": {
+          "sha256": "89c5f6fb29c37ceed7b241a3173536b5ffd20a79783e6e99a7767f09c4bc6755",
+          "size": 1447
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-appearance-pair-raw.phases/linux-arm64-P-save-raw.receipt.json": {
+          "sha256": "b613a1edbe0c5f84ca190d537cb8ee69f2af53799496581e04a8e060134369a7",
+          "size": 2577
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-appearance-pair-raw.phases/linux-arm64-P-save-raw.run.json": {
+          "sha256": "095456bf9356e9a2af76d6c45f6d43235de94a375ea8b1af9c5038fc9d4a1132",
+          "size": 1780
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-paired-v2-raw-archive.receipt.json": {
+          "sha256": "a75f745747b3720f7c8cd68920bc875da4e4c01fa612fd5de7db7f3317bb8402",
+          "size": 7598
+        },
+        "evidence/public-release/native-ci/linux-arm64/smoke/linux-arm64-paired-v2-raw-archive.run.json": {
+          "sha256": "a4324c2585563b6dd68ff356a63f55788149ab70d3f2db25ea3f41e82465e610",
+          "size": 3009
+        },
+        "evidence/public-release/native-ci/linux-x64/build-receipt.json": {
+          "sha256": "6307c2a72ca5da52d326b23a2a91fbdde6a8117335eb2e588a8f80aa5492a31a",
+          "size": 2151
+        },
+        "evidence/public-release/native-ci/linux-x64/node-authenticity.json": {
+          "sha256": "ed28783d541a39b126dfb63e7f7d6b6aac3d71c3dfa718a7ca63896e7514ec26",
+          "size": 847
+        },
+        "evidence/public-release/native-ci/linux-x64/package-manifest.json": {
+          "sha256": "fb2b250b354949fd704e0901bde79ff60ec66b92577a08d1b299945f02fef19d",
+          "size": 425521
+        },
+        "evidence/public-release/native-ci/linux-x64/package-record.json": {
+          "sha256": "f73cfbc9abd72d6db960b3e6ecb9a9399797a74cd753d880d51049d31484c2ff",
+          "size": 906
+        },
+        "evidence/public-release/native-ci/linux-x64/plan.json": {
+          "sha256": "a71e89a451369ae78fbda2cfd571906b912491c3b2ba19eb7eeb15b6dc49a285",
+          "size": 1462
+        },
+        "evidence/public-release/native-ci/linux-x64/qualification.json": {
+          "sha256": "70cedd0890b70d44d4eabd2c4ccfefbf8affbb9c6323a1ce872a7d28b1197256",
+          "size": 2723
+        },
+        "evidence/public-release/native-ci/linux-x64/rc-evidence.json": {
+          "sha256": "dc59ce280cf353cdb9c11e75c04dacd97e4b2210e718248e68e064a55b200016",
+          "size": 12632
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-C-raw-archive.receipt.json": {
+          "sha256": "cb319c63afc192e455897e7c2de0570f81d66cf3f211ab1c79d22f1a7acc99cf",
+          "size": 2842
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-C-raw-archive.run.json": {
+          "sha256": "6ecd20b71d509bd7cfe3fd3aea5062535d89bb85cb24eaed4030d87b790590a9",
+          "size": 2580
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-C-signal-npm-package.receipt.json": {
+          "sha256": "a0e867b1200d0cb4abaeb4619672c8d6e570e15af923831f393e0a8c925ba47f",
+          "size": 2844
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-C-signal-npm-package.run.json": {
+          "sha256": "783851c3902a2d6e97d21589463da23158175869229addb4fa4e5f771bbc843f",
+          "size": 2973
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-appearance-pair-raw-view-a.receipt.json": {
+          "sha256": "c5ee3d19bce4300a2dd6f54d98ea409e438637be0cdfb7194f7816b2dd364be9",
+          "size": 740
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-appearance-pair-raw-view-b.receipt.json": {
+          "sha256": "6c3efc322cd83f92b8120b834f2e47b3c23cd013bcefa6ed7e5577a917931686",
+          "size": 437
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-appearance-pair-raw.pair.run.json": {
+          "sha256": "294f40f7bd72b9a168e52fd68cb474ae161edaf841db0b7594ebe3e70116acd1",
+          "size": 3050
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-appearance-pair-raw.phases/linux-x64-P-restart-raw.receipt.json": {
+          "sha256": "3caee9cbb7e21fc19cb8f5e450b5eca302ee930fead674ddcd784b446bc82760",
+          "size": 1907
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-appearance-pair-raw.phases/linux-x64-P-restart-raw.run.json": {
+          "sha256": "2c60cdeca11be692e7879db61e57f8446b378729aba748368bae7d6b83b969e2",
+          "size": 1443
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-appearance-pair-raw.phases/linux-x64-P-save-raw.receipt.json": {
+          "sha256": "4dfe13f4a7bb2a92fe171a87f680648ecce2e70a044bfa2c9502c6b715b43c94",
+          "size": 2577
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-appearance-pair-raw.phases/linux-x64-P-save-raw.run.json": {
+          "sha256": "8e86b8de7b0af1ed20d62177f092b629436b1b4e99cb90d1459ebafb631e2c72",
+          "size": 1776
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-paired-v2-raw-archive.receipt.json": {
+          "sha256": "060163273a7194bc9603cd5e258c99939a43b7290f6850aa4d6f3a75e9d09bfd",
+          "size": 7594
+        },
+        "evidence/public-release/native-ci/linux-x64/smoke/linux-x64-paired-v2-raw-archive.run.json": {
+          "sha256": "87dd7754b8665b549f9c03fc98befe00fdff60072b0b7917a38668eab8689782",
+          "size": 3000
+        },
+        "evidence/public-release/native-ci/macos-arm64/build-receipt.json": {
+          "sha256": "704f265694899f8d52778f4f873fb89eee7460442902c310c593f9f8abf30590",
+          "size": 2014
+        },
+        "evidence/public-release/native-ci/macos-arm64/node-authenticity.json": {
+          "sha256": "8ac235e8011b7b10f79924487107bd9f0c33801e621deca8333b2e2c6231c12b",
+          "size": 1171
+        },
+        "evidence/public-release/native-ci/macos-arm64/package-manifest.json": {
+          "sha256": "2004bbac8b7f879000233497c95f5079a7f5a71b0d3d9f17b15152947a59ca95",
+          "size": 437637
+        },
+        "evidence/public-release/native-ci/macos-arm64/package-record.json": {
+          "sha256": "dc9f8402bdf334eb92a4a7aef023d2e3973f0d46e4d055da2a70327a02210b59",
+          "size": 910
+        },
+        "evidence/public-release/native-ci/macos-arm64/plan.json": {
+          "sha256": "a71e89a451369ae78fbda2cfd571906b912491c3b2ba19eb7eeb15b6dc49a285",
+          "size": 1462
+        },
+        "evidence/public-release/native-ci/macos-arm64/qualification.json": {
+          "sha256": "546d4d5dc83bed94158a0a894791e8ec1fa37ee93a53fdc77a1c1cede0d9e394",
+          "size": 1997
+        },
+        "evidence/public-release/native-ci/macos-arm64/rc-evidence.json": {
+          "sha256": "14ae45f18c4fbb6fbf9999fe2064cc1efe6d060614f4b0c2c8895e96ea80c3d6",
+          "size": 11746
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-A-npm-package.receipt.json": {
+          "sha256": "9a05282c75b8b2c7970bc78a51d19eb6a36f2b012b484bf8cd29797f9e6fbfad",
+          "size": 2845
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-A-npm-package.run.json": {
+          "sha256": "27560f96fcb8518fe772ce2175318475ac0e462ef940a7568696e798f607d753",
+          "size": 2350
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-A-raw-archive.receipt.json": {
+          "sha256": "78b3724ad8880a87812b78c3d037f6b7bebcc3c1434559fa9345efd66942d13e",
+          "size": 2829
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-A-raw-archive.run.json": {
+          "sha256": "4df7134cf7a17da77fc26f15db49ab20b22c5605c47bc2ed826476d2c0cc3011",
+          "size": 2350
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-appearance-pair-raw-view-a.receipt.json": {
+          "sha256": "2a6278e81f7cdad9a0a91251d9d2daa9390385ef0548ca8133f3c0933ffb009c",
+          "size": 739
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-appearance-pair-raw-view-b.receipt.json": {
+          "sha256": "d88f1af5a182cbbec76099780316ceeccc4825f01f8d071e1985f60a05825b04",
+          "size": 438
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-appearance-pair-raw.pair.run.json": {
+          "sha256": "6d9e66745754f585bfae0a0198da492227023fd159514c435c3ef747e3c41618",
+          "size": 3101
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-appearance-pair-raw.phases/darwin-arm64-P-restart-raw.receipt.json": {
+          "sha256": "1b7f67f30ff340a5bdb145519bfe87f870ce3375d62fbe17ab2b684970c8ed68",
+          "size": 1936
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-appearance-pair-raw.phases/darwin-arm64-P-restart-raw.run.json": {
+          "sha256": "109eb22df747db90a169a3bde5b4f3ae237e92e44fe51fa396b87c789783ca63",
+          "size": 1492
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-appearance-pair-raw.phases/darwin-arm64-P-save-raw.receipt.json": {
+          "sha256": "297981808fc283207c35d763c853743658aec1f9d1305488be2078753f0c8756",
+          "size": 2604
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-appearance-pair-raw.phases/darwin-arm64-P-save-raw.run.json": {
+          "sha256": "b99963ebd94e7d643ac5c57cbbfb1d2c02d59b84b1ca4356ba78df8ae8cd4b46",
+          "size": 1823
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-paired-v2-raw-archive.receipt.json": {
+          "sha256": "5eaab40d6fd42e1f73e1cfac16b5523f09eccdeea687a4c900363dcc862f8079",
+          "size": 7625
+        },
+        "evidence/public-release/native-ci/macos-arm64/smoke/darwin-arm64-paired-v2-raw-archive.run.json": {
+          "sha256": "43dd8e50c8d71f357cd49e6e874e419fc87d3ae04e903b81e9941f65082fe005",
+          "size": 3052
+        },
+        "evidence/public-release/native-ci/native-reference.json": {
+          "sha256": "ec9c78e97d86ec19758d5c9704b288051ec6a1013d0167f9323cc05d7333037c",
+          "size": 4285
+        },
+        "evidence/public-release/native-ci/rc-index-original.zip": {
+          "sha256": "1c5ce07befdb8907a36e808f55d7c43f9f5efef7ba33a3f1371d227e5a853d26",
+          "size": 3076
+        },
+        "evidence/public-release/npm/metadata.json": {
+          "sha256": "737620a3d1d66ef08c8c936c18057bad62f72d95cd7a87d3b7edb4bcffc53dc4",
+          "size": 349
+        },
+        "evidence/public-release/npm/package.tgz": {
+          "sha256": "41792773942cc9b039ce8b26114152396c950e43a897a14bc778a3be07d2d81f",
+          "size": 22813
+        },
+        "evidence/public-release/payloads/theme-forge-nebular-fusion-v0.8.0-aarch64-apple-darwin.app.tar.gz": {
+          "sha256": "0a7ab188afc4660f68bd6dabfda96309a348108a8d77a4786df1731cddaf6896",
+          "size": 49769994
+        },
+        "evidence/public-release/payloads/theme-forge-nebular-fusion-v0.8.0-aarch64-unknown-linux-gnu.tar.gz": {
+          "sha256": "4bbc40f180d954e1ca496606da9b63d7ce0f49dd29e802893aabc4aa0e859e94",
+          "size": 57038323
+        },
+        "evidence/public-release/payloads/theme-forge-nebular-fusion-v0.8.0-x86_64-unknown-linux-gnu.tar.gz": {
+          "sha256": "498f0f6ff81c32200843e04016f86f7733905df0b0712c3f3639162ad5655abc",
+          "size": 56825312
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-dark.toml": {
+          "sha256": "6a95e550c0c3e92793a873251eed3bc888e5e4c4a3355124d5230eaebe479387",
+          "size": 371
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-light.toml": {
+          "sha256": "8e53627c743ba21b079b281638804f3a9214895686514dbf5fec0c279db71667",
+          "size": 375
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand-package.toml": {
+          "sha256": "d205c6db34f0af25d6657a8133593d1d67b50dda8e4cfc34973450dd141c7bd4",
+          "size": 1194
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand.toml": {
+          "sha256": "1017ebaca28269b4d4397e84bf29696ddea3f615ef1a8e5a6d67606a369c8b41",
+          "size": 1012
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/.tfsb/companions/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/.tfsb/project.toml": {
+          "sha256": "932378720ed558961f520df7c6d74da2a3b11c6a5f31263cbe565a22d5e801c3",
+          "size": 69
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/bundle/assets/fixture-mark-on-dark.svg": {
+          "sha256": "1068a15abd03564d4a48257825914baa14ae26990aad96c0c8f46e2d5a27a15b",
+          "size": 345
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/bundle/assets/fixture-mark-on-light.svg": {
+          "sha256": "a1bf2b63584d6c5e7832d2e7c29f9137f6f15c4a0d004b9e71c1ee599d75d75f",
+          "size": 348
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/bundle/brand/brand-package.toml": {
+          "sha256": "d205c6db34f0af25d6657a8133593d1d67b50dda8e4cfc34973450dd141c7bd4",
+          "size": 1194
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/bundle/brand/brand.toml": {
+          "sha256": "1017ebaca28269b4d4397e84bf29696ddea3f615ef1a8e5a6d67606a369c8b41",
+          "size": 1012
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/bundle/companions/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/bundle/tfsb-brand-manifest.json": {
+          "sha256": "c9c652e36d881775d14ed467bad4a1e5494d3ef55b2aade0252f74c6299a28e4",
+          "size": 1874
+        },
+        "evidence/public-release/smoke-source/docs/examples/v0.4/brand-system/core-minimal/bundle/tfsb-manifest.json": {
+          "sha256": "53ece77670595a24f49bbdfb0af0498e093e5a08366ecaff090814a02c9f70e8",
+          "size": 1110
+        },
+        "evidence/public-release/smoke-source/package.json": {
+          "sha256": "64df6f25e3fee6d56d31afdeefa6da1fdb4ebdf7d79033195caecb6fb2ed6be9",
+          "size": 1833
+        },
+        "evidence/public-release/smoke-source/tools/appearance-matrix-prep1/generate.mjs": {
+          "sha256": "2472f6ede72c17152d51410146d126251a26821815111b6c1b214308484ad67d",
+          "size": 17120
+        },
+        "evidence/public-release/smoke-source/tools/build-inputs.mjs": {
+          "sha256": "cdb80c1a9742a8632a5eb9284d970669714340daf809c0368095658e38c65154",
+          "size": 16400
+        },
+        "evidence/public-release/smoke-source/tools/build-settings.mjs": {
+          "sha256": "f7578fccf935e14aee190a2de4378a986a182b038e41b261f3f9355e33449cd0",
+          "size": 24182
+        },
+        "evidence/public-release/smoke-source/tools/candidate-provenance.mjs": {
+          "sha256": "20244b6765d6e7d0ee5fd86452096a4546f189103b0acb9f065c4a1479c23155",
+          "size": 15484
+        },
+        "evidence/public-release/smoke-source/tools/darwin-linkage-validator.mjs": {
+          "sha256": "67073d25aa00bc6c8086e8d10a2bd7302cc46c6416894bcba553880edf83f0f9",
+          "size": 7678
+        },
+        "evidence/public-release/smoke-source/tools/fs-snapshot.mjs": {
+          "sha256": "30ad6c3f0394126a7d3e5534507fe46c78c34946edd15bd5c91b36e2b36df351",
+          "size": 13794
+        },
+        "evidence/public-release/smoke-source/tools/native-launcher.mjs": {
+          "sha256": "3595cfaf0a2f1ac51a48862dc5f6aa842db6d3431a62159bcb93cb0abc812f2d",
+          "size": 7193
+        },
+        "evidence/public-release/smoke-source/tools/native-rc-package.mjs": {
+          "sha256": "0ef948c2f9f45a9343586288681ae5ed6f6527b85912a52bd8c37aa50e3682c6",
+          "size": 33102
+        },
+        "evidence/public-release/smoke-source/tools/native-rc-smoke.mjs": {
+          "sha256": "ee2a26e00522f27d49550d3931cdd25e0f9956a0786d487f9af89755cf8bff39",
+          "size": 65040
+        },
+        "evidence/public-release/smoke-source/tools/native-runtime.mjs": {
+          "sha256": "a9d6c8e885b9db41877c5d2d79efe48f2e47daf791e0f1ad1ca06636d37d962e",
+          "size": 118749
+        },
+        "evidence/public-release/smoke-source/tools/node-runtime-authority.mjs": {
+          "sha256": "5495e291131a963c3e9bc9730aacb108d770954ce88f397e0f4a3c9ce768635e",
+          "size": 37973
+        },
+        "evidence/public-release/smoke-source/tools/platform-targets.mjs": {
+          "sha256": "35321c7e888038210589612873136c96bf697789f6f4e90918442faa41e13aec",
+          "size": 7292
+        },
+        "evidence/public-release/smoke-source/tools/sidecar-common.mjs": {
+          "sha256": "e0ca4d4a4bba4abd756f1399e31a768a20873eefb6c50ac26a75adddccc1978c",
+          "size": 81902
+        },
+        "evidence/public-release/smoke-source/tools/sidecar-verify.mjs": {
+          "sha256": "fba7f292b3c01ed062f4727e0c22912bc269b6ca76fca8328fb5329c098aac77",
+          "size": 1906
+        },
+        "evidence/public-release/source/COMMERCIAL-LICENSE.md": {
+          "sha256": "29fa83d6c8a530e7fb08c605ba01d8781c16e43a4644de3333b2058e4cc09281",
+          "size": 943
+        },
+        "evidence/public-release/source/LICENSE": {
+          "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+          "size": 34460
+        },
+        "evidence/public-release/source/NOTICE": {
+          "sha256": "84c3bfd695449b5330344ba7e5d355f3bb3a1a7f8925aea3b2755145709db1e0",
+          "size": 614
+        },
+        "evidence/public-release/source/PROVENANCE.json": {
+          "sha256": "736defe9853e0a9aaaae3e5dfe54d46fa562cac233b73b0053ddbc7ae4ebef5a",
+          "size": 14439
+        },
+        "evidence/public-release/source/README.md": {
+          "sha256": "580c7eba90ba5aed86be729302d8cedd610398ca84e4aadbffdb2d228ce58d2d",
+          "size": 881
+        },
+        "evidence/public-release/source/nebular-compiled-public-build-source-authority-v0.8.0.json": {
+          "sha256": "53dea0e5ca138616a94d351e2490f94aa34de74d2665fd62119034ca1fb58dcf",
+          "size": 1767
+        },
+        "evidence/public-release/source/theme-forge-nebular-fusion-v0.8.0-source.tar.gz": {
+          "sha256": "9eb30214158d1bfaf2d7d4c2b5311ed43e02a26e455239b1873abb11353c63b6",
+          "size": 6725884
+        },
+        "product-capture/evidence/api/commit.json": {
+          "sha256": "02b8026e8a0829bab91f4c91d5ac1a2c5d37d4481ae77b2295298ddfd3e7da41",
+          "size": 1469
+        },
+        "product-capture/evidence/api/ref.json": {
+          "sha256": "7a73b42045ed7b87d5a7af51e402603efc7c52d21132d0abc55cd20770503c31",
+          "size": 430
+        },
+        "product-capture/evidence/api/release.json": {
+          "sha256": "359ee5fc17617fea4f04bfa039b0b8f9e302a45ac120cb278cdbd375ed0ce48e",
+          "size": 38245
+        },
+        "product-capture/evidence/api/repository.json": {
+          "sha256": "2de102b57664335990170701224986e71eb954edddb574d42fc805ba916b2f48",
+          "size": 8395
+        },
+        "product-capture/evidence/api/tags.json": {
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "size": 3
+        },
+        "product-capture/evidence/api/tree.json": {
+          "sha256": "d2dd442ec0fbe3788cfd21bb8796e5ee1158b68f42c84e351e480e7efd00b079",
+          "size": 287553
+        },
+        "product-capture/evidence/assets/SHA256SUMS": {
+          "sha256": "52901ccad88c2a003ea1f9413062ffe314ed03f8410abe77a30f09e6a85a643f",
+          "size": 1972
+        },
+        "product-capture/evidence/assets/nebular-compiled-public-build-source-authority-v0.8.0.json": {
+          "sha256": "53dea0e5ca138616a94d351e2490f94aa34de74d2665fd62119034ca1fb58dcf",
+          "size": 1767
+        },
+        "product-capture/evidence/assets/nebular-v0.8.0-native-ci-provenance.json": {
+          "sha256": "736defe9853e0a9aaaae3e5dfe54d46fa562cac233b73b0053ddbc7ae4ebef5a",
+          "size": 14439
+        },
+        "product-capture/evidence/assets/theme-forge-nebular-fusion-v0.8.0-aarch64-apple-darwin.app.tar.gz": {
+          "sha256": "0a7ab188afc4660f68bd6dabfda96309a348108a8d77a4786df1731cddaf6896",
+          "size": 49769994
+        },
+        "product-capture/evidence/assets/theme-forge-nebular-fusion-v0.8.0-aarch64-unknown-linux-gnu.tar.gz": {
+          "sha256": "4bbc40f180d954e1ca496606da9b63d7ce0f49dd29e802893aabc4aa0e859e94",
+          "size": 57038323
+        },
+        "product-capture/evidence/assets/theme-forge-nebular-fusion-v0.8.0-source.tar.gz": {
+          "sha256": "9eb30214158d1bfaf2d7d4c2b5311ed43e02a26e455239b1873abb11353c63b6",
+          "size": 6725884
+        },
+        "product-capture/evidence/assets/theme-forge-nebular-fusion-v0.8.0-x86_64-unknown-linux-gnu.tar.gz": {
+          "sha256": "498f0f6ff81c32200843e04016f86f7733905df0b0712c3f3639162ad5655abc",
+          "size": 56825312
+        },
+        "product-capture/evidence/fetch-receipt.json": {
+          "sha256": "d693c8af8a43bde5d136203bd7717bb5e01a97b59b05f6bad7a7e7843bb07abd",
+          "size": 6282
+        },
+        "product-capture/selection.json": {
+          "sha256": "6cde2828deed24a837347aa1b38021cf8d87bcee831f972239e730f471fa578f",
+          "size": 1592
+        },
+        "public-inputs-preparation.json": {
+          "sha256": "c2c62279bdbfca11fa364ba06b76f79b73cab70cc6af0127771a3e1ec61c21ca",
+          "size": 1704
+        },
+        "qualification-inputs-prep.json": {
+          "sha256": "9cffcb440a6683d4d07c35fd4b5382cb3c40e248bd77ce69cfc6d7a873a37846",
+          "size": 62189
+        },
+        "raw-release/manifests/darwin-arm64.json": {
+          "sha256": "2bf0eabbe090ce75b863bb6a9e0ee08c17353fa57714bff19a34e6e197f6598b",
+          "size": 348085
+        },
+        "raw-release/manifests/linux-arm64-gnu.json": {
+          "sha256": "f7e2a7d119ab6be5e1a0377b6e2e6cbc1b8c70d1805a5c04a874656bae0cd836",
+          "size": 380122
+        },
+        "raw-release/manifests/linux-x64-gnu.json": {
+          "sha256": "bfd2a7230bb3c29c52c6f048bc7e6bb5ce943d2f01aaed4e8c065b64d895796b",
+          "size": 380116
+        },
+        "raw-release/native-ci/linux-arm64/package-record.json": {
+          "sha256": "d932bca0009d138b354ef771db257697489a78451130f3616b271562bc720209",
+          "size": 911
+        },
+        "raw-release/native-ci/linux-x64/package-record.json": {
+          "sha256": "f73cfbc9abd72d6db960b3e6ecb9a9399797a74cd753d880d51049d31484c2ff",
+          "size": 906
+        },
+        "raw-release/native-ci/macos-arm64/package-record.json": {
+          "sha256": "dc9f8402bdf334eb92a4a7aef023d2e3973f0d46e4d055da2a70327a02210b59",
+          "size": 910
+        },
+        "raw-release/payloads/theme-forge-nebular-fusion-v0.8.0-aarch64-apple-darwin.app.tar.gz": {
+          "sha256": "0a7ab188afc4660f68bd6dabfda96309a348108a8d77a4786df1731cddaf6896",
+          "size": 49769994
+        },
+        "raw-release/payloads/theme-forge-nebular-fusion-v0.8.0-aarch64-unknown-linux-gnu.tar.gz": {
+          "sha256": "4bbc40f180d954e1ca496606da9b63d7ce0f49dd29e802893aabc4aa0e859e94",
+          "size": 57038323
+        },
+        "raw-release/payloads/theme-forge-nebular-fusion-v0.8.0-x86_64-unknown-linux-gnu.tar.gz": {
+          "sha256": "498f0f6ff81c32200843e04016f86f7733905df0b0712c3f3639162ad5655abc",
+          "size": 56825312
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-dark.toml": {
+          "sha256": "6a95e550c0c3e92793a873251eed3bc888e5e4c4a3355124d5230eaebe479387",
+          "size": 371
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-light.toml": {
+          "sha256": "8e53627c743ba21b079b281638804f3a9214895686514dbf5fec0c279db71667",
+          "size": 375
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand-package.toml": {
+          "sha256": "d205c6db34f0af25d6657a8133593d1d67b50dda8e4cfc34973450dd141c7bd4",
+          "size": 1194
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand.toml": {
+          "sha256": "1017ebaca28269b4d4397e84bf29696ddea3f615ef1a8e5a6d67606a369c8b41",
+          "size": 1012
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/.tfsb/companions/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/.tfsb/project.toml": {
+          "sha256": "932378720ed558961f520df7c6d74da2a3b11c6a5f31263cbe565a22d5e801c3",
+          "size": 69
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/bundle/assets/fixture-mark-on-dark.svg": {
+          "sha256": "1068a15abd03564d4a48257825914baa14ae26990aad96c0c8f46e2d5a27a15b",
+          "size": 345
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/bundle/assets/fixture-mark-on-light.svg": {
+          "sha256": "a1bf2b63584d6c5e7832d2e7c29f9137f6f15c4a0d004b9e71c1ee599d75d75f",
+          "size": 348
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/bundle/brand/brand-package.toml": {
+          "sha256": "d205c6db34f0af25d6657a8133593d1d67b50dda8e4cfc34973450dd141c7bd4",
+          "size": 1194
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/bundle/brand/brand.toml": {
+          "sha256": "1017ebaca28269b4d4397e84bf29696ddea3f615ef1a8e5a6d67606a369c8b41",
+          "size": 1012
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/bundle/companions/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/bundle/tfsb-brand-manifest.json": {
+          "sha256": "c9c652e36d881775d14ed467bad4a1e5494d3ef55b2aade0252f74c6299a28e4",
+          "size": 1874
+        },
+        "raw-release/smoke-support/darwin-arm64/docs/examples/v0.4/brand-system/core-minimal/bundle/tfsb-manifest.json": {
+          "sha256": "53ece77670595a24f49bbdfb0af0498e093e5a08366ecaff090814a02c9f70e8",
+          "size": 1110
+        },
+        "raw-release/smoke-support/darwin-arm64/package.json": {
+          "sha256": "64df6f25e3fee6d56d31afdeefa6da1fdb4ebdf7d79033195caecb6fb2ed6be9",
+          "size": 1833
+        },
+        "raw-release/smoke-support/darwin-arm64/source/nebular-compiled-public-build-source-authority-v0.8.0.json": {
+          "sha256": "53dea0e5ca138616a94d351e2490f94aa34de74d2665fd62119034ca1fb58dcf",
+          "size": 1767
+        },
+        "raw-release/smoke-support/darwin-arm64/source/theme-forge-nebular-fusion-v0.8.0-source.tar.gz": {
+          "sha256": "9eb30214158d1bfaf2d7d4c2b5311ed43e02a26e455239b1873abb11353c63b6",
+          "size": 6725884
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/appearance-matrix-prep1/generate.mjs": {
+          "sha256": "2472f6ede72c17152d51410146d126251a26821815111b6c1b214308484ad67d",
+          "size": 17120
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/build-inputs.mjs": {
+          "sha256": "cdb80c1a9742a8632a5eb9284d970669714340daf809c0368095658e38c65154",
+          "size": 16400
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/build-settings.mjs": {
+          "sha256": "f7578fccf935e14aee190a2de4378a986a182b038e41b261f3f9355e33449cd0",
+          "size": 24182
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/candidate-provenance.mjs": {
+          "sha256": "20244b6765d6e7d0ee5fd86452096a4546f189103b0acb9f065c4a1479c23155",
+          "size": 15484
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/darwin-linkage-validator.mjs": {
+          "sha256": "67073d25aa00bc6c8086e8d10a2bd7302cc46c6416894bcba553880edf83f0f9",
+          "size": 7678
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/fs-snapshot.mjs": {
+          "sha256": "30ad6c3f0394126a7d3e5534507fe46c78c34946edd15bd5c91b36e2b36df351",
+          "size": 13794
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/native-launcher.mjs": {
+          "sha256": "3595cfaf0a2f1ac51a48862dc5f6aa842db6d3431a62159bcb93cb0abc812f2d",
+          "size": 7193
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/native-rc-package.mjs": {
+          "sha256": "0ef948c2f9f45a9343586288681ae5ed6f6527b85912a52bd8c37aa50e3682c6",
+          "size": 33102
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/native-rc-smoke.mjs": {
+          "sha256": "ee2a26e00522f27d49550d3931cdd25e0f9956a0786d487f9af89755cf8bff39",
+          "size": 65040
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/native-runtime.mjs": {
+          "sha256": "a9d6c8e885b9db41877c5d2d79efe48f2e47daf791e0f1ad1ca06636d37d962e",
+          "size": 118749
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/node-runtime-authority.mjs": {
+          "sha256": "5495e291131a963c3e9bc9730aacb108d770954ce88f397e0f4a3c9ce768635e",
+          "size": 37973
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/platform-targets.mjs": {
+          "sha256": "35321c7e888038210589612873136c96bf697789f6f4e90918442faa41e13aec",
+          "size": 7292
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/sidecar-common.mjs": {
+          "sha256": "e0ca4d4a4bba4abd756f1399e31a768a20873eefb6c50ac26a75adddccc1978c",
+          "size": 81902
+        },
+        "raw-release/smoke-support/darwin-arm64/tools/sidecar-verify.mjs": {
+          "sha256": "fba7f292b3c01ed062f4727e0c22912bc269b6ca76fca8328fb5329c098aac77",
+          "size": 1906
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-dark.toml": {
+          "sha256": "6a95e550c0c3e92793a873251eed3bc888e5e4c4a3355124d5230eaebe479387",
+          "size": 371
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-light.toml": {
+          "sha256": "8e53627c743ba21b079b281638804f3a9214895686514dbf5fec0c279db71667",
+          "size": 375
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand-package.toml": {
+          "sha256": "d205c6db34f0af25d6657a8133593d1d67b50dda8e4cfc34973450dd141c7bd4",
+          "size": 1194
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand.toml": {
+          "sha256": "1017ebaca28269b4d4397e84bf29696ddea3f615ef1a8e5a6d67606a369c8b41",
+          "size": 1012
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/.tfsb/companions/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/.tfsb/project.toml": {
+          "sha256": "932378720ed558961f520df7c6d74da2a3b11c6a5f31263cbe565a22d5e801c3",
+          "size": 69
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/assets/fixture-mark-on-dark.svg": {
+          "sha256": "1068a15abd03564d4a48257825914baa14ae26990aad96c0c8f46e2d5a27a15b",
+          "size": 345
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/assets/fixture-mark-on-light.svg": {
+          "sha256": "a1bf2b63584d6c5e7832d2e7c29f9137f6f15c4a0d004b9e71c1ee599d75d75f",
+          "size": 348
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/brand/brand-package.toml": {
+          "sha256": "d205c6db34f0af25d6657a8133593d1d67b50dda8e4cfc34973450dd141c7bd4",
+          "size": 1194
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/brand/brand.toml": {
+          "sha256": "1017ebaca28269b4d4397e84bf29696ddea3f615ef1a8e5a6d67606a369c8b41",
+          "size": 1012
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/companions/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/tfsb-brand-manifest.json": {
+          "sha256": "c9c652e36d881775d14ed467bad4a1e5494d3ef55b2aade0252f74c6299a28e4",
+          "size": 1874
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/tfsb-manifest.json": {
+          "sha256": "53ece77670595a24f49bbdfb0af0498e093e5a08366ecaff090814a02c9f70e8",
+          "size": 1110
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/package.json": {
+          "sha256": "64df6f25e3fee6d56d31afdeefa6da1fdb4ebdf7d79033195caecb6fb2ed6be9",
+          "size": 1833
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/source/nebular-compiled-public-build-source-authority-v0.8.0.json": {
+          "sha256": "53dea0e5ca138616a94d351e2490f94aa34de74d2665fd62119034ca1fb58dcf",
+          "size": 1767
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/source/theme-forge-nebular-fusion-v0.8.0-source.tar.gz": {
+          "sha256": "9eb30214158d1bfaf2d7d4c2b5311ed43e02a26e455239b1873abb11353c63b6",
+          "size": 6725884
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/appearance-matrix-prep1/generate.mjs": {
+          "sha256": "2472f6ede72c17152d51410146d126251a26821815111b6c1b214308484ad67d",
+          "size": 17120
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/build-inputs.mjs": {
+          "sha256": "cdb80c1a9742a8632a5eb9284d970669714340daf809c0368095658e38c65154",
+          "size": 16400
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/build-settings.mjs": {
+          "sha256": "f7578fccf935e14aee190a2de4378a986a182b038e41b261f3f9355e33449cd0",
+          "size": 24182
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/candidate-provenance.mjs": {
+          "sha256": "20244b6765d6e7d0ee5fd86452096a4546f189103b0acb9f065c4a1479c23155",
+          "size": 15484
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/darwin-linkage-validator.mjs": {
+          "sha256": "67073d25aa00bc6c8086e8d10a2bd7302cc46c6416894bcba553880edf83f0f9",
+          "size": 7678
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/fs-snapshot.mjs": {
+          "sha256": "30ad6c3f0394126a7d3e5534507fe46c78c34946edd15bd5c91b36e2b36df351",
+          "size": 13794
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/native-launcher.mjs": {
+          "sha256": "3595cfaf0a2f1ac51a48862dc5f6aa842db6d3431a62159bcb93cb0abc812f2d",
+          "size": 7193
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/native-rc-package.mjs": {
+          "sha256": "0ef948c2f9f45a9343586288681ae5ed6f6527b85912a52bd8c37aa50e3682c6",
+          "size": 33102
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/native-rc-smoke.mjs": {
+          "sha256": "ee2a26e00522f27d49550d3931cdd25e0f9956a0786d487f9af89755cf8bff39",
+          "size": 65040
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/native-runtime.mjs": {
+          "sha256": "a9d6c8e885b9db41877c5d2d79efe48f2e47daf791e0f1ad1ca06636d37d962e",
+          "size": 118749
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/node-runtime-authority.mjs": {
+          "sha256": "5495e291131a963c3e9bc9730aacb108d770954ce88f397e0f4a3c9ce768635e",
+          "size": 37973
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/platform-targets.mjs": {
+          "sha256": "35321c7e888038210589612873136c96bf697789f6f4e90918442faa41e13aec",
+          "size": 7292
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/sidecar-common.mjs": {
+          "sha256": "e0ca4d4a4bba4abd756f1399e31a768a20873eefb6c50ac26a75adddccc1978c",
+          "size": 81902
+        },
+        "raw-release/smoke-support/linux-arm64-gnu/tools/sidecar-verify.mjs": {
+          "sha256": "fba7f292b3c01ed062f4727e0c22912bc269b6ca76fca8328fb5329c098aac77",
+          "size": 1906
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-dark.toml": {
+          "sha256": "6a95e550c0c3e92793a873251eed3bc888e5e4c4a3355124d5230eaebe479387",
+          "size": 371
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/.tfsb/assets/fixture-mark-on-light.toml": {
+          "sha256": "8e53627c743ba21b079b281638804f3a9214895686514dbf5fec0c279db71667",
+          "size": 375
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand-package.toml": {
+          "sha256": "d205c6db34f0af25d6657a8133593d1d67b50dda8e4cfc34973450dd141c7bd4",
+          "size": 1194
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/.tfsb/brand.toml": {
+          "sha256": "1017ebaca28269b4d4397e84bf29696ddea3f615ef1a8e5a6d67606a369c8b41",
+          "size": 1012
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/.tfsb/companions/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/.tfsb/project.toml": {
+          "sha256": "932378720ed558961f520df7c6d74da2a3b11c6a5f31263cbe565a22d5e801c3",
+          "size": 69
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/assets/fixture-mark-on-dark.svg": {
+          "sha256": "1068a15abd03564d4a48257825914baa14ae26990aad96c0c8f46e2d5a27a15b",
+          "size": 345
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/assets/fixture-mark-on-light.svg": {
+          "sha256": "a1bf2b63584d6c5e7832d2e7c29f9137f6f15c4a0d004b9e71c1ee599d75d75f",
+          "size": 348
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/brand/brand-package.toml": {
+          "sha256": "d205c6db34f0af25d6657a8133593d1d67b50dda8e4cfc34973450dd141c7bd4",
+          "size": 1194
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/brand/brand.toml": {
+          "sha256": "1017ebaca28269b4d4397e84bf29696ddea3f615ef1a8e5a6d67606a369c8b41",
+          "size": 1012
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/companions/GUIDANCE.md": {
+          "sha256": "10a61401be21913c99086526840a27a24991815db9d7044ac1668787e737a9d3",
+          "size": 90
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/tfsb-brand-manifest.json": {
+          "sha256": "c9c652e36d881775d14ed467bad4a1e5494d3ef55b2aade0252f74c6299a28e4",
+          "size": 1874
+        },
+        "raw-release/smoke-support/linux-x64-gnu/docs/examples/v0.4/brand-system/core-minimal/bundle/tfsb-manifest.json": {
+          "sha256": "53ece77670595a24f49bbdfb0af0498e093e5a08366ecaff090814a02c9f70e8",
+          "size": 1110
+        },
+        "raw-release/smoke-support/linux-x64-gnu/package.json": {
+          "sha256": "64df6f25e3fee6d56d31afdeefa6da1fdb4ebdf7d79033195caecb6fb2ed6be9",
+          "size": 1833
+        },
+        "raw-release/smoke-support/linux-x64-gnu/source/nebular-compiled-public-build-source-authority-v0.8.0.json": {
+          "sha256": "53dea0e5ca138616a94d351e2490f94aa34de74d2665fd62119034ca1fb58dcf",
+          "size": 1767
+        },
+        "raw-release/smoke-support/linux-x64-gnu/source/theme-forge-nebular-fusion-v0.8.0-source.tar.gz": {
+          "sha256": "9eb30214158d1bfaf2d7d4c2b5311ed43e02a26e455239b1873abb11353c63b6",
+          "size": 6725884
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/appearance-matrix-prep1/generate.mjs": {
+          "sha256": "2472f6ede72c17152d51410146d126251a26821815111b6c1b214308484ad67d",
+          "size": 17120
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/build-inputs.mjs": {
+          "sha256": "cdb80c1a9742a8632a5eb9284d970669714340daf809c0368095658e38c65154",
+          "size": 16400
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/build-settings.mjs": {
+          "sha256": "f7578fccf935e14aee190a2de4378a986a182b038e41b261f3f9355e33449cd0",
+          "size": 24182
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/candidate-provenance.mjs": {
+          "sha256": "20244b6765d6e7d0ee5fd86452096a4546f189103b0acb9f065c4a1479c23155",
+          "size": 15484
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/darwin-linkage-validator.mjs": {
+          "sha256": "67073d25aa00bc6c8086e8d10a2bd7302cc46c6416894bcba553880edf83f0f9",
+          "size": 7678
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/fs-snapshot.mjs": {
+          "sha256": "30ad6c3f0394126a7d3e5534507fe46c78c34946edd15bd5c91b36e2b36df351",
+          "size": 13794
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/native-launcher.mjs": {
+          "sha256": "3595cfaf0a2f1ac51a48862dc5f6aa842db6d3431a62159bcb93cb0abc812f2d",
+          "size": 7193
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/native-rc-package.mjs": {
+          "sha256": "0ef948c2f9f45a9343586288681ae5ed6f6527b85912a52bd8c37aa50e3682c6",
+          "size": 33102
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/native-rc-smoke.mjs": {
+          "sha256": "ee2a26e00522f27d49550d3931cdd25e0f9956a0786d487f9af89755cf8bff39",
+          "size": 65040
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/native-runtime.mjs": {
+          "sha256": "a9d6c8e885b9db41877c5d2d79efe48f2e47daf791e0f1ad1ca06636d37d962e",
+          "size": 118749
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/node-runtime-authority.mjs": {
+          "sha256": "5495e291131a963c3e9bc9730aacb108d770954ce88f397e0f4a3c9ce768635e",
+          "size": 37973
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/platform-targets.mjs": {
+          "sha256": "35321c7e888038210589612873136c96bf697789f6f4e90918442faa41e13aec",
+          "size": 7292
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/sidecar-common.mjs": {
+          "sha256": "e0ca4d4a4bba4abd756f1399e31a768a20873eefb6c50ac26a75adddccc1978c",
+          "size": 81902
+        },
+        "raw-release/smoke-support/linux-x64-gnu/tools/sidecar-verify.mjs": {
+          "sha256": "fba7f292b3c01ed062f4727e0c22912bc269b6ca76fca8328fb5329c098aac77",
+          "size": 1906
+        },
+        "raw-release/source/COMMERCIAL-LICENSE.md": {
+          "sha256": "29fa83d6c8a530e7fb08c605ba01d8781c16e43a4644de3333b2058e4cc09281",
+          "size": 943
+        },
+        "raw-release/source/LICENSE": {
+          "sha256": "62eef07fc3ad238dd889ff98cf9ed87b3ef0f421579b6945f87ec37c608afb62",
+          "size": 34460
+        },
+        "raw-release/source/NOTICE": {
+          "sha256": "84c3bfd695449b5330344ba7e5d355f3bb3a1a7f8925aea3b2755145709db1e0",
+          "size": 614
+        },
+        "raw-release/source/PROVENANCE.json": {
+          "sha256": "736defe9853e0a9aaaae3e5dfe54d46fa562cac233b73b0053ddbc7ae4ebef5a",
+          "size": 14439
+        },
+        "raw-release/source/README.md": {
+          "sha256": "580c7eba90ba5aed86be729302d8cedd610398ca84e4aadbffdb2d228ce58d2d",
+          "size": 881
+        }
+      },
+      "id": 13643899895,
+      "size_in_bytes": 531072546
+    },
+    "tfnf-080-universal-qualification-darwin-arm64": {
+      "archive_sha256": "9e9972ac50fa4a68920ab9a6fd970627be2c656c67ce44b98e8a979461d931b1",
+      "files": {
+        "darwin-arm64/result.json": {
+          "sha256": "787047f5b1ed6fb063425743e49c1a105bdc82c71d450377c5cdcddd8a95e4b1",
+          "size": 25133
+        }
+      },
+      "id": 13644686143,
+      "size_in_bytes": 6707
+    },
+    "tfnf-080-universal-qualification-linux-arm64-gnu": {
+      "archive_sha256": "f4ca475907f2a978e232a7b15358424f820e94be6de080ef764121557bd23901",
+      "files": {
+        "linux-arm64-gnu/result.json": {
+          "sha256": "7fbc4c3cc930f74cca960c818801907237449cf3e153c69423e1cb2c4d7af6bc",
+          "size": 35548
+        }
+      },
+      "id": 13644187058,
+      "size_in_bytes": 7722
+    },
+    "tfnf-080-universal-qualification-linux-arm64-gnu-floor": {
+      "archive_sha256": "a05714b3fb1682d7f3e870e922f17b4276104f62ca26349ff081e239d06603ba",
+      "files": {
+        "linux-arm64-gnu/missing-runtime.json": {
+          "sha256": "ad8f327b75c2875f2ec6e71b0bf7ea0f315fc68afcb4a75f09cc61ed339ee707",
+          "size": 7958
+        },
+        "linux-arm64-gnu/result.json": {
+          "sha256": "0273b607fe5886ae7e84dab5ceb6770a2d7eec8aa9007e717f80b5efbcdca9ba",
+          "size": 35539
+        }
+      },
+      "id": 13644715558,
+      "size_in_bytes": 43829
+    },
+    "tfnf-080-universal-qualification-linux-x64-gnu": {
+      "archive_sha256": "980bd179c4cd72231ac9698c7bfced6039a17d138b1265d2f379ea1cad119abb",
+      "files": {
+        "linux-x64-gnu/result.json": {
+          "sha256": "98b0f62a28f143e22387eebce62950048ba0802fbec4c6ebefb20e192bbf66f9",
+          "size": 48673
+        }
+      },
+      "id": 13644526821,
+      "size_in_bytes": 10592
+    },
+    "tfnf-080-universal-qualification-linux-x64-gnu-floor": {
+      "archive_sha256": "4a65e4e288fc9c2a0efc894d70c4c28769395a7b14e3a3cd468252fec80fdba4",
+      "files": {
+        "linux-x64-gnu/missing-runtime.json": {
+          "sha256": "d224c09c945ed0341bc07401e72afc3772664fed2724ba0f6c56f3088942d0a6",
+          "size": 7951
+        },
+        "linux-x64-gnu/result.json": {
+          "sha256": "cffbd838157117fab227f9cf3095c2d2abbf0172e8e0897719dd10a42d8bf12f",
+          "size": 48637
+        }
+      },
+      "id": 13644810840,
+      "size_in_bytes": 56912
+    }
+  },
+  "description_sha256": "3dce6c6699bb471b05bc80a117a74a6a7df11418ea121ff965d11e5ff1d4c397",
+  "distribution": "universal-launcher",
+  "environment": "pypi",
+  "identity": "0c00fb6cc2ece4538538e22c18b7b647a8d7ec6890e5641e2e3837fefe844159",
+  "matrix_sha256": "0c047b94753c5c7d96a2691a3d82904c6c2c67b6287e835f11ed032f48006cfd",
+  "project": "theme-forge-nebular-fusion",
+  "repository": "Knowledge-Forge-AI/release-starport-9",
+  "run": {
+    "attempt": "1",
+    "id": "42548398040"
+  },
+  "runtime_index_sha256": "ffe57b7771e1f896b2d556f8d61ca2bcee6941c91a31deed3d0227e1c81be264",
+  "runtime_inputs_sha256": "2d972cd984233f732a3731b6c709846d5b6aefc1eb1d4715fd31848c89ada4d4",
+  "schema": "rs9.nebular080-universal-publication.v1",
+  "source": {
+    "commit": "7a7026420daaa60bf6674ee6873dff3ad4b1fd0c",
+    "tree": "145b400bbfe60f2ab7291b58ee81ab6df8bcada6"
+  },
+  "version": "0.8.0",
+  "wheel": {
+    "filename": "theme_forge_nebular_fusion-0.8.0-py3-none-any.whl",
+    "sha256": "f426464f09acf316e416c34fce934e5920f48379caa6eebfcbd783b8ab3ad35e",
+    "size": 228274,
+    "tag": "py3-none-any",
+    "version": "0.8.0"
+  },
+  "workflow": "rs9-tfnf-pypi-publish.yml"
+}
