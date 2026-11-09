@@ -12,6 +12,7 @@ import io
 import json
 import pickle
 import unittest
+from unittest.mock import patch
 
 from rs9 import archarm_sdk
 from rs9.build_native import MockCommandRunner
@@ -349,6 +350,26 @@ class CleanupTest(RefusalMixin, unittest.TestCase):
         self.assertEqual(lease.state, "closed")
         self.assertEqual(self.h.engine.containers, {})
 
+
+class ProfileSelectionTest(RefusalMixin, unittest.TestCase):
+    def test_public_profiles_select_exact_loaders_and_preserve_historical_default(self):
+        historical = pins_module.load_qualified_pins()
+        self.assertEqual(archarm_sdk._real_seams().pins_loader().digests, historical.digests)
+        successor = archarm_sdk._real_seams("successor-20261109").pins_loader()
+        self.assertEqual(successor.digests["packagePinsSha256"],
+                         "a0896233d98b32fde260c6139321dfc64be4efa345585ee16bdbdd4ffdd2f207")
+        self.assertNotEqual(successor.digests["packagePinsSha256"], historical.digests["packagePinsSha256"])
+        for profile in (None, "", "latest", "successor", pins_module.load_qualified_pins):
+            with self.subTest(profile=profile):
+                self.assertRefused("PIN_FILE", archarm_sdk._real_seams, profile)
+
+    def test_profile_loader_mismatch_cannot_confer_qualified_authority(self):
+        historical = pins_module.load_qualified_pins()
+        successor = archarm_sdk._real_seams("successor-20261109").pins_loader()
+        with patch.object(archarm_sdk, "load_qualified_pins", return_value=successor):
+            self.assertRefused("PIN_FILE", archarm_sdk._real_seams().pins_loader)
+        with patch("rs9._archarm_support.successor_20261109.load_successor_pins", return_value=historical):
+            self.assertRefused("PIN_FILE", archarm_sdk._real_seams("successor-20261109").pins_loader)
 
 class PinsAndFetchTest(RefusalMixin, unittest.TestCase):
     def setUp(self):

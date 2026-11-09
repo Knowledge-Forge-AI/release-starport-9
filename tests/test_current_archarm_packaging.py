@@ -110,6 +110,10 @@ class FakeLease:
                 "state": self.state, "runId": str(RUN_ID), "runAttempt": 1, "sourceSha": "a" * 40,
                 "identity": {"uid": self.uid, "gid": self.gid, "guestAccount": "rs9builder", "guestHome": "/tmp/home"},
                 "flags": {"nativeArmHost": True, "sdkImageCommitted": True, "installerRemoved": True},
+                "digests": {"rootfsSha256": self.h.selected_inputs["rootfs_sha256"],
+                            "rootfsPinSha256": self.h.selected_inputs["rootfs_pin_sha256"],
+                            "packagePinsSha256": (self.h.reported_pin_digest
+                                or self.h.selected_inputs["package_pins_sha256"])},
                 "pinsMatchQualifiedOrigin": self.h.pins_qualified, "hostReceiptCount": self.host_receipts,
                 "cleanupComplete": self.cleanup_complete,
                 "assertions": {"signingSecretsUsed": False, "publicationAuthority": False,
@@ -234,6 +238,8 @@ class Harness:
         self.builder_argv, self.repo_argv, self.build_calls, self.npm_calls = [], [], [], []
         self.spec_calls, self.client_kwargs, self.tamper_kwargs = [], None, None
         self.sdk_calls = []
+        self.selected_inputs = dict(arm.QUALIFIED_INPUTS)
+        self.reported_pin_digest = None
         self.executed = True
         self.repo_exit = 0
         self.makepkg_argv = POLICY_MAKEPKG
@@ -261,9 +267,15 @@ class Harness:
 
     # ---- peer fakes
 
-    def acquire_sdk(self, *, host, workspace, context, uid, gid):
+    def acquire_sdk(self, *, host, workspace, context, uid, gid, input_profile):
         self.sdk_calls.append({"workspace": Path(workspace), "existed": Path(workspace).exists(),
-                               "context": dict(context), "uid": uid, "gid": gid, "host": host})
+                               "context": dict(context), "uid": uid, "gid": gid, "host": host,
+                               "input_profile": input_profile})
+        if input_profile == "successor-20261109":
+            from rs9._archarm_support.successor_20261109 import INPUTS
+            self.selected_inputs = dict(INPUTS)
+        else:
+            self.test.assertEqual(input_profile, "historical")
         self.lease = FakeLease(self, uid, gid)
         return self.lease
 
@@ -394,6 +406,39 @@ class CurrentArchArmProducerTests(unittest.TestCase):
     def required(self, result):
         return {name: gate(result, name)["status"] for name in arm.REQUIRED_GATES}
 
+    def test_nebular080_selects_exact_successor_and_records_its_input_identity(self):
+        from rs9._archarm_support.successor_20261109 import INPUTS, PROFILE
+        h = Harness(self).start()
+        next(intent for _, intent, _ in h.captures if intent["project"]["id"] == NEBULAR)["version"] = "0.8.0"
+        result = arm.execute(h.context)
+        self.assertEqual(set(self.required(result).values()), {"pass"}, self.required(result))
+        self.assertEqual(h.sdk_calls[0]["input_profile"], PROFILE)
+        self.assertEqual(result["details"]["environment"]["qualified_inputs"], dict(INPUTS))
+        self.assertFalse(result["details"]["environment"]["qualified_inputs"]["refresh_allowed"])
+
+    def test_unknown_or_missing_nebular_version_refuses_before_any_sdk_acquisition(self):
+        for version in (None, "0.9.0", "0.8", "0.8.1"):
+            with self.subTest(version=version):
+                h = Harness(self).start()
+                intent = next(intent for _, intent, _ in h.captures if intent["project"]["id"] == NEBULAR)
+                intent["version"] = version
+                with self.assertRaises(ContractError) as caught:
+                    arm.execute(h.context)
+                self.assertEqual(caught.exception.code, "CONTEXT_INVALID")
+                self.assertEqual(h.sdk_calls, [])
+                self.assertEqual(h.events, [])
+
+    def test_successor_cannot_accept_historical_or_unknown_package_digest(self):
+        for digest in (arm.QUALIFIED_INPUTS["package_pins_sha256"], "f" * 64):
+            with self.subTest(digest=digest):
+                h = Harness(self).start()
+                next(intent for _, intent, _ in h.captures if intent["project"]["id"] == NEBULAR)["version"] = "0.8.0"
+                h.reported_pin_digest = digest
+                result = arm.execute(h.context)
+                self.assertEqual(gate(result, arm.ENV_GATE)["status"], "fail")
+                self.assertEqual(h.build_calls, [])
+                self.assertIn("sdk-exit", h.events)
+
     def test_required_gate_names_match_the_source_contract(self):
         lanes = json.loads((REPO_ROOT / "operators/theme-forge-current-202610/hosted-lanes.json").read_bytes())
         row = next(l for l in lanes["lanes"] if (l["lane"], l["system"]) == ("pacman", "aarch64-linux"))
@@ -412,6 +457,7 @@ class CurrentArchArmProducerTests(unittest.TestCase):
         # Closed SDK context: fresh workspace, run/source identity, fixture homes private.
         self.assertEqual(len(h.sdk_calls), 1)
         call = h.sdk_calls[0]
+        self.assertEqual(call["input_profile"], "historical")
         self.assertFalse(call["existed"])
         self.assertEqual(call["workspace"], h.scratch / "archarm-sdk")
         self.assertEqual(call["context"], {"runId": str(RUN_ID), "runAttempt": 1, "sourceSha": "a" * 40,

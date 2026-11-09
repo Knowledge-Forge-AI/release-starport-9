@@ -888,12 +888,13 @@ class CurrentPacmanDesktopCacheBaselineTests(unittest.TestCase):
 
     def test_current_pages_client_caller_keeps_all_families_and_emits_cache_setup(self):
         from tests.test_pages_smoke_diagnostic import ConnectedPagesControls
-        original_context = PagesLaneTests.context
+        from tests.test_hosted_deb import PagesLaneTests as ConnectedPagesFixture
+        original_context = ConnectedPagesFixture.context
         def current_context(fixture):
             return {**original_context(fixture), "generation": hd.CURRENT_GENERATION}
         fixture = ConnectedPagesControls()
         try:
-            with patch.object(PagesLaneTests, "context", current_context):
+            with patch.object(ConnectedPagesFixture, "context", current_context):
                 gates, details = fixture.exercise(False)
             self.assertTrue(all(gate["status"] == "pass" for gate in gates))
             self.assertEqual(set(details["client"]), {"apt", "dnf", "pacman"})
