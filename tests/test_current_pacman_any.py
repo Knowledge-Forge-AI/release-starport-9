@@ -315,6 +315,7 @@ class CanonicalAnyCase(unittest.TestCase):
 
 
 class AcquireSuccessTests(CanonicalAnyCase):
+
     def test_success_imports_exact_original_bytes_with_closed_witness(self):
         zip_bytes = self.build()
         provider = Provider(zip_bytes)
@@ -427,6 +428,47 @@ class ProviderIdentityTests(CanonicalAnyCase):
         super().setUp()
         self.zip = self.build()
 
+    def test_nonobject_run_json_has_only_fixed_decode_label(self):
+        for value in ([], None, "UNTRUSTED_SENTINEL_DATA"):
+            with self.subTest(kind=type(value).__name__):
+                provider = Provider(self.zip)
+                provider.run = value
+                error = self.refuse(provider, "CANONICAL_ANY_RUN")
+                self.assertEqual(error.details["substage"], "provider-run-json")
+                self.assertNotIn("UNTRUSTED_SENTINEL_DATA", str(error) + json.dumps(error.details))
+                self.assertEqual(len(provider.calls), 1)
+
+    def test_closed_run_refusal_labels_retain_no_untrusted_values(self):
+        for status, conclusion, expected in (
+                ("queued", None, "provider-run-queued-null"),
+                ("queued", "success", "provider-run-lifecycle"),
+                ("completed", "failure", "provider-run-lifecycle"),
+                ("waiting", None, "provider-run-lifecycle"),
+                ("UNTRUSTED_SENTINEL_DATA", None, "provider-run-lifecycle")):
+            with self.subTest(status=status, conclusion=conclusion):
+                provider = Provider(self.zip)
+                provider.run.update(status=status, conclusion=conclusion)
+                error = self.refuse(provider, "CANONICAL_ANY_RUN")
+                self.assertEqual(error.details["substage"], expected)
+                self.assertNotIn("UNTRUSTED_SENTINEL_DATA", str(error) + json.dumps(error.details))
+                self.assertEqual(len(provider.calls), 1)
+        provider = Provider(self.zip)
+        provider.run.update(status="queued", head_sha="UNTRUSTED_SENTINEL_DATA")
+        error = self.refuse(provider, "CANONICAL_ANY_RUN")
+        self.assertEqual(error.details["substage"], "provider-run-source")
+        self.assertNotIn("UNTRUSTED_SENTINEL_DATA", str(error) + json.dumps(error.details))
+        self.assertEqual(len(provider.calls), 1)
+
+
+    def test_diagnostic_preserves_existing_run_conclusion_handling(self):
+        for conclusion in (None, "success", "failure", False):
+            provider = Provider(self.zip)
+            provider.run.update(conclusion=conclusion)
+            self.assertEqual(any_mod._check_run(provider.run, self.source, status="in_progress"), REPO_ID)
+        provider.run.pop("conclusion")
+        self.assertEqual(any_mod._check_run(provider.run, self.source, status="in_progress"), REPO_ID)
+
+
     def test_wrong_repository_source_run_attempt_refused(self):
         cases = {"repository": {"repository": {"id": REPO_ID, "full_name": "Knowledge-Forge-AI/theme-forge-packages"}},
                  "fork": {"head_repository": {"id": 1, "full_name": "someone/release-starport-9"}},
@@ -434,11 +476,15 @@ class ProviderIdentityTests(CanonicalAnyCase):
                  "attempt": {"run_attempt": 2}, "event": {"event": "workflow_dispatch"},
                  "branch": {"head_branch": "topic"}, "workflow": {"path": ".github/workflows/rs9-candidate-tests.yml"},
                  "completed": {"status": "completed", "conclusion": "success"}}
+        substages = {"repository": "repository", "fork": "head-repository", "source": "source",
+                     "run": "id", "bool-run": "id", "attempt": "attempt", "event": "event",
+                     "branch": "branch", "workflow": "workflow", "completed": "lifecycle"}
         for label, mutation in cases.items():
             with self.subTest(case=label):
                 provider = Provider(self.zip)
                 provider.run.update(mutation)
-                self.refuse(provider, "CANONICAL_ANY_RUN")
+                error = self.refuse(provider, "CANONICAL_ANY_RUN")
+                self.assertEqual(error.details["substage"], "provider-run-" + substages[label])
                 self.assertEqual(len(provider.calls), 1)
 
     def test_wrong_jobs_refused(self):
