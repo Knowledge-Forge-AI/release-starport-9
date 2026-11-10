@@ -30,6 +30,41 @@ class ProvisionObservationTests(unittest.TestCase):
         self.assertEqual(po.classify_provision_failure(b"metadata DNS TLS mirror", b"", []), "unknown")
         self.assertEqual(po.classify_provision_failure(examples["disk"], examples["dns"], []), "dns disk")
 
+    def test_pacman_categories_are_opt_in_fixed_ordered_and_bounded(self):
+        names = ["pkg" + str(i) for i in range(8)]
+        lines = [
+            b"failed to download metadata", b"all mirrors were tried", b"could not resolve host",
+            b"failed to connect", b"ssl certificate problem", b"gpg check failed",
+            *(b"No match for argument: " + name.encode() for name in names),
+            b"no space left on device", b"out of memory", b"could not satisfy dependencies",
+            b"conflicting files", b"invalid or corrupted package (PGP signature)",
+            b"unable to lock database", b"failed to prepare transaction",
+            b"error while loading shared libraries", b"bash: pacman: command not found",
+        ]
+        raw = b"\n".join(lines) + b"\n" + b"x" * po.MAX_STREAM_BYTES
+        observed = po.classify_provision_failure(None, raw, names, pacman_failure_diagnostic=True)
+        expected = ("metadata mirror dns network tls repo-gpg no-match disk oom dependency file-conflict "
+                    "package-corrupt database-lock transaction loader command-missing output-unreadable "
+                    "scan-truncated missing:pkg0 missing:pkg1 missing:pkg2 names-omitted")
+        self.assertEqual(observed, expected)
+        self.assertLessEqual(len(observed), po.MAX_REASON_BYTES)
+        self.assertEqual(safe_details({"reason_token": observed}), {"reason_token": observed})
+
+    def test_pacman_categories_are_not_emitted_without_opt_in(self):
+        for raw in (
+                b"could not satisfy dependencies", b"conflicting files", b"exists in filesystem",
+                b"invalid or corrupted database (PGP signature)", b"unable to lock database",
+                b"failed to commit transaction", b"symbol lookup error: libx.so",
+                b"sh: 1: pacman: not found"):
+            with self.subTest(raw=raw):
+                self.assertEqual(po.classify_provision_failure(b"", raw, []), "unknown")
+
+    def test_pacman_option_requires_boolean(self):
+        for value in (1, None, "true"):
+            with self.subTest(value=value), self.assertRaises(ContractError) as caught:
+                po.classify_provision_failure(b"", b"", [], pacman_failure_diagnostic=value)
+            self.assertEqual(caught.exception.code, "INVALID_ARGUMENT")
+
     def test_package_names_only_from_source_argument(self):
         examples = (b"No match for argument: safe-devel", b"Unable to find a match: safe-devel unknown",
                     b"E: Unable to locate package safe-devel", b"error: target not found: safe-devel",
@@ -112,6 +147,47 @@ class ProvisionObservationTests(unittest.TestCase):
                 self.assertEqual(calls[1][1], ["docker", "rm", "-f", "rs9-prov-aaaaaaaaaaaa"])
                 self.assertEqual([c[2] for c in calls], [600, 30])
                 self.assertEqual(runner.timeout, 600)
+
+    def test_pacman_opt_in_propagates_with_substage_and_preserves_failure_cleanup(self):
+        runner = SubprocessRunner(timeout=600)
+        runner.which = lambda tool: "/usr/bin/" + tool
+        calls, rows = [], []
+
+        def run(command, **kwargs):
+            calls.append((command, kwargs["timeout"]))
+            if command[1] == "run":
+                return subprocess.CompletedProcess(command, 1, b"", b"error: failed to prepare transaction\n")
+            return subprocess.CompletedProcess(command, 0, b"", b"")
+
+        with patch.object(hd.os, "getuid", return_value=0), patch("rs9.build_native.subprocess.run", side_effect=run):
+            with self.assertRaises(ContractError) as caught:
+                hd.provision_image(
+                    runner, "pacman", "base@sha256:" + "b" * 64, "linux/amd64", "test-tag", ["safe-devel"],
+                    recorder=rows, substage_prefix="build-", pacman_failure_diagnostic=True,
+                )
+        self.assertEqual(caught.exception.code, "PROVISION_FAILED")
+        self.assertEqual(caught.exception.details["reason_token"], "unknown transaction")
+        self.assertEqual(caught.exception.details["substage"], "build-provision")
+        self.assertEqual(caught.exception.details["cleanup"], "complete")
+        self.assertEqual([call[0][1] for call in calls], ["run", "rm"])
+        self.assertEqual(rows[0]["substage"], "build-provision")
+
+    def test_pacman_option_rejects_invalid_or_non_pacman_before_native_action(self):
+        runner = SubprocessRunner(timeout=600)
+        runner.which = lambda tool: "/usr/bin/" + tool
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append(command)
+            raise AssertionError("native action must not run")
+
+        with patch("rs9.build_native.subprocess.run", side_effect=run):
+            for family, value in (("pacman", 1), ("dnf", True)):
+                with self.subTest(family=family, value=value), self.assertRaises(ContractError) as caught:
+                    hd.provision_image(runner, family, "fixture", "linux/amd64", "test-tag", ["safe-devel"],
+                                       pacman_failure_diagnostic=value)
+                self.assertEqual(caught.exception.code, "INVALID_ARGUMENT")
+        self.assertEqual(calls, [])
 
     def test_classifier_error_cannot_replace_failure_or_cleanup(self):
         for cleanup_exit in (0, 1):

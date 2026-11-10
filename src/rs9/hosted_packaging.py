@@ -491,8 +491,13 @@ def execute(context):
     repository_reports = {}
     repo = bundle = keys = None
     try:
+        builder_provision_options = (
+            {"pacman_failure_diagnostic": True, "substage_prefix": "build-"}
+            if family == "pacman" and generation == CURRENT_GENERATION else {}
+        )
         provision_image(host, "pacman" if family == "pacman" else "dnf", environment["image_ref"],
-                        platform, tag, [*tools, *environment["preprovisioned_packages"], *client_tools])
+                        platform, tag, [*tools, *environment["preprovisioned_packages"], *client_tools],
+                        **builder_provision_options)
         # A persistent passwd identity and HOME are needed by makepkg; builders are not root.
         checked(host, ["docker", "run", "--rm", "--network", "none", tag, "true"], substage="builder-check")
         if family == "rpm":
@@ -912,8 +917,13 @@ def execute(context):
                 client_image = verify_client_image(host, client_tag, client_runtime,
                                                    environment=environment, arch=arch, system=system)
             else:
+                client_provision_options = (
+                    {"pacman_failure_diagnostic": True, "substage_prefix": "client-"}
+                    if family == "pacman" and generation == CURRENT_GENERATION else {}
+                )
                 provision_image(host, "pacman", environment["image_ref"], platform, client_tag,
-                                [*environment["preprovisioned_packages"], *client_tools])
+                                [*environment["preprovisioned_packages"], *client_tools],
+                                **client_provision_options)
                 client_image = client_tag
             spec = spec_for(dirs)
             rows, evidence = client_cycle(host, spec, image=client_image, platform=platform, generation=generation,

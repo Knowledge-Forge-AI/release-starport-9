@@ -19,6 +19,9 @@ MAX_MISSING_NAMES = 4
 MAX_REASON_BYTES = 240
 
 CATEGORIES = ("metadata", "mirror", "dns", "network", "tls", "repo-gpg", "no-match", "disk", "oom")
+PACMAN_CATEGORIES = (
+    "dependency", "file-conflict", "package-corrupt", "database-lock", "transaction", "loader", "command-missing"
+)
 _PACKAGE = re.compile(r"[A-Za-z0-9][A-Za-z0-9+._-]{0,63}(?::[a-z0-9-]{1,16})?\Z")
 _PATTERNS = {
     "metadata": re.compile(r"failed to download metadata|cannot download repomd\.xml|"
@@ -38,6 +41,16 @@ _PATTERNS = {
                            r"target not found:|has no installation candidate|^no package .{0,512} available\.?$", re.I),
     "disk": re.compile(r"no space left on device|disk quota exceeded|not enough free space", re.I),
     "oom": re.compile(r"out of memory|cannot allocate memory|oom-kill", re.I),
+}
+_PACMAN_PATTERNS = {
+    "dependency": re.compile(r"could not satisfy dependencies", re.I),
+    "file-conflict": re.compile(r"conflicting files|exists in filesystem", re.I),
+    "package-corrupt": re.compile(r"(?:invalid or corrupted package|invalid or corrupted database)"
+                                   r"(?:\s+\([^()\r\n]{0,128}\))?", re.I),
+    "database-lock": re.compile(r"unable to lock database", re.I),
+    "transaction": re.compile(r"failed to prepare transaction|failed to commit transaction", re.I),
+    "loader": re.compile(r"error while loading shared libraries|symbol lookup error", re.I),
+    "command-missing": re.compile(r"^(?:[^:\r\n]{1,128}:\s*){1,3}(?:command\s+)?not found\s*$", re.I),
 }
 _MISSING = (
     re.compile(r"^(?:error:\s*)?no match for argument:\s*(\S+)\s*$", re.I),
@@ -64,13 +77,16 @@ def _source_packages(packages: Sequence[str]) -> tuple[set[str], bool]:
     return allowed, len(packages) > MAX_SOURCE_PACKAGES
 
 
-def classify_provision_failure(stdout: bytes, stderr: bytes, packages: Sequence[str]) -> str:
+def classify_provision_failure(stdout: bytes, stderr: bytes, packages: Sequence[str], *,
+                               pacman_failure_diagnostic: bool = False) -> str:
     """Return one existing safe_details reason_token, never raw output fragments.
 
     Categories mean only that a tool-output template was observed. They do not
     identify the root cause, authorize package changes, or affect failure state.
     """
-    categories, missing, flags = set(), set(), set()
+    if type(pacman_failure_diagnostic) is not bool:
+        raise ContractError("INVALID_ARGUMENT", "Pacman failure diagnostic option must be boolean")
+    categories, pacman_categories, missing, flags = set(), set(), set(), set()
     allowed, source_omitted = _source_packages(packages)
     scanned = 0
     for stream in (stderr, stdout):
@@ -98,12 +114,16 @@ def classify_provision_failure(stdout: bytes, stderr: bytes, packages: Sequence[
                 flags.add("output-unreadable")
                 continue
             categories.update(name for name, pattern in _PATTERNS.items() if pattern.search(line))
+            if pacman_failure_diagnostic:
+                pacman_categories.update(name for name, pattern in _PACMAN_PATTERNS.items() if pattern.search(line))
             for pattern in _MISSING:
                 match = pattern.fullmatch(line)
                 if match:
                     missing.update(name for name in match.group(1).split() if name in allowed)
                     break
     parts = [name for name in CATEGORIES if name in categories] or ["unknown"]
+    if pacman_failure_diagnostic:
+        parts.extend(name for name in PACMAN_CATEGORIES if name in pacman_categories)
     parts.extend(sorted(flags))
     omitted = source_omitted and "no-match" in categories
     emitted = 0
