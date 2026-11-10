@@ -38,12 +38,70 @@ from rs9.current_generation import (
     bind_native_build_generation,
     generation_paths,
 )
-from rs9.errors import ContractError
+from rs9.errors import APT_ACTIVITY_VALUES, ContractError
 from rs9.npm_deps import authenticate_dependencies, closure_for_capture
 from rs9.records import closed, record_sha256, snapshot, validate_sanitized_string, validate_sha256
 from rs9.release_core import ReleaseCapture, authenticated_record_hash, digest
 from rs9.scratch import canonical, physical_directory
 from rs9.security import validate_repository, validate_safe_relative_posix_path, validate_summary, validate_version_string
+
+
+APT_ACTIVITY_DIAGNOSTIC_PREFIX = "# rs9-current-apt-activity-v1\n"
+_APT_ACTIVITY_TAIL_BYTES = 32768
+_APT_ACTIVITY_MARKERS = (
+    (b"Hit:", "index-hit"),
+    (b"Get:", "fetch"),
+    (b"Ign:", "fetch-ignored"),
+    (b"Fetched ", "fetched"),
+    (b"Reading package lists", "package-lists"),
+    (b"Building dependency tree", "dependency-tree"),
+    (b"Reading state information", "state-information"),
+    (b"Need to get ", "download-plan"),
+    (b"Selecting previously unselected package", "select"),
+    (b"Unpacking ", "unpack"),
+    (b"Setting up ", "configure"),
+    (b"Processing triggers for ", "triggers"),
+)
+
+
+def _timeout_stream_tail(value: Any) -> tuple[bytes, bool]:
+    """Bound a TimeoutExpired stream before parsing, without decoding its text."""
+    if isinstance(value, bytes):
+        clipped = len(value) > _APT_ACTIVITY_TAIL_BYTES
+        return value[-_APT_ACTIVITY_TAIL_BYTES:], clipped
+    if isinstance(value, bytearray):
+        clipped = len(value) > _APT_ACTIVITY_TAIL_BYTES
+        return bytes(value[-_APT_ACTIVITY_TAIL_BYTES:]), clipped
+    if isinstance(value, str):
+        suffix = value[-_APT_ACTIVITY_TAIL_BYTES:]
+        encoded = suffix.encode()
+        clipped = len(value) > _APT_ACTIVITY_TAIL_BYTES or len(encoded) > _APT_ACTIVITY_TAIL_BYTES
+        return encoded[-_APT_ACTIVITY_TAIL_BYTES:], clipped
+    return b"", False
+
+
+def _apt_activity_for_timeout(argv: Any, stdout: Any) -> str | None:
+    """Return a closed APT activity label only for an exact tagged Docker run."""
+    if (not isinstance(argv, (list, tuple)) or len(argv) < 4
+            or argv[0] != "docker" or argv[1] != "run"
+            or tuple(argv[-3:-1]) != ("sh", "-c")
+            or not isinstance(argv[-1], str)
+            or not argv[-1].startswith(APT_ACTIVITY_DIAGNOSTIC_PREFIX)):
+        return None
+    tail, clipped = _timeout_stream_tail(stdout)
+    if clipped:
+        first_newline = tail.find(b"\n")
+        if first_newline < 0:
+            return "unknown"
+        tail = tail[first_newline + 1:]
+    last = None
+    for line in tail.split(b"\n"):
+        line = line[:-1] if line.endswith(b"\r") else line
+        for marker, label in _APT_ACTIVITY_MARKERS:
+            if line.startswith(marker):
+                last = label
+                break
+    return last if last in APT_ACTIVITY_VALUES else "unknown"
 
 
 def extract_for_packaging(archive, destination, *, expected_sha256):
@@ -244,6 +302,9 @@ class SubprocessRunner(CommandRunner):
             }
             if deadline_seconds is not None:
                 details["deadline_seconds"] = deadline_seconds
+            apt_activity = _apt_activity_for_timeout(argv, out_b)
+            if apt_activity is not None:
+                details["apt_activity"] = apt_activity
             raise ContractError(
                 "TOOL_TIMEOUT",
                 "Native tool exceeded its bounded execution time",
