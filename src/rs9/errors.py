@@ -11,6 +11,62 @@ APT_ACTIVITY_VALUES = frozenset({
     "unpack", "configure", "triggers", "unknown",
 })
 
+APT_FETCH_ORIGINS = frozenset({"archive", "security", "ports"})
+APT_FETCH_SUITES = frozenset({
+    "resolute", "resolute-updates", "resolute-security", "resolute-backports",
+})
+APT_FETCH_COMPONENTS = frozenset({"main", "restricted", "universe", "multiverse"})
+APT_FETCH_INDEX_ARCHITECTURES = frozenset({"amd64", "arm64"})
+APT_FETCH_PACKAGE_ARCHITECTURES = frozenset({"amd64", "arm64", "all"})
+APT_FETCH_KINDS = frozenset({"inrelease", "packages", "package"})
+_APT_FETCH_PACKAGE_NAME = re.compile(r"[a-z0-9][a-z0-9+.-]{1,127}", re.ASCII)
+
+
+def validate_apt_fetch(value):
+    """Return one exact, closed APT fetch descriptor or ``None``."""
+    if type(value) is not dict or any(type(key) is not str for key in value) or type(value.get("origin")) is not str:
+        return None
+    origin = value["origin"]
+    suite = value.get("suite")
+    kind = value.get("kind")
+    if (origin not in APT_FETCH_ORIGINS or type(suite) is not str
+            or suite not in APT_FETCH_SUITES or type(kind) is not str
+            or kind not in APT_FETCH_KINDS):
+        return None
+    if kind == "inrelease":
+        keys = ("origin", "suite", "kind")
+    elif kind == "packages":
+        keys = ("origin", "suite", "kind", "component", "architecture")
+    else:
+        keys = ("origin", "suite", "kind", "component", "index_architecture", "package_architecture", "package")
+    if set(value) != set(keys):
+        return None
+    if kind != "inrelease":
+        component = value.get("component")
+        if type(component) is not str or component not in APT_FETCH_COMPONENTS:
+            return None
+    if kind == "packages":
+        architecture = value.get("architecture")
+        if type(architecture) is not str or architecture not in APT_FETCH_INDEX_ARCHITECTURES:
+            return None
+    if kind == "package":
+        index_architecture = value.get("index_architecture")
+        package_architecture = value.get("package_architecture")
+        if (type(index_architecture) is not str or index_architecture not in APT_FETCH_INDEX_ARCHITECTURES
+                or type(package_architecture) is not str or package_architecture not in APT_FETCH_PACKAGE_ARCHITECTURES):
+            return None
+        package = value.get("package")
+        if (type(package) is not str or not _APT_FETCH_PACKAGE_NAME.fullmatch(package)):
+            return None
+        from rs9.security import scan_for_credentials
+        try:
+            scan_for_credentials(package)
+        except ContractError:
+            return None
+        if re.fullmatch(r"[a-f0-9]{40,64}", package):
+            return None
+    return {key: value[key] for key in keys}
+
 
 def safe_details(details):
     """Closed, bounded public identifiers only; reject credentials and host paths."""
@@ -39,6 +95,7 @@ def safe_details(details):
     allowed.update({"path", "path_sha256"})
     allowed.update({"scenario", "diagnostic_sha256"})
     allowed.add("apt_activity")
+    allowed.add("apt_fetch")
     allowed.add("stream_custody")
     result, dropped = {}, False
     if not isinstance(details, dict):
@@ -93,6 +150,13 @@ def safe_details(details):
         if key == "apt_activity":
             if isinstance(value, str) and value in APT_ACTIVITY_VALUES:
                 result[key] = value
+            else:
+                dropped = True
+            continue
+        if key == "apt_fetch":
+            descriptor = validate_apt_fetch(value)
+            if descriptor is not None:
+                result[key] = descriptor
             else:
                 dropped = True
             continue

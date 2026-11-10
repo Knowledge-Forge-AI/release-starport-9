@@ -94,6 +94,184 @@ class PreparationDiagnosticsTests(unittest.TestCase):
         self.assertEqual(self.timeout_details(command, None)["apt_activity"], "unknown")
         self.assertEqual(self.timeout_details(command, "Reading package lists: private\n")["apt_activity"], "package-lists")
 
+    def test_apt_fetch_real_description_forms_and_provision_timeout_boundary(self):
+        cases = (
+            (b"Get:1 http://archive.ubuntu.com/ubuntu resolute InRelease\n",
+             {"origin": "archive", "suite": "resolute", "kind": "inrelease"}),
+            (b"Get:2 https://security.ubuntu.com/ubuntu/ resolute-security/main amd64 Packages [1,234 kB]\n",
+             {"origin": "security", "suite": "resolute-security", "kind": "packages",
+              "component": "main", "architecture": "amd64"}),
+            (b"Get:3 http://ports.ubuntu.com/ubuntu-ports resolute-updates/universe arm64 libdemo arm64 1.2.3-4 [32 kB]\n",
+             {"origin": "ports", "suite": "resolute-updates", "kind": "package",
+              "component": "universe", "index_architecture": "arm64", "package_architecture": "arm64", "package": "libdemo"}),
+            (b"Get:4 http://archive.ubuntu.com/ubuntu resolute/main amd64 python3-pkg-resources all 1:68.1.2-2ubuntu1 [168 kB]\n",
+             {"origin": "archive", "suite": "resolute", "kind": "package", "component": "main",
+              "index_architecture": "amd64", "package_architecture": "all", "package": "python3-pkg-resources"}),
+        )
+        for line, expected in cases:
+            with self.subTest(expected=expected):
+                error, calls, rows = self.provision_timeout_details(line)
+                self.assertEqual(error.code, "TOOL_TIMEOUT")
+                self.assertEqual(error.details["apt_fetch"], expected)
+                self.assertEqual(rows[0]["apt_fetch"], expected)
+                self.assertEqual(error.details["apt_activity"], "fetch")
+                self.assertEqual(error.details["deadline_seconds"], 600)
+                self.assertEqual(error.details["stdout_sha256"], digest(line))
+                self.assertEqual(error.details["stderr_sha256"], digest(b"private-stderr"))
+                self.assertEqual(error.details["cleanup"], "complete")
+                self.assertEqual(rows[0]["outcome"], "timeout")
+                self.assertEqual(len(calls), 2)
+                for withheld in ("archive.ubuntu.com", "security.ubuntu.com", "ports.ubuntu.com", "/ubuntu",
+                                 "1.2.3-4", "68.1.2-2ubuntu1", "1,234 kB", "32 kB", "168 kB"):
+                    self.assertNotIn(withheld, repr(error.details))
+
+    def test_apt_fetch_rejects_nonofficial_unknown_and_nonpackage_index_records(self):
+        lines = (
+            b"Get:1 https://user:pass@archive.ubuntu.com/ubuntu resolute InRelease\n",
+            b"Get:1 https://archive.ubuntu.com:443/ubuntu resolute InRelease\n",
+            b"Get:1 https://mirror.archive.ubuntu.com/ubuntu resolute InRelease\n",
+            b"Get:1 https://archive.ubuntu.com/%75buntu resolute InRelease\n",
+            b"Get:1 https://archive.ubuntu.com/notubuntu resolute InRelease\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu/private resolute InRelease\n",
+            b"Get:1 https://ports.ubuntu.com/ubuntu-ports/pool/x resolute InRelease\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu?token=private resolute InRelease\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu#private resolute InRelease\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu resolute InRelease [1 secret]\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu noble InRelease\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu resolute/unknown amd64 Packages\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu resolute/main riscv64 Packages\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu resolute/main all Packages\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu resolute/main amd64 X-Package amd64 1.0\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu resolute/main amd64 libdemo Metadata\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu resolute/main amd64 c-n-f Metadata [8,968 B]\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu resolute/main amd64 Components\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu resolute/main Translation-en\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu resolute/main amd64 Packages 2026.11.pdiff\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu resolute/main amd64 c-n-f amd64 Metadata\n",
+            b"Get:1 https://archive.ubuntu.com/ubuntu resolute/main amd64 libdemo 1.2.3-4\n",
+        )
+        for line in lines:
+            with self.subTest(line=line):
+                error, _, _ = self.provision_timeout_details(line)
+                self.assertEqual(error.details["apt_activity"], "fetch")
+                self.assertNotIn("apt_fetch", error.details)
+
+    def test_apt_fetch_binds_final_activity_and_keeps_clipping_and_failure_guards(self):
+        first = b"Get:1 http://archive.ubuntu.com/ubuntu resolute InRelease\n"
+        last = b"Get:8 http://archive.ubuntu.com/ubuntu resolute/main amd64 libdemo all 1.2.3-4\n"
+        expected = {"origin": "archive", "suite": "resolute", "kind": "package", "component": "main",
+                    "index_architecture": "amd64", "package_architecture": "all", "package": "libdemo"}
+        for output in (first + last, first + b"x" * 32768 + b"\n\xff\xfe\n" + last):
+            error, _, _ = self.provision_timeout_details(output)
+            self.assertEqual(error.details["apt_fetch"], expected)
+            self.assertEqual(error.details["apt_activity"], "fetch")
+            self.assertNotIn("1.2.3-4", repr(error.details))
+        later = (
+            b"Get:9 https://unknown.invalid/ubuntu resolute InRelease\n",
+            b"Get:9 http://archive.ubuntu.com/ubuntu resolute/main Translation-en\n",
+            b"Hit:9 http://archive.ubuntu.com/ubuntu resolute InRelease\n",
+            b"Ign:9 http://archive.ubuntu.com/ubuntu resolute InRelease\n",
+            b"Unpacking something\n",
+            b"Err:9 transport failed\n",
+        )
+        for line in later:
+            with self.subTest(later=line):
+                error, _, _ = self.provision_timeout_details(first + last + line)
+                self.assertNotIn("apt_fetch", error.details)
+        boundary = b"\n" + last + b"x" * (32768 - len(last))
+        boundary_error, _, _ = self.provision_timeout_details(boundary)
+        self.assertNotIn("apt_fetch", boundary_error.details)
+        with patch("rs9.build_native._apt_fetch_for_timeout", side_effect=RuntimeError("private parser failure")):
+            error, _, rows = self.provision_timeout_details(last)
+        self.assertEqual(error.code, "TOOL_TIMEOUT")
+        self.assertEqual(error.details["stdout_sha256"], digest(last))
+        self.assertEqual(error.details["stderr_sha256"], digest(b"private-stderr"))
+        self.assertEqual(error.details["cleanup"], "complete")
+        self.assertNotIn("apt_fetch", error.details)
+        self.assertEqual(rows[0]["outcome"], "timeout")
+
+    def test_apt_fetch_sanitizer_rejects_wrong_nested_shapes_and_credential_like_names(self):
+        class DictionarySubclass(dict):
+            pass
+        valid = {"origin": "archive", "suite": "resolute", "kind": "package", "component": "main",
+                 "index_architecture": "amd64", "package_architecture": "all", "package": "libdemo"}
+        sanitized = safe_details({"apt_fetch": valid})["apt_fetch"]
+        self.assertEqual(sanitized, valid)
+        self.assertIsNot(sanitized, valid)
+        invalid = (None, [], "descriptor", 1, DictionarySubclass(valid),
+            {**valid, 1: "bad-key"}, {**valid, "extra": "ignored"},
+            {**valid, "origin": "evil"}, {**valid, "suite": "noble"},
+            {**valid, "index_architecture": "all"}, {**valid, "package_architecture": "riscv64"},
+            {**valid, "package": "Bad_Name"}, {**valid, "package": "../private"},
+            {**valid, "package": 1}, {**valid, "package": "p"}, {**valid, "package": "a" * 40},
+            {**valid, "version": "secret"},
+            {"origin": "archive", "suite": "resolute", "kind": "inrelease", "package": "bad"},
+            {"origin": "archive", "suite": "resolute", "kind": "packages", "component": "main", "architecture": "all"})
+        for value in invalid:
+            with self.subTest(value=value):
+                result = safe_details({"apt_fetch": value})
+                self.assertNotIn("apt_fetch", result)
+                self.assertTrue(result["details_truncated"])
+        with patch("rs9.security.scan_for_credentials", side_effect=ContractError("CREDENTIAL_DETECTED", "Synthetic refusal")):
+            self.assertNotIn("apt_fetch", safe_details({"apt_fetch": valid}))
+
+    def test_apt_fetch_unmarked_success_and_oserror_routes_are_unchanged(self):
+        valid = b"Get:1 https://archive.ubuntu.com/ubuntu resolute InRelease\n"
+        tagged = APT_ACTIVITY_DIAGNOSTIC_PREFIX + "apt-get update"
+        commands = (["docker", "run", "image", "sh", "-c", "apt-get update"],
+                    ["docker", "exec", "fixture", "sh", "-c", tagged],
+                    ["podman", "run", "image", "sh", "-c", tagged],
+                    ["docker", "run", "image", "bash", "-c", tagged])
+        for command in commands:
+            self.assertNotIn("apt_fetch", self.timeout_details(command, valid))
+        command = ["docker", "run", "image", "sh", "-c", tagged]
+        runner = SubprocessRunner(timeout=600)
+        runner.which = lambda tool: "/usr/bin/" + tool
+        with patch("rs9.build_native.subprocess.run", return_value=subprocess.CompletedProcess(command, 0, valid, b"")):
+            receipt = runner.run(command)
+        self.assertEqual(receipt.exit_code, 0)
+        self.assertNotIn("apt_fetch", receipt.to_record())
+        with patch("rs9.build_native.subprocess.run", side_effect=OSError("private")):
+            with self.assertRaises(ContractError) as caught:
+                runner.run(command)
+        self.assertEqual(caught.exception.code, "TOOL_EXECUTION")
+        self.assertNotIn("apt_fetch", caught.exception.details)
+
+    def test_apt_fetch_crlf_bytearray_and_string_timeout_streams(self):
+        data = b"Get:1 https://archive.ubuntu.com/ubuntu resolute InRelease\r\n"
+        for value in (data, bytearray(data), data.decode()):
+            with self.subTest(kind=type(value).__name__):
+                error, _, _ = self.provision_timeout_details(value)
+                self.assertEqual(error.details["apt_fetch"], {"origin": "archive", "suite": "resolute", "kind": "inrelease"})
+                self.assertEqual(error.details["stdout_sha256"], digest(data))
+
+    def test_apt_fetch_current_debian_gate_and_actual_recording_keep_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scratch = root / "scratch"
+            scratch.mkdir()
+            line = b"Get:1 http://archive.ubuntu.com/ubuntu resolute/main amd64 libdemo all 1.2\n"
+            expected = {"origin": "archive", "suite": "resolute", "kind": "package", "component": "main",
+                        "index_architecture": "amd64", "package_architecture": "all", "package": "libdemo"}
+            runner = SubprocessRunner(timeout=600)
+            runner.which = lambda tool: "/usr/bin/" + tool
+            def run(command, **kwargs):
+                if command[1] == "run":
+                    raise subprocess.TimeoutExpired(command, kwargs["timeout"], output=line, stderr=b"")
+                return subprocess.CompletedProcess(command, 0, b"", b"")
+            with patch.object(hd, "prepare_environment", return_value={"image_ref": "fixture", "unpinned": False}), \
+                 patch("rs9.build_native.subprocess.run", side_effect=run):
+                result = hd.execute_deb({"repository": root, "scratch": scratch, "system": "amd64", "pins": {},
+                    "runner": runner, "generation": CURRENT_GENERATION, "maintainer": "fixture-maintainer"})
+            gate = next(g for g in result["gates"] if g["name"] == "deb-container-environment")
+            self.assertEqual((gate["status"], gate["reason"]), ("fail", "TOOL_TIMEOUT"))
+            rows = result["details"]["container_preparation"]
+            timeout = next(row for row in rows if row.get("outcome") == "timeout")
+            values = (gate["apt_fetch"], gate["details"]["apt_fetch"], timeout["apt_fetch"],
+                      result["details"]["environment_failure"]["details"]["apt_fetch"])
+            self.assertTrue(all(value == expected for value in values))
+            self.assertEqual(gate["details"]["cleanup"], "complete")
+
     def test_apt_activity_only_applies_to_tagged_docker_run_timeouts(self):
         tagged = APT_ACTIVITY_DIAGNOSTIC_PREFIX + "apt-get update"
         commands = (

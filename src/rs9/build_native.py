@@ -38,7 +38,7 @@ from rs9.current_generation import (
     bind_native_build_generation,
     generation_paths,
 )
-from rs9.errors import APT_ACTIVITY_VALUES, ContractError
+from rs9.errors import APT_ACTIVITY_VALUES, ContractError, validate_apt_fetch
 from rs9.npm_deps import authenticate_dependencies, closure_for_capture
 from rs9.records import closed, record_sha256, snapshot, validate_sanitized_string, validate_sha256
 from rs9.release_core import ReleaseCapture, authenticated_record_hash, digest
@@ -102,6 +102,108 @@ def _apt_activity_for_timeout(argv: Any, stdout: Any) -> str | None:
                 last = label
                 break
     return last if last in APT_ACTIVITY_VALUES else "unknown"
+
+
+_APT_FETCH_LINE_NUMBER = rb"[0-9]{1,6}"
+_APT_FETCH_SIZE = rb"(?: \[(?:[0-9]{1,18}|[0-9]{1,3}(?:,[0-9]{3}){1,5})(?:\.[0-9]{1,3})? [kMGTPE]?B\])?"
+_APT_FETCH_INRELEASE = re.compile(
+    rb"^Get:" + _APT_FETCH_LINE_NUMBER
+    + rb" (?P<url>https?://[^\s\[\]]+)"
+    + rb" (?P<suite>[A-Za-z0-9-]{1,64}) InRelease" + _APT_FETCH_SIZE + rb"$"
+)
+_APT_FETCH_PACKAGES = re.compile(
+    rb"^Get:" + _APT_FETCH_LINE_NUMBER
+    + rb" (?P<url>https?://[^\s\[\]]+)"
+    + rb" (?P<suite>[A-Za-z0-9-]{1,64})/(?P<component>[A-Za-z0-9_-]{1,32})"
+    + rb" (?P<architecture>[A-Za-z0-9_-]{1,32}) Packages" + _APT_FETCH_SIZE + rb"$"
+)
+_APT_FETCH_PACKAGE = re.compile(
+    rb"^Get:" + _APT_FETCH_LINE_NUMBER
+    + rb" (?P<url>https?://[^\s\[\]]+)"
+    + rb" (?P<suite>[A-Za-z0-9-]{1,64})/(?P<component>[A-Za-z0-9_-]{1,32})"
+    + rb" (?P<index_architecture>amd64|arm64)"
+    + rb" (?P<package>[A-Za-z0-9+.-]{1,128})"
+    + rb" (?P<package_architecture>amd64|arm64|all)"
+    + rb" (?P<version>[0-9][A-Za-z0-9+.:~-]{0,127})" + _APT_FETCH_SIZE + rb"$"
+)
+
+
+def _apt_fetch_origin(url: bytes) -> str | None:
+    """Map one exact public Ubuntu archive URL to a closed origin label."""
+    if not isinstance(url, bytes) or len(url) > 2048 or b"%" in url:
+        return None
+    match = re.fullmatch(
+        rb"https?://(?P<host>archive\.ubuntu\.com|security\.ubuntu\.com|ports\.ubuntu\.com)"
+        rb"(?P<path>/ubuntu(?:-ports)?/?)",
+        url,
+    )
+    if match is None:
+        return None
+    path = match.group("path")
+    host = match.group("host")
+    if host == b"ports.ubuntu.com":
+        if path not in (b"/ubuntu-ports", b"/ubuntu-ports/"):
+            return None
+        return "ports"
+    if path not in (b"/ubuntu", b"/ubuntu/"):
+        return None
+    return "archive" if host == b"archive.ubuntu.com" else "security"
+
+
+def _apt_fetch_descriptor(line: bytes) -> dict[str, str] | None:
+    """Parse one bounded, full-line official Ubuntu APT Get record."""
+    for pattern, kind in (
+        (_APT_FETCH_INRELEASE, "inrelease"),
+        (_APT_FETCH_PACKAGES, "packages"),
+        (_APT_FETCH_PACKAGE, "package"),
+    ):
+        match = pattern.fullmatch(line)
+        if match is None:
+            continue
+        origin = _apt_fetch_origin(match.group("url"))
+        if origin is None:
+            return None
+        descriptor: dict[str, str] = {
+            "origin": origin,
+            "suite": match.group("suite").decode("ascii"),
+            "kind": kind,
+        }
+        if kind == "packages":
+            descriptor.update({
+                "component": match.group("component").decode("ascii"),
+                "architecture": match.group("architecture").decode("ascii"),
+            })
+        if kind == "package":
+            descriptor.update({
+                "component": match.group("component").decode("ascii"),
+                "index_architecture": match.group("index_architecture").decode("ascii"),
+                "package_architecture": match.group("package_architecture").decode("ascii"),
+                "package": match.group("package").decode("ascii"),
+            })
+        return validate_apt_fetch(descriptor)
+    return None
+
+
+def _apt_fetch_for_timeout(argv: Any, stdout: Any) -> dict[str, str] | None:
+    """Describe only the same final activity-marker line as a tagged fetch timeout."""
+    if (not isinstance(argv, (list, tuple)) or len(argv) < 4
+            or argv[0] != "docker" or argv[1] != "run"
+            or tuple(argv[-3:-1]) != ("sh", "-c")
+            or not isinstance(argv[-1], str)
+            or not argv[-1].startswith(APT_ACTIVITY_DIAGNOSTIC_PREFIX)):
+        return None
+    tail, clipped = _timeout_stream_tail(stdout)
+    if clipped:
+        first_newline = tail.find(b"\n")
+        if first_newline < 0:
+            return None
+        tail = tail[first_newline + 1:]
+    last = None
+    for line in tail.split(b"\n"):
+        line = line[:-1] if line.endswith(b"\r") else line
+        if any(line.startswith(marker) for marker, _ in _APT_ACTIVITY_MARKERS) or line.startswith(b"Err:"):
+            last = _apt_fetch_descriptor(line) if line.startswith(b"Get:") else None
+    return last
 
 
 def extract_for_packaging(archive, destination, *, expected_sha256):
@@ -305,6 +407,12 @@ class SubprocessRunner(CommandRunner):
             apt_activity = _apt_activity_for_timeout(argv, out_b)
             if apt_activity is not None:
                 details["apt_activity"] = apt_activity
+            try:
+                apt_fetch = _apt_fetch_for_timeout(argv, out_b)
+            except Exception:
+                apt_fetch = None
+            if apt_fetch is not None:
+                details["apt_fetch"] = apt_fetch
             raise ContractError(
                 "TOOL_TIMEOUT",
                 "Native tool exceeded its bounded execution time",
