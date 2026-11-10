@@ -518,8 +518,13 @@ def provision_image(
     substage_prefix: str = "",
     *,
     apt_activity_diagnostic: bool = False,
+    pacman_failure_diagnostic: bool = False,
 ) -> str:
     """Network-enabled one-time provisioning, committed to a local image used offline afterwards."""
+    if type(pacman_failure_diagnostic) is not bool:
+        raise ContractError("INVALID_ARGUMENT", "Pacman failure diagnostic option must be boolean")
+    if pacman_failure_diagnostic and family != "pacman":
+        raise ContractError("INVALID_ARGUMENT", "Pacman failure diagnostic requires pacman provisioning")
     if apt_activity_diagnostic and family != "apt":
         raise ContractError("INVALID_ARGUMENT", "APT activity diagnostic requires apt provisioning")
     for package in packages:
@@ -544,7 +549,11 @@ def provision_image(
             raise err.with_details(substage=prov_substage) from None
         if run.exit_code != 0:
             try:
-                observation = classify_provision_failure(run.stdout_bytes, run.stderr_bytes, packages)
+                if pacman_failure_diagnostic:
+                    observation = classify_provision_failure(run.stdout_bytes, run.stderr_bytes, packages,
+                                                             pacman_failure_diagnostic=True)
+                else:
+                    observation = classify_provision_failure(run.stdout_bytes, run.stderr_bytes, packages)
             except Exception:
                 # An optional observation must not replace failure or cleanup.
                 observation = "observation-unavailable"
