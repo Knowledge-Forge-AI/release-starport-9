@@ -6,14 +6,226 @@ import unittest
 from unittest.mock import patch
 
 from rs9 import hosted_deb as hd
-from rs9.build_native import SubprocessRunner
-from rs9.errors import ContractError
+from rs9.build_native import APT_ACTIVITY_DIAGNOSTIC_PREFIX, SubprocessRunner
+from rs9.current_generation import CURRENT_GENERATION, HISTORICAL_GENERATION
+from rs9.errors import ContractError, safe_details
 from rs9.hosted_custody import diagnostic_bytes
 from rs9.release_core import digest
 from rs9.scratch import canonical
 
 
 class PreparationDiagnosticsTests(unittest.TestCase):
+    def timeout_details(self, command, output, *, stderr=b"private-stderr"):
+        runner = SubprocessRunner(timeout=600)
+        runner.which = lambda tool: "/usr/bin/" + tool
+
+        def run(argv, **kwargs):
+            raise subprocess.TimeoutExpired(argv, kwargs["timeout"], output=output, stderr=stderr)
+
+        with patch("rs9.build_native.subprocess.run", side_effect=run):
+            with self.assertRaises(ContractError) as caught:
+                runner.run(command)
+        self.assertEqual(caught.exception.code, "TOOL_TIMEOUT")
+        return caught.exception.details
+
+    def provision_timeout_details(self, output):
+        runner = SubprocessRunner(timeout=600)
+        runner.which = lambda tool: "/usr/bin/" + tool
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append(command)
+            if command[1] == "run":
+                raise subprocess.TimeoutExpired(command, kwargs["timeout"], output=output, stderr=b"private-stderr")
+            return subprocess.CompletedProcess(command, 0, b"", b"")
+
+        rows = []
+        with patch("rs9.build_native.subprocess.run", side_effect=run):
+            with self.assertRaises(ContractError) as caught:
+                hd.provision_image(
+                    runner, "apt", "fixture", "linux/amd64", "phase-owned:fixture", ["python3"],
+                    recorder=rows, substage_prefix="client-", apt_activity_diagnostic=True,
+                )
+        return caught.exception, calls, rows
+
+    def test_current_apt_activity_prefix_labels_timeout_without_raw_output(self):
+        error, calls, rows = self.provision_timeout_details(b"Get: https://private.invalid/secret.pkg\n")
+        self.assertEqual(error.details["apt_activity"], "fetch")
+        self.assertNotIn("private.invalid", repr(error.details))
+        self.assertNotIn(b"secret.pkg", repr(error.details).encode())
+        self.assertEqual(error.details["deadline_seconds"], 600)
+        self.assertEqual(error.details["stderr_sha256"], digest(b"private-stderr"))
+        self.assertEqual(len(calls), 2)  # failed provision plus bounded cleanup
+        self.assertEqual(rows[0]["outcome"], "timeout")
+
+    def test_apt_activity_labels_and_last_recognized_ordering(self):
+        command = ["docker", "run", "--name", "fixture", "image", "sh", "-c",
+                   APT_ACTIVITY_DIAGNOSTIC_PREFIX + "apt-get update"]
+        markers = (
+            (b"Hit: private", "index-hit"),
+            (b"Get: private", "fetch"),
+            (b"Ign: private", "fetch-ignored"),
+            (b"Fetched private", "fetched"),
+            (b"Reading package lists: private", "package-lists"),
+            (b"Building dependency tree: private", "dependency-tree"),
+            (b"Reading state information: private", "state-information"),
+            (b"Need to get private", "download-plan"),
+            (b"Selecting previously unselected package private", "select"),
+            (b"Unpacking private", "unpack"),
+            (b"Setting up private", "configure"),
+            (b"Processing triggers for private", "triggers"),
+        )
+        for line, label in markers:
+            with self.subTest(label=label):
+                self.assertEqual(self.timeout_details(command, line + b"\n")["apt_activity"], label)
+        ordered = b"\n".join(line for line, _ in markers[:4]) + b"\nnot an APT line\n" + markers[7][0] + b"\n"
+        self.assertEqual(self.timeout_details(command, ordered)["apt_activity"], "download-plan")
+
+    def test_apt_activity_binary_tail_partial_line_and_unknown_are_bounded(self):
+        command = ["docker", "run", "--name", "fixture", "image", "sh", "-c",
+                   APT_ACTIVITY_DIAGNOSTIC_PREFIX + "apt-get update"]
+        clipped = b"Get: stale\n" + (b"x" * 32768) + b"\nFetched final https://private.invalid/pkg\n"
+        details = self.timeout_details(command, clipped)
+        self.assertEqual(details["apt_activity"], "fetched")
+        self.assertNotIn("private.invalid", repr(details))
+        boundary_aligned = b"\nGet: retained\n" + (b"x" * 32754)
+        self.assertEqual(self.timeout_details(command, boundary_aligned)["apt_activity"], "unknown")
+        self.assertEqual(self.timeout_details(command, b"\xff\xfe\nHit: binary\n")["apt_activity"], "index-hit")
+        self.assertEqual(self.timeout_details(command, None)["apt_activity"], "unknown")
+        self.assertEqual(self.timeout_details(command, "Reading package lists: private\n")["apt_activity"], "package-lists")
+
+    def test_apt_activity_only_applies_to_tagged_docker_run_timeouts(self):
+        tagged = APT_ACTIVITY_DIAGNOSTIC_PREFIX + "apt-get update"
+        commands = (
+            ["docker", "run", "image", "sh", "-c", "apt-get update"],
+            ["docker", "exec", "fixture", "sh", "-c", tagged],
+            ["podman", "run", "image", "sh", "-c", tagged],
+            ["docker", "run", "image", "bash", "-c", tagged],
+        )
+        for command in commands:
+            with self.subTest(command=command[:2]):
+                self.assertNotIn("apt_activity", self.timeout_details(command, b"Get: private\n"))
+
+    def test_apt_activity_success_oserror_and_safe_details_are_unchanged_or_closed(self):
+        command = ["docker", "run", "image", "sh", "-c", APT_ACTIVITY_DIAGNOSTIC_PREFIX + "apt-get update"]
+        runner = SubprocessRunner(timeout=600)
+        runner.which = lambda tool: "/usr/bin/" + tool
+        with patch("rs9.build_native.subprocess.run", return_value=subprocess.CompletedProcess(command, 0, b"Get: private\n", b"")):
+            receipt = runner.run(command)
+        self.assertEqual(receipt.exit_code, 0)
+        with patch("rs9.build_native.subprocess.run", side_effect=OSError("private")):
+            with self.assertRaises(ContractError) as caught:
+                runner.run(command)
+        self.assertEqual(caught.exception.code, "TOOL_EXECUTION")
+        self.assertNotIn("apt_activity", caught.exception.details)
+        for value in (None, 1, True, "Get: private", "../fetch", "fetch\n"):
+            with self.subTest(value=value):
+                sanitized = safe_details({"apt_activity": value})
+                self.assertNotIn("apt_activity", sanitized)
+                self.assertTrue(sanitized["details_truncated"])
+
+    def test_apt_activity_opt_in_prefix_preserves_default_script_and_rejects_non_apt_before_mutation(self):
+        runner = SubprocessRunner(timeout=600)
+        runner.which = lambda tool: "/usr/bin/" + tool
+        scripts = []
+
+        def run(command, **kwargs):
+            if command[1] == "run":
+                scripts.append(command[-1])
+            return subprocess.CompletedProcess(command, 0, b"", b"")
+
+        with patch("rs9.build_native.subprocess.run", side_effect=run):
+            hd.provision_image(runner, "apt", "fixture", "linux/amd64", "default:fixture", ["python3"])
+            hd.provision_image(runner, "apt", "fixture", "linux/amd64", "current:fixture", ["python3"],
+                               apt_activity_diagnostic=True)
+            with self.assertRaises(ContractError) as caught:
+                hd.provision_image(runner, "dnf", "fixture", "linux/amd64", "wrong:fixture", ["python3"],
+                                   apt_activity_diagnostic=True)
+        self.assertEqual(caught.exception.code, "INVALID_ARGUMENT")
+        self.assertEqual(len(scripts), 2)
+        self.assertEqual(scripts[1].removeprefix(APT_ACTIVITY_DIAGNOSTIC_PREFIX), scripts[0])
+
+    def test_execute_deb_selects_opt_in_only_for_current_generation(self):
+        selected = []
+
+        for generation in (HISTORICAL_GENERATION, CURRENT_GENERATION):
+            with self.subTest(generation=generation):
+                temporary = tempfile.TemporaryDirectory()
+                self.addCleanup(temporary.cleanup)
+                root = Path(temporary.name)
+                scratch = root / "scratch"
+                scratch.mkdir()
+                runner = SubprocessRunner(timeout=600)
+                runner.which = lambda tool: "/usr/bin/" + tool
+                calls = []
+
+                def run(command, **kwargs):
+                    calls.append(command)
+                    if command[1] == "run":
+                        raise subprocess.TimeoutExpired(command, kwargs["timeout"], output=b"Get: synthetic\n", stderr=b"private")
+                    return subprocess.CompletedProcess(command, 0, b"", b"")
+
+                with patch.object(hd, "prepare_environment", return_value={"image_ref": "fixture", "unpinned": False}), \
+                     patch("rs9.build_native.subprocess.run", side_effect=run):
+                    result = hd.execute_deb({
+                        "repository": root, "scratch": scratch, "system": "amd64", "pins": {},
+                        "runner": runner, "generation": generation,
+                        "maintainer": "fixture-maintainer",
+                    })
+                gate = next(g for g in result["gates"] if g["name"] == "deb-container-environment")
+                self.assertEqual(gate["reason"], "TOOL_TIMEOUT")
+                script = next(command[-1] for command in calls if command[1] == "run")
+                selected.append(script.startswith(APT_ACTIVITY_DIAGNOSTIC_PREFIX))
+                if generation == CURRENT_GENERATION:
+                    self.assertEqual(gate["details"]["apt_activity"], "fetch")
+                else:
+                    self.assertNotIn("apt_activity", gate["details"])
+        self.assertEqual(selected, [False, True])
+
+    def test_pages_client_selects_opt_in_only_for_current_generation(self):
+        selected = []
+
+        for generation in (HISTORICAL_GENERATION, CURRENT_GENERATION):
+            with self.subTest(generation=generation):
+                temporary = tempfile.TemporaryDirectory()
+                self.addCleanup(temporary.cleanup)
+                root = Path(temporary.name)
+                scratch = root / "scratch"
+                scratch.mkdir()
+                tree = root / "tree"
+                tree.mkdir()
+                runner = SubprocessRunner(timeout=600)
+                runner.which = lambda tool: "/usr/bin/" + tool
+                host = hd.RecordingRunner(runner)
+                calls = []
+
+                def run(command, **kwargs):
+                    calls.append(command)
+                    if command[1] == "run":
+                        raise subprocess.TimeoutExpired(command, kwargs["timeout"], output=b"Get: synthetic\n", stderr=b"private")
+                    return subprocess.CompletedProcess(command, 0, b"", b"")
+
+                context = {
+                    "generation": generation,
+                    "pins": {},
+                    "wrong_signing_fixture": object(),
+                }
+                bundles = {("deb", "amd64"): {"packages": {}}}
+                gates, details = [], {}
+                with patch.object(hd, "prepare_environment", return_value={"image_ref": "fixture"}), \
+                     patch("rs9.build_native.subprocess.run", side_effect=run):
+                    hd._pages_client_tests(
+                        context, host, root, scratch, {}, tree, bundles, object(), gates, details, [], [], "fixture-rpm",
+                    )
+                script = next(command[-1] for command in calls if command[1] == "run")
+                selected.append(script.startswith(APT_ACTIVITY_DIAGNOSTIC_PREFIX))
+                setup = next(g for g in gates if g["name"] == "pages-client.setup")
+                if generation == CURRENT_GENERATION:
+                    self.assertEqual(setup["details"]["apt_activity"], "fetch")
+                else:
+                    self.assertNotIn("apt_activity", setup["details"])
+        self.assertEqual(selected, [False, True])
+
     def test_cleanup_deadline_is_local_bounded_and_reentrant(self):
         for timeout in (None, 600, 5):
             with self.subTest(timeout=timeout):

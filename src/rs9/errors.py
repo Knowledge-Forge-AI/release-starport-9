@@ -5,6 +5,13 @@ from __future__ import annotations
 import re
 
 
+APT_ACTIVITY_VALUES = frozenset({
+    "index-hit", "fetch", "fetch-ignored", "fetched", "package-lists",
+    "dependency-tree", "state-information", "download-plan", "select",
+    "unpack", "configure", "triggers", "unknown",
+})
+
+
 def safe_details(details):
     """Closed, bounded public identifiers only; reject credentials and host paths."""
     from rs9.security import scan_for_credentials, validate_safe_relative_posix_path
@@ -31,6 +38,7 @@ def safe_details(details):
                     "parent_mode", "target_mode"})
     allowed.update({"path", "path_sha256"})
     allowed.update({"scenario", "diagnostic_sha256"})
+    allowed.add("apt_activity")
     allowed.add("stream_custody")
     result, dropped = {}, False
     if not isinstance(details, dict):
@@ -78,6 +86,12 @@ def safe_details(details):
             continue
         if key == "scenario":
             if isinstance(value, str) and value in {"A", "B", "C", "C-signal"}:
+                result[key] = value
+            else:
+                dropped = True
+            continue
+        if key == "apt_activity":
+            if isinstance(value, str) and value in APT_ACTIVITY_VALUES:
                 result[key] = value
             else:
                 dropped = True

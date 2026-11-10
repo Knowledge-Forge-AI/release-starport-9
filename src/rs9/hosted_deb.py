@@ -56,6 +56,7 @@ from rs9.build_native import (
     CommandRunner,
     NativePrerequisiteUnavailable,
     SubprocessRunner,
+    APT_ACTIVITY_DIAGNOSTIC_PREFIX,
     validate_scratch_root,
 )
 from rs9.errors import ContractError, safe_details
@@ -515,8 +516,12 @@ def provision_image(
     packages: Sequence[str],
     recorder: Any = None,
     substage_prefix: str = "",
+    *,
+    apt_activity_diagnostic: bool = False,
 ) -> str:
     """Network-enabled one-time provisioning, committed to a local image used offline afterwards."""
+    if apt_activity_diagnostic and family != "apt":
+        raise ContractError("INVALID_ARGUMENT", "APT activity diagnostic requires apt provisioning")
     for package in packages:
         if not _PACKAGE_RE.fullmatch(package):
             raise ContractError("INVALID_ARGUMENT", "Unsafe package name for provisioning")
@@ -526,6 +531,8 @@ def provision_image(
         script += " && pacman -Fy --noconfirm"
     if os.getuid() > 0:
         script += " && (getent passwd " + str(os.getuid()) + " || useradd -m -u " + str(os.getuid()) + " rs9builder)"
+    if apt_activity_diagnostic:
+        script = APT_ACTIVITY_DIAGNOSTIC_PREFIX + script
     prov_substage = f"{substage_prefix}provision" if substage_prefix else "provision"
     commit_substage = f"{substage_prefix}commit" if substage_prefix else "commit"
     try:
@@ -1797,7 +1804,8 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
             libs = tuple((pins.get("deb", {}) or {}).get("build_packages") or DEFAULT_NATIVE_LIBRARY_PACKAGES)
             builder_tag = f"rs9-deb-builder-{system}:{uuid.uuid4().hex[:8]}"
             images.append(builder_tag)
-            provision_image(host, "apt", env["image_ref"], platform, builder_tag, [*BUILD_TOOL_PACKAGES, *libs], recorder=details["container_preparation"], substage_prefix="build-")
+            provision_image(host, "apt", env["image_ref"], platform, builder_tag, [*BUILD_TOOL_PACKAGES, *libs], recorder=details["container_preparation"], substage_prefix="build-",
+                            apt_activity_diagnostic=context.get("generation", HISTORICAL_GENERATION) == CURRENT_GENERATION)
             builder = ContainerRunner(host, builder_tag, platform=platform,
                                       mounts=[(str(scratch), str(scratch), True)], user=_user())
             from rs9.hosted_native import container_tool_facts
@@ -1925,7 +1933,8 @@ def execute_deb(context: dict[str, Any]) -> dict[str, Any]:
                             names.append(name)
                 client_tag = f"rs9-deb-client-{system}:{uuid.uuid4().hex[:8]}"
                 images.append(client_tag)
-                provision_image(host, "apt", env["image_ref"], platform, client_tag, [*names, "python3", "xvfb", "dbus-x11"], recorder=details["container_preparation"], substage_prefix="client-")
+                provision_image(host, "apt", env["image_ref"], platform, client_tag, [*names, "python3", "xvfb", "dbus-x11"], recorder=details["container_preparation"], substage_prefix="client-",
+                                apt_activity_diagnostic=context.get("generation", HISTORICAL_GENERATION) == CURRENT_GENERATION)
                 keyring = scratch / "client-keyring" / "rs9-nonproduction.gpg"
                 keyring.parent.mkdir()
                 _write_public_keyring(keyring, fixture.public_key_binary)
@@ -2416,7 +2425,8 @@ def _pages_client_tests(
             for path in bundle["packages"].values():
                 deb_names += [n for n in _dependency_names(path.read_bytes()) if n not in deb_names]
         apt_tag = f"rs9-pages-apt:{uuid.uuid4().hex[:8]}"
-        provision_image(host, "apt", env["image_ref"], "linux/amd64", apt_tag, [*deb_names, "python3", "xvfb", "dbus-x11"], recorder=host, substage_prefix="client-")
+        provision_image(host, "apt", env["image_ref"], "linux/amd64", apt_tag, [*deb_names, "python3", "xvfb", "dbus-x11"], recorder=host, substage_prefix="client-",
+                        apt_activity_diagnostic=context.get("generation", HISTORICAL_GENERATION) == CURRENT_GENERATION)
         images.append(apt_tag)
         pacman_image = provision_native("pacman", "x86_64-linux", pins, runner=host)
         pac_tag = f"rs9-pages-arch:{uuid.uuid4().hex[:8]}"
