@@ -492,7 +492,7 @@ def execute(context):
     repo = bundle = keys = None
     try:
         builder_provision_options = (
-            {"pacman_failure_diagnostic": True, "substage_prefix": "build-"}
+            {"pacman_failure_diagnostic": True, "pacman_full_upgrade": True, "substage_prefix": "build-"}
             if family == "pacman" and generation == CURRENT_GENERATION else {}
         )
         provision_image(host, "pacman" if family == "pacman" else "dnf", environment["image_ref"],
@@ -918,7 +918,7 @@ def execute(context):
                                                    environment=environment, arch=arch, system=system)
             else:
                 client_provision_options = (
-                    {"pacman_failure_diagnostic": True, "substage_prefix": "client-"}
+                    {"pacman_failure_diagnostic": True, "pacman_full_upgrade": True, "substage_prefix": "client-"}
                     if family == "pacman" and generation == CURRENT_GENERATION else {}
                 )
                 provision_image(host, "pacman", environment["image_ref"], platform, client_tag,

@@ -505,6 +505,7 @@ PROVISION_COMMANDS = {
     "dnf": "dnf -y install {packages}",
     "pacman": "pacman -Sy --noconfirm --needed {packages}",
 }
+PACMAN_FULL_UPGRADE_COMMAND = "pacman -Syu --noconfirm --needed {packages}"
 
 
 def provision_image(
@@ -519,19 +520,25 @@ def provision_image(
     *,
     apt_activity_diagnostic: bool = False,
     pacman_failure_diagnostic: bool = False,
+    pacman_full_upgrade: bool = False,
 ) -> str:
     """Network-enabled one-time provisioning, committed to a local image used offline afterwards."""
     if type(pacman_failure_diagnostic) is not bool:
         raise ContractError("INVALID_ARGUMENT", "Pacman failure diagnostic option must be boolean")
     if pacman_failure_diagnostic and family != "pacman":
         raise ContractError("INVALID_ARGUMENT", "Pacman failure diagnostic requires pacman provisioning")
+    if type(pacman_full_upgrade) is not bool:
+        raise ContractError("INVALID_ARGUMENT", "Pacman full upgrade option must be boolean")
+    if pacman_full_upgrade and family != "pacman":
+        raise ContractError("INVALID_ARGUMENT", "Pacman full upgrade requires pacman provisioning")
     if apt_activity_diagnostic and family != "apt":
         raise ContractError("INVALID_ARGUMENT", "APT activity diagnostic requires apt provisioning")
     for package in packages:
         if not _PACKAGE_RE.fullmatch(package):
             raise ContractError("INVALID_ARGUMENT", "Unsafe package name for provisioning")
     name = f"rs9-prov-{uuid.uuid4().hex[:12]}"
-    script = PROVISION_COMMANDS[family].format(packages=" ".join(packages))
+    command_template = PACMAN_FULL_UPGRADE_COMMAND if pacman_full_upgrade else PROVISION_COMMANDS[family]
+    script = command_template.format(packages=" ".join(packages))
     if family == "pacman":
         script += " && pacman -Fy --noconfirm"
     if os.getuid() > 0:
@@ -2439,8 +2446,13 @@ def _pages_client_tests(
         images.append(apt_tag)
         pacman_image = provision_native("pacman", "x86_64-linux", pins, runner=host)
         pac_tag = f"rs9-pages-arch:{uuid.uuid4().hex[:8]}"
+        pacman_options = (
+            {"pacman_full_upgrade": True}
+            if context.get("generation", HISTORICAL_GENERATION) == CURRENT_GENERATION else {}
+        )
         provision_image(host, "pacman", pacman_image["image_ref"], "linux/amd64", pac_tag,
-                        [*pacman_image["preprovisioned_packages"], "python", "xorg-server-xvfb", "dbus"], recorder=host, substage_prefix="client-")
+                        [*pacman_image["preprovisioned_packages"], "python", "xorg-server-xvfb", "dbus"], recorder=host, substage_prefix="client-",
+                        **pacman_options)
         images.append(pac_tag)
     except (ContractError, NativePrerequisiteUnavailable, OSError) as err:
         status = "not-run" if isinstance(err, NativePrerequisiteUnavailable) else "fail"

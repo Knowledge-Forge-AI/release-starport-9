@@ -172,6 +172,60 @@ class ProvisionObservationTests(unittest.TestCase):
         self.assertEqual([call[0][1] for call in calls], ["run", "rm"])
         self.assertEqual(rows[0]["substage"], "build-provision")
 
+    def test_pacman_full_upgrade_changes_only_sync_flag_and_preserves_default_route(self):
+        runner = SubprocessRunner(timeout=600)
+        runner.which = lambda tool: "/usr/bin/" + tool
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append(command)
+            return subprocess.CompletedProcess(command, 0, b"", b"")
+
+        with patch.object(hd.os, "getuid", return_value=0), patch.object(hd.uuid, "uuid4") as uuid, \
+                patch("rs9.build_native.subprocess.run", side_effect=run):
+            uuid.return_value.hex = "a" * 32
+            hd.provision_image(runner, "pacman", "fixture", "linux/amd64", "default:tag", ["python"])
+            hd.provision_image(runner, "pacman", "fixture", "linux/amd64", "full:tag", ["python"],
+                               pacman_full_upgrade=True)
+        scripts = [command[-1] for command in calls if command[1] == "run"]
+        self.assertEqual(len(scripts), 2)
+        self.assertEqual(hd.PROVISION_COMMANDS["pacman"], "pacman -Sy --noconfirm --needed {packages}")
+        default = hd.PROVISION_COMMANDS["pacman"].format(packages="python") + " && pacman -Fy --noconfirm"
+        full = hd.PACMAN_FULL_UPGRADE_COMMAND.format(packages="python") + " && pacman -Fy --noconfirm"
+        self.assertEqual(scripts, [default, full])
+        self.assertEqual(full, default.replace("pacman -Sy --noconfirm --needed",
+                                                "pacman -Syu --noconfirm --needed"))
+        self.assertEqual([command[2] for command in calls if command[1] == "run"], ["--name", "--name"])
+        self.assertEqual([command[3] for command in calls if command[1] == "run"],
+                         ["rs9-prov-aaaaaaaaaaaa", "rs9-prov-aaaaaaaaaaaa"])
+        self.assertEqual([command[1] for command in calls], ["run", "commit", "rm", "run", "commit", "rm"])
+
+    def test_pacman_full_upgrade_failure_preserves_hash_cleanup_and_observer_fallback(self):
+        runner = SubprocessRunner(timeout=600)
+        runner.which = lambda tool: "/usr/bin/" + tool
+        calls = []
+        stdout, stderr = b"private stdout", b"error: conflicting files\nprivate stderr"
+
+        def run(command, **kwargs):
+            calls.append((command, kwargs["timeout"]))
+            exit_code = 1 if command[1] == "run" else 0
+            return subprocess.CompletedProcess(command, exit_code, stdout, stderr)
+
+        with patch.object(hd.os, "getuid", return_value=0), patch.object(hd.uuid, "uuid4") as uuid, \
+                patch.object(hd, "classify_provision_failure", side_effect=ValueError("private observer")), \
+                patch("rs9.build_native.subprocess.run", side_effect=run):
+            uuid.return_value.hex = "a" * 32
+            with self.assertRaises(ContractError) as caught:
+                hd.provision_image(runner, "pacman", "fixture", "linux/amd64", "full:tag", ["python"],
+                                   pacman_full_upgrade=True)
+        failure = caught.exception
+        self.assertEqual(failure.code, "PROVISION_FAILED")
+        self.assertEqual(failure.details, {"substage": "provision", "tool": "pacman", "exit_code": 1,
+            "stdout_sha256": digest(stdout), "stderr_sha256": digest(stderr),
+            "reason_token": "observation-unavailable", "cleanup": "complete"})
+        self.assertEqual([command[0][1] for command in calls], ["run", "rm"])
+        self.assertEqual([timeout for _, timeout in calls], [600, 30])
+
     def test_pacman_option_rejects_invalid_or_non_pacman_before_native_action(self):
         runner = SubprocessRunner(timeout=600)
         runner.which = lambda tool: "/usr/bin/" + tool
@@ -186,6 +240,23 @@ class ProvisionObservationTests(unittest.TestCase):
                 with self.subTest(family=family, value=value), self.assertRaises(ContractError) as caught:
                     hd.provision_image(runner, family, "fixture", "linux/amd64", "test-tag", ["safe-devel"],
                                        pacman_failure_diagnostic=value)
+                self.assertEqual(caught.exception.code, "INVALID_ARGUMENT")
+        self.assertEqual(calls, [])
+
+    def test_pacman_full_upgrade_rejects_invalid_or_non_pacman_before_native_action(self):
+        runner = SubprocessRunner(timeout=600)
+        runner.which = lambda tool: "/usr/bin/" + tool
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append(command)
+            raise AssertionError("native action must not run")
+
+        with patch("rs9.build_native.subprocess.run", side_effect=run):
+            for family, value in (("pacman", 1), ("dnf", True)):
+                with self.subTest(family=family, value=value), self.assertRaises(ContractError) as caught:
+                    hd.provision_image(runner, family, "fixture", "linux/amd64", "full:tag", ["python"],
+                                       pacman_full_upgrade=value)
                 self.assertEqual(caught.exception.code, "INVALID_ARGUMENT")
         self.assertEqual(calls, [])
 

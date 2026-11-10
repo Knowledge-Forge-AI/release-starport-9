@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from rs9 import hosted_deb as hd
+from rs9 import hosted_packaging as hp
 from rs9.build_native import APT_ACTIVITY_DIAGNOSTIC_PREFIX, SubprocessRunner
 from rs9.current_generation import CURRENT_GENERATION, HISTORICAL_GENERATION
 from rs9.errors import ContractError, safe_details
@@ -15,6 +16,16 @@ from rs9.scratch import canonical
 
 
 class PreparationDiagnosticsTests(unittest.TestCase):
+    def test_pacman_full_upgrade_routing_is_current_only_static(self):
+        hosted_source = Path(hp.__file__).read_text(encoding="utf-8")
+        deb_source = Path(hd.__file__).read_text(encoding="utf-8")
+        self.assertEqual(hosted_source.count('"pacman_full_upgrade": True'), 2)
+        self.assertEqual(hosted_source.count('if family == "pacman" and generation == CURRENT_GENERATION else {}'), 2)
+        self.assertIn('"pacman_failure_diagnostic": True, "pacman_full_upgrade": True, "substage_prefix": "build-"', hosted_source)
+        self.assertIn('"pacman_failure_diagnostic": True, "pacman_full_upgrade": True, "substage_prefix": "client-"', hosted_source)
+        self.assertIn('if context.get("generation", HISTORICAL_GENERATION) == CURRENT_GENERATION else {}', deb_source)
+        self.assertIn('"pacman_full_upgrade": True', deb_source)
+
     def timeout_details(self, command, output, *, stderr=b"private-stderr"):
         runner = SubprocessRunner(timeout=600)
         runner.which = lambda tool: "/usr/bin/" + tool
