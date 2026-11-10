@@ -35,13 +35,13 @@ VERSIONS_080 = {
 }
 # Exact proposed 0.8 paired-P body pins; no caller or JSON may replace them.
 CONSUMER_FILE_HASHES_080 = {
-    ".github/workflows/publish.yml": "f7a87163e1843508c38477a822e3ca9183cda79af033d5f6e4b1e2576e89d604",
+    ".github/workflows/publish.yml": "dceefdb4c67e714118a07f3c77a09031eadfc32f93f3efd91b5325e7667e3b77",
     "flake.lock": "ed928e945c79e3d7f19d37b13a05f0d97b98440b38661d97bf77844e40606431",
     "flake.nix": "67be263eae65764407ef29126d28183f0270f60ad45acb8fd1202cec6411d9dd",
     "keys/knowledge-forge-ai-packages.asc": "6931a99cf38e204c0adc75dd868f8c0e79d68e58e2644f575d4be1da2ea18d95",
     "package-matrix.json": "7e74cd3c676cc57dad275b5123f71c89227d101c024676c012a7fb4c7d93d091",
     "release-lock.json": "d489a366edeeadf26ed33bd72f9ada63e7826cf590824b84f51a2a225d4d788c",
-    "tools/verification/current_import_routing.py": "94ce933b6ddfbf82e527418e3ed75d6fb1a26211aa5009c5c96183db86465651",
+    "tools/verification/current_import_routing.py": "3fd095f4aab2855dc1033dc558a70db60159af75989470496363c2605f4e979e",
     "tools/verification/generate-publication-provenance.mjs": "1fd13ff84ca4267fb2d2207f006fb966e910426d7555528d115a9afd9119b695",
     "tools/verification/verify-publication-provenance.mjs": "50abdc435dc2a34bdc8a7511329f7fe9baad7c3554a7eecdab258c004145ef87",
 }
