@@ -43,6 +43,28 @@ requires all fifteen jobs in one original main-branch push campaign; a manual
 dispatch, rerun attempt or combination of campaigns cannot substitute for that
 source-bound evidence.
 
+### APT client provisioning checkpoint: 2026-11-10
+
+At [commit `fd3ed3cf`](https://github.com/Knowledge-Forge-AI/release-starport-9/commit/fd3ed3cff0e31729f8d71982e9b39e4208e7d6e2),
+[original current-generation run 42749073554](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/42749073554)
+passed thirteen of its fifteen jobs, including its full hosted unit gate and
+all native package lanes, including AArch64 pacman. The historical full hosted
+unit gate in [run 42749073606](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/42749073606)
+also passed at the same commit. Pages completed package
+metadata assembly, then its APT client-provisioning command exceeded the existing
+600-second limit. Its receipt records the provisioning container's cleanup as complete. Pages and the required
+summary failed; this commit is not a qualified publication source.
+
+The receipt identifies the timed-out boundary, not the underlying APT, network
+or container cause. A source-equivalent qualification campaign preserves provisioning code,
+dependency declarations and derivation, and image-pin policy, diagnostic fields, timeouts and
+gates. Resolved base images, APT packages, archive/mirror and network state can differ.
+It must pass all fifteen current-generation jobs and both full hosted unit
+gates at the same successor commit in their original main-push workflows.
+Evidence from the failed campaign cannot substitute for missing results. Any further failure requires diagnosis
+before a successor. Signing, client admission and production publication remain
+subject to their existing separate gates.
+
 ## Mission
 
 RS9 exists to centralize publication machinery that would otherwise be duplicated across projects:
