@@ -236,7 +236,14 @@ def safe_details(details):
                 dropped = True
             continue
         if key == "product_errors":
-            from rs9.product_classes import PRODUCT_PACKAGING_CLASSES
+            try:
+                from rs9.product_classes import PRODUCT_PACKAGING_CLASSES
+            except ModuleNotFoundError as exc:
+                if exc.name != "rs9.product_classes":
+                    raise
+                # CLI distributions omit the native publication modules.
+                dropped = True
+                continue
             if (isinstance(value, dict) and len(value) <= 4
                     and all(product in PRODUCT_PACKAGING_CLASSES and isinstance(code, str)
                             and re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", code) for product, code in value.items())):
@@ -245,7 +252,14 @@ def safe_details(details):
                 dropped = True
             continue
         if key in {"operation", "host", "transport_error", "http_status", "redirect_hops"}:
-            from rs9.github import HOSTS, REQUEST_CLASSES
+            try:
+                from rs9.github import HOSTS, REQUEST_CLASSES
+            except ModuleNotFoundError as exc:
+                if exc.name != "rs9.github":
+                    raise
+                # CLI distributions omit the native publication modules.
+                dropped = True
+                continue
             valid = ((key == "operation" and isinstance(value, str) and value in REQUEST_CLASSES)
                      or (key == "operation" and isinstance(value, str) and value in {
                          "rpm-repository", "repository-metadata", "package-signing",

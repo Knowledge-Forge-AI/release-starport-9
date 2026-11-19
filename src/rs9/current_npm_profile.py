@@ -10,12 +10,12 @@ import json
 from rs9.archives import inspect_archive
 from rs9.bootstrap import require_configuration_authority
 from rs9.errors import ContractError
+from rs9.evidence_profile_roles import CURRENT_PACKAGE_PROFILE
 from rs9.npm_commands import authenticate_bins
 from rs9.release_core import authenticated_record_hash, digest
 from rs9.security import scan_for_credentials, validate_ecosystem_name
 from rs9.spdx import validate_spdx_expression
 
-CURRENT_PACKAGE_PROFILE = "npm-root-receipt-archive.v1alpha1"
 LEGAL_SOURCES = ("LICENSE", "NOTICE", "COMMERCIAL-LICENSE.md")
 
 

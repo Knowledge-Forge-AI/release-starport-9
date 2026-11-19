@@ -1,0 +1,12 @@
+{
+  "schema": "rs9.instance-template.v1alpha1",
+  "id": "github-homebrew-projection",
+  "version": "v1alpha1",
+  "kind": "presence-scaffold",
+  "qualified": false,
+  "publication_enabled": false,
+  "files": [
+    {"name": "publisher-registration.json", "role": "reviewable-scaffold"},
+    {"name": "review-checklist.md", "role": "reviewable-scaffold"}
+  ]
+}

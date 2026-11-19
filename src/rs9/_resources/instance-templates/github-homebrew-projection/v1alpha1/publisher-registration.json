@@ -1,0 +1,9 @@
+{
+  "schema": "rs9.instance-review-registration.v1alpha1",
+  "kind": "presence-scaffold",
+  "remoteState": "unknown",
+  "qualified": false,
+  "publicationAuthority": false,
+  "publicationEnabled": false,
+  "note": "Review scaffold only; no workflow or remote proof is supplied."
+}

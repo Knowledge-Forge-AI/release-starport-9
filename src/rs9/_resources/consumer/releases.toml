@@ -1,0 +1,12 @@
+schema = "rs9.releases.v1alpha1"
+
+[release]
+tag = "v{version}"
+prerelease = "reject"
+
+[[assets]]
+id = "example-binary"
+name = "example-tool-{version}-linux-x64.tar.gz"
+format = "tar.gz"
+platforms = ["x86_64-linux"]
+commands = {example-tool = "bin/example-tool"}

@@ -1,0 +1,15 @@
+schema = "rs9.project.v1alpha1"
+
+[project]
+id = "example-tool"
+name = "Example Tool"
+repository = "example-org/example-tool"
+
+[license]
+expression = "MIT"
+files = ["LICENSE"]
+source = "tagged-repository"
+
+[[commands]]
+name = "example-tool"
+interface = "cli"

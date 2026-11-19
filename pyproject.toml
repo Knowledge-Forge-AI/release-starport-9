@@ -1,0 +1,28 @@
+[build-system]
+requires = ["flit_core==4.2.0"]
+build-backend = "rs9_build"
+backend-path = ["packaging"]
+
+[project]
+name = "release-starport-9"
+version = "0.1.0"
+description = "Release Starport 9 offline contract validation and publication intent tools"
+readme = "docs/rs9-cli.md"
+requires-python = ">=3.11"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE", "NOTICE", "COMMERCIAL-LICENSE.md"]
+authors = [{name = "Samuel Leighton Lair", email = "sam.lair@knowledge-forge.ai"}]
+dependencies = []
+
+[project.scripts]
+rs9 = "rs9.cli:main"
+
+[project.urls]
+Source = "https://github.com/Knowledge-Forge-AI/release-starport-9"
+Documentation = "https://github.com/Knowledge-Forge-AI/release-starport-9/tree/main/docs"
+
+[tool.flit.module]
+name = "rs9"
+
+[tool.flit.sdist]
+include = ["docs/rs9-cli.md"]

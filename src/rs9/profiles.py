@@ -8,22 +8,16 @@ import struct
 from rs9.archives import inspect_archive
 from rs9.current_npm_profile import CURRENT_PACKAGE_PROFILE, LEGAL_SOURCES, evaluate_current_package
 from rs9.errors import ContractError
+from rs9.evidence_profile_roles import PACKAGE_PROFILE, PROFILE_ROLES, TAURI_AUTHORITY_PROFILE, TAURI_PROFILE
 from rs9.release_core import ReleaseCapture, digest, read_evidence, json_evidence, authenticated_record_hash
 from rs9.scratch import ConfinedWriter, canonical, physical_directory
 from rs9.security import validate_ecosystem_name, scan_for_credentials, validate_safe_relative_posix_path
 from rs9.spdx import validate_spdx_expression
 
-TAURI_PROFILE = "tauri-desktop-archive.v1alpha1"
-TAURI_AUTHORITY_PROFILE = "tauri-desktop-archive.v1alpha2"
-PACKAGE_PROFILE = "npm-package-archive.v1alpha1"
 # Tagged licensing authority is independent of license.files (native payload
 # legal copies). COMMERCIAL-LICENSE.md remains authenticated source evidence.
 TAURI_SOURCES = ("LICENSE", "NOTICE", "COMMERCIAL-LICENSE.md", "package.json",
                  "src-tauri/Cargo.toml", "src-tauri/tauri.conf.json")
-PROFILE_ROLES = {TAURI_PROFILE: {"provenance", "sbom-spdx", "third-party-notices", "npm-wrapper"},
-                 PACKAGE_PROFILE: {"provenance", "notice"}}
-PROFILE_ROLES[TAURI_AUTHORITY_PROFILE] = PROFILE_ROLES[TAURI_PROFILE]
-PROFILE_ROLES[CURRENT_PACKAGE_PROFILE] = {"root-package-receipt"}
 
 
 def png_size(data):

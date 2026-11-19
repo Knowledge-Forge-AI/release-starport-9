@@ -4,7 +4,22 @@
 
 Projects remain responsible for producing authoritative public GitHub releases. RS9 is intended to consume those releases, verify their identity and provenance, and handle downstream packaging and publication across supported ecosystems.
 
-The short name and prospective CLI name are **`rs9`**.
+The command-line interface is **`rs9`**.
+
+## Install the CLI
+
+RS9 0.1.0 supports Python 3.11 and later. Install the wheel in a virtual
+environment from the [GitHub release](https://github.com/Knowledge-Forge-AI/release-starport-9/releases/tag/v0.1.0).
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install https://github.com/Knowledge-Forge-AI/release-starport-9/releases/download/v0.1.0/release_starport_9-0.1.0-py3-none-any.whl
+.venv/bin/rs9 --version
+.venv/bin/rs9 doctor
+```
+
+See the [CLI guide](docs/rs9-cli.md) for contract validation, local publishing
+plans, formula rendering, and GitHub instance commands.
 
 ## Current status and navigation
 
