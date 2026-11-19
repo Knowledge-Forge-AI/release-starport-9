@@ -70,7 +70,7 @@ def validate_releases(doc, commands):
     if "evidence" in doc:
         evidence = table(doc["evidence"], {"profile", "checksums", "assets"}, "evidence",
                          required={"profile", "checksums", "assets"})
-        from rs9.profiles import PROFILE_ROLES
+        from rs9.evidence_profile_roles import PROFILE_ROLES
         choice(evidence["profile"], set(PROFILE_ROLES), "evidence.profile")
         validate_safe_basename(evidence["checksums"])
         rows = typed(evidence["assets"], list, "evidence.assets")
