@@ -153,7 +153,34 @@ def api(repository, suffix):
                             2 * 1024 * 1024, os.environ.get("GH_TOKEN")))
 
 
-def admit_previous_deployment(repository):
+def admit_failed_initial_rs9_deployment(deployment):
+    repository = "release-starport-9"
+    history = api(repository, "deployments?environment=github-pages&per_page=2")
+    expected = (
+        (7946354757, "4edd8de4e20e2bd539897b5bf6a26c1ae17c4c2a", 44768889552, 136404470822,
+         "failure", "rs9-cli-linux-publish-v010.yml"),
+        (7713538844, "0f717d1ff8d2ce9b3db675b76ac268335af91b52", 43044444717, 130604674307,
+         "success", "project-pages.yml"),
+    )
+    require(isinstance(history, list) and len(history) == len(expected) and history[0] == deployment,
+            "RS9_INITIAL_RECOVERY_HISTORY")
+    for item, (identifier, source, run_id, job_id, conclusion, workflow) in zip(history, expected):
+        require(item.get("id") == identifier and item.get("sha") == source and item.get("ref") == "main",
+                "RS9_INITIAL_RECOVERY_DEPLOYMENT")
+        statuses = api(repository, "deployments/" + str(identifier) + "/statuses")
+        url = f"https://github.com/Knowledge-Forge-AI/{repository}/actions/runs/{run_id}/job/{job_id}"
+        require(isinstance(statuses, list) and statuses and statuses[0].get("state") == conclusion
+                and statuses[0].get("log_url") == url, "RS9_INITIAL_RECOVERY_STATUS")
+        run = api(repository, "actions/runs/" + str(run_id))
+        require(run.get("id") == run_id and run.get("path") == ".github/workflows/" + workflow
+                and run.get("head_sha") == source and run.get("head_branch") == "main"
+                and run.get("run_attempt") == 1 and run.get("status") == "completed"
+                and run.get("conclusion") == conclusion, "RS9_INITIAL_RECOVERY_RUN")
+    return {"kind": "exact-failed-initial-rs9-publication", "previousDeployment": expected[0][0],
+            "lastSuccessfulDeployment": expected[1][0], "sourceCommit": expected[1][1]}
+
+
+def admit_previous_deployment(repository, *, recover_rs9=False):
     deployments = api(repository, "deployments?environment=github-pages&per_page=1")
     require(isinstance(deployments, list) and len(deployments) <= 1, "DEPLOYMENT_RESPONSE")
     if not deployments:
@@ -169,6 +196,9 @@ def admit_previous_deployment(repository):
     identifier = deployment.get("id")
     require(type(identifier) is int and identifier > 0 and deployment.get("ref") == "main", "DEPLOYMENT_IDENTITY")
     statuses = api(repository, "deployments/" + str(identifier) + "/statuses")
+    if (recover_rs9 and repository == "release-starport-9" and isinstance(statuses, list)
+            and statuses and statuses[0].get("state") == "failure"):
+        return admit_failed_initial_rs9_deployment(deployment)
     require(isinstance(statuses, list) and statuses and statuses[0].get("state") == "success", "PREVIOUS_DEPLOYMENT_NOT_SUCCESSFUL")
     if repository == "theme-forge-packages" and identifier == INITIAL_PACKAGE_DEPLOYMENT:
         require(deployment.get("sha") == INITIAL_PACKAGE_SOURCE, "INITIAL_PACKAGE_SOURCE")
@@ -232,13 +262,29 @@ def archive_exact(root, names, destination, inventory=None):
     require(all(not p.is_symlink() for p in members), "OUTPUT_LINK")
     actual = {p.relative_to(root).as_posix() for p in members if not p.is_dir()}
     require(actual == set(names), "OUTPUT_INVENTORY")
-    with tarfile.open(destination, "x", format=tarfile.USTAR_FORMAT) as archive:
+    directories = {""}
+    for name in names:
+        safe_member(name)
+        parts = name.split("/")
+        directories.update("/".join(parts[:index]) for index in range(1, len(parts)))
+    require({p.relative_to(root).as_posix() for p in members if p.is_dir()}
+            == directories - {""}, "OUTPUT_DIRECTORY_INVENTORY")
+    with tarfile.open(destination, "x", format=tarfile.GNU_FORMAT) as archive:
+        # Match the working publisher's rooted directory/file topology while
+        # retaining neutral metadata and exact protected regular-file bytes.
+        for name in sorted(directories, key=lambda value: (value.count("/") + bool(value), value)):
+            info = tarfile.TarInfo("./" + name if name else ".")
+            info.type = tarfile.DIRTYPE
+            info.mode = 0o755
+            info.uid = info.gid = info.mtime = 0
+            info.uname = info.gname = ""
+            archive.addfile(info)
         for name in sorted(names):
             body = read_regular(root / name, 128 * 1024 * 1024)
             if name in inventory:
                 record = inventory[name]
                 require(len(body) == record["bytes"] and sha256(body) == record["sha256"], "ARCHIVE_PROTECTED_MEMBER_CHANGED")
-            info = tarfile.TarInfo(name)
+            info = tarfile.TarInfo("./" + name)
             info.size = len(body)
             info.mode = 0o644
             info.uid = info.gid = info.mtime = 0
@@ -247,11 +293,17 @@ def archive_exact(root, names, destination, inventory=None):
     # Bind the actual closed upload archive, rather than only its input tree.
     with tarfile.open(destination, "r:") as archive:
         archived = archive.getmembers()
-        require(len(archived) == len(names) and {m.name for m in archived} == set(names), "ARCHIVE_INVENTORY")
+        def normalized(member):
+            require(member.name == "." or member.name.startswith("./"), "ARCHIVE_ROOT")
+            return "" if member.name == "." else member.name.removeprefix("./").rstrip("/")
+        require(len(archived) == len(names) + len(directories)
+                and {normalized(m) for m in archived if m.isfile()} == set(names)
+                and {normalized(m) for m in archived if m.isdir()} == directories, "ARCHIVE_INVENTORY")
         for member in archived:
-            require(member.isfile() and not member.issym() and not member.islnk(), "ARCHIVE_MEMBER_TYPE")
-            if member.name in inventory:
-                record = inventory[member.name]
+            require((member.isfile() or member.isdir()) and not member.issym() and not member.islnk(), "ARCHIVE_MEMBER_TYPE")
+            name = normalized(member)
+            if name in inventory:
+                record = inventory[name]
                 require(member.size == record["bytes"], "ARCHIVE_PROTECTED_SIZE")
                 body = archive.extractfile(member).read(record["bytes"] + 1)
                 require(len(body) == record["bytes"] and sha256(body) == record["sha256"], "ARCHIVE_PROTECTED_DIGEST")
@@ -265,7 +317,8 @@ def assemble(repository, site_root, output, archive, *, initial_rs9_tree=None):
     if "GITHUB_REPOSITORY" in os.environ:
         require(os.environ["GITHUB_REPOSITORY"] == "Knowledge-Forge-AI/" + repository
                 and os.environ.get("GITHUB_REF") == "refs/heads/main", "WORKFLOW_REPOSITORY")
-    previous = admit_previous_deployment(repository)
+    recover_rs9 = initial_rs9_tree is not None
+    previous = admit_previous_deployment(repository, recover_rs9=recover_rs9)
     if repository == "theme-forge-packages":
         source = read_regular(site_root / "protected-inventory.json", 65536)
         require(sha256(source) == INVENTORY_SHA256, "INVENTORY_SOURCE_DIGEST")
@@ -307,6 +360,7 @@ def assemble(repository, site_root, output, archive, *, initial_rs9_tree=None):
     write_new(output, "site-preservation.json", (json.dumps(receipt, indent=2) + "\n").encode())
     verify_protected(output, inventory)
     archive_exact(output, [*inventory, *WEBSITE_FILES, "site-preservation.json"], archive, inventory)
+    require(admit_previous_deployment(repository, recover_rs9=recover_rs9) == previous, "HOSTING_STATE_CHANGED")
     return receipt
 
 

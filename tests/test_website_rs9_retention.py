@@ -77,9 +77,20 @@ class Rs9RetentionTests(unittest.TestCase):
         self.assertEqual(receipt["protectedPublicBytes"], sum(map(len, self.files.values())))
         self.assertEqual(receipt["previousHosting"], self.previous)
         with tarfile.open(self.archive, "r:") as archive:
-            self.assertEqual(set(archive.getnames()), {*self.files, *pages.WEBSITE_FILES, "site-preservation.json"})
+            members = archive.getmembers()
+            self.assertEqual(members[0].name, ".")
+            self.assertTrue(members[0].isdir())
+            directories = {"."}
+            for member in members[1:]:
+                self.assertTrue(member.name.startswith("./"))
+                self.assertIn(member.name.rsplit("/", 1)[0], directories)
+                self.assertIn(member.mode, (0o644, 0o755))
+                if member.isdir():
+                    directories.add(member.name)
+            self.assertEqual({member.name.removeprefix("./") for member in members if member.isfile()},
+                             {*self.files, *pages.WEBSITE_FILES, "site-preservation.json"})
             for name, body in self.files.items():
-                self.assertEqual(archive.extractfile(name).read(), body)
+                self.assertEqual(archive.extractfile("./" + name).read(), body)
 
     def test_missing_inventory_cannot_produce_a_website_only_archive(self):
         self.inventory.unlink()
@@ -155,7 +166,7 @@ class Rs9RetentionTests(unittest.TestCase):
         with tarfile.open(self.archive, "r:") as current:
             with tarfile.open(fileobj=io.BytesIO(first_bytes), mode="r:") as original:
                 for name in self.files:
-                    self.assertEqual(current.extractfile(name).read(), original.extractfile(name).read())
+                    self.assertEqual(current.extractfile("./" + name).read(), original.extractfile("./" + name).read())
 
     def test_initial_cannot_replace_a_published_inventory(self):
         staged = self.stage_initial_tree()
@@ -182,3 +193,36 @@ class Rs9RetentionTests(unittest.TestCase):
         with self.assertRaisesRegex(pages.Refused, "RS9_INITIAL_MEMBER_CHANGED"):
             self.run_assembler(self.fetch, initial_rs9_tree=staged)
         self.assertFalse(self.archive.exists())
+
+
+    def test_initial_recovery_requires_exact_failed_run_and_last_live_site(self):
+        repo = "release-starport-9"
+        prefix = f"https://github.com/Knowledge-Forge-AI/{repo}/actions/runs/"
+        failed = {"id": 7946354757, "sha": "4edd8de4e20e2bd539897b5bf6a26c1ae17c4c2a", "ref": "main"}
+        live = {"id": 7713538844, "sha": "0f717d1ff8d2ce9b3db675b76ac268335af91b52", "ref": "main"}
+        history = [failed, live]
+        routes = {
+            "deployments?environment=github-pages&per_page=1": [failed],
+            "deployments?environment=github-pages&per_page=2": history,
+        }
+        evidence = ((failed, 44768889552, 136404470822, "failure", "rs9-cli-linux-publish-v010.yml"),
+                    (live, 43044444717, 130604674307, "success", "project-pages.yml"))
+        for row, run, job, result, workflow in evidence:
+            routes[f"deployments/{row['id']}/statuses"] = [
+                {"state": result, "log_url": f"{prefix}{run}/job/{job}"}
+            ]
+            routes[f"actions/runs/{run}"] = {
+                "id": run, "path": ".github/workflows/" + workflow, "head_sha": row["sha"],
+                "head_branch": "main", "run_attempt": 1, "status": "completed", "conclusion": result,
+            }
+        with patch.object(pages, "api", side_effect=lambda _repo, route: routes[route]):
+            with self.assertRaisesRegex(pages.Refused, "PREVIOUS_DEPLOYMENT_NOT_SUCCESSFUL"):
+                pages.admit_previous_deployment(repo)
+            self.assertEqual(pages.admit_previous_deployment(repo, recover_rs9=True)["sourceCommit"], live["sha"])
+            routes["actions/runs/44768889552"]["run_attempt"] = 2
+            with self.assertRaisesRegex(pages.Refused, "RS9_INITIAL_RECOVERY_RUN"):
+                pages.admit_previous_deployment(repo, recover_rs9=True)
+            routes["actions/runs/44768889552"]["run_attempt"] = 1
+            history.reverse()
+            with self.assertRaisesRegex(pages.Refused, "RS9_INITIAL_RECOVERY_HISTORY"):
+                pages.admit_previous_deployment(repo, recover_rs9=True)
