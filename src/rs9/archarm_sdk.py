@@ -9,7 +9,7 @@ original probe controller, not this module.
 ``acquire_sdk(...)`` returns an unprepared :class:`ArchArmSDK`. Entering it
 eagerly reconstructs the exact qualified SDK inside one disposable job:
 
-1. exact-origin pins (139 packages, signed rootfs) or a hard refusal;
+1. exact named-profile package pins and signed rootfs, or a hard refusal;
 2. fixed host tools (docker, gpgv, uname) present -- never installed;
 3. native ``Linux aarch64`` host and ``linux/arm64`` engine;
 4. anonymous fixed downloads, exact lengths/hashes, ``gpgv`` VALIDSIG by the
