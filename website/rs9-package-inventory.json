@@ -1,0 +1,117 @@
+{
+  "files": {
+    "packages/rs9/apt/dists/stable/InRelease": {
+      "bytes": 2149,
+      "sha256": "f8395ccff01ea2d667653f215f193847260703f7dd09bca8fd7a64fc6b350703"
+    },
+    "packages/rs9/apt/dists/stable/Release": {
+      "bytes": 1267,
+      "sha256": "4e97c59f9e07ca3f5f77576b7cdca3ab8fb3f6d4fe5f0a85375dd5933a5bd8c0"
+    },
+    "packages/rs9/apt/dists/stable/Release.gpg": {
+      "bytes": 833,
+      "sha256": "12132cd5abcbdfd8e94ae3829fa5ff48d14d29e2f5df1cc1ad7d7f88d9eebc89"
+    },
+    "packages/rs9/apt/dists/stable/main/binary-amd64/Packages": {
+      "bytes": 649,
+      "sha256": "f6b70b1b9146158efb7429858b6f3d0e9c2226527ffdbe5aa03abcea2d214336"
+    },
+    "packages/rs9/apt/dists/stable/main/binary-amd64/Packages.gz": {
+      "bytes": 449,
+      "sha256": "7ef98976d16e6727d0b3e613fd409d15a4dd60c3b5ea0fd1e996f388c558e6e6"
+    },
+    "packages/rs9/apt/dists/stable/main/binary-arm64/Packages": {
+      "bytes": 649,
+      "sha256": "f6b70b1b9146158efb7429858b6f3d0e9c2226527ffdbe5aa03abcea2d214336"
+    },
+    "packages/rs9/apt/dists/stable/main/binary-arm64/Packages.gz": {
+      "bytes": 449,
+      "sha256": "7ef98976d16e6727d0b3e613fd409d15a4dd60c3b5ea0fd1e996f388c558e6e6"
+    },
+    "packages/rs9/apt/pool/main/r/release-starport-9/release-starport-9_0.1.0-1_all.deb": {
+      "bytes": 137052,
+      "sha256": "85cbc1136e146032e623aab0decc1a49bf6f426ce1a2dfb663a0dc48a58a5a97"
+    },
+    "packages/rs9/keys/rs9-signing.asc": {
+      "bytes": 3947,
+      "sha256": "6931a99cf38e204c0adc75dd868f8c0e79d68e58e2644f575d4be1da2ea18d95"
+    },
+    "packages/rs9/keys/rs9-signing.gpg": {
+      "bytes": 2855,
+      "sha256": "e510f004b68e89db8a91d2a84117053d79f5123e67c92eaa24a30fb33b9d289e"
+    },
+    "packages/rs9/pacman/aarch64/release-starport-9-0.1.0-1-any.pkg.tar.zst": {
+      "bytes": 184680,
+      "sha256": "776d94979b34d83a8d4209924ac205f04ba1ae7219a704b5acd390b872f552c6"
+    },
+    "packages/rs9/pacman/aarch64/release-starport-9-0.1.0-1-any.pkg.tar.zst.sig": {
+      "bytes": 566,
+      "sha256": "0ca1ac5839f91c68e19d6baf9d9bd914ce490a9a619a435d29b4c8e2cb1f6565"
+    },
+    "packages/rs9/pacman/aarch64/rs9.db": {
+      "bytes": 1075,
+      "sha256": "ce0e10309fdf8e5b5f848ffc9cc220825c065a3ef5f48ceb4d2df48c844a39ea"
+    },
+    "packages/rs9/pacman/aarch64/rs9.db.sig": {
+      "bytes": 566,
+      "sha256": "5fdeeb9a8ac87f839ba3a4d4bfafd46cf93836f490b4027b63e438da5d576d0e"
+    },
+    "packages/rs9/pacman/aarch64/rs9.files": {
+      "bytes": 1666,
+      "sha256": "3dfb058ad7c70d2e94c2038549a67b864c59e72cc05f640c06487a84986d1db4"
+    },
+    "packages/rs9/pacman/aarch64/rs9.files.sig": {
+      "bytes": 566,
+      "sha256": "0874624dc0ab8297f367915fccfbe369a83b9a68f4e56eb2e157e015c426e94c"
+    },
+    "packages/rs9/pacman/x86_64/release-starport-9-0.1.0-1-any.pkg.tar.zst": {
+      "bytes": 184680,
+      "sha256": "776d94979b34d83a8d4209924ac205f04ba1ae7219a704b5acd390b872f552c6"
+    },
+    "packages/rs9/pacman/x86_64/release-starport-9-0.1.0-1-any.pkg.tar.zst.sig": {
+      "bytes": 566,
+      "sha256": "cf59ca9cc8e4c69f65d7e73ce61ab7580f8aff4da8331a9eb1f984064b1af2d5"
+    },
+    "packages/rs9/pacman/x86_64/rs9.db": {
+      "bytes": 1077,
+      "sha256": "58a18542cf0c5bcdb18af045e94f1a7f482e453159727a060aca83129fbf2828"
+    },
+    "packages/rs9/pacman/x86_64/rs9.db.sig": {
+      "bytes": 566,
+      "sha256": "51a209f722bba98d851d2dfa80a952d02035f015f5828f1c300176a2cef53263"
+    },
+    "packages/rs9/pacman/x86_64/rs9.files": {
+      "bytes": 1672,
+      "sha256": "df249ccc5197e67ad117b70a3f7fe22fa70c701b0850f67a31a0f8a1c56b1a04"
+    },
+    "packages/rs9/pacman/x86_64/rs9.files.sig": {
+      "bytes": 566,
+      "sha256": "9d1f2b3247a7054afd5711764130c29adf7615db53256c6a936114aeb367da9a"
+    },
+    "packages/rs9/rpm/release-starport-9-0.1.0-1.noarch.rpm": {
+      "bytes": 151530,
+      "sha256": "53b4cce7b5a68d2f25e780b17d829380c4c340352266b0b4ac8fa35347674ec9"
+    },
+    "packages/rs9/rpm/repodata/55ee781e7917efc40da41b055fd6d36b17d46794062e5c5ff5cff5856e4191c5-primary.xml.zst": {
+      "bytes": 767,
+      "sha256": "55ee781e7917efc40da41b055fd6d36b17d46794062e5c5ff5cff5856e4191c5"
+    },
+    "packages/rs9/rpm/repodata/b7efe8c663866827b31c8083559e71eabef8a484ff6f65d6b767d364591f3305-other.xml.zst": {
+      "bytes": 241,
+      "sha256": "b7efe8c663866827b31c8083559e71eabef8a484ff6f65d6b767d364591f3305"
+    },
+    "packages/rs9/rpm/repodata/c1b943027bcd974f2708a2cf3c61a9e3f13340e8c7ba9a70f48e3c85b0b2df99-filelists.xml.zst": {
+      "bytes": 842,
+      "sha256": "c1b943027bcd974f2708a2cf3c61a9e3f13340e8c7ba9a70f48e3c85b0b2df99"
+    },
+    "packages/rs9/rpm/repodata/repomd.xml": {
+      "bytes": 1550,
+      "sha256": "4967d27f4f451db76a75065cf4b13e1a77e51555d958a06d5c929f9d5a44659f"
+    },
+    "packages/rs9/rpm/repodata/repomd.xml.asc": {
+      "bytes": 833,
+      "sha256": "055f7ded49b953dd4f09ae56edded26f1e333f28a162f81b907fa94c6f82de7f"
+    }
+  },
+  "schema": "knowledge-forge.rs9-pages-inventory.v1"
+}

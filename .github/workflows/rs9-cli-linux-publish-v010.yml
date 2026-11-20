@@ -1,0 +1,113 @@
+name: Qualify and publish RS9 0.1.0 signed repositories
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: rs9-pages-publication
+  cancel-in-progress: false
+
+jobs:
+  clients:
+    if: github.repository == 'Knowledge-Forge-AI/release-starport-9' && github.ref == 'refs/heads/main' && github.sha == inputs.expected_commit && github.run_attempt == 1
+    name: ${{ matrix.family }} on ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { family: apt, arch: x86_64, platform: amd64, runner: ubuntu-24.04 }
+          - { family: apt, arch: aarch64, platform: arm64, runner: ubuntu-24.04-arm }
+          - { family: rpm, arch: x86_64, platform: amd64, runner: ubuntu-24.04 }
+          - { family: rpm, arch: aarch64, platform: arm64, runner: ubuntu-24.04-arm }
+          - { family: pacman, arch: x86_64, platform: amd64, runner: ubuntu-24.04 }
+          - { family: pacman, arch: aarch64, platform: arm64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify original signed artifact and its public key
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: PYTHONPATH=src python3 -P -B operators/rs9-cli-linux-v010/admit.py "$RUNNER_TEMP/rs9-linux-admitted"
+      - name: Qualify the signed repository on its native host
+        shell: bash
+        env:
+          RS9_FAMILY: ${{ matrix.family }}
+          RS9_ARCH: ${{ matrix.arch }}
+          RS9_PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "$RS9_ARCH"
+          if [[ "$RS9_FAMILY:$RS9_ARCH" == pacman:aarch64 ]]; then
+            mkdir -m 0700 "$RUNNER_TEMP/rs9-cli-archarm"
+            PYTHONPATH=src python3 -P -B operators/rs9-cli-linux-v010/archarm_client.py \
+              "$RUNNER_TEMP/rs9-linux-admitted" "$RUNNER_TEMP/rs9-cli-archarm"
+          else
+            mkdir -m 0700 "$RUNNER_TEMP/rs9-cli-client-build"
+            docker build --platform "linux/$RS9_PLATFORM" --target "$RS9_FAMILY-client" \
+              --tag rs9-cli-native-client --file operators/rs9-cli-linux-v010/clients.Dockerfile \
+              "$RUNNER_TEMP/rs9-cli-client-build"
+            docker run --rm --pull=never --network=none --security-opt=no-new-privileges \
+              --mount "type=bind,src=$RUNNER_TEMP/rs9-linux-admitted,dst=/admitted,readonly" \
+              --mount "type=bind,src=$GITHUB_WORKSPACE/operators/rs9-cli-linux-v010/clients.sh,dst=/clients.sh,readonly" \
+              rs9-cli-native-client /bin/bash /clients.sh "$RS9_FAMILY"
+          fi
+
+  stage-pages:
+    needs: clients
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      deployments: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Assemble the original package bytes and tracked website
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          qualified="$RUNNER_TEMP/rs9-linux-admitted"
+          PYTHONPATH=src python3 -P -B operators/rs9-cli-linux-v010/admit.py "$qualified"
+          cmp "$qualified/rs9-package-inventory.json" website/rs9-package-inventory.json
+          mv "$qualified/rs9-package-inventory.json" "$qualified/rs9-package-inventory.json.sig" "$RUNNER_TEMP/"
+          python3 -I -B website/tools/assemble-pages.py \
+            --repository release-starport-9 --initial-rs9-tree "$qualified" \
+            --output "$RUNNER_TEMP/rs9-package-pages" --archive "$RUNNER_TEMP/artifact.tar"
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy-pages:
+    needs: stage-pages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
+        id: pages
