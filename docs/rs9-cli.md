@@ -38,7 +38,7 @@ PYTHONPATH=src python3 -m rs9 --help
 RS9 0.1.0 is available through signed APT, DNF and pacman repositories on
 [the RS9 Pages origin](https://rs9.knowledge-forge.ai/). The package name is
 `release-starport-9` and the installed command is `rs9`. The
-[native qualification](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/44768889552)
+[native qualification](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/44770929836)
 covered install, version reporting, doctor, removal and a signature-rejection
 case for each ecosystem on x86-64 and ARM64.
 
