@@ -18,11 +18,10 @@
           else pkgs.callPackage ./nix/nebular.nix {} { inherit product; capture = rs9-capture; }
         ) products;
     in {
-      packages = perSystem (system:
-        let
-          pkgs = import nixpkgs { inherit system; };
-          cli = pkgs.callPackage ./nix/rs9-cli.nix {};
-        in { rs9 = cli; default = cli; }
+      # The released CLI is independent of the staged publication outputs.
+      cli = perSystem (system:
+        let pkgs = import nixpkgs { inherit system; };
+        in { rs9 = pkgs.callPackage ./nix/rs9-cli.nix {}; }
       );
       candidates = perSystem build;
       checks = perSystem (system: build system);

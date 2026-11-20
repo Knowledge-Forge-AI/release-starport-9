@@ -21,14 +21,15 @@ See the [CLI guide](docs/rs9-cli.md) for contract validation, local publishing
 plans, formula rendering, and GitHub instance commands.
 
 The same wheel is available from the [GitHub release](https://github.com/Knowledge-Forge-AI/release-starport-9/releases/tag/v0.1.0).
-The RS9 flake's `rs9` package installs it by its release SHA-256.
+The RS9 flake's dedicated `cli` output installs it by its release SHA-256.
 
 ```sh
-nix run --no-write-lock-file github:Knowledge-Forge-AI/release-starport-9#rs9 -- --version
+nix run --no-write-lock-file github:Knowledge-Forge-AI/release-starport-9#cli.aarch64-darwin.rs9 -- --version
 ```
 
-The Nix package was built and checked on Apple Silicon. The two Linux outputs
-evaluate using the same pinned wheel and Python floor.
+The Nix package was built and checked on Apple Silicon. The
+`cli.aarch64-linux.rs9` and `cli.x86_64-linux.rs9` outputs evaluate using
+the same pinned wheel and Python floor.
 
 RS9 declares its own release inputs in [`.rs9`](.rs9) and registers its
 Homebrew projection under [its publisher instance](config/instances/rs9-public/rs9-instance.toml).
