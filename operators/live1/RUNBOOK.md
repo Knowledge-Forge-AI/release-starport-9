@@ -195,10 +195,12 @@ Ubuntu 26.04 build runner and dependency derivation before that lane can proceed
 
 ## Exact manager setup packets, pending independent readiness
 
-1. In the RS9 GitHub repository, configure protected environments `pypi`,
-   `rs9-production-signing` and `github-pages`, required manager approval and main
-   deployment restriction. A future production workflow must be reviewed/pinned,
-   narrowly permissioned and bound to the approved candidate inventory.
+1. The RS9 standalone signing preflight uses the protected `rs9-signing`
+   environment on Branch `main` with required manager review. The manual
+   dispatch binds the independently reviewed commit. The `pypi` and
+   `github-pages` environments continue to control their existing destinations.
+   A future production workflow must be independently reviewed, narrowly
+   permissioned and bound to the approved candidate inventory.
 2. Audit custody of the **existing** primary fingerprint
    `7D03EE84F8C7025FD2F3D772BF89DF6643C2F1AF` and signing subkey
    `C021E00EE3D37C459B0E1CB3199F8028126E8A8C`. Compare public-key metadata only.
