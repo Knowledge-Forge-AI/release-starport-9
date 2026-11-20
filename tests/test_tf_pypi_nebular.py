@@ -1886,9 +1886,13 @@ class NebularPyPIContractTests(unittest.TestCase):
         from rs9.tf_pypi_nebular import _nebular_import_closure_paths
 
         closure_paths = _nebular_import_closure_paths(ROOT)
-        role_owner = "src/rs9/evidence_profile_roles.py"
-        self.assertEqual(closure_paths.count(role_owner), 1)
-        historical_paths = [path for path in closure_paths if path != role_owner]
+        successors = {
+            "src/rs9/evidence_profile_roles.py",
+            "src/rs9/_archarm_support/successor_20261120.py",
+        }
+        for path in successors:
+            self.assertEqual(closure_paths.count(path), 1)
+        historical_paths = [path for path in closure_paths if path not in successors]
         self.assertEqual(len(historical_paths), 140)
         self.assertEqual(hashlib.sha256(json.dumps(historical_paths, separators=(",", ":")).encode()).hexdigest(),
                          "0b7f19ccff3134d9ffe7d68cc7b81f30dc3579fce5014f6ba2a7e0ea2d5420a6")

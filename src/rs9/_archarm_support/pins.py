@@ -125,6 +125,11 @@ def validate_package_pins(doc, expect):
             and doc["toolNodeVersion"] == TOOL_NODE_VERSION, "PIN_VERSION")
     require(doc["networkDuringInstallOrProbe"] is False
             and doc["noBasePackageUpgrades"] is True, "PIN_SCHEMA")
+    return validate_package_records(doc, expect, VERSION_PINS)
+
+
+def validate_package_records(doc, expect, version_pins):
+    """Check package records after the caller has admitted the profile header."""
     packages = doc["packages"]
     require(isinstance(packages, list) and 0 < len(packages) <= MAX_PACKAGES, "PIN_COUNT")
     require(_is_int(doc["packageCount"]) and doc["packageCount"] == len(packages)
@@ -157,8 +162,8 @@ def validate_package_pins(doc, expect):
         require(isinstance(record["signatureSha256"], str)
                 and HEX64_RE.fullmatch(record["signatureSha256"]) is not None, "PIN_PACKAGE")
         _check_license_list(record["licenses"])
-        if name in VERSION_PINS:
-            require(version == VERSION_PINS[name], "PIN_VERSION")
+        if name in version_pins:
+            require(version == version_pins[name], "PIN_VERSION")
         total += record["bytes"]
         require(total <= MAX_PACKAGE_TOTAL_BYTES, "PIN_BYTES")
     require(set(ROOT_NAMES) <= names, "PIN_ROOTS")

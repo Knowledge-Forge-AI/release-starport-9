@@ -9,7 +9,7 @@ original probe controller, not this module.
 ``acquire_sdk(...)`` returns an unprepared :class:`ArchArmSDK`. Entering it
 eagerly reconstructs the exact qualified SDK inside one disposable job:
 
-1. exact-origin pins (139 packages, signed rootfs) or a hard refusal;
+1. exact named-profile package pins and signed rootfs, or a hard refusal;
 2. fixed host tools (docker, gpgv, uname) present -- never installed;
 3. native ``Linux aarch64`` host and ``linux/arm64`` engine;
 4. anonymous fixed downloads, exact lengths/hashes, ``gpgv`` VALIDSIG by the
@@ -57,6 +57,7 @@ import uuid
 from rs9.build_native import CommandReceipt, CommandRunner, NativePrerequisiteUnavailable
 from rs9.current_generation import CURRENT_GENERATION
 from rs9._archarm_support import paths as _paths
+from rs9._archarm_support import successor_20261120 as _openssl
 from rs9._archarm_support.cleanup import (Layout, Record, cleanup_container, cleanup_image,
                                           remove_fresh_docker_home, remove_workspace)
 from rs9._archarm_support.docker import (FIXED_ENV, HEX64_RE, IMAGE_ID_RE, DockerCli,
@@ -167,6 +168,9 @@ def _real_seams(input_profile="historical"):
         from rs9._archarm_support.successor_20261109 import INPUTS, load_successor_pins
         loader = load_successor_pins
         expected_digest = INPUTS["package_pins_sha256"]
+    elif input_profile == _openssl.PROFILE:
+        loader = _openssl.load_successor_pins
+        expected_digest = _openssl.PACKAGE_PINS_SHA256
     else:
         raise SdkRefusal("PIN_FILE")
 
@@ -190,9 +194,9 @@ def acquire_sdk(*, host: CommandRunner, workspace: Path, context: Mapping[str, A
     ``sourceSha`` (40 hex), ``generation`` (the current generation) and optional
     ``privateRoots`` (absolute host paths, e.g. fixture/runtime homes, that no
     worker bind may overlap). ``uid``/``gid`` must be this process's actual
-    numeric identity, each in 1..2147483647. ``input_profile`` selects only the
-    exact historical inputs or the separately native-qualified 20261109 input
-    successor. It does not qualify this SDK implementation or product routes.
+    numeric identity, each in 1..2147483647. ``input_profile`` selects the
+    historical inputs or a named, separately native-qualified successor input
+    set. SDK and product qualification are separate from input qualification.
     """
     return ArchArmSDK(_TOKEN, host=host, workspace=workspace, context=context, uid=uid,
                       gid=gid, seams=_real_seams(input_profile))
@@ -538,7 +542,10 @@ class ArchArmSDK:
         spec = dict(name=installer.name, image=base.id, profile=profile,
                     label_values=installer.labels, env=INSTALLER_ENV,
                     binds=installer_binds(layout.inputs), workdir="/",
-                    cmd=installer_cmd(count=len(packages), uid=s.uid, gid=s.gid))
+                    cmd=installer_cmd(
+                        count=len(packages), uid=s.uid, gid=s.gid,
+                        openssl_transition=s.pins_qualified
+                        and s.digests.get("packagePinsSha256") == _openssl.PACKAGE_PINS_SHA256))
         installer.requested = True
         code, out = docker(create_argv(**spec), timeout=180)
         require(code == 0, "INSTALLER_CREATE")
@@ -1063,7 +1070,8 @@ class ArchArmClient:
         file_exclusion = None
         if s.pins_qualified is True:
             from rs9._archarm_support.successor_20261109 import INPUTS
-            if s.digests.get("packagePinsSha256") == INPUTS["package_pins_sha256"]:
+            if s.digests.get("packagePinsSha256") in (
+                    INPUTS["package_pins_sha256"], _openssl.PACKAGE_PINS_SHA256):
                 # desktop-file-utils 0.29 generates this cache on desktop-file
                 # removal. The shared parser applies this only to regular files;
                 # historical SDKs and nonregular entries retain full comparison.
