@@ -1,0 +1,44 @@
+name: RS9 Signing Key Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Independently reviewed main commit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rs9-signing-preflight
+  cancel-in-progress: false
+
+jobs:
+  signing-key:
+    if: github.repository == 'Knowledge-Forge-AI/release-starport-9' && github.ref == 'refs/heads/main'
+    environment: rs9-signing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Bind the admitted main commit
+        shell: bash
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_COMMIT" =~ ^[a-f0-9]{40}$ && "$EXPECTED_COMMIT" == "$GITHUB_SHA" ]]
+      - name: Check out the exact preflight source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify a throwaway signature
+        shell: bash
+        env:
+          PACKAGE_SIGNING_KEY: ${{ secrets.PACKAGE_SIGNING_KEY }}
+          PACKAGE_SIGNING_PASSPHRASE: ${{ secrets.PACKAGE_SIGNING_PASSPHRASE }}
+        run: |
+          set +x
+          set -euo pipefail
+          PYTHONPATH=src python3 -P -B -m rs9.hosted_signing_preflight
