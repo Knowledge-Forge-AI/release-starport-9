@@ -18,7 +18,7 @@ def config(server):
 
 
 def run(inputs, work):
-    root = "/srv/rs9-cli-admitted"
+    root = "/srv/rs9/cli-admitted"
     live = root + "/packages/rs9"
     keys = live + "/keys/rs9-signing.gpg"
     inputs.joinpath("client.conf").write_text(config(live + "/pacman/aarch64"))
