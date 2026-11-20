@@ -1,0 +1,84 @@
+name: Sign RS9 0.1.0 Linux repository candidates
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rs9-cli-linux-sign-v010
+  cancel-in-progress: false
+
+jobs:
+  sign-exact-repositories:
+    if: github.repository == 'Knowledge-Forge-AI/release-starport-9' && github.ref == 'refs/heads/main' && github.run_attempt == 1 && github.sha == inputs.expected_commit
+    runs-on: ubuntu-24.04
+    environment: rs9-signing
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Prepare the verified public inputs and signing image
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$RUNNER_TEMP/rs9-cli-input" "$RUNNER_TEMP/rs9-cli-output" "$RUNNER_TEMP/rs9-cli-build"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --max-time 120 --max-filesize 1048576 \
+            --output "$RUNNER_TEMP/rs9-cli-input/release.zip" \
+            'https://github.com/Knowledge-Forge-AI/release-starport-9/releases/download/rs9-cli-v0.1.0-linux-build-inputs/rs9-cli-0.1.0-unsigned-linux-inputs.zip'
+          printf '%s  %s\n' 34685d9d98f2c8c623abe1ab36e4519dc0440712262a688c4206f92d68e2f3ad "$RUNNER_TEMP/rs9-cli-input/release.zip" | sha256sum --check
+          docker build --platform linux/amd64 --file operators/rs9-cli-linux-v010/Dockerfile \
+            --iidfile "$RUNNER_TEMP/rs9-cli-image" "$RUNNER_TEMP/rs9-cli-build"
+      - name: Sign and verify in the offline container
+        shell: bash
+        env:
+          PACKAGE_SIGNING_KEY: ${{ secrets.PACKAGE_SIGNING_KEY }}
+          PACKAGE_SIGNING_PASSPHRASE: ${{ secrets.PACKAGE_SIGNING_PASSPHRASE }}
+        run: |
+          set +x
+          set -euo pipefail
+          python3 -I -B - <<'PY'
+          import json, os, re, subprocess
+          from pathlib import Path
+          temp = Path(os.environ["RUNNER_TEMP"])
+          image = (temp / "rs9-cli-image").read_text().strip()
+          if not re.fullmatch(r"sha256:[0-9a-f]{64}", image):
+              raise SystemExit("RS9_LINUX_IMAGE_ID")
+          key = os.environ.pop("PACKAGE_SIGNING_KEY", "")
+          phrase = os.environ.pop("PACKAGE_SIGNING_PASSPHRASE", "")
+          if not key or not phrase:
+              raise SystemExit("RS9_LINUX_SIGNING_INPUT_ABSENT")
+          frame = json.dumps({"key": key, "passphrase": phrase}).encode()
+          command = [
+              "/usr/bin/docker", "run", "--rm", "--pull=never", "--interactive", "--network=none",
+              "--cap-drop=ALL", "--security-opt=no-new-privileges", "--read-only",
+              "--tmpfs", "/tmp:rw,nosuid,nodev,mode=1777,size=64m", "--workdir", "/source",
+              "--user", f"{os.getuid()}:{os.getgid()}", "--env", "PYTHONPATH=/source/src",
+              "--mount", f"type=bind,src={Path.cwd()},dst=/source,readonly",
+              "--mount", f"type=bind,src={temp / 'rs9-cli-input' / 'release.zip'},dst=/input/release.zip,readonly",
+              "--mount", f"type=bind,src={temp / 'rs9-cli-output'},dst=/output", image,
+              "/usr/bin/python3", "-P", "-B", "/source/operators/rs9-cli-linux-v010/sign.py",
+          ]
+          try:
+              result = subprocess.run(command, input=frame, env={"PATH": "/usr/bin:/bin", "HOME": str(Path.home())},
+                                      capture_output=True, timeout=180, check=False)
+          except (OSError, subprocess.SubprocessError):
+              raise SystemExit("RS9_LINUX_SIGNING_CONTAINER") from None
+          if result.returncode or result.stdout.strip() != b"RS9_LINUX_APT_RPM_PACMAN_SIGNING_VERIFIED":
+              raise SystemExit("RS9_LINUX_SIGNING_FAILED")
+          print("RS9_LINUX_APT_RPM_PACMAN_SIGNING_VERIFIED")
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rs9-cli-signed-linux-v010
+          path: ${{ runner.temp }}/rs9-cli-output/
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,43 @@
+{
+  "archive": {
+    "bytes": 478107,
+    "name": "rs9-cli-0.1.0-unsigned-linux-inputs.zip",
+    "sha256": "34685d9d98f2c8c623abe1ab36e4519dc0440712262a688c4206f92d68e2f3ad"
+  },
+  "members": {
+    "apt/dists/stable/Release": {
+      "bytes": 1267,
+      "sha256": "4e97c59f9e07ca3f5f77576b7cdca3ab8fb3f6d4fe5f0a85375dd5933a5bd8c0"
+    },
+    "apt/dists/stable/main/binary-amd64/Packages": {
+      "bytes": 649,
+      "sha256": "f6b70b1b9146158efb7429858b6f3d0e9c2226527ffdbe5aa03abcea2d214336"
+    },
+    "apt/dists/stable/main/binary-amd64/Packages.gz": {
+      "bytes": 449,
+      "sha256": "7ef98976d16e6727d0b3e613fd409d15a4dd60c3b5ea0fd1e996f388c558e6e6"
+    },
+    "apt/dists/stable/main/binary-arm64/Packages": {
+      "bytes": 649,
+      "sha256": "f6b70b1b9146158efb7429858b6f3d0e9c2226527ffdbe5aa03abcea2d214336"
+    },
+    "apt/dists/stable/main/binary-arm64/Packages.gz": {
+      "bytes": 449,
+      "sha256": "7ef98976d16e6727d0b3e613fd409d15a4dd60c3b5ea0fd1e996f388c558e6e6"
+    },
+    "apt/pool/main/r/release-starport-9/release-starport-9_0.1.0-1_all.deb": {
+      "bytes": 137052,
+      "sha256": "85cbc1136e146032e623aab0decc1a49bf6f426ce1a2dfb663a0dc48a58a5a97"
+    },
+    "build-inputs/release-starport-9-0.1.0-1-any.pkg.tar.zst": {
+      "bytes": 184680,
+      "sha256": "776d94979b34d83a8d4209924ac205f04ba1ae7219a704b5acd390b872f552c6"
+    },
+    "build-inputs/release-starport-9-0.1.0-1.noarch.rpm": {
+      "bytes": 151530,
+      "sha256": "68385a1c40d1d44f140a17b94aa082420f38b0d019cc499cb6e4fab2097ab42b"
+    }
+  },
+  "schema": "rs9.cli-v010-linux-inputs.v1",
+  "wheelSha256": "8eca005afde7134e0dcb0e817b58f9b0e1ffe12a1e8697ba9a67123b28f84b57"
+}

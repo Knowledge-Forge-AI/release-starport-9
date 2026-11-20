@@ -1,0 +1,39 @@
+name: Verify the installed RS9 0.1.0 Nix CLI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installed-nix-cli:
+    if: github.repository == 'Knowledge-Forge-AI/release-starport-9' && github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-24.04
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+          - system: aarch64-darwin
+            runner: macos-15
+    name: Installed Nix CLI on ${{ matrix.system }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@e50d5f73bfe71c2dd0aa4218de8f4afa59f8f81d
+      - name: Check installed version and doctor outside the checkout
+        shell: bash
+        env:
+          RS9_SYSTEM: ${{ matrix.system }}
+        run: |
+          set -euo pipefail
+          path="$(nix build --no-write-lock-file --no-link --print-out-paths ".#cli.$RS9_SYSTEM.rs9")"
+          cd "$RUNNER_TEMP"
+          test "$("$path/bin/rs9" --version)" = '0.1.0'
+          "$path/bin/rs9" doctor
