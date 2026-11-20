@@ -1,0 +1,10 @@
+schema = "rs9.homebrew.v1alpha1"
+
+[[packages]]
+id = "cli"
+name = "release-starport-9"
+assets = ["cli-wheel", "cli-sdist"]
+
+[[publish]]
+package = "cli"
+destination = "kfa-homebrew-tap"

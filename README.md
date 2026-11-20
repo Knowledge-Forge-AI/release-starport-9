@@ -8,12 +8,11 @@ The command-line interface is **`rs9`**.
 
 ## Install the CLI
 
-RS9 0.1.0 supports Python 3.11 and later. Install the wheel in a virtual
-environment from the [GitHub release](https://github.com/Knowledge-Forge-AI/release-starport-9/releases/tag/v0.1.0).
+RS9 0.1.0 supports Python 3.11 and later. Install it from [PyPI](https://pypi.org/project/release-starport-9/0.1.0/).
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install https://github.com/Knowledge-Forge-AI/release-starport-9/releases/download/v0.1.0/release_starport_9-0.1.0-py3-none-any.whl
+.venv/bin/python -m pip install release-starport-9==0.1.0
 .venv/bin/rs9 --version
 .venv/bin/rs9 doctor
 ```
@@ -21,14 +20,29 @@ python3 -m venv .venv
 See the [CLI guide](docs/rs9-cli.md) for contract validation, local publishing
 plans, formula rendering, and GitHub instance commands.
 
+The same wheel is available from the [GitHub release](https://github.com/Knowledge-Forge-AI/release-starport-9/releases/tag/v0.1.0).
+The RS9 flake's `rs9` package installs it by its release SHA-256.
+
+```sh
+nix run --no-write-lock-file github:Knowledge-Forge-AI/release-starport-9#rs9 -- --version
+```
+
+The Nix package was built and checked on Apple Silicon. The two Linux outputs
+evaluate using the same pinned wheel and Python floor.
+
+RS9 declares its own release inputs in [`.rs9`](.rs9) and registers its
+Homebrew projection under [its publisher instance](config/instances/rs9-public/rs9-instance.toml).
+The registration produces a local plan with no publication authority.
+The wheel and source distribution predate the self-consumer manifest. Their
+GitHub and PyPI bytes remain the release inputs.
+
 ## Current status and navigation
 
 Foundation 3 supplies the publication-state planner. The first Theme Forge LIVE1
 candidate adds an exact-generation bootstrap, mandatory adapter gates, downstream
-package builders and retained signed-object storage. **PyPI, RS9 Nix, pacman,
-DNF/RPM and APT are pending / not live.** Real release downloads, native
-qualification and attended production transports remain incomplete. Existing
-Theme Forge publication surfaces remain authoritative.
+package builders and retained signed-object storage. The dated Theme Forge
+checkpoints below document those campaigns. The RS9 CLI install routes are
+listed above. Existing Theme Forge publication surfaces remain authoritative.
 
 - [CONT2 non-production hosted candidate](docs/live1-hosted-candidate.md)
 - [Documentation index](docs/README.md)

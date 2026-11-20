@@ -1,0 +1,31 @@
+schema = "rs9.project.v1alpha1"
+
+[project]
+id = "release-starport-9"
+name = "Release Starport 9"
+repository = "Knowledge-Forge-AI/release-starport-9"
+summary = "Validate release contracts and plan downstream package publication"
+
+[license]
+expression = "AGPL-3.0-or-later"
+source = "tagged-repository"
+files = ["LICENSE", "NOTICE", "COMMERCIAL-LICENSE.md"]
+
+[runtime]
+kind = "python"
+constraint = ">=3.11"
+
+[[commands]]
+name = "rs9"
+interface = "cli"
+
+[[checks]]
+id = "version"
+argv = ["rs9", "--version"]
+requires-display = false
+expect-stdout-contains = "{version}"
+
+[[checks]]
+id = "doctor"
+argv = ["rs9", "doctor"]
+requires-display = false
