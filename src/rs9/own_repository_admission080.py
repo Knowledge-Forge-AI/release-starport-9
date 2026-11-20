@@ -35,7 +35,7 @@ VERSIONS_080 = {
 }
 # Exact proposed 0.8 paired-P body pins; no caller or JSON may replace them.
 CONSUMER_FILE_HASHES_080 = {
-    ".github/workflows/publish.yml": "92cc48e2e2bb87292a2e05c73d0aebde6a4e16f88a5a1216c65f94e2e7d995e6",
+    ".github/workflows/publish.yml": "32edbd72e3a6edc7b650b8e6cc97c878977045e07b389e6faf05729bc5a5b7fb",
     "flake.lock": "ed928e945c79e3d7f19d37b13a05f0d97b98440b38661d97bf77844e40606431",
     "flake.nix": "67be263eae65764407ef29126d28183f0270f60ad45acb8fd1202cec6411d9dd",
     "keys/knowledge-forge-ai-packages.asc": "6931a99cf38e204c0adc75dd868f8c0e79d68e58e2644f575d4be1da2ea18d95",
