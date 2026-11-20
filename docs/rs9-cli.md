@@ -33,6 +33,88 @@ PYTHONPATH=src python3 -m rs9 --help
 `python3 -m rs9` is the source entry point. The existing
 `python3 -m rs9.contract` entry point is independent and unchanged.
 
+## Signed Linux repositories
+
+RS9 0.1.0 is available through signed APT, DNF and pacman repositories on
+[the RS9 Pages origin](https://rs9.knowledge-forge.ai/). The package name is
+`release-starport-9` and the installed command is `rs9`. The
+[native qualification](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/44770929836)
+covered install, version reporting, doctor, removal and a signature-rejection
+case for each ecosystem on x86-64 and ARM64.
+
+Check the public certificate before trusting it. Its primary fingerprint is
+`7D03EE84F8C7025FD2F3D772BF89DF6643C2F1AF` and its signing subkey is
+`C021E00EE3D37C459B0E1CB3199F8028126E8A8C`.
+
+### APT
+
+Download the [binary public certificate](https://rs9.knowledge-forge.ai/packages/rs9/keys/rs9-signing.gpg)
+and install it as `/etc/apt/keyrings/rs9-signing.gpg`, readable by APT.
+Use this line in a new `rs9.list` under `/etc/apt/sources.list.d/`:
+
+```text
+deb [signed-by=/etc/apt/keyrings/rs9-signing.gpg] https://rs9.knowledge-forge.ai/packages/rs9/apt stable main
+```
+
+Refresh with `sudo apt update`, then run `sudo apt install release-starport-9`.
+
+### DNF
+
+Add a new `rs9.repo` under `/etc/yum.repos.d/`:
+
+```ini
+[rs9]
+name=Release Starport 9
+baseurl=https://rs9.knowledge-forge.ai/packages/rs9/rpm
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://rs9.knowledge-forge.ai/packages/rs9/keys/rs9-signing.asc
+```
+
+Run `sudo dnf install release-starport-9` and confirm the publisher
+fingerprint if prompted.
+
+### pacman
+
+Download the [binary public certificate](https://rs9.knowledge-forge.ai/packages/rs9/keys/rs9-signing.gpg)
+as `rs9-signing.gpg`. Add and locally sign the verified key:
+
+```sh
+sudo pacman-key --add rs9-signing.gpg
+sudo pacman-key --lsign-key 7D03EE84F8C7025FD2F3D772BF89DF6643C2F1AF
+```
+
+Append a new repository entry to `/etc/pacman.conf`. The `$arch` variable
+selects the signed index for the installed system:
+
+```ini
+[rs9]
+SigLevel = PackageRequired DatabaseRequired
+Server = https://rs9.knowledge-forge.ai/packages/rs9/pacman/$arch
+```
+
+Install as part of a full system sync with `sudo pacman -Syu release-starport-9`.
+
+## Inspect the release used by the RS9 self-consumer
+
+From the source checkout, use the Python CLI release profile to capture and
+verify the original RS9 0.1.0 wheel and source distribution:
+
+```sh
+PYTHONPATH=src python3 -m rs9.python_cli_release \
+  Knowledge-Forge-AI/release-starport-9 --version 0.1.0 \
+  --distribution release-starport-9 --command rs9 --capture ./rs9-v010-evidence
+```
+
+The capture directory must be new. Use `--evidence ./rs9-v010-evidence` in
+place of `--capture` for an offline recheck. The result binds the release tag,
+checksums, wheel RECORD, Python floor, console entry point, package contents
+and three tagged license files. The profile covers dependency-free pure
+Python CLI archives and executes no archive members. The 0.1.0 installation
+does not include this source utility. A verification result supplies evidence
+for onboarding and creates no publisher registration or deployment.
+
 ## Commands
 
 ```text

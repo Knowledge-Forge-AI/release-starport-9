@@ -27,9 +27,12 @@ The RS9 flake's dedicated `cli` output installs it by its release SHA-256.
 nix run --no-write-lock-file github:Knowledge-Forge-AI/release-starport-9#cli.aarch64-darwin.rs9 -- --version
 ```
 
-The Nix package was built and checked on Apple Silicon. The
-`cli.aarch64-linux.rs9` and `cli.x86_64-linux.rs9` outputs evaluate using
-the same pinned wheel and Python floor.
+The [installed Nix CLI checks](https://github.com/Knowledge-Forge-AI/release-starport-9/actions/runs/44766532839)
+passed on Apple Silicon, Linux ARM64 and Linux x86-64.
+
+Other installation routes include the [Knowledge Forge AI Homebrew tap](https://brew.rs9.knowledge-forge.ai/),
+[the npm launcher](https://www.npmjs.com/package/@knowledge-forge-ai/release-starport-9/v/0.1.0),
+and the [signed APT, DNF and pacman repositories](docs/rs9-cli.md#signed-linux-repositories).
 
 RS9 declares its own release inputs in [`.rs9`](.rs9) and registers its
 Homebrew projection under [its publisher instance](config/instances/rs9-public/rs9-instance.toml).
