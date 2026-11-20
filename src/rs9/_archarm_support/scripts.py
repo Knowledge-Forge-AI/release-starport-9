@@ -1,9 +1,9 @@
 """Guest scripts: ported installer (+ guest-account stage) and the drop-only preamble.
 
 The installer body is the qualified ``INSTALL_SCRIPT`` with the namespace
-transforms recorded in ``origin.py``. The only behavioral addition is the
-``account`` stage, placed after every package/hook/file-capability validation
-and before ``done`` (hence before the sole SDK commit).
+transforms recorded in ``origin.py``. The ``account`` stage follows every
+package/hook/file-capability validation. Only the admitted OpenSSL transition
+profile selects the inventory guards from the later key-free probe.
 
 The preamble performs no privilege transition. It only verifies, using bash
 builtins reading its own ``/proc/self/status``, that real/effective/saved/fs
@@ -19,6 +19,7 @@ import re
 from rs9._archarm_support.pins import ROOT_NAMES
 from rs9._archarm_support.refusal import SdkRefusal, require
 from rs9._archarm_support.rootfs import FINGERPRINT
+from rs9._archarm_support.successor_20261120 import PACKAGE_COUNT as TRANSITION_PACKAGE_COUNT
 
 INPUTS_TARGET = "/run/rs9-inputs"
 GUEST_KEYRING = "/var/lib/rs9-archarm-sdk-gnupg"
@@ -49,6 +50,30 @@ INSTALL_FAILURES = ("identity", "inputs", "keyring", "pacman_query", "chroot", "
                     "account_name_collision", "account_create", "account_verify")
 INSTALL_PREFIX = "RSI"
 
+_NO_UPGRADE_VERIFY = r'''test -z "$(LC_ALL=C comm -23 "$T/before" "$T/after")" || fail base_changed
+test "$(LC_ALL=C comm -13 "$T/before" "$T/after" | wc -l)" -eq @COUNT@ || fail delta'''
+
+# From the key-free probe at 32f9f4e29f735507446e1f3df74557df1496d54e.
+_OPENSSL_INVENTORY_FUNCTIONS = r'''plan_inventory() {
+  test "$(wc -l < "$T/selected")" -eq 141 || fail delta
+  grep -Fxq 'openssl 3.6.3-1' "$T/before" || fail base_changed
+  grep -Fxq 'openssl 4.1.0-1' "$T/selected" || fail delta
+  grep -Fxq 'openssl-3 3.5.9-2' "$T/selected" || fail delta
+  awk '{print $1}' "$T/before" | LC_ALL=C sort > "$T/base-names" || fail base_changed
+  awk '{print $1}' "$T/selected" | LC_ALL=C sort > "$T/selected-names" || fail delta
+  test "$(LC_ALL=C comm -12 "$T/base-names" "$T/selected-names")" = openssl || fail base_changed
+  test "$(LC_ALL=C sort -u "$T/selected-names" | wc -l)" -eq 141 || fail delta
+  { awk '$1 != "openssl"' "$T/before"; cat "$T/selected"; } | LC_ALL=C sort > "$T/expected" || fail delta
+}
+check_inventory() {
+  cmp -s "$T/expected" "$T/after" || fail base_changed
+}
+'''
+_OPENSSL_INVENTORY_PLAN = r'''pacman --config "$C" -Qp "$@" | LC_ALL=C sort > "$T/selected" || fail pacman_query
+plan_inventory
+'''
+_OPENSSL_INVENTORY_CLEANUP = ' "$T/selected" "$T/base-names" "$T/selected-names" "$T/expected"'
+
 _INSTALL_TEMPLATE = r'''set -euo pipefail
 exec 3>&1 >/dev/null 2>&1
 umask 022
@@ -65,7 +90,7 @@ N=@ACCOUNT@
 H=@HOME@
 mark() { printf 'RSI %s\n' "$1" >&3; }
 fail() { printf 'RSI fail %s\n' "$1" >&3; exit 1; }
-test "$(id -u):$(id -g)" = 0:0 || fail identity
+@FUNCTIONS@test "$(id -u):$(id -g)" = 0:0 || fail identity
 test "$(uname -m)" = aarch64 || fail identity
 test ! -e "$G" || fail inputs
 test ! -e "$T" || fail inputs
@@ -90,15 +115,14 @@ test "$(awk -F: '$1 == "pub" { print $2 }' "$T/keys")" = u || fail keyring
 test "$(awk -F: '$1 == "fpr" { print $10; exit }' "$T/keys")" = "$FPR" || fail keyring
 mark keyring
 pacman --config "$C" -Q | LC_ALL=C sort > "$T/before" || fail pacman_query
-rc=0
+@PLAN@rc=0
 pacman --config "$C" -U --noconfirm --noprogressbar "$@" > "$T/pacman.out" 2>&1 || rc=$?
 if grep -q 'could not change the root directory' "$T/pacman.out"; then fail chroot; fi
 test "$rc" -eq 0 || fail pacman_exit
 if grep -Eq '^error:|command failed to execute correctly' "$T/pacman.out"; then fail pacman_error; fi
 mark pacman
 pacman --config "$C" -Q | LC_ALL=C sort > "$T/after" || fail pacman_query
-test -z "$(LC_ALL=C comm -23 "$T/before" "$T/after")" || fail base_changed
-test "$(LC_ALL=C comm -13 "$T/before" "$T/after" | wc -l)" -eq @COUNT@ || fail delta
+@VERIFY@
 pacman --config "$C" -Q @ROOTS@ || fail delta
 mark delta
 test -s /usr/share/glib-2.0/schemas/gschemas.compiled || fail hooks_schemas
@@ -141,7 +165,7 @@ case "$(awk -F: -v n="$N" '$1 == n { print $2 }' /etc/shadow)" in
 esac
 test ! -e "$H" || fail account_verify
 mark account
-rm -f -- "$T/keys" "$T/before" "$T/after" "$T/pacman.out"
+rm -f -- "$T/keys" "$T/before" "$T/after" "$T/pacman.out"@CLEANUP@
 rmdir -- "$T"
 mark done
 '''
@@ -151,11 +175,17 @@ def valid_id(value):
     return type(value) is int and 1 <= value <= MAX_ID
 
 
-def render_install_script(*, count, uid, gid):
+def render_install_script(*, count, uid, gid, openssl_transition=False):
     require(type(count) is int and 0 < count <= 256, "INSTALL_SCRIPT")
     require(valid_id(uid) and valid_id(gid), "RUNNER_IDENTITY")
+    require(type(openssl_transition) is bool
+            and (not openssl_transition or count == TRANSITION_PACKAGE_COUNT), "INSTALL_SCRIPT")
     text = _INSTALL_TEMPLATE
-    for key, value in (("@INPUTS@", INPUTS_TARGET), ("@KEYRING@", GUEST_KEYRING),
+    for key, value in (("@FUNCTIONS@", _OPENSSL_INVENTORY_FUNCTIONS if openssl_transition else ""),
+                       ("@PLAN@", _OPENSSL_INVENTORY_PLAN if openssl_transition else ""),
+                       ("@VERIFY@", "check_inventory" if openssl_transition else _NO_UPGRADE_VERIFY),
+                       ("@CLEANUP@", _OPENSSL_INVENTORY_CLEANUP if openssl_transition else ""),
+                       ("@INPUTS@", INPUTS_TARGET), ("@KEYRING@", GUEST_KEYRING),
                        ("@FPR@", FINGERPRINT), ("@UID@", str(uid)), ("@GID@", str(gid)),
                        ("@ACCOUNT@", GUEST_ACCOUNT), ("@HOME@", GUEST_HOME),
                        ("@COUNT@", str(count)), ("@ENTRIES@", str(2 * count)),
@@ -165,8 +195,9 @@ def render_install_script(*, count, uid, gid):
     return text
 
 
-def installer_cmd(*, count, uid, gid):
-    return ("/usr/bin/bash", "-c", render_install_script(count=count, uid=uid, gid=gid))
+def installer_cmd(*, count, uid, gid, openssl_transition=False):
+    return ("/usr/bin/bash", "-c", render_install_script(
+        count=count, uid=uid, gid=gid, openssl_transition=openssl_transition))
 
 
 # ----------------------------------------------------------------------- preamble
