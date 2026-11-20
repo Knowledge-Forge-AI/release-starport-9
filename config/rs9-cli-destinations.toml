@@ -1,0 +1,25 @@
+schema = "rs9.destinations.v1alpha1"
+
+[[destinations]]
+id = "pypi"
+adapter = "pypi"
+mode = "direct"
+platforms = ["x86_64-linux", "aarch64-linux", "aarch64-darwin", "x86_64-darwin"]
+status = "live"
+base-url = "https://pypi.org"
+
+[[destinations]]
+id = "kfa-homebrew-tap"
+adapter = "homebrew"
+mode = "projection"
+platforms = ["aarch64-darwin", "x86_64-linux", "aarch64-linux"]
+status = "candidate"
+repository = "Knowledge-Forge-AI/homebrew-tap"
+
+[[destinations]]
+id = "rs9-nix"
+adapter = "nix"
+mode = "projection"
+platforms = ["aarch64-darwin", "x86_64-linux", "aarch64-linux"]
+status = "candidate"
+repository = "Knowledge-Forge-AI/release-starport-9"

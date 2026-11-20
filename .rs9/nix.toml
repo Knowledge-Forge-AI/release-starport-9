@@ -1,0 +1,10 @@
+schema = "rs9.nix.v1alpha1"
+
+[[packages]]
+id = "cli"
+name = "rs9"
+assets = ["cli-wheel"]
+
+[[publish]]
+package = "cli"
+destination = "rs9-nix"

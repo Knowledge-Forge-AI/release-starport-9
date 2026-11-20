@@ -1,0 +1,19 @@
+schema = "rs9.releases.v1alpha1"
+
+[release]
+tag = "v{version}"
+prerelease = "reject"
+
+[[assets]]
+id = "cli-wheel"
+name = "release_starport_9-{version}-py3-none-any.whl"
+format = "wheel"
+platforms = ["any"]
+commands = {}
+
+[[assets]]
+id = "cli-sdist"
+name = "release_starport_9-{version}.tar.gz"
+format = "sdist"
+platforms = ["any"]
+commands = {}

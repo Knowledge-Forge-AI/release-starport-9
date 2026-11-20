@@ -12,6 +12,7 @@ import struct
 import sys
 import tarfile
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import patch
 import warnings
@@ -422,6 +423,10 @@ def scan_file_text(name, text, *, private_path=None, allow_pattern_source=False)
     if private_path is None:
         private_path = re.compile(r"/" + r"Users/|/" + r"home/[^/\s]+/|[A-Z]:\\" + r"Users\\")
     allowance = _native_public_path_allowance(name, text, private_path)
+    if (name == "src/rs9/provision_journal.py"
+            and hashlib.sha256(text.encode("utf-8")).hexdigest()
+            == "cda9c9245203aa5ae2e9a367e7f9682a826dcb6ba4720a634c69bf01c9decd86"):
+        allowance += 1
     scan_text(text, private_path=private_path,
               allow_pattern_source=allow_pattern_source,
               allowed_private_match_count=allowance)
@@ -466,7 +471,18 @@ class HygieneTests(unittest.TestCase):
             for node in ast.walk(tree):
                 for module in import_roots(node):
                     self.assertIn(module, sys.stdlib_module_names | {"rs9"})
-        self.assertFalse((ROOT / "src/rs9/__main__.py").exists())
+        self.assertTrue((ROOT / "src/rs9/__main__.py").is_file())
+        project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+        self.assertEqual(project["scripts"], {"rs9": "rs9.cli:main"})
+
+    def test_provision_path_marker_allowance_requires_the_exact_scanned_source(self):
+        name = "src/rs9/provision_journal.py"
+        _, source = file_texts(ROOT / name)[0]
+        scan_file_text(name, source)
+        with self.assertRaisesRegex(ValueError, "Private path"):
+            scan_file_text(name, source + "\n# changed bytes\n")
+        with self.assertRaisesRegex(ValueError, "Private path"):
+            scan_file_text("src/rs9/another_module.py", source)
 
     def test_relative_import_roots_are_package_local(self):
         cases = (

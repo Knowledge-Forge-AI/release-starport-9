@@ -1,5 +1,5 @@
 {
-  description = "RS9 non-production authenticated candidate builds";
+  description = "Release Starport 9 CLI and non-production candidate builds";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/0921fdb3e13e40fe25fbc52b89661a9d6d32ac68";
   inputs.rs9-capture = { url = "path:./nix/empty-capture"; flake = false; };
   outputs = { self, nixpkgs ? throw "Pinned nixpkgs required", rs9-capture ? ./nix/empty-capture }:
@@ -18,6 +18,11 @@
           else pkgs.callPackage ./nix/nebular.nix {} { inherit product; capture = rs9-capture; }
         ) products;
     in {
+      # The released CLI is independent of the staged publication outputs.
+      cli = perSystem (system:
+        let pkgs = import nixpkgs { inherit system; };
+        in { rs9 = pkgs.callPackage ./nix/rs9-cli.nix {}; }
+      );
       candidates = perSystem build;
       checks = perSystem (system: build system);
       # Note: 'experiments' is not a standard flake output attribute recognized

@@ -1,0 +1,31 @@
+{
+  "files": [
+    {
+      "mode": 420,
+      "path": ".rs9-instance/consumers/release-starport-9.toml",
+      "role": "consumer-registration",
+      "sha256": "692380968dd9a9369b063ce0db1ae50f6f5d6bb5cd595d899ac34c9bdde67ec5"
+    },
+    {
+      "mode": 420,
+      "path": ".rs9-instance/scaffold/publisher-registration.json",
+      "role": "reviewable-scaffold",
+      "sha256": "ab1539672f7b584e50e172db1df97c40dd878595b41ccc9c70abea1cf80baf57"
+    },
+    {
+      "mode": 420,
+      "path": ".rs9-instance/scaffold/review-checklist.md",
+      "role": "reviewable-scaffold",
+      "sha256": "cb5af197d27b13caec27aaa5e8d1f3510468133c6276ebefa5df199d99dd5f49"
+    },
+    {
+      "mode": 420,
+      "path": "rs9-instance.toml",
+      "role": "instance-manifest",
+      "sha256": "f640f385fde4c4f11ae927c071a1f0b1ba41a80f2937569895f5ae379cedf6b4"
+    }
+  ],
+  "instance_manifest_sha256": "f640f385fde4c4f11ae927c071a1f0b1ba41a80f2937569895f5ae379cedf6b4",
+  "schema": "rs9.instance-desired-state.v1alpha1",
+  "template_sha256": "ff1a1ff2d256653b7ce1f059d4a1d7b492d7d00c2769b49de6e50124a0260f80"
+}
