@@ -5,22 +5,31 @@ from __future__ import annotations
 import argparse
 import configparser
 from email import message_from_bytes
+import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import tomllib
 
+from rs9.constants import ALLOWED_PROJECT_FILES
 from rs9.errors import ContractError
-from rs9.release_core import authenticate_release, authenticated_record_hash, capture_release, digest, read_evidence
+from rs9.github import PublicClient
+from rs9.release_core import (
+    authenticate_release, authenticated_record_hash, authenticated_tree, capture_release, digest, read_evidence,
+)
 from rs9.scratch import physical_directory
+from rs9.security import validate_repository
 from rs9.tf_pypi_archive import AdmissionError, read_tar
-from rs9.tf_pypi_verify import read_wheel, verify_record
+from rs9.wheel_evidence import read_wheel, verify_record
 
 _SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 _VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\Z")
 _TARGET = re.compile(r"([a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)*):[a-zA-Z_]\w*\Z", re.ASCII)
 _LEGAL = ("COMMERCIAL-LICENSE.md", "LICENSE", "NOTICE")
 _ASSET_LIMIT = 4 * 1024 * 1024
+_CONSUMER_FILES = ("homebrew.toml", "project.toml", "releases.toml")
+_CONSUMER_FILE_LIMIT = 128 * 1024
 
 
 def _require(ok, code):
@@ -109,9 +118,39 @@ def _verify_pair(capture, wheel_name, sdist_name, *, stem, name, version, comman
             "requiresPython": python, "license": license_expression}
 
 
+def _tagged_consumer_inputs(capture):
+    code = "PYTHON_CLI_TAGGED_CONTRACT_LAYOUT"
+    directory_sha = None
+    blobs = {}
+    for entry in authenticated_tree(capture)["tree"]:
+        path = entry["path"]
+        if path == ".rs9":
+            _require(entry.get("type") == "tree" and entry.get("mode") == "040000", code)
+            directory_sha = entry.get("sha")
+        elif path.startswith(".rs9/"):
+            name = path.removeprefix(".rs9/")
+            blob_sha = entry.get("sha")
+            _require(name in ALLOWED_PROJECT_FILES
+                     and entry.get("type") == "blob" and entry.get("mode") == "100644"
+                     and isinstance(blob_sha, str) and re.fullmatch(r"[0-9a-f]{40}", blob_sha), code)
+            blobs[name] = bytes.fromhex(blob_sha)
+
+    # The closed directory contains only flat regular files, so Git sorts
+    # these ASCII basenames directly when encoding its tree object.
+    body = b"".join(
+        b"100644 " + name.encode("ascii") + b"\0" + blob
+        for name, blob in sorted(blobs.items())
+    )
+    tree_sha = hashlib.sha1(b"tree " + str(len(body)).encode("ascii") + b"\0" + body).hexdigest()
+    _require(directory_sha == tree_sha, code)
+    return {name: digest(capture.source[f".rs9/{name}"]) for name in _CONSUMER_FILES}
+
+
 def inspect_python_cli_release(repository: str, version: str, distribution: str, command: str, evidence: Path,
-                               *, fresh_capture=False):
+                               *, fresh_capture: bool = False, require_tagged_consumer_contract: bool = False):
     """Verify a public release capture, optionally collecting it in a fresh directory."""
+    _require(os.name == "posix", "PYTHON_CLI_PLATFORM")
+    validate_repository(repository)
     _require(len(version) <= 30 and _VERSION.fullmatch(version)
              and len(distribution) <= 64 and _SLUG.fullmatch(distribution)
              and len(command) <= 64 and _SLUG.fullmatch(command), "PYTHON_CLI_COORDINATES")
@@ -125,6 +164,9 @@ def inspect_python_cli_release(repository: str, version: str, distribution: str,
         "payload_assets": [{"id": "cli-sdist", "name": sdist_name, "format": "tar.gz", "platforms": ["any"]}],
         "evidence_assets": [{"role": "cli-wheel", "name": wheel_name}],
     }
+    if require_tagged_consumer_contract:
+        selection["source_paths"].extend(f".rs9/{name}" for name in _CONSUMER_FILES)
+        selection["limits"]["source_bytes"] = _CONSUMER_FILE_LIMIT
     if fresh_capture:
         target = physical_directory(evidence.parent) / evidence.name
         try:
@@ -134,7 +176,7 @@ def inspect_python_cli_release(repository: str, version: str, distribution: str,
         except OSError:
             raise ContractError("PYTHON_CLI_CAPTURE_DIRECTORY", "Cannot create the capture directory") from None
         try:
-            capture_release(selection, target, asset_transport="release-api")
+            capture_release(selection, target, client=PublicClient(), asset_transport="release-api")
         except (AttributeError, KeyError, OSError, TypeError, ValueError):
             raise ContractError("PYTHON_CLI_CAPTURE_FAILED", "The public release capture failed") from None
     capture = authenticate_release(selection, evidence)
@@ -143,10 +185,77 @@ def inspect_python_cli_release(repository: str, version: str, distribution: str,
         facts = _verify_pair(capture, wheel_name, sdist_name, stem=stem, name=distribution, version=version, command=command)
     except (AdmissionError, AttributeError, KeyError, TypeError, UnicodeError, ValueError, configparser.Error):
         raise ContractError("PYTHON_CLI_ARCHIVE", "Python CLI release archives were refused") from None
-    return {"schema": "rs9.python-cli-release.v1alpha1", "repository": repository,
+    receipt = {"schema": "rs9.python-cli-release.v1alpha1", "repository": repository,
             "version": version, "command": command, "tagCommit": capture.record["tag"]["commit"],
             "releaseRecordSha256": record_digest, "wheelSha256": capture.asset_metadata[wheel_name]["sha256"],
             "sdistSha256": capture.asset_metadata[sdist_name]["sha256"], **facts}
+
+    if require_tagged_consumer_contract:
+        receipt["taggedConsumerInputs"] = _tagged_consumer_inputs(capture)
+    return receipt
+
+
+def verify_homebrew_plan_evidence(
+    intent: dict, evidence: Path, *, require_tagged_consumer_contract: bool = False,
+) -> dict:
+    """Bind offline evidence to an intent freshly produced by the instance planner."""
+    target, = intent["targets"]
+    selected = set(target["assets"])
+    assets = {asset["format"]: asset for asset in intent["assets"] if asset["id"] in selected}
+    commands = intent["commands"]
+    version = intent["version"]
+    runtime = intent.get("runtime", {})
+    license_info = intent["license"]
+    code = "PYTHON_CLI_PLAN_MISMATCH"
+    _require(
+        target["adapter"] == "homebrew" and target["mode"] == "projection"
+        and len(selected) == len(assets) == 2 and set(assets) == {"wheel", "sdist"}
+        and all(asset["platforms"] == ["any"] for asset in assets.values())
+        and len(commands) == 1 and commands[0]["interface"] == "cli"
+        and runtime.get("kind") == "python"
+        and license_info["source"] == "tagged-repository"
+        and sorted(license_info["files"]) == list(_LEGAL)
+        and intent["release"]["prerelease"] == "reject" and "evidence" not in intent["release"]
+        and intent["tag"] == "v" + version,
+        code,
+    )
+    suffix = "-" + version + ".tar.gz"
+    sdist_name = assets["sdist"]["name"]
+    stem = sdist_name.removesuffix(suffix)
+    distribution = stem.replace("_", "-")
+    _require(
+        sdist_name == distribution.replace("-", "_") + suffix
+        and assets["wheel"]["name"] == stem + "-" + version + "-py3-none-any.whl",
+        code,
+    )
+    receipt = inspect_python_cli_release(
+        intent["project"]["repository"], version, distribution, commands[0]["name"], evidence,
+        require_tagged_consumer_contract=require_tagged_consumer_contract,
+    )
+    _require(receipt["requiresPython"] == runtime.get("constraint")
+             and receipt["license"] == license_info["expression"], code)
+    tagged_inputs = receipt.get("taggedConsumerInputs")
+    if require_tagged_consumer_contract:
+        selected_inputs = {name: [] for name in _CONSUMER_FILES}
+        for input_record in intent.get("evidence", {}).get("inputs", []):
+            if input_record.get("filename") in selected_inputs:
+                selected_inputs[input_record["filename"]].append(input_record.get("sha256"))
+        _require(
+            tagged_inputs is not None and all(
+                selected_inputs[name] == [tagged_inputs[name]] for name in _CONSUMER_FILES
+            ),
+            "PYTHON_CLI_TAGGED_CONTRACT_MISMATCH",
+        )
+    return {
+        "schema": "rs9.python-cli-plan-evidence.v1alpha1",
+        "distribution": distribution,
+        "assets": [
+            {"id": assets[kind]["id"], "name": assets[kind]["name"], "sha256": receipt[kind + "Sha256"]}
+            for kind in ("sdist", "wheel")
+        ],
+        "receipt": receipt,
+        "taggedConsumerContractVerified": require_tagged_consumer_contract,
+    }
 
 
 class _Parser(argparse.ArgumentParser):
@@ -163,11 +272,13 @@ def main(argv=None):
     origin = parser.add_mutually_exclusive_group(required=True)
     origin.add_argument("--evidence", type=Path, help="inspect an existing capture")
     origin.add_argument("--capture", type=Path, help="collect public release evidence in a new directory and inspect it")
+    parser.add_argument("--require-tagged-consumer-contract", action="store_true")
     arguments = parser.parse_args(argv)
     try:
         evidence = arguments.capture if arguments.capture is not None else arguments.evidence
         result = inspect_python_cli_release(arguments.repository, arguments.version, arguments.distribution,
-                                            arguments.command, evidence, fresh_capture=arguments.capture is not None)
+                                            arguments.command, evidence, fresh_capture=arguments.capture is not None,
+                                            require_tagged_consumer_contract=arguments.require_tagged_consumer_contract)
     except ContractError as error:
         print(json.dumps({"ok": False, "code": error.code}))
         return 1

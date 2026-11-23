@@ -111,11 +111,13 @@ The capture directory must be new. Use `--evidence ./rs9-v010-evidence` in
 place of `--capture` for an offline recheck. The result binds the release tag,
 checksums, wheel RECORD, Python floor, console entry point, package contents
 and three tagged license files. The profile covers dependency-free pure
-Python CLI archives and executes no archive members. The 0.1.0 installation
-does not include this source utility. A verification result supplies evidence
+Python CLI archives and executes no archive members. The published 0.1.0 wheel predates the installed `release inspect` command. A verification result supplies evidence
 for onboarding and creates no publisher registration or deployment.
 
 ## Commands
+
+Builds that include `rs9 release inspect` can use the same release profile
+through the installed CLI.
 
 ```text
 rs9 --version
@@ -133,6 +135,16 @@ rs9 instance register PUBLISHER_ROOT --id CONSUMER_ID \
   --package PACKAGE_ID
 rs9 instance plan PUBLISHER_ROOT --consumer CONSUMER_ID \
   --project PROJECT --destinations FILE --version RELEASE_VERSION
+rs9 instance prepare-homebrew PUBLISHER_ROOT --consumer CONSUMER_ID \
+  --project PROJECT --destinations FILE --version RELEASE_VERSION \
+  --release-evidence CAPTURE --output NEW_DIRECTORY
+rs9 instance apply-homebrew PUBLISHER_ROOT --consumer CONSUMER_ID \
+  --project PROJECT --destinations FILE --version RELEASE_VERSION \
+  --release-evidence CAPTURE --tap-root TAP_CHECKOUT \
+  --tap-repository OWNER/TAP --expect-formula-sha256 SHA256 [--dry-run]
+rs9 instance inspect-homebrew PUBLISHER_ROOT --consumer CONSUMER_ID \
+  --project PROJECT --destinations FILE --version RELEASE_VERSION \
+  --release-evidence CAPTURE --branch TAP_BRANCH
 rs9 instance github doctor [--engine-wheel PATH]
 rs9 instance github plan PUBLISHER_ROOT --engine-wheel PATH --output PLAN
 rs9 instance github apply PUBLISHER_ROOT --plan PLAN --engine-wheel PATH \
@@ -210,6 +222,42 @@ runtime engine identity separately and rejects a manifest pinned to a different
 engine version. Instance plans remain
 `remoteState: "unknown"`, `publicationAuthority: false`, and do not perform
 GitHub operations.
+
+Use `--require-tagged-consumer-contract` with `release inspect` to capture
+or verify the release tag's exact `.rs9/project.toml`, `.rs9/releases.toml`,
+and `.rs9/homebrew.toml` files. Strict intake also recomputes the Git object
+ID for the complete closed `.rs9` directory from its listed blob entries and
+requires it to equal the directory object recorded in the captured tree.
+The option is also available on the three
+Homebrew instance commands that consume `--release-evidence`. Those commands
+compare the three captured blob digests against the freshly normalized local
+inputs. Other adapter inputs and instance destination configuration remain
+separate. Ordinary release inspection preserves archive-only verification
+for releases that predate the consumer contract.
+
+`instance apply-homebrew` always requires tagged consumer input verification.
+It matches the declared destination and an explicitly reviewed formula digest
+before applying to the local checkout's existing `Formula/` directory. A
+missing formula is linked atomically from complete staged bytes. Identical
+bytes and mode give a no-op. Different bytes, unexpected modes, symlinks,
+and conflicting arrivals are refused. This operation creates no Git commit,
+contacts no remote, and does not confer publication authority.
+
+Use the same command with `--dry-run` to check the tagged input, reviewed
+formula, and local tap before applying changes. The result includes
+`dryRun: true` and reports `ready` when the destination is absent
+or `noop` when its bytes and mode already match. Drift and unsafe paths
+use the same refusals as apply. Apply repeats admission and file checks.
+
+`instance inspect-homebrew` reruns local planning and release-evidence
+verification, renders the expected formula in memory, and reads the tap
+repository declared by the selected destination. The command compares the
+Git mode and exact formula bytes at a pinned branch commit. It rereads the
+branch and reports `unknown` if the branch or identity changed during the
+observation. Other results are `match`, `missing`, `drift`, and `unsafe`.
+Drift is a successful observation and does not authorize replacement.
+The result includes formula digests and the tagged-consumer-contract flag.
+It omits the remote file contents and claims no publication authority.
 
 Publisher-root confinement for the instance lane uses POSIX descriptor-relative
 filesystem operations (`dir_fd`/`O_NOFOLLOW`) and is qualified only for that

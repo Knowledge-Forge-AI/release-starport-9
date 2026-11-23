@@ -20,6 +20,8 @@ MODULES = (
     "homebrew_renderer", "installed_homebrew", "provision_cli", "instance_provision",
     "provision_journal", "github_provision_reader", "instance_github_bootstrap",
     "github_provision",
+    "archives", "command_policies", "github", "python_cli_release", "release_core",
+    "scratch", "tf_pypi_archive", "wheel_evidence",
 )
 RESOURCES = ("README.md", "consumer/project.toml", "consumer/releases.toml")
 INSTANCE_RESOURCES = (

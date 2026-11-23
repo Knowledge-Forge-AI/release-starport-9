@@ -9,6 +9,7 @@ replays an uncertain operation.
 from __future__ import annotations
 
 import json
+import hashlib
 import fcntl
 import os
 import re
@@ -469,6 +470,81 @@ def plan_instance_github_cli(
         "artifact_sha256": binding["artifact_sha256"],
         "publicationAuthority": False,
         "qualified": False,
+        "publicationEnabled": False,
+    }
+
+
+def inspect_homebrew_projection(
+    plan: Mapping[str, Any],
+    branch: str,
+    *,
+    _reader: GitHubReadTransport | None = None,
+) -> dict[str, Any]:
+    """Observe the exact formula for evidence verified by this invocation."""
+    from rs9.homebrew_renderer import render_python_wheel_formula
+    from rs9.instance import record_sha256
+
+    path, desired, template = render_python_wheel_formula(plan)
+    target, = plan["normalizedIntent"]["targets"]
+    repository = target.get("repository")
+    if not isinstance(repository, str):
+        _reject("HOMEBREW_DESTINATION_REPOSITORY", "The registered tap must name its GitHub repository")
+
+    reader = _reader if _reader is not None else GitHubReadTransport()
+    initial = reader.read_branch(repository, branch)
+    commit, tree = initial["commit"], initial["tree"]
+    parent_path = path.rsplit("/", 1)[0]
+    parent = reader.read_parent(repository, parent_path, commit)
+    remote: dict[str, Any] = {"commit": commit, "tree": tree, "state": "unsafe"}
+
+    def same_snapshot(row: Mapping[str, Any], expected_path: str) -> bool:
+        return (
+            row.get("path") == expected_path
+            and row.get("commit") == commit
+            and row.get("tree") == tree
+            and row.get("repository") == initial.get("repository")
+            and row.get("metadata_sha256") == initial.get("metadata_sha256")
+        )
+
+    if not same_snapshot(parent, parent_path):
+        _reject("HOMEBREW_OBSERVATION_MISMATCH", "The tap response does not match its branch snapshot")
+    if parent["state"] == "absent":
+        remote["state"] = "missing"
+    elif parent["state"] == "present" and parent["type"] == "tree" and parent["mode"] == "040000":
+        entry = reader.read_file(repository, path, commit)
+        if not same_snapshot(entry, path):
+            _reject("HOMEBREW_OBSERVATION_MISMATCH", "The formula response does not match its branch snapshot")
+        if entry["state"] == "missing":
+            remote["state"] = "missing"
+        elif entry["state"] == "present" and entry["type"] == "blob":
+            byte_data = entry.get("data")
+            if not isinstance(byte_data, bytes):
+                _reject("HOMEBREW_OBSERVATION_MISMATCH", "The formula blob has no verified bytes")
+            actual_sha256 = hashlib.sha256(byte_data).hexdigest()
+            if entry.get("size") != len(byte_data) or entry.get("sha256") != actual_sha256:
+                _reject("HOMEBREW_OBSERVATION_MISMATCH", "The formula blob does not match its verified digest")
+            same = entry["mode"] == "100644" and byte_data == desired
+            remote.update(
+                state="match" if same else "drift",
+                mode=entry["mode"],
+                sha256=actual_sha256,
+                size=len(byte_data),
+            )
+
+    latest = reader.read_branch(repository, branch)
+    if any(latest.get(key) != initial.get(key) for key in ("commit", "tree", "repository", "metadata_sha256")):
+        remote = {"state": "unknown", "reason": "branch-changed"}
+    return {
+        "schema": "rs9.homebrew-projection-observation.v1alpha1",
+        "instanceId": plan["instance_id"],
+        "consumerId": plan["consumer_id"],
+        "instancePlanSha256": record_sha256(plan),
+        "taggedConsumerContractVerified": plan["releaseEvidence"]["taggedConsumerContractVerified"],
+        "destination": {"repository": repository, "branch": branch, "path": path},
+        "desired": {"sha256": hashlib.sha256(desired).hexdigest(), "size": len(desired),
+                    "mode": "100644", "template": template},
+        "remote": remote,
+        "publicationAuthority": False,
         "publicationEnabled": False,
     }
 

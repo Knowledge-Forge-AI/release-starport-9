@@ -1,8 +1,8 @@
 """Offline installed-CLI composition for one Homebrew formula candidate.
 
 The pure renderer owns the normalized contract and formula bytes.  This
-module owns only strict local input custody, a review receipt, and exclusive
-output files.  It never fetches, executes, installs, or publishes anything.
+module owns strict local input custody, review receipts, and exclusive
+formula output. It never fetches, executes formulae, or publishes remotely.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import stat
 import sys
 from collections.abc import Mapping
@@ -21,7 +22,9 @@ from rs9.errors import ContractError
 from rs9.homebrew_renderer import (
     SCHEMA_RENDER,
     VARIANT_CLI,
+    VARIANT_PYTHON_WHEEL,
     render_homebrew_formula,
+    render_python_wheel_formula,
 )
 
 
@@ -289,27 +292,28 @@ def _validate_renderer_result(rendered: Mapping[str, Any]) -> tuple[dict[str, An
     return dict(manifest), path, formula
 
 
+def _write_formula_bytes(fd: int, data: bytes) -> os.stat_result:
+    view = memoryview(data)
+    while view:
+        written = os.write(fd, view)
+        if written <= 0:
+            raise OSError("short write")
+        view = view[written:]
+    os.fchmod(fd, 0o644)
+    info = os.fstat(fd)
+    if (not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644
+            or info.st_nlink != 1 or info.st_size != len(data)):
+        raise OSError("output custody changed")
+    return info
+
+
 def _write_new_file(directory_fd: int, name: str, data: bytes) -> None:
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
-    fd: int | None = None
+    fd = os.open(name, flags, 0o644, dir_fd=directory_fd)
     try:
-        fd = os.open(name, flags, 0o644, dir_fd=directory_fd)
-        offset = 0
-        while offset < len(data):
-            written = os.write(fd, data[offset:])
-            if written <= 0:
-                raise OSError("short write")
-            offset += written
-        # This is our newly-created inode, never an existing path.  Set the
-        # documented receipt mode despite a restrictive process umask.
-        os.fchmod(fd, 0o644)
-        info = os.fstat(fd)
-        if (not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644
-                or info.st_nlink != 1 or info.st_size != len(data)):
-            raise OSError("output custody changed")
+        _write_formula_bytes(fd, data)
     finally:
-        if fd is not None:
-            os.close(fd)
+        os.close(fd)
 
 
 def _write_output(output_value: str | os.PathLike[str], formula_path: str, formula: bytes, result: bytes) -> None:
@@ -442,4 +446,161 @@ def render_homebrew_output(
     return result
 
 
-__all__ = ["SCHEMA_RESULT", "render_homebrew_output"]
+def write_python_wheel_formula(plan: Mapping[str, Any], output_dir: Path) -> dict[str, Any]:
+    """Write a candidate from the plan this invocation just verified."""
+    from rs9.instance import record_sha256
+
+    formula_path, formula, template = render_python_wheel_formula(plan)
+    if not _FORMULA_NAME.fullmatch(formula_path.removeprefix("Formula/")) or len(formula) > MAX_FORMULA_BYTES:
+        _reject("HOMEBREW_RENDER_RESULT")
+    result = {
+        "schema": "rs9.homebrew-python-wheel-result.v1alpha1",
+        "variant": VARIANT_PYTHON_WHEEL,
+        "status": "rendered",
+        "qualified": False,
+        "publicationAuthority": False,
+        "publicationEnabled": False,
+        "engine": plan["runtimeEngine"],
+        "instanceId": plan["instance_id"],
+        "consumerId": plan["consumer_id"],
+        "instancePlanSha256": record_sha256(plan),
+        "template": template,
+        "releaseEvidence": plan["releaseEvidence"],
+        "files": [{"path": formula_path, "sha256": _sha256(formula), "size": len(formula), "mode": "100644"}],
+    }
+    _write_output(output_dir, formula_path, formula, _canonical_json(result))
+    return result
+
+
+def _same_inode(first: os.stat_result, second: os.stat_result) -> bool:
+    return (first.st_dev, first.st_ino) == (second.st_dev, second.st_ino)
+
+
+def _assert_tap_paths(root: Path, root_fd: int, directory_fd: int) -> None:
+    _check_physical_ancestors(root, code="HOMEBREW_TAP_CUSTODY")
+    for path, descriptor in ((root, root_fd), (root / "Formula", directory_fd)):
+        observed = path.lstat()
+        if not stat.S_ISDIR(observed.st_mode) or not _same_inode(observed, os.fstat(descriptor)):
+            _reject("HOMEBREW_TAP_CUSTODY")
+
+
+def _tap_formula_present(directory: int, name: str, desired: bytes) -> bool:
+    try:
+        observed = os.stat(name, dir_fd=directory, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    if not stat.S_ISREG(observed.st_mode) or observed.st_size > MAX_FORMULA_BYTES:
+        _reject("HOMEBREW_TAP_CUSTODY")
+    fd = os.open(name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=directory)
+    try:
+        if _identity(os.fstat(fd)) != _identity(observed):
+            _reject("HOMEBREW_TAP_CHANGED")
+        actual = _read_fd(fd, MAX_FORMULA_BYTES, code="HOMEBREW_TAP_CUSTODY")
+        current = os.stat(name, dir_fd=directory, follow_symlinks=False)
+        if _identity(current) != _identity(observed) or _identity(os.fstat(fd)) != _identity(observed):
+            _reject("HOMEBREW_TAP_CHANGED")
+    finally:
+        os.close(fd)
+    if actual != desired or stat.S_IMODE(observed.st_mode) != 0o644:
+        _reject("HOMEBREW_FORMULA_DRIFT")
+    return True
+
+
+def _publish_tap_formula(
+    root: Path, root_fd: int, directory: int, name: str, formula: bytes, *, dry_run: bool,
+) -> str:
+    _assert_tap_paths(root, root_fd, directory)
+    present = _tap_formula_present(directory, name, formula)
+    if present or dry_run:
+        _assert_tap_paths(root, root_fd, directory)
+        return "noop" if present else "ready"
+    stage = ".rs9-" + secrets.token_hex(16) + ".tmp"
+    fd = os.open(stage, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
+    original = None
+    try:
+        original = os.fstat(fd)
+        prepared = _write_formula_bytes(fd, formula)
+        os.fsync(fd)
+        _assert_tap_paths(root, root_fd, directory)
+        if _identity(os.stat(stage, dir_fd=directory, follow_symlinks=False)) != _identity(prepared):
+            _reject("HOMEBREW_TAP_CHANGED")
+        try:
+            os.link(stage, name, src_dir_fd=directory, dst_dir_fd=directory, follow_symlinks=False)
+        except FileExistsError:
+            if _tap_formula_present(directory, name, formula):
+                _assert_tap_paths(root, root_fd, directory)
+                return "noop"
+            _reject("HOMEBREW_TAP_CHANGED")
+        if not _tap_formula_present(directory, name, formula):
+            _reject("HOMEBREW_TAP_CHANGED")
+        _assert_tap_paths(root, root_fd, directory)
+        return "created"
+    finally:
+        try:
+            if original is not None:
+                current = os.stat(stage, dir_fd=directory, follow_symlinks=False)
+                if not _same_inode(current, original):
+                    _reject("HOMEBREW_TAP_CHANGED")
+                os.unlink(stage, dir_fd=directory)
+                os.fsync(directory)
+        finally:
+            os.close(fd)
+
+
+def apply_python_wheel_formula(
+    plan: Mapping[str, Any],
+    tap_root: Path,
+    *,
+    tap_repository: str,
+    expected_sha256: str,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Check or install one reviewed formula in an explicitly selected local tap."""
+    from rs9.instance import record_sha256
+
+    if plan["releaseEvidence"].get("taggedConsumerContractVerified") is not True:
+        _reject("HOMEBREW_TAGGED_CONTRACT_REQUIRED")
+    target, = plan["normalizedIntent"]["targets"]
+    if not isinstance(tap_repository, str) or tap_repository != target.get("repository"):
+        _reject("HOMEBREW_TAP_IDENTITY")
+    path, formula, template = render_python_wheel_formula(plan)
+    name = path.removeprefix("Formula/")
+    if not _FORMULA_NAME.fullmatch(name) or not 1 <= len(formula) <= MAX_FORMULA_BYTES:
+        _reject("HOMEBREW_RENDER_RESULT")
+    digest = _sha256(formula)
+    if expected_sha256 != digest:
+        _reject("HOMEBREW_FORMULA_REVIEW_CHANGED")
+    if ".." in Path(tap_root).parts:
+        _reject("HOMEBREW_TAP_CUSTODY")
+    root = _as_path(tap_root, code="HOMEBREW_TAP_CUSTODY")
+    _check_physical_ancestors(root, code="HOMEBREW_TAP_CUSTODY")
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    try:
+        root_fd = os.open(root, flags)
+        try:
+            directory = os.open("Formula", flags, dir_fd=root_fd)
+            try:
+                status = _publish_tap_formula(root, root_fd, directory, name, formula, dry_run=dry_run)
+            finally:
+                os.close(directory)
+        finally:
+            os.close(root_fd)
+    except OSError:
+        _reject("HOMEBREW_TAP_CUSTODY")
+    return {
+        "schema": "rs9.homebrew-local-projection-result.v1alpha1",
+        "status": status,
+        **({"dryRun": True} if dry_run else {}),
+        "instanceId": plan["instance_id"],
+        "consumerId": plan["consumer_id"],
+        "instancePlanSha256": record_sha256(plan),
+        "repository": tap_repository,
+        "formula": {"path": path, "sha256": digest, "size": len(formula), "mode": "100644"},
+        "template": template,
+        "taggedConsumerContractVerified": True,
+        "publicationAuthority": False,
+        "publicationEnabled": False,
+    }
+
+
+__all__ = ["SCHEMA_RESULT", "render_homebrew_output", "write_python_wheel_formula", "apply_python_wheel_formula"]
