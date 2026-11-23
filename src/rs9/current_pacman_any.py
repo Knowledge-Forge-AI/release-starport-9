@@ -278,11 +278,16 @@ def _check_run(doc, local, *, status):
     if (not isinstance(head, dict) or head.get("full_name") != REPOSITORY
             or head.get("id") != repo["id"]):
         raise _fail("CANONICAL_ANY_RUN", "Provider run differs from the importer's original push run", "provider-run-head-repository")
-    if doc.get("status") != status:
-        label = ("provider-run-queued-null" if status == "in_progress"
-                 and doc.get("status") == "queued" and "conclusion" in doc
-                 and doc["conclusion"] is None else "provider-run-lifecycle")
-        raise _fail("CANONICAL_ANY_RUN", "Provider run is not in the required lifecycle state", label)
+    if status == "in_progress":
+        # Conditional policy admits queued aggregate metadata only with null
+        # conclusion. The following job admission still requires the successful
+        # original constructor and the one active, source-bound ARM importer.
+        if doc.get("status") not in ("in_progress", "queued"):
+            raise _fail("CANONICAL_ANY_RUN", "Provider run is not in the required lifecycle state", "provider-run-lifecycle")
+        if "conclusion" not in doc or doc.get("conclusion") is not None:
+            raise _fail("CANONICAL_ANY_RUN", "Active provider run must have no conclusion", "provider-run-conclusion")
+    elif doc.get("status") != status:
+        raise _fail("CANONICAL_ANY_RUN", "Provider run is not in the required lifecycle state", "provider-run-lifecycle")
     return repo["id"]
 
 
