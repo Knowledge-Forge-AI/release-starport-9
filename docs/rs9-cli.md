@@ -133,6 +133,11 @@ rs9 instance register PUBLISHER_ROOT --id CONSUMER_ID \
   --package PACKAGE_ID
 rs9 instance plan PUBLISHER_ROOT --consumer CONSUMER_ID \
   --project PROJECT --destinations FILE --version RELEASE_VERSION
+rs9 instance plan-upgrade PUBLISHER_ROOT --consumer CONSUMER_ID \
+  --project PROJECT --destinations FILE --version RELEASE_VERSION --json > PLAN
+rs9 instance apply-upgrade PUBLISHER_ROOT --consumer CONSUMER_ID \
+  --project PROJECT --destinations FILE --version RELEASE_VERSION \
+  --plan PLAN [--dry-run]
 rs9 instance github doctor [--engine-wheel PATH]
 rs9 instance github plan PUBLISHER_ROOT --engine-wheel PATH --output PLAN
 rs9 instance github apply PUBLISHER_ROOT --plan PLAN --engine-wheel PATH \
@@ -214,14 +219,21 @@ GitHub operations.
 Publisher-root confinement for the instance lane uses POSIX descriptor-relative
 filesystem operations (`dir_fd`/`O_NOFOLLOW`) and is qualified only for that
 scope. No Windows instance-filesystem qualification is claimed by this CLI.
-The state-file replacement compares the predecessor hash captured during
-registration validation; it is a check-then-replace guard for one local
-operator, not a concurrent-writer compare-and-swap or CAS claim. Input drift
-is terminal in v1alpha1 because registrations are immutable; no upgrade or
-re-registration command is exposed in this slice. The complete destinations
-file is the per-consumer immutable snapshot, so an unrelated edit to a shared
-destinations file is terminal drift; selected-entry rebinding and upgrade are
-held for a future contract.
+State-file replacement checks the predecessor hash for a single local
+operator. Coordinate concurrent writers before applying a plan.
+
+When `instance plan` reports input drift, use `instance plan-upgrade --json`
+to save a review for the existing registration. The review binds the complete
+destinations file, normalized intent, registration and publisher state. Run
+`instance apply-upgrade --dry-run` with the same inputs and saved plan to check
+whether it can apply, resume or return a no-op without writing files. Apply
+with the same command and omit `--dry-run`. Apply rechecks the bound inputs
+and publisher state. A relevant change requires a fresh review.
+
+After an interruption, rerun apply with the same reviewed plan. RS9 can
+resume an exact pending transaction and leaves unrelated files and unowned
+staging artifacts in place. These upgrade commands operate locally and carry
+no publication authority.
 
 The physical-ancestor policy checks the publisher root, selected consumer
 project and `.rs9` roots, and the destinations-file parent without silently

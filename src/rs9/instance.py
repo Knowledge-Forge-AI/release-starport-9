@@ -16,11 +16,13 @@ import shutil
 import stat
 import tempfile
 import tomllib
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from datetime import datetime
 from importlib.resources import files as resource_files
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from rs9.constants import SCHEMA_DESTINATIONS
 from rs9.cross_validator import cross_validate, resolve_targets
@@ -42,6 +44,7 @@ SCHEMA_CONSUMER = "rs9.instance-consumer.v1alpha1"
 SCHEMA_DESIRED = "rs9.instance-desired-state.v1alpha1"
 SCHEMA_TRANSACTION = "rs9.instance-transaction.v1alpha1"
 SCHEMA_PLAN = "rs9.instance-plan.v1alpha1"
+SCHEMA_UPGRADE_PLAN = "rs9.instance-consumer-upgrade-plan.v1alpha1"
 SCHEMA_TEMPLATE = "rs9.instance-template.v1alpha1"
 
 INSTANCE_FILE = "rs9-instance.toml"
@@ -391,12 +394,43 @@ def _write_stage_file(stage: Path, relative: str, data: bytes, *, mode: int = 0o
     return target
 
 
-def _link_new(root_fd: int, stage_file: Path, relative: str) -> str:
+@contextmanager
+def _stage_upgrade_file(root_fd: int, data: bytes, *, mode: int) -> Iterator[str]:
+    """Stage a single write inside the already-inspected publisher directory."""
+
+    name = f".rs9-instance-upgrade-{uuid4().hex}"
+    try:
+        descriptor = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                             0o600, dir_fd=root_fd)
+    except OSError:
+        raise ContractError("OUTPUT_CONFINEMENT", "Private upgrade staging failed") from None
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            identity = os.fstat(stream.fileno())
+            try:
+                stream.write(data)
+                stream.flush()
+                os.fchmod(stream.fileno(), mode)
+                os.fsync(stream.fileno())
+                yield name
+            finally:
+                try:
+                    observed = os.stat(name, dir_fd=root_fd, follow_symlinks=False)
+                    if os.path.samestat(identity, observed):
+                        os.unlink(name, dir_fd=root_fd)
+                except FileNotFoundError:
+                    # The successful replacement consumes the staged name.
+                    pass
+    except OSError:
+        raise ContractError("OUTPUT_CONFINEMENT", "Private upgrade staging failed") from None
+
+
+def _link_new(root_fd: int, stage_file: Path | str, relative: str) -> str:
     parts = _relative_parts(relative)
     parent = None
     try:
         parent = _walk_parent(root_fd, parts, create=True)
-        os.link(stage_file, parts[-1], dst_dir_fd=parent, follow_symlinks=False)
+        os.link(stage_file, parts[-1], src_dir_fd=root_fd, dst_dir_fd=parent, follow_symlinks=False)
         os.fsync(parent)
         return "created"
     except FileExistsError:
@@ -408,11 +442,10 @@ def _link_new(root_fd: int, stage_file: Path, relative: str) -> str:
             os.close(parent)
 
 
-def _atomic_replace_control(root: Path, stage_file: Path, relative: str, expected_sha256: str | None) -> str:
+def _atomic_replace_control(root_fd: int, stage_file: Path | str, relative: str, expected_sha256: str | None) -> str:
     """Replace an RS9-owned control file after an exact readback check."""
 
     parts = _relative_parts(relative)
-    root_fd = _open_root(root)
     parent = None
     try:
         parent = _walk_parent(root_fd, parts, create=True)
@@ -420,14 +453,15 @@ def _atomic_replace_control(root: Path, stage_file: Path, relative: str, expecte
         if current["state"] == "missing":
             if expected_sha256 is not None:
                 return "drift"
-            os.link(stage_file, parts[-1], dst_dir_fd=parent, follow_symlinks=False)
+            os.link(stage_file, parts[-1], src_dir_fd=root_fd, dst_dir_fd=parent, follow_symlinks=False)
             os.fsync(parent)
             return "created"
-        if current["state"] != "present" or expected_sha256 is None or current["sha256"] != expected_sha256:
+        if (current["state"] != "present" or current["mode"] != 0o644
+                or expected_sha256 is None or current["sha256"] != expected_sha256):
             return "drift" if current["state"] == "present" else "unsafe"
         # A controlled state file is not consumer content.  Replacing it is
         # allowed only after the previous bytes match the expected identity.
-        os.replace(os.fspath(stage_file), parts[-1], dst_dir_fd=parent)
+        os.replace(stage_file, parts[-1], src_dir_fd=root_fd, dst_dir_fd=parent)
         os.fsync(parent)
         return "replaced"
     except OSError:
@@ -435,7 +469,6 @@ def _atomic_replace_control(root: Path, stage_file: Path, relative: str, expecte
     finally:
         if parent is not None:
             os.close(parent)
-        os.close(root_fd)
 
 
 def _unlink_marker(root_fd: int) -> None:
@@ -445,6 +478,7 @@ def _unlink_marker(root_fd: int) -> None:
         parent = _walk_parent(root_fd, parts)
         try:
             os.unlink(parts[-1], dir_fd=parent)
+            os.fsync(parent)
         except FileNotFoundError:
             pass
     except FileNotFoundError:
@@ -858,17 +892,23 @@ def _load_transaction(root_fd: int) -> dict[str, Any] | None:
     except (UnicodeError, ValueError):
         raise ContractError("TRANSACTION_SCHEMA", "Instance transaction marker is invalid") from None
     table(transaction, {"schema", "operation", "desired_state_sha256", "state", "files",
-                        "pending_consumer_id", "pending_path"},
+                        "pending_consumer_id", "pending_path", "plan_sha256"},
           "instance transaction", required={"schema", "operation", "desired_state_sha256", "state", "files"})
     if (transaction["schema"] != SCHEMA_TRANSACTION or type(transaction["operation"]) is not str
-            or transaction["operation"] not in {"init", "register"}):
+            or transaction["operation"] not in {"init", "register", "upgrade"}):
         raise ContractError("TRANSACTION_SCHEMA", "Unsupported instance transaction")
     _validate_sha(transaction["desired_state_sha256"], "transaction.desired_state_sha256")
     if type(transaction["state"]) is not str or transaction["state"] not in {"prepared", "committing"}:
         raise ContractError("TRANSACTION_SCHEMA", "Unsupported transaction state")
     has_consumer_id = "pending_consumer_id" in transaction
     has_pending_path = "pending_path" in transaction
-    if transaction["operation"] == "register":
+    if transaction["operation"] == "upgrade":
+        if info["mode"] != 0o600:
+            raise ContractError("TRANSACTION_UNSAFE", "Upgrade transaction marker has an unexpected mode")
+        _validate_sha(transaction.get("plan_sha256"), "transaction.plan_sha256")
+    elif "plan_sha256" in transaction:
+        raise ContractError("TRANSACTION_SCHEMA", "Unexpected transaction plan identity")
+    if transaction["operation"] in {"register", "upgrade"}:
         if not has_consumer_id or not has_pending_path:
             raise ContractError("TRANSACTION_SCHEMA", "Register transaction target is missing")
         pending_consumer_id = transaction["pending_consumer_id"]
@@ -1030,7 +1070,7 @@ def _commit(root: Path, desired: list[dict[str, Any]], contents: Mapping[str, by
             if expected_predecessor_sha256 is None:
                 return "drift"
             result = _atomic_replace_control(
-                root, stage_state, STATE_FILE, expected_predecessor_sha256)
+                root_fd, stage_state, STATE_FILE, expected_predecessor_sha256)
             if result not in {"replaced", "created"}:
                 return result
         else:
@@ -1082,7 +1122,7 @@ def _pending_transaction_record(marker: Mapping[str, Any] | None) -> dict[str, A
     if marker is None:
         return None
     pending: dict[str, Any] = {"operation": marker["operation"]}
-    if marker["operation"] == "register":
+    if marker["operation"] in {"register", "upgrade"}:
         pending.update({
             "consumer_id": marker["pending_consumer_id"],
             "path": marker["pending_path"],
@@ -1287,6 +1327,88 @@ def _observation_reason(observation: Mapping[str, Any] | None, evaluated_at: str
     return "remote-readback-requires-authorized-observer"
 
 
+def _upgrade_result(plan: dict, outcome: str, *, dry_run: bool = False) -> Record:
+    result = {
+        "schema": "rs9.instance-consumer-upgrade-result.v1alpha1",
+        "instance_id": plan["instance_id"], "consumer_id": plan["consumer_id"],
+        "planSha256": record_sha256(plan), "outcome": outcome, "changes": plan["changes"],
+        "remoteState": "unknown", "publicationAuthority": False, "publicationEnabled": False,
+    }
+    if dry_run:
+        result["dryRun"] = True
+    return Record(snapshot(result))
+
+
+def _apply_upgrade_files(root_fd: int, plan: dict, desired: list[dict],
+                         replacement: bytes, proposed_state: bytes, *, dry_run: bool) -> Record:
+    plan_sha = record_sha256(plan)
+    consumer_id = plan["consumer_id"]
+    registration_path = _registration_path(consumer_id)
+    paths = (registration_path, STATE_FILE)
+    expected = {row["path"]: row for row in plan["changes"]}
+    unrelated = [row for row in desired if row["path"] != registration_path]
+
+    def verify_unrelated() -> None:
+        if any(row["state"] != "exact" for row in _current_files(root_fd, unrelated)):
+            raise ContractError("UPGRADE_PUBLISHER_STATE", "Unrelated publisher files no longer match")
+
+    verify_unrelated()
+
+    def phase() -> tuple[str, str]:
+        statuses = []
+        for path in paths:
+            info = _inspect_file(root_fd, path)
+            if info["state"] != "present" or info["mode"] != 0o644:
+                raise ContractError("UPGRADE_PUBLISHER_STATE", "Required upgrade file is unavailable")
+            if info["sha256"] == expected[path]["beforeSha256"]:
+                statuses.append("before")
+            elif info["sha256"] == expected[path]["afterSha256"]:
+                statuses.append("after")
+            else:
+                raise ContractError("UPGRADE_PUBLISHER_STATE", "Upgrade file differs from both reviewed versions")
+        return statuses[0], statuses[1]
+
+    transaction = {
+        "schema": SCHEMA_TRANSACTION, "operation": "upgrade", "state": "prepared",
+        "desired_state_sha256": expected[STATE_FILE]["afterSha256"], "plan_sha256": plan_sha,
+        "pending_consumer_id": consumer_id, "pending_path": registration_path,
+        "files": [{"path": path, "sha256": expected[path]["afterSha256"], "status": "pending"}
+                  for path in paths],
+    }
+    marker = _load_transaction(root_fd)
+    if marker is not None and marker != transaction:
+        raise ContractError("UPGRADE_TRANSACTION", "A different publisher transaction is pending")
+    start = phase()
+    if start == ("before", "after") or (start == ("after", "before") and marker is None):
+        raise ContractError("UPGRADE_TRANSACTION", "Publisher files do not form a recoverable upgrade state")
+
+    if dry_run:
+        outcome = "resume" if marker is not None else "noop" if start == ("after", "after") else "ready"
+        return _upgrade_result(plan, outcome, dry_run=True)
+
+    if marker is None:
+        if start == ("after", "after"):
+            return _upgrade_result(plan, "noop")
+        with _stage_upgrade_file(root_fd, _json_bytes(transaction), mode=0o600) as staged:
+            if _link_new(root_fd, staged, TRANSACTION_FILE) != "created":
+                raise ContractError("UPGRADE_TRANSACTION", "A publisher transaction started during apply")
+
+    files = zip(paths, (replacement, proposed_state), strict=True)
+    for index, (path, body) in enumerate(files):
+        if _load_transaction(root_fd) != transaction:
+            raise ContractError("UPGRADE_TRANSACTION", "The publisher transaction changed during apply")
+        if phase()[index] == "before":
+            with _stage_upgrade_file(root_fd, body, mode=0o644) as staged:
+                result = _atomic_replace_control(root_fd, staged, path, expected[path]["beforeSha256"])
+                if result != "replaced":
+                    raise ContractError("UPGRADE_PUBLISHER_STATE", "The upgrade preimage changed during apply")
+    if phase() != ("after", "after") or _load_transaction(root_fd) != transaction:
+        raise ContractError("UPGRADE_TRANSACTION", "The completed upgrade could not be verified")
+    verify_unrelated()
+    _unlink_marker(root_fd)
+    return _upgrade_result(plan, "applied")
+
+
 def plan_instance(
     publisher_root: str | os.PathLike[str],
     *,
@@ -1296,6 +1418,10 @@ def plan_instance(
     version: str,
     evaluated_at: str | None = None,
     observation: Mapping[str, Any] | None = None,
+    review_upgrade: bool = False,
+    _reviewed_upgrade: Mapping[str, Any] | None = None,
+    _runtime_version: str | None = None,
+    _dry_run_upgrade: bool = False,
 ) -> Record:
     """Return a canonical offline desired-state snapshot with remote unknown."""
 
@@ -1306,24 +1432,28 @@ def plan_instance(
     root_fd = _open_root(root)
     try:
         manifest, manifest_bytes = _load_manifest(root, root_fd)
+        if _reviewed_upgrade is not None and manifest["engine"]["version"] != _runtime_version:
+            raise ContractError("ENGINE_VERSION_MISMATCH", "Instance engine version does not match runtime")
         template = _template(manifest["template"]["id"], manifest["template"]["version"])
         if manifest["template"]["sha256"] != template["sha256"]:
             raise ContractError("TEMPLATE_MISMATCH", "Pinned instance template differs from installed template")
         registrations = _list_registrations(root_fd)
         if consumer_id not in registrations:
             raise ContractError("MISSING_REQUIRED_FILE", "Consumer registration is missing")
-        registration, _ = registrations[consumer_id]
+        registration, registration_bytes = registrations[consumer_id]
         consumer = _load_consumer(project, destinations, version=version)
         selected_inputs = consumer["project_inputs"]
-        if (registration["project_id"] != consumer["project_id"] or registration["repository"] != consumer["repository"]
-                or registration["destination_id"] != consumer["target"]["destination"]
-                or registration["package_id"] != consumer["target"]["package"]
-                or registration["package_name"] != consumer["target"]["name"]
-                or registration["project_inputs"] != selected_inputs
-                or registration["destinations_sha256"] != consumer["destinations_sha256"]):
-            input_state = "drift"
-        else:
-            input_state = "exact"
+        same_identity = (
+            registration["project_id"] == consumer["project_id"]
+            and registration["repository"] == consumer["repository"]
+            and registration["destination_id"] == consumer["target"]["destination"]
+            and registration["package_id"] == consumer["target"]["package"]
+            and registration["package_name"] == consumer["target"]["name"]
+        )
+        same_destinations = registration["destinations_sha256"] == consumer["destinations_sha256"]
+        input_state = "exact" if (
+            same_identity and same_destinations and registration["project_inputs"] == selected_inputs
+        ) else "drift"
         desired = _desired_files(manifest_bytes, template, registrations)
         current = _current_files(root_fd, desired)
         marker = _load_transaction(root_fd)
@@ -1355,6 +1485,76 @@ def plan_instance(
                                           if row.get("filename") in selected_names]
         normalized_for_plan["evidence"] = normalized_evidence
         embedded_normalized_sha256 = record_sha256(normalized_for_plan)
+        if review_upgrade or _reviewed_upgrade is not None:
+            if _reviewed_upgrade is None and local_state != "noop":
+                raise ContractError("UPGRADE_PUBLISHER_STATE", "The publisher must match its recorded state before upgrade review")
+            if not same_identity:
+                raise ContractError("UPGRADE_IDENTITY_CHANGED", "The proposed consumer changes its registered identity")
+            if not same_destinations:
+                raise ContractError("UPGRADE_DESTINATION_CHANGED", "The proposed destinations differ from the registered snapshot")
+
+            original_inputs = registration["project_inputs"]
+            if _reviewed_upgrade is not None:
+                inputs = _reviewed_upgrade.get("projectInputs")
+                before = inputs.get("before") if isinstance(inputs, dict) else None
+                if (not isinstance(before, dict) or before.keys() != selected_inputs.keys()
+                        or not all(isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
+                                   for value in before.values())):
+                    raise ContractError("UPGRADE_PLAN_CHANGED", "Invalid reviewed consumer preimage")
+                if original_inputs not in (before, selected_inputs):
+                    raise ContractError("UPGRADE_PUBLISHER_STATE", "Registered inputs differ from the reviewed plan")
+                original_inputs = before
+                registration = dict(registration, project_inputs=before, project_inputs_sha256=record_sha256(before))
+                registration_bytes = _render_registration(registration)
+                registrations[consumer_id] = (registration, registration_bytes)
+                desired = _desired_files(manifest_bytes, template, registrations)
+                state_bytes = _render_state(manifest_bytes, template["sha256"], desired)
+            changed_inputs = sorted(name for name in original_inputs.keys() | selected_inputs.keys()
+                                    if original_inputs.get(name) != selected_inputs.get(name))
+            changes = []
+            if changed_inputs:
+                replacement = dict(registration, project_inputs=selected_inputs,
+                                   project_inputs_sha256=consumer["project_inputs_sha256"])
+                replacement_bytes = _render_registration(replacement)
+                proposed = dict(registrations)
+                proposed[consumer_id] = (replacement, replacement_bytes)
+                proposed_state = _render_state(
+                    manifest_bytes, template["sha256"], _desired_files(manifest_bytes, template, proposed),
+                )
+                changes = [
+                    {"path": _registration_path(consumer_id), "beforeSha256": _sha256(registration_bytes),
+                     "afterSha256": _sha256(replacement_bytes)},
+                    {"path": STATE_FILE, "beforeSha256": _sha256(state_bytes), "afterSha256": _sha256(proposed_state)},
+                ]
+            upgrade_plan = {
+                "schema": SCHEMA_UPGRADE_PLAN,
+                "instance_id": manifest["instance_id"],
+                "consumer_id": consumer_id,
+                "engine": manifest["engine"],
+                "template": manifest["template"],
+                "releaseVersion": version,
+                "outcome": "review" if changes else "noop",
+                "changedInputs": changed_inputs,
+                "projectInputs": {"before": original_inputs, "after": selected_inputs},
+                "destinationsSha256": consumer["destinations_sha256"],
+                "normalizedIntentSha256": embedded_normalized_sha256,
+                "changes": changes,
+                "remoteState": "unknown",
+                "publicationAuthority": False,
+                "publicationEnabled": False,
+            }
+            if _reviewed_upgrade is None:
+                return Record(snapshot(upgrade_plan))
+            if canonical(upgrade_plan) != canonical(_reviewed_upgrade):
+                raise ContractError("UPGRADE_PLAN_CHANGED", "The reviewed upgrade no longer matches the proposed inputs")
+            if not changes:
+                if local_state != "noop":
+                    raise ContractError("UPGRADE_PUBLISHER_STATE", "The publisher does not match its recorded state")
+                return _upgrade_result(upgrade_plan, "noop", dry_run=_dry_run_upgrade)
+            return _apply_upgrade_files(
+                root_fd, upgrade_plan, desired, replacement_bytes, proposed_state, dry_run=_dry_run_upgrade,
+            )
+
         result = {
             "schema": SCHEMA_PLAN,
             "instance_id": manifest["instance_id"],
@@ -1385,4 +1585,16 @@ def plan_instance(
         os.close(root_fd)
 
 
-__all__ = ["init_instance", "plan_instance", "register_consumer"]
+def apply_consumer_upgrade(
+    publisher_root: str | os.PathLike[str], *, consumer_id: str,
+    project: str | os.PathLike[str], destinations: str | os.PathLike[str], version: str,
+    reviewed_plan: Mapping[str, Any], runtime_version: str, dry_run: bool = False,
+) -> Record:
+    """Check, apply or resume an exact reviewed local upgrade."""
+    return plan_instance(
+        publisher_root, consumer_id=consumer_id, project=project, destinations=destinations, version=version,
+        _reviewed_upgrade=reviewed_plan, _runtime_version=_safe_version(runtime_version), _dry_run_upgrade=dry_run,
+    )
+
+
+__all__ = ["apply_consumer_upgrade", "init_instance", "plan_instance", "register_consumer"]

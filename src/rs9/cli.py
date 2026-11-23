@@ -109,6 +109,14 @@ def _add_json_option(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_instance_plan_inputs(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("publisher_root", metavar="PUBLISHER_ROOT")
+    parser.add_argument("--consumer", dest="consumer_id", metavar="CONSUMER_ID", required=True)
+    parser.add_argument("--project", metavar="PROJECT", required=True)
+    parser.add_argument("--destinations", metavar="FILE", required=True)
+    parser.add_argument("--version", dest="release_version", metavar="RELEASE_VERSION", required=True)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = _ArgumentParser(
         prog="rs9",
@@ -236,12 +244,24 @@ def _build_parser() -> argparse.ArgumentParser:
         "plan",
         help="prepare an offline publisher-root desired-state plan",
     )
-    instance_plan.add_argument("publisher_root", metavar="PUBLISHER_ROOT")
-    instance_plan.add_argument("--consumer", dest="consumer_id", metavar="CONSUMER_ID", required=True)
-    instance_plan.add_argument("--project", metavar="PROJECT", required=True)
-    instance_plan.add_argument("--destinations", metavar="FILE", required=True)
-    instance_plan.add_argument("--version", dest="release_version", metavar="RELEASE_VERSION", required=True)
+    _add_instance_plan_inputs(instance_plan)
     _add_json_option(instance_plan)
+
+    instance_plan_upgrade = instance_commands.add_parser(
+        "plan-upgrade", help="review changed consumer inputs against an existing registration",
+    )
+    _add_instance_plan_inputs(instance_plan_upgrade)
+    _add_json_option(instance_plan_upgrade)
+
+    instance_apply_upgrade = instance_commands.add_parser(
+        "apply-upgrade", help="apply or resume one reviewed local consumer upgrade",
+    )
+    _add_instance_plan_inputs(instance_apply_upgrade)
+    instance_apply_upgrade.add_argument("--plan", type=Path, required=True, metavar="FILE")
+    instance_apply_upgrade.add_argument(
+        "--dry-run", action="store_true", help="verify the saved review and publisher state without writing",
+    )
+    _add_json_option(instance_apply_upgrade)
 
     instance_github = instance_commands.add_parser(
         "github",
@@ -563,12 +583,14 @@ def _run_instance_plan(args: argparse.Namespace) -> dict[str, Any]:
     from rs9.instance import plan_instance
 
     runtime_version = distribution_version()
+    review_upgrade = args.instance_command == "plan-upgrade"
     result = dict(plan_instance(
         args.publisher_root,
         consumer_id=args.consumer_id,
         project=args.project,
         destinations=args.destinations,
         version=args.release_version,
+        review_upgrade=review_upgrade,
     ))
     engine = result.get("engine")
     if (not isinstance(engine, dict) or engine.get("distribution") != DIST_NAME
@@ -577,8 +599,29 @@ def _run_instance_plan(args: argparse.Namespace) -> dict[str, Any]:
         result["runtimeEngine"] = {"distribution": DIST_NAME, "version": runtime_version}
         raise _InstanceOperationalFailure("ENGINE_VERSION_MISMATCH", "engine-mismatch", result)
     result["runtimeEngine"] = {"distribution": DIST_NAME, "version": runtime_version}
+    if review_upgrade:
+        return result
     _require_instance_plan_success(result)
     return result
+
+
+def _run_instance_apply_upgrade(args: argparse.Namespace) -> dict[str, Any]:
+    from rs9.errors import ContractError
+    from rs9.github_cli import _safe_read_json
+    from rs9.instance import apply_consumer_upgrade
+
+    envelope = _safe_read_json(args.plan, error_code="UPGRADE_PLAN")
+    result = envelope.get("result")
+    if (envelope.get("schema") != "rs9.cli.v1alpha1" or envelope.get("ok") is not True
+            or envelope.get("command") != "instance.plan-upgrade" or not isinstance(result, dict)):
+        raise ContractError("UPGRADE_PLAN", "An upgrade review JSON envelope is required")
+    reviewed = dict(result)
+    reviewed.pop("runtimeEngine", None)
+    return dict(apply_consumer_upgrade(
+        args.publisher_root, consumer_id=args.consumer_id, project=args.project,
+        destinations=args.destinations, version=args.release_version,
+        reviewed_plan=reviewed, runtime_version=distribution_version(), dry_run=args.dry_run,
+    ))
 
 
 def _run_instance_github_doctor(args: argparse.Namespace) -> dict[str, Any]:
@@ -733,6 +776,10 @@ def _command_name(args: argparse.Namespace) -> str:
         return "instance.register"
     if args.command == "instance" and args.instance_command == "plan":
         return "instance.plan"
+    if args.command == "instance" and args.instance_command == "plan-upgrade":
+        return "instance.plan-upgrade"
+    if args.command == "instance" and args.instance_command == "apply-upgrade":
+        return "instance.apply-upgrade"
     if args.command == "instance" and args.instance_command == "github":
         if args.github_command == "doctor":
             return "instance.github.doctor"
@@ -779,6 +826,11 @@ def _human_success(command: str, result: Any) -> None:
         text = f"Consumer registration: {result['outcome']}.\n"
     elif command == "instance.plan":
         text = "Offline instance plan: prepared. Use --json for details.\n"
+    elif command == "instance.plan-upgrade":
+        text = f"Offline consumer upgrade: {result['outcome']}. Use --json for details.\n"
+    elif command == "instance.apply-upgrade":
+        subject = "Local consumer upgrade check" if result.get("dryRun") else "Local consumer upgrade"
+        text = f"{subject}: {result['outcome']}. Use --json for details.\n"
     elif command == "instance.github.doctor":
         text = "GitHub instance doctor: complete.\n"
     elif command == "instance.github.plan":
@@ -863,8 +915,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = _run_instance_init(args)
         elif command == "instance.register":
             result = _run_instance_register(args)
-        elif command == "instance.plan":
+        elif command in {"instance.plan", "instance.plan-upgrade"}:
             result = _run_instance_plan(args)
+        elif command == "instance.apply-upgrade":
+            result = _run_instance_apply_upgrade(args)
         elif command == "instance.github.doctor":
             result = _run_instance_github_doctor(args)
         elif command == "instance.github.plan":
