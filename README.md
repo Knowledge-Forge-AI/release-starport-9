@@ -34,11 +34,29 @@ Other installation routes include the [Knowledge Forge AI Homebrew tap](https://
 [the npm launcher](https://www.npmjs.com/package/@knowledge-forge-ai/release-starport-9/v/0.1.0),
 and the [signed APT, DNF and pacman repositories](docs/rs9-cli.md#signed-linux-repositories).
 
-RS9 declares its own release inputs in [`.rs9`](.rs9) and registers its
-Homebrew projection under [its publisher instance](config/instances/rs9-public/rs9-instance.toml).
-The registration produces a local plan with no publication authority.
-The wheel and source distribution predate the self-consumer manifest. Their
-GitHub and PyPI bytes remain the release inputs.
+## Plan RS9's own downstream publication
+
+RS9 declares its release inputs in [`.rs9`](.rs9). Use the
+[RS9 destination configuration](config/rs9-cli-destinations.toml) to plan
+the PyPI, Homebrew, and Nix routes. From the root of a current checkout,
+use the installed `rs9` CLI to validate the contract and read the intent.
+
+```sh
+rs9 project validate . --destinations config/rs9-cli-destinations.toml
+rs9 project intent . --destinations config/rs9-cli-destinations.toml --version 0.1.0
+```
+
+The [publisher instance](config/instances/rs9-public/rs9-instance.toml)
+registers the Homebrew projection. Its local plan is available with:
+
+```sh
+rs9 instance plan config/instances/rs9-public --consumer release-starport-9 \
+  --project . --destinations config/rs9-cli-destinations.toml --version 0.1.0
+```
+
+These commands validate and plan offline. They grant no publication
+authority. The immutable `v0.1.0` tag predates the self-consumer manifest.
+Strict release intake requires the contract at the release tag.
 
 ## Current status and navigation
 
