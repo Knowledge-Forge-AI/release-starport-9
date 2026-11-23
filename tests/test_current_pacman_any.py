@@ -315,6 +315,20 @@ class CanonicalAnyCase(unittest.TestCase):
 
 
 class AcquireSuccessTests(CanonicalAnyCase):
+    def test_queued_null_aggregate_keeps_original_bytes_and_active_job_authority(self):
+        provider = Provider(self.build())
+        provider.run.update(status="queued", conclusion=None)
+        token, workspace = self.acquire(provider)
+        self.assertEqual(set(token.files), {LOOM, SOLAR})
+        for product, path in token.files.items():
+            self.assertEqual(path.read_bytes(), payload(name(product)))
+        document = json.loads(token.witness_record())
+        self.assertEqual(document["source"], self.source)
+        self.assertEqual(document["constructor"]["job_id"], CONSTRUCTOR_ID)
+        self.assertEqual(document["importer"]["job_id"], IMPORTER_ID)
+        self.assertEqual(document["construction_authority"], "pacman/x86_64-linux")
+        self.assertIs(document["publication_authority"], False)
+        self.assertEqual(len(provider.calls), 4)
 
     def test_success_imports_exact_original_bytes_with_closed_witness(self):
         zip_bytes = self.build()
@@ -438,36 +452,49 @@ class ProviderIdentityTests(CanonicalAnyCase):
                 self.assertNotIn("UNTRUSTED_SENTINEL_DATA", str(error) + json.dumps(error.details))
                 self.assertEqual(len(provider.calls), 1)
 
-    def test_closed_run_refusal_labels_retain_no_untrusted_values(self):
-        for status, conclusion, expected in (
-                ("queued", None, "provider-run-queued-null"),
-                ("queued", "success", "provider-run-lifecycle"),
-                ("completed", "failure", "provider-run-lifecycle"),
-                ("waiting", None, "provider-run-lifecycle"),
-                ("UNTRUSTED_SENTINEL_DATA", None, "provider-run-lifecycle")):
-            with self.subTest(status=status, conclusion=conclusion):
+    def test_closed_run_refusal_substages_and_null_conclusion_are_enforced(self):
+        for status in ("in_progress", "queued"):
+            provider = Provider(self.zip)
+            provider.run.update(status=status)
+            provider.run.pop("conclusion")
+            error = self.refuse(provider, "CANONICAL_ANY_RUN")
+            self.assertEqual(error.details["substage"], "provider-run-conclusion")
+            self.assertEqual(len(provider.calls), 1)
+            for conclusion in ("success", "failure", "cancelled", "timed_out", "", False):
+                with self.subTest(status=status, conclusion=conclusion):
+                    provider = Provider(self.zip)
+                    provider.run.update(status=status, conclusion=conclusion)
+                    error = self.refuse(provider, "CANONICAL_ANY_RUN")
+                    self.assertEqual(error.details["substage"], "provider-run-conclusion")
+                    self.assertEqual(len(provider.calls), 1)
+        for status in ("completed", "waiting", "pending", "requested", "unknown", None, False):
+            with self.subTest(status=status):
                 provider = Provider(self.zip)
-                provider.run.update(status=status, conclusion=conclusion)
+                provider.run.update(status=status, conclusion=None)
                 error = self.refuse(provider, "CANONICAL_ANY_RUN")
-                self.assertEqual(error.details["substage"], expected)
-                self.assertNotIn("UNTRUSTED_SENTINEL_DATA", str(error) + json.dumps(error.details))
+                self.assertEqual(error.details["substage"], "provider-run-lifecycle")
                 self.assertEqual(len(provider.calls), 1)
         provider = Provider(self.zip)
-        provider.run.update(status="queued", head_sha="UNTRUSTED_SENTINEL_DATA")
+        provider.run.update(status="queued", head_sha="3" * 40)
         error = self.refuse(provider, "CANONICAL_ANY_RUN")
         self.assertEqual(error.details["substage"], "provider-run-source")
-        self.assertNotIn("UNTRUSTED_SENTINEL_DATA", str(error) + json.dumps(error.details))
         self.assertEqual(len(provider.calls), 1)
 
-
-    def test_diagnostic_preserves_existing_run_conclusion_handling(self):
-        for conclusion in (None, "success", "failure", False):
-            provider = Provider(self.zip)
-            provider.run.update(conclusion=conclusion)
-            self.assertEqual(any_mod._check_run(provider.run, self.source, status="in_progress"), REPO_ID)
-        provider.run.pop("conclusion")
-        self.assertEqual(any_mod._check_run(provider.run, self.source, status="in_progress"), REPO_ID)
-
+    def test_queued_null_cannot_bypass_successful_constructor_and_active_importer(self):
+        cases = (
+            lambda p: p.job("pacman-x86_64-linux").update(conclusion="failure"),
+            lambda p: p.job("pacman-x86_64-linux").update(status="in_progress", conclusion=None),
+            lambda p: p.job("pacman-aarch64-linux").update(status="completed", conclusion="success"),
+            lambda p: p.job("pacman-aarch64-linux").update(labels=["ubuntu-24.04"]),
+            lambda p: p.job("pacman-aarch64-linux").update(head_sha="3" * 40),
+        )
+        for index, mutate in enumerate(cases):
+            with self.subTest(case=index):
+                provider = Provider(self.zip)
+                provider.run.update(status="queued", conclusion=None)
+                mutate(provider)
+                self.refuse(provider, "CANONICAL_ANY_JOB")
+                self.assertEqual(len(provider.calls), 2)
 
     def test_wrong_repository_source_run_attempt_refused(self):
         cases = {"repository": {"repository": {"id": REPO_ID, "full_name": "Knowledge-Forge-AI/theme-forge-packages"}},
