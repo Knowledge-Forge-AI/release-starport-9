@@ -108,8 +108,11 @@ except socket.gaierror as error:
 
 def _bounded_body(response, tls_sock, timeout):
     deadline = time.monotonic() + timeout
+    expected_length = response.length
     data = bytearray()
-    while len(data) <= MAX_RESPONSE_BODY:
+    # A Connection: close response can release the socket as soon as the
+    # HTTP reader consumes its last byte.
+    while len(data) <= MAX_RESPONSE_BODY and not response.isclosed():
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise TimeoutError()
@@ -120,6 +123,8 @@ def _bounded_body(response, tls_sock, timeout):
         if not part:
             break
         data.extend(part)
+    if len(data) <= MAX_RESPONSE_BODY and expected_length is not None and len(data) < expected_length:
+        raise http.client.IncompleteRead(b"", expected_length - len(data))
     return data
 
 
