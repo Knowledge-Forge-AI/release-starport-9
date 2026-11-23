@@ -130,7 +130,7 @@ rs9 instance init PUBLISHER_ROOT --id INSTANCE_ID \
   [--runner RUNNER] [--environment ENVIRONMENT] [--operator-binding BINDING]
 rs9 instance register PUBLISHER_ROOT --id CONSUMER_ID \
   --project PROJECT --destinations FILE --destination DESTINATION_ID \
-  --package PACKAGE_ID
+  --package PACKAGE_ID [--dry-run] [--expect-plan-sha256 SHA256]
 rs9 instance plan PUBLISHER_ROOT --consumer CONSUMER_ID \
   --project PROJECT --destinations FILE --version RELEASE_VERSION
 rs9 instance plan-upgrade PUBLISHER_ROOT --consumer CONSUMER_ID \
@@ -215,6 +215,15 @@ runtime engine identity separately and rejects a manifest pinned to a different
 engine version. Instance plans remain
 `remoteState: "unknown"`, `publicationAuthority: false`, and do not perform
 GitHub operations.
+
+Use `instance register --dry-run --json` to review the local registration
+without writing. It reports `ready` for a new registration, `resume` for a
+matching interrupted transaction, or `noop` for a complete registration.
+Pass the reported `planSha256` as `--expect-plan-sha256` on the same command
+without `--dry-run` to require the reviewed managed-file state, input
+bindings and transaction before staging. Take a fresh review after changes
+or an interruption. Registration describes local intent. Remote state and
+publication authority require separate qualification.
 
 Publisher-root confinement for the instance lane uses POSIX descriptor-relative
 filesystem operations (`dir_fd`/`O_NOFOLLOW`) and is qualified only for that

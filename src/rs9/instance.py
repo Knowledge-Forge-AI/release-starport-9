@@ -991,16 +991,35 @@ def _state_matches_transaction_window(
     return state_info["state"] == "missing"
 
 
+def _registration_review_digest(
+    current: list[dict[str, Any]], state_info: Mapping[str, Any], state_bytes: bytes,
+    marker: Mapping[str, Any] | None, consumer_id: str | None,
+) -> str:
+    return record_sha256({
+        "schema": "rs9.instance-registration-review.v1alpha1",
+        "consumer_id": consumer_id,
+        "files": current,
+        "state": {key: state_info[key] for key in ("state", "mode", "sha256")},
+        "desired_state_sha256": _sha256(state_bytes),
+        "transaction": marker,
+    })
+
+
 def _commit(root: Path, desired: list[dict[str, Any]], contents: Mapping[str, bytes], state_bytes: bytes,
             *, allow_state_replace: bool, operation: str,
             expected_predecessor_sha256: str | None = None,
-            pending_consumer_id: str | None = None) -> str:
+            pending_consumer_id: str | None = None,
+            reviewed_registration_sha256: str | None = None) -> str:
     root_fd = _open_root(root)
     try:
         current = _current_files(root_fd, desired)
         marker = _load_transaction(root_fd)
         current_states = {row["path"]: row["state"] for row in current}
         state_info = _inspect_file(root_fd, STATE_FILE)
+        if reviewed_registration_sha256 is not None:
+            observed_review = _registration_review_digest(current, state_info, state_bytes, marker, pending_consumer_id)
+            if reviewed_registration_sha256 != observed_review:
+                raise ContractError("REGISTRATION_PLAN_CHANGED", "The reviewed registration plan no longer matches")
     except BaseException:
         # These reads happen before the staging cleanup guard is installed.
         os.close(root_fd)
@@ -1218,8 +1237,16 @@ def register_consumer(
     destination_id: str,
     package_id: str,
     version_provider: Callable[[], str] | None = None,
+    dry_run: bool = False,
+    expected_plan_sha256: str | None = None,
 ) -> Record:
-    """Register one validated Homebrew projection consumer locally."""
+    """Review or register one validated Homebrew projection consumer locally."""
+
+    if expected_plan_sha256 is not None:
+        _validate_sha(expected_plan_sha256, "registration plan")
+    extra: dict[str, Any] = {"consumer_id": consumer_id}
+    if dry_run:
+        extra["dryRun"] = True
 
     root = _validate_root(publisher_root)
     root_fd = _open_root(root)
@@ -1254,7 +1281,7 @@ def register_consumer(
             return _instance_result(operation="register", manifest=manifest, outcome="drift", files=[
                 {"path": path, "state": "drift", "desired_sha256": _sha256(registration_bytes),
                  "observed_sha256": existing["sha256"]}
-            ], extra={"consumer_id": consumer_id})
+            ], extra=extra)
         registrations = _list_registrations(root_fd)
         old_desired = _desired_files(manifest_bytes, template, registrations)
         old_state_bytes = _render_state(manifest_bytes, template["sha256"], old_desired)
@@ -1266,13 +1293,13 @@ def register_consumer(
         if old_state_info["state"] in {"unsafe", "unreadable"}:
             return _instance_result(operation="register", manifest=manifest, outcome="unsafe",
                                     files=_current_files(root_fd, old_desired),
-                                    extra={"consumer_id": consumer_id})
+                                    extra=extra)
         if (old_state_info["state"] == "present"
                 and (old_state_info["sha256"] != _sha256(old_state_bytes)
                      or old_state_info["mode"] != 0o644)) and not state_window:
             return _instance_result(operation="register", manifest=manifest, outcome="drift",
                                     files=_current_files(root_fd, old_desired),
-                                    extra={"consumer_id": consumer_id})
+                                    extra=extra)
         predecessor_sha256 = None
         if old_state_info["state"] == "present":
             predecessor_sha256 = _validate_sha(old_state_info["sha256"], "predecessor state")
@@ -1284,7 +1311,24 @@ def register_consumer(
         outcome = _local_outcome(current, marker is not None)
         if outcome in {"drift", "unsafe"}:
             return _instance_result(operation="register", manifest=manifest, outcome=outcome, files=current,
-                                    extra={"consumer_id": consumer_id})
+                                    extra=extra)
+        if dry_run:
+            if marker is None:
+                outcome = "noop" if outcome == "noop" and predecessor_sha256 == _sha256(state_bytes) else "ready"
+            elif _transaction_matches(marker, state_bytes, desired, "register", pending_consumer_id=consumer_id):
+                outcome = "resume"
+            pending = _pending_transaction_record(marker)
+            if pending is not None:
+                extra["pendingTransaction"] = pending
+            if outcome in {"ready", "resume", "noop"}:
+                plan_sha = _registration_review_digest(current, old_state_info, state_bytes, marker, consumer_id)
+                if expected_plan_sha256 is not None and plan_sha != expected_plan_sha256:
+                    raise ContractError("REGISTRATION_PLAN_CHANGED", "The reviewed registration plan no longer matches")
+                extra["planSha256"] = plan_sha
+                extra["desiredStateSha256"] = _sha256(state_bytes)
+                extra["observedStateSha256"] = predecessor_sha256
+            return _instance_result(operation="register", manifest=manifest, outcome=outcome, files=current,
+                                    extra=extra)
     finally:
         os.close(root_fd)
     contents = {INSTANCE_FILE: manifest_bytes}
@@ -1292,7 +1336,8 @@ def register_consumer(
     contents[path] = registration_bytes
     outcome = _commit(
         root, desired, contents, state_bytes, allow_state_replace=True, operation="register",
-        expected_predecessor_sha256=predecessor_sha256, pending_consumer_id=consumer_id)
+        expected_predecessor_sha256=predecessor_sha256, pending_consumer_id=consumer_id,
+        reviewed_registration_sha256=expected_plan_sha256)
     result_fd = _open_root(root)
     try:
         current = _current_files(result_fd, desired)
@@ -1300,7 +1345,6 @@ def register_consumer(
     finally:
         os.close(result_fd)
     pending = _pending_transaction_record(final_marker) if outcome == "interrupted" else None
-    extra = {"consumer_id": consumer_id}
     if pending is not None:
         extra["pendingTransaction"] = pending
     return _instance_result(operation="register", manifest=manifest, outcome=outcome, files=current,

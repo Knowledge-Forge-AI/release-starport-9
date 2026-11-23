@@ -238,6 +238,8 @@ def _build_parser() -> argparse.ArgumentParser:
     instance_register.add_argument("--destinations", metavar="FILE", required=True)
     instance_register.add_argument("--destination", dest="destination_id", metavar="DESTINATION_ID", required=True)
     instance_register.add_argument("--package", dest="package_id", metavar="PACKAGE_ID", required=True)
+    instance_register.add_argument("--dry-run", action="store_true", help="review local registration without writing")
+    instance_register.add_argument("--expect-plan-sha256", metavar="SHA256", help="require the reviewed registration digest")
     _add_json_option(instance_register)
 
     instance_plan = instance_commands.add_parser(
@@ -574,8 +576,11 @@ def _run_instance_register(args: argparse.Namespace) -> dict[str, Any]:
         destination_id=args.destination_id,
         package_id=args.package_id,
         version_provider=lambda: runtime_version,
+        dry_run=args.dry_run,
+        expected_plan_sha256=args.expect_plan_sha256,
     ))
-    _require_instance_success(result)
+    if not (args.dry_run and result.get("outcome") in {"ready", "resume"}):
+        _require_instance_success(result)
     return result
 
 
@@ -823,7 +828,8 @@ def _human_success(command: str, result: Any) -> None:
     elif command == "instance.init":
         text = f"Publisher instance: {result['outcome']}.\n"
     elif command == "instance.register":
-        text = f"Consumer registration: {result['outcome']}.\n"
+        label = "Consumer registration check" if result.get("dryRun") else "Consumer registration"
+        text = f"{label}: {result['outcome']}.\n"
     elif command == "instance.plan":
         text = "Offline instance plan: prepared. Use --json for details.\n"
     elif command == "instance.plan-upgrade":

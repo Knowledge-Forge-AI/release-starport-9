@@ -53,6 +53,83 @@ class InstanceUpgradeTests(unittest.TestCase):
             version_provider=version_provider,
         ))
 
+    def test_registration_review_checks_preimages_and_writes_only_on_apply(self) -> None:
+        self.init()
+        project = Path(self.temp.name) / "registration-project"
+        shutil.copytree(TF_PROJECT, project)
+        options = dict(consumer_id="nebular", project=project, destinations=DESTINATIONS,
+                       destination_id="kfa-homebrew-tap", package_id="main",
+                       version_provider=lambda: "unreleased")
+
+        def snapshot():
+            return {path.relative_to(self.publisher): (path.read_bytes(), path.stat().st_ino)
+                    for path in self.publisher.rglob("*") if path.is_file()}
+
+        before = snapshot()
+        plan = register_consumer(self.publisher, **options, dry_run=True)
+        self.assertEqual(plan["outcome"], "ready")
+        self.assertFalse(plan["publicationAuthority"])
+        self.assertEqual(register_consumer(self.publisher, **options, dry_run=True), plan)
+        self.assertEqual(snapshot(), before)
+
+        config = project / ".rs9/homebrew.toml"
+        original = config.read_bytes()
+        config.write_bytes(original + b"\n# changed after review\n")
+        with self.assertRaisesRegex(ContractError, "REGISTRATION_PLAN_CHANGED"):
+            register_consumer(self.publisher, **options, expected_plan_sha256=plan["planSha256"])
+        self.assertEqual(snapshot(), before)
+        config.write_bytes(original)
+
+        # Remove an exact managed file between admission and the actual staging read.
+        path = self.publisher / ".rs9-instance/scaffold/review-checklist.md"
+        original_scaffold = path.read_bytes()
+        commit = instance_module._commit
+
+        def changed(root, *args, **kwargs):
+            path.unlink()
+            return commit(root, *args, **kwargs)
+
+        with mock.patch.object(instance_module, "_commit", side_effect=changed):
+            with self.assertRaisesRegex(ContractError, "REGISTRATION_PLAN_CHANGED"):
+                register_consumer(self.publisher, **options, expected_plan_sha256=plan["planSha256"])
+        self.assertFalse((self.publisher / TRANSACTION_FILE).exists())
+        self.assertFalse(list(self.publisher.glob(".rs9-instance-stage-*")))
+        self.assertFalse(path.exists())
+        path.write_bytes(original_scaffold)
+        path.chmod(0o644)
+
+        self.assertEqual(register_consumer(
+            self.publisher, **options, expected_plan_sha256=plan["planSha256"],
+        )["outcome"], "created")
+        ready_again = register_consumer(self.publisher, **options, dry_run=True)
+        self.assertEqual(ready_again["outcome"], "noop")
+        self.assertNotEqual(ready_again["planSha256"], plan["planSha256"])
+        after = snapshot()
+        self.assertEqual(register_consumer(
+            self.publisher, **options, expected_plan_sha256=ready_again["planSha256"],
+        )["outcome"], "noop")
+        self.assertEqual(snapshot(), after)
+
+    def test_registration_review_separates_matching_and_unrelated_transactions(self) -> None:
+        self.init()
+        options = dict(project=TF_PROJECT, destinations=DESTINATIONS, destination_id="kfa-homebrew-tap",
+                       package_id="main", version_provider=lambda: "unreleased")
+        with mock.patch.object(instance_module, "_atomic_replace_control", side_effect=RuntimeError("interrupt")):
+            with self.assertRaisesRegex(RuntimeError, "interrupt"):
+                register_consumer(self.publisher, **options, consumer_id="nebular")
+        marker = self.publisher / TRANSACTION_FILE
+        before = marker.read_bytes()
+        resume = register_consumer(self.publisher, **options, consumer_id="nebular", dry_run=True)
+        self.assertEqual(resume["outcome"], "resume")
+        unrelated = register_consumer(self.publisher, **options, consumer_id="another", dry_run=True)
+        self.assertEqual(unrelated["outcome"], "interrupted")
+        self.assertNotIn("planSha256", unrelated)
+        self.assertEqual(marker.read_bytes(), before)
+        completed = register_consumer(self.publisher, **options, consumer_id="nebular",
+                                      expected_plan_sha256=resume["planSha256"])
+        self.assertEqual(completed["outcome"], "created")
+        self.assertFalse(marker.exists())
+
     def test_upgrade_recovers_between_registration_and_state_replacement(self) -> None:
         self.init()
         project = Path(self.temp.name) / "proposed-consumer"
