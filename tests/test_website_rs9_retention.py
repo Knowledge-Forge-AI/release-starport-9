@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import tarfile
 import tempfile
@@ -41,6 +42,11 @@ class Rs9RetentionTests(unittest.TestCase):
         }
         self.write_inventory()
         self.previous = {"previousDeployment": 42, "sourceCommit": "7" * 40}
+        self.workflow_identity = {
+            "GITHUB_REPOSITORY": "Knowledge-Forge-AI/release-starport-9",
+            "GITHUB_REF": "refs/heads/main",
+            "GITHUB_SHA": "9" * 40,
+        }
         self.live_receipt = {
             "schema": "knowledge-forge.website-preservation.v1",
             "repository": "Knowledge-Forge-AI/release-starport-9",
@@ -59,7 +65,8 @@ class Rs9RetentionTests(unittest.TestCase):
                 return json.dumps(self.live_receipt).encode()
             return fetch(url, limit)
 
-        with patch.object(pages, "admit_previous_deployment", return_value=self.previous), \
+        with patch.dict(os.environ, self.workflow_identity), \
+                patch.object(pages, "admit_previous_deployment", return_value=self.previous), \
                 patch.object(pages, "fetch", side_effect=read_public):
             return pages.assemble("release-starport-9", self.site, self.outputs, self.archive,
                                   initial_rs9_tree=initial_rs9_tree)
@@ -72,6 +79,7 @@ class Rs9RetentionTests(unittest.TestCase):
 
     def test_site_only_build_retains_exact_repository_members(self):
         receipt = self.run_assembler(self.fetch)
+        self.assertEqual(receipt["websiteSourceCommit"], self.workflow_identity["GITHUB_SHA"])
         self.assertEqual(receipt["protectedFileCount"], len(self.files))
         self.assertEqual(receipt["protectedInventorySha256"], pages.sha256(self.inventory.read_bytes()))
         self.assertEqual(receipt["protectedPublicBytes"], sum(map(len, self.files.values())))
@@ -91,6 +99,18 @@ class Rs9RetentionTests(unittest.TestCase):
                              {*self.files, *pages.WEBSITE_FILES, "site-preservation.json"})
             for name, body in self.files.items():
                 self.assertEqual(archive.extractfile("./" + name).read(), body)
+
+    def test_non_main_workflow_ref_cannot_assemble_the_site(self):
+        identity = self.workflow_identity | {"GITHUB_REF": "refs/heads/candidate"}
+        with patch.dict(os.environ, identity), \
+                patch.object(pages, "admit_previous_deployment") as admit, \
+                patch.object(pages, "fetch") as fetch:
+            with self.assertRaisesRegex(pages.Refused, "WORKFLOW_REPOSITORY"):
+                pages.assemble("release-starport-9", self.site, self.outputs, self.archive)
+        admit.assert_not_called()
+        fetch.assert_not_called()
+        self.assertFalse(self.outputs.exists())
+        self.assertFalse(self.archive.exists())
 
     def test_missing_inventory_cannot_produce_a_website_only_archive(self):
         self.inventory.unlink()
