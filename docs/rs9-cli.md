@@ -247,6 +247,9 @@ destinations file, normalized intent, registration and publisher state. Run
 whether it can apply, resume or return a no-op without writing files. Apply
 with the same command and omit `--dry-run`. Apply rechecks the bound inputs
 and publisher state. A relevant change requires a fresh review.
+If a local publisher mutation returns `INSTANCE_BUSY`, let the active writer
+finish, then retry the reviewed apply. The retry still verifies that the
+reviewed state is current or can be resumed.
 
 After an interruption, rerun apply with the same reviewed plan. RS9 can
 resume an exact pending transaction and leaves unrelated files and unowned

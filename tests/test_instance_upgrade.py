@@ -7,7 +7,9 @@ import os
 import shutil
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 from unittest import mock
 
 from rs9 import instance as instance_module
@@ -170,6 +172,53 @@ class InstanceUpgradeTests(unittest.TestCase):
                                       expected_plan_sha256=resume["planSha256"])
         self.assertEqual(completed["outcome"], "created")
         self.assertFalse(marker.exists())
+
+    def test_upgrade_serializes_same_plan_recovery_and_other_local_writers(self) -> None:
+        self.init()
+        project = Path(self.temp.name) / "concurrent-consumer"
+        shutil.copytree(TF_PROJECT, project)
+        self.register_tf(project=project)
+        config = project / ".rs9/homebrew.toml"
+        config.write_bytes(config.read_bytes() + b"\n# reviewed concurrent check\n")
+        args = dict(consumer_id="nebular", project=project, destinations=DESTINATIONS, version="0.6.1")
+        review = plan_instance(self.publisher, **args, review_upgrade=True)
+
+        def apply(*, dry_run=False):
+            return apply_consumer_upgrade(self.publisher, **args, reviewed_plan=review,
+                                          runtime_version="unreleased", dry_run=dry_run)
+
+        paused, release = Event(), Event()
+        unlink = instance_module._unlink_marker
+
+        def hold_marker(fd):
+            if paused.is_set():
+                unlink(fd)
+                return
+            paused.set()
+            if not release.wait(10):
+                raise AssertionError("Timed out waiting to resume marker cleanup")
+            unlink(fd)
+
+        marker = self.publisher / TRANSACTION_FILE
+        with mock.patch.object(instance_module, "_unlink_marker", side_effect=hold_marker):
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                attempt = executor.submit(apply)
+                try:
+                    self.assertTrue(paused.wait(10))
+                    before = (marker.read_bytes(), marker.stat().st_ino)
+                    self.assertEqual(apply(dry_run=True)["outcome"], "resume")
+                    with self.assertRaisesRegex(ContractError, "INSTANCE_BUSY"):
+                        apply()
+                    with self.assertRaisesRegex(ContractError, "INSTANCE_BUSY"):
+                        self.register_tf(consumer_id="later")
+                    self.assertEqual((marker.read_bytes(), marker.stat().st_ino), before)
+                    self.assertFalse((self.publisher / ".rs9-instance/consumers/later.toml").exists())
+                finally:
+                    release.set()
+                self.assertEqual(attempt.result(10)["outcome"], "applied")
+        self.assertFalse(marker.exists())
+        self.assertEqual(apply()["outcome"], "noop")
+        self.assertEqual(self.register_tf(consumer_id="later")["outcome"], "created")
 
     def test_upgrade_recovers_between_registration_and_state_replacement(self) -> None:
         self.init()

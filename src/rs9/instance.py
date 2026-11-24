@@ -227,6 +227,18 @@ def _open_root(root: Path) -> int:
         raise ContractError("INPUT_UNREADABLE", "Publisher root cannot be opened") from None
 
 
+def _lock_local_writer(root_fd: int) -> None:
+    """Serialize cooperating writers until their publisher descriptor closes."""
+    try:
+        import fcntl
+
+        fcntl.flock(root_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise ContractError("INSTANCE_BUSY", "Another local writer is applying a publisher transaction") from None
+    except (ImportError, OSError):
+        raise ContractError("OUTPUT_CONFINEMENT", "Cannot lock the publisher directory") from None
+
+
 def _reject_parent_components(path: str | os.PathLike[str]) -> None:
     """Reject lexical parent traversal before validating an input path.
 
@@ -1047,6 +1059,7 @@ def _commit(root: Path, desired: list[dict[str, Any]], contents: Mapping[str, by
             reviewed_registration_sha256: str | None = None) -> str:
     root_fd = _open_root(root)
     try:
+        _lock_local_writer(root_fd)
         current = _current_files(root_fd, desired)
         marker = _load_transaction(root_fd)
         current_states = {row["path"]: row["state"] for row in current}
@@ -1510,6 +1523,8 @@ def plan_instance(
     root = _validate_root(publisher_root)
     root_fd = _open_root(root)
     try:
+        if _reviewed_upgrade is not None and not _dry_run_upgrade:
+            _lock_local_writer(root_fd)
         manifest, manifest_bytes = _load_manifest(root, root_fd)
         if _reviewed_upgrade is not None and manifest["engine"]["version"] != _runtime_version:
             raise ContractError("ENGINE_VERSION_MISMATCH", "Instance engine version does not match runtime")
