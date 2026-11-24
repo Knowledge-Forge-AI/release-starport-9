@@ -14,8 +14,10 @@ from rs9 import instance as instance_module
 from rs9.errors import ContractError
 from rs9.instance import (
     TRANSACTION_FILE,
+    STATE_FILE,
     apply_consumer_upgrade,
     init_instance,
+    inspect_instance,
     plan_instance,
     register_consumer,
 )
@@ -52,6 +54,45 @@ class InstanceUpgradeTests(unittest.TestCase):
             package_id="main",
             version_provider=version_provider,
         ))
+
+    def test_doctor_reports_managed_state_without_a_consumer_checkout(self) -> None:
+        self.init()
+        self.register_tf(version_provider=lambda: "unreleased")
+        unrelated = self.publisher / "operator-notes.txt"
+        unrelated.write_text("manual file", encoding="utf-8")
+        state = self.publisher / STATE_FILE
+        original = state.read_bytes()
+        state_inode = state.stat().st_ino
+
+        result = inspect_instance(self.publisher, runtime_version="unreleased")
+        self.assertEqual(result["outcome"], "noop")
+        self.assertEqual(result["registeredConsumers"], ["nebular"])
+        self.assertIsNone(result["pendingTransaction"])
+        self.assertEqual(result["remoteState"], "unknown")
+        self.assertFalse(result["publicationAuthority"])
+        self.assertEqual((state.read_bytes(), state.stat().st_ino), (original, state_inode))
+        self.assertEqual(unrelated.read_text(encoding="utf-8"), "manual file")
+        self.assertEqual(inspect_instance(self.publisher, runtime_version="unreleased"), result)
+
+        state.write_bytes(original + b" ")
+        result = inspect_instance(self.publisher, runtime_version="unreleased")
+        self.assertEqual(result["outcome"], "drift")
+        self.assertEqual(next(row for row in result["files"] if row["path"] == STATE_FILE)["state"], "drift")
+        self.assertEqual(state.read_bytes(), original + b" ")
+        with self.assertRaisesRegex(ContractError, "ENGINE_VERSION_MISMATCH"):
+            inspect_instance(self.publisher, runtime_version="0.0.0")
+
+    def test_doctor_reports_pending_registration_without_resuming(self) -> None:
+        self.init()
+        with mock.patch.object(instance_module, "_atomic_replace_control", side_effect=RuntimeError("interrupt")):
+            with self.assertRaisesRegex(RuntimeError, "interrupt"):
+                self.register_tf(version_provider=lambda: "unreleased")
+        marker = self.publisher / TRANSACTION_FILE
+        previous = marker.read_bytes()
+        result = inspect_instance(self.publisher, runtime_version="unreleased")
+        self.assertEqual(result["outcome"], "interrupted")
+        self.assertEqual(result["pendingTransaction"]["consumer_id"], "nebular")
+        self.assertEqual(marker.read_bytes(), previous)
 
     def test_registration_review_checks_preimages_and_writes_only_on_apply(self) -> None:
         self.init()

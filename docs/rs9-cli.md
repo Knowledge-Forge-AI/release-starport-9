@@ -128,6 +128,7 @@ rs9 instance init PUBLISHER_ROOT --id INSTANCE_ID \
   --publisher-repository OWNER/REPO --publisher-branch BRANCH \
   [--template TEMPLATE_ID] [--template-version TEMPLATE_VERSION] \
   [--runner RUNNER] [--environment ENVIRONMENT] [--operator-binding BINDING]
+rs9 instance doctor PUBLISHER_ROOT [--json]
 rs9 instance register PUBLISHER_ROOT --id CONSUMER_ID \
   --project PROJECT --destinations FILE --destination DESTINATION_ID \
   --package PACKAGE_ID [--dry-run] [--expect-plan-sha256 SHA256]
@@ -159,6 +160,14 @@ stale distribution selected from another `PYTHONPATH`, reports `unreleased`;
 the CLI does not invent or borrow a release number.
 The resulting engine string is a distribution label: a development value such
 as `unreleased` cannot distinguish independently rebuilt source trees.
+
+`instance doctor` checks the local publisher manifest, installed template,
+registration files and recorded desired state. It reports pending local
+transactions for inspection and returns a nonzero exit when the publisher
+needs review. It reads no consumer checkout and contacts no remote service.
+Use `instance plan` to compare a specific consumer's current inputs.
+The doctor result leaves remote state unknown and confers no publication
+authority.
 
 `doctor` reports only the running Python implementation/version and whether a
 `gh` executable is present on `PATH`. It does not execute `gh` and does not

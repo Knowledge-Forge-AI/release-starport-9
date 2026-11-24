@@ -870,6 +870,41 @@ def _current_files(root_fd: int, desired: list[dict[str, Any]]) -> list[dict[str
     return result
 
 
+def inspect_instance(publisher_root: str | os.PathLike[str], *, runtime_version: str) -> Record:
+    """Inspect the local publisher's managed files without consumer checkouts."""
+    root = _validate_root(publisher_root)
+    root_fd = _open_root(root)
+    try:
+        manifest, manifest_bytes = _load_manifest(root, root_fd)
+        if manifest["engine"]["version"] != _safe_version(runtime_version):
+            raise ContractError("ENGINE_VERSION_MISMATCH", "Instance engine version does not match runtime")
+        template = _template(manifest["template"]["id"], manifest["template"]["version"])
+        if manifest["template"]["sha256"] != template["sha256"]:
+            raise ContractError("TEMPLATE_MISMATCH", "Pinned instance template differs from installed template")
+        registrations = _list_registrations(root_fd)
+        desired = _desired_files(manifest_bytes, template, registrations)
+        state_bytes = _render_state(manifest_bytes, template["sha256"], desired)
+        state_file = {"path": STATE_FILE, "role": "desired-state", "sha256": _sha256(state_bytes), "mode": 0o644}
+        files = _current_files(root_fd, [*desired, state_file])
+        marker = _load_transaction(root_fd)
+        outcome = _local_outcome(files, marker is not None)
+        state = files[-1]
+        # A registration may already be linked while the state file still
+        # records its verified predecessor.
+        if outcome == "drift" and state["state"] == "drift" and _state_matches_transaction_window(
+            marker,
+            {"state": "present", "mode": state["observed_mode"], "sha256": state["observed_sha256"]},
+            manifest_bytes=manifest_bytes, template=template, desired=desired, registrations=registrations,
+        ):
+            outcome = _local_outcome(files[:-1], True)
+        return _instance_result(
+            operation="doctor", manifest=manifest, outcome=outcome, files=files,
+            extra={"registeredConsumers": sorted(registrations), "pendingTransaction": _pending_transaction_record(marker)},
+        )
+    finally:
+        os.close(root_fd)
+
+
 def _local_outcome(current: list[dict[str, Any]], marker_present: bool) -> str:
     states = {row["state"] for row in current}
     if "unsafe" in states or "unreadable" in states:
@@ -1641,4 +1676,4 @@ def apply_consumer_upgrade(
     )
 
 
-__all__ = ["apply_consumer_upgrade", "init_instance", "plan_instance", "register_consumer"]
+__all__ = ["apply_consumer_upgrade", "init_instance", "inspect_instance", "plan_instance", "register_consumer"]

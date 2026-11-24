@@ -228,6 +228,12 @@ def _build_parser() -> argparse.ArgumentParser:
     instance_init.add_argument("--operator-binding", default="github-actions-oidc", metavar="BINDING")
     _add_json_option(instance_init)
 
+    instance_doctor = instance_commands.add_parser(
+        "doctor", help="check local publisher state and registrations without contacting GitHub",
+    )
+    instance_doctor.add_argument("publisher_root", metavar="PUBLISHER_ROOT")
+    _add_json_option(instance_doctor)
+
     instance_register = instance_commands.add_parser(
         "register",
         help="register one validated consumer locally",
@@ -777,6 +783,8 @@ def _command_name(args: argparse.Namespace) -> str:
             return "adapter.homebrew.render"
     if args.command == "instance" and args.instance_command == "init":
         return "instance.init"
+    if args.command == "instance" and args.instance_command == "doctor":
+        return "instance.doctor"
     if args.command == "instance" and args.instance_command == "register":
         return "instance.register"
     if args.command == "instance" and args.instance_command == "plan":
@@ -827,6 +835,8 @@ def _human_success(command: str, result: Any) -> None:
         text = "Homebrew formula render: written. Use --json for details.\n"
     elif command == "instance.init":
         text = f"Publisher instance: {result['outcome']}.\n"
+    elif command == "instance.doctor":
+        text = f"Local publisher files match. Registered consumers: {len(result['registeredConsumers'])}.\n"
     elif command == "instance.register":
         label = "Consumer registration check" if result.get("dryRun") else "Consumer registration"
         text = f"{label}: {result['outcome']}.\n"
@@ -919,6 +929,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = _run_adapter_homebrew_render(args)
         elif command == "instance.init":
             result = _run_instance_init(args)
+        elif command == "instance.doctor":
+            from rs9.instance import inspect_instance
+
+            result = dict(inspect_instance(args.publisher_root, runtime_version=distribution_version()))
+            _require_instance_success(result)
         elif command == "instance.register":
             result = _run_instance_register(args)
         elif command in {"instance.plan", "instance.plan-upgrade"}:
