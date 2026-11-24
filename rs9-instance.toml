@@ -1,0 +1,24 @@
+schema = "rs9.instance.v1alpha1"
+instance_id = "rs9-public"
+
+[engine]
+distribution = "release-starport-9"
+version = "0.1.0"
+
+[template]
+id = "github-homebrew-projection"
+version = "v1alpha1"
+sha256 = "ff1a1ff2d256653b7ce1f059d4a1d7b492d7d00c2769b49de6e50124a0260f80"
+
+[hosting]
+provider = "github.com"
+scope = "Knowledge-Forge-AI"
+publisher_repository = "Knowledge-Forge-AI/release-starport-9"
+publisher_branch = "main"
+runner = "ubuntu-24.04"
+environment = "rs9-publish"
+operator_binding = "github-actions-oidc"
+
+[adapter]
+name = "homebrew"
+mode = "projection"
