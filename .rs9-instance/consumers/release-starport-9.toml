@@ -1,0 +1,14 @@
+schema = "rs9.instance-consumer.v1alpha1"
+id = "release-starport-9"
+project_id = "release-starport-9"
+repository = "Knowledge-Forge-AI/release-starport-9"
+destination_id = "kfa-homebrew-tap"
+package_id = "cli"
+package_name = "release-starport-9"
+project_inputs_sha256 = "261f9e479c425295b3da1e259bb226d396b08d3c9744efc31a41e05a913ed4d6"
+destinations_sha256 = "7e597274be0d76571474757e2782b5f1043d30ba83bd7442d8146328b5931029"
+
+[project_inputs]
+"homebrew.toml" = "59ca243c3fe376d875ffba1b888f66a8468aef149f7050fd48d0b8a9887e1c3e"
+"project.toml" = "688e6bd529e8f748db3f46e515eaea1686c789fe9e3b878346a4ce4ac62d39fd"
+"releases.toml" = "8b40d26ca8b8614f7a0a2273bab9f6c782ee2225e61bb232398532ca19b32a4b"
