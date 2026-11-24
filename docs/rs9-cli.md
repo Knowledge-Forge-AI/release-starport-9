@@ -259,6 +259,32 @@ Drift is a successful observation and does not authorize replacement.
 The result includes formula digests and the tagged-consumer-contract flag.
 It omits the remote file contents and claims no publication authority.
 
+### Review a forward update to an existing tap formula
+
+Start with a release tag that contains the consumer contract. RS9's
+historical `v0.1.0` tag predates that contract. Its archive evidence is
+useful for inspection, while a successor needs its own tagged evidence.
+Confirm that `instance plan` matches the registered consumer. Render the
+successor in a new directory with `instance prepare-homebrew` and the
+`--require-tagged-consumer-contract` option. Use the same evidence and
+strict option with `instance inspect-homebrew`.
+
+For an existing formula, use a fresh tap checkout at the exact observed
+commit. Confirm that its index is clean, the formula is a `100644` entry,
+and the index blob's SHA-256 matches `remote.sha256` in the observation.
+Confirm that the generated file's SHA-256 matches `desired.sha256` and
+review the diff, including version, archive URLs, hashes and native checks.
+An `unsafe` or `unknown` observation needs investigation before review.
+
+Apply the reviewed one-file patch to the isolated Git index with
+`git apply --cached --check` followed by `git apply --cached`. Verify that
+the staged formula matches the reviewed digest and mode and is the only
+staged path. The index operation leaves the worktree untouched. Recheck
+the remote branch before submitting the tap change. If the base changed,
+repeat the observation and review against the new base. A native check of
+the exact formula and its release archives is still required before
+enabling the forward publication lane.
+
 Publisher-root confinement for the instance lane uses POSIX descriptor-relative
 filesystem operations (`dir_fd`/`O_NOFOLLOW`) and is qualified only for that
 scope. No Windows instance-filesystem qualification is claimed by this CLI.
