@@ -553,6 +553,7 @@ def apply_python_wheel_formula(
     *,
     tap_repository: str,
     expected_sha256: str,
+    expected_tap_target_sha256: str | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
     """Check or install one reviewed formula in an explicitly selected local tap."""
@@ -575,11 +576,22 @@ def apply_python_wheel_formula(
     root = _as_path(tap_root, code="HOMEBREW_TAP_CUSTODY")
     _check_physical_ancestors(root, code="HOMEBREW_TAP_CUSTODY")
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    target_sha256 = None
     try:
         root_fd = os.open(root, flags)
         try:
             directory = os.open("Formula", flags, dir_fd=root_fd)
             try:
+                if dry_run or expected_tap_target_sha256 is not None:
+                    root_info, formula_info = os.fstat(root_fd), os.fstat(directory)
+                    target_sha256 = record_sha256({
+                        "schema": "rs9.homebrew-local-tap-target.v1alpha1",
+                        "repository": tap_repository,
+                        "root": [root_info.st_dev, root_info.st_ino],
+                        "formulaDirectory": [formula_info.st_dev, formula_info.st_ino],
+                    })
+                    if expected_tap_target_sha256 is not None and expected_tap_target_sha256 != target_sha256:
+                        _reject("HOMEBREW_TAP_TARGET_CHANGED")
                 status = _publish_tap_formula(root, root_fd, directory, name, formula, dry_run=dry_run)
             finally:
                 os.close(directory)
@@ -591,6 +603,7 @@ def apply_python_wheel_formula(
         "schema": "rs9.homebrew-local-projection-result.v1alpha1",
         "status": status,
         **({"dryRun": True} if dry_run else {}),
+        **({"tapTargetSha256": target_sha256} if target_sha256 is not None else {}),
         "instanceId": plan["instance_id"],
         "consumerId": plan["consumer_id"],
         "instancePlanSha256": record_sha256(plan),

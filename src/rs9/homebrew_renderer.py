@@ -109,6 +109,14 @@ _PYTHON_WHEEL_TEMPLATE = """class @@CLASS@@ < Formula
 end
 """
 
+_RS9_PYTHON_WHEEL_TEMPLATE = _PYTHON_WHEEL_TEMPLATE.replace(
+    '    assert_match "@@VERSION@@", shell_output("#{bin}/@@COMMAND@@ --version")',
+    '    assert_equal "@@VERSION@@\\n", shell_output("#{bin}/@@COMMAND@@ --version")\n'
+    '    doctor = JSON.parse(shell_output("#{bin}/@@COMMAND@@ --json doctor"))\n'
+    '    assert_equal true, doctor.fetch("ok")\n'
+    '    assert_equal true, doctor.fetch("result").fetch("python").fetch("tomllib")',
+)
+
 _TAURI_TEMPLATE = """class @@CLASS@@ < Formula
   desc "CLI launcher for the Nebular Fusion desktop workbench"
   homepage "@@HOMEPAGE@@"
@@ -601,9 +609,19 @@ def render_python_wheel_formula(plan: Mapping[str, Any]) -> tuple[str, bytes, di
         "LICENSE": license_expression,
         "COMMAND": command,
     }
-    template = {"id": "homebrew-python-wheel", "version": TEMPLATE_VERSION,
-                "sha256": _sha256(_PYTHON_WHEEL_TEMPLATE.encode("utf-8"))}
-    return f"Formula/{package}.rb", _render_text(_PYTHON_WHEEL_TEMPLATE, values), template
+    template_source = _PYTHON_WHEEL_TEMPLATE
+    template_id = "homebrew-python-wheel"
+    if (binding.get("taggedConsumerContractVerified") is True
+            and repository == "Knowledge-Forge-AI/release-starport-9"
+            and binding.get("distribution") == "release-starport-9" and command == "rs9"):
+        if not any(check["argv"] == [command, "doctor"] and check["expect-exit"] == 0
+                   and check["requires-display"] is False for check in intent["checks"]):
+            _fail("HOMEBREW_RENDER_RS9_DOCTOR_CHECK")
+        template_source = _RS9_PYTHON_WHEEL_TEMPLATE
+        template_id = "homebrew-python-wheel-rs9"
+    template = {"id": template_id, "version": TEMPLATE_VERSION,
+                "sha256": _sha256(template_source.encode("utf-8"))}
+    return f"Formula/{package}.rb", _render_text(template_source, values), template
 
 
 def render_homebrew_formula(normalized: Mapping[str, Any], payload: Mapping[str, Any], *, variant: str) -> dict[str, Any]:

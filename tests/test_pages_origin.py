@@ -54,6 +54,10 @@ class FakeHTTPResponse:
         self._body = io.BytesIO(body)
         self.headers = headers or {}
         self.closed = False
+        self.length = None
+
+    def isclosed(self):
+        return self.closed
 
     def read(self, amt: int | None = None) -> bytes:
         if amt is None:
@@ -111,6 +115,32 @@ class PagesOriginTests(unittest.TestCase):
             diag = diagnose_pages_origin("CNAME", _conn=conn)
         self.assertEqual(diag["state"], "unknown")
         self.assertEqual(diag["class"], "timeout")
+
+    @staticmethod
+    def _close_after_body(payload: bytes, length: int, *, expected_sha256=None):
+        client, server = socket.socketpair()
+        with client, server:
+            server.sendall(
+                b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: "
+                + str(length).encode("ascii") + b"\r\n\r\n" + payload
+            )
+            server.shutdown(socket.SHUT_WR)
+            return diagnose_pages_origin("CNAME", _tls_sock=client, expected_sha256=expected_sha256)
+
+    def test_connection_close_keeps_a_complete_response(self):
+        payload = b"rs9.knowledge-forge.ai\n"
+        digest = hashlib.sha256(payload).hexdigest()
+        diagnostic = self._close_after_body(payload, len(payload), expected_sha256=digest)
+        self._assert_diagnostic_valid(diagnostic)
+        self.assertEqual(diagnostic["state"], "exact")
+        self.assertEqual(diagnostic["body_sha256"], digest)
+
+    def test_connection_close_refuses_a_truncated_response(self):
+        diagnostic = self._close_after_body(b"rs9.", 40)
+        self._assert_diagnostic_valid(diagnostic)
+        self.assertEqual(diagnostic["state"], "unknown")
+        self.assertEqual(diagnostic["class"], "protocol-error")
+        self.assertNotIn("body_sha256", diagnostic)
 
     def test_exact_request_redirect_metadata_and_cli(self):
         import contextlib

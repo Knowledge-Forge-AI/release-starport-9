@@ -426,6 +426,20 @@ def _binding_for(path_value: str | os.PathLike[str], supplied: Mapping[str, Any]
     return _engine_view(verify_engine_wheel(path_value))
 
 
+def _read_instance_plan(
+    publisher_root: str, binding: Mapping[str, Any], reader: Any | None,
+) -> dict[str, Any]:
+    _validate_local_engine_snapshot(publisher_root, binding)
+    observed_at = instance_github._now()
+    observation = instance_github.observe_instance(
+        publisher_root, reader if reader is not None else GitHubReadTransport(),
+        observed_at=observed_at, bootstrap=False,
+    )
+    return dict(instance_github.plan_instance_github(
+        publisher_root, observation, evaluated_at=observed_at, bootstrap=False,
+    ))
+
+
 def plan_instance_github_cli(
     publisher_root: str,
     *,
@@ -437,15 +451,7 @@ def plan_instance_github_cli(
     binding = _binding_for(engine_wheel, _binding)
     reserved = _reserve_plan_output(output)
     try:
-        _validate_local_engine_snapshot(publisher_root, binding)
-        reader = _reader or GitHubReadTransport()
-        observed_at = instance_github._now()
-        observation = instance_github.observe_instance(
-            publisher_root, reader, observed_at=observed_at, bootstrap=False,
-        )
-        plan = dict(instance_github.plan_instance_github(
-            publisher_root, observation, evaluated_at=observed_at, bootstrap=False,
-        ))
+        plan = _read_instance_plan(publisher_root, binding, _reader)
         wrapper = _wrap_plan(plan, binding)
         path, fd, identity = reserved
         try:
@@ -695,13 +701,15 @@ def resume_instance_github_cli(
 
 def doctor_instance_github_cli(
     *,
+    publisher_root: str | None = None,
     engine_wheel: str | os.PathLike[str] | None = None,
     _binding: Mapping[str, Any] | None = None,
+    _reader: Any | None = None,
 ) -> dict[str, Any]:
     binding = None
     if engine_wheel is not None or _binding is not None:
         binding = _binding_for(engine_wheel, _binding)
-    return {
+    report = {
         "schema": "rs9.instance-github-cli-doctor.v1alpha1",
         "engine": binding,
         "gh": {"available": shutil.which("gh") is not None},
@@ -711,6 +719,25 @@ def doctor_instance_github_cli(
         "publicationAuthority": False,
         "qualified": False,
         "publicationEnabled": False,
+    }
+    if publisher_root is None:
+        return report
+    if binding is None:
+        _reject("CLI_INPUT", "A bound engine wheel is required for remote observation.")
+    plan = _read_instance_plan(publisher_root, binding, _reader)
+    return {
+        **report,
+        "schema": "rs9.instance-github-cli-remote-doctor.v1alpha1",
+        "remote_reads": True,
+        "instance": plan["instance"],
+        "outcome": plan["outcome"],
+        "remoteState": plan["remoteState"],
+        "reason": plan["reason"],
+        "commit": plan["commit"],
+        "observedAt": plan["observed_at"],
+        "managedFiles": [
+            {"path": row["path"], "comparison": row["action"]} for row in plan["files"]
+        ],
     }
 
 

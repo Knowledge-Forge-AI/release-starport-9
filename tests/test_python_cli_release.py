@@ -122,6 +122,42 @@ def add_tagged_consumer(root, files):
 
 
 class PythonCliReleaseTests(unittest.TestCase):
+    def test_tagged_rs9_formula_preserves_version_and_doctor_checks(self):
+        root = self.fixture()
+        intent = normalized_homebrew_intent()
+        evidence = verify_homebrew_plan_evidence(intent, root)
+        intent["project"]["repository"] = "Knowledge-Forge-AI/release-starport-9"
+        intent["commands"][0]["name"] = "rs9"
+        intent["checks"][0]["argv"][0] = "rs9"
+        intent["checks"].append({
+            "id": "doctor", "argv": ["rs9", "doctor"],
+            "expect-exit": 0, "requires-display": False,
+        })
+        evidence["distribution"] = "release-starport-9"
+        evidence["receipt"].update(repository=intent["project"]["repository"], command="rs9")
+        plan = {"normalizedIntent": intent, "inputs": {}, "releaseEvidence": evidence}
+
+        def render(*, tagged):
+            bound = record_sha256(intent)
+            plan["inputs"]["normalized_sha256"] = bound
+            evidence.update(normalizedSha256=bound, taggedConsumerContractVerified=tagged)
+            return render_python_wheel_formula(plan)
+
+        _, historical, template = render(tagged=False)
+        self.assertEqual(template["id"], "homebrew-python-wheel")
+        self.assertNotIn(b"--json doctor", historical)
+
+        _, forward, template = render(tagged=True)
+        self.assertEqual(template["id"], "homebrew-python-wheel-rs9")
+        self.assertIn(b'assert_equal "1.2.3\\n", shell_output("#{bin}/rs9 --version")', forward)
+        self.assertIn(b'JSON.parse(shell_output("#{bin}/rs9 --json doctor"))', forward)
+        self.assertIn(b'doctor.fetch("result").fetch("python").fetch("tomllib")', forward)
+        self.assertIn(b'assert_predicate pkgshare/file, :file?', forward)
+
+        intent["checks"].pop()
+        with self.assertRaisesRegex(ContractError, "HOMEBREW_RENDER_RS9_DOCTOR_CHECK"):
+            render(tagged=True)
+
     def test_prepares_one_formula_with_both_verified_assets_without_clobber(self):
         root = self.fixture()
         intent = normalized_homebrew_intent()
@@ -326,15 +362,38 @@ class PythonCliReleaseTests(unittest.TestCase):
         self.assertFalse(preview["publicationAuthority"])
         self.assertEqual(list((tap / "Formula").iterdir()), [neighbor])
         self.assertEqual(neighbor.stat(), before)
+        reviewed_target = preview["tapTargetSha256"]
+        self.assertRegex(reviewed_target, r"^[a-f0-9]{64}$")
+
+        other_tap = root / "other-tap"
+        (other_tap / "Formula").mkdir(parents=True)
+        with self.assertRaisesRegex(ContractError, "HOMEBREW_TAP_TARGET_CHANGED"):
+            apply_python_wheel_formula(
+                plan, other_tap, tap_repository=tap_repository, expected_sha256=digest(desired),
+                expected_tap_target_sha256=reviewed_target,
+            )
+        self.assertEqual(list((other_tap / "Formula").iterdir()), [])
+
+        original_formulas = tap / "reviewed-Formula"
+        (tap / "Formula").rename(original_formulas)
+        (tap / "Formula").mkdir()
+        with self.assertRaisesRegex(ContractError, "HOMEBREW_TAP_TARGET_CHANGED"):
+            apply(expected_tap_target_sha256=reviewed_target)
+        self.assertEqual(list((tap / "Formula").iterdir()), [])
+        (tap / "Formula").rmdir()
+        original_formulas.rename(tap / "Formula")
+
         with patch("rs9.installed_homebrew.os.link", side_effect=OSError("interrupted before link")):
             with self.assertRaisesRegex(ContractError, "HOMEBREW_TAP_CUSTODY"):
                 apply()
         self.assertEqual(list((tap / "Formula").iterdir()), [neighbor])
-        created = apply()
+        created = apply(expected_tap_target_sha256=reviewed_target)
         self.assertEqual(created["status"], "created")
+        self.assertEqual(created["tapTargetSha256"], reviewed_target)
         self.assertEqual(target.read_bytes(), desired)
         self.assertFalse(created["publicationEnabled"])
         initial = target.stat()
+        self.assertEqual(apply(expected_tap_target_sha256=reviewed_target)["status"], "noop")
         self.assertEqual(apply()["status"], "noop")
         self.assertEqual(target.stat(), initial)
         self.assertEqual(apply(dry_run=True)["status"], "noop")

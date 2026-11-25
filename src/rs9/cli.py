@@ -259,6 +259,12 @@ def _build_parser() -> argparse.ArgumentParser:
     instance_init.add_argument("--operator-binding", default="github-actions-oidc", metavar="BINDING")
     _add_json_option(instance_init)
 
+    instance_doctor = instance_commands.add_parser(
+        "doctor", help="check local publisher state and registrations without contacting GitHub",
+    )
+    instance_doctor.add_argument("publisher_root", metavar="PUBLISHER_ROOT")
+    _add_json_option(instance_doctor)
+
     instance_register = instance_commands.add_parser(
         "register",
         help="register one validated consumer locally",
@@ -269,6 +275,8 @@ def _build_parser() -> argparse.ArgumentParser:
     instance_register.add_argument("--destinations", metavar="FILE", required=True)
     instance_register.add_argument("--destination", dest="destination_id", metavar="DESTINATION_ID", required=True)
     instance_register.add_argument("--package", dest="package_id", metavar="PACKAGE_ID", required=True)
+    instance_register.add_argument("--dry-run", action="store_true", help="review local registration without writing")
+    instance_register.add_argument("--expect-plan-sha256", metavar="SHA256", help="require the reviewed registration digest")
     _add_json_option(instance_register)
 
     instance_plan = instance_commands.add_parser(
@@ -292,6 +300,9 @@ def _build_parser() -> argparse.ArgumentParser:
     instance_apply_homebrew.add_argument("--tap-repository", metavar="OWNER/REPO", required=True)
     instance_apply_homebrew.add_argument("--expect-formula-sha256", metavar="SHA256", required=True)
     instance_apply_homebrew.add_argument(
+        "--expect-tap-target-sha256", metavar="SHA256", help="require the reviewed local tap target digest",
+    )
+    instance_apply_homebrew.add_argument(
         "--dry-run", action="store_true", help="verify reviewed evidence and local formula state without writing",
     )
 
@@ -300,6 +311,22 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_instance_plan_options(instance_inspect_homebrew, require_evidence=True)
     instance_inspect_homebrew.add_argument("--branch", metavar="BRANCH", required=True)
+
+    instance_plan_upgrade = instance_commands.add_parser(
+        "plan-upgrade", help="review changed consumer inputs against an existing registration",
+    )
+    _add_instance_plan_inputs(instance_plan_upgrade)
+    _add_json_option(instance_plan_upgrade)
+
+    instance_apply_upgrade = instance_commands.add_parser(
+        "apply-upgrade", help="apply or resume one reviewed local consumer upgrade",
+    )
+    _add_instance_plan_inputs(instance_apply_upgrade)
+    instance_apply_upgrade.add_argument("--plan", type=Path, required=True, metavar="FILE")
+    instance_apply_upgrade.add_argument(
+        "--dry-run", action="store_true", help="verify the saved review and publisher state without writing",
+    )
+    _add_json_option(instance_apply_upgrade)
 
     instance_github = instance_commands.add_parser(
         "github",
@@ -314,9 +341,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
     github_doctor = github_commands.add_parser(
         "doctor",
-        help="report local GitHub transport and engine-artifact capabilities",
+        help="check local GitHub tooling or read an instance at a pinned remote commit",
     )
     github_doctor.add_argument("--engine-wheel", metavar="PATH")
+    github_doctor.add_argument("--publisher-root", metavar="PUBLISHER_ROOT",
+                               help="read the configured publisher branch, requiring --engine-wheel")
     _add_json_option(github_doctor)
 
     github_plan = github_commands.add_parser(
@@ -612,8 +641,11 @@ def _run_instance_register(args: argparse.Namespace) -> dict[str, Any]:
         destination_id=args.destination_id,
         package_id=args.package_id,
         version_provider=lambda: runtime_version,
+        dry_run=args.dry_run,
+        expected_plan_sha256=args.expect_plan_sha256,
     ))
-    _require_instance_success(result)
+    if not (args.dry_run and result.get("outcome") in {"ready", "resume"}):
+        _require_instance_success(result)
     return result
 
 
@@ -621,12 +653,14 @@ def _run_instance_plan(args: argparse.Namespace) -> dict[str, Any]:
     from rs9.instance import plan_instance
 
     runtime_version = distribution_version()
+    review_upgrade = args.instance_command == "plan-upgrade"
     result = dict(plan_instance(
         args.publisher_root,
         consumer_id=args.consumer_id,
         project=args.project,
         destinations=args.destinations,
         version=args.release_version,
+        review_upgrade=review_upgrade,
     ))
     engine = result.get("engine")
     if (not isinstance(engine, dict) or engine.get("distribution") != DIST_NAME
@@ -635,6 +669,8 @@ def _run_instance_plan(args: argparse.Namespace) -> dict[str, Any]:
         result["runtimeEngine"] = {"distribution": DIST_NAME, "version": runtime_version}
         raise _InstanceOperationalFailure("ENGINE_VERSION_MISMATCH", "engine-mismatch", result)
     result["runtimeEngine"] = {"distribution": DIST_NAME, "version": runtime_version}
+    if review_upgrade:
+        return result
     _require_instance_plan_success(result)
     if args.require_tagged_consumer_contract and args.release_evidence is None:
         from rs9.errors import ContractError
@@ -653,10 +689,29 @@ def _run_instance_plan(args: argparse.Namespace) -> dict[str, Any]:
     return result
 
 
+def _run_instance_apply_upgrade(args: argparse.Namespace) -> dict[str, Any]:
+    from rs9.errors import ContractError
+    from rs9.github_cli import _safe_read_json
+    from rs9.instance import apply_consumer_upgrade
+
+    envelope = _safe_read_json(args.plan, error_code="UPGRADE_PLAN")
+    result = envelope.get("result")
+    if (envelope.get("schema") != "rs9.cli.v1alpha1" or envelope.get("ok") is not True
+            or envelope.get("command") != "instance.plan-upgrade" or not isinstance(result, dict)):
+        raise ContractError("UPGRADE_PLAN", "An upgrade review JSON envelope is required")
+    reviewed = dict(result)
+    reviewed.pop("runtimeEngine", None)
+    return dict(apply_consumer_upgrade(
+        args.publisher_root, consumer_id=args.consumer_id, project=args.project,
+        destinations=args.destinations, version=args.release_version,
+        reviewed_plan=reviewed, runtime_version=distribution_version(), dry_run=args.dry_run,
+    ))
+
+
 def _run_instance_github_doctor(args: argparse.Namespace) -> dict[str, Any]:
     from rs9.github_cli import doctor_instance_github_cli
 
-    return doctor_instance_github_cli(engine_wheel=args.engine_wheel)
+    return doctor_instance_github_cli(publisher_root=args.publisher_root, engine_wheel=args.engine_wheel)
 
 
 def _run_instance_github_plan(args: argparse.Namespace) -> dict[str, Any]:
@@ -803,6 +858,8 @@ def _command_name(args: argparse.Namespace) -> str:
             return "adapter.homebrew.render"
     if args.command == "instance" and args.instance_command == "init":
         return "instance.init"
+    if args.command == "instance" and args.instance_command == "doctor":
+        return "instance.doctor"
     if args.command == "instance" and args.instance_command == "register":
         return "instance.register"
     if args.command == "instance" and args.instance_command == "plan":
@@ -813,6 +870,10 @@ def _command_name(args: argparse.Namespace) -> str:
         return "instance.apply-homebrew"
     if args.command == "instance" and args.instance_command == "inspect-homebrew":
         return "instance.inspect-homebrew"
+    if args.command == "instance" and args.instance_command == "plan-upgrade":
+        return "instance.plan-upgrade"
+    if args.command == "instance" and args.instance_command == "apply-upgrade":
+        return "instance.apply-upgrade"
     if args.command == "instance" and args.instance_command == "github":
         if args.github_command == "doctor":
             return "instance.github.doctor"
@@ -858,8 +919,11 @@ def _human_success(command: str, result: Any) -> None:
         text = "Homebrew formula render: written. Use --json for details.\n"
     elif command == "instance.init":
         text = f"Publisher instance: {result['outcome']}.\n"
+    elif command == "instance.doctor":
+        text = f"Local publisher files match. Registered consumers: {len(result['registeredConsumers'])}.\n"
     elif command == "instance.register":
-        text = f"Consumer registration: {result['outcome']}.\n"
+        label = "Consumer registration check" if result.get("dryRun") else "Consumer registration"
+        text = f"{label}: {result['outcome']}.\n"
     elif command == "instance.plan":
         text = "Offline instance plan: prepared. Use --json for details.\n"
     elif command == "instance.prepare-homebrew":
@@ -869,8 +933,15 @@ def _human_success(command: str, result: Any) -> None:
         text = f"{subject}: {result['status']}. Use --json for details.\n"
     elif command == "instance.inspect-homebrew":
         text = f"Homebrew tap observation: {result['remote']['state']}. Use --json for details.\n"
+    elif command == "instance.plan-upgrade":
+        text = f"Offline consumer upgrade: {result['outcome']}. Use --json for details.\n"
+    elif command == "instance.apply-upgrade":
+        subject = "Local consumer upgrade check" if result.get("dryRun") else "Local consumer upgrade"
+        text = f"{subject}: {result['outcome']}. Use --json for details.\n"
     elif command == "instance.github.doctor":
         text = "GitHub instance doctor: complete.\n"
+        if "outcome" in result:
+            text = f"GitHub instance readback: {result['outcome']}. Use --json for details.\n"
     elif command == "instance.github.plan":
         text = f"GitHub instance plan: written ({result['outcome']}, {result['remoteState']}).\n"
     elif command == "instance.github.apply":
@@ -963,9 +1034,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = _run_adapter_homebrew_render(args)
         elif command == "instance.init":
             result = _run_instance_init(args)
+        elif command == "instance.doctor":
+            from rs9.instance import inspect_instance
+
+            result = dict(inspect_instance(args.publisher_root, runtime_version=distribution_version()))
+            _require_instance_success(result)
         elif command == "instance.register":
             result = _run_instance_register(args)
-        elif command == "instance.plan":
+        elif command in {"instance.plan", "instance.plan-upgrade"}:
             result = _run_instance_plan(args)
         elif command == "instance.prepare-homebrew":
             from rs9.installed_homebrew import write_python_wheel_formula
@@ -976,14 +1052,24 @@ def main(argv: Sequence[str] | None = None) -> int:
 
             result = apply_python_wheel_formula(
                 _run_instance_plan(args), args.tap_root, tap_repository=args.tap_repository,
-                expected_sha256=args.expect_formula_sha256, dry_run=args.dry_run,
+                expected_sha256=args.expect_formula_sha256,
+                expected_tap_target_sha256=args.expect_tap_target_sha256, dry_run=args.dry_run,
             )
         elif command == "instance.inspect-homebrew":
             from rs9.github_cli import inspect_homebrew_projection
 
             result = inspect_homebrew_projection(_run_instance_plan(args), args.branch)
+        elif command == "instance.apply-upgrade":
+            result = _run_instance_apply_upgrade(args)
         elif command == "instance.github.doctor":
+            if args.publisher_root is not None and args.engine_wheel is None:
+                return _report_error(
+                    command, "USAGE_ERROR", "--publisher-root requires --engine-wheel.",
+                    status=2, json_output=json_output,
+                )
             result = _run_instance_github_doctor(args)
+            if args.publisher_root is not None:
+                _require_instance_success(result)
         elif command == "instance.github.plan":
             result = _run_instance_github_plan(args)
         elif command == "instance.github.apply":

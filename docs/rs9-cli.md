@@ -130,9 +130,10 @@ rs9 instance init PUBLISHER_ROOT --id INSTANCE_ID \
   --publisher-repository OWNER/REPO --publisher-branch BRANCH \
   [--template TEMPLATE_ID] [--template-version TEMPLATE_VERSION] \
   [--runner RUNNER] [--environment ENVIRONMENT] [--operator-binding BINDING]
+rs9 instance doctor PUBLISHER_ROOT [--json]
 rs9 instance register PUBLISHER_ROOT --id CONSUMER_ID \
   --project PROJECT --destinations FILE --destination DESTINATION_ID \
-  --package PACKAGE_ID
+  --package PACKAGE_ID [--dry-run] [--expect-plan-sha256 SHA256]
 rs9 instance plan PUBLISHER_ROOT --consumer CONSUMER_ID \
   --project PROJECT --destinations FILE --version RELEASE_VERSION
 rs9 instance prepare-homebrew PUBLISHER_ROOT --consumer CONSUMER_ID \
@@ -141,11 +142,18 @@ rs9 instance prepare-homebrew PUBLISHER_ROOT --consumer CONSUMER_ID \
 rs9 instance apply-homebrew PUBLISHER_ROOT --consumer CONSUMER_ID \
   --project PROJECT --destinations FILE --version RELEASE_VERSION \
   --release-evidence CAPTURE --tap-root TAP_CHECKOUT \
-  --tap-repository OWNER/TAP --expect-formula-sha256 SHA256 [--dry-run]
+  --tap-repository OWNER/TAP --expect-formula-sha256 SHA256 \
+  [--expect-tap-target-sha256 SHA256] [--dry-run]
 rs9 instance inspect-homebrew PUBLISHER_ROOT --consumer CONSUMER_ID \
   --project PROJECT --destinations FILE --version RELEASE_VERSION \
   --release-evidence CAPTURE --branch TAP_BRANCH
+rs9 instance plan-upgrade PUBLISHER_ROOT --consumer CONSUMER_ID \
+  --project PROJECT --destinations FILE --version RELEASE_VERSION --json > PLAN
+rs9 instance apply-upgrade PUBLISHER_ROOT --consumer CONSUMER_ID \
+  --project PROJECT --destinations FILE --version RELEASE_VERSION \
+  --plan PLAN [--dry-run]
 rs9 instance github doctor [--engine-wheel PATH]
+rs9 instance github doctor --publisher-root PUBLISHER_ROOT --engine-wheel PATH [--json]
 rs9 instance github plan PUBLISHER_ROOT --engine-wheel PATH --output PLAN
 rs9 instance github apply PUBLISHER_ROOT --plan PLAN --engine-wheel PATH \
   [--operation-id OPERATION_ID]
@@ -166,6 +174,14 @@ stale distribution selected from another `PYTHONPATH`, reports `unreleased`;
 the CLI does not invent or borrow a release number.
 The resulting engine string is a distribution label: a development value such
 as `unreleased` cannot distinguish independently rebuilt source trees.
+
+`instance doctor` checks the local publisher manifest, installed template,
+registration files and recorded desired state. It reports pending local
+transactions for inspection and returns a nonzero exit when the publisher
+needs review. It reads no consumer checkout and contacts no remote service.
+Use `instance plan` to compare a specific consumer's current inputs.
+The doctor result leaves remote state unknown and confers no publication
+authority.
 
 `doctor` reports only the running Python implementation/version and whether a
 `gh` executable is present on `PATH`. It does not execute `gh` and does not
@@ -223,6 +239,15 @@ engine version. Instance plans remain
 `remoteState: "unknown"`, `publicationAuthority: false`, and do not perform
 GitHub operations.
 
+Use `instance register --dry-run --json` to review the local registration
+without writing. It reports `ready` for a new registration, `resume` for a
+matching interrupted transaction, or `noop` for a complete registration.
+Pass the reported `planSha256` as `--expect-plan-sha256` on the same command
+without `--dry-run` to require the reviewed managed-file state, input
+bindings and transaction before staging. Take a fresh review after changes
+or an interruption. Registration describes local intent. Remote state and
+publication authority require separate qualification.
+
 Use `--require-tagged-consumer-contract` with `release inspect` to capture
 or verify the release tag's exact `.rs9/project.toml`, `.rs9/releases.toml`,
 and `.rs9/homebrew.toml` files. Strict intake also recomputes the Git object
@@ -248,6 +273,12 @@ formula, and local tap before applying changes. The result includes
 `dryRun: true` and reports `ready` when the destination is absent
 or `noop` when its bytes and mode already match. Drift and unsafe paths
 use the same refusals as apply. Apply repeats admission and file checks.
+When reviewing a local target, use `--dry-run --json` and pass its
+`tapTargetSha256` to apply as `--expect-tap-target-sha256`. This binds
+the tap repository label and the two reviewed local directories by device
+and inode. A different checkout or replaced `Formula/` directory requires
+a fresh review. The digest is a local filesystem binding. GitHub identity
+and publication remain governed by the separate remote commands.
 
 `instance inspect-homebrew` reruns local planning and release-evidence
 verification, renders the expected formula in memory, and reads the tap
@@ -288,14 +319,24 @@ enabling the forward publication lane.
 Publisher-root confinement for the instance lane uses POSIX descriptor-relative
 filesystem operations (`dir_fd`/`O_NOFOLLOW`) and is qualified only for that
 scope. No Windows instance-filesystem qualification is claimed by this CLI.
-The state-file replacement compares the predecessor hash captured during
-registration validation; it is a check-then-replace guard for one local
-operator, not a concurrent-writer compare-and-swap or CAS claim. Input drift
-is terminal in v1alpha1 because registrations are immutable; no upgrade or
-re-registration command is exposed in this slice. The complete destinations
-file is the per-consumer immutable snapshot, so an unrelated edit to a shared
-destinations file is terminal drift; selected-entry rebinding and upgrade are
-held for a future contract.
+State-file replacement checks the predecessor hash for a single local
+operator. Coordinate concurrent writers before applying a plan.
+
+When `instance plan` reports input drift, use `instance plan-upgrade --json`
+to save a review for the existing registration. The review binds the complete
+destinations file, normalized intent, registration and publisher state. Run
+`instance apply-upgrade --dry-run` with the same inputs and saved plan to check
+whether it can apply, resume or return a no-op without writing files. Apply
+with the same command and omit `--dry-run`. Apply rechecks the bound inputs
+and publisher state. A relevant change requires a fresh review.
+If a local publisher mutation returns `INSTANCE_BUSY`, let the active writer
+finish, then retry the reviewed apply. The retry still verifies that the
+reviewed state is current or can be resumed.
+
+After an interruption, rerun apply with the same reviewed plan. RS9 can
+resume an exact pending transaction and leaves unrelated files and unowned
+staging artifacts in place. These upgrade commands operate locally and carry
+no publication authority.
 
 The physical-ancestor policy checks the publisher root, selected consumer
 project and `.rs9` roots, and the destinations-file parent without silently
@@ -332,10 +373,14 @@ provisioning contract below.
 
 The GitHub family is opt-in by command name. Ordinary `rs9`, `doctor`,
 `project`, and local `instance` commands remain offline and auth-free.
-`instance github doctor` is also local-only: it reports whether `gh` is
-available and, when supplied, verifies an explicit engine wheel. It does not
-run `gh` or inspect authentication. Human mode reports completion only; use
-`--json` for the availability and engine-binding fields.
+`instance github doctor` by default reports whether `gh` is available
+and optionally verifies the named engine wheel offline. Specify
+`--publisher-root` with `--engine-wheel` to read that publisher's
+configured GitHub branch through the existing read transport. The JSON
+result identifies the observed commit, managed-file comparisons and
+reason. An exact snapshot returns exit 0. Drift, missing files and an
+unknown remote state return exit 1. The observation produces no plan
+file, transaction journal, or publication authority.
 
 The `plan`, `apply`, and `resume` commands require `--engine-wheel PATH`. The
 wheel is opened as a bounded local archive and its raw SHA-256 is recorded;
