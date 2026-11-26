@@ -334,7 +334,7 @@ def _select_sdk_inputs(captures):
     versions = [intent.get("version") for _, intent, _ in captures
                 if intent.get("project", {}).get("id") == NEBULAR]
     if versions == ["0.8.0"]:
-        from rs9._archarm_support.successor_20261120 import INPUTS, PROFILE
+        from rs9._archarm_support.successor_20261126 import INPUTS, PROFILE
         return PROFILE, dict(INPUTS)
     if versions == ["0.7.1"]:
         return "historical", dict(QUALIFIED_INPUTS)

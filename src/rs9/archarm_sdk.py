@@ -58,6 +58,7 @@ from rs9.build_native import CommandReceipt, CommandRunner, NativePrerequisiteUn
 from rs9.current_generation import CURRENT_GENERATION
 from rs9._archarm_support import paths as _paths
 from rs9._archarm_support import successor_20261120 as _openssl
+from rs9._archarm_support import successor_20261126 as _graphics
 from rs9._archarm_support.cleanup import (Layout, Record, cleanup_container, cleanup_image,
                                           remove_fresh_docker_home, remove_workspace)
 from rs9._archarm_support.docker import (FIXED_ENV, HEX64_RE, IMAGE_ID_RE, DockerCli,
@@ -141,6 +142,10 @@ PACMAN_KEY_DENIED = frozenset({"--recv-keys", "--refresh-keys", "--keyserver", "
                                "--export", "--edit-key"})
 
 _TOKEN = object()
+_TRANSITION_PROFILES = {_openssl.PROFILE: _openssl, _graphics.PROFILE: _graphics}
+_TRANSITION_PIN_DIGESTS = frozenset(
+    profile.PACKAGE_PINS_SHA256 for profile in _TRANSITION_PROFILES.values()
+)
 
 
 # --------------------------------------------------------------------------- seams
@@ -168,9 +173,10 @@ def _real_seams(input_profile="historical"):
         from rs9._archarm_support.successor_20261109 import INPUTS, load_successor_pins
         loader = load_successor_pins
         expected_digest = INPUTS["package_pins_sha256"]
-    elif input_profile == _openssl.PROFILE:
-        loader = _openssl.load_successor_pins
-        expected_digest = _openssl.PACKAGE_PINS_SHA256
+    elif isinstance(input_profile, str) and input_profile in _TRANSITION_PROFILES:
+        selected = _TRANSITION_PROFILES[input_profile]
+        loader = selected.load_successor_pins
+        expected_digest = selected.PACKAGE_PINS_SHA256
     else:
         raise SdkRefusal("PIN_FILE")
 
@@ -545,7 +551,7 @@ class ArchArmSDK:
                     cmd=installer_cmd(
                         count=len(packages), uid=s.uid, gid=s.gid,
                         openssl_transition=s.pins_qualified
-                        and s.digests.get("packagePinsSha256") == _openssl.PACKAGE_PINS_SHA256))
+                        and s.digests.get("packagePinsSha256") in _TRANSITION_PIN_DIGESTS))
         installer.requested = True
         code, out = docker(create_argv(**spec), timeout=180)
         require(code == 0, "INSTALLER_CREATE")
@@ -1071,7 +1077,7 @@ class ArchArmClient:
         if s.pins_qualified is True:
             from rs9._archarm_support.successor_20261109 import INPUTS
             if s.digests.get("packagePinsSha256") in (
-                    INPUTS["package_pins_sha256"], _openssl.PACKAGE_PINS_SHA256):
+                    INPUTS["package_pins_sha256"], *_TRANSITION_PIN_DIGESTS):
                 # desktop-file-utils 0.29 generates this cache on desktop-file
                 # removal. The shared parser applies this only to regular files;
                 # historical SDKs and nonregular entries retain full comparison.
