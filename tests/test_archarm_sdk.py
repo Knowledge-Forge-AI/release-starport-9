@@ -7,6 +7,7 @@ native evidence and never qualifies the SDK module.
 from __future__ import annotations
 
 import copy
+from dataclasses import replace
 import hashlib
 import io
 import json
@@ -17,7 +18,7 @@ from unittest.mock import patch
 from rs9 import archarm_sdk
 from rs9.build_native import MockCommandRunner
 from rs9.current_generation import HISTORICAL_GENERATION
-from rs9._archarm_support import origin, pins as pins_module
+from rs9._archarm_support import origin, pins as pins_module, successor_20261120, successor_20261126
 from rs9._archarm_support.fetch import AnonymousFetcher
 from rs9._archarm_support.profiles import CAP_ADD, HOSTNAME
 from rs9._archarm_support.refusal import SdkRefusal
@@ -63,6 +64,27 @@ class LeasePreparationTest(RefusalMixin, unittest.TestCase):
         self.assertFalse((self.h.root / "work").exists())
         self.assertEqual(self.h.engine.images, {})
         self.assertEqual(self.h.engine.containers, {})
+
+    def test_installer_enables_transition_only_for_qualified_transition_digests(self):
+        historical = origin.ORIGIN_FILES["PACKAGE-PINS.json"]["sha256"]
+        old = successor_20261120.PACKAGE_PINS_SHA256
+        new = successor_20261126.PACKAGE_PINS_SHA256
+        cases = ((True, historical, False), (True, old, True), (True, new, True),
+                 (False, new, False), (True, "0" * 64, False))
+        build_installer = archarm_sdk.installer_cmd
+
+        def render_fake_installer(**kwargs):
+            # Synthetic bundles have fewer entries. Exercise route selection
+            # here and use the ordinary renderer for the fake engine fixture.
+            return build_installer(**{**kwargs, "openssl_transition": False})
+
+        for qualified, digest, expected in cases:
+            with self.subTest(qualified=qualified, digest=digest):
+                bundle = replace(self.h.bundle, qualified=qualified,
+                                 digests={**self.h.bundle.digests, "packagePinsSha256": digest})
+                with patch.object(archarm_sdk, "installer_cmd", side_effect=render_fake_installer) as installer:
+                    with self.h.lease(pins_loader=lambda: bundle):
+                        self.assertEqual(installer.call_args.kwargs["openssl_transition"], expected)
 
     def test_public_signature_verification_uses_explicit_home_without_gpg_environment(self):
         calls = []

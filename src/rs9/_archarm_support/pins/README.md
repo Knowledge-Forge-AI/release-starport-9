@@ -10,8 +10,16 @@ byte difference. They are not regenerated, refreshed or re-pinned.
 | `ROOTFS-PIN.json` | 3408 | `0d92f648e1f9bc2ef29846b7f37d7fae99ccbb4adc6fd918d797c2ac9054edff` | `tools/verification/archarm_base_probe/ROOTFS-PIN.json` |
 | `archlinuxarm-builder-public.gpg` | 3857 | `4e4202772328674af68f90f675e077d192337fc8ced15cddcd35875a9de5b5f9` | `tools/verification/archarm_base_probe/archlinuxarm-builder-public.gpg` |
 
-The preparing worker had only text-editing tools and could not create a
-byte-exact copy of the binary public key, so it placed none of the three. The
-parent must byte-copy them from the qualified source (the files under
-`reference/qualified-tools/`). It must then check the sizes and digests above
-and include this directory in the package data.
+## Named successors
+
+Each successor carries its own exact package file, byte length and SHA-256.
+All profiles reuse the root filesystem and signing certificate listed above.
+
+The Nebular 0.8.0 product route selects `PACKAGE-PINS-successor-20261126.json`.
+Its 79,740 bytes match SHA-256
+`1471e21504ac0edb5d1abf9602f0266e6efce42e8c9398aff7f5efadda6cb17a`.
+Only the eight package rows identified in the graphics runtime probe changed
+from the 20261120 profile. The
+[key-free native probe](https://github.com/Knowledge-Forge-AI/theme-forge-packages/actions/runs/45865135627)
+verified the dependency runtime. RS9 product build and client qualification
+require their own evidence.

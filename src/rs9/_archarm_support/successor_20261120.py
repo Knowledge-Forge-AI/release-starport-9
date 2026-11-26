@@ -13,6 +13,7 @@ from rs9._archarm_support.refusal import SdkRefusal, require
 PROFILE = "successor-20261120"
 PACKAGE_PINS_NAME = "PACKAGE-PINS-successor-20261120.json"
 PACKAGE_PINS_SHA256 = "e3933f2d2ef013edc8d988e87b07c255d828e3c36d8e1152dad0911c8bd739ff"
+PACKAGE_PINS_BYTES = 79740
 PACKAGE_COUNT = 141
 EXPECT = MappingProxyType({
     **pins.REAL_EXPECT, "packageCount": PACKAGE_COUNT, "packageBytes": 210600960,
@@ -45,6 +46,10 @@ _VERSIONS = MappingProxyType({
 
 
 def validate_package_pins(doc):
+    return _validate_package_pins(doc, EXPECT, _VERSIONS)
+
+
+def _validate_package_pins(doc, expected, versions):
     require(isinstance(doc, dict) and set(doc) == _TOP_KEYS, "PIN_SCHEMA")
     require(doc["schema"] == "tf.archarm-runtime-package-pins.v2"
             and doc["networkDuringInstallOrProbe"] is False
@@ -53,17 +58,23 @@ def validate_package_pins(doc):
     require(doc["publicSigningFingerprint"] == pins.FINGERPRINT, "PIN_FINGERPRINT")
     require(doc["toolPythonVersion"] == "3.14.10" and doc["toolNodeVersion"] == "22.23.5",
             "PIN_VERSION")
-    pins.validate_package_records(doc, EXPECT, _VERSIONS)
+    pins.validate_package_records(doc, expected, versions)
     require({"openssl", "openssl-3"} <= {record["name"] for record in doc["packages"]},
             "PIN_ROOTS")
     return doc
 
 
 def load_successor_pins(root=pins.PIN_DIR):
+    return _load_successor_pins(
+        root, PACKAGE_PINS_NAME, PACKAGE_PINS_BYTES, PACKAGE_PINS_SHA256, EXPECT, _VERSIONS,
+    )
+
+
+def _load_successor_pins(root, filename, size, digest, expected, versions):
     root = Path(root)
-    package_raw = pins.read_bounded(root / PACKAGE_PINS_NAME, pins.MAX_PIN_FILE_BYTES)
-    require(len(package_raw) == 79740
-            and hashlib.sha256(package_raw).hexdigest() == PACKAGE_PINS_SHA256, "PIN_FILE")
+    package_raw = pins.read_bounded(root / filename, pins.MAX_PIN_FILE_BYTES)
+    require(len(package_raw) == size
+            and hashlib.sha256(package_raw).hexdigest() == digest, "PIN_FILE")
     rootfs_raw = pins._exact_origin(
         pins.read_bounded(root / pins.ROOTFS_PIN_NAME, pins.MAX_PIN_FILE_BYTES), pins.ROOTFS_PIN_NAME)
     cert = ORIGIN_FILES[pins.CERT_NAME]
@@ -72,13 +83,13 @@ def load_successor_pins(root=pins.PIN_DIR):
     except SdkRefusal:
         raise SdkRefusal("PIN_FILE") from None
 
-    package_doc = validate_package_pins(pins.load_json(package_raw))
-    rootfs_doc = pins.validate_rootfs_pin(pins.load_json(rootfs_raw), EXPECT)
+    package_doc = _validate_package_pins(pins.load_json(package_raw), expected, versions)
+    rootfs_doc = pins.validate_rootfs_pin(pins.load_json(rootfs_raw), expected)
     digests = {
-        "rootfsSha256": INPUTS["rootfs_sha256"],
-        "rootfsPinSha256": INPUTS["rootfs_pin_sha256"],
-        "packagePinsSha256": PACKAGE_PINS_SHA256,
-        "publicKeySha256": EXPECT["publicKeySha256"],
+        "rootfsSha256": expected["rootfsSha256"],
+        "rootfsPinSha256": ORIGIN_FILES[pins.ROOTFS_PIN_NAME]["sha256"],
+        "packagePinsSha256": digest,
+        "publicKeySha256": expected["publicKeySha256"],
         "publicKeyFingerprint": pins.FINGERPRINT,
     }
-    return pins.PinBundle(package_doc, rootfs_doc, root / pins.CERT_NAME, dict(EXPECT), digests, True)
+    return pins.PinBundle(package_doc, rootfs_doc, root / pins.CERT_NAME, dict(expected), digests, True)

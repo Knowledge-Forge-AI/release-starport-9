@@ -1889,6 +1889,7 @@ class NebularPyPIContractTests(unittest.TestCase):
         successors = {
             "src/rs9/evidence_profile_roles.py",
             "src/rs9/_archarm_support/successor_20261120.py",
+            "src/rs9/_archarm_support/successor_20261126.py",
         }
         for path in successors:
             self.assertEqual(closure_paths.count(path), 1)

@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from rs9 import archarm_sdk
 from rs9._archarm_support import successor_20261120 as successor
+from rs9._archarm_support import successor_20261126 as graphics
 from rs9._archarm_support.refusal import SdkRefusal
 from rs9._archarm_support.scripts import render_install_script
 
@@ -25,6 +26,24 @@ class OpenSSLTransitionTest(unittest.TestCase):
             with patch.object(successor, "load_successor_pins", return_value=rejected):
                 with self.assertRaisesRegex(SdkRefusal, "PIN_FILE"):
                     archarm_sdk._real_seams(successor.PROFILE).pins_loader()
+
+    def test_graphics_profile_closes_the_eight_row_delta(self):
+        previous = archarm_sdk._real_seams(successor.PROFILE).pins_loader()
+        current = archarm_sdk._real_seams(graphics.PROFILE).pins_loader()
+        old = {row["name"]: row for row in previous.packages}
+        new = {row["name"]: row for row in current.packages}
+        self.assertEqual(old.keys(), new.keys())
+        self.assertEqual({name for name in old if old[name] != new[name]}, {
+            "at-spi2-core", "glycin", "gtk-update-icon-cache", "harfbuzz",
+            "harfbuzz-icu", "libjxl", "mesa", "webkit2gtk-4.1",
+        })
+        self.assertEqual(current.digests["packagePinsSha256"], graphics.PACKAGE_PINS_SHA256)
+        self.assertEqual(sum(row["bytes"] for row in current.packages), 210849784)
+        self.assertEqual(current.package_pins["basePackageUpgrade"],
+                         previous.package_pins["basePackageUpgrade"])
+        with patch.object(graphics, "load_successor_pins", return_value=previous):
+            with self.assertRaisesRegex(SdkRefusal, "PIN_FILE"):
+                archarm_sdk._real_seams(graphics.PROFILE).pins_loader()
 
     def test_inventory_proves_exact_transition(self):
         script = render_install_script(count=141, uid=1001, gid=118, openssl_transition=True)

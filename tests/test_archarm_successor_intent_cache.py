@@ -5,7 +5,9 @@ import unittest
 from unittest.mock import Mock
 
 from rs9 import archarm_sdk, client_inventory as inventory, hosted_deb
-from rs9._archarm_support import origin, successor_20261109
+from rs9._archarm_support import (
+    origin, successor_20261109, successor_20261120, successor_20261126,
+)
 from rs9.build_native import CommandReceipt
 from rs9.errors import ContractError
 from tests.test_client_inventory import _make_framed_payload
@@ -46,8 +48,13 @@ class SuccessorIntentCacheTests(unittest.TestCase):
         return result
 
     def test_qualified_successor_regular_cache_is_excluded_by_actual_adapter_parser(self):
-        result = self.capture([entry(), entry("usr/bin/retained", mode=0o755)])
-        self.assertEqual(result, {"usr/bin/retained": "a" * 64 + ":0755"})
+        for profile in (successor_20261109, successor_20261120, successor_20261126):
+            with self.subTest(profile=profile.PROFILE):
+                result = self.capture(
+                    [entry(), entry("usr/bin/retained", mode=0o755)],
+                    digest=profile.INPUTS["package_pins_sha256"],
+                )
+                self.assertEqual(result, {"usr/bin/retained": "a" * 64 + ":0755"})
 
     def test_both_literal_qualification_and_exact_successor_digest_are_required(self):
         cases = [(False, SUCCESSOR), (1, SUCCESSOR), ("true", SUCCESSOR),
