@@ -13,6 +13,7 @@ from rs9._archarm_support.refusal import SdkRefusal, require
 PROFILE = "successor-20261120"
 PACKAGE_PINS_NAME = "PACKAGE-PINS-successor-20261120.json"
 PACKAGE_PINS_SHA256 = "e3933f2d2ef013edc8d988e87b07c255d828e3c36d8e1152dad0911c8bd739ff"
+PACKAGE_PINS_BYTES = 79740
 PACKAGE_COUNT = 141
 EXPECT = MappingProxyType({
     **pins.REAL_EXPECT, "packageCount": PACKAGE_COUNT, "packageBytes": 210600960,
@@ -64,13 +65,15 @@ def _validate_package_pins(doc, expected, versions):
 
 
 def load_successor_pins(root=pins.PIN_DIR):
-    return _load_successor_pins(root, PACKAGE_PINS_NAME, PACKAGE_PINS_SHA256, EXPECT, _VERSIONS)
+    return _load_successor_pins(
+        root, PACKAGE_PINS_NAME, PACKAGE_PINS_BYTES, PACKAGE_PINS_SHA256, EXPECT, _VERSIONS,
+    )
 
 
-def _load_successor_pins(root, filename, digest, expected, versions):
+def _load_successor_pins(root, filename, size, digest, expected, versions):
     root = Path(root)
     package_raw = pins.read_bounded(root / filename, pins.MAX_PIN_FILE_BYTES)
-    require(len(package_raw) == 79740
+    require(len(package_raw) == size
             and hashlib.sha256(package_raw).hexdigest() == digest, "PIN_FILE")
     rootfs_raw = pins._exact_origin(
         pins.read_bounded(root / pins.ROOTFS_PIN_NAME, pins.MAX_PIN_FILE_BYTES), pins.ROOTFS_PIN_NAME)

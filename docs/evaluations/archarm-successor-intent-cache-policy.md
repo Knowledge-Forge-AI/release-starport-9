@@ -72,3 +72,10 @@ inactive because its required original refusal was not observed.
 
 Rollback reverts these three paths and requires fresh qualification before
 later adoption. Historical evidence and the failed original run remain intact.
+
+## Later runtime profiles
+
+The 20261120 and 20261126 qualified pin digests also use this one-file
+rule. Both retain the same desktop-file-utils package record. The scope
+remains the exact regular file in the ArchARM client inventory, and the
+historical profile continues to compare that path.

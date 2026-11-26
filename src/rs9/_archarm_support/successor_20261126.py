@@ -9,6 +9,7 @@ from rs9._archarm_support import pins, successor_20261120 as previous
 PROFILE = "successor-20261126"
 PACKAGE_PINS_NAME = "PACKAGE-PINS-successor-20261126.json"
 PACKAGE_PINS_SHA256 = "1471e21504ac0edb5d1abf9602f0266e6efce42e8c9398aff7f5efadda6cb17a"
+PACKAGE_PINS_BYTES = 79740
 EXPECT = MappingProxyType({**previous.EXPECT, "packageBytes": 210849784})
 INPUTS = MappingProxyType({
     **previous.INPUTS,
@@ -31,5 +32,5 @@ _VERSIONS = MappingProxyType({**previous._VERSIONS, "webkit2gtk-4.1": "2.54.3-1"
 
 def load_successor_pins(root=pins.PIN_DIR):
     return previous._load_successor_pins(
-        root, PACKAGE_PINS_NAME, PACKAGE_PINS_SHA256, EXPECT, _VERSIONS,
+        root, PACKAGE_PINS_NAME, PACKAGE_PINS_BYTES, PACKAGE_PINS_SHA256, EXPECT, _VERSIONS,
     )
