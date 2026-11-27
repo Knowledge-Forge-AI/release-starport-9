@@ -271,8 +271,8 @@ class Harness:
         self.sdk_calls.append({"workspace": Path(workspace), "existed": Path(workspace).exists(),
                                "context": dict(context), "uid": uid, "gid": gid, "host": host,
                                "input_profile": input_profile})
-        if input_profile == "successor-20261126":
-            from rs9._archarm_support.successor_20261126 import INPUTS
+        if input_profile == "successor-20261127":
+            from rs9._archarm_support.successor_20261127 import INPUTS
             self.selected_inputs = dict(INPUTS)
         else:
             self.test.assertEqual(input_profile, "historical")
@@ -407,7 +407,7 @@ class CurrentArchArmProducerTests(unittest.TestCase):
         return {name: gate(result, name)["status"] for name in arm.REQUIRED_GATES}
 
     def test_nebular080_selects_exact_successor_and_records_its_input_identity(self):
-        from rs9._archarm_support.successor_20261126 import INPUTS, PROFILE
+        from rs9._archarm_support.successor_20261127 import INPUTS, PROFILE
         h = Harness(self).start()
         next(intent for _, intent, _ in h.captures if intent["project"]["id"] == NEBULAR)["version"] = "0.8.0"
         result = arm.execute(h.context)

@@ -15,7 +15,7 @@ byte difference. They are not regenerated, refreshed or re-pinned.
 Each successor carries its own exact package file, byte length and SHA-256.
 All profiles reuse the root filesystem and signing certificate listed above.
 
-The Nebular 0.8.0 product route selects `PACKAGE-PINS-successor-20261126.json`.
+The 20261126 profile uses `PACKAGE-PINS-successor-20261126.json`.
 Its 79,740 bytes match SHA-256
 `1471e21504ac0edb5d1abf9602f0266e6efce42e8c9398aff7f5efadda6cb17a`.
 Only the eight package rows identified in the graphics runtime probe changed
@@ -23,3 +23,10 @@ from the 20261120 profile. The
 [key-free native probe](https://github.com/Knowledge-Forge-AI/theme-forge-packages/actions/runs/45865135627)
 verified the dependency runtime. RS9 product build and client qualification
 require their own evidence.
+
+The Nebular 0.8.0 product route now selects
+`PACKAGE-PINS-successor-20261127.json`. Its 79,740 bytes match
+SHA-256 `c1b59ee9fa35a6af5062341e7261abfdbed0520f5b7c1f6121bf8bece8abd27a`.
+The only changed package is libcups 2:2.4.20-2. The
+[key-free native probe](https://github.com/Knowledge-Forge-AI/theme-forge-packages/actions/runs/46041837561)
+verified the dependency runtime and cleanup.
