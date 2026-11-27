@@ -9,6 +9,7 @@ replays an uncertain operation.
 from __future__ import annotations
 
 import json
+import hashlib
 import fcntl
 import os
 import re
@@ -425,6 +426,20 @@ def _binding_for(path_value: str | os.PathLike[str], supplied: Mapping[str, Any]
     return _engine_view(verify_engine_wheel(path_value))
 
 
+def _read_instance_plan(
+    publisher_root: str, binding: Mapping[str, Any], reader: Any | None,
+) -> dict[str, Any]:
+    _validate_local_engine_snapshot(publisher_root, binding)
+    observed_at = instance_github._now()
+    observation = instance_github.observe_instance(
+        publisher_root, reader if reader is not None else GitHubReadTransport(),
+        observed_at=observed_at, bootstrap=False,
+    )
+    return dict(instance_github.plan_instance_github(
+        publisher_root, observation, evaluated_at=observed_at, bootstrap=False,
+    ))
+
+
 def plan_instance_github_cli(
     publisher_root: str,
     *,
@@ -436,15 +451,7 @@ def plan_instance_github_cli(
     binding = _binding_for(engine_wheel, _binding)
     reserved = _reserve_plan_output(output)
     try:
-        _validate_local_engine_snapshot(publisher_root, binding)
-        reader = _reader or GitHubReadTransport()
-        observed_at = instance_github._now()
-        observation = instance_github.observe_instance(
-            publisher_root, reader, observed_at=observed_at, bootstrap=False,
-        )
-        plan = dict(instance_github.plan_instance_github(
-            publisher_root, observation, evaluated_at=observed_at, bootstrap=False,
-        ))
+        plan = _read_instance_plan(publisher_root, binding, _reader)
         wrapper = _wrap_plan(plan, binding)
         path, fd, identity = reserved
         try:
@@ -469,6 +476,81 @@ def plan_instance_github_cli(
         "artifact_sha256": binding["artifact_sha256"],
         "publicationAuthority": False,
         "qualified": False,
+        "publicationEnabled": False,
+    }
+
+
+def inspect_homebrew_projection(
+    plan: Mapping[str, Any],
+    branch: str,
+    *,
+    _reader: GitHubReadTransport | None = None,
+) -> dict[str, Any]:
+    """Observe the exact formula for evidence verified by this invocation."""
+    from rs9.homebrew_renderer import render_python_wheel_formula
+    from rs9.instance import record_sha256
+
+    path, desired, template = render_python_wheel_formula(plan)
+    target, = plan["normalizedIntent"]["targets"]
+    repository = target.get("repository")
+    if not isinstance(repository, str):
+        _reject("HOMEBREW_DESTINATION_REPOSITORY", "The registered tap must name its GitHub repository")
+
+    reader = _reader if _reader is not None else GitHubReadTransport()
+    initial = reader.read_branch(repository, branch)
+    commit, tree = initial["commit"], initial["tree"]
+    parent_path = path.rsplit("/", 1)[0]
+    parent = reader.read_parent(repository, parent_path, commit)
+    remote: dict[str, Any] = {"commit": commit, "tree": tree, "state": "unsafe"}
+
+    def same_snapshot(row: Mapping[str, Any], expected_path: str) -> bool:
+        return (
+            row.get("path") == expected_path
+            and row.get("commit") == commit
+            and row.get("tree") == tree
+            and row.get("repository") == initial.get("repository")
+            and row.get("metadata_sha256") == initial.get("metadata_sha256")
+        )
+
+    if not same_snapshot(parent, parent_path):
+        _reject("HOMEBREW_OBSERVATION_MISMATCH", "The tap response does not match its branch snapshot")
+    if parent["state"] == "absent":
+        remote["state"] = "missing"
+    elif parent["state"] == "present" and parent["type"] == "tree" and parent["mode"] == "040000":
+        entry = reader.read_file(repository, path, commit)
+        if not same_snapshot(entry, path):
+            _reject("HOMEBREW_OBSERVATION_MISMATCH", "The formula response does not match its branch snapshot")
+        if entry["state"] == "missing":
+            remote["state"] = "missing"
+        elif entry["state"] == "present" and entry["type"] == "blob":
+            byte_data = entry.get("data")
+            if not isinstance(byte_data, bytes):
+                _reject("HOMEBREW_OBSERVATION_MISMATCH", "The formula blob has no verified bytes")
+            actual_sha256 = hashlib.sha256(byte_data).hexdigest()
+            if entry.get("size") != len(byte_data) or entry.get("sha256") != actual_sha256:
+                _reject("HOMEBREW_OBSERVATION_MISMATCH", "The formula blob does not match its verified digest")
+            same = entry["mode"] == "100644" and byte_data == desired
+            remote.update(
+                state="match" if same else "drift",
+                mode=entry["mode"],
+                sha256=actual_sha256,
+                size=len(byte_data),
+            )
+
+    latest = reader.read_branch(repository, branch)
+    if any(latest.get(key) != initial.get(key) for key in ("commit", "tree", "repository", "metadata_sha256")):
+        remote = {"state": "unknown", "reason": "branch-changed"}
+    return {
+        "schema": "rs9.homebrew-projection-observation.v1alpha1",
+        "instanceId": plan["instance_id"],
+        "consumerId": plan["consumer_id"],
+        "instancePlanSha256": record_sha256(plan),
+        "taggedConsumerContractVerified": plan["releaseEvidence"]["taggedConsumerContractVerified"],
+        "destination": {"repository": repository, "branch": branch, "path": path},
+        "desired": {"sha256": hashlib.sha256(desired).hexdigest(), "size": len(desired),
+                    "mode": "100644", "template": template},
+        "remote": remote,
+        "publicationAuthority": False,
         "publicationEnabled": False,
     }
 
@@ -619,13 +701,15 @@ def resume_instance_github_cli(
 
 def doctor_instance_github_cli(
     *,
+    publisher_root: str | None = None,
     engine_wheel: str | os.PathLike[str] | None = None,
     _binding: Mapping[str, Any] | None = None,
+    _reader: Any | None = None,
 ) -> dict[str, Any]:
     binding = None
     if engine_wheel is not None or _binding is not None:
         binding = _binding_for(engine_wheel, _binding)
-    return {
+    report = {
         "schema": "rs9.instance-github-cli-doctor.v1alpha1",
         "engine": binding,
         "gh": {"available": shutil.which("gh") is not None},
@@ -635,6 +719,25 @@ def doctor_instance_github_cli(
         "publicationAuthority": False,
         "qualified": False,
         "publicationEnabled": False,
+    }
+    if publisher_root is None:
+        return report
+    if binding is None:
+        _reject("CLI_INPUT", "A bound engine wheel is required for remote observation.")
+    plan = _read_instance_plan(publisher_root, binding, _reader)
+    return {
+        **report,
+        "schema": "rs9.instance-github-cli-remote-doctor.v1alpha1",
+        "remote_reads": True,
+        "instance": plan["instance"],
+        "outcome": plan["outcome"],
+        "remoteState": plan["remoteState"],
+        "reason": plan["reason"],
+        "commit": plan["commit"],
+        "observedAt": plan["observed_at"],
+        "managedFiles": [
+            {"path": row["path"], "comparison": row["action"]} for row in plan["files"]
+        ],
     }
 
 

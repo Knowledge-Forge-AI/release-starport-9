@@ -1,4 +1,5 @@
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
+from copy import deepcopy
 import hashlib
 import io
 import json
@@ -7,11 +8,18 @@ import stat
 import tarfile
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import zipfile
 
 from rs9.errors import ContractError
-from rs9.python_cli_release import inspect_python_cli_release, main
+from rs9.cli import main as rs9_main
+from rs9.github import ScopedGitHubAuthorization
+from rs9.github_cli import inspect_homebrew_projection
+from rs9.github_reader import GitHubReadTransport
+from rs9.homebrew_renderer import render_python_wheel_formula
+from rs9.installed_homebrew import apply_python_wheel_formula, write_python_wheel_formula
+from rs9.instance import record_sha256
+from rs9.python_cli_release import inspect_python_cli_release, main, verify_homebrew_plan_evidence
 from rs9.release_core import digest
 from rs9.wheel import format_record
 from tests.shadow_fixtures import tar_bytes
@@ -30,10 +38,32 @@ PROJECT = (b'[project]\nname = "example-cli"\nversion = "1.2.3"\nrequires-python
            b'dependencies = []\n[project.scripts]\nexample = "example.cli:main"\n')
 
 
-def write_evidence(root, *, new_metadata=b"", pyproject=PROJECT, different_source=False, bad_record=False):
+def normalized_homebrew_intent():
+    return {
+        "project": {"id": "example-cli", "name": "Example CLI", "repository": REPOSITORY},
+        "tag": "v1.2.3",
+        "version": "1.2.3",
+        "release": {"prerelease": "reject"},
+        "runtime": {"kind": "python", "constraint": ">=3.11"},
+        "license": {"source": "tagged-repository", "expression": "MIT",
+                    "files": ["COMMERCIAL-LICENSE.md", "LICENSE", "NOTICE"]},
+        "commands": [{"interface": "cli", "name": "example"}],
+        "checks": [{"id": "version", "argv": ["example", "--version"],
+                    "requires-display": False, "expect-exit": 0, "expect-stdout-contains": "1.2.3"}],
+        "assets": [
+            {"id": "source", "name": SDIST, "format": "sdist", "platforms": ["any"]},
+            {"id": "wheel", "name": WHEEL, "format": "wheel", "platforms": ["any"]},
+        ],
+        "targets": [{"adapter": "homebrew", "mode": "projection", "name": "example-cli",
+                     "assets": ["source", "wheel"]}],
+    }
+
+
+def write_evidence(root, *, new_metadata=b"", pyproject=PROJECT, different_source=False, bad_record=False,
+                   cli_source=b"def main(): return 0\n"):
     licenses = {name: b"Synthetic license fixture.\n" for name in ("LICENSE", "NOTICE", "COMMERCIAL-LICENSE.md")}
     source = {"pyproject.toml": PROJECT, **licenses}
-    package = {"example/__init__.py": b"", "example/cli.py": b"def main(): return 0\n"}
+    package = {"example/__init__.py": b"", "example/cli.py": cli_source}
     info = {"METADATA": METADATA + new_metadata,
             "WHEEL": b"Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
             "entry_points.txt": b"[console_scripts]\nexample=example.cli:main\n",
@@ -75,7 +105,169 @@ def write_evidence(root, *, new_metadata=b"", pyproject=PROJECT, different_sourc
             (root / folder / path).write_bytes(body)
 
 
+def add_tagged_consumer(root, files):
+    source = root / "source/.rs9"
+    source.mkdir(exist_ok=True)
+    tree_path = root / "api/tree.json"
+    tree = json.loads(tree_path.read_bytes())
+    tree_body = bytearray()
+    for name, raw in sorted(files.items()):
+        (source / name).write_bytes(raw)
+        blob = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+        tree["tree"].append({"path": f".rs9/{name}", "type": "blob", "mode": "100644", "sha": blob})
+        tree_body.extend(b"100644 " + name.encode("ascii") + b"\0" + bytes.fromhex(blob))
+    directory_sha = hashlib.sha1(b"tree " + str(len(tree_body)).encode("ascii") + b"\0" + tree_body).hexdigest()
+    tree["tree"].append({"path": ".rs9", "type": "tree", "mode": "040000", "sha": directory_sha})
+    tree_path.write_text(json.dumps(tree), encoding="utf-8")
+
+
 class PythonCliReleaseTests(unittest.TestCase):
+    def test_tagged_rs9_formula_preserves_version_and_doctor_checks(self):
+        root = self.fixture()
+        intent = normalized_homebrew_intent()
+        evidence = verify_homebrew_plan_evidence(intent, root)
+        intent["project"]["repository"] = "Knowledge-Forge-AI/release-starport-9"
+        intent["commands"][0]["name"] = "rs9"
+        intent["checks"][0]["argv"][0] = "rs9"
+        intent["checks"].append({
+            "id": "doctor", "argv": ["rs9", "doctor"],
+            "expect-exit": 0, "requires-display": False,
+        })
+        evidence["distribution"] = "release-starport-9"
+        evidence["receipt"].update(repository=intent["project"]["repository"], command="rs9")
+        plan = {"normalizedIntent": intent, "inputs": {}, "releaseEvidence": evidence}
+
+        def render(*, tagged):
+            bound = record_sha256(intent)
+            plan["inputs"]["normalized_sha256"] = bound
+            evidence.update(normalizedSha256=bound, taggedConsumerContractVerified=tagged)
+            return render_python_wheel_formula(plan)
+
+        _, historical, template = render(tagged=False)
+        self.assertEqual(template["id"], "homebrew-python-wheel")
+        self.assertNotIn(b"--json doctor", historical)
+
+        _, forward, template = render(tagged=True)
+        self.assertEqual(template["id"], "homebrew-python-wheel-rs9")
+        self.assertIn(b'assert_equal "1.2.3\\n", shell_output("#{bin}/rs9 --version")', forward)
+        self.assertIn(b'JSON.parse(shell_output("#{bin}/rs9 --json doctor"))', forward)
+        self.assertIn(b'doctor.fetch("result").fetch("python").fetch("tomllib")', forward)
+        self.assertIn(b'assert_predicate pkgshare/file, :file?', forward)
+
+        intent["checks"].pop()
+        with self.assertRaisesRegex(ContractError, "HOMEBREW_RENDER_RS9_DOCTOR_CHECK"):
+            render(tagged=True)
+
+    def test_prepares_one_formula_with_both_verified_assets_without_clobber(self):
+        root = self.fixture()
+        intent = normalized_homebrew_intent()
+        intent_sha = record_sha256(intent)
+        plan = {
+            "instance_id": "publisher", "consumer_id": "example",
+            "inputs": {"normalized_sha256": intent_sha},
+            "runtimeEngine": {"distribution": "release-starport-9", "version": "0.0.0.dev0"},
+            "normalizedIntent": intent,
+            "releaseEvidence": {**verify_homebrew_plan_evidence(intent, root), "normalizedSha256": intent_sha},
+        }
+        output = root / "formula-candidate"
+        receipt = write_python_wheel_formula(plan, output)
+        path = output / "Formula/example-cli.rb"
+        body = path.read_bytes()
+        self.assertIn(WHEEL.encode(), body)
+        self.assertIn(SDIST.encode(), body)
+        self.assertIn(digest((root / "assets" / WHEEL).read_bytes()).encode(), body)
+        self.assertIn(digest((root / "assets" / SDIST).read_bytes()).encode(), body)
+        self.assertEqual(receipt["files"][0]["sha256"], digest(body))
+        self.assertFalse(receipt["publicationAuthority"])
+        with self.assertRaisesRegex(ContractError, "HOMEBREW_OUTPUT_EXISTS"):
+            write_python_wheel_formula(plan, output)
+        self.assertEqual(path.read_bytes(), body)
+        plan["normalizedIntent"]["checks"] = []
+        with self.assertRaisesRegex(ContractError, "HOMEBREW_RENDER_PROVENANCE"):
+            write_python_wheel_formula(plan, root / "refused")
+        self.assertFalse((root / "refused").exists())
+
+    def test_observes_only_the_registered_tap_and_refuses_mixed_snapshots(self):
+        root = self.fixture()
+        intent = normalized_homebrew_intent()
+        tap = "Example/independent-tap"
+        intent["targets"][0]["repository"] = tap
+        intent_sha = record_sha256(intent)
+        plan = {
+            "instance_id": "publisher", "consumer_id": "example",
+            "inputs": {"normalized_sha256": intent_sha}, "normalizedIntent": intent,
+            "releaseEvidence": {**verify_homebrew_plan_evidence(intent, root), "normalizedSha256": intent_sha},
+        }
+        path, formula, _ = render_python_wheel_formula(plan)
+        snapshot = {"commit": "a" * 40, "tree": "b" * 40,
+                    "repository": {"full_name": tap, "private": False}, "metadata_sha256": "c" * 64}
+        reader = Mock(spec=GitHubReadTransport)
+        reader.read_branch.return_value = snapshot
+        reader.read_parent.return_value = {
+            **snapshot, "path": "Formula", "state": "present", "type": "tree", "mode": "040000",
+        }
+        matching = {
+            **snapshot, "path": path, "state": "present", "type": "blob", "mode": "100644",
+            "data": formula, "size": len(formula), "sha256": digest(formula),
+        }
+        reader.read_file.return_value = matching
+
+        result = inspect_homebrew_projection(plan, "stable", _reader=reader)
+        self.assertEqual(result["remote"]["state"], "match")
+        self.assertFalse(result["publicationAuthority"])
+        self.assertFalse(result["publicationEnabled"])
+        self.assertFalse(result["taggedConsumerContractVerified"])
+        reader.read_file.assert_called_once_with(tap, path, snapshot["commit"])
+        self.assertNotIn("class ExampleCli", json.dumps(result))
+
+        for override, expected in (
+            ({"mode": "100755"}, "drift"),
+            ({"state": "missing", "type": "missing", "data": None}, "missing"),
+            ({"type": "symlink", "mode": "120000"}, "unsafe"),
+        ):
+            with self.subTest(expected=expected):
+                reader.read_file.return_value = {**matching, **override}
+                self.assertEqual(inspect_homebrew_projection(plan, "stable", _reader=reader)["remote"]["state"], expected)
+
+        reader.read_file.return_value = {**matching, "tree": "d" * 40}
+        with self.assertRaisesRegex(ContractError, "HOMEBREW_OBSERVATION_MISMATCH"):
+            inspect_homebrew_projection(plan, "stable", _reader=reader)
+
+        reader.read_file.return_value = matching
+        reader.read_branch.side_effect = [snapshot, {**snapshot, "commit": "d" * 40}]
+        result = inspect_homebrew_projection(plan, "stable", _reader=reader)
+        self.assertEqual(result["remote"], {"state": "unknown", "reason": "branch-changed"})
+
+    def test_binds_verified_artifacts_to_the_selected_homebrew_intent(self):
+        root = self.fixture()
+        with patch("rs9.python_cli_release.capture_release") as capture:
+            evidence = verify_homebrew_plan_evidence(normalized_homebrew_intent(), root)
+        capture.assert_not_called()
+        self.assertFalse(evidence["taggedConsumerContractVerified"])
+        self.assertEqual(evidence["distribution"], "example-cli")
+        self.assertEqual(evidence["receipt"], self.inspect(root))
+        self.assertEqual(evidence["assets"], [
+            {"id": "source", "name": SDIST, "sha256": digest((root / "assets" / SDIST).read_bytes())},
+            {"id": "wheel", "name": WHEEL, "sha256": digest((root / "assets" / WHEEL).read_bytes())},
+        ])
+
+    def test_refuses_evidence_for_a_different_plan(self):
+        root = self.fixture()
+        baseline = normalized_homebrew_intent()
+        cases = (
+            lambda intent: intent["targets"][0].update(assets=["wheel"]),
+            lambda intent: intent["assets"][1].update(name="different-1.2.3-py3-none-any.whl"),
+            lambda intent: intent["runtime"].update(constraint=">=3.12"),
+            lambda intent: intent["license"].update(expression="BSD-3-Clause"),
+            lambda intent: intent["release"].update(evidence={"profile": "different"}),
+        )
+        for change in cases:
+            with self.subTest(change=change):
+                intent = deepcopy(baseline)
+                change(intent)
+                with self.assertRaisesRegex(ContractError, "PYTHON_CLI_PLAN_MISMATCH"):
+                    verify_homebrew_plan_evidence(intent, root)
+
     def fixture(self, **kwargs):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -99,6 +291,163 @@ class PythonCliReleaseTests(unittest.TestCase):
         self.assertEqual(envelope["result"]["packageMembers"], 2)
         self.assertEqual(envelope["result"]["wheelSha256"], digest((root / "assets" / WHEEL).read_bytes()))
 
+    def test_tagged_contract_admission_binds_the_selected_configuration_bytes(self):
+        root = self.fixture()
+        files = {name: f'# fixture {name}\n'.encode()
+                 for name in ("project.toml", "releases.toml", "homebrew.toml")}
+        add_tagged_consumer(root, files)
+        intent = normalized_homebrew_intent()
+        intent["evidence"] = {"inputs": [
+            {"filename": name, "sha256": digest(raw)} for name, raw in files.items()
+        ]}
+        ordinary = verify_homebrew_plan_evidence(intent, root)
+        self.assertFalse(ordinary["taggedConsumerContractVerified"])
+        strict = verify_homebrew_plan_evidence(intent, root, require_tagged_consumer_contract=True)
+        self.assertTrue(strict["taggedConsumerContractVerified"])
+        self.assertEqual(strict["receipt"]["taggedConsumerInputs"], {
+            name: digest(raw) for name, raw in files.items()
+        })
+        drifted = deepcopy(intent)
+        drifted["evidence"]["inputs"][0]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(ContractError, "PYTHON_CLI_TAGGED_CONTRACT_MISMATCH"):
+            verify_homebrew_plan_evidence(drifted, root, require_tagged_consumer_contract=True)
+        drifted = deepcopy(intent)
+        drifted["evidence"]["inputs"].append(drifted["evidence"]["inputs"][0])
+        with self.assertRaisesRegex(ContractError, "PYTHON_CLI_TAGGED_CONTRACT_MISMATCH"):
+            verify_homebrew_plan_evidence(drifted, root, require_tagged_consumer_contract=True)
+        (root / "source/.rs9/homebrew.toml").write_bytes(b"# different captured bytes")
+        with self.assertRaisesRegex(ContractError, "SOURCE_BLOB_MISMATCH"):
+            verify_homebrew_plan_evidence(intent, root, require_tagged_consumer_contract=True)
+
+    def test_applies_a_tagged_formula_atomically_and_protects_the_local_tap(self):
+        root = self.fixture()
+        tap_repository = "Example/independent-tap"
+        files = {name: b"# test tagged content\n"
+                 for name in ("homebrew.toml", "project.toml", "releases.toml")}
+        add_tagged_consumer(root, files)
+        intent = normalized_homebrew_intent()
+        intent["targets"][0]["repository"] = tap_repository
+        intent["evidence"] = {"inputs": [
+            {"filename": name, "sha256": digest(raw)} for name, raw in files.items()
+        ]}
+        intent_sha = record_sha256(intent)
+        plan = {
+            "instance_id": "publisher", "consumer_id": "example",
+            "inputs": {"normalized_sha256": intent_sha}, "normalizedIntent": intent,
+            "releaseEvidence": {**verify_homebrew_plan_evidence(
+                intent, root, require_tagged_consumer_contract=True,
+            ), "normalizedSha256": intent_sha},
+        }
+        path, desired, _ = render_python_wheel_formula(plan)
+        tap = root / "local-tap"
+        (tap / "Formula").mkdir(parents=True)
+        target = tap / path
+        neighbor = tap / "Formula/another.rb"
+        neighbor.write_bytes(b"# unrelated formula\n")
+
+        def apply(**extra):
+            options = {"tap_repository": tap_repository, "expected_sha256": digest(desired), **extra}
+            return apply_python_wheel_formula(plan, tap, **options)
+
+        with self.assertRaisesRegex(ContractError, "HOMEBREW_FORMULA_REVIEW_CHANGED"):
+            apply(expected_sha256="0" * 64)
+        with self.assertRaisesRegex(ContractError, "HOMEBREW_FORMULA_REVIEW_CHANGED"):
+            apply(expected_sha256="0" * 64, dry_run=True)
+        before = neighbor.stat()
+        with patch("rs9.installed_homebrew._write_formula_bytes") as write:
+            preview = apply(dry_run=True)
+        write.assert_not_called()
+        self.assertEqual(preview["status"], "ready")
+        self.assertIs(preview["dryRun"], True)
+        self.assertFalse(preview["publicationAuthority"])
+        self.assertEqual(list((tap / "Formula").iterdir()), [neighbor])
+        self.assertEqual(neighbor.stat(), before)
+        reviewed_target = preview["tapTargetSha256"]
+        self.assertRegex(reviewed_target, r"^[a-f0-9]{64}$")
+
+        other_tap = root / "other-tap"
+        (other_tap / "Formula").mkdir(parents=True)
+        with self.assertRaisesRegex(ContractError, "HOMEBREW_TAP_TARGET_CHANGED"):
+            apply_python_wheel_formula(
+                plan, other_tap, tap_repository=tap_repository, expected_sha256=digest(desired),
+                expected_tap_target_sha256=reviewed_target,
+            )
+        self.assertEqual(list((other_tap / "Formula").iterdir()), [])
+
+        original_formulas = tap / "reviewed-Formula"
+        (tap / "Formula").rename(original_formulas)
+        (tap / "Formula").mkdir()
+        with self.assertRaisesRegex(ContractError, "HOMEBREW_TAP_TARGET_CHANGED"):
+            apply(expected_tap_target_sha256=reviewed_target)
+        self.assertEqual(list((tap / "Formula").iterdir()), [])
+        (tap / "Formula").rmdir()
+        original_formulas.rename(tap / "Formula")
+
+        with patch("rs9.installed_homebrew.os.link", side_effect=OSError("interrupted before link")):
+            with self.assertRaisesRegex(ContractError, "HOMEBREW_TAP_CUSTODY"):
+                apply()
+        self.assertEqual(list((tap / "Formula").iterdir()), [neighbor])
+        created = apply(expected_tap_target_sha256=reviewed_target)
+        self.assertEqual(created["status"], "created")
+        self.assertEqual(created["tapTargetSha256"], reviewed_target)
+        self.assertEqual(target.read_bytes(), desired)
+        self.assertFalse(created["publicationEnabled"])
+        initial = target.stat()
+        self.assertEqual(apply(expected_tap_target_sha256=reviewed_target)["status"], "noop")
+        self.assertEqual(apply()["status"], "noop")
+        self.assertEqual(target.stat(), initial)
+        self.assertEqual(apply(dry_run=True)["status"], "noop")
+        self.assertEqual(target.stat(), initial)
+        self.assertNotIn("dryRun", created)
+        target.write_bytes(b"# competing formula\n")
+        for options in ({}, {"dry_run": True}):
+            with self.assertRaisesRegex(ContractError, "HOMEBREW_FORMULA_DRIFT"):
+                apply(**options)
+        self.assertEqual(target.read_bytes(), b"# competing formula\n")
+        self.assertEqual(neighbor.read_bytes(), b"# unrelated formula\n")
+        self.assertEqual(set((tap / "Formula").iterdir()), {target, neighbor})
+
+        target.unlink()
+        def competing_writer(*args, **kwargs):
+            target.write_bytes(b"# created during apply")
+            raise FileExistsError
+        with patch("rs9.installed_homebrew.os.link", side_effect=competing_writer):
+            with self.assertRaisesRegex(ContractError, "HOMEBREW_FORMULA_DRIFT"):
+                apply()
+        self.assertEqual(target.read_bytes(), b"# created during apply")
+        self.assertEqual(set((tap / "Formula").iterdir()), {target, neighbor})
+
+    def test_tagged_contract_admission_rejects_legacy_or_unknown_layout(self):
+        root = self.fixture()
+        intent = normalized_homebrew_intent()
+        with self.assertRaisesRegex(ContractError, "MISSING_EVIDENCE"):
+            verify_homebrew_plan_evidence(intent, root, require_tagged_consumer_contract=True)
+        files = {name: b"# fixture\n" for name in
+                 ("homebrew.toml", "project.toml", "releases.toml", "unexpected.toml")}
+        add_tagged_consumer(root, files)
+        with self.assertRaisesRegex(ContractError, "PYTHON_CLI_TAGGED_CONTRACT_LAYOUT"):
+            verify_homebrew_plan_evidence(intent, root, require_tagged_consumer_contract=True)
+
+    def test_strict_inspection_requires_the_matching_git_consumer_subtree(self):
+        root = self.fixture()
+        files = {name: b"# fixture\n" for name in ("homebrew.toml", "project.toml", "releases.toml")}
+        add_tagged_consumer(root, files)
+        tree_path = root / "api/tree.json"
+        tree = json.loads(tree_path.read_bytes())
+        directory = next(entry for entry in tree["tree"] if entry["path"] == ".rs9")
+        for changed in (None, {**directory, "sha": "0" * 40}, {**directory, "sha": "bad"}):
+            rows = [entry for entry in tree["tree"] if entry["path"] != ".rs9"]
+            if changed is not None:
+                rows.append(changed)
+            tree_path.write_text(json.dumps({**tree, "tree": rows}), encoding="utf-8")
+            with self.subTest(directory=changed):
+                self.assertFalse("taggedConsumerInputs" in self.inspect(root))
+                with self.assertRaisesRegex(ContractError, "PYTHON_CLI_TAGGED_CONTRACT_LAYOUT"):
+                    inspect_python_cli_release(
+                        REPOSITORY, "1.2.3", "example-cli", "example", root,
+                        require_tagged_consumer_contract=True,
+                    )
+
     def test_changed_wheel_transport_is_refused(self):
         root = self.fixture()
         wheel = root / "assets" / WHEEL
@@ -107,12 +456,44 @@ class PythonCliReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractError, "DIGEST_MISMATCH"):
             self.inspect(root)
 
+    def test_rs9_release_inspect_authenticates_the_offline_pair_without_remote_access(self):
+        root = self.fixture()
+        stream = io.StringIO()
+        with patch("rs9.python_cli_release.capture_release") as capture, redirect_stdout(stream):
+            code = rs9_main(["release", "inspect", REPOSITORY, "--tag", "v1.2.3",
+                             "--distribution", "example-cli", "--command", "example",
+                             "--evidence", str(root), "--json"])
+        capture.assert_not_called()
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(stream.getvalue()), {
+            "schema": "rs9.cli.v1alpha1", "command": "release.inspect",
+            "ok": True, "result": self.inspect(root),
+        })
+
+    def test_rs9_release_inspect_refuses_coordinates_before_creating_capture(self):
+        parent = self.fixture()
+        for repository, tag, expected in (("not-a-repo", "v1.2.3", "INVALID_REPOSITORY"),
+                                          (REPOSITORY, "1.2.3", "PYTHON_CLI_COORDINATES")):
+            with self.subTest(repository=repository, tag=tag):
+                target = parent / "capture"
+                stream = io.StringIO()
+                with patch("rs9.python_cli_release.capture_release") as capture, redirect_stderr(stream):
+                    code = rs9_main(["release", "inspect", repository, "--tag", tag,
+                                     "--distribution", "example-cli", "--command", "example",
+                                     "--capture", str(target), "--json"])
+                self.assertEqual(code, 1)
+                self.assertEqual(json.loads(stream.getvalue())["error"]["code"], expected)
+                self.assertFalse(target.exists())
+                capture.assert_not_called()
+
     def test_capture_collects_the_same_release_coordinates_and_verifies_the_bytes(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         target = Path(temporary.name).resolve() / "capture"
 
-        def provide(selection, output, *, asset_transport):
+        def provide(selection, output, *, client, asset_transport):
+            self.assertFalse(any(isinstance(handler, ScopedGitHubAuthorization)
+                                 for handler in client.opener.handlers))
             self.assertEqual(selection["repository"], REPOSITORY)
             self.assertEqual(selection["tag"], "v1.2.3")
             self.assertEqual(selection["payload_assets"][0]["name"], SDIST)

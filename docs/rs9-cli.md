@@ -111,15 +111,20 @@ The capture directory must be new. Use `--evidence ./rs9-v010-evidence` in
 place of `--capture` for an offline recheck. The result binds the release tag,
 checksums, wheel RECORD, Python floor, console entry point, package contents
 and three tagged license files. The profile covers dependency-free pure
-Python CLI archives and executes no archive members. The 0.1.0 installation
-does not include this source utility. A verification result supplies evidence
+Python CLI archives and executes no archive members. The published 0.1.0 wheel predates the installed `release inspect` command. A verification result supplies evidence
 for onboarding and creates no publisher registration or deployment.
 
 ## Commands
 
+Builds that include `rs9 release inspect` can use the same release profile
+through the installed CLI.
+
 ```text
 rs9 --version
 rs9 doctor
+rs9 release inspect OWNER/REPO --tag TAG --distribution DISTRIBUTION \
+  --command ENTRY_COMMAND (--evidence DIRECTORY | --capture DIRECTORY) \
+  [--require-tagged-consumer-contract] [--json]
 rs9 project validate PROJECT [--destinations FILE]
 rs9 project intent PROJECT --destinations FILE --version RELEASE_VERSION
 rs9 adapter homebrew render --normalized FILE --payload-facts FILE \
@@ -133,13 +138,26 @@ rs9 instance register PUBLISHER_ROOT --id CONSUMER_ID \
   --project PROJECT --destinations FILE --destination DESTINATION_ID \
   --package PACKAGE_ID [--dry-run] [--expect-plan-sha256 SHA256]
 rs9 instance plan PUBLISHER_ROOT --consumer CONSUMER_ID \
-  --project PROJECT --destinations FILE --version RELEASE_VERSION
+  --project PROJECT --destinations FILE --version RELEASE_VERSION \
+  [--release-evidence CAPTURE] [--require-tagged-consumer-contract] [--json]
+rs9 instance prepare-homebrew PUBLISHER_ROOT --consumer CONSUMER_ID \
+  --project PROJECT --destinations FILE --version RELEASE_VERSION \
+  --release-evidence CAPTURE --output NEW_DIRECTORY
+rs9 instance apply-homebrew PUBLISHER_ROOT --consumer CONSUMER_ID \
+  --project PROJECT --destinations FILE --version RELEASE_VERSION \
+  --release-evidence CAPTURE --tap-root TAP_CHECKOUT \
+  --tap-repository OWNER/TAP --expect-formula-sha256 SHA256 \
+  [--expect-tap-target-sha256 SHA256] [--dry-run]
+rs9 instance inspect-homebrew PUBLISHER_ROOT --consumer CONSUMER_ID \
+  --project PROJECT --destinations FILE --version RELEASE_VERSION \
+  --release-evidence CAPTURE --branch TAP_BRANCH
 rs9 instance plan-upgrade PUBLISHER_ROOT --consumer CONSUMER_ID \
   --project PROJECT --destinations FILE --version RELEASE_VERSION --json > PLAN
 rs9 instance apply-upgrade PUBLISHER_ROOT --consumer CONSUMER_ID \
   --project PROJECT --destinations FILE --version RELEASE_VERSION \
   --plan PLAN [--dry-run]
 rs9 instance github doctor [--engine-wheel PATH]
+rs9 instance github doctor --publisher-root PUBLISHER_ROOT --engine-wheel PATH [--json]
 rs9 instance github plan PUBLISHER_ROOT --engine-wheel PATH --output PLAN
 rs9 instance github apply PUBLISHER_ROOT --plan PLAN --engine-wheel PATH \
   [--operation-id OPERATION_ID]
@@ -234,6 +252,81 @@ bindings and transaction before staging. Take a fresh review after changes
 or an interruption. Registration describes local intent. Remote state and
 publication authority require separate qualification.
 
+Use `--require-tagged-consumer-contract` with `release inspect` to capture
+or verify the release tag's exact `.rs9/project.toml`, `.rs9/releases.toml`,
+and `.rs9/homebrew.toml` files. Strict intake also recomputes the Git object
+ID for the complete closed `.rs9` directory from its listed blob entries and
+requires it to equal the directory object recorded in the captured tree.
+That recomputation checks the internal consistency of the captured
+GitHub tree listing. The tag and root tree identity come from the
+capture's GitHub observations.
+
+`instance plan` and the three Homebrew commands accept
+`--release-evidence CAPTURE`. Adding `--require-tagged-consumer-contract`
+compares the three captured blob digests with the matching local inputs.
+`instance plan --json` adds a `releaseEvidence` result when a capture is
+supplied. Other adapter inputs and instance destination configuration
+remain separate. Ordinary release inspection preserves archive-only
+verification for releases that predate the consumer contract.
+The installed release inspection runs on POSIX and accepts a `v`-prefixed
+`--tag`. The checkout verifier shown above accepts bare `--version`.
+
+`instance apply-homebrew` always requires tagged consumer input verification.
+It matches the declared destination and an explicitly reviewed formula digest
+before applying to the local checkout's existing `Formula/` directory. A
+missing formula is linked atomically from complete staged bytes. Identical
+bytes and mode give a no-op. Different bytes, unexpected modes, symlinks,
+and conflicting arrivals are refused. This operation creates no Git commit,
+contacts no remote, and does not confer publication authority.
+
+Use the same command with `--dry-run` to check the tagged input, reviewed
+formula, and local tap before applying changes. The result includes
+`dryRun: true` and reports `ready` when the destination is absent
+or `noop` when its bytes and mode already match. Drift and unsafe paths
+use the same refusals as apply. Apply repeats admission and file checks.
+When reviewing a local target, use `--dry-run --json` and pass its
+`tapTargetSha256` to apply as `--expect-tap-target-sha256`. This binds
+the tap repository label and the two reviewed local directories by device
+and inode. A different checkout or replaced `Formula/` directory requires
+a fresh review. The digest is a local filesystem binding. GitHub identity
+and publication remain governed by the separate remote commands.
+
+`instance inspect-homebrew` reruns local planning and release-evidence
+verification, renders the expected formula in memory, and reads the tap
+repository declared by the selected destination. The command compares the
+Git mode and exact formula bytes at a pinned branch commit. It rereads the
+branch and reports `unknown` if the branch or identity changed during the
+observation. Other results are `match`, `missing`, `drift`, and `unsafe`.
+Drift is a successful observation and does not authorize replacement.
+The result includes formula digests and the tagged-consumer-contract flag.
+It omits the remote file contents and claims no publication authority.
+
+### Review a forward update to an existing tap formula
+
+Start with a release tag that contains the consumer contract. RS9's
+historical `v0.1.0` tag predates that contract. Its archive evidence is
+useful for inspection, while a successor needs its own tagged evidence.
+Confirm that `instance plan` matches the registered consumer. Render the
+successor in a new directory with `instance prepare-homebrew` and the
+`--require-tagged-consumer-contract` option. Use the same evidence and
+strict option with `instance inspect-homebrew`.
+
+For an existing formula, use a fresh tap checkout at the exact observed
+commit. Confirm that its index is clean, the formula is a `100644` entry,
+and the index blob's SHA-256 matches `remote.sha256` in the observation.
+Confirm that the generated file's SHA-256 matches `desired.sha256` and
+review the diff, including version, archive URLs, hashes and native checks.
+An `unsafe` or `unknown` observation needs investigation before review.
+
+Apply the reviewed one-file patch to the isolated Git index with
+`git apply --cached --check` followed by `git apply --cached`. Verify that
+the staged formula matches the reviewed digest and mode and is the only
+staged path. The index operation leaves the worktree untouched. Recheck
+the remote branch before submitting the tap change. If the base changed,
+repeat the observation and review against the new base. A native check of
+the exact formula and its release archives is still required before
+enabling the forward publication lane.
+
 Publisher-root confinement for the instance lane uses POSIX descriptor-relative
 filesystem operations (`dir_fd`/`O_NOFOLLOW`) and is qualified only for that
 scope. No Windows instance-filesystem qualification is claimed by this CLI.
@@ -289,12 +382,17 @@ contract. It operates on an already-existing repository. It does not create a
 repository or bootstrap a branch; those behaviors belong only to the separate
 provisioning contract below.
 
-The GitHub family is opt-in by command name. Ordinary `rs9`, `doctor`,
-`project`, and local `instance` commands remain offline and auth-free.
-`instance github doctor` is also local-only: it reports whether `gh` is
-available and, when supplied, verifies an explicit engine wheel. It does not
-run `gh` or inspect authentication. Human mode reports completion only; use
-`--json` for the availability and engine-binding fields.
+Commands under `instance github`, `instance inspect-homebrew`, and
+`release inspect --capture` inspect GitHub. Local validation, planning,
+and `release inspect --evidence` can run offline without authentication.
+`instance github doctor` by default reports whether `gh` is available
+and optionally verifies the named engine wheel offline. Specify
+`--publisher-root` with `--engine-wheel` to read that publisher's
+configured GitHub branch through the existing read transport. The JSON
+result identifies the observed commit, managed-file comparisons and
+reason. An exact snapshot returns exit 0. Drift, missing files and an
+unknown remote state return exit 1. The observation produces no plan
+file, transaction journal, or publication authority.
 
 The `plan`, `apply`, and `resume` commands require `--engine-wheel PATH`. The
 wheel is opened as a bounded local archive and its raw SHA-256 is recorded;

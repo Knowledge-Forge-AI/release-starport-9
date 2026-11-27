@@ -31,6 +31,7 @@ MAX_CANONICAL_NODES = 1_000_000
 
 VARIANT_CLI = "cli-archive"
 VARIANT_TAURI = "tauri-desktop-archive"
+VARIANT_PYTHON_WHEEL = "python-wheel"
 VARIANTS = frozenset({VARIANT_CLI, VARIANT_TAURI})
 
 _SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
@@ -72,6 +73,49 @@ _CLI_TEMPLATE = """class @@CLASS@@ < Formula
   end
 end
 """
+
+_PYTHON_WHEEL_TEMPLATE = """class @@CLASS@@ < Formula
+  include Language::Python::Virtualenv
+
+  desc "@@DESC@@"
+  homepage "@@HOMEPAGE@@"
+  url "@@SOURCEURL@@"
+  version "@@VERSION@@"
+  sha256 "@@SOURCESHA@@"
+  license "@@LICENSE@@"
+
+  depends_on "python@3.14"
+
+  resource "cli-wheel" do
+    url "@@WHEELURL@@"
+    sha256 "@@WHEELSHA@@"
+  end
+
+  def install
+    ENV["PIP_NO_INDEX"] = "1"
+    wheel = buildpath/"@@WHEELNAME@@"
+    cp resource("cli-wheel").cached_download, wheel
+    virtualenv_create(libexec, "python3.14", system_site_packages: false)
+      .pip_install_and_link(wheel, build_isolation: false)
+    pkgshare.install "LICENSE", "NOTICE", "COMMERCIAL-LICENSE.md"
+  end
+
+  test do
+    assert_match "@@VERSION@@", shell_output("#{bin}/@@COMMAND@@ --version")
+    %w[LICENSE NOTICE COMMERCIAL-LICENSE.md].each do |file|
+      assert_predicate pkgshare/file, :file?
+    end
+  end
+end
+"""
+
+_RS9_PYTHON_WHEEL_TEMPLATE = _PYTHON_WHEEL_TEMPLATE.replace(
+    '    assert_match "@@VERSION@@", shell_output("#{bin}/@@COMMAND@@ --version")',
+    '    assert_equal "@@VERSION@@\\n", shell_output("#{bin}/@@COMMAND@@ --version")\n'
+    '    doctor = JSON.parse(shell_output("#{bin}/@@COMMAND@@ --json doctor"))\n'
+    '    assert_equal true, doctor.fetch("ok")\n'
+    '    assert_equal true, doctor.fetch("result").fetch("python").fetch("tomllib")',
+)
 
 _TAURI_TEMPLATE = """class @@CLASS@@ < Formula
   desc "CLI launcher for the Nebular Fusion desktop workbench"
@@ -520,6 +564,64 @@ def _render_text(template: str, values: Mapping[str, str]) -> bytes:
         return values[key]
 
     return _PLACEHOLDER.sub(replace, template).encode("utf-8")
+
+
+def render_python_wheel_formula(plan: Mapping[str, Any]) -> tuple[str, bytes, dict[str, str]]:
+    """Render the formula for an in-process plan with verified release evidence."""
+    from rs9.instance import record_sha256
+
+    intent = plan["normalizedIntent"]
+    binding = plan["releaseEvidence"]
+    receipt = binding["receipt"]
+    if (plan["inputs"]["normalized_sha256"] != record_sha256(intent)
+            or binding["normalizedSha256"] != plan["inputs"]["normalized_sha256"]):
+        _fail("HOMEBREW_RENDER_PROVENANCE")
+    _, _, repository, summary = _validate_project(intent)
+    license_expression = _validate_license(intent)
+    command, interface = _validate_commands(intent)
+    version = _version(intent["version"], field="$.version")
+    if (interface != "cli" or receipt["repository"] != repository or receipt["command"] != command
+            or receipt["version"] != version or receipt["license"] != license_expression
+            or receipt["requiresPython"] not in {">=3.11", ">=3.12", ">=3.13", ">=3.14"}
+            or "status" in intent["license"]):
+        _fail("HOMEBREW_RENDER_PYTHON_PROFILE")
+    if not any(check["argv"] == [command, "--version"] and check["expect-exit"] == 0
+               and check["requires-display"] is False and check.get("expect-stdout-contains") == version
+               for check in intent["checks"]):
+        _fail("HOMEBREW_RENDER_PYTHON_VERSION_CHECK")
+
+    target, = intent["targets"]
+    package = _slug(target["name"], field="$.targets[].name")
+    source, wheel = binding["assets"]
+    homepage = "https://github.com/" + repository
+    base = homepage + "/releases/download/v" + version + "/"
+    wheel_name = _text(wheel["name"], field="$.wheel.name", max_bytes=512)
+    values = {
+        "CLASS": _class_name(package),
+        "DESC": summary,
+        "HOMEPAGE": _url(homepage, field="$.project.repository"),
+        "SOURCEURL": _url(base + source["name"], field="$.sdist.url", expected_basename=source["name"]),
+        "SOURCESHA": _hash(source["sha256"], field="$.sdist.sha256"),
+        "WHEELURL": _url(base + wheel_name, field="$.wheel.url", expected_basename=wheel_name),
+        "WHEELSHA": _hash(wheel["sha256"], field="$.wheel.sha256"),
+        "WHEELNAME": wheel_name,
+        "VERSION": version,
+        "LICENSE": license_expression,
+        "COMMAND": command,
+    }
+    template_source = _PYTHON_WHEEL_TEMPLATE
+    template_id = "homebrew-python-wheel"
+    if (binding.get("taggedConsumerContractVerified") is True
+            and repository == "Knowledge-Forge-AI/release-starport-9"
+            and binding.get("distribution") == "release-starport-9" and command == "rs9"):
+        if not any(check["argv"] == [command, "doctor"] and check["expect-exit"] == 0
+                   and check["requires-display"] is False for check in intent["checks"]):
+            _fail("HOMEBREW_RENDER_RS9_DOCTOR_CHECK")
+        template_source = _RS9_PYTHON_WHEEL_TEMPLATE
+        template_id = "homebrew-python-wheel-rs9"
+    template = {"id": template_id, "version": TEMPLATE_VERSION,
+                "sha256": _sha256(template_source.encode("utf-8"))}
+    return f"Formula/{package}.rb", _render_text(template_source, values), template
 
 
 def render_homebrew_formula(normalized: Mapping[str, Any], payload: Mapping[str, Any], *, variant: str) -> dict[str, Any]:
