@@ -93,11 +93,9 @@ def parse_formula(content: str | bytes) -> Dict[str, Any]:
 
     # Referenced commands
     commands: Set[str] = set()
-    # (bin/"cmd").write
-    for m in re.finditer(r'\(bin/["\']([^"\']+)["\']\)\.write', text):
-        commands.add(m.group(1))
-    # bin/"cmd"
-    for m in re.finditer(r'bin/["\']([^"\']+)["\']', text):
+    # Match this formula's bin and sbin methods, not another formula's
+    # bin or opt_bin when it is used to invoke a dependency.
+    for m in re.finditer(r'(?<![\w.])(?:self\.)?s?bin/["\']([^"\']+)["\']', text):
         commands.add(m.group(1))
     # #{bin}/cmd
     for m in re.finditer(r'#\{bin\}/([a-zA-Z0-9_-]+)', text):
