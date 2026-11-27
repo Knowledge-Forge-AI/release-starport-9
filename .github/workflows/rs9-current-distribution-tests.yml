@@ -168,7 +168,12 @@ jobs:
         with:
           node-version: '22'
       - name: Provision hosted repository tools
-        run: sudo apt-get update && sudo apt-get install -y gnupg rpm createrepo-c libarchive-tools zstd xz-utils
+        run: |
+          ubuntu_sources=/etc/apt/sources.list.d/ubuntu.sources
+          apt_sources=(-o "Dir::Etc::sourcelist=$ubuntu_sources" -o "Dir::Etc::sourceparts=-")
+          test -s "$ubuntu_sources" &&
+            sudo apt-get "${apt_sources[@]}" update &&
+            sudo apt-get "${apt_sources[@]}" install -y gnupg rpm createrepo-c libarchive-tools zstd xz-utils
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         continue-on-error: true
         with:
@@ -243,7 +248,12 @@ jobs:
         with:
           node-version: '22'
       - name: Provision hosted repository tools
-        run: sudo apt-get update && sudo apt-get install -y gnupg rpm createrepo-c libarchive-tools zstd xz-utils
+        run: |
+          ubuntu_sources=/etc/apt/sources.list.d/ubuntu.sources
+          apt_sources=(-o "Dir::Etc::sourcelist=$ubuntu_sources" -o "Dir::Etc::sourceparts=-")
+          test -s "$ubuntu_sources" &&
+            sudo apt-get "${apt_sources[@]}" update &&
+            sudo apt-get "${apt_sources[@]}" install -y gnupg rpm createrepo-c libarchive-tools zstd xz-utils
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         continue-on-error: true
         with:
