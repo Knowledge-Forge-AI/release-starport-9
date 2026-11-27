@@ -9,6 +9,7 @@ from unittest.mock import patch
 from rs9 import archarm_sdk
 from rs9._archarm_support import successor_20261120 as successor
 from rs9._archarm_support import successor_20261126 as graphics
+from rs9._archarm_support import successor_20261127 as libcups
 from rs9._archarm_support.refusal import SdkRefusal
 from rs9._archarm_support.scripts import render_install_script
 
@@ -44,6 +45,20 @@ class OpenSSLTransitionTest(unittest.TestCase):
         with patch.object(graphics, "load_successor_pins", return_value=previous):
             with self.assertRaisesRegex(SdkRefusal, "PIN_FILE"):
                 archarm_sdk._real_seams(graphics.PROFILE).pins_loader()
+
+    def test_libcups_profile_requires_the_exact_single_package_delta(self):
+        previous = archarm_sdk._real_seams(graphics.PROFILE).pins_loader()
+        current = archarm_sdk._real_seams(libcups.PROFILE).pins_loader()
+        old = {row["name"]: row for row in previous.packages}
+        new = {row["name"]: row for row in current.packages}
+        self.assertEqual(old.keys(), new.keys())
+        self.assertEqual({name for name in old if old[name] != new[name]}, {"libcups"})
+        self.assertEqual(new["libcups"]["version"], "2:2.4.20-2")
+        self.assertEqual(current.digests["packagePinsSha256"], libcups.PACKAGE_PINS_SHA256)
+        self.assertEqual(sum(row["bytes"] for row in current.packages), 210849968)
+        with patch.object(libcups, "load_successor_pins", return_value=previous):
+            with self.assertRaisesRegex(SdkRefusal, "PIN_FILE"):
+                archarm_sdk._real_seams(libcups.PROFILE).pins_loader()
 
     def test_inventory_proves_exact_transition(self):
         script = render_install_script(count=141, uid=1001, gid=118, openssl_transition=True)

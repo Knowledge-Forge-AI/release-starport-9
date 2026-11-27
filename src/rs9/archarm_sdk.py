@@ -59,6 +59,7 @@ from rs9.current_generation import CURRENT_GENERATION
 from rs9._archarm_support import paths as _paths
 from rs9._archarm_support import successor_20261120 as _openssl
 from rs9._archarm_support import successor_20261126 as _graphics
+from rs9._archarm_support import successor_20261127 as _libcups
 from rs9._archarm_support.cleanup import (Layout, Record, cleanup_container, cleanup_image,
                                           remove_fresh_docker_home, remove_workspace)
 from rs9._archarm_support.docker import (FIXED_ENV, HEX64_RE, IMAGE_ID_RE, DockerCli,
@@ -142,7 +143,9 @@ PACMAN_KEY_DENIED = frozenset({"--recv-keys", "--refresh-keys", "--keyserver", "
                                "--export", "--edit-key"})
 
 _TOKEN = object()
-_TRANSITION_PROFILES = {_openssl.PROFILE: _openssl, _graphics.PROFILE: _graphics}
+_TRANSITION_PROFILES = {
+    _openssl.PROFILE: _openssl, _graphics.PROFILE: _graphics, _libcups.PROFILE: _libcups,
+}
 _TRANSITION_PIN_DIGESTS = frozenset(
     profile.PACKAGE_PINS_SHA256 for profile in _TRANSITION_PROFILES.values()
 )

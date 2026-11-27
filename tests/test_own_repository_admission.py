@@ -902,6 +902,7 @@ class QualifiedFixture(SourceFixtures):
         pins=self.rs/'src/rs9/_archarm_support/pins'
         for name in ('ROOTFS-PIN.json', 'PACKAGE-PINS.json', 'PACKAGE-PINS-successor-20261109.json',
                      'PACKAGE-PINS-successor-20261120.json', 'PACKAGE-PINS-successor-20261126.json',
+                     'PACKAGE-PINS-successor-20261127.json',
                      'archlinuxarm-builder-public.gpg'):
             with self.subTest(pin=name):
                 path=pins/name;original=path.read_bytes();path.write_bytes(original+b'\n')
