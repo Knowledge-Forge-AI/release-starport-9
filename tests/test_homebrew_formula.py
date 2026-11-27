@@ -139,6 +139,31 @@ class HomebrewFormulaParserTests(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(any("restriction" in r for r in reasons))
 
+    def test_dependency_executable_is_not_a_formula_command(self):
+        fixture = FIXTURES / "Formula/theme-forge-stellar-loom.rb"
+        source = fixture.read_text()
+        expected = {"commands": ["tfsl", "tfsl-batch"]}
+        self.assertEqual(source.count("  test do\n"), 1)
+        for directory in ("opt_bin", "bin", "opt_sbin", "sbin"):
+            with self.subTest(directory=directory):
+                probe = f'  test do\n    system Formula["node"].{directory}/"node", "--version"\n'
+                with_probe = source.replace("  test do\n", probe)
+                self.assertEqual(compare_formula_identity(parse_formula(with_probe), expected), (True, []))
+
+    def test_extra_formula_bin_and_sbin_commands_remain_conflicts(self):
+        fixture = FIXTURES / "Formula/theme-forge-stellar-loom.rb"
+        source = fixture.read_text()
+        expected = {"commands": ["tfsl", "tfsl-batch"]}
+        self.assertEqual(source.count("  def install\n"), 1)
+        for directory in ("bin", "sbin", "self.bin", "self.sbin"):
+            with self.subTest(directory=directory):
+                install = f'  def install\n    ({directory}/"node").write "local executable"\n'
+                updated = source.replace("  def install\n", install)
+                self.assertIn("node", parse_formula(updated)["referenced_commands"])
+                exact, reasons = compare_formula_identity(parse_formula(updated), expected)
+                self.assertFalse(exact)
+                self.assertTrue(any("formula commands" in reason for reason in reasons))
+
     def test_schema_violations_fail_closed(self):
         bad_cases = [
             ("missing-class", 'url "https://example.com/pkg.tgz"\nsha256 "' + "a" * 64 + '"\nlicense "MIT"\n'),
