@@ -122,6 +122,9 @@ through the installed CLI.
 ```text
 rs9 --version
 rs9 doctor
+rs9 release inspect OWNER/REPO --tag TAG --distribution DISTRIBUTION \
+  --command ENTRY_COMMAND (--evidence DIRECTORY | --capture DIRECTORY) \
+  [--require-tagged-consumer-contract] [--json]
 rs9 project validate PROJECT [--destinations FILE]
 rs9 project intent PROJECT --destinations FILE --version RELEASE_VERSION
 rs9 adapter homebrew render --normalized FILE --payload-facts FILE \
@@ -135,7 +138,8 @@ rs9 instance register PUBLISHER_ROOT --id CONSUMER_ID \
   --project PROJECT --destinations FILE --destination DESTINATION_ID \
   --package PACKAGE_ID [--dry-run] [--expect-plan-sha256 SHA256]
 rs9 instance plan PUBLISHER_ROOT --consumer CONSUMER_ID \
-  --project PROJECT --destinations FILE --version RELEASE_VERSION
+  --project PROJECT --destinations FILE --version RELEASE_VERSION \
+  [--release-evidence CAPTURE] [--require-tagged-consumer-contract] [--json]
 rs9 instance prepare-homebrew PUBLISHER_ROOT --consumer CONSUMER_ID \
   --project PROJECT --destinations FILE --version RELEASE_VERSION \
   --release-evidence CAPTURE --output NEW_DIRECTORY
@@ -253,12 +257,19 @@ or verify the release tag's exact `.rs9/project.toml`, `.rs9/releases.toml`,
 and `.rs9/homebrew.toml` files. Strict intake also recomputes the Git object
 ID for the complete closed `.rs9` directory from its listed blob entries and
 requires it to equal the directory object recorded in the captured tree.
-The option is also available on the three
-Homebrew instance commands that consume `--release-evidence`. Those commands
-compare the three captured blob digests against the freshly normalized local
-inputs. Other adapter inputs and instance destination configuration remain
-separate. Ordinary release inspection preserves archive-only verification
-for releases that predate the consumer contract.
+That recomputation checks the internal consistency of the captured
+GitHub tree listing. The tag and root tree identity come from the
+capture's GitHub observations.
+
+`instance plan` and the three Homebrew commands accept
+`--release-evidence CAPTURE`. Adding `--require-tagged-consumer-contract`
+compares the three captured blob digests with the matching local inputs.
+`instance plan --json` adds a `releaseEvidence` result when a capture is
+supplied. Other adapter inputs and instance destination configuration
+remain separate. Ordinary release inspection preserves archive-only
+verification for releases that predate the consumer contract.
+The installed release inspection runs on POSIX and accepts a `v`-prefixed
+`--tag`. The checkout verifier shown above accepts bare `--version`.
 
 `instance apply-homebrew` always requires tagged consumer input verification.
 It matches the declared destination and an explicitly reviewed formula digest
@@ -371,8 +382,9 @@ contract. It operates on an already-existing repository. It does not create a
 repository or bootstrap a branch; those behaviors belong only to the separate
 provisioning contract below.
 
-The GitHub family is opt-in by command name. Ordinary `rs9`, `doctor`,
-`project`, and local `instance` commands remain offline and auth-free.
+Commands under `instance github`, `instance inspect-homebrew`, and
+`release inspect --capture` inspect GitHub. Local validation, planning,
+and `release inspect --evidence` can run offline without authentication.
 `instance github doctor` by default reports whether `gh` is available
 and optionally verifies the named engine wheel offline. Specify
 `--publisher-root` with `--engine-wheel` to read that publisher's
